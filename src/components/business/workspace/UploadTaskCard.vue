@@ -18,41 +18,52 @@ defineProps<{
   >
     <NCard
       :bordered="false"
-      style="border: 0"
-      class="border border-white/10 bg-white/[0.06] shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+      class="border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_18px_60px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+      content-class="!p-0"
     >
       <template #header>
         <div>
-          <h1 class="text-2xl font-black text-white">{{ capability.title }}</h1>
-          <p class="mt-2 text-base font-semibold leading-7 text-slate-400">
+          <h1 class="text-2xl font-black text-[var(--app-text)]">
+            {{ capability.title }}
+          </h1>
+          <p
+            class="mt-2 text-base font-semibold leading-7 text-[var(--app-text-soft)]"
+          >
             {{ capability.description }}
           </p>
         </div>
       </template>
 
-      <NUpload :show-file-list="false" :accept="capability.accept">
-        <NUploadDragger
-          class="!rounded-2xl !border-dashed !border-white/15 !bg-[#101621]/70 !py-10"
-        >
-          <div class="flex flex-col items-center text-center">
-            <span class="text-4xl">📷</span>
-            <strong class="mt-4 text-xl text-white">{{
-              capability.uploadTitle
-            }}</strong>
-            <span class="mt-2 text-sm font-semibold text-slate-400">
-              {{ capability.uploadHint }}
-            </span>
-            <NTag :bordered="false" round size="small" class="mt-4">
-              {{ capability.requiredLabel }}
-            </NTag>
-          </div>
-        </NUploadDragger>
-      </NUpload>
+      <div class="Upload">
+        <NUpload :show-file-list="false" :accept="capability.accept">
+          <NUploadDragger
+            class="!rounded-2xl !border-dashed !border-[var(--app-border)] !bg-[var(--app-surface-soft)] !py-10"
+          >
+            <div class="flex flex-col items-center text-center">
+              <span class="text-4xl">📷</span>
+              <strong class="mt-4 text-xl text-[var(--app-text)]">
+                {{ capability.uploadTitle }}
+              </strong>
+              <span
+                class="mt-2 text-sm font-semibold text-[var(--app-text-soft)]"
+              >
+                {{ capability.uploadHint }}
+              </span>
+              <NTag :bordered="false" round size="small" class="mt-4">
+                {{ capability.requiredLabel }}
+              </NTag>
+            </div>
+          </NUploadDragger>
+        </NUpload>
+      </div>
     </NCard>
   </motion.div>
 </template>
 <style scoped>
 .n-card {
-  background: #0a0d13;
+  border-radius: 12px;
+}
+.Upload {
+  margin: 24px;
 }
 </style>

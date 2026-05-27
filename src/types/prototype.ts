@@ -1,6 +1,7 @@
 export interface NavItem {
   path: string
   label: string
+  icon?: string
 }
 
 export interface HeroMetric {

@@ -5,7 +5,7 @@ import HomeWorkflow from '@/components/business/home/HomeWorkflow.vue'
 </script>
 
 <template>
-  <main class="min-h-[calc(100vh-74px)] bg-[#080a10]">
+  <main class="min-h-[calc(100vh-var(--app-header-offset))] overflow-x-hidden bg-[var(--app-bg)]">
     <HomeHero />
     <HomeFeatureGrid />
     <HomeWorkflow />

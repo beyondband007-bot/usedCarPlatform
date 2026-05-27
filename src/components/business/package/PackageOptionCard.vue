@@ -22,7 +22,7 @@ defineProps<{
       :class="item.active ? 'border-amber-300/70 shadow-[0_0_38px_rgba(214,179,111,0.2)]' : 'border-white/10'"
     >
       <NTag v-if="item.active" type="warning" round :bordered="false" class="absolute right-5 top-5">
-        推荐
+        鎺ㄨ崘
       </NTag>
       <strong class="text-3xl font-black text-white">{{ item.price }}</strong>
       <p class="mt-2 text-lg font-bold text-slate-400">{{ item.description }}</p>

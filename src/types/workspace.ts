@@ -1,4 +1,5 @@
 export type WorkspaceCapabilityKind = 'scene' | 'beauty' | 'interior' | 'batch' | 'delivery' | 'future'
+export type WorkspaceCapabilityBlock = 'selector' | 'scene-settings' | 'actions'
 
 export type WorkspaceTagType = 'default' | 'success' | 'warning' | 'info'
 
@@ -40,6 +41,7 @@ export interface WorkspaceCapability {
   requiredLabel: string
   selectorTitle?: string
   selectorTag?: string
+  middleBlocks?: WorkspaceCapabilityBlock[]
   options: WorkspaceOption[]
   tutorial: WorkspaceTutorialStep[]
   recent: WorkspaceRecentItem[]

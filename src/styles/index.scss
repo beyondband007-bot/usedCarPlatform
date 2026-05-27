@@ -1,0 +1,88 @@
+@use "sass:map";
+
+$theme-vars: (
+  light: (
+    app-bg: #f3f5f8,
+    app-surface: #ffffff,
+    app-surface-soft: #eef2f7,
+    app-border: rgba(15, 23, 42, 0.12),
+    app-text: #0f172a,
+    app-text-soft: #475569,
+    app-header-bg: #ffffff,
+    app-header-shadow: 0 4px 24px rgba(15, 23, 42, 0.08),
+    app-header-nav: #4b5563,
+    app-header-nav-active-bg: #fff7ed,
+    app-header-nav-active: #f97316,
+    app-header-brand-sub: #6b7280,
+    app-header-chip-bg: #f3f4f6,
+    app-header-chip-text: #374151,
+    app-header-credits-bg: #fff7ed,
+    app-header-credits-text: #374151,
+    app-header-user: #374151,
+  ),
+  dark: (
+    app-bg: #080a10,
+    app-surface: #11131b,
+    app-surface-soft: #0d1018,
+    app-border: rgba(255, 255, 255, 0.1),
+    app-text: #f8fafc,
+    app-text-soft: #94a3b8,
+    app-header-bg: #111827,
+    app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.35),
+    app-header-nav: #9ca3af,
+    app-header-nav-active-bg: #1f2937,
+    app-header-nav-active: #f97316,
+    app-header-brand-sub: #9ca3af,
+    app-header-chip-bg: #1f2937,
+    app-header-chip-text: #d1d5db,
+    app-header-credits-bg: #292524,
+    app-header-credits-text: #fbbf24,
+    app-header-user: #f9fafb,
+  ),
+);
+
+@mixin apply-theme-vars($mode) {
+  $vars: map.get($theme-vars, $mode);
+  --app-bg: #{map.get($vars, app-bg)};
+  --app-surface: #{map.get($vars, app-surface)};
+  --app-surface-soft: #{map.get($vars, app-surface-soft)};
+  --app-border: #{map.get($vars, app-border)};
+  --app-text: #{map.get($vars, app-text)};
+  --app-text-soft: #{map.get($vars, app-text-soft)};
+  --app-header-bg: #{map.get($vars, app-header-bg)};
+  --app-header-shadow: #{map.get($vars, app-header-shadow)};
+  --app-header-nav: #{map.get($vars, app-header-nav)};
+  --app-header-nav-active-bg: #{map.get($vars, app-header-nav-active-bg)};
+  --app-header-nav-active: #{map.get($vars, app-header-nav-active)};
+  --app-header-brand-sub: #{map.get($vars, app-header-brand-sub)};
+  --app-header-chip-bg: #{map.get($vars, app-header-chip-bg)};
+  --app-header-chip-text: #{map.get($vars, app-header-chip-text)};
+  --app-header-credits-bg: #{map.get($vars, app-header-credits-bg)};
+  --app-header-credits-text: #{map.get($vars, app-header-credits-text)};
+  --app-header-user: #{map.get($vars, app-header-user)};
+  --app-header-offset: 5.5rem;
+}
+
+:root {
+  color-scheme: dark;
+  @include apply-theme-vars(dark);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  @include apply-theme-vars(light);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  @include apply-theme-vars(dark);
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  overflow-x: hidden;
+  background: var(--app-bg);
+  color: var(--app-text);
+}

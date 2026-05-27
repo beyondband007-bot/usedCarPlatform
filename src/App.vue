@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import {
   darkTheme,
   NConfigProvider,
@@ -8,38 +9,85 @@ import {
   type GlobalThemeOverrides,
 } from "naive-ui";
 
-const themeOverrides: GlobalThemeOverrides = {
-  common: {
-    borderRadius: "12px",
-    borderRadiusSmall: "10px",
-    primaryColor: "#d6b36f",
-    primaryColorHover: "#e4c782",
-    primaryColorPressed: "#b68a3e",
-    bodyColor: "#090b11",
-    cardColor: "rgba(18, 22, 32, 0.72)",
-    modalColor: "rgba(18, 22, 32, 0.92)",
-    popoverColor: "rgba(18, 22, 32, 0.92)",
-    textColorBase: "#f7f7f8",
-  },
-  Card: {
-    borderRadius: "0px",
-  },
-  Button: {
-    borderRadiusMedium: "12px",
-    borderRadiusLarge: "12px",
-  },
-  Input: {
-    borderRadius: "14px",
-  },
-};
+import { useAppStore } from "@/stores/app";
+
+const appStore = useAppStore();
+const activeTheme = computed(() => (appStore.isDarkMode ? darkTheme : null));
+
+const themeOverrides = computed<GlobalThemeOverrides>(() =>
+  appStore.isDarkMode
+    ? {
+        // 夜间模式整体样式
+
+        // 通用效果，谨慎设置，影响全局
+        common: {
+          borderRadiusSmall: "10px",
+          primaryColor: "#d6b36f",
+          primaryColorHover: "#e4c782",
+          primaryColorPressed: "#b68a3e",
+          bodyColor: "#080a10",
+          cardColor: "#11131b",
+          modalColor: "#11131b",
+          popoverColor: "#11131b",
+          textColorBase: "#f8fafc",
+        },
+        // 卡片
+        Card: {
+          borderRadius: "0px",
+        },
+        // 按钮
+        Button: {
+          borderRadiusMedium: "12px",
+          borderRadiusLarge: "12px",
+        },
+        // 输入框
+        Input: {
+          borderRadius: "4px",
+        },
+      }
+    : {
+        // 日间模式整体样式
+
+        // 通用效果，谨慎设置，影响全局
+        common: {
+          borderRadiusSmall: "10px",
+          primaryColor: "#d6b36f",
+          primaryColorHover: "#e4c782",
+          primaryColorPressed: "#b68a3e",
+          bodyColor: "#f3f5f8",
+          cardColor: "#ffffff",
+          modalColor: "#ffffff",
+          popoverColor: "#ffffff",
+          textColorBase: "#0f172a",
+        },
+        // 卡片
+        Card: {
+          borderRadius: "0px",
+        },
+        // 按钮
+        Button: {
+          borderRadiusMedium: "12px",
+          borderRadiusLarge: "12px",
+        },
+        // 输入框
+        Input: {
+          borderRadius: "4px",
+        },
+      },
+);
 </script>
 
 <template>
-  <NConfigProvider :theme="darkTheme" :theme-overrides="themeOverrides">
+  <NConfigProvider :theme="activeTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
       <NDialogProvider>
         <NNotificationProvider>
-          <RouterView />
+          <div
+            :data-theme="appStore.isDarkMode ? 'dark' : 'light'"
+            class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]"
+          >
+            <RouterView />
+          </div>
         </NNotificationProvider>
       </NDialogProvider>
     </NMessageProvider>

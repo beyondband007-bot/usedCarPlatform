@@ -7,13 +7,13 @@ import type {
 } from '@/types/prototype'
 
 export const topNavigation: NavItem[] = [
-  { path: '/home', label: '首页' },
-  { path: '/pricing', label: '企业套餐' },
-  { path: '/workspace', label: '视觉工作台' },
-  { path: '/credits', label: '积分查询' },
-  { path: '/enterprise', label: '企业账号登录' },
-  { path: '/package-points', label: '套餐/积分' },
-  { path: '/visitor-layer', label: '访客浮层' },
+  { path: '/home', label: '首页', icon: 'mdi:home-outline' },
+  { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
+  { path: '/workspace', label: '视觉工作台', icon: 'mdi:palette-outline' },
+  { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
+  { path: '/enterprise', label: '企业账号登录', icon: 'mdi:account-key-outline' },
+  { path: '/package-points', label: '套餐/积分', icon: 'mdi:package-variant-closed' },
+  { path: '/visitor-layer', label: '访客浮层', icon: 'mdi:account-group-outline' },
 ]
 
 export const secondaryNavigation: NavItem[] = [
@@ -117,3 +117,19 @@ export const packageOptions: PackageOption[] = [
     action: '预约演示',
   },
 ]
+
+export const pricingPageMetrics = [
+  { label: '账号并发', value: '1 - 20', desc: '按套餐支持同时使用账号数' },
+  { label: '积分到账', value: '200 - 9,800', desc: '购买后立即到账，可用于各项功能' },
+  { label: '专属场景', value: '可定制', desc: '按需配置专属场景，满足业务需求' },
+] as const
+
+export const pricingPageCopy = {
+  title: '企业套餐',
+  subtitle: '面向汽车电商与出海车商，按账号、积分、外观图组并发和专属场景配置团队产能',
+  tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
+  unit: '/ 套餐',
+  recommended: '推荐',
+  footer: '所有套餐积分自购买之日起 12 个月内有效，过期未使用积分将自动清零。',
+  footerAction: '查看套餐说明',
+} as const

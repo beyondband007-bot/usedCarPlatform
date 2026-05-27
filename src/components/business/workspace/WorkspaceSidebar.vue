@@ -17,7 +17,6 @@ const emit = defineEmits<{
     :bordered="false"
     class="h-full border-r border-white/10 bg-[#0d1018]/90 shadow-none backdrop-blur-xl"
     content-class="!p-4"
-    style="border: 0 !important"
   >
     <div class="flex h-full flex-col gap-6 overflow-y-auto">
       <section

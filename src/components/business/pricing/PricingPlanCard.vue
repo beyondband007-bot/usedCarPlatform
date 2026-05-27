@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { NButton, NCard, NTag } from 'naive-ui'
-import { motion } from 'motion-v'
+import { NButton, NCard, NTag } from "naive-ui";
+import { motion } from "motion-v";
 
-import type { PricingPlan } from '@/types/prototype'
+import type { PricingPlan } from "@/types/prototype";
 
 defineProps<{
-  plan: PricingPlan
-  index: number
-}>()
+  plan: PricingPlan;
+  index: number;
+}>();
 </script>
 
 <template>
@@ -16,39 +16,54 @@ defineProps<{
     :animate="{ opacity: 1, y: 0 }"
     :transition="{ duration: 0.42, delay: index * 0.08 }"
     :while-hover="{ y: -6 }"
-    class="h-full"
+    class="h-full min-w-0"
   >
     <NCard
       :bordered="false"
-      class="relative h-full min-h-[520px] border bg-white/[0.06] shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+      class="h-full border bg-[#10141d] shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
       :class="plan.featured ? 'border-amber-300/70' : 'border-white/10'"
+      content-class="!p-0"
     >
-      <NTag
-        v-if="plan.badge"
-        type="warning"
-        round
-        :bordered="false"
-        class="absolute right-8 top-8"
-      >
-        {{ plan.badge }}
-      </NTag>
+      <div class="flex h-full min-h-[360px] flex-col px-6 py-6 xl:px-7 xl:py-7">
+        <div class="mb-5 flex min-h-7 items-start justify-between gap-4">
+          <h2
+            class="text-2xl font-black tracking-normal text-white xl:text-3xl"
+          >
+            {{ plan.name }}
+          </h2>
+          <NTag v-if="plan.badge" type="warning" round :bordered="false">
+            {{ plan.badge }}
+          </NTag>
+        </div>
 
-      <h2 class="text-3xl font-black text-white">{{ plan.name }}</h2>
-      <p class="mt-9 text-5xl font-black text-white">
-        {{ plan.price }}
-        <span class="text-lg font-bold text-slate-400">/ 套餐</span>
-      </p>
+        <p
+          class="flex items-end gap-2 text-4xl font-black tracking-normal text-white xl:text-5xl"
+        >
+          {{ plan.price }}
+          <span class="pb-1 text-base font-bold text-slate-400 xl:text-lg"
+            >/ 套餐</span
+          >
+        </p>
 
-      <ul class="mt-8 grid gap-4 text-lg font-semibold text-slate-300">
-        <li v-for="benefit in plan.benefits" :key="benefit" class="flex gap-3">
-          <span class="text-emerald-300">✓</span>
-          <span>{{ benefit }}</span>
-        </li>
-      </ul>
+        <ul
+          class="mt-7 grid gap-3 text-sm font-semibold leading-6 text-slate-300 xl:text-base"
+        >
+          <li
+            v-for="benefit in plan.benefits"
+            :key="benefit"
+            class="flex gap-2"
+          >
+            <span class="mt-1 shrink-0 text-emerald-300">✓</span>
+            <span class="min-w-0 flex-1">{{ benefit }}</span>
+          </li>
+        </ul>
 
-      <NButton type="warning" size="large" block class="absolute bottom-8 left-8 right-8 !w-auto !rounded-xl">
-        {{ plan.action }}
-      </NButton>
+        <div class="mt-auto pt-6">
+          <NButton type="warning" size="large" block class="!rounded-xl">
+            {{ plan.action }}
+          </NButton>
+        </div>
+      </div>
     </NCard>
   </motion.div>
 </template>
