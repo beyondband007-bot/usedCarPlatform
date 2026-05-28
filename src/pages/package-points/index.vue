@@ -563,10 +563,12 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .plan-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  --plan-gap: clamp(18px, 1.8vw, 28px);
+
+  display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
-  gap: clamp(18px, 1.8vw, 28px);
+  gap: var(--plan-gap);
   margin-top: 18px;
 }
 
@@ -576,12 +578,15 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   contain: layout paint;
   display: flex;
   flex-direction: column;
+  flex: 1 1 calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
   min-width: 0;
   width: 100%;
+  max-width: calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
+  aspect-ratio: 3 / 4;
   max-width: 100%;
-  height: clamp(292px, 16.4vw, 334px);
-  min-height: 292px;
-  max-height: 334px;
+  height: auto;
+  min-height: 0;
+  max-height: none;
   overflow: hidden;
   padding: clamp(18px, 1.4vw, 22px) clamp(18px, 1.5vw, 24px) 18px;
   border: 1px solid var(--recharge-border-soft);
