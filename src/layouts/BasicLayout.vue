@@ -24,12 +24,15 @@ const {
 
 <template>
   <div
-    class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]"
+    class="app-layout bg-[var(--app-bg)] text-[var(--app-text)]"
+    :class="{ 'app-layout--auth': showSubNav }"
     :data-subnav="showSubNav ? 'true' : undefined"
   >
     <AppHeader />
     <AppSubNav v-if="showSubNav" />
-    <RouterView />
+    <div class="app-layout-main">
+      <RouterView />
+    </div>
     <VisitorWorkbenchModal
       v-model:show="visitorModalVisible"
       @login="goToAuth"
@@ -37,3 +40,33 @@ const {
     />
   </div>
 </template>
+
+<style scoped lang="scss">
+.app-layout {
+  min-height: 100dvh;
+}
+
+.app-layout--auth {
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-layout-main {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-layout:not(.app-layout--auth) .app-layout-main {
+  flex: none;
+  overflow: visible;
+}
+</style>

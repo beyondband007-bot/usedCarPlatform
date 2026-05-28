@@ -67,12 +67,21 @@ export interface WorkspaceCapability {
   actionLabel: string
 }
 
+export type WorkspaceMenuTagVariant =
+  | 'available'
+  | 'demo'
+  | 'package'
+  | 'planned'
+  | 'beta'
+
 export interface WorkspaceMenuItem {
   code: string
   icon: string
   label: string
   tag: string
-  tagType: WorkspaceTagType
+  tagType?: WorkspaceTagType
+  tagVariant?: WorkspaceMenuTagVariant
+  disabled?: boolean
 }
 
 export interface WorkspaceMenuGroup {

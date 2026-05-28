@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NTag } from "naive-ui";
 import { motion } from "motion-v";
 
 import type { WorkspaceCapability } from "@/types/workspace";
@@ -40,9 +39,6 @@ const optionRows = computed(() => {
     >
       <header class="option-selector-head">
         <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
-        <NTag type="info" :bordered="false" round size="small">
-          {{ capability.selectorTag }}
-        </NTag>
       </header>
 
       <div class="option-scroll-shell">

@@ -12,8 +12,11 @@ import type {
 } from "@/types/workspace";
 
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
+import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
+import { paintColorOptions } from "@/constants/paint-colors";
+import { downloadDeliveryTasks } from "@/utils/delivery-download";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
@@ -64,6 +67,11 @@ const projectName = ref("5月展厅批量上新");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const isApplyingTemplate = ref(false);
+const selectedPaintColorId = ref(paintColorOptions[0]?.id ?? "");
+
+const showPaintColorPicker = computed(
+  () => props.capability.code === "paint-refresh",
+);
 
 const outputRatioOptions = [
   { label: "1:1 主图", value: "1:1" },
@@ -212,6 +220,14 @@ const batchScenes = [
     title: "柔光顶灯",
     image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=520&q=80",
   },
+  {
+    title: "城市夜景",
+    image: "https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=520&q=80",
+  },
+  {
+    title: "林荫户外",
+    image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=520&q=80",
+  },
 ];
 
 type DeliveryTask = {
@@ -256,11 +272,43 @@ const deliveryTasks = ref<DeliveryTask[]>([
     progress: 62,
     imageCount: 0,
   },
+  {
+    title: "奔驰 E级 · 夜景街道",
+    meta: "14 张成片 · 2026-05-18 16:02",
+    image: "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=180&q=80",
+    selected: false,
+    progress: 100,
+    imageCount: 14,
+  },
+  {
+    title: "奥迪 A6 · 纯白影棚",
+    meta: "9 张成片 · 2026-05-17 11:26",
+    image: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=180&q=80",
+    selected: false,
+    progress: 100,
+    imageCount: 9,
+  },
+  {
+    title: "蔚来 ET5 · 户外林荫",
+    meta: "11 张成片 · 2026-05-16 20:41",
+    image: "https://images.unsplash.com/photo-1617814076665-65e6f9995f35?auto=format&fit=crop&w=180&q=80",
+    selected: false,
+    progress: 100,
+    imageCount: 11,
+  },
 ]);
 
 const deliverySelectedCount = computed(
   () => deliveryTasks.value.filter((task) => task.selected).length,
 );
+
+const deliveryDownloadableCount = computed(
+  () =>
+    deliveryTasks.value.filter((task) => task.selected && task.progress >= 100)
+      .length,
+);
+
+const isDeliveryBatchDownloading = ref(false);
 
 const deliverySelectedImages = computed(() =>
   deliveryTasks.value
@@ -287,6 +335,26 @@ function toggleSelectAllDelivery() {
   });
 }
 
+async function handleDeliveryBatchDownload() {
+  const selectedTasks = deliveryTasks.value.filter(
+    (task) => task.selected && task.progress >= 100,
+  );
+
+  if (!selectedTasks.length) {
+    message.warning("请先勾选已完成的任务");
+    return;
+  }
+
+  isDeliveryBatchDownloading.value = true;
+
+  try {
+    const count = await downloadDeliveryTasks(selectedTasks);
+    message.success(`已开始下载 ${count} 张成片`);
+  } finally {
+    isDeliveryBatchDownloading.value = false;
+  }
+}
+
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
@@ -301,30 +369,38 @@ const activeCreateRatioLabel = computed(() => {
 </script>
 
 <template>
-  <div class="generate-panel">
+  <div
+    class="generate-panel"
+    :class="{
+      'is-batch': props.capability.kind === 'batch',
+      'is-delivery': props.capability.kind === 'delivery',
+    }"
+  >
     <template v-if="props.capability.kind === 'batch'">
-      <div class="batch-tabs">
-        <button
-          type="button"
-          :class="{ active: batchTab === 'create' }"
-          @click="batchTab = 'create'"
-        >
-          新建任务
-        </button>
-        <button
-          type="button"
-          :class="{ active: batchTab === 'visual' }"
-          @click="batchTab = 'visual'"
-        >
-          视觉处理配置
-        </button>
-      </div>
+      <div class="batch-panel">
+        <div class="batch-tabs">
+          <button
+            type="button"
+            :class="{ active: batchTab === 'create' }"
+            @click="batchTab = 'create'"
+          >
+            新建任务
+          </button>
+          <button
+            type="button"
+            :class="{ active: batchTab === 'visual' }"
+            @click="batchTab = 'visual'"
+          >
+            视觉处理配置
+          </button>
+        </div>
 
-      <section class="batch-card batch-notice">
-        当前套餐：企业团队档 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传 3 套。单张生成仍可正常使用。
-      </section>
+        <section class="batch-card batch-notice">
+          当前套餐：企业团队档 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传 3 套。单张生成仍可正常使用。
+        </section>
 
-      <template v-if="batchTab === 'create'">
+        <div class="batch-panel-scroll">
+          <template v-if="batchTab === 'create'">
         <section class="batch-card inline-field">
           <span>使用预设</span>
           <NSelect
@@ -404,9 +480,9 @@ const activeCreateRatioLabel = computed(() => {
           <span>用于成片交付中的内饰展示图，可选上传</span>
           <b>选填</b>
         </button>
-      </template>
+          </template>
 
-      <template v-else>
+          <template v-else>
         <section class="batch-card preset-save-card">
           <div class="preset-save-row">
             <span>预设</span>
@@ -490,18 +566,55 @@ const activeCreateRatioLabel = computed(() => {
           </div>
           <NSwitch v-model:value="interiorEnhance" size="large" />
         </section>
-      </template>
+          </template>
+        </div>
 
-      <div class="sticky-action">
+        <footer class="batch-panel-footer">
+          <NButton
+            type="primary"
+            size="large"
+            block
+            :disabled="batchTab === 'create' && !createTaskPresetId"
+            @click="handleStickyAction"
+          >
+            {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
+            <span class="ml-2">💎 预计 120</span>
+          </NButton>
+        </footer>
+      </div>
+    </template>
+
+    <template v-else-if="props.capability.code === 'future-short-video'">
+      <section class="batch-card batch-notice short-video-notice">
+        短视频生成为 Beta 能力：可上传车图预览流程，点击「生成演示」不会创建真实任务，右侧可查看演示视频。
+      </section>
+
+      <UploadTaskCard :capability="props.capability" />
+
+      <CapabilityOptionSelector
+        v-if="hasBlock('selector')"
+        :capability="props.capability"
+        :selected-option-id="props.selectedOptionId"
+        @select="emit('selectOption', $event)"
+      />
+
+      <div
+        v-if="hasBlock('actions')"
+        class="flex flex-wrap items-center justify-center gap-4 pt-3"
+      >
+        <NTag type="warning" round :bordered="false">
+          预计消耗 {{ props.capability.cost }} 积分
+        </NTag>
+        <NTag type="success" round :bordered="false">
+          余额 {{ props.capability.balance }} 积分
+        </NTag>
         <NButton
-          type="primary"
+          type="warning"
           size="large"
-          block
-          :disabled="batchTab === 'create' && !createTaskPresetId"
-          @click="handleStickyAction"
+          class="min-w-48 !rounded-xl"
+          @click="handleGenerate"
         >
-          {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
-          <span class="ml-2">💎 预计 120</span>
+          {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}
         </NButton>
       </div>
     </template>
@@ -584,7 +697,9 @@ const activeCreateRatioLabel = computed(() => {
                 ghost
                 size="large"
                 class="delivery-download-btn"
-                :disabled="deliverySelectedCount === 0"
+                :disabled="deliveryDownloadableCount === 0"
+                :loading="isDeliveryBatchDownloading"
+                @click="handleDeliveryBatchDownload"
               >
                 批量下载
               </NButton>
@@ -603,6 +718,11 @@ const activeCreateRatioLabel = computed(() => {
 
     <template v-else>
       <UploadTaskCard :capability="props.capability" />
+
+      <PaintColorPicker
+        v-if="showPaintColorPicker"
+        v-model="selectedPaintColorId"
+      />
 
       <CapabilityOptionSelector
         v-if="hasBlock('selector')"
@@ -677,6 +797,72 @@ const activeCreateRatioLabel = computed(() => {
   --scene-scroll-thumb-start: #3dcda8;
   --scene-scroll-thumb-end: #5b9dff;
   --scene-scroll-thumb-glow: rgba(91, 157, 255, 0.5);
+}
+
+.generate-panel.is-batch,
+.generate-panel.is-delivery {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(12px, 1.2vw, 16px);
+  padding-bottom: 0;
+}
+
+.batch-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(12px, 1.2vw, 16px);
+}
+
+.batch-panel-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
+}
+
+.batch-panel-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.batch-panel-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--scene-scroll-thumb-start),
+    var(--scene-scroll-thumb-end)
+  );
+}
+
+.batch-panel-footer {
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
+    var(--app-surface-soft) 24%,
+    var(--app-surface-soft) 100%
+  );
+}
+
+.delivery-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(12px, 1.2vw, 16px);
 }
 
 .batch-tabs,
@@ -892,14 +1078,45 @@ const activeCreateRatioLabel = computed(() => {
 .plain-input {
   width: 100%;
   height: 48px;
-  border: 1px solid var(--app-border);
+  border: 1px solid color-mix(in srgb, #2f7cff 24%, var(--app-border));
   border-radius: 8px;
-  background: var(--app-surface-soft);
+  background: var(--app-surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 80%, transparent);
   color: var(--app-text);
   padding: 0 16px;
   font: inherit;
   font-size: 16px;
   font-weight: 700;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.plain-input:hover {
+  border-color: color-mix(in srgb, #2f7cff 38%, var(--app-border));
+}
+
+.plain-input:focus {
+  border-color: color-mix(in srgb, #2f7cff 58%, var(--app-border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 80%, transparent),
+    0 0 0 3px color-mix(in srgb, #2f7cff 14%, transparent);
+}
+
+.plain-input:focus-visible {
+  outline: none;
+}
+
+:global([data-theme="dark"]) .plain-input {
+  background: color-mix(in srgb, var(--app-surface-soft) 88%, #0f172a);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+
+:global([data-theme="dark"]) .plain-input:focus {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
+    0 0 0 3px color-mix(in srgb, #5b9dff 22%, transparent);
 }
 
 .batch-upload {
@@ -961,7 +1178,10 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .batch-scene-card {
+  container-type: inline-size;
+  min-width: 0;
   padding: 16px;
+  overflow: hidden;
 }
 
 .scene-head {
@@ -995,14 +1215,18 @@ const activeCreateRatioLabel = computed(() => {
 
 .scene-grid {
   --scene-gap: 12px;
-  --scene-visible: 2.25;
+  --scene-col-width: clamp(128px, 38cqw, 176px);
 
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--scene-col-width);
+  grid-template-rows: repeat(2, auto);
   gap: var(--scene-gap);
+  margin-right: -2px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 2px 20px;
-  scroll-padding-inline: 2px;
+  padding: 2px 10px 14px 2px;
+  scroll-padding-inline: 8px;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
   scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
@@ -1061,7 +1285,7 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .scene-grid article {
-  flex: 0 0 calc((100% - var(--scene-gap) * 2) / var(--scene-visible));
+  width: var(--scene-col-width);
   scroll-snap-align: start;
   overflow: hidden;
   border: 2px solid color-mix(in srgb, var(--app-border) 88%, transparent);
@@ -1080,7 +1304,7 @@ const activeCreateRatioLabel = computed(() => {
 
 .scene-grid img {
   width: 100%;
-  height: clamp(118px, 12vw, 150px);
+  height: clamp(96px, 28cqw, 132px);
   object-fit: cover;
 }
 
@@ -1107,19 +1331,49 @@ const activeCreateRatioLabel = computed(() => {
   );
 }
 
+.delivery-board {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+}
+
 .delivery-list {
+  --delivery-row-height: 88px;
   display: grid;
-  max-height: min(52vh, 520px);
+  max-height: calc(var(--delivery-row-height) * 6);
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
+}
+
+.delivery-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.delivery-list::-webkit-scrollbar-track {
+  background: var(--scene-scroll-track);
+}
+
+.delivery-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--scene-scroll-thumb-start),
+    var(--scene-scroll-thumb-end)
+  );
 }
 
 .delivery-item {
   display: grid;
+  box-sizing: border-box;
+  height: var(--delivery-row-height, 88px);
+  min-height: var(--delivery-row-height, 88px);
   grid-template-columns: 32px 72px minmax(0, 1fr) 72px;
   align-items: center;
   gap: 14px;
-  min-height: 88px;
   padding: 14px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--app-border) 88%, transparent);
   background: var(--app-surface);

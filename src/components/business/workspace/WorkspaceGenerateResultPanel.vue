@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 
 import type { WorkspaceGenerateResult } from "@/types/workspace";
+import { downloadFile } from "@/utils/download";
 
 const props = defineProps<{
   result: WorkspaceGenerateResult;
@@ -43,14 +44,7 @@ function handlePreviewLoad(event: Event) {
 }
 
 function handleDownload(url: string, alt: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${alt || "generate-result"}.jpg`;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  document.body.append(link);
-  link.click();
-  link.remove();
+  downloadFile(url, `${alt || "generate-result"}.jpg`);
 }
 </script>
 
@@ -153,6 +147,7 @@ function handleDownload(url: string, alt: string) {
   display: flex;
   min-height: 0;
   flex: 1;
+  align-items: center;
   justify-content: center;
   overflow: auto;
   overscroll-behavior: contain;
@@ -163,6 +158,7 @@ function handleDownload(url: string, alt: string) {
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
+  max-height: 100%;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--assist-border);
@@ -176,7 +172,7 @@ function handleDownload(url: string, alt: string) {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: min(72vh, 920px);
+  max-height: 100%;
   border-radius: 12px;
   object-fit: contain;
   background: #0b1220;

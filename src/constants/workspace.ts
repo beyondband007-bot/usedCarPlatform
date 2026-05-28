@@ -1,8 +1,8 @@
-import { workspaceFlowModules } from '@/constants/app-flow'
 import type {
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
   WorkspaceMenuGroup,
+  WorkspaceMenuItem,
   WorkspaceOption,
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
@@ -219,7 +219,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "scene_showroom_light",
     kind: "scene",
     groupTitle: "场景影棚",
-    icon: "🏢",
+    icon: "mdi:domain",
     label: "展厅灯光",
     tag: "可用",
     tagType: "success",
@@ -238,7 +238,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "scene_outdoor",
     kind: "scene",
     groupTitle: "场景影棚",
-    icon: "🌳",
+    icon: "mdi:pine-tree",
     label: "户外场景",
     tag: "可用",
     tagType: "success",
@@ -257,7 +257,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "scene_road_motion",
     kind: "scene",
     groupTitle: "场景影棚",
-    icon: "🛣️",
+    icon: "mdi:road-variant",
     label: "道路动态",
     tag: "可用",
     tagType: "success",
@@ -276,7 +276,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "scene_sky_studio",
     kind: "scene",
     groupTitle: "场景影棚",
-    icon: "☁️",
+    icon: "mdi:weather-cloudy",
     label: "天空影棚",
     tag: "可用",
     tagType: "success",
@@ -295,7 +295,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "beauty_paint_refresh",
     kind: "beauty",
     groupTitle: "车辆美容",
-    icon: "✨",
+    icon: "mdi:spray",
     label: "烤漆翻新",
     tag: "演示",
     tagType: "warning",
@@ -314,7 +314,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "beauty_light_consistency",
     kind: "beauty",
     groupTitle: "车辆美容",
-    icon: "☀️",
+    icon: "mdi:white-balance-sunny",
     label: "光污一致化",
     tag: "演示",
     tagType: "warning",
@@ -333,7 +333,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     apiCode: "interior_clean",
     kind: "interior",
     groupTitle: "内饰",
-    icon: "🪑",
+    icon: "mdi:car-seat",
     label: "内饰清洁",
     tag: "演示",
     tagType: "warning",
@@ -351,10 +351,10 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: "batch-new",
     apiCode: "batch_listing",
     kind: "batch",
-    groupTitle: '批量上新',
-    icon: "📦",
+    groupTitle: "批量 & 交付",
+    icon: "mdi:package-variant-closed",
     label: "批量上新",
-    tag: "套餐商价",
+    tag: "套餐高阶",
     tagType: "info",
     title: "批量上新",
     description: "上传批量车源素材，按企业套餐能力进行任务队列处理。",
@@ -370,8 +370,8 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: "delivery",
     apiCode: "asset_delivery",
     kind: "delivery",
-    groupTitle: '成片交付',
-    icon: "📁",
+    groupTitle: "批量 & 交付",
+    icon: "mdi:folder-multiple-outline",
     label: "成片交付",
     tag: "可用",
     tagType: "success",
@@ -384,6 +384,24 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     middleBlocks: ["selector"],
     options: showroomOptions,
     actionLabel: "生成交付包",
+  }),
+  createCapability({
+    code: "future-short-video",
+    apiCode: "future_short_video",
+    kind: "future",
+    groupTitle: "后续内容能力",
+    icon: "mdi:movie-open-outline",
+    label: "短视频生成",
+    tag: "Beta",
+    tagType: "info",
+    title: "短视频生成",
+    description:
+      "由静态车图生成营销短视频素材，当前为 Beta 演示入口，不进入真实任务队列。",
+    uploadTitle: "车辆外观图",
+    uploadHint: "点击/拖拽上传 · JPG / PNG / WebP · ≤10MB",
+    middleBlocks: onlyActions,
+    options: showroomOptions,
+    actionLabel: "生成演示",
   }),
 ];
 
@@ -420,19 +438,95 @@ export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[]
   },
 ];
 
-export const workspaceMenuGroups: WorkspaceMenuGroup[] = workspaceFlowModules.map(
-  (module) => ({
-    title: module.title,
-    items: workspaceCapabilities
-      .filter((capability) =>
-        (module.capabilityCodes as readonly string[]).includes(capability.code),
-      )
-      .map((capability) => ({
-        code: capability.code,
-        icon: capability.icon,
-        label: capability.label,
-        tag: capability.tag,
-        tagType: capability.tagType,
-      })),
-  }),
-)
+function menuTagVariant(
+  tag: string,
+  tagType: WorkspaceCapability['tagType'],
+): WorkspaceMenuItem['tagVariant'] {
+  if (tag === 'Beta') return 'beta'
+  if (tag === '规划中') return 'planned'
+  if (tagType === 'success') return 'available'
+  if (tagType === 'warning') return 'demo'
+  if (tagType === 'info') return 'package'
+  return 'planned'
+}
+
+function toMenuItem(capability: WorkspaceCapability): WorkspaceMenuItem {
+  return {
+    code: capability.code,
+    icon: capability.icon,
+    label: capability.label,
+    tag: capability.tag,
+    tagType: capability.tagType,
+    tagVariant: menuTagVariant(capability.tag, capability.tagType),
+  }
+}
+
+function pickMenuItems(codes: string[]): WorkspaceMenuItem[] {
+  return codes
+    .map((code) => workspaceCapabilities.find((item) => item.code === code))
+    .filter((item): item is WorkspaceCapability => Boolean(item))
+    .map(toMenuItem)
+}
+
+const futureSidebarItems: WorkspaceMenuItem[] = [
+  {
+    code: 'future-main-template',
+    icon: 'mdi:puzzle-outline',
+    label: '主图套版',
+    tag: '规划中',
+    tagVariant: 'planned',
+    disabled: true,
+  },
+  {
+    code: 'future-short-video',
+    icon: 'mdi:movie-open-outline',
+    label: '短视频生成',
+    tag: 'Beta',
+    tagVariant: 'beta',
+  },
+  {
+    code: 'future-detail-page',
+    icon: 'mdi:file-document-outline',
+    label: '详情页素材',
+    tag: '规划中',
+    tagVariant: 'planned',
+    disabled: true,
+  },
+  {
+    code: 'future-distribution',
+    icon: 'mdi:bullhorn-outline',
+    label: '多平台分发',
+    tag: '规划中',
+    tagVariant: 'planned',
+    disabled: true,
+  },
+]
+
+/** 工作台左侧子菜单（与产品稿分组一致） */
+export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
+  {
+    title: '场景影棚',
+    items: pickMenuItems([
+      'showroom-light',
+      'outdoor-scene',
+      'road-motion',
+      'sky-studio',
+    ]),
+  },
+  {
+    title: '车辆美容',
+    items: pickMenuItems(['paint-refresh', 'light-consistency']),
+  },
+  {
+    title: '内饰',
+    items: pickMenuItems(['interior-clean']),
+  },
+  {
+    title: '批量 & 交付',
+    items: pickMenuItems(['batch-new', 'delivery']),
+  },
+  {
+    title: '后续内容能力',
+    items: futureSidebarItems,
+  },
+]

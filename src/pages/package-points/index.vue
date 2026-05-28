@@ -10,13 +10,13 @@ import {
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
+import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
+import {
+  rechargePlanToneMap,
+  rechargePlans,
+  type RechargePlanTone,
+} from "@/constants/recharge-plans";
 import { useAppStore } from "@/stores/app";
-
-import planBasicBg from "@/img/基础套餐.png";
-import planAdvancedBg from "@/img/进阶套餐.png";
-import planPremiumBg from "@/img/尊享套餐.png";
-
-type PlanTone = "blue" | "purple" | "gold";
 
 type RechargeRecord = {
   orderNo: string;
@@ -34,14 +34,8 @@ type RecordSummary = {
   icon: string;
 };
 
-const planToneMap: Record<string, PlanTone> = {
-  基础套餐: "blue",
-  进阶套餐: "purple",
-  尊享套餐: "gold",
-};
-
-function getPlanTone(plan: string): PlanTone {
-  return planToneMap[plan] ?? "blue";
+function getPlanTone(plan: string): RechargePlanTone {
+  return rechargePlanToneMap[plan] ?? "blue";
 }
 
 const recordSummary: RecordSummary[] = [
@@ -73,35 +67,23 @@ const recordSummary: RecordSummary[] = [
 
 const planTypeMeta: Record<
   string,
-  { icon: string; tone: PlanTone }
+  { icon: string; tone: RechargePlanTone }
 > = {
-  基础套餐: { icon: "mdi:layers-triple-outline", tone: "blue" },
-  进阶套餐: { icon: "mdi:chart-bar", tone: "purple" },
-  尊享套餐: { icon: "mdi:crown-outline", tone: "gold" },
+  企业基础版: { icon: "mdi:layers-triple-outline", tone: "blue" },
+  企业团队版: { icon: "mdi:chart-bar", tone: "purple" },
+  企业旗舰版: { icon: "mdi:crown-outline", tone: "gold" },
 };
 
-type RechargePlan = {
-  name: string;
-  image: string;
-  tone: PlanTone;
-};
-
-const selectedPlanName = ref("进阶套餐");
+const selectedPlanName = ref("企业团队版");
 const pressingPlanName = ref<string | null>(null);
 
 const appStore = useAppStore();
 
 const recordTypeOptions = [
   { label: "全部类型", value: "all" },
-  { label: "基础套餐", value: "basic" },
-  { label: "进阶套餐", value: "advanced" },
-  { label: "尊享套餐", value: "premium" },
-];
-
-const rechargePlans: RechargePlan[] = [
-  { name: "基础套餐", image: planBasicBg, tone: "blue" },
-  { name: "进阶套餐", image: planAdvancedBg, tone: "purple" },
-  { name: "尊享套餐", image: planPremiumBg, tone: "gold" },
+  { label: "企业基础版", value: "basic" },
+  { label: "企业团队版", value: "advanced" },
+  { label: "企业旗舰版", value: "premium" },
 ];
 
 function handlePlanPointerDown(name: string) {
@@ -119,7 +101,7 @@ function handlePlanSelect(name: string) {
 const records: RechargeRecord[] = [
   {
     orderNo: "202605200001",
-    plan: "进阶套餐",
+    plan: "企业团队版",
     amount: "¥3,980",
     points: "550",
     status: "支付成功",
@@ -127,7 +109,7 @@ const records: RechargeRecord[] = [
   },
   {
     orderNo: "202605190002",
-    plan: "基础套餐",
+    plan: "企业基础版",
     amount: "¥980",
     points: "200",
     status: "支付成功",
@@ -135,7 +117,7 @@ const records: RechargeRecord[] = [
   },
   {
     orderNo: "202605180003",
-    plan: "尊享套餐",
+    plan: "企业旗舰版",
     amount: "¥9,800",
     points: "9800",
     status: "支付成功",
@@ -143,7 +125,7 @@ const records: RechargeRecord[] = [
   },
   {
     orderNo: "202605160006",
-    plan: "尊享套餐",
+    plan: "企业旗舰版",
     amount: "¥9,800",
     points: "9800",
     status: "支付中",
@@ -151,7 +133,7 @@ const records: RechargeRecord[] = [
   },
   {
     orderNo: "202605150004",
-    plan: "进阶套餐",
+    plan: "企业团队版",
     amount: "¥3,980",
     points: "550",
     status: "支付失败",
@@ -159,7 +141,7 @@ const records: RechargeRecord[] = [
   },
   {
     orderNo: "202605100005",
-    plan: "基础套餐",
+    plan: "企业基础版",
     amount: "¥980",
     points: "200",
     status: "支付成功",
@@ -179,7 +161,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     key: "plan",
     width: 168,
     render(row) {
-      const meta = planTypeMeta[row.plan] ?? planTypeMeta["基础套餐"];
+      const meta = planTypeMeta[row.plan] ?? planTypeMeta["企业基础版"];
       return h(
         "span",
         { class: ["plan-type-pill", `is-${meta.tone}`] },
@@ -283,45 +265,18 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
           <section class="plan-module" aria-label="选择充值套餐">
             <h2 class="section-title">选择充值套餐</h2>
             <div class="plan-grid">
-              <article
+              <RechargePlanCard
                 v-for="plan in rechargePlans"
                 :key="plan.name"
-                class="plan-card"
-                :class="[
-                  `is-${plan.tone}`,
-                  {
-                    'is-selected': selectedPlanName === plan.name,
-                    'is-pressing': pressingPlanName === plan.name,
-                  },
-                ]"
-                role="button"
-                tabindex="0"
-                :aria-pressed="selectedPlanName === plan.name"
-                :aria-label="`${plan.name}，点击选择并充值`"
-                @click="handlePlanSelect(plan.name)"
-                @keydown.enter.prevent="handlePlanSelect(plan.name)"
-                @keydown.space.prevent="handlePlanSelect(plan.name)"
+                :plan="plan"
+                :selected="selectedPlanName === plan.name"
+                :pressing="pressingPlanName === plan.name"
+                @select="handlePlanSelect(plan.name)"
                 @pointerdown="handlePlanPointerDown(plan.name)"
                 @pointerup="clearPlanPress"
                 @pointerleave="clearPlanPress"
                 @pointercancel="clearPlanPress"
-              >
-                <span
-                  v-if="selectedPlanName === plan.name"
-                  class="plan-card-check"
-                  aria-hidden="true"
-                >
-                  <Icon icon="mdi:check" />
-                </span>
-                <img
-                  class="plan-card-bg"
-                  :src="plan.image"
-                  :alt="plan.name"
-                  loading="lazy"
-                  decoding="async"
-                  draggable="false"
-                />
-              </article>
+              />
             </div>
           </section>
 
@@ -643,193 +598,19 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   min-width: 0;
 }
 
+.plan-module > .section-title {
+  margin-left: -6px;
+}
+
 .plan-grid {
   --plan-gap: clamp(18px, 1.8vw, 28px);
 
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: flex-start;
   gap: var(--plan-gap);
   margin-top: 18px;
-}
-
-.plan-card {
-  --plan-shadow: 0 14px 34px rgba(56, 112, 190, 0.12);
-  --plan-ring: transparent;
-  --plan-lift: 0px;
-
-  position: relative;
-  flex: 1 1 calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
-  min-width: 0;
-  width: 100%;
-  max-width: calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
-  overflow: hidden;
-  border: 0;
-  border-radius: clamp(14px, 1.2vw, 20px);
-  background: transparent;
-  box-shadow: var(--plan-shadow);
-  transform: translateY(var(--plan-lift));
-  cursor: pointer;
-  outline: none;
-  transition:
-    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.26s cubic-bezier(0.22, 1, 0.36, 1);
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.plan-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border: 3px solid var(--plan-ring);
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  transition:
-    opacity 0.26s ease,
-    border-color 0.26s ease;
-}
-
-.plan-card.is-blue {
-  --plan-accent: #2f7dff;
-  --plan-shadow: 0 14px 34px rgba(47, 125, 255, 0.14);
-}
-
-.plan-card.is-purple {
-  --plan-accent: #8f57ff;
-  --plan-shadow: 0 14px 34px rgba(143, 87, 255, 0.16);
-}
-
-.plan-card.is-gold {
-  --plan-accent: #f49a23;
-  --plan-shadow: 0 14px 34px rgba(244, 154, 35, 0.16);
-}
-
-.theme-dark .plan-card.is-blue {
-  --plan-shadow: 0 16px 36px rgba(47, 125, 255, 0.22);
-}
-
-.theme-dark .plan-card.is-purple {
-  --plan-shadow: 0 16px 36px rgba(143, 87, 255, 0.24);
-}
-
-.theme-dark .plan-card.is-gold {
-  --plan-shadow: 0 16px 36px rgba(244, 154, 35, 0.22);
-}
-
-.plan-card:hover {
-  --plan-lift: -5px;
-}
-
-.plan-card.is-pressing {
-  --plan-lift: 2px;
-
-  transition-duration: 0.12s;
-}
-
-.plan-card.is-selected {
-  --plan-lift: -8px;
-  --plan-ring: var(--plan-accent);
-}
-
-.plan-card.is-selected.is-blue {
-  --plan-shadow:
-    0 0 0 1px rgba(47, 125, 255, 0.2),
-    0 10px 26px rgba(47, 125, 255, 0.22),
-    0 24px 52px rgba(47, 125, 255, 0.32);
-}
-
-.plan-card.is-selected.is-purple {
-  --plan-shadow:
-    0 0 0 1px rgba(143, 87, 255, 0.22),
-    0 10px 26px rgba(143, 87, 255, 0.24),
-    0 24px 52px rgba(143, 87, 255, 0.34);
-}
-
-.plan-card.is-selected.is-gold {
-  --plan-shadow:
-    0 0 0 1px rgba(244, 154, 35, 0.24),
-    0 10px 26px rgba(244, 154, 35, 0.24),
-    0 24px 52px rgba(244, 154, 35, 0.34);
-}
-
-.plan-card.is-selected::after {
-  opacity: 1;
-}
-
-.plan-card:focus-visible {
-  --plan-ring: var(--plan-accent);
-}
-
-.plan-card:focus-visible::after {
-  opacity: 1;
-}
-
-.plan-card-check {
-  position: absolute;
-  top: clamp(10px, 1vw, 14px);
-  right: clamp(10px, 1vw, 14px);
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: clamp(28px, 2.4vw, 34px);
-  height: clamp(28px, 2.4vw, 34px);
-  border-radius: 999px;
-  background: var(--plan-accent);
-  color: #fff;
-  font-size: 18px;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--plan-accent) 42%, transparent);
-  animation: plan-check-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes plan-check-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-
-  70% {
-    transform: scale(1.08);
-  }
-
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.plan-card-bg {
-  display: block;
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  vertical-align: top;
-  pointer-events: none;
-  transition: filter 0.26s ease;
-}
-
-.plan-card:not(.is-selected) .plan-card-bg {
-  filter: saturate(0.94) brightness(0.98);
-}
-
-.plan-card.is-selected .plan-card-bg {
-  filter: saturate(1.04) brightness(1.02);
-}
-
-.plan-card.is-pressing .plan-card-bg {
-  filter: saturate(1) brightness(0.96);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .plan-card,
-  .plan-card::after,
-  .plan-card-bg,
-  .plan-card-check {
-    animation: none;
-    transition: none;
-  }
+  margin-left: clamp(10px, 1.4vw, 22px);
 }
 
 .records-module {
@@ -1117,7 +898,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   font-weight: 700;
 }
 
-.plan-type-pill {
+.records-data-table :deep(.plan-type-pill) {
   display: inline-flex;
   max-width: 100%;
   align-items: center;
@@ -1127,71 +908,80 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
-.plan-type-pill-icon {
+.records-data-table :deep(.plan-type-pill-icon) {
+  display: inline-flex;
   flex: 0 0 auto;
   font-size: 16px;
 }
 
-.plan-type-pill.is-blue {
+.records-data-table :deep(.plan-type-pill.is-blue) {
   background: rgba(47, 125, 255, 0.1);
   color: #2f7dff;
 }
 
-.plan-type-pill.is-purple {
+.records-data-table :deep(.plan-type-pill.is-purple) {
   background: rgba(143, 87, 255, 0.1);
   color: #8f57ff;
 }
 
-.plan-type-pill.is-gold {
+.records-data-table :deep(.plan-type-pill.is-gold) {
   background: rgba(244, 154, 35, 0.12);
   color: #f49a23;
 }
 
-.amount-cell {
+.records-data-table :deep(.amount-cell) {
   font-size: 15px;
   font-weight: 900;
 }
 
-.amount-cell.is-blue {
+.records-data-table :deep(.amount-cell.is-blue) {
   color: #2f7dff;
 }
 
-.amount-cell.is-purple {
+.records-data-table :deep(.amount-cell.is-purple) {
   color: #8f57ff;
 }
 
-.amount-cell.is-gold {
+.records-data-table :deep(.amount-cell.is-gold) {
   color: #f49a23;
 }
 
-.points-cell {
+.records-data-table :deep(.points-cell) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
-.points-cell-icon {
+.records-data-table :deep(.points-cell-icon) {
+  display: inline-flex;
+  flex: 0 0 auto;
   color: #f49a23;
   font-size: 18px;
 }
 
-.status-text {
+.records-data-table :deep(.points-cell > span) {
+  line-height: 1;
+}
+
+.records-data-table :deep(.status-text) {
   font-size: 14px;
   font-weight: 800;
 }
 
-.status-text.is-success {
+.records-data-table :deep(.status-text.is-success) {
   color: #18a058;
 }
 
-.status-text.is-pending {
+.records-data-table :deep(.status-text.is-pending) {
   color: #347cff;
 }
 
-.status-text.is-failed {
+.records-data-table :deep(.status-text.is-failed) {
   color: #d03050;
 }
 
@@ -1276,11 +1066,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 @media (max-width: 1180px) {
-  .plan-card {
+  :deep(.recharge-plan-card) {
     flex-basis: calc((100% - var(--plan-gap)) / 2);
     max-width: calc((100% - var(--plan-gap)) / 2);
   }
-
 }
 
 @media (max-height: 820px) and (min-width: 981px) {
@@ -1310,6 +1099,14 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
   .plan-grid {
     margin-top: 12px;
+  }
+
+  :deep(.recharge-plan-card) {
+    --plan-card-ratio-h: 1184;
+  }
+
+  :deep(.recharge-plan-card.is-gold) {
+    --plan-card-ratio-h: 1216;
   }
 }
 
@@ -1370,9 +1167,19 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .plan-card {
+  :deep(.recharge-plan-card) {
     flex-basis: 100%;
     max-width: 100%;
+  }
+
+  :deep(.plan-card-content) {
+    left: clamp(14px, 5%, 28px);
+    width: 58%;
+    max-width: 58%;
+  }
+
+  .plan-grid {
+    margin-left: 6px;
   }
 
   .records-summary {
