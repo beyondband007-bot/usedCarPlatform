@@ -1,4 +1,10 @@
-import { computed, ref } from 'vue'
+﻿import { computed, ref } from 'vue'
+
+import {
+  getDefaultLogo,
+  uploadDefaultLogo,
+  type UserLogoSetting,
+} from '@/api/visual-workbench'
 
 const STORAGE_KEY = 'workspace-recent-logo'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024
@@ -6,26 +12,33 @@ const ACCEPT_TYPES = new Set(['image/png', 'image/svg+xml'])
 
 export interface WorkspaceLogoAsset {
   dataUrl: string
+  assetId?: string
   fileName: string
   mimeType: string
+  size?: number
   uploadedAt: string
 }
 
-function readStoredLogo(): WorkspaceLogoAsset | null {
-  if (typeof window === 'undefined') {
-    return null
+function toLogoAsset(setting: UserLogoSetting): WorkspaceLogoAsset {
+  return {
+    dataUrl: setting.logo.url,
+    assetId: setting.logoAssetId,
+    fileName: setting.logo.fileName,
+    mimeType: setting.logo.mimeType,
+    size: setting.logo.size,
+    uploadedAt: setting.updatedAt,
   }
+}
+
+function readStoredLogo(): WorkspaceLogoAsset | null {
+  if (typeof window === 'undefined') return null
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      return null
-    }
+    if (!raw) return null
 
     const parsed = JSON.parse(raw) as WorkspaceLogoAsset
-    if (!parsed?.dataUrl || !parsed.uploadedAt) {
-      return null
-    }
+    if (!parsed?.dataUrl || !parsed.uploadedAt) return null
 
     return parsed
   } catch {
@@ -34,9 +47,7 @@ function readStoredLogo(): WorkspaceLogoAsset | null {
 }
 
 function persistLogo(asset: WorkspaceLogoAsset | null) {
-  if (typeof window === 'undefined') {
-    return
-  }
+  if (typeof window === 'undefined') return
 
   if (!asset) {
     window.localStorage.removeItem(STORAGE_KEY)
@@ -48,35 +59,17 @@ function persistLogo(asset: WorkspaceLogoAsset | null) {
 
 function formatUploadLabel(iso: string) {
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
+  if (Number.isNaN(date.getTime())) return ''
 
   const pad = (value: number) => String(value).padStart(2, '0')
-
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} 上传`
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('invalid_result'))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('read_failed'))
-    reader.readAsDataURL(file)
-  })
 }
 
 export function useWorkspaceLogo() {
   const recentLogo = ref<WorkspaceLogoAsset | null>(readStoredLogo())
   const useRecentLogo = ref(Boolean(recentLogo.value))
   const isUploading = ref(false)
+  const isLoading = ref(false)
 
   const uploadedAtLabel = computed(() =>
     recentLogo.value ? formatUploadLabel(recentLogo.value.uploadedAt) : '',
@@ -86,33 +79,36 @@ export function useWorkspaceLogo() {
     const isSvg = file.name.toLowerCase().endsWith('.svg')
     const typeAllowed = ACCEPT_TYPES.has(file.type) || (isSvg && file.type === '')
 
-    if (!typeAllowed) {
-      return '仅支持 PNG / SVG 格式'
-    }
-
-    if (file.size > MAX_SIZE_BYTES) {
-      return 'Logo 文件不能超过 2MB'
-    }
+    if (!typeAllowed) return '仅支持 PNG / SVG 格式'
+    if (file.size > MAX_SIZE_BYTES) return 'Logo 文件不能超过 2MB'
 
     return null
   }
 
+  async function refreshDefaultLogo() {
+    isLoading.value = true
+
+    try {
+      const setting = await getDefaultLogo()
+      const asset = setting ? toLogoAsset(setting) : null
+      recentLogo.value = asset
+      useRecentLogo.value = Boolean(asset)
+      persistLogo(asset)
+      return asset
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function uploadLogoFile(file: File) {
     const validationError = validateLogoFile(file)
-    if (validationError) {
-      throw new Error(validationError)
-    }
+    if (validationError) throw new Error(validationError)
 
     isUploading.value = true
 
     try {
-      const dataUrl = await readFileAsDataUrl(file)
-      const asset: WorkspaceLogoAsset = {
-        dataUrl,
-        fileName: file.name,
-        mimeType: file.type || (file.name.endsWith('.svg') ? 'image/svg+xml' : 'image/png'),
-        uploadedAt: new Date().toISOString(),
-      }
+      const setting = await uploadDefaultLogo(file)
+      const asset = toLogoAsset(setting)
 
       recentLogo.value = asset
       useRecentLogo.value = true
@@ -125,9 +121,7 @@ export function useWorkspaceLogo() {
   }
 
   function selectRecentLogo() {
-    if (!recentLogo.value) {
-      return false
-    }
+    if (!recentLogo.value) return false
 
     useRecentLogo.value = true
     return true
@@ -143,7 +137,9 @@ export function useWorkspaceLogo() {
     recentLogo,
     useRecentLogo,
     isUploading,
+    isLoading,
     uploadedAtLabel,
+    refreshDefaultLogo,
     uploadLogoFile,
     selectRecentLogo,
     clearRecentLogo,

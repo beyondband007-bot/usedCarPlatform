@@ -1,12 +1,31 @@
 <script setup lang="ts">
-import { NCard, NTag, NUpload, NUploadDragger } from "naive-ui";
+import { computed } from "vue";
+import { NCard, NTag, NUpload, NUploadDragger, type UploadFileInfo } from "naive-ui";
 import { motion } from "motion-v";
 
 import type { WorkspaceCapability } from "@/types/workspace";
 
-defineProps<{
+const props = defineProps<{
   capability: WorkspaceCapability;
+  uploadedFileName?: string;
+  isUploading?: boolean;
 }>();
+
+const emit = defineEmits<{
+  selectFile: [file: File];
+}>();
+
+const uploadHint = computed(() => {
+  if (props.isUploading) return "正在上传素材...";
+  if (props.uploadedFileName) return props.uploadedFileName;
+  return props.capability.uploadHint;
+});
+
+function handleUploadChange(options: { file: UploadFileInfo }) {
+  const file = options.file.file;
+  if (!file) return;
+  emit("selectFile", file);
+}
 </script>
 
 <template>
@@ -35,7 +54,13 @@ defineProps<{
       </template>
 
       <div class="Upload">
-        <NUpload :show-file-list="false" :accept="capability.accept">
+        <NUpload
+          :show-file-list="false"
+          :accept="capability.accept"
+          :default-upload="false"
+          :disabled="isUploading"
+          @change="handleUploadChange"
+        >
           <NUploadDragger
             class="!rounded-2xl !border-dashed !border-[var(--app-border)] !bg-[var(--app-surface-soft)] !py-10"
           >
@@ -47,7 +72,7 @@ defineProps<{
               <span
                 class="mt-2 text-sm font-semibold text-[var(--app-text-soft)]"
               >
-                {{ capability.uploadHint }}
+                {{ uploadHint }}
               </span>
               <NTag :bordered="false" round size="small" class="mt-4">
                 {{ capability.requiredLabel }}

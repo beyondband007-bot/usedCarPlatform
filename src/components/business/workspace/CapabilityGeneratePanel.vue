@@ -3,12 +3,14 @@ import { computed, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { NButton, NInput, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
 
+import { uploadCarExterior } from "@/api/visual-workbench";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
+  WorkspaceGeneratePayload,
 } from "@/types/workspace";
 
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
@@ -21,11 +23,12 @@ import { downloadDeliveryTasks } from "@/utils/delivery-download";
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
+  isGenerating?: boolean;
 }>();
 
 const emit = defineEmits<{
   selectOption: [id: string];
-  generate: [payload: { outputRatio: string }];
+  generate: [payload: WorkspaceGeneratePayload];
 }>();
 
 const outputRatioLabelMap: Record<string, string> = {
@@ -35,12 +38,6 @@ const outputRatioLabelMap: Record<string, string> = {
   "9:16": "主图 9:16",
   "16:9": "主图 16:9",
 };
-
-function handleGenerate() {
-  emit("generate", {
-    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
-  });
-}
 
 const message = useMessage();
 const {
@@ -68,6 +65,9 @@ const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const isApplyingTemplate = ref(false);
 const selectedPaintColorId = ref(paintColorOptions[0]?.id ?? "");
+const uploadedAsset = ref<{ assetId: string; fileName: string } | null>(null);
+const uploadedFileName = ref("");
+const isUploadingVehicle = ref(false);
 
 const showPaintColorPicker = computed(
   () => props.capability.code === "paint-refresh",
@@ -161,6 +161,44 @@ function handleStickyAction() {
   if (batchTab.value === "visual") {
     handleSaveVisualConfig();
   }
+}
+
+async function handleVehicleFileSelected(file: File) {
+  isUploadingVehicle.value = true;
+  uploadedFileName.value = file.name;
+
+  try {
+    const asset = await uploadCarExterior(file);
+    uploadedAsset.value = {
+      assetId: asset.assetId,
+      fileName: asset.fileName,
+    };
+    uploadedFileName.value = asset.fileName;
+    message.success("车辆图片上传成功");
+  } catch (error) {
+    uploadedAsset.value = null;
+    uploadedFileName.value = "";
+    const text = error instanceof Error ? error.message : "车辆图片上传失败";
+    message.error(text);
+  } finally {
+    isUploadingVehicle.value = false;
+  }
+}
+
+function handleGenerate() {
+  if (!uploadedAsset.value) {
+    message.warning("请先上传车辆外观图");
+    return;
+  }
+
+  emit("generate", {
+    inputAssetId: uploadedAsset.value.assetId,
+    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+    optionId: props.capability.kind === "scene" ? props.selectedOptionId : undefined,
+    useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
+    colorCode:
+      props.capability.code === "paint-refresh" ? selectedPaintColorId.value : undefined,
+  });
 }
 
 watch(
@@ -589,7 +627,12 @@ const activeCreateRatioLabel = computed(() => {
         短视频生成为 Beta 能力：可上传车图预览流程，点击「生成演示」不会创建真实任务，右侧可查看演示视频。
       </section>
 
-      <UploadTaskCard :capability="props.capability" />
+      <UploadTaskCard
+        :capability="props.capability"
+        :uploaded-file-name="uploadedFileName"
+        :is-uploading="isUploadingVehicle"
+        @select-file="handleVehicleFileSelected"
+      />
 
       <CapabilityOptionSelector
         v-if="hasBlock('selector')"
@@ -612,6 +655,8 @@ const activeCreateRatioLabel = computed(() => {
           type="warning"
           size="large"
           class="min-w-48 !rounded-xl"
+          :loading="props.isGenerating"
+          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
           @click="handleGenerate"
         >
           {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}
@@ -717,7 +762,12 @@ const activeCreateRatioLabel = computed(() => {
     </template>
 
     <template v-else>
-      <UploadTaskCard :capability="props.capability" />
+      <UploadTaskCard
+        :capability="props.capability"
+        :uploaded-file-name="uploadedFileName"
+        :is-uploading="isUploadingVehicle"
+        @select-file="handleVehicleFileSelected"
+      />
 
       <PaintColorPicker
         v-if="showPaintColorPicker"
@@ -769,6 +819,8 @@ const activeCreateRatioLabel = computed(() => {
           type="warning"
           size="large"
           class="min-w-48 !rounded-xl"
+          :loading="props.isGenerating"
+          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
           @click="handleGenerate"
         >
           {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}

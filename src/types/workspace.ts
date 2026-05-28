@@ -40,6 +40,14 @@ export interface WorkspaceGenerateResult {
   imageHeight?: number
 }
 
+export interface WorkspaceGeneratePayload {
+  inputAssetId: string
+  outputRatio: string
+  optionId?: string
+  useLogo?: boolean
+  colorCode?: string
+}
+
 export interface WorkspaceCapability {
   code: string
   apiCode: string

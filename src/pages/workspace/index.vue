@@ -1,168 +1,196 @@
-<script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useMessage } from "naive-ui";
+﻿<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useMessage } from 'naive-ui'
 
-import { SHORT_VIDEO_BETA_MESSAGE } from "@/constants/short-video-beta";
+import { createGenerationTask, getGenerationTask, type GenerationTaskDetail, type CreateGenerationTaskPayload } from '@/api/visual-workbench'
+import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
+import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
+import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
+import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
+import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
+import type { WorkspaceGeneratePayload, WorkspaceGenerateResult, WorkspaceRecentItem } from '@/types/workspace'
 
-import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
-import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
-import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
-import {
-  defaultWorkspaceCapabilityCode,
-  workspaceCapabilities,
-} from "@/constants/workspace";
-import type {
-  WorkspaceGenerateResult,
-  WorkspaceRecentItem,
-} from "@/types/workspace";
-
-const outputRatioSizeMap: Record<string, { width: number; height: number }> = {
-  "主图 1:1": { width: 1024, height: 1024 },
-  "主图 3:4": { width: 900, height: 1200 },
-  "主图 4:3": { width: 1200, height: 900 },
-  "主图 9:16": { width: 900, height: 1600 },
-  "主图 16:9": { width: 1600, height: 900 },
-};
-
-const route = useRoute();
-const router = useRouter();
-const message = useMessage();
-
-const SHORT_VIDEO_CAPABILITY_CODE = "future-short-video";
+const route = useRoute()
+const router = useRouter()
+const message = useMessage()
+const SHORT_VIDEO_CAPABILITY_CODE = 'future-short-video'
 
 function resolveCapabilityCode(code: unknown) {
-  if (typeof code !== "string") {
-    return defaultWorkspaceCapabilityCode;
-  }
-
-  return workspaceCapabilities.some((item) => item.code === code)
-    ? code
-    : defaultWorkspaceCapabilityCode;
+  if (typeof code !== 'string') return defaultWorkspaceCapabilityCode
+  return workspaceCapabilities.some((item) => item.code === code) ? code : defaultWorkspaceCapabilityCode
 }
 
-const activeCode = ref(resolveCapabilityCode(route.params.code));
-const generationResult = ref<WorkspaceGenerateResult | null>(null);
+const activeCode = ref(resolveCapabilityCode(route.params.code))
+const generationResult = ref<WorkspaceGenerateResult | null>(null)
+const isGenerating = ref(false)
 
 watch(
   () => route.params.code,
   (code, previousCode) => {
-    const resolved = resolveCapabilityCode(code);
-    activeCode.value = resolved;
+    const resolved = resolveCapabilityCode(code)
+    activeCode.value = resolved
 
-    if (
-      resolved === SHORT_VIDEO_CAPABILITY_CODE &&
-      previousCode !== code
-    ) {
-      notifyShortVideoBeta();
+    if (resolved === SHORT_VIDEO_CAPABILITY_CODE && previousCode !== code) {
+      notifyShortVideoBeta()
     }
   },
-);
+)
 
 function notifyShortVideoBeta() {
-  message.info(SHORT_VIDEO_BETA_MESSAGE, { duration: 4500 });
+  message.info(SHORT_VIDEO_BETA_MESSAGE, { duration: 4500 })
 }
 
 function handleSelectCapability(code: string) {
-  activeCode.value = code;
+  activeCode.value = code
 
   if (route.params.code !== code) {
-    router.replace({ name: "Workspace", params: { code } });
-    return;
+    router.replace({ name: 'Workspace', params: { code } })
+    return
   }
 
   if (code === SHORT_VIDEO_CAPABILITY_CODE) {
-    notifyShortVideoBeta();
+    notifyShortVideoBeta()
   }
 }
 
 const activeCapability = computed(
-  () =>
-    workspaceCapabilities.find(
-      (capability) => capability.code === activeCode.value,
-    ) ?? workspaceCapabilities[0],
-);
+  () => workspaceCapabilities.find((capability) => capability.code === activeCode.value) ?? workspaceCapabilities[0],
+)
 
-const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? "");
+const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? '')
 
 watch(activeCode, () => {
-  const capability = activeCapability.value;
-  const hasSelected = capability.options.some(
-    (item) => item.id === selectedOptionId.value,
-  );
+  const capability = activeCapability.value
+  const hasSelected = capability.options.some((item) => item.id === selectedOptionId.value)
 
   if (!hasSelected) {
-    selectedOptionId.value = capability.options[0]?.id ?? "";
+    selectedOptionId.value = capability.options[0]?.id ?? ''
   }
 
-  generationResult.value = null;
-});
-
-const mockResultPreview =
-  "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1400&q=85";
+  generationResult.value = null
+})
 
 function formatGenerateTime(date = new Date()) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function handleGenerate(payload: { outputRatio: string }) {
-  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
-    notifyShortVideoBeta();
-    return;
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function pollGenerationTask(taskId: string) {
+  let latest: GenerationTaskDetail | null = null
+
+  for (let index = 0; index < 90; index += 1) {
+    const task = await getGenerationTask(taskId)
+    latest = task
+
+    if (task.status === 'success' || task.status === 'fail' || task.status === 'canceled') {
+      return task
+    }
+
+    await sleep(index === 0 ? 1500 : 4000)
   }
 
-  const option = activeCapability.value.options.find(
-    (item) => item.id === selectedOptionId.value,
-  );
-  const sceneTitle = option?.title ?? "经典白棚";
+  return latest
+}
 
-  const size = outputRatioSizeMap[payload.outputRatio] ?? {
-    width: 1600,
-    height: 900,
-  };
+function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResult | null {
+  const image = task.resultImages[0]
+  if (!image?.url) return null
 
-  generationResult.value = {
-    createdAt: formatGenerateTime(),
+  const option = activeCapability.value.options.find((item) => item.id === task.optionId)
+  const sceneTitle = option?.title ?? activeCapability.value.label
+
+  return {
+    createdAt: task.updatedAt ?? task.createdAt ?? formatGenerateTime(),
     statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: payload.outputRatio,
-    previewImage: mockResultPreview,
+    ratioLabel: `${task.outputRatio} · ${task.resolution}`,
+    previewImage: image.url,
     previewAlt: `${sceneTitle}生成结果`,
-    downloadUrl: mockResultPreview,
-    imageWidth: size.width,
-    imageHeight: size.height,
-  };
+    downloadUrl: image.url,
+    imageWidth: 1600,
+    imageHeight: 900,
+  }
+}
+
+async function handleGenerate(payload: WorkspaceGeneratePayload) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    notifyShortVideoBeta()
+    return
+  }
+
+  isGenerating.value = true
+  generationResult.value = null
+
+  try {
+    const createPayload: CreateGenerationTaskPayload = {
+      inputAssetId: payload.inputAssetId,
+      optionId: payload.optionId,
+      useLogo: payload.useLogo,
+      colorCode: payload.colorCode,
+    }
+
+    const created = await createGenerationTask(activeCapability.value.code, createPayload)
+    message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
+
+    const task = await pollGenerationTask(created.taskId)
+    if (!task) {
+      message.warning('任务仍在处理中，请稍后刷新查看')
+      return
+    }
+
+    if (task.status !== 'success') {
+      message.error(task.error?.message || '生成任务失败')
+      return
+    }
+
+    const result = buildResultFromTask(task)
+    if (!result) {
+      message.warning('任务完成，但没有返回图片')
+      return
+    }
+
+    generationResult.value = result
+    message.success('生成完成')
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '生成任务创建失败'
+    message.error(text)
+  } finally {
+    isGenerating.value = false
+  }
 }
 
 function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResult | null {
-  if (item.status !== "success" || !item.previewImage) return null;
+  if (item.status !== 'success' || !item.previewImage) return null
 
   return {
     createdAt: item.createdAt,
     statusText: `已完成 · ${item.sceneLabel ?? item.title} · 单图生成结果`,
-    ratioLabel: item.ratioLabel ?? "主图",
+    ratioLabel: item.ratioLabel ?? '主图',
     previewImage: item.previewImage,
     previewAlt: item.title,
     downloadUrl: item.previewImage,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,
-  };
+  }
 }
 
 function handlePickRecent(item: WorkspaceRecentItem) {
-  const result = buildResultFromRecent(item);
-  if (result) generationResult.value = result;
+  const result = buildResultFromRecent(item)
+  if (result) generationResult.value = result
 }
 
 function clearGenerationResult() {
-  generationResult.value = null;
+  generationResult.value = null
 }
 
 function handlePickTemplate(payload: { capabilityCode: string; optionId: string }) {
-  selectedOptionId.value = payload.optionId;
-  activeCode.value = payload.capabilityCode;
-  generationResult.value = null;
+  selectedOptionId.value = payload.optionId
+  activeCode.value = payload.capabilityCode
+  generationResult.value = null
 }
 </script>
 
@@ -170,10 +198,7 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
   <main class="workspace-page bg-[var(--app-bg)]">
     <section class="workspace-shell">
       <div class="workspace-col workspace-col--nav">
-        <WorkspaceSidebar
-          :active-code="activeCode"
-          @select="handleSelectCapability"
-        />
+        <WorkspaceSidebar :active-code="activeCode" @select="handleSelectCapability" />
       </div>
 
       <section
@@ -187,6 +212,7 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
           <CapabilityGeneratePanel
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
+            :is-generating="isGenerating"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
           />

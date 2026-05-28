@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { NSwitch, useMessage } from 'naive-ui'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import { useWorkspaceLogo } from '@/composables/useWorkspaceLogo'
 
@@ -14,10 +14,26 @@ const {
   recentLogo,
   useRecentLogo,
   isUploading,
+  isLoading,
   uploadedAtLabel,
+  refreshDefaultLogo,
   uploadLogoFile,
   selectRecentLogo,
 } = useWorkspaceLogo()
+
+watch(
+  enabled,
+  async (value) => {
+    if (!value) return
+
+    try {
+      await refreshDefaultLogo()
+    } catch {
+      message.warning('Logo 读取失败，请稍后重试')
+    }
+  },
+  { immediate: true },
+)
 
 function openUpload() {
   fileInputRef.value?.click()
@@ -29,9 +45,7 @@ async function handleFileChange(event: Event) {
 
   input.value = ''
 
-  if (!file) {
-    return
-  }
+  if (!file) return
 
   try {
     await uploadLogoFile(file)
@@ -48,7 +62,7 @@ function handleSelectRecent() {
     return
   }
 
-  message.success('已切换为最近 Logo')
+  message.success('已选择默认 Logo')
 }
 </script>
 
@@ -71,7 +85,7 @@ function handleSelectRecent() {
           <div class="min-w-0">
             <h3 class="text-base font-black tracking-normal text-[var(--app-text)]">使用 Logo</h3>
             <p class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]">
-              开启后可沿用最近上传 Logo，也可重新上传。
+              开启后创建任务会传 useLogo，后端自动使用当前账号默认 Logo。
             </p>
           </div>
           <NSwitch v-model:value="enabled" size="large" />
@@ -83,7 +97,7 @@ function handleSelectRecent() {
           type="button"
           class="recent-logo-row"
           :class="{ 'is-active': useRecentLogo && recentLogo }"
-          :disabled="!recentLogo"
+          :disabled="!recentLogo || isLoading"
           @click="handleSelectRecent"
         >
           <span class="logo-preview">
@@ -92,11 +106,11 @@ function handleSelectRecent() {
               :src="recentLogo.dataUrl"
               :alt="recentLogo.fileName"
             />
-            <span v-else class="logo-preview-placeholder">宇昊名车</span>
+            <span v-else class="logo-preview-placeholder">Logo</span>
           </span>
           <span class="logo-copy">
-            <strong>使用最近 Logo</strong>
-            <small>{{ recentLogo ? uploadedAtLabel : '暂无记录，请先上传' }}</small>
+            <strong>{{ recentLogo ? '使用默认 Logo' : '暂无默认 Logo' }}</strong>
+            <small>{{ recentLogo ? uploadedAtLabel : '请先上传 PNG / SVG Logo' }}</small>
           </span>
         </button>
 
@@ -107,7 +121,7 @@ function handleSelectRecent() {
           :disabled="isUploading"
           @click="openUpload"
         >
-          {{ isUploading ? '上传中…' : '重新上传' }}
+          {{ isUploading ? '上传中...' : '重新上传' }}
         </button>
       </div>
     </section>
@@ -120,8 +134,8 @@ function handleSelectRecent() {
       @click="openUpload"
     >
       <Icon icon="mdi:tag-heart-outline" />
-      <strong>{{ isUploading ? '上传中…' : '上传 Logo' }}</strong>
-      <span>PNG / SVG · ≤2MB</span>
+      <strong>{{ isUploading ? '上传中...' : '上传 Logo' }}</strong>
+      <span>PNG / SVG · <= 2MB</span>
     </button>
   </div>
 </template>
