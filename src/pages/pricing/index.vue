@@ -1,145 +1,189 @@
 <script setup lang="ts">
-import { NButton, NTag } from "naive-ui";
+import { Icon } from "@iconify/vue";
 
-import { pricingPageCopy, pricingPageMetrics, pricingPlans } from "@/constants/prototype";
+import PricingPlanCard from "@/components/business/pricing/PricingPlanCard.vue";
+import {
+  pricingPageCopy,
+  pricingPageMetrics,
+  pricingPlans,
+} from "@/constants/prototype";
 
-const plans = pricingPlans.map((plan, index) => ({
-  name: plan.name,
-  description: plan.benefits[plan.benefits.length - 1] ?? "",
-  price: plan.price,
-  tone: index === 1 ? "amber" : index === 2 ? "violet" : "blue",
-  action: plan.action,
-  recommended: plan.featured ?? false,
-  benefits: plan.benefits,
+const copy = pricingPageCopy;
+
+const metricIcons = [
+  "mdi:account-multiple-outline",
+  "mdi:cash-fast",
+  "mdi:image-filter-center-focus-strong-outline",
+] as const;
+
+const metrics = pricingPageMetrics.map((metric, index) => ({
+  ...metric,
+  icon: metricIcons[index] ?? "mdi:chart-line",
 }));
 
-const metrics = pricingPageMetrics;
-const copy = pricingPageCopy;
+const heroHighlights = [
+  { label: "开通账号", value: "1 - 20", icon: "mdi:account-key-outline" },
+  { label: "积分额度", value: "200 - 9,800", icon: "mdi:diamond-stone" },
+  { label: "图组并发", value: "1 - 20", icon: "mdi:layers-triple-outline" },
+] as const;
+
+const serviceItems = [
+  {
+    title: "账号协同",
+    desc: "多账号按套餐开通，适合门店与运营团队并行处理。",
+    icon: "mdi:account-network-outline",
+  },
+  {
+    title: "素材产能",
+    desc: "外观图组、单张生成和场景配置可按业务节奏使用。",
+    icon: "mdi:image-multiple-outline",
+  },
+  {
+    title: "采购可控",
+    desc: "套餐权益清晰，积分有效期与使用范围在购买前明确展示。",
+    icon: "mdi:clipboard-check-outline",
+  },
+] as const;
+
+const purchaseNotes = [
+  "套餐购买后积分立即到账",
+  "积分有效期为购买日起 12 个月",
+  "旗舰档支持专属场景配置沟通",
+] as const;
 </script>
 
 <template>
-  <main class="min-h-[calc(100vh-var(--app-header-offset))] bg-[var(--app-bg)] px-4 py-5 lg:px-6">
-    <section class="mx-auto max-w-[1320px]">
-      <div
-        class="relative overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-8 shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:px-8"
+  <main
+    class="min-h-[calc(100vh-var(--app-header-offset))] bg-[var(--app-bg)] px-3 py-6 sm:px-4 lg:px-6"
+  >
+    <section class="mx-auto w-full max-w-[1320px] space-y-6">
+      <section
+        class="relative w-full max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_24px_90px_rgba(15,23,42,0.12)]"
       >
-        <div class="relative z-10 max-w-3xl">
-          <h1 class="text-4xl font-black tracking-normal text-[var(--app-text)]">{{ copy.title }}</h1>
-          <p class="mt-4 text-base font-semibold leading-7 text-[var(--app-text-soft)]">
-            {{ copy.subtitle }}
-          </p>
-          <NTag type="info" round :bordered="false" class="mt-5">{{ copy.tag }}</NTag>
-        </div>
-
-        <div class="absolute right-8 top-5 hidden h-28 w-80 rounded-[32px] bg-blue-100/80 lg:block">
-          <div class="absolute bottom-5 left-10 h-10 w-20 rounded-full bg-blue-500/70"></div>
-          <div class="absolute right-14 top-5 h-20 w-16 rounded-xl bg-blue-400/70"></div>
-          <div class="absolute right-5 bottom-4 h-16 w-10 rounded-lg bg-cyan-200"></div>
-        </div>
-      </div>
-
-      <section class="mt-5 grid gap-5 lg:grid-cols-3">
         <div
-          v-for="plan in plans"
-          :key="plan.name"
-          class="relative flex min-h-[500px] flex-col rounded-xl border bg-[var(--app-surface)] p-8 shadow-[0_18px_52px_rgba(15,23,42,0.08)]"
-          :class="plan.recommended ? 'border-amber-400 shadow-[0_20px_60px_rgba(245,158,11,0.18)]' : 'border-[var(--app-border)]'"
+          class="grid min-w-0 gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-8 xl:p-10"
         >
-          <div
-            v-if="plan.recommended"
-            class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-300 px-6 py-1 text-sm font-black text-amber-950"
-          >
-            {{ copy.recommended }}
-          </div>
-
-          <div class="flex items-start gap-5">
+          <div class="min-w-0 max-w-full">
             <div
-              class="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-3xl font-black"
-              :class="
-                plan.tone === 'amber'
-                  ? 'bg-amber-50 text-amber-500'
-                  : plan.tone === 'violet'
-                    ? 'bg-violet-50 text-violet-500'
-                    : 'bg-blue-50 text-blue-500'
-              "
+              class="inline-flex items-center gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-black text-orange-500"
             >
-              {{ plan.name.slice(0, 1) }}
+              <Icon icon="mdi:briefcase-check-outline" class="text-lg" />
+              企业采购方案
             </div>
-            <div>
-              <h2 class="text-2xl font-black tracking-normal text-[var(--app-text)]">
-                {{ plan.name }}
-              </h2>
-              <p class="mt-2 text-sm font-semibold text-[var(--app-text-soft)]">
-                {{ plan.description }}
-              </p>
-            </div>
-          </div>
 
-          <div class="mt-7 flex items-end gap-2">
-            <strong
-              class="text-4xl font-black tracking-normal"
-              :class="plan.tone === 'amber' ? 'text-amber-500' : 'text-blue-500'"
+            <h1
+              class="mt-6 max-w-3xl break-words text-[2.35rem] font-black leading-tight tracking-normal text-[var(--app-text)] [overflow-wrap:anywhere] sm:text-4xl md:text-5xl"
             >
-              {{ plan.price }}
-            </strong>
-            <span class="pb-1 text-base font-semibold text-[var(--app-text-soft)]">{{ copy.unit }}</span>
-          </div>
+              {{ copy.title }}
+            </h1>
+            <p
+              class="mt-5 max-w-3xl break-words text-[15px] font-semibold leading-7 text-[var(--app-text-soft)] [overflow-wrap:anywhere] sm:text-base sm:leading-8 md:text-lg"
+            >
+              {{ copy.subtitle }}
+            </p>
+            <p
+              class="mt-4 max-w-2xl break-words text-sm font-semibold leading-6 text-[var(--app-text-soft)] [overflow-wrap:anywhere]"
+            >
+              {{ copy.tag }}
+            </p>
 
-          <div class="my-7 h-px bg-[var(--app-border)]"></div>
-
-          <ul class="grid gap-4 text-sm font-semibold text-[var(--app-text)]">
-            <li v-for="benefit in plan.benefits" :key="benefit" class="flex items-start gap-3">
-              <span
-                class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs text-white"
-                :class="plan.tone === 'amber' ? 'bg-amber-500' : 'bg-blue-500'"
+            <div class="mt-7 grid gap-3 sm:flex sm:flex-wrap">
+              <a
+                href="#pricing-plans"
+                class="inline-flex h-12 w-full items-center justify-center rounded-full bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(249,115,22,0.24)] transition hover:bg-orange-600 active:translate-y-px sm:w-auto"
               >
-                +
-              </span>
-              <span class="min-w-0 flex-1">{{ benefit }}</span>
-            </li>
-          </ul>
+                查看套餐
+                <Icon icon="mdi:arrow-down" class="ml-2 text-lg" />
+              </a>
+              <RouterLink
+                to="/enterprise"
+                class="inline-flex h-12 w-full items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-6 text-sm font-black text-[var(--app-text)] transition hover:border-orange-400 hover:text-orange-500 active:translate-y-px sm:w-auto"
+              >
+                申请企业账号
+                <Icon icon="mdi:arrow-right" class="ml-2 text-lg" />
+              </RouterLink>
+            </div>
 
-          <NButton
-            size="large"
-            round
-            class="mt-auto"
-            :type="plan.recommended ? 'warning' : 'primary'"
-            :ghost="!plan.recommended"
+            <dl class="mt-8 grid gap-3 sm:grid-cols-3">
+              <div
+                v-for="item in heroHighlights"
+                :key="item.label"
+                class="min-w-0 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4"
+              >
+                <dt
+                  class="flex items-center gap-2 text-sm font-bold text-[var(--app-text-soft)]"
+                >
+                  <Icon :icon="item.icon" class="text-lg text-orange-500" />
+                  {{ item.label }}
+                </dt>
+                <dd
+                  class="mt-3 text-2xl font-black tracking-normal text-[var(--app-text)]"
+                >
+                  {{ item.value }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <aside
+            class="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)]"
+            aria-label="套餐服务概览"
           >
-            {{ plan.action }}
-          </NButton>
+            <img
+              class="h-40 w-full object-cover"
+              src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=82"
+              alt="汽车展厅车辆内容生产场景"
+            />
+            <div class="space-y-4 p-5">
+              <div>
+                <p class="text-sm font-black text-orange-500">团队产能配置</p>
+                <h2
+                  class="mt-2 text-2xl font-black tracking-normal text-[var(--app-text)]"
+                >
+                  从试运行到集团交付
+                </h2>
+              </div>
+
+              <div class="grid gap-3">
+                <div
+                  v-for="item in serviceItems"
+                  :key="item.title"
+                  class="flex min-w-0 gap-3 rounded-lg bg-[var(--app-surface)] p-4"
+                >
+                  <Icon
+                    :icon="item.icon"
+                    class="mt-0.5 shrink-0 text-xl text-orange-500"
+                  />
+                  <div class="min-w-0">
+                    <h3
+                      class="break-words text-sm font-black text-[var(--app-text)] [overflow-wrap:anywhere]"
+                    >
+                      {{ item.title }}
+                    </h3>
+                    <p
+                      class="mt-1 break-words text-sm font-semibold leading-6 text-[var(--app-text-soft)] [overflow-wrap:anywhere]"
+                    >
+                      {{ item.desc }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
       <section
-        class="mt-5 grid gap-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_18px_52px_rgba(15,23,42,0.06)] lg:grid-cols-3"
+        id="pricing-plans"
+        class="grid scroll-mt-28 gap-5 lg:grid-cols-3"
       >
-        <div
-          v-for="metric in metrics"
-          :key="metric.label"
-          class="flex items-center gap-5 rounded-xl bg-[var(--app-surface-soft)] p-5"
-        >
-          <div
-            class="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-blue-100 text-2xl font-black text-blue-500"
-          >
-            {{ metric.label.slice(0, 1) }}
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-[var(--app-text-soft)]">{{ metric.label }}</p>
-            <strong class="mt-2 block text-3xl font-black tracking-normal text-[var(--app-text)]">
-              {{ metric.value }}
-            </strong>
-            <p class="mt-2 text-sm font-semibold text-[var(--app-text-soft)]">{{ metric.desc }}</p>
-          </div>
-        </div>
+        <PricingPlanCard
+          v-for="(plan, index) in pricingPlans"
+          :key="plan.name"
+          :plan="plan"
+          :index="index"
+        />
       </section>
-
-      <div
-        class="mt-5 flex items-center justify-between rounded-lg bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-600"
-      >
-        <span>{{ copy.footer }}</span>
-        <button type="button" class="font-black">{{ copy.footerAction }}</button>
-      </div>
     </section>
   </main>
 </template>

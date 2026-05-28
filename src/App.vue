@@ -37,8 +37,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
         },
         // 按钮
         Button: {
-          borderRadiusMedium: "12px",
-          borderRadiusLarge: "12px",
+          borderRadiusMedium: "4px",
+          borderRadiusLarge: "4px",
         },
         // 输入框
         Input: {
@@ -66,8 +66,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
         },
         // 按钮
         Button: {
-          borderRadiusMedium: "12px",
-          borderRadiusLarge: "12px",
+          borderRadiusMedium: "4px",
+          borderRadiusLarge: "4px",
         },
         // 输入框
         Input: {

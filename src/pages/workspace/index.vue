@@ -28,7 +28,7 @@ watch(activeCapability, (capability) => {
 <template>
   <main class="min-h-[calc(100vh-var(--app-header-offset))] bg-[var(--app-bg)]">
     <section
-      class="grid min-h-[calc(100vh-var(--app-header-offset))] gap-0 lg:grid-cols-[280px_minmax(420px,560px)_1fr]"
+      class="grid h-[calc(100vh-var(--app-header-offset))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[240px_minmax(360px,500px)_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(380px,520px)_minmax(0,1fr)]"
     >
       <WorkspaceSidebar
         :active-code="activeCode"
@@ -36,7 +36,7 @@ watch(activeCapability, (capability) => {
       />
 
       <section
-        class="flex min-h-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-surface-soft)]"
+        class="flex min-h-0 min-w-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-surface-soft)]"
       >
         <div class="flex-1 overflow-y-auto p-5 lg:p-8 CapabilityGeneratePanel">
           <CapabilityGeneratePanel

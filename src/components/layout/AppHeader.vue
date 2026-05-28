@@ -13,9 +13,9 @@ const currentUser = {
 </script>
 
 <template>
-  <div class="sticky top-0 z-50 px-4 pt-4">
+  <div class="sticky top-0 z-50 ra-0">
     <header
-      class="flex min-h-[72px] w-full max-w-full items-center gap-4 overflow-hidden rounded-2xl bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
+      class="flex min-h-[72px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
     >
       <RouterLink
         to="/home"
@@ -27,7 +27,9 @@ const currentUser = {
           <Icon icon="mdi:car-side" class="text-2xl" />
         </span>
         <span class="hidden min-w-0 sm:block">
-          <span class="block text-base font-black leading-tight text-[var(--app-text)]">
+          <span
+            class="block text-base font-black leading-tight text-[var(--app-text)]"
+          >
             企业二手车
           </span>
           <span
@@ -77,7 +79,11 @@ const currentUser = {
           @click="appStore.toggleTheme()"
         >
           <Icon
-            :icon="appStore.isDarkMode ? 'mdi:white-balance-sunny' : 'mdi:moon-waning-crescent'"
+            :icon="
+              appStore.isDarkMode
+                ? 'mdi:white-balance-sunny'
+                : 'mdi:moon-waning-crescent'
+            "
             class="text-base"
           />
           <span class="hidden md:inline">

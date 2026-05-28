@@ -4,7 +4,7 @@ export const useAppStore = defineStore("app", {
   state: () => ({
     appName: "脸谱AI汽车电商视觉平台",
     sidebarCollapsed: false,
-    isDarkMode: true,
+    isDarkMode: false,
   }),
   actions: {
     setSidebarCollapsed(collapsed: boolean) {
