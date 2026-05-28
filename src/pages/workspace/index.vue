@@ -5,7 +5,6 @@ import { useRoute, useRouter } from "vue-router";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
-import { WORKSPACE_DEFAULT_CAPABILITY } from "@/constants/app-flow";
 import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,

@@ -1,17 +1,39 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { NDropdown } from "naive-ui";
-import { useRouter } from "vue-router";
+import { computed, inject } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import { topNavigation } from "@/constants/prototype";
+import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
+import type { NavItem } from "@/types/prototype";
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const userMenuOptions = [{ label: "退出登录", key: "logout" }];
+
+function isNavItemActive(item: NavItem) {
+  if (item.workbenchEntry) {
+    return route.path.startsWith("/workspace");
+  }
+
+  return route.path === item.path || route.path.startsWith(`${item.path}/`);
+}
+
+function handleNavClick(item: NavItem) {
+  if (item.workbenchEntry && !authStore.isLoggedIn) {
+    workbenchEntry?.openWorkbench();
+    return;
+  }
+
+  router.push(item.path);
+}
 
 function handleUserMenu(key: string) {
   if (key !== "logout") {
@@ -21,6 +43,8 @@ function handleUserMenu(key: string) {
   authStore.logout();
   router.push("/home");
 }
+
+const navItems = computed(() => topNavigation);
 </script>
 
 <template>
@@ -55,32 +79,26 @@ function handleUserMenu(key: string) {
         class="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] xl:gap-2 [&::-webkit-scrollbar]:hidden"
         aria-label="主导航"
       >
-        <RouterLink
-          v-for="item in topNavigation"
+        <button
+          v-for="item in navItems"
           :key="item.path"
-          :to="item.path"
-          custom
-          v-slot="{ navigate, isActive }"
+          type="button"
+          class="inline-flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 xl:min-w-[80px] xl:px-4"
+          :class="
+            isNavItemActive(item)
+              ? 'bg-[var(--app-header-nav-active-bg)] text-[var(--app-header-nav-active)]'
+              : 'text-[var(--app-header-nav)] hover:bg-[var(--app-header-nav-active-bg)]/60 hover:text-[var(--app-header-nav-active)]'
+          "
+          @click="handleNavClick(item)"
         >
-          <button
-            type="button"
-            class="inline-flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 xl:min-w-[80px] xl:px-4"
-            :class="
-              isActive
-                ? 'bg-[var(--app-header-nav-active-bg)] text-[var(--app-header-nav-active)]'
-                : 'text-[var(--app-header-nav)] hover:bg-[var(--app-header-nav-active-bg)]/60 hover:text-[var(--app-header-nav-active)]'
-            "
-            @click="navigate"
-          >
-            <Icon
-              v-if="item.icon"
-              :icon="item.icon"
-              class="text-xl"
-              :class="isActive ? 'text-[var(--app-header-nav-active)]' : ''"
-            />
-            <span>{{ item.label }}</span>
-          </button>
-        </RouterLink>
+          <Icon
+            v-if="item.icon"
+            :icon="item.icon"
+            class="text-xl"
+            :class="isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''"
+          />
+          <span>{{ item.label }}</span>
+        </button>
       </nav>
 
       <div class="ml-auto flex shrink-0 items-center gap-2 xl:gap-3">
@@ -119,6 +137,15 @@ function handleUserMenu(key: string) {
             <Icon icon="mdi:chevron-down" class="hidden text-base lg:inline" />
           </button>
         </NDropdown>
+
+        <RouterLink
+          v-else-if="route.path !== '/auth'"
+          to="/auth"
+          class="inline-flex items-center gap-1.5 rounded-full bg-[var(--app-header-nav-active-bg)] px-3 py-2 text-xs font-semibold text-[var(--app-header-nav-active)] no-underline transition hover:opacity-90"
+        >
+          <Icon icon="mdi:account-key-outline" class="text-base" />
+          <span class="hidden sm:inline">登录</span>
+        </RouterLink>
       </div>
     </header>
   </div>

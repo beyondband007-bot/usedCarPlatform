@@ -75,47 +75,56 @@ const deliveryResults = [
   {
     title: "主图 · 玻璃展厅",
     ratio: "1 / 1",
-    image: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "竖版详情 · 车头",
     ratio: "3 / 4",
-    image: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "横版详情 · 侧身",
     ratio: "4 / 3",
-    image: "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "内饰 · 中控",
     ratio: "1 / 1",
-    image: "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "竖版封面 · 灯光",
     ratio: "3 / 4",
-    image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "竖屏封面 · 全屏",
     ratio: "9 / 16",
-    image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "宽幅 · 展厅氛围",
     ratio: "16 / 9",
-    image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=82",
+    image:
+      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=82",
   },
   {
     title: "细节 · 轮毂",
     ratio: "1 / 1",
-    image: "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=900&q=82",
   },
   {
     title: "内饰 · 座椅",
     ratio: "4 / 3",
-    image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=900&q=82",
+    image:
+      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=900&q=82",
   },
 ] as const;
 
@@ -188,126 +197,130 @@ function getDeliveryMediaStyle(ratio: string) {
     </template>
 
     <template v-else>
-    <header class="assist-tabs">
-      <div class="tab-group" role="tablist" aria-label="辅助面板">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === 'guide'"
-          :class="{ active: activeTab === 'guide' }"
-          @click="activeTab = 'guide'"
-        >
-          使用教程
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === 'recent'"
-          :class="{ active: activeTab === 'recent' }"
-          @click="activeTab = 'recent'"
-        >
-          最近生成
-        </button>
-      </div>
-      <button class="expand-button" type="button">展开灯光</button>
-    </header>
-
-    <section v-if="activeTab === 'guide'" class="guide-layout">
-      <section class="tutorial-section" aria-label="使用教程流程">
-        <h2>使用教程</h2>
-        <div class="tutorial-flow">
-          <template
-            v-for="(step, index) in tutorialSteps"
-            :key="`${capability.code}-${step.title}`"
+      <header class="assist-tabs">
+        <div class="tab-group" role="tablist" aria-label="辅助面板">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'guide'"
+            :class="{ active: activeTab === 'guide' }"
+            @click="activeTab = 'guide'"
           >
-            <motion.article
-              :initial="{ opacity: 0, y: 14 }"
-              :animate="{ opacity: 1, y: 0 }"
-              :transition="{ duration: 0.32, delay: index * 0.04 }"
-              class="tutorial-step"
+            使用教程
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'recent'"
+            :class="{ active: activeTab === 'recent' }"
+            @click="activeTab = 'recent'"
+          >
+            最近生成
+          </button>
+        </div>
+      </header>
+
+      <section v-if="activeTab === 'guide'" class="guide-layout">
+        <section class="tutorial-section" aria-label="使用教程流程">
+          <h2>使用教程</h2>
+          <div class="tutorial-flow">
+            <template
+              v-for="(step, index) in tutorialSteps"
+              :key="`${capability.code}-${step.title}`"
             >
-              <div class="tutorial-placeholder">
-                <Icon :icon="step.icon" />
-                <span>{{ String(index + 1).padStart(2, "0") }}</span>
+              <motion.article
+                :initial="{ opacity: 0, y: 14 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.32, delay: index * 0.04 }"
+                class="tutorial-step"
+              >
+                <div class="tutorial-placeholder">
+                  <Icon :icon="step.icon" />
+                  <span>{{ String(index + 1).padStart(2, "0") }}</span>
+                </div>
+                <p>{{ step.title }}</p>
+              </motion.article>
+              <Icon
+                v-if="index < tutorialSteps.length - 1"
+                icon="mdi:arrow-right"
+                class="flow-arrow"
+              />
+            </template>
+          </div>
+        </section>
+
+        <section class="template-section" aria-label="模板推荐">
+          <h2>初次使用？试试这些</h2>
+          <div class="template-grid">
+            <article
+              v-for="item in templateCards"
+              :key="item.title"
+              role="button"
+              tabindex="0"
+              class="template-card"
+              :class="{ 'is-active': isTemplateActive(item) }"
+              :aria-pressed="isTemplateActive(item)"
+              :aria-label="`选择${item.title}场景`"
+              @click="handleTemplatePick(item)"
+              @keydown.enter.prevent="handleTemplatePick(item)"
+              @keydown.space.prevent="handleTemplatePick(item)"
+            >
+              <img
+                :src="item.image"
+                :alt="item.title"
+                loading="lazy"
+                draggable="false"
+              />
+              <div class="template-title">
+                <span>{{ item.title }}</span>
               </div>
-              <p>{{ step.title }}</p>
-            </motion.article>
-            <Icon
-              v-if="index < tutorialSteps.length - 1"
-              icon="mdi:arrow-right"
-              class="flow-arrow"
-            />
-          </template>
-        </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="requirement-section" aria-label="素材要求">
+          <strong>素材要求</strong>
+          <div class="requirement-list">
+            <span v-for="item in capability.requirements" :key="item">
+              <Icon icon="mdi:check" />
+              {{ item }}
+            </span>
+          </div>
+        </section>
       </section>
 
-      <section class="template-section" aria-label="模板推荐">
-        <h2>初次使用？试试这些</h2>
-        <div class="template-grid">
-          <article
-            v-for="item in templateCards"
-            :key="item.title"
-            role="button"
-            tabindex="0"
-            class="template-card"
-            :class="{ 'is-active': isTemplateActive(item) }"
-            :aria-pressed="isTemplateActive(item)"
-            :aria-label="`选择${item.title}场景`"
-            @click="handleTemplatePick(item)"
-            @keydown.enter.prevent="handleTemplatePick(item)"
-            @keydown.space.prevent="handleTemplatePick(item)"
-          >
-            <img :src="item.image" :alt="item.title" loading="lazy" draggable="false" />
-            <div class="template-title">
-              <span>{{ item.title }}</span>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="requirement-section" aria-label="素材要求">
-        <strong>素材要求</strong>
-        <div class="requirement-list">
-          <span v-for="item in capability.requirements" :key="item">
-            <Icon icon="mdi:check" />
-            {{ item }}
+      <section v-else class="recent-layout" aria-label="最近生成">
+        <article
+          v-for="item in capability.recent"
+          :key="item.id"
+          class="recent-card"
+          :class="{ 'is-clickable': canOpenRecent(item) }"
+          :role="canOpenRecent(item) ? 'button' : undefined"
+          :tabindex="canOpenRecent(item) ? 0 : undefined"
+          :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+          @click="handleRecentPick(item)"
+          @keydown.enter.prevent="handleRecentPick(item)"
+          @keydown.space.prevent="handleRecentPick(item)"
+        >
+          <img
+            v-if="item.thumbnail"
+            :src="item.thumbnail"
+            :alt="item.title"
+            loading="lazy"
+            draggable="false"
+          />
+          <div v-else class="recent-empty">
+            <Icon icon="mdi:image-outline" />
+          </div>
+          <div class="recent-copy">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.createdAt }}</p>
+          </div>
+          <span class="recent-status" :class="`is-${item.status}`">
+            {{ statusLabelMap[item.status] }}
           </span>
-        </div>
+        </article>
       </section>
-    </section>
-
-    <section v-else class="recent-layout" aria-label="最近生成">
-      <article
-        v-for="item in capability.recent"
-        :key="item.id"
-        class="recent-card"
-        :class="{ 'is-clickable': canOpenRecent(item) }"
-        :role="canOpenRecent(item) ? 'button' : undefined"
-        :tabindex="canOpenRecent(item) ? 0 : undefined"
-        :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
-        @click="handleRecentPick(item)"
-        @keydown.enter.prevent="handleRecentPick(item)"
-        @keydown.space.prevent="handleRecentPick(item)"
-      >
-        <img
-          v-if="item.thumbnail"
-          :src="item.thumbnail"
-          :alt="item.title"
-          loading="lazy"
-          draggable="false"
-        />
-        <div v-else class="recent-empty">
-          <Icon icon="mdi:image-outline" />
-        </div>
-        <div class="recent-copy">
-          <h3>{{ item.title }}</h3>
-          <p>{{ item.createdAt }}</p>
-        </div>
-        <span class="recent-status" :class="`is-${item.status}`">
-          {{ statusLabelMap[item.status] }}
-        </span>
-      </article>
-    </section>
     </template>
   </aside>
 </template>
@@ -327,8 +340,7 @@ function getDeliveryMediaStyle(ratio: string) {
   --assist-scroll-thumb: rgba(126, 164, 216, 0.58);
   --assist-scroll-thumb-hover: rgba(151, 186, 233, 0.82);
   --assist-shadow:
-    0 18px 52px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 18px 52px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
   display: flex;
   container-type: inline-size;
@@ -341,7 +353,11 @@ function getDeliveryMediaStyle(ratio: string) {
   overflow: hidden;
   padding: 18px 20px 20px;
   background:
-    radial-gradient(720px 180px at 48% 0%, rgba(47, 130, 255, 0.13), transparent 72%),
+    radial-gradient(
+      720px 180px at 48% 0%,
+      rgba(47, 130, 255, 0.13),
+      transparent 72%
+    ),
     var(--assist-bg);
   color: var(--assist-text);
 }
@@ -358,11 +374,14 @@ function getDeliveryMediaStyle(ratio: string) {
   --assist-scroll-thumb: rgba(85, 133, 194, 0.48);
   --assist-scroll-thumb-hover: rgba(47, 130, 255, 0.68);
   --assist-shadow:
-    0 14px 34px rgba(78, 111, 148, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 14px 34px rgba(78, 111, 148, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 
   background:
-    radial-gradient(760px 180px at 45% 0%, rgba(176, 215, 255, 0.24), transparent 74%),
+    radial-gradient(
+      760px 180px at 45% 0%,
+      rgba(176, 215, 255, 0.24),
+      transparent 74%
+    ),
     #f8fbff;
 }
 
@@ -433,7 +452,9 @@ function getDeliveryMediaStyle(ratio: string) {
   font-size: 14px;
   font-weight: 900;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .delivery-download-all:hover {
@@ -473,11 +494,19 @@ function getDeliveryMediaStyle(ratio: string) {
 .delivery-result-layout::-webkit-scrollbar-thumb {
   border: 2px solid var(--assist-scroll-track);
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--assist-blue), var(--assist-scroll-thumb));
+  background: linear-gradient(
+    90deg,
+    var(--assist-blue),
+    var(--assist-scroll-thumb)
+  );
 }
 
 .delivery-result-layout::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, var(--assist-blue), var(--assist-scroll-thumb-hover));
+  background: linear-gradient(
+    90deg,
+    var(--assist-blue),
+    var(--assist-scroll-thumb-hover)
+  );
 }
 
 .delivery-result-card {
@@ -611,7 +640,11 @@ function getDeliveryMediaStyle(ratio: string) {
 
 .guide-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
+  background: linear-gradient(
+    180deg,
+    var(--assist-blue),
+    var(--assist-scroll-thumb)
+  );
 }
 
 .tutorial-section,
@@ -641,7 +674,9 @@ function getDeliveryMediaStyle(ratio: string) {
 
 .tutorial-flow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr);
+  grid-template-columns:
+    minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr)
+    42px minmax(0, 1fr);
   align-items: center;
   gap: clamp(10px, 1.2vw, 22px);
   min-height: clamp(128px, 15vh, 188px);
@@ -666,13 +701,21 @@ function getDeliveryMediaStyle(ratio: string) {
   border: 1px dashed rgba(73, 130, 218, 0.34);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.02)
+    ),
     var(--assist-card-strong);
 }
 
 .theme-light .tutorial-placeholder {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(239, 246, 255, 0.8)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.85),
+      rgba(239, 246, 255, 0.8)
+    ),
     var(--assist-card-strong);
 }
 
@@ -847,7 +890,11 @@ function getDeliveryMediaStyle(ratio: string) {
 
 .recent-card.is-clickable:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border));
+  border-color: color-mix(
+    in srgb,
+    var(--assist-blue) 45%,
+    var(--assist-border)
+  );
   box-shadow:
     0 0 0 2px rgba(47, 130, 255, 0.12),
     var(--assist-shadow);
@@ -942,7 +989,9 @@ function getDeliveryMediaStyle(ratio: string) {
 
   .tutorial-flow {
     gap: 10px;
-    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr);
+    grid-template-columns:
+      minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr)
+      28px minmax(0, 1fr);
   }
 
   .flow-arrow {

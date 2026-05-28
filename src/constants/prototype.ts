@@ -10,15 +10,26 @@ import planEnterpriseBasicBg from '@/img/企业基础.png'
 import planEnterpriseTeamBg from '@/img/企业团队.png'
 import planEnterpriseFlagshipBg from '@/img/企业旗舰.png'
 
+/** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
   { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
+  {
+    path: '/workspace',
+    label: '视觉工作台',
+    icon: 'mdi:palette-outline',
+    workbenchEntry: true,
+  },
+  { path: '/auth', label: '企业账号登录', icon: 'mdi:account-key-outline' },
+  { path: '/visitor-layer', label: '访客浮层', icon: 'mdi:account-group-outline' },
 ]
 
-/** 登录后二级导航：工作台为唯一业务入口 */
+/** 登录后二级导航 */
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/workspace', label: '视觉工作台' },
+  { path: '/credits', label: '积分查询' },
+  { path: '/package-points', label: '套餐/积分' },
 ]
 
 export const homeFeatures: FeatureEntry[] = [

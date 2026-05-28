@@ -51,18 +51,6 @@ const emit = defineEmits<{
         </div>
       </section>
 
-      <div class="workspace-sidebar-footer mt-auto grid gap-2">
-        <RouterLink to="/credits" class="block">
-          <NButton quaternary size="large" block class="!rounded-2xl !font-semibold">
-            积分查询
-          </NButton>
-        </RouterLink>
-        <RouterLink to="/package-points" class="block">
-          <NButton type="warning" ghost size="large" block class="!rounded-2xl">
-            套餐/积分
-          </NButton>
-        </RouterLink>
-      </div>
     </div>
   </NCard>
 </template>

@@ -13,6 +13,7 @@ import type {
 
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
+import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
@@ -613,43 +614,7 @@ const activeCreateRatioLabel = computed(() => {
       <template
         v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
       >
-        <div
-          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-5 logo-setting-card"
-        >
-          <div class="flex items-start justify-between gap-5">
-            <div class="min-w-0">
-              <h3
-                class="text-base font-black tracking-normal text-[var(--app-text)]"
-              >
-                使用 Logo
-              </h3>
-              <p
-                class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]"
-              >
-                开启后可沿用最近上传 Logo，也可重新上传。
-              </p>
-            </div>
-            <NSwitch v-model:value="useLogo" size="large" />
-          </div>
-        </div>
-
-        <section v-if="useLogo" class="logo-expand-panel" aria-label="Logo 上传设置">
-          <button type="button" class="recent-logo-card">
-            <span class="logo-preview">宇昊名车</span>
-            <span class="logo-copy">
-              <strong>使用最近 Logo</strong>
-              <small>2026-05-18 上传</small>
-            </span>
-          </button>
-
-          <button type="button" class="reupload-button">重新上传</button>
-
-          <button type="button" class="logo-upload-drop">
-            <Icon icon="mdi:tag-heart-outline" />
-            <strong>上传 Logo</strong>
-            <span>PNG / SVG · ≤2MB</span>
-          </button>
-        </section>
+        <WorkspaceLogoPanel v-model:enabled="useLogo" />
 
         <div
           class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
@@ -1353,115 +1318,4 @@ const activeCreateRatioLabel = computed(() => {
     conic-gradient(#5b9dff var(--progress), rgba(255, 255, 255, 0.12) 0);
 }
 
-.logo-setting-card {
-  border-radius: 12px;
-}
-
-.logo-expand-panel {
-  display: grid;
-  gap: 12px;
-  margin-top: -10px;
-  padding: 0;
-}
-
-.recent-logo-card,
-.reupload-button,
-.logo-upload-drop {
-  width: 100%;
-  border-radius: 10px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.recent-logo-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 68px;
-  padding: 12px 16px;
-  border: 2px solid #2f7cff;
-  background: color-mix(in srgb, var(--app-surface) 88%, #2f7cff 12%);
-  text-align: left;
-}
-
-.logo-preview {
-  display: grid;
-  place-items: center;
-  width: 96px;
-  height: 34px;
-  flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 5px;
-  border: 1px solid rgba(246, 184, 78, 0.62);
-  background:
-    linear-gradient(90deg, rgba(255, 214, 114, 0.14), transparent 55%),
-    #111722;
-  color: #f5d37a;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.logo-copy {
-  min-width: 0;
-}
-
-.logo-copy strong,
-.logo-copy small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.logo-copy strong {
-  color: var(--app-text);
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.logo-copy small {
-  margin-top: 4px;
-  color: var(--app-text-soft);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.reupload-button {
-  height: 48px;
-  border: 2px solid #2f7cff;
-  background: color-mix(in srgb, var(--app-surface-soft) 88%, #2f7cff 12%);
-  color: var(--app-text);
-  text-align: left;
-  padding: 0 18px;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.logo-upload-drop {
-  display: grid;
-  place-items: center;
-  min-height: 190px;
-  border: 1px dashed color-mix(in srgb, #2f7cff 44%, var(--app-border));
-  background: color-mix(in srgb, var(--app-surface) 92%, #2f7cff 8%);
-  color: var(--app-text);
-}
-
-.logo-upload-drop .iconify {
-  margin-bottom: 12px;
-  color: #f4a329;
-  font-size: 34px;
-}
-
-.logo-upload-drop strong {
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.logo-upload-drop span {
-  margin-top: 8px;
-  color: var(--app-text-soft);
-  font-size: 14px;
-  font-weight: 700;
-}
 </style>

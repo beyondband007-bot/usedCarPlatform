@@ -2,6 +2,8 @@ export interface NavItem {
   path: string
   label: string
   icon?: string
+  /** 访客点击时展示浮层，登录后正常跳转 path */
+  workbenchEntry?: boolean
 }
 
 export interface HeroMetric {
