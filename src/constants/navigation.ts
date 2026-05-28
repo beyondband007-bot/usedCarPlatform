@@ -36,7 +36,7 @@ export const mainNavigation: NavigationItem[] = [
     description: '积分消耗明细',
   },
   {
-    path: '/enterprise',
+    path: '/auth',
     label: '企业账号',
     description: '成员与权限管理',
   },

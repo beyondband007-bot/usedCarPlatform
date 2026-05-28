@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
 import { motion } from 'motion-v'
+
+defineEmits<{
+  enterWorkbench: []
+}>()
 </script>
 
 <template>
@@ -26,11 +30,16 @@ import { motion } from 'motion-v'
       <p>
         针对汽车电商、出海车商打造专业级的内容生成平台
       </p>
-      <RouterLink to="/workspace" class="home-hero-action">
-        <NButton size="large" round class="home-primary-button">
+      <div class="home-hero-action">
+        <NButton
+          size="large"
+          round
+          class="home-primary-button"
+          @click="$emit('enterWorkbench')"
+        >
           进入视觉工作台
         </NButton>
-      </RouterLink>
+      </div>
     </motion.div>
   </section>
 </template>

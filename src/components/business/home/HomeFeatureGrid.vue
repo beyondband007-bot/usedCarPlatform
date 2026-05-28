@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { homeFeatures } from '@/constants/prototype'
 import HomeFeatureCard from '@/components/business/home/HomeFeatureCard.vue'
+
+defineEmits<{
+  enterWorkbench: []
+}>()
 </script>
 
 <template>
@@ -10,6 +14,7 @@ import HomeFeatureCard from '@/components/business/home/HomeFeatureCard.vue'
       :key="entry.title"
       :entry="entry"
       :index="index"
+      @enter-workbench="$emit('enterWorkbench')"
     />
   </section>
 </template>

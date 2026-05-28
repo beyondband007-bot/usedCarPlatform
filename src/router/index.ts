@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { AUTH_ROUTE } from '@/constants/app-flow'
 import { useAuthStore } from '@/stores/auth'
 
 import { routes } from './routes'
@@ -34,7 +35,7 @@ router.beforeEach((to) => {
   }
 
   return {
-    path: '/enterprise',
+    path: AUTH_ROUTE,
     query: {
       redirect: to.fullPath,
     },

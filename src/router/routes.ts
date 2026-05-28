@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
 import AuthenticatedLayout from '@/layouts/AuthenticatedLayout.vue'
 import BasicLayout from '@/layouts/BasicLayout.vue'
 
@@ -28,8 +29,8 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'enterprise',
-        name: 'Enterprise',
+        path: 'auth',
+        name: 'Auth',
         component: () => import('@/pages/enterprise/index.vue'),
         meta: {
           title: '企业账号登录',
@@ -38,13 +39,12 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'enterprise',
+        redirect: '/auth',
+      },
+      {
         path: 'visitor-layer',
-        name: 'VisitorLayer',
-        component: () => import('@/pages/visitor-layer/index.vue'),
-        meta: {
-          title: '访客浮层',
-          description: '访客引导浮层',
-        },
+        redirect: '/home',
       },
       {
         path: '',
@@ -55,11 +55,18 @@ export const routes: RouteRecordRaw[] = [
         children: [
           {
             path: 'workspace',
+            redirect: {
+              name: 'Workspace',
+              params: { code: WORKSPACE_DEFAULT_CAPABILITY },
+            },
+          },
+          {
+            path: 'workspace/:code',
             name: 'Workspace',
             component: () => import('@/pages/workspace/index.vue'),
             meta: {
               title: '视觉工作台',
-              description: 'AI 图片生成核心',
+              description: '场景影棚 · 批量上新 · 成片交付',
               requiresAuth: true,
             },
           },
@@ -71,6 +78,7 @@ export const routes: RouteRecordRaw[] = [
               title: '积分查询',
               description: '积分流水查询',
               requiresAuth: true,
+              hiddenNav: true,
             },
           },
           {
@@ -81,6 +89,7 @@ export const routes: RouteRecordRaw[] = [
               title: '套餐/积分',
               description: '当前套餐和积分概览',
               requiresAuth: true,
+              hiddenNav: true,
             },
           },
         ],

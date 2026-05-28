@@ -15,6 +15,8 @@ export interface FeatureEntry {
   action: string
   image: string
   to?: string
+  /** 未登录时弹出访客浮层，已登录进入视觉工作台 */
+  workbenchEntry?: boolean
   dark?: boolean
   highlighted?: boolean
 }

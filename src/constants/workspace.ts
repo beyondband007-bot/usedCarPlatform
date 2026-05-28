@@ -1,10 +1,11 @@
+import { workspaceFlowModules } from '@/constants/app-flow'
 import type {
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
   WorkspaceMenuGroup,
   WorkspaceOption,
   WorkspaceTemplateRecommendation,
-} from "@/types/workspace";
+} from '@/types/workspace'
 
 const tutorial = [
   {
@@ -350,7 +351,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: "batch-new",
     apiCode: "batch_listing",
     kind: "batch",
-    groupTitle: "批量 & 交付",
+    groupTitle: '批量上新',
     icon: "📦",
     label: "批量上新",
     tag: "套餐商价",
@@ -369,7 +370,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: "delivery",
     apiCode: "asset_delivery",
     kind: "delivery",
-    groupTitle: "批量 & 交付",
+    groupTitle: '成片交付',
     icon: "📁",
     label: "成片交付",
     tag: "可用",
@@ -419,28 +420,19 @@ export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[]
   },
 ];
 
-export const workspaceMenuGroups: WorkspaceMenuGroup[] = workspaceCapabilities.reduce<WorkspaceMenuGroup[]>(
-  (groups, capability) => {
-    const targetGroup = groups.find((group) => group.title === capability.groupTitle);
-
-    const item = {
-      code: capability.code,
-      icon: capability.icon,
-      label: capability.label,
-      tag: capability.tag,
-      tagType: capability.tagType,
-    };
-
-    if (targetGroup) {
-      targetGroup.items.push(item);
-    } else {
-      groups.push({
-        title: capability.groupTitle,
-        items: [item],
-      });
-    }
-
-    return groups;
-  },
-  [],
-);
+export const workspaceMenuGroups: WorkspaceMenuGroup[] = workspaceFlowModules.map(
+  (module) => ({
+    title: module.title,
+    items: workspaceCapabilities
+      .filter((capability) =>
+        (module.capabilityCodes as readonly string[]).includes(capability.code),
+      )
+      .map((capability) => ({
+        code: capability.code,
+        icon: capability.icon,
+        label: capability.label,
+        tag: capability.tag,
+        tagType: capability.tagType,
+      })),
+  }),
+)

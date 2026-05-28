@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
+import { WORKSPACE_DEFAULT_CAPABILITY } from "@/constants/app-flow";
 import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,
@@ -21,8 +23,36 @@ const outputRatioSizeMap: Record<string, { width: number; height: number }> = {
   "主图 16:9": { width: 1600, height: 900 },
 };
 
-const activeCode = ref(defaultWorkspaceCapabilityCode);
+const route = useRoute();
+const router = useRouter();
+
+function resolveCapabilityCode(code: unknown) {
+  if (typeof code !== "string") {
+    return defaultWorkspaceCapabilityCode;
+  }
+
+  return workspaceCapabilities.some((item) => item.code === code)
+    ? code
+    : defaultWorkspaceCapabilityCode;
+}
+
+const activeCode = ref(resolveCapabilityCode(route.params.code));
 const generationResult = ref<WorkspaceGenerateResult | null>(null);
+
+watch(
+  () => route.params.code,
+  (code) => {
+    activeCode.value = resolveCapabilityCode(code);
+  },
+);
+
+function handleSelectCapability(code: string) {
+  activeCode.value = code;
+
+  if (route.params.code !== code) {
+    router.replace({ name: "Workspace", params: { code } });
+  }
+}
 
 const activeCapability = computed(
   () =>
@@ -115,7 +145,7 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
       <div class="workspace-col workspace-col--nav">
         <WorkspaceSidebar
           :active-code="activeCode"
-          @select="activeCode = $event"
+          @select="handleSelectCapability"
         />
       </div>
 

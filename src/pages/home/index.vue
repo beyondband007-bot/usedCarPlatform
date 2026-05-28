@@ -2,16 +2,29 @@
 import HomeFeatureGrid from '@/components/business/home/HomeFeatureGrid.vue'
 import HomeHero from '@/components/business/home/HomeHero.vue'
 import HomeWorkflow from '@/components/business/home/HomeWorkflow.vue'
+import VisitorWorkbenchModal from '@/components/business/home/VisitorWorkbenchModal.vue'
+import { useWorkbenchEntry } from '@/composables/useWorkbenchEntry'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+const {
+  visitorModalVisible,
+  openWorkbench,
+  closeVisitorModal,
+  goToAuth,
+} = useWorkbenchEntry()
 </script>
 
 <template>
   <main class="home-page" :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'">
-    <HomeHero />
-    <HomeFeatureGrid />
+    <HomeHero @enter-workbench="openWorkbench" />
+    <HomeFeatureGrid @enter-workbench="openWorkbench" />
     <HomeWorkflow />
+    <VisitorWorkbenchModal
+      v-model:show="visitorModalVisible"
+      @login="goToAuth"
+      @dismiss="closeVisitorModal"
+    />
   </main>
 </template>
 

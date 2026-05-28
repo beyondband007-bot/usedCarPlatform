@@ -13,23 +13,20 @@ import planEnterpriseFlagshipBg from '@/img/企业旗舰.png'
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
   { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
-  { path: '/enterprise', label: '企业账号登录', icon: 'mdi:account-key-outline' },
-  { path: '/visitor-layer', label: '访客浮层', icon: 'mdi:account-group-outline' },
 ]
 
+/** 登录后二级导航：工作台为唯一业务入口 */
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/workspace', label: '视觉工作台' },
-  { path: '/credits', label: '积分查询' },
-  { path: '/package-points', label: '套餐/积分' },
 ]
 
 export const homeFeatures: FeatureEntry[] = [
   {
     title: '视觉工作台',
-    description: '场景影棚、车辆美容、成片交付',
-    action: '连接客服',
-    to: '/workspace',
+    description: '场景影棚、批量上新、成片交付',
+    action: '进入工作台',
+    workbenchEntry: true,
     image:
       'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=780&q=80',
   },

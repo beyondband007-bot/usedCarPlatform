@@ -17,7 +17,7 @@ function handleLogin() {
       ? route.query.redirect
       : '/workspace'
 
-  if (redirect === '/enterprise') {
+  if (redirect === '/auth' || redirect === '/enterprise') {
     router.push('/workspace')
     return
   }

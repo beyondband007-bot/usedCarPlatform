@@ -4,10 +4,20 @@ import { motion } from "motion-v";
 
 import type { FeatureEntry } from "@/types/prototype";
 
-defineProps<{
+const props = defineProps<{
   entry: FeatureEntry;
   index: number;
 }>();
+
+const emit = defineEmits<{
+  enterWorkbench: [];
+}>();
+
+function handleAction() {
+  if (props.entry.workbenchEntry) {
+    emit("enterWorkbench");
+  }
+}
 </script>
 
 <template>
@@ -34,6 +44,14 @@ defineProps<{
             {{ entry.action }}
           </NButton>
         </RouterLink>
+        <NButton
+          v-else-if="entry.workbenchEntry"
+          round
+          class="home-feature-button"
+          @click="handleAction"
+        >
+          {{ entry.action }}
+        </NButton>
         <NButton v-else round class="home-feature-button is-disabled">
           {{ entry.action }}
         </NButton>
