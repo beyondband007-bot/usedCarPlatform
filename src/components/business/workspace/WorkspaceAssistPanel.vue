@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
+import { useMessage } from "naive-ui";
 
+import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
+import {
+  deliveryResults,
+  formatDeliveryRatio,
+  type DeliveryResultItem,
+} from "@/constants/delivery-results";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
+import { downloadAllDeliveryResults } from "@/utils/delivery-download";
 import type {
   WorkspaceCapability,
   WorkspaceGenerateResult,
@@ -52,6 +60,11 @@ function handleTemplatePick(item: (typeof templateCards)[number]) {
 const appStore = useAppStore();
 const activeTab = ref<"guide" | "recent">("guide");
 
+const showTemplateRecommendations = computed(
+  () =>
+    props.capability.kind !== "beauty" && props.capability.kind !== "interior",
+);
+
 const tutorialSteps = [
   {
     title: "上传车图",
@@ -71,62 +84,49 @@ const tutorialSteps = [
   },
 ] as const;
 
-const deliveryResults = [
-  {
-    title: "主图 · 玻璃展厅",
-    ratio: "1 / 1",
-    image:
-      "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=900&q=82",
+const deliveryResultCount = deliveryResults.length;
+const message = useMessage();
+const selectedDeliveryItem = ref<DeliveryResultItem | null>(null);
+const isDownloadingAllDelivery = ref(false);
+
+watch(
+  () => props.capability.kind,
+  () => {
+    selectedDeliveryItem.value = null;
   },
-  {
-    title: "竖版详情 · 车头",
-    ratio: "3 / 4",
-    image:
-      "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "横版详情 · 侧身",
-    ratio: "4 / 3",
-    image:
-      "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "内饰 · 中控",
-    ratio: "1 / 1",
-    image:
-      "https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "竖版封面 · 灯光",
-    ratio: "3 / 4",
-    image:
-      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "竖屏封面 · 全屏",
-    ratio: "9 / 16",
-    image:
-      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "宽幅 · 展厅氛围",
-    ratio: "16 / 9",
-    image:
-      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=82",
-  },
-  {
-    title: "细节 · 轮毂",
-    ratio: "1 / 1",
-    image:
-      "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "内饰 · 座椅",
-    ratio: "4 / 3",
-    image:
-      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=900&q=82",
-  },
-] as const;
+);
+
+function buildDeliveryGenerateResult(
+  item: DeliveryResultItem,
+): WorkspaceGenerateResult {
+  return {
+    createdAt: "2026-05-20 09:32",
+    statusText: `已完成 · ${item.title} · 成片预览`,
+    ratioLabel: formatDeliveryRatio(item.ratio),
+    previewImage: item.image,
+    previewAlt: item.title,
+    downloadUrl: item.image,
+  };
+}
+
+function openDeliveryPreview(item: DeliveryResultItem) {
+  selectedDeliveryItem.value = item;
+}
+
+function closeDeliveryPreview() {
+  selectedDeliveryItem.value = null;
+}
+
+async function handleDownloadAllDelivery() {
+  isDownloadingAllDelivery.value = true;
+
+  try {
+    const count = await downloadAllDeliveryResults();
+    message.success(`已开始下载 ${count} 张成片`);
+  } finally {
+    isDownloadingAllDelivery.value = false;
+  }
+}
 
 const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   waiting: "等待中",
@@ -136,15 +136,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   fail: "失败",
 };
 
-function formatDeliveryRatio(ratio: string) {
-  return ratio.replace(/\s*\/\s*/g, ":");
-}
 
-function getDeliveryMediaStyle(ratio: string) {
-  return {
-    "--delivery-ratio": ratio,
-  } as Record<string, string>;
-}
 </script>
 
 <template>
@@ -158,27 +150,47 @@ function getDeliveryMediaStyle(ratio: string) {
       @back="emit('backFromResult')"
     />
 
+    <WorkspaceGenerateResultPanel
+      v-else-if="selectedDeliveryItem"
+      :result="buildDeliveryGenerateResult(selectedDeliveryItem)"
+      @back="closeDeliveryPreview"
+    />
+
+    <ShortVideoBetaPanel v-else-if="capability.code === 'future-short-video'" />
+
     <template v-else-if="capability.kind === 'delivery'">
       <div class="delivery-panel">
         <header class="delivery-result-head">
           <div>
             <p>成片结果</p>
             <h2>5月展厅批量上新</h2>
-            <span>已完成 12 张 · 根据生成比例自动排布</span>
+            <span
+              >已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span
+            >
           </div>
-          <button type="button" class="delivery-download-all">下载全部</button>
+          <button
+            type="button"
+            class="delivery-download-all"
+            :disabled="isDownloadingAllDelivery"
+            @click="handleDownloadAllDelivery"
+          >
+            {{ isDownloadingAllDelivery ? "下载中..." : "下载全部" }}
+          </button>
         </header>
 
         <section class="delivery-result-layout" aria-label="成片交付结果">
           <article
             v-for="item in deliveryResults"
             :key="item.title"
-            class="delivery-result-card"
+            class="delivery-result-card is-clickable"
+            role="button"
+            tabindex="0"
+            :aria-label="`查看大图：${item.title}`"
+            @click="openDeliveryPreview(item)"
+            @keydown.enter.prevent="openDeliveryPreview(item)"
+            @keydown.space.prevent="openDeliveryPreview(item)"
           >
-            <div
-              class="delivery-result-media"
-              :style="getDeliveryMediaStyle(item.ratio)"
-            >
+            <div class="delivery-result-media">
               <img
                 :src="item.image"
                 :alt="item.title"
@@ -188,8 +200,10 @@ function getDeliveryMediaStyle(ratio: string) {
               />
             </div>
             <footer class="delivery-result-foot">
-              <strong>{{ item.title }}</strong>
-              <span>{{ formatDeliveryRatio(item.ratio) }}</span>
+              <strong class="delivery-result-name">{{ item.title }}</strong>
+              <span class="delivery-result-ratio">{{
+                formatDeliveryRatio(item.ratio)
+              }}</span>
             </footer>
           </article>
         </section>
@@ -220,7 +234,11 @@ function getDeliveryMediaStyle(ratio: string) {
         </div>
       </header>
 
-      <section v-if="activeTab === 'guide'" class="guide-layout">
+      <section
+        v-if="activeTab === 'guide'"
+        class="guide-layout"
+        :class="{ 'is-compact-guide': !showTemplateRecommendations }"
+      >
         <section class="tutorial-section" aria-label="使用教程流程">
           <h2>使用教程</h2>
           <div class="tutorial-flow">
@@ -249,7 +267,11 @@ function getDeliveryMediaStyle(ratio: string) {
           </div>
         </section>
 
-        <section class="template-section" aria-label="模板推荐">
+        <section
+          v-if="showTemplateRecommendations"
+          class="template-section"
+          aria-label="模板推荐"
+        >
           <h2>初次使用？试试这些</h2>
           <div class="template-grid">
             <article
@@ -457,16 +479,23 @@ function getDeliveryMediaStyle(ratio: string) {
     border-color 0.2s ease;
 }
 
-.delivery-download-all:hover {
+.delivery-download-all:hover:not(:disabled) {
   border-color: rgba(47, 130, 255, 0.5);
   background: rgba(47, 130, 255, 0.2);
 }
 
+.delivery-download-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .delivery-result-layout {
+  display: grid;
   flex: 1;
   min-height: 0;
-  columns: 2;
-  column-gap: clamp(14px, 1.6vw, 20px);
+  align-content: start;
+  gap: clamp(10px, 1.2vw, 14px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 132px), 1fr));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -475,9 +504,27 @@ function getDeliveryMediaStyle(ratio: string) {
   scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
 
-@container (min-width: 860px) {
+@container (min-width: 420px) {
   .delivery-result-layout {
-    columns: 3;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  }
+}
+
+@container (min-width: 640px) {
+  .delivery-result-layout {
+    grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  }
+}
+
+@container (min-width: 900px) {
+  .delivery-result-layout {
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  }
+}
+
+@container (min-width: 1180px) {
+  .delivery-result-layout {
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   }
 }
 
@@ -510,10 +557,10 @@ function getDeliveryMediaStyle(ratio: string) {
 }
 
 .delivery-result-card {
-  display: inline-block;
+  display: flex;
   width: 100%;
-  margin: 0 0 clamp(14px, 1.6vw, 20px);
-  break-inside: avoid;
+  min-width: 0;
+  flex-direction: column;
   border: 1px solid var(--assist-border);
   border-radius: 12px;
   background: var(--assist-card);
@@ -521,13 +568,29 @@ function getDeliveryMediaStyle(ratio: string) {
   overflow: hidden;
 }
 
-.delivery-result-media {
-  --delivery-ratio: 1 / 1;
+.delivery-result-card.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
 
+.delivery-result-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
+  box-shadow: 0 10px 24px rgba(47, 130, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.delivery-result-card.is-clickable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--assist-blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.delivery-result-media {
   position: relative;
   width: 100%;
-  aspect-ratio: var(--delivery-ratio);
-  max-height: min(52vh, 520px);
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background:
     linear-gradient(145deg, rgba(47, 130, 255, 0.08), transparent 42%),
@@ -544,11 +607,9 @@ function getDeliveryMediaStyle(ratio: string) {
 }
 
 .delivery-result-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px 13px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 11px;
   border-top: 1px solid var(--assist-border-soft);
   background: color-mix(in srgb, var(--assist-card) 92%, white);
 }
@@ -557,26 +618,27 @@ function getDeliveryMediaStyle(ratio: string) {
   background: #fff;
 }
 
-.delivery-result-foot strong,
-.delivery-result-foot span {
+.delivery-result-name,
+.delivery-result-ratio {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.delivery-result-foot strong {
-  min-width: 0;
+.delivery-result-name {
   color: var(--assist-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
+  line-height: 1.35;
 }
 
-.delivery-result-foot span {
-  flex-shrink: 0;
+.delivery-result-ratio {
   color: var(--assist-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
 }
 
 .tab-group {
@@ -632,6 +694,10 @@ function getDeliveryMediaStyle(ratio: string) {
   padding: 0 6px 28px 0;
   scrollbar-width: thin;
   scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
+}
+
+.guide-layout.is-compact-guide {
+  grid-template-rows: auto auto;
 }
 
 .guide-layout::-webkit-scrollbar {
@@ -1003,9 +1069,6 @@ function getDeliveryMediaStyle(ratio: string) {
     gap: 14px;
   }
 
-  .delivery-result-layout {
-    column-count: 2;
-  }
 }
 
 @media (max-width: 1180px) {
@@ -1015,22 +1078,6 @@ function getDeliveryMediaStyle(ratio: string) {
 
   .delivery-result-head button {
     width: 100%;
-  }
-
-  .delivery-result-layout {
-    column-count: 1;
-  }
-}
-
-@container (min-width: 760px) {
-  .delivery-result-layout {
-    column-count: 2;
-  }
-}
-
-@container (min-width: 1040px) {
-  .delivery-result-layout {
-    column-count: 3;
   }
 }
 

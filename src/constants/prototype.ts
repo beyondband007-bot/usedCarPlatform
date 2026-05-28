@@ -21,7 +21,6 @@ export const topNavigation: NavItem[] = [
     workbenchEntry: true,
   },
   { path: '/auth', label: '企业账号登录', icon: 'mdi:account-key-outline' },
-  { path: '/visitor-layer', label: '访客浮层', icon: 'mdi:account-group-outline' },
 ]
 
 /** 登录后二级导航 */

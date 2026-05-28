@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { NDropdown } from "naive-ui";
+import { NPopover } from "naive-ui";
+import { ref } from "vue";
 import { computed, inject } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -16,7 +17,7 @@ const router = useRouter();
 const route = useRoute();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
-const userMenuOptions = [{ label: "退出登录", key: "logout" }];
+const userMenuOpen = ref(false);
 
 function isNavItemActive(item: NavItem) {
   if (item.workbenchEntry) {
@@ -35,16 +36,17 @@ function handleNavClick(item: NavItem) {
   router.push(item.path);
 }
 
-function handleUserMenu(key: string) {
-  if (key !== "logout") {
-    return;
-  }
-
+function handleLogout() {
+  userMenuOpen.value = false;
   authStore.logout();
   router.push("/home");
 }
 
-const navItems = computed(() => topNavigation);
+const navItems = computed(() =>
+  authStore.isLoggedIn
+    ? topNavigation.filter((item) => item.path !== "/auth")
+    : topNavigation,
+);
 </script>
 
 <template>
@@ -120,23 +122,46 @@ const navItems = computed(() => topNavigation);
           </span>
         </button>
 
-        <NDropdown
+        <NPopover
           v-if="authStore.isLoggedIn"
+          v-model:show="userMenuOpen"
           trigger="click"
-          :options="userMenuOptions"
-          @select="handleUserMenu"
+          placement="bottom-end"
+          :show-arrow="false"
+          raw
+          to="body"
         >
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 rounded-full px-2 py-2 text-xs font-semibold text-[var(--app-header-user)] transition hover:opacity-90"
+          <template #trigger>
+            <button
+              type="button"
+              class="user-menu-trigger"
+              :aria-expanded="userMenuOpen"
+              aria-haspopup="menu"
+            >
+              <span class="user-menu-avatar" aria-hidden="true">
+                <Icon icon="mdi:account-circle-outline" />
+              </span>
+              <span class="user-menu-name">{{ authStore.userName }}</span>
+              <Icon icon="mdi:chevron-down" class="user-menu-chevron" />
+            </button>
+          </template>
+
+          <div
+            class="user-menu-panel"
+            :class="appStore.isDarkMode ? 'is-dark' : 'is-light'"
+            role="menu"
           >
-            <Icon icon="mdi:office-building-outline" class="text-lg" />
-            <span class="hidden max-w-24 truncate lg:inline">
-              {{ authStore.userName }}
-            </span>
-            <Icon icon="mdi:chevron-down" class="hidden text-base lg:inline" />
-          </button>
-        </NDropdown>
+            <button
+              type="button"
+              class="user-menu-logout"
+              role="menuitem"
+              @click="handleLogout"
+            >
+              <Icon icon="mdi:logout" class="user-menu-logout-icon" />
+              退出登录
+            </button>
+          </div>
+        </NPopover>
 
         <RouterLink
           v-else-if="route.path !== '/auth'"
@@ -150,3 +175,124 @@ const navItems = computed(() => topNavigation);
     </header>
   </div>
 </template>
+
+<style scoped lang="scss">
+.user-menu-trigger {
+  display: inline-flex;
+  max-width: min(100%, 200px);
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-header-chip-bg);
+  color: var(--app-header-user);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.user-menu-trigger:hover {
+  border-color: color-mix(in srgb, #f97316 32%, var(--app-border));
+  background: var(--app-header-nav-active-bg);
+  box-shadow: 0 4px 14px color-mix(in srgb, #f97316 12%, transparent);
+}
+
+.user-menu-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f97316 14%, var(--app-header-chip-bg));
+  color: var(--app-header-nav-active);
+  font-size: 18px;
+}
+
+.user-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-chevron {
+  flex-shrink: 0;
+  font-size: 16px;
+  opacity: 0.72;
+}
+
+@media (max-width: 639px) {
+  .user-menu-name {
+    display: none;
+  }
+
+  .user-menu-trigger {
+    padding-inline: 6px;
+  }
+}
+</style>
+
+<style lang="scss">
+.user-menu-panel {
+  min-width: 152px;
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.user-menu-panel.is-light {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.14);
+}
+
+.user-menu-panel.is-dark {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #11131b;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+}
+
+.user-menu-logout {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.user-menu-panel.is-light .user-menu-logout {
+  color: #0f172a;
+}
+
+.user-menu-panel.is-dark .user-menu-logout {
+  color: #f8fafc;
+}
+
+.user-menu-panel.is-light .user-menu-logout:hover {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.user-menu-panel.is-dark .user-menu-logout:hover {
+  background: #1f2937;
+  color: #fb923c;
+}
+
+.user-menu-logout-icon {
+  font-size: 18px;
+}
+</style>

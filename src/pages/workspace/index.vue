@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useMessage } from "naive-ui";
+
+import { SHORT_VIDEO_BETA_MESSAGE } from "@/constants/short-video-beta";
 
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
@@ -24,6 +27,9 @@ const outputRatioSizeMap: Record<string, { width: number; height: number }> = {
 
 const route = useRoute();
 const router = useRouter();
+const message = useMessage();
+
+const SHORT_VIDEO_CAPABILITY_CODE = "future-short-video";
 
 function resolveCapabilityCode(code: unknown) {
   if (typeof code !== "string") {
@@ -40,16 +46,33 @@ const generationResult = ref<WorkspaceGenerateResult | null>(null);
 
 watch(
   () => route.params.code,
-  (code) => {
-    activeCode.value = resolveCapabilityCode(code);
+  (code, previousCode) => {
+    const resolved = resolveCapabilityCode(code);
+    activeCode.value = resolved;
+
+    if (
+      resolved === SHORT_VIDEO_CAPABILITY_CODE &&
+      previousCode !== code
+    ) {
+      notifyShortVideoBeta();
+    }
   },
 );
+
+function notifyShortVideoBeta() {
+  message.info(SHORT_VIDEO_BETA_MESSAGE, { duration: 4500 });
+}
 
 function handleSelectCapability(code: string) {
   activeCode.value = code;
 
   if (route.params.code !== code) {
     router.replace({ name: "Workspace", params: { code } });
+    return;
+  }
+
+  if (code === SHORT_VIDEO_CAPABILITY_CODE) {
+    notifyShortVideoBeta();
   }
 }
 
@@ -85,6 +108,11 @@ function formatGenerateTime(date = new Date()) {
 }
 
 function handleGenerate(payload: { outputRatio: string }) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    notifyShortVideoBeta();
+    return;
+  }
+
   const option = activeCapability.value.options.find(
     (item) => item.id === selectedOptionId.value,
   );
@@ -148,7 +176,13 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
         />
       </div>
 
-      <section class="workspace-col workspace-col--main">
+      <section
+        class="workspace-col workspace-col--main"
+        :class="{
+          'workspace-col--batch': activeCapability.kind === 'batch',
+          'workspace-col--delivery': activeCapability.kind === 'delivery',
+        }"
+      >
         <div class="workspace-col-scroll">
           <CapabilityGeneratePanel
             :capability="activeCapability"
@@ -175,15 +209,20 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
 
 <style scoped lang="scss">
 .workspace-page {
-  height: calc(100dvh - var(--app-header-offset));
-  min-height: calc(100vh - var(--app-header-offset));
+  display: flex;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
 .workspace-shell {
   display: grid;
-  height: 100%;
   min-height: 0;
+  flex: 1;
+  height: 100%;
   gap: 0;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr);
@@ -202,6 +241,12 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
   min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.workspace-col--nav,
+.workspace-col--assist {
+  display: flex;
+  flex-direction: column;
 }
 
 .workspace-col--main {
@@ -224,15 +269,30 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
   }
 }
 
+.workspace-col--batch .workspace-col-scroll,
+.workspace-col--delivery .workspace-col-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: clamp(12px, 1.5vw, 20px);
+
+  @media (width >= 1024px) {
+    padding: clamp(20px, 2vw, 28px) clamp(20px, 2vw, 28px)
+      clamp(12px, 1.5vw, 20px);
+  }
+}
+
 @media (width < 1024px) {
   .workspace-page {
     height: auto;
-    min-height: calc(100vh - var(--app-header-offset));
+    max-height: none;
+    min-height: calc(100dvh - var(--app-header-offset));
     overflow: visible;
   }
 
   .workspace-shell {
     height: auto;
+    flex: none;
     overflow: visible;
   }
 

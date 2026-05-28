@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
 import { secondaryNavigation } from '@/constants/prototype'
+import { useAuthStore } from '@/stores/auth'
 import type { NavItem } from '@/types/prototype'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 function isNavItemActive(item: NavItem) {
   if (item.path === '/workspace') {
@@ -49,5 +52,60 @@ function navigate(item: NavItem) {
         {{ item.label }}
       </button>
     </div>
+
+    <RouterLink
+      to="/credits"
+      class="subnav-credits shrink-0"
+      aria-label="查看积分余额与流水"
+    >
+      <Icon icon="mdi:diamond-stone" class="subnav-credits-icon" />
+      <span class="subnav-credits-label">积分余额</span>
+      <strong class="subnav-credits-value">{{ authStore.credits }}</strong>
+    </RouterLink>
   </nav>
 </template>
+
+<style scoped lang="scss">
+.subnav-credits {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--app-header-credits-bg);
+  color: var(--app-header-credits-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.subnav-credits:hover {
+  box-shadow: 0 4px 14px color-mix(in srgb, #f97316 14%, transparent);
+}
+
+.subnav-credits-icon {
+  flex-shrink: 0;
+  color: #3b82f6;
+  font-size: 14px;
+}
+
+.subnav-credits-label {
+  font-weight: 700;
+}
+
+.subnav-credits-value {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+@media (max-width: 767px) {
+  .subnav-credits-label {
+    display: none;
+  }
+}
+</style>

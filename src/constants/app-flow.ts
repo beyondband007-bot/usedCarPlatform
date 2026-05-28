@@ -2,7 +2,7 @@
  * 产品流程目录（访客首页 → 企业视觉工作台）
  *
  * 访客（顶栏：首页 / 企业套餐 / 视觉工作台）
- * ├─ 点击视觉工作台（顶栏或首页 CTA）→ 访客浮层 → /auth 登录 / 稍后再说
+ * ├─ 点击视觉工作台（顶栏或首页 CTA）→ 登录引导弹窗 → /auth 登录 / 稍后再说
  * ├─ 点击企业套餐 → /pricing
  * └─ 浏览案例与能力介绍
  *
@@ -18,7 +18,7 @@ export const WORKSPACE_ROUTE = '/workspace'
 
 export const WORKSPACE_DEFAULT_CAPABILITY = 'showroom-light'
 
-/** 工作台三大模块 */
+/** 工作台业务模块（与左侧子菜单分组对应） */
 export const workspaceFlowModules = [
   {
     id: 'scene',
@@ -30,24 +30,28 @@ export const workspaceFlowModules = [
       'outdoor-scene',
       'road-motion',
       'sky-studio',
-      'paint-refresh',
-      'light-consistency',
-      'interior-clean',
     ],
   },
   {
-    id: 'batch',
-    title: '批量上新',
-    description: '项目信息 · 图组上传 · 视觉预设 · 创建批量任务',
-    defaultCapabilityCode: 'batch-new',
-    capabilityCodes: ['batch-new'],
+    id: 'beauty',
+    title: '车辆美容',
+    description: '烤漆翻新 · 光污一致化',
+    defaultCapabilityCode: 'paint-refresh',
+    capabilityCodes: ['paint-refresh', 'light-consistency'],
   },
   {
-    id: 'delivery',
-    title: '成片交付',
-    description: '任务列表 · 预览切换 · 批量下载与删除',
-    defaultCapabilityCode: 'delivery',
-    capabilityCodes: ['delivery'],
+    id: 'interior',
+    title: '内饰',
+    description: '内饰清洁增强',
+    defaultCapabilityCode: 'interior-clean',
+    capabilityCodes: ['interior-clean'],
+  },
+  {
+    id: 'batch-delivery',
+    title: '批量 & 交付',
+    description: '批量上新任务 · 成片交付包',
+    defaultCapabilityCode: 'batch-new',
+    capabilityCodes: ['batch-new', 'delivery'],
   },
 ] as const
 

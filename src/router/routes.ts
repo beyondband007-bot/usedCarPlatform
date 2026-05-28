@@ -43,15 +43,6 @@ export const routes: RouteRecordRaw[] = [
         redirect: '/auth',
       },
       {
-        path: 'visitor-layer',
-        name: 'VisitorLayer',
-        component: () => import('@/pages/visitor-layer/index.vue'),
-        meta: {
-          title: '访客浮层',
-          description: '访客引导浮层',
-        },
-      },
-      {
         path: '',
         component: AuthenticatedLayout,
         meta: {
