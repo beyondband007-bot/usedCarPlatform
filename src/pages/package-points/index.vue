@@ -1281,6 +1281,12 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   .plan-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .plan-visual-stack {
+    margin-top: 12px;
+    transform: scale(0.82);
+    transform-origin: center center;
+  }
 }
 
 @media (max-height: 820px) and (min-width: 981px) {
