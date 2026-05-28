@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { useAuthStore } from '@/stores/auth'
+
 import { routes } from './routes'
 
 const router = createRouter({
@@ -8,6 +10,35 @@ const router = createRouter({
   scrollBehavior() {
     return { top: 0 }
   },
+})
+
+function resolveRedirectPath(redirect: unknown, fallback: string) {
+  return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : fallback
+}
+
+router.beforeEach((to) => {
+  const authStore = useAuthStore()
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+  const guestOnly = to.matched.some((record) => record.meta.guestOnly)
+
+  if (guestOnly && authStore.isLoggedIn) {
+    return resolveRedirectPath(to.query.redirect, '/workspace')
+  }
+
+  if (!requiresAuth) {
+    return true
+  }
+
+  if (authStore.isLoggedIn) {
+    return true
+  }
+
+  return {
+    path: '/enterprise',
+    query: {
+      redirect: to.fullPath,
+    },
+  }
 })
 
 export default router

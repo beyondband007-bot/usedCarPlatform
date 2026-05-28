@@ -3,6 +3,7 @@ import type {
   WorkspaceCapabilityBlock,
   WorkspaceMenuGroup,
   WorkspaceOption,
+  WorkspaceTemplateRecommendation,
 } from "@/types/workspace";
 
 const tutorial = [
@@ -30,8 +31,14 @@ const recent = [
     title: "经典白棚生成任务",
     status: "success",
     createdAt: "2026-05-20 09:32",
+    sceneLabel: "经典白棚",
+    ratioLabel: "主图 16:9",
     thumbnail:
       "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=220&q=80",
+    previewImage:
+      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1600&h=900&q=85",
+    imageWidth: 1600,
+    imageHeight: 900,
   },
   {
     id: "recent-2",
@@ -380,6 +387,37 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
 ];
 
 export const defaultWorkspaceCapabilityCode = "showroom-light";
+
+export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  {
+    title: "经典白棚",
+    capabilityCode: "showroom-light",
+    optionId: "white-studio",
+    image:
+      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "玻璃展厅",
+    capabilityCode: "showroom-light",
+    optionId: "glass-hall",
+    image:
+      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "城市光廊",
+    capabilityCode: "outdoor-scene",
+    optionId: "tree-park",
+    image:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "户外动态",
+    capabilityCode: "road-motion",
+    optionId: "urban-road",
+    image:
+      "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
 export const workspaceMenuGroups: WorkspaceMenuGroup[] = workspaceCapabilities.reduce<WorkspaceMenuGroup[]>(
   (groups, capability) => {

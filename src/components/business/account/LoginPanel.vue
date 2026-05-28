@@ -1,6 +1,29 @@
 <script setup lang="ts">
 import { NButton, NInput } from 'naive-ui'
 import { motion } from 'motion-v'
+import { useRoute, useRouter } from 'vue-router'
+
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+
+function handleLogin() {
+  authStore.login()
+
+  const redirect =
+    typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      ? route.query.redirect
+      : '/workspace'
+
+  if (redirect === '/enterprise') {
+    router.push('/workspace')
+    return
+  }
+
+  router.push(redirect)
+}
 </script>
 
 <template>
@@ -25,7 +48,7 @@ import { motion } from 'motion-v'
         </label>
       </div>
 
-      <NButton type="primary" size="large" block class="login-submit">
+      <NButton type="primary" size="large" block class="login-submit" @click="handleLogin">
         登录
       </NButton>
 

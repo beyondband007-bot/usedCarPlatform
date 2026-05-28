@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { NDropdown } from "naive-ui";
+import { useRouter } from "vue-router";
 
 import { topNavigation } from "@/constants/prototype";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
+const router = useRouter();
 
-const currentUser = {
-  name: "企业用户",
-  credits: "1,250",
-};
+const userMenuOptions = [{ label: "退出登录", key: "logout" }];
+
+function handleUserMenu(key: string) {
+  if (key !== "logout") {
+    return;
+  }
+
+  authStore.logout();
+  router.push("/home");
+}
 </script>
 
 <template>
@@ -91,23 +102,23 @@ const currentUser = {
           </span>
         </button>
 
-        <div
-          class="hidden items-center gap-1.5 rounded-full bg-[var(--app-header-credits-bg)] px-3 py-2 text-xs font-semibold text-[var(--app-header-credits-text)] md:inline-flex"
+        <NDropdown
+          v-if="authStore.isLoggedIn"
+          trigger="click"
+          :options="userMenuOptions"
+          @select="handleUserMenu"
         >
-          <span>积分余额 {{ currentUser.credits }}</span>
-          <Icon icon="mdi:diamond-stone" class="text-sm text-blue-500" />
-        </div>
-
-        <button
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-full px-2 py-2 text-xs font-semibold text-[var(--app-header-user)] transition hover:opacity-90"
-        >
-          <Icon icon="mdi:office-building-outline" class="text-lg" />
-          <span class="hidden max-w-24 truncate lg:inline">
-            {{ currentUser.name }}
-          </span>
-          <Icon icon="mdi:chevron-down" class="hidden text-base lg:inline" />
-        </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full px-2 py-2 text-xs font-semibold text-[var(--app-header-user)] transition hover:opacity-90"
+          >
+            <Icon icon="mdi:office-building-outline" class="text-lg" />
+            <span class="hidden max-w-24 truncate lg:inline">
+              {{ authStore.userName }}
+            </span>
+            <Icon icon="mdi:chevron-down" class="hidden text-base lg:inline" />
+          </button>
+        </NDropdown>
       </div>
     </header>
   </div>

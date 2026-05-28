@@ -15,10 +15,10 @@ const emit = defineEmits<{
 <template>
   <NCard
     :bordered="false"
-    class="h-full border-r border-white/10 bg-[#0d1018]/90 shadow-none backdrop-blur-xl"
-    content-class="!p-4"
+    class="workspace-sidebar h-full min-h-0 border-r border-white/10 bg-[#0d1018]/90 shadow-none backdrop-blur-xl"
+    content-class="!flex !h-full !min-h-0 !flex-col !overflow-hidden !p-4"
   >
-    <div class="flex h-full flex-col gap-6 overflow-y-auto">
+    <div class="workspace-sidebar-body">
       <section
         v-for="group in workspaceMenuGroups"
         :key="group.title"
@@ -59,11 +59,25 @@ const emit = defineEmits<{
     </div>
   </NCard>
 </template>
-<style scoped>
-::v-deep .n-card {
+<style scoped lang="scss">
+:deep(.workspace-sidebar.n-card) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   border: 0 !important;
-  /* border-radius: 0 !important; */
   padding: 0;
   margin: 0 !important;
+}
+
+.workspace-sidebar-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 16px;
 }
 </style>

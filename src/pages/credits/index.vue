@@ -251,7 +251,8 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   display: flex;
   flex-direction: column;
   min-width: 0;
-  width: min(2400px, 100%);
+  width: 100%;
+  max-width: 1500px;
   min-height: calc(100vh - var(--app-header-offset) - var(--credit-page-pad) - var(--credit-page-pad));
   gap: clamp(16px, 1.6vw, 24px);
   margin: 0 auto;
@@ -349,7 +350,6 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   white-space: nowrap;
 }
 
-.query-button,
 .export-button,
 .detail-button {
   border: 0;
@@ -365,7 +365,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   --n-height: clamp(46px, 5vh, 56px);
   --n-border-radius: 12px;
   --n-color: #256ed7;
-  --n-color-hover: #3685ef;
+  --n-color-hover: #256ed7;
   --n-color-pressed: #1d61c8;
   --n-color-focus: #256ed7;
   --n-border: 0;
@@ -376,20 +376,73 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   --n-text-color-hover: #fff;
   --n-text-color-pressed: #fff;
   --n-text-color-focus: #fff;
+  --n-ripple-color: transparent;
   height: clamp(46px, 5vh, 56px);
   max-width: 100%;
   flex-shrink: 0;
   min-width: clamp(116px, 8vw, 136px);
   overflow: hidden;
+  border: 0;
   border-radius: 12px;
-  background: linear-gradient(140deg, #3685ef, #1d61c8);
+  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
   box-shadow: 0 12px 26px rgba(33, 99, 202, 0.26);
   color: #fff;
+  font-family: inherit;
   font-size: 17px;
   font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease;
 }
 
+.query-button:hover,
+.query-button:focus,
+.query-button:focus-visible,
+.query-button:not(:disabled):hover,
+.query-button:not(:disabled):focus,
 .query-button:active,
+.query-button:not(:disabled):active {
+  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
+  box-shadow: 0 12px 26px rgba(33, 99, 202, 0.26);
+  color: #fff !important;
+  filter: none;
+  transform: none;
+}
+
+.query-button :deep(.n-button__content),
+.query-button:hover :deep(.n-button__content),
+.query-button:focus :deep(.n-button__content),
+.query-button:focus-visible :deep(.n-button__content),
+.query-button:active :deep(.n-button__content),
+.query-button:not(:disabled):hover :deep(.n-button__content),
+.query-button:not(:disabled):focus :deep(.n-button__content),
+.query-button:not(:disabled):active :deep(.n-button__content) {
+  color: #fff !important;
+}
+
+.query-button :deep(.n-button:not(:disabled):hover),
+.query-button :deep(.n-button:not(:disabled):focus),
+.query-button :deep(.n-button:not(:disabled):active) {
+  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
+  color: #fff !important;
+}
+
+.query-button :deep(.n-button__border),
+.query-button :deep(.n-button__state-border) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.query-button:hover :deep(.n-button__state-border),
+.query-button:focus :deep(.n-button__state-border),
+.query-button:focus-visible :deep(.n-button__state-border) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.query-button:active {
+  transform: translateY(1px);
+}
+
 .export-button:active,
 .detail-button:active {
   transform: translateY(1px);

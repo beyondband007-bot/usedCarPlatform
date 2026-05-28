@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import AuthenticatedLayout from '@/layouts/AuthenticatedLayout.vue'
 import BasicLayout from '@/layouts/BasicLayout.vue'
 
 export const routes: RouteRecordRaw[] = [
@@ -27,39 +28,13 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'workspace',
-        name: 'Workspace',
-        component: () => import('@/pages/workspace/index.vue'),
-        meta: {
-          title: '视觉工作台',
-          description: 'AI 图片生成核心',
-        },
-      },
-      {
-        path: 'credits',
-        name: 'Credits',
-        component: () => import('@/pages/credits/index.vue'),
-        meta: {
-          title: '积分查询',
-          description: '积分流水查询',
-        },
-      },
-      {
         path: 'enterprise',
         name: 'Enterprise',
         component: () => import('@/pages/enterprise/index.vue'),
         meta: {
           title: '企业账号登录',
           description: '企业账号登录',
-        },
-      },
-      {
-        path: 'package-points',
-        name: 'PackagePoints',
-        component: () => import('@/pages/package-points/index.vue'),
-        meta: {
-          title: '套餐/积分',
-          description: '当前套餐和积分概览',
+          guestOnly: true,
         },
       },
       {
@@ -70,6 +45,45 @@ export const routes: RouteRecordRaw[] = [
           title: '访客浮层',
           description: '访客引导浮层',
         },
+      },
+      {
+        path: '',
+        component: AuthenticatedLayout,
+        meta: {
+          requiresAuth: true,
+        },
+        children: [
+          {
+            path: 'workspace',
+            name: 'Workspace',
+            component: () => import('@/pages/workspace/index.vue'),
+            meta: {
+              title: '视觉工作台',
+              description: 'AI 图片生成核心',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'credits',
+            name: 'Credits',
+            component: () => import('@/pages/credits/index.vue'),
+            meta: {
+              title: '积分查询',
+              description: '积分流水查询',
+              requiresAuth: true,
+            },
+          },
+          {
+            path: 'package-points',
+            name: 'PackagePoints',
+            component: () => import('@/pages/package-points/index.vue'),
+            meta: {
+              title: '套餐/积分',
+              description: '当前套餐和积分概览',
+              requiresAuth: true,
+            },
+          },
+        ],
       },
     ],
   },

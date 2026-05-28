@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NButton, NSelect, NSwitch, NTag } from "naive-ui";
+import { NButton, NInput, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
 
+import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import type {
+  BatchVisualTemplate,
+  BatchVisualTemplateInput,
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
 } from "@/types/workspace";
@@ -18,15 +21,48 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   selectOption: [id: string];
+  generate: [payload: { outputRatio: string }];
 }>();
+
+const outputRatioLabelMap: Record<string, string> = {
+  "1:1": "主图 1:1",
+  "3:4": "主图 3:4",
+  "4:3": "主图 4:3",
+  "9:16": "主图 9:16",
+  "16:9": "主图 16:9",
+};
+
+function handleGenerate() {
+  emit("generate", {
+    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+  });
+}
+
+const message = useMessage();
+const {
+  NEW_PRESET_VALUE,
+  templates: visualTemplates,
+  getTemplateById,
+  saveTemplate,
+  updateTemplate,
+} = useBatchVisualTemplates();
 
 const useLogo = ref(false);
 const outputRatio = ref("1:1");
 const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
-const batchPreset = ref("team");
-const visualPreset = ref("default");
+const batchSceneIndex = ref(0);
+const batchSceneCategory = ref("展厅灯光");
+const useRecentLogo = ref(false);
+const lightConsistency = ref(true);
+const paintRefresh = ref(false);
+const interiorEnhance = ref(false);
+const newPresetName = ref("");
+const projectName = ref("5月展厅批量上新");
+const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
+const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
+const isApplyingTemplate = ref(false);
 
 const outputRatioOptions = [
   { label: "1:1 主图", value: "1:1" },
@@ -36,15 +72,127 @@ const outputRatioOptions = [
   { label: "16:9 横版", value: "16:9" },
 ];
 
-const presetOptions = [
-  { label: "企业团队档", value: "team" },
-  { label: "旗舰批量档", value: "elite" },
-];
+const visualPresetOptions = computed(() => [
+  { label: "输入名称", value: NEW_PRESET_VALUE },
+  ...visualTemplates.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
+]);
 
-const visualPresetOptions = [
-  { label: "输入名称", value: "default" },
-  { label: "5月展厅批量上新", value: "may" },
-];
+const createPresetOptions = computed(() =>
+  visualTemplates.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
+);
+
+function buildTemplateInput(): BatchVisualTemplateInput {
+  return {
+    name:
+      visualPreset.value === NEW_PRESET_VALUE
+        ? newPresetName.value.trim()
+        : getTemplateById(visualPreset.value)?.name ?? newPresetName.value.trim(),
+    enableSceneChange: enableSceneChange.value,
+    sceneIndex: batchSceneIndex.value,
+    sceneCategory: batchSceneCategory.value,
+    outputRatio: outputRatio.value,
+    useRecentLogo: useRecentLogo.value,
+    lightConsistency: lightConsistency.value,
+    paintRefresh: paintRefresh.value,
+    interiorEnhance: interiorEnhance.value,
+  };
+}
+
+function applyTemplate(template: BatchVisualTemplate) {
+  isApplyingTemplate.value = true;
+  enableSceneChange.value = template.enableSceneChange;
+  batchSceneIndex.value = template.sceneIndex;
+  batchSceneCategory.value = template.sceneCategory;
+  outputRatio.value = template.outputRatio;
+  useRecentLogo.value = template.useRecentLogo;
+  lightConsistency.value = template.lightConsistency;
+  paintRefresh.value = template.paintRefresh;
+  interiorEnhance.value = template.interiorEnhance;
+  isApplyingTemplate.value = false;
+}
+
+function handleSaveVisualPreset() {
+  const input = buildTemplateInput();
+
+  if (!input.name) {
+    message.warning("请输入预设名称");
+    return;
+  }
+
+  if (visualPreset.value === NEW_PRESET_VALUE) {
+    const created = saveTemplate(input);
+    visualPreset.value = created.id;
+    newPresetName.value = "";
+    createTaskPresetId.value = created.id;
+    message.success(`预设「${created.name}」已保存`);
+    return;
+  }
+
+  const updated = updateTemplate(visualPreset.value, input);
+  if (!updated) {
+    message.error("预设保存失败，请重试");
+    return;
+  }
+
+  createTaskPresetId.value = updated.id;
+  message.success(`预设「${updated.name}」已更新`);
+}
+
+function handleSaveVisualConfig() {
+  handleSaveVisualPreset();
+}
+
+function handleStickyAction() {
+  if (batchTab.value === "visual") {
+    handleSaveVisualConfig();
+  }
+}
+
+watch(
+  visualPreset,
+  (presetId) => {
+    if (isApplyingTemplate.value || presetId === NEW_PRESET_VALUE) return;
+
+    const template = getTemplateById(presetId);
+    if (template) applyTemplate(template);
+  },
+  { immediate: true },
+);
+
+watch(createTaskPresetId, (presetId) => {
+  const template = getTemplateById(presetId);
+  if (!template) return;
+
+  projectName.value = template.name;
+});
+
+watch(
+  visualTemplates,
+  (list) => {
+    if (!list.length) {
+      createTaskPresetId.value = "";
+      return;
+    }
+
+    if (!list.some((item) => item.id === createTaskPresetId.value)) {
+      createTaskPresetId.value = list[0].id;
+    }
+
+    if (
+      visualPreset.value !== NEW_PRESET_VALUE &&
+      !list.some((item) => item.id === visualPreset.value)
+    ) {
+      visualPreset.value = list[0].id;
+    }
+  },
+  { deep: true },
+);
 
 const batchScenes = [
   {
@@ -65,13 +213,23 @@ const batchScenes = [
   },
 ];
 
-const deliveryTasks = [
+type DeliveryTask = {
+  title: string;
+  meta: string;
+  image: string;
+  selected: boolean;
+  progress: number;
+  imageCount: number;
+};
+
+const deliveryTasks = ref<DeliveryTask[]>([
   {
     title: "5月展厅批量上新 · 成片交付",
     meta: "12 张成片 · 2026-05-20 09:32",
     image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=180&q=80",
     selected: true,
     progress: 100,
+    imageCount: 12,
   },
   {
     title: "宝马 5系 · 暗调展厅",
@@ -79,6 +237,7 @@ const deliveryTasks = [
     image: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
+    imageCount: 10,
   },
   {
     title: "丰田 凯美瑞 · 玻璃展厅",
@@ -86,6 +245,7 @@ const deliveryTasks = [
     image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
+    imageCount: 8,
   },
   {
     title: "理想 L8 · 柔光顶灯",
@@ -93,11 +253,50 @@ const deliveryTasks = [
     image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 62,
+    imageCount: 0,
   },
-];
+]);
+
+const deliverySelectedCount = computed(
+  () => deliveryTasks.value.filter((task) => task.selected).length,
+);
+
+const deliverySelectedImages = computed(() =>
+  deliveryTasks.value
+    .filter((task) => task.selected)
+    .reduce((total, task) => total + task.imageCount, 0),
+);
+
+const isAllDeliverySelected = computed(
+  () =>
+    deliveryTasks.value.length > 0 &&
+    deliveryTasks.value.every((task) => task.selected),
+);
+
+function toggleDeliveryTask(index: number) {
+  const task = deliveryTasks.value[index];
+  if (!task) return;
+  task.selected = !task.selected;
+}
+
+function toggleSelectAllDelivery() {
+  const nextValue = !isAllDeliverySelected.value;
+  deliveryTasks.value.forEach((task) => {
+    task.selected = nextValue;
+  });
+}
 
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
+
+const activeCreateTemplate = computed(() =>
+  createTaskPresetId.value ? getTemplateById(createTaskPresetId.value) : undefined,
+);
+
+const activeCreateRatioLabel = computed(() => {
+  const ratio = activeCreateTemplate.value?.outputRatio;
+  return outputRatioOptions.find((item) => item.value === ratio)?.label ?? ratio;
+});
 </script>
 
 <template>
@@ -127,12 +326,60 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
       <template v-if="batchTab === 'create'">
         <section class="batch-card inline-field">
           <span>使用预设</span>
-          <NSelect v-model:value="batchPreset" :options="presetOptions" size="large" />
+          <NSelect
+            v-model:value="createTaskPresetId"
+            :options="createPresetOptions"
+            placeholder="请选择已保存的预设"
+            size="large"
+          />
+        </section>
+
+        <section v-if="createTaskPresetId && activeCreateTemplate" class="preset-summary">
+          <header class="preset-summary-head">
+            <span class="preset-summary-icon" aria-hidden="true">
+              <Icon icon="mdi:check-decagram" />
+            </span>
+            <div class="preset-summary-copy">
+              <p>已套用视觉配置</p>
+              <strong>{{ activeCreateTemplate.name }}</strong>
+            </div>
+          </header>
+
+          <div class="preset-summary-tags">
+            <span
+              v-if="activeCreateTemplate.enableSceneChange"
+              class="preset-tag is-scene"
+            >
+              <Icon icon="mdi:image-filter-hdr" />
+              {{ activeCreateTemplate.sceneCategory }} ·
+              {{ batchScenes[activeCreateTemplate.sceneIndex]?.title }}
+            </span>
+            <span class="preset-tag is-ratio">
+              <Icon icon="mdi:aspect-ratio" />
+              {{ activeCreateRatioLabel }}
+            </span>
+            <span v-if="activeCreateTemplate.lightConsistency" class="preset-tag is-on">
+              <Icon icon="mdi:weather-sunny" />
+              光污一致化
+            </span>
+            <span v-if="activeCreateTemplate.useRecentLogo" class="preset-tag is-on">
+              <Icon icon="mdi:badge-account-horizontal-outline" />
+              最近 Logo
+            </span>
+            <span v-if="activeCreateTemplate.paintRefresh" class="preset-tag is-on">
+              <Icon icon="mdi:spray" />
+              烤漆翻新
+            </span>
+            <span v-if="activeCreateTemplate.interiorEnhance" class="preset-tag is-on">
+              <Icon icon="mdi:seat-passenger" />
+              内饰清洁
+            </span>
+          </div>
         </section>
 
         <section class="batch-card">
           <h3>项目名</h3>
-          <input class="plain-input" value="5月展厅批量上新" />
+          <input v-model="projectName" class="plain-input" type="text" />
         </section>
 
         <button type="button" class="batch-upload">
@@ -159,10 +406,25 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
       </template>
 
       <template v-else>
-        <section class="batch-card inline-field preset-save">
-          <span>预设</span>
-          <NSelect v-model:value="visualPreset" :options="visualPresetOptions" size="large" />
-          <NButton type="primary" size="large">保存</NButton>
+        <section class="batch-card preset-save-card">
+          <div class="preset-save-row">
+            <span>预设</span>
+            <NSelect
+              v-model:value="visualPreset"
+              :options="visualPresetOptions"
+              size="large"
+            />
+            <NButton type="primary" size="large" @click="handleSaveVisualPreset">
+              保存
+            </NButton>
+          </div>
+          <NInput
+            v-if="visualPreset === NEW_PRESET_VALUE"
+            v-model:value="newPresetName"
+            class="preset-name-input"
+            size="large"
+            placeholder="输入预设名称，例如 5月展厅批量上新"
+          />
         </section>
 
         <section class="batch-card switch-card">
@@ -176,13 +438,14 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
         <section v-if="enableSceneChange" class="batch-scene-card">
           <div class="scene-head">
             <h3>批量场景选择</h3>
-            <button type="button">展厅灯光 <Icon icon="mdi:chevron-down" /></button>
+            <button type="button">{{ batchSceneCategory }} <Icon icon="mdi:chevron-down" /></button>
           </div>
           <div class="scene-grid">
             <article
               v-for="(scene, index) in batchScenes"
               :key="scene.title"
-              :class="{ active: index === 0 }"
+              :class="{ active: index === batchSceneIndex }"
+              @click="batchSceneIndex = index"
             >
               <img :src="scene.image" :alt="scene.title" />
               <strong>{{ scene.title }}</strong>
@@ -200,7 +463,7 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
             <h3>使用最近 Logo</h3>
             <p>开启后可沿用最近上传 Logo，也可重新上传。</p>
           </div>
-          <NSwitch size="large" />
+          <NSwitch v-model:value="useRecentLogo" size="large" />
         </section>
 
         <section class="batch-card switch-card">
@@ -208,7 +471,7 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
             <h3>光污一致化</h3>
             <p>批量弱化眩光、反光和色偏，让车辆与新场景更融合。</p>
           </div>
-          <NSwitch :default-value="true" size="large" />
+          <NSwitch v-model:value="lightConsistency" size="large" />
         </section>
 
         <section class="batch-card switch-card">
@@ -216,7 +479,7 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
             <h3>烤漆翻新预览</h3>
             <p>增强漆面亮度和轮毂金属质感，作为演示型美容开关。</p>
           </div>
-          <NSwitch size="large" />
+          <NSwitch v-model:value="paintRefresh" size="large" />
         </section>
 
         <section class="batch-card switch-card">
@@ -224,12 +487,18 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
             <h3>内饰清洁增强</h3>
             <p>对已上传内饰图做清洁与质感增强。</p>
           </div>
-          <NSwitch size="large" />
+          <NSwitch v-model:value="interiorEnhance" size="large" />
         </section>
       </template>
 
       <div class="sticky-action">
-        <NButton type="primary" size="large" block>
+        <NButton
+          type="primary"
+          size="large"
+          block
+          :disabled="batchTab === 'create' && !createTaskPresetId"
+          @click="handleStickyAction"
+        >
           {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
           <span class="ml-2">💎 预计 120</span>
         </NButton>
@@ -237,39 +506,98 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">
-      <div class="delivery-tabs">
-        <button type="button" class="active">成片交付</button>
+      <div class="delivery-panel">
+        <div class="delivery-tabs">
+          <button type="button" class="active">成片交付</button>
+        </div>
+
+        <section class="batch-card batch-notice delivery-notice">
+          这里展示批量上新里已完成的任务。点击任务后，右侧结果框查看该任务出图；勾选多个任务后可批量下载。
+        </section>
+
+        <section class="delivery-board" aria-label="成片交付任务列表">
+          <div class="delivery-list">
+            <article
+              v-for="(task, index) in deliveryTasks"
+              :key="task.title"
+              class="delivery-item"
+              :class="{ 'is-selected': task.selected, 'is-loading': task.progress < 100 }"
+              role="button"
+              tabindex="0"
+              @click="toggleDeliveryTask(index)"
+              @keydown.enter.prevent="toggleDeliveryTask(index)"
+              @keydown.space.prevent="toggleDeliveryTask(index)"
+            >
+              <label class="delivery-check" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="task.selected"
+                  :aria-label="`选择${task.title}`"
+                  @change="toggleDeliveryTask(index)"
+                />
+              </label>
+
+              <img
+                class="delivery-thumb"
+                :src="task.image"
+                :alt="task.title"
+                loading="lazy"
+                draggable="false"
+              />
+
+              <div class="delivery-copy">
+                <h3>{{ task.title }}</h3>
+                <p>{{ task.meta }}</p>
+              </div>
+
+              <div class="delivery-status">
+                <template v-if="task.progress >= 100">
+                  <span class="delivery-status-ring" aria-hidden="true"></span>
+                  <strong>已完成</strong>
+                </template>
+                <template v-else>
+                  <span
+                    class="delivery-status-progress"
+                    :style="{ '--progress': `${task.progress}%` }"
+                    aria-hidden="true"
+                  >
+                    <b>{{ task.progress }}%</b>
+                  </span>
+                  <strong class="delivery-status-meta">{{ task.progress }}%</strong>
+                </template>
+              </div>
+            </article>
+          </div>
+
+          <footer class="delivery-actions">
+            <p class="delivery-actions-summary">
+              已选 <strong>{{ deliverySelectedCount }}</strong> 个任务，预计下载
+              <strong>{{ deliverySelectedImages }}</strong> 张图
+            </p>
+            <div class="delivery-actions-buttons">
+              <button type="button" class="delivery-link-btn" @click="toggleSelectAllDelivery">
+                {{ isAllDeliverySelected ? "取消全选" : "全选" }}
+              </button>
+              <NButton
+                type="warning"
+                ghost
+                size="large"
+                class="delivery-download-btn"
+                :disabled="deliverySelectedCount === 0"
+              >
+                批量下载
+              </NButton>
+              <button
+                type="button"
+                class="delivery-link-btn is-danger"
+                :disabled="deliverySelectedCount === 0"
+              >
+                批量删除
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
-
-      <section class="batch-card batch-notice">
-        这里展示批量上新里已完成的任务。点击任务后，右侧结果框查看该任务出图；勾选多个任务后可批量下载。
-      </section>
-
-      <section class="delivery-list">
-        <article
-          v-for="task in deliveryTasks"
-          :key="task.title"
-          :class="{ active: task.selected }"
-        >
-          <input type="checkbox" :checked="task.selected" />
-          <img :src="task.image" :alt="task.title" />
-          <div class="delivery-copy">
-            <h3>{{ task.title }}</h3>
-            <p>{{ task.meta }}</p>
-          </div>
-          <div class="delivery-status" :class="{ loading: task.progress < 100 }">
-            <span></span>
-            <strong>{{ task.progress === 100 ? "已完成" : `${task.progress}%` }}</strong>
-          </div>
-        </article>
-      </section>
-
-      <section class="delivery-actions">
-        <p>已选 <strong>1</strong> 个任务，预计下载 12 张图。</p>
-        <button type="button">全选</button>
-        <NButton type="warning" size="large">批量下载</NButton>
-        <button type="button">批量删除</button>
-      </section>
     </template>
 
     <template v-else>
@@ -352,7 +680,12 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
         <NTag type="success" round :bordered="false">
           余额 {{ props.capability.balance }} 积分
         </NTag>
-        <NButton type="warning" size="large" class="min-w-48 !rounded-xl">
+        <NButton
+          type="warning"
+          size="large"
+          class="min-w-48 !rounded-xl"
+          @click="handleGenerate"
+        >
           {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}
         </NButton>
       </div>
@@ -362,18 +695,23 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
 
 <style scoped lang="scss">
 .generate-panel {
-  --scene-scroll-track: rgba(218, 226, 237, 0.9);
-  --scene-scroll-thumb: rgba(22, 176, 108, 0.88);
-  --scene-scroll-thumb-hover: rgba(8, 149, 88, 0.96);
+  padding-bottom: 8px;
+  --scene-scroll-track: rgba(218, 226, 237, 0.72);
+  --scene-scroll-track-glow: rgba(47, 124, 255, 0.14);
+  --scene-scroll-thumb-start: #19c995;
+  --scene-scroll-thumb-end: #2f7cff;
+  --scene-scroll-thumb-glow: rgba(47, 124, 255, 0.42);
 
   display: grid;
   gap: 18px;
 }
 
 :global([data-theme="dark"]) .generate-panel {
-  --scene-scroll-track: rgba(255, 255, 255, 0.1);
-  --scene-scroll-thumb: rgba(61, 203, 136, 0.72);
-  --scene-scroll-thumb-hover: rgba(95, 230, 166, 0.92);
+  --scene-scroll-track: rgba(255, 255, 255, 0.08);
+  --scene-scroll-track-glow: rgba(47, 124, 255, 0.22);
+  --scene-scroll-thumb-start: #3dcda8;
+  --scene-scroll-thumb-end: #5b9dff;
+  --scene-scroll-thumb-glow: rgba(91, 157, 255, 0.5);
 }
 
 .batch-tabs,
@@ -416,13 +754,6 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
 
 .batch-card,
 .batch-scene-card,
-.delivery-list,
-.delivery-actions {
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
-}
-
 .batch-notice {
   padding: 16px 18px;
   border-color: rgba(74, 144, 255, 0.38);
@@ -445,8 +776,135 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
   padding: 16px;
 }
 
-.preset-save {
+.preset-save-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.preset-save-row {
+  display: grid;
   grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.preset-name-input {
+  width: 100%;
+}
+
+.preset-summary {
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, #2f7cff 18%, var(--app-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #2f7cff 9%, var(--app-surface)) 0%, var(--app-surface) 58%),
+    var(--app-surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
+}
+
+:global([data-theme="dark"]) .preset-summary {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.preset-summary-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.preset-summary-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #2f7cff 14%, var(--app-surface-soft));
+  color: #2f7cff;
+  font-size: 20px;
+}
+
+.preset-summary-copy {
+  min-width: 0;
+}
+
+.preset-summary-copy p {
+  margin: 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.preset-summary-copy strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-tag {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.preset-tag .iconify {
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.preset-tag.is-scene {
+  border-color: color-mix(in srgb, #2f7cff 28%, var(--app-border));
+  background: color-mix(in srgb, #2f7cff 10%, var(--app-surface-soft));
+  color: #1f5fbf;
+}
+
+.preset-tag.is-ratio {
+  border-color: color-mix(in srgb, #8f57ff 24%, var(--app-border));
+  background: color-mix(in srgb, #8f57ff 10%, var(--app-surface-soft));
+  color: #5b3f9c;
+}
+
+.preset-tag.is-on {
+  border-color: color-mix(in srgb, #27b77d 30%, var(--app-border));
+  background: color-mix(in srgb, #27b77d 12%, var(--app-surface-soft));
+  color: #157a52;
+}
+
+:global([data-theme="dark"]) .preset-tag.is-scene {
+  color: #8eb8ff;
+}
+
+:global([data-theme="dark"]) .preset-tag.is-ratio {
+  color: #c4a8ff;
+}
+
+:global([data-theme="dark"]) .preset-tag.is-on {
+  color: #6ee7b7;
 }
 
 .inline-field span {
@@ -571,45 +1029,83 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
 }
 
 .scene-grid {
+  --scene-gap: 12px;
+  --scene-visible: 2.25;
+
   display: flex;
-  gap: 12px;
+  gap: var(--scene-gap);
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 0 20px;
+  padding: 2px 2px 20px;
   scroll-padding-inline: 2px;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
-  scrollbar-color: var(--scene-scroll-thumb) var(--scene-scroll-track);
+  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
 }
 
 .scene-grid::-webkit-scrollbar {
-  height: 10px;
+  height: 9px;
 }
 
 .scene-grid::-webkit-scrollbar-track {
+  margin-inline: 4px;
   border-radius: 999px;
-  background: var(--scene-scroll-track);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-border) 68%, transparent);
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--scene-scroll-track-glow) 18%,
+      var(--scene-scroll-track-glow) 82%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--app-border) 55%, transparent) 0 1px,
+      transparent 1px 7px
+    ),
+    var(--scene-scroll-track);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--scene-scroll-thumb-end) 18%, transparent);
 }
 
 .scene-grid::-webkit-scrollbar-thumb {
   border: 2px solid var(--scene-scroll-track);
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--scene-scroll-thumb), #2f7cff);
+  background: linear-gradient(
+    90deg,
+    var(--scene-scroll-thumb-start) 0%,
+    var(--scene-scroll-thumb-end) 58%,
+    color-mix(in srgb, var(--scene-scroll-thumb-end) 72%, #6b8cff) 100%
+  );
+  box-shadow:
+    0 0 10px var(--scene-scroll-thumb-glow),
+    0 0 2px color-mix(in srgb, var(--scene-scroll-thumb-start) 65%, transparent);
 }
 
 .scene-grid::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, var(--scene-scroll-thumb-hover), #4d92ff);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--scene-scroll-thumb-start) 88%, #fff) 0%,
+    color-mix(in srgb, var(--scene-scroll-thumb-end) 90%, #fff) 55%,
+    #6b8cff 100%
+  );
+  box-shadow:
+    0 0 14px var(--scene-scroll-thumb-glow),
+    0 0 4px color-mix(in srgb, var(--scene-scroll-thumb-start) 75%, transparent);
 }
 
 .scene-grid article {
-  flex: 0 0 calc((100% - 24px) / 2.25);
+  flex: 0 0 calc((100% - var(--scene-gap) * 2) / var(--scene-visible));
   scroll-snap-align: start;
   overflow: hidden;
-  border: 2px solid rgba(47, 124, 255, 0.5);
+  border: 2px solid color-mix(in srgb, var(--app-border) 88%, transparent);
   border-radius: 10px;
   background: var(--app-surface-soft);
   cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .scene-grid article.active {
@@ -636,37 +1132,77 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
   position: sticky;
   bottom: 0;
   z-index: 2;
-  margin: 8px -8px -8px;
-  padding: 18px 8px 8px;
-  background: linear-gradient(180deg, transparent, var(--app-surface-soft) 34%);
+  margin-top: 12px;
+  padding: 16px 0 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
+    var(--app-surface-soft) 28%,
+    var(--app-surface-soft) 100%
+  );
 }
 
 .delivery-list {
   display: grid;
-  gap: 0;
-  overflow: hidden;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.delivery-list article {
+.delivery-item {
   display: grid;
-  grid-template-columns: 28px 64px minmax(0, 1fr) 56px;
+  grid-template-columns: 32px 72px minmax(0, 1fr) 72px;
   align-items: center;
-  gap: 12px;
-  min-height: 84px;
-  padding: 12px;
-  border-bottom: 1px solid var(--app-border);
+  gap: 14px;
+  min-height: 88px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 88%, transparent);
+  background: var(--app-surface);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.delivery-list article.active {
-  background: color-mix(in srgb, #2f7cff 10%, var(--app-surface));
-  border-bottom-color: #2f7cff;
+.delivery-item:last-child {
+  border-bottom: 0;
 }
 
-.delivery-list img {
-  width: 64px;
-  height: 52px;
-  border-radius: 6px;
+.delivery-item:hover {
+  background: color-mix(in srgb, #2f7cff 4%, var(--app-surface));
+}
+
+.delivery-item.is-selected {
+  background: color-mix(in srgb, #2f7cff 9%, var(--app-surface-soft));
+  box-shadow: inset 3px 0 0 #2f7cff;
+}
+
+.delivery-item:focus-visible {
+  background: color-mix(in srgb, #2f7cff 8%, var(--app-surface-soft));
+  box-shadow: inset 0 0 0 2px rgba(47, 124, 255, 0.22);
+}
+
+.delivery-check {
+  display: grid;
+  place-items: center;
+}
+
+.delivery-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #2f7cff;
+  cursor: pointer;
+}
+
+.delivery-thumb {
+  width: 72px;
+  height: 56px;
+  border: 1px solid color-mix(in srgb, var(--app-border) 80%, transparent);
+  border-radius: 10px;
   object-fit: cover;
+  background: var(--app-surface-soft);
 }
 
 .delivery-copy {
@@ -685,58 +1221,136 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
   color: var(--app-text);
   font-size: 15px;
   font-weight: 900;
+  line-height: 1.35;
 }
 
 .delivery-copy p {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   color: var(--app-text-soft);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.4;
 }
 
 .delivery-status {
   display: grid;
   justify-items: center;
-  gap: 5px;
+  gap: 6px;
+}
+
+.delivery-status strong {
   color: #16b981;
   font-size: 12px;
   font-weight: 900;
+  line-height: 1.2;
 }
 
-.delivery-status span {
-  width: 22px;
-  height: 22px;
-  border: 4px solid currentColor;
-  border-radius: 999px;
-}
-
-.delivery-status.loading {
+.delivery-item.is-loading .delivery-status strong {
   color: #2f7cff;
 }
 
-.delivery-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
+.delivery-status-ring {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #16b981;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16b981 8%, transparent);
 }
 
-.delivery-actions p {
+.delivery-status-progress {
+  --progress: 0%;
+
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(closest-side, var(--app-surface) 72%, transparent 73% 100%),
+    conic-gradient(#2f7cff var(--progress), #dfe7f2 0);
+}
+
+.delivery-status-progress b {
+  display: none;
+}
+
+.delivery-status-meta {
+  font-size: 12px;
+}
+
+.delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 16px;
+  padding: 16px 18px;
+  border-top: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface-soft) 72%, var(--app-surface));
+}
+
+.delivery-actions-summary {
   margin: 0;
+  min-width: 220px;
+  flex: 1 1 220px;
   color: var(--app-text-soft);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.5;
 }
 
-.delivery-actions > button {
+.delivery-actions-summary strong {
+  color: var(--app-text);
+  font-weight: 900;
+}
+
+.delivery-actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.delivery-link-btn {
   border: 0;
   background: transparent;
   color: var(--app-text-soft);
+  padding: 0;
   font-family: inherit;
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.delivery-link-btn:hover:not(:disabled) {
+  color: #2f7cff;
+}
+
+.delivery-link-btn.is-danger:hover:not(:disabled) {
+  color: #e25555;
+}
+
+.delivery-link-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.delivery-download-btn {
+  min-width: 112px;
+  border-radius: 10px !important;
+  font-weight: 900 !important;
+}
+
+:global([data-theme="dark"]) .delivery-board {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+:global([data-theme="dark"]) .delivery-status-progress {
+  background:
+    radial-gradient(closest-side, var(--app-surface) 72%, transparent 73% 100%),
+    conic-gradient(#5b9dff var(--progress), rgba(255, 255, 255, 0.12) 0);
 }
 
 .logo-setting-card {

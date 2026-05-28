@@ -1,39 +1,93 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { h } from "vue";
+import { h, ref } from "vue";
 import {
   NButton,
   NDataTable,
   NDatePicker,
   NPagination,
   NSelect,
-  NTag,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
 import { useAppStore } from "@/stores/app";
+
+import planBasicBg from "@/img/基础套餐.png";
+import planAdvancedBg from "@/img/进阶套餐.png";
+import planPremiumBg from "@/img/尊享套餐.png";
+
+type PlanTone = "blue" | "purple" | "gold";
 
 type RechargeRecord = {
   orderNo: string;
   plan: string;
   amount: string;
   points: string;
-  status: string;
+  status: "支付成功" | "支付中" | "支付失败";
   paidAt: string;
+};
+
+type RecordSummary = {
+  label: string;
+  value: string;
+  tone: "blue" | "purple" | "gold" | "navy";
+  icon: string;
+};
+
+const planToneMap: Record<string, PlanTone> = {
+  基础套餐: "blue",
+  进阶套餐: "purple",
+  尊享套餐: "gold",
+};
+
+function getPlanTone(plan: string): PlanTone {
+  return planToneMap[plan] ?? "blue";
+}
+
+const recordSummary: RecordSummary[] = [
+  {
+    label: "今日充值金额 (元)",
+    value: "12,680",
+    tone: "blue",
+    icon: "mdi:cash-multiple",
+  },
+  {
+    label: "今日获得积分",
+    value: "126,800",
+    tone: "purple",
+    icon: "mdi:diamond-stone",
+  },
+  {
+    label: "累计充值金额 (元)",
+    value: "236,580",
+    tone: "gold",
+    icon: "mdi:chart-line",
+  },
+  {
+    label: "累计获得积分",
+    value: "2,365,800",
+    tone: "navy",
+    icon: "mdi:star-four-points",
+  },
+];
+
+const planTypeMeta: Record<
+  string,
+  { icon: string; tone: PlanTone }
+> = {
+  基础套餐: { icon: "mdi:layers-triple-outline", tone: "blue" },
+  进阶套餐: { icon: "mdi:chart-bar", tone: "purple" },
+  尊享套餐: { icon: "mdi:crown-outline", tone: "gold" },
 };
 
 type RechargePlan = {
   name: string;
-  price: string;
-  points: string;
-  account: string;
-  quota: string;
-  icon: string;
-  tone: "blue" | "purple" | "gold";
-  active?: boolean;
-  badge?: string;
-  features?: string[];
+  image: string;
+  tone: PlanTone;
 };
+
+const selectedPlanName = ref("进阶套餐");
+const pressingPlanName = ref<string | null>(null);
 
 const appStore = useAppStore();
 
@@ -45,61 +99,28 @@ const recordTypeOptions = [
 ];
 
 const rechargePlans: RechargePlan[] = [
-  {
-    name: "基础套餐",
-    price: "¥980",
-    points: "赠送 200 积分",
-    account: "1 账号",
-    quota: "1 套件",
-    icon: "mdi:layers-triple-outline",
-    tone: "blue",
-    badge: "入门优选",
-    features: [
-      "1 个企业账号",
-      "每账号同时上传 1 套外观图组",
-      "单张生成正常使用",
-      "适合小团队试运行",
-    ],
-  },
-  {
-    name: "进阶套餐",
-    price: "¥2,980",
-    points: "赠送 550 积分",
-    account: "5 账号",
-    quota: "5 套件",
-    icon: "mdi:layers-plus",
-    tone: "purple",
-    active: true,
-    features: [
-      "5 个企业账号",
-      "每账号同时上传 5 套外观图组",
-      "单张生成正常使用",
-      "适合车商团队批量上新",
-    ],
-  },
-  {
-    name: "尊享套餐",
-    price: "¥9,800",
-    points: "赠送 9,800 积分",
-    account: "20 账号",
-    quota: "20 专属场景",
-    icon: "mdi:crown-outline",
-    tone: "gold",
-    badge: "商阶之选",
-    features: [
-      "20 个企业账号",
-      "每账号同时上传 20 套外观图组",
-      "可定制 20 个专属场景",
-      "适合集团化和出海团队",
-    ],
-  },
+  { name: "基础套餐", image: planBasicBg, tone: "blue" },
+  { name: "进阶套餐", image: planAdvancedBg, tone: "purple" },
+  { name: "尊享套餐", image: planPremiumBg, tone: "gold" },
 ];
+
+function handlePlanPointerDown(name: string) {
+  pressingPlanName.value = name;
+}
+
+function clearPlanPress() {
+  pressingPlanName.value = null;
+}
+
+function handlePlanSelect(name: string) {
+  selectedPlanName.value = name;
+}
 
 const records: RechargeRecord[] = [
   {
     orderNo: "202605200001",
     plan: "进阶套餐",
-    amount: "¥2,980",
+    amount: "¥3,980",
     points: "550",
     status: "支付成功",
     paidAt: "2026-05-20 10:30:45",
@@ -121,9 +142,17 @@ const records: RechargeRecord[] = [
     paidAt: "2026-05-18 09:15:33",
   },
   {
+    orderNo: "202605160006",
+    plan: "尊享套餐",
+    amount: "¥9,800",
+    points: "9800",
+    status: "支付中",
+    paidAt: "2026-05-16 14:22:09",
+  },
+  {
     orderNo: "202605150004",
     plan: "进阶套餐",
-    amount: "¥2,980",
+    amount: "¥3,980",
     points: "550",
     status: "支付失败",
     paidAt: "2026-05-15 11:05:22",
@@ -148,33 +177,51 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   {
     title: "套餐类型",
     key: "plan",
-    width: 140,
+    width: 168,
+    render(row) {
+      const meta = planTypeMeta[row.plan] ?? planTypeMeta["基础套餐"];
+      return h(
+        "span",
+        { class: ["plan-type-pill", `is-${meta.tone}`] },
+        [
+          h(Icon, { icon: meta.icon, class: "plan-type-pill-icon" }),
+          h("span", row.plan),
+        ],
+      );
+    },
   },
   {
-    title: "金额（元）",
+    title: "金额 (元)",
     key: "amount",
     width: 130,
+    render(row) {
+      const tone = getPlanTone(row.plan);
+      return h("span", { class: ["amount-cell", `is-${tone}`] }, row.amount);
+    },
   },
   {
     title: "获得积分",
     key: "points",
-    width: 130,
+    width: 140,
+    render(row) {
+      return h("span", { class: "points-cell" }, [
+        h(Icon, { icon: "mdi:coin", class: "points-cell-icon" }),
+        h("span", row.points),
+      ]);
+    },
   },
   {
     title: "状态",
     key: "status",
-    width: 140,
+    width: 120,
     render(row) {
-      return h(
-        NTag,
-        {
-          type: row.status === "支付成功" ? "success" : "error",
-          round: true,
-          bordered: false,
-          class: "status-tag",
-        },
-        { default: () => row.status },
-      );
+      const statusClass =
+        row.status === "支付成功"
+          ? "is-success"
+          : row.status === "支付中"
+            ? "is-pending"
+            : "is-failed";
+      return h("span", { class: ["status-text", statusClass] }, row.status);
     },
   },
   {
@@ -185,7 +232,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   {
     title: "操作",
     key: "action",
-    width: 120,
+    width: 128,
     fixed: "right",
     render() {
       return h(
@@ -197,7 +244,12 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
           attrType: "button",
           class: "detail-button",
         },
-        { default: () => "查看详情" },
+        {
+          default: () => [
+            "查看详情",
+            h(Icon, { icon: "mdi:chevron-right", class: "detail-button-icon" }),
+          ],
+        },
       );
     },
   },
@@ -227,119 +279,130 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
           </div>
         </header>
 
-        <section class="plan-section">
-          <h2>选择充值套餐</h2>
-          <div class="plan-grid">
-            <article
-              v-for="plan in rechargePlans"
-              :key="plan.name"
-              class="plan-card"
-              :class="[`is-${plan.tone}`, { 'is-active': plan.active }]"
-            >
-              <span v-if="plan.active" class="recommend-badge">推荐</span>
-              <div class="plan-main">
-                <div v-if="plan.tone === 'blue'" class="plan-visual-stack" aria-hidden="true">
-                  <span class="stack-base"></span>
-                  <span class="stack-layer stack-layer-bottom"></span>
-                  <span class="stack-layer stack-layer-middle"></span>
-                  <span class="stack-layer stack-layer-top">
-                    <Icon icon="mdi:flash" />
-                  </span>
-                </div>
+        <div class="recharge-body">
+          <section class="plan-module" aria-label="选择充值套餐">
+            <h2 class="section-title">选择充值套餐</h2>
+            <div class="plan-grid">
+              <article
+                v-for="plan in rechargePlans"
+                :key="plan.name"
+                class="plan-card"
+                :class="[
+                  `is-${plan.tone}`,
+                  {
+                    'is-selected': selectedPlanName === plan.name,
+                    'is-pressing': pressingPlanName === plan.name,
+                  },
+                ]"
+                role="button"
+                tabindex="0"
+                :aria-pressed="selectedPlanName === plan.name"
+                :aria-label="`${plan.name}，点击选择并充值`"
+                @click="handlePlanSelect(plan.name)"
+                @keydown.enter.prevent="handlePlanSelect(plan.name)"
+                @keydown.space.prevent="handlePlanSelect(plan.name)"
+                @pointerdown="handlePlanPointerDown(plan.name)"
+                @pointerup="clearPlanPress"
+                @pointerleave="clearPlanPress"
+                @pointercancel="clearPlanPress"
+              >
+                <span
+                  v-if="selectedPlanName === plan.name"
+                  class="plan-card-check"
+                  aria-hidden="true"
+                >
+                  <Icon icon="mdi:check" />
+                </span>
+                <img
+                  class="plan-card-bg"
+                  :src="plan.image"
+                  :alt="plan.name"
+                  loading="lazy"
+                  decoding="async"
+                  draggable="false"
+                />
+              </article>
+            </div>
+          </section>
 
-                <div v-else class="plan-icon">
-                  <Icon :icon="plan.icon" />
-                </div>
+          <section class="records-module" aria-label="充值流水">
+            <div class="records-header">
+              <h2 class="section-title">充值流水</h2>
+              <form class="records-filter" aria-label="充值流水筛选条件">
+                <NDatePicker
+                  class="records-date-picker"
+                  type="daterange"
+                  clearable
+                  size="medium"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                />
 
-                <div class="plan-copy">
-                  <h3>
-                    {{ plan.name }}
-                    <span v-if="plan.badge" class="plan-badge">{{ plan.badge }}</span>
-                  </h3>
-                  <div class="plan-price-row">
-                    <strong>{{ plan.price }}</strong>
-                    <span>/ 套餐</span>
-                  </div>
-                  <p class="plan-gift">
-                    <Icon icon="mdi:gift-outline" />
-                    {{ plan.points }}
-                  </p>
+                <NSelect
+                  class="records-type-select"
+                  :options="recordTypeOptions"
+                  default-value="all"
+                  size="medium"
+                />
+
+                <NButton
+                  class="export-button"
+                  size="medium"
+                  attr-type="button"
+                >
+                  <template #icon>
+                    <Icon icon="mdi:tray-arrow-up" />
+                  </template>
+                  导出记录
+                </NButton>
+              </form>
+            </div>
+
+            <div class="records-summary" aria-label="充值统计概览">
+              <article
+                v-for="item in recordSummary"
+                :key="item.label"
+                class="summary-card"
+                :class="`is-${item.tone}`"
+              >
+                <span class="summary-card-icon" aria-hidden="true">
+                  <Icon :icon="item.icon" />
+                </span>
+                <div class="summary-card-copy">
+                  <p>{{ item.label }}</p>
+                  <strong>{{ item.value }}</strong>
                 </div>
+              </article>
+            </div>
+
+            <div class="records-table-panel">
+              <div class="records-table-wrap">
+                <NDataTable
+                  class="records-data-table"
+                  :columns="recordsColumns"
+                  :data="records"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="false"
+                  :scroll-x="1080"
+                />
               </div>
 
-              <ul v-if="plan.features" class="plan-features">
-                <li v-for="feature in plan.features" :key="feature">
-                  <Icon icon="mdi:check-circle" />
-                  <span>{{ feature }}</span>
-                </li>
-              </ul>
-
-              <dl v-else class="plan-meta">
-                <div>
-                  <Icon icon="mdi:account-outline" />
-                  <dt>{{ plan.account }}</dt>
-                </div>
-                <div>
-                  <Icon icon="mdi:calendar-check-outline" />
-                  <dt>{{ plan.quota }}</dt>
-                </div>
-              </dl>
-
-              <NButton class="plan-button" type="primary" attr-type="button">
-                <span class="plan-button-text">立即充值</span>
-                <Icon class="plan-button-arrow" icon="mdi:arrow-right" />
-              </NButton>
-            </article>
-          </div>
-        </section>
-
-        <section class="records-section" aria-label="充值流水">
-          <div class="records-header">
-            <h2>充值流水</h2>
-            <form class="records-filter" aria-label="充值流水筛选条件">
-              <NDatePicker
-                class="records-date-picker"
-                type="daterange"
-                clearable
-                size="medium"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-              />
-
-              <NSelect
-                class="records-type-select"
-                :options="recordTypeOptions"
-                default-value="all"
-                size="medium"
-              />
-
-              <NButton
-                class="export-button"
-                type="primary"
-                secondary
-                size="medium"
-                attr-type="button"
-              >
-                导出记录
-              </NButton>
-            </form>
-          </div>
-
-          <div class="records-table-wrap">
-            <NDataTable
-              class="records-data-table"
-              :columns="recordsColumns"
-              :data="records"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-              :scroll-x="1040"
-              flex-height
-            />
-          </div>
-
-          <NPagination class="records-pager" :page="1" :page-count="1" />
-        </section>
+              <footer class="records-footer">
+                <p class="records-total">共 128 条</p>
+                <NPagination
+                  class="records-pager"
+                  :page="1"
+                  :page-size="10"
+                  :item-count="128"
+                  :page-sizes="[10, 20, 50]"
+                  show-size-picker
+                  show-quick-jumper
+                />
+              </footer>
+            </div>
+          </section>
+        </div>
       </section>
     </section>
   </main>
@@ -412,7 +475,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .recharge-shell {
-  width: min(2400px, 100%);
+  width: 100%;
+  max-width: 1500px;
   min-height: calc(100vh - var(--app-header-offset) - var(--recharge-page-pad) - var(--recharge-page-pad));
   margin: 0 auto;
 }
@@ -462,12 +526,28 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .recharge-hero h1,
-.plan-section h2,
-.records-header h2 {
+.section-title {
   margin: 0;
   color: var(--recharge-text);
   font-weight: 900;
   letter-spacing: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.section-title::before {
+  content: "";
+  flex: 0 0 4px;
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #4d9dff, #2f6bff);
 }
 
 .recharge-hero h1 {
@@ -548,18 +628,19 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   top: 34px;
 }
 
-.plan-section {
-  position: relative;
-  z-index: 0;
-  flex-shrink: 0;
+.recharge-body {
+  display: flex;
   min-width: 0;
-  padding: clamp(18px, 1.6vw, 22px) clamp(22px, 2.4vw, 34px) clamp(28px, 2.4vw, 38px);
+  flex-direction: column;
+  gap: clamp(22px, 2.2vw, 32px);
+  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px) clamp(24px, 2vw, 32px);
 }
 
-.plan-section h2,
-.records-header h2 {
-  font-size: 20px;
-  line-height: 1.35;
+.plan-module {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .plan-grid {
@@ -573,532 +654,349 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .plan-card {
+  --plan-shadow: 0 14px 34px rgba(56, 112, 190, 0.12);
+  --plan-ring: transparent;
+  --plan-lift: 0px;
+
   position: relative;
-  isolation: isolate;
-  contain: layout paint;
-  display: flex;
-  flex-direction: column;
   flex: 1 1 calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
   min-width: 0;
   width: 100%;
   max-width: calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
-  aspect-ratio: 3 / 4;
-  max-width: 100%;
-  height: auto;
-  min-height: 0;
-  max-height: none;
   overflow: hidden;
-  padding: clamp(18px, 1.4vw, 22px) clamp(18px, 1.5vw, 24px) 18px;
-  border: 1px solid var(--recharge-border-soft);
-  border-radius: 10px;
-  background: var(--recharge-panel-strong);
+  border: 0;
+  border-radius: clamp(14px, 1.2vw, 20px);
+  background: transparent;
+  box-shadow: var(--plan-shadow);
+  transform: translateY(var(--plan-lift));
+  cursor: pointer;
+  outline: none;
+  transition:
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.plan-card > * {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
+.plan-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 3px solid var(--plan-ring);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.26s ease,
+    border-color 0.26s ease;
 }
 
 .plan-card.is-blue {
-  border-color: rgba(79, 151, 255, 0.46);
-  background:
-    radial-gradient(circle at 22% 28%, rgba(72, 166, 255, 0.22), transparent 24%),
-    linear-gradient(135deg, rgba(12, 32, 64, 0.96), rgba(8, 19, 40, 0.92));
-  box-shadow:
-    inset 0 0 0 1px rgba(110, 174, 255, 0.08),
-    0 16px 34px rgba(13, 33, 68, 0.18);
+  --plan-accent: #2f7dff;
+  --plan-shadow: 0 14px 34px rgba(47, 125, 255, 0.14);
 }
 
-.theme-light .plan-card.is-blue {
-  border-color: rgba(151, 191, 255, 0.76);
-  background:
-    radial-gradient(circle at 18% 26%, rgba(96, 174, 255, 0.18), transparent 25%),
-    linear-gradient(112deg, rgba(255, 255, 255, 0.99) 0%, rgba(250, 253, 255, 0.96) 46%, rgba(232, 243, 255, 0.92) 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.86),
-    0 20px 42px rgba(64, 119, 186, 0.12);
+.plan-card.is-purple {
+  --plan-accent: #8f57ff;
+  --plan-shadow: 0 14px 34px rgba(143, 87, 255, 0.16);
 }
 
-.plan-card.is-blue::before,
-.plan-card.is-blue::after {
-  content: "";
+.plan-card.is-gold {
+  --plan-accent: #f49a23;
+  --plan-shadow: 0 14px 34px rgba(244, 154, 35, 0.16);
+}
+
+.theme-dark .plan-card.is-blue {
+  --plan-shadow: 0 16px 36px rgba(47, 125, 255, 0.22);
+}
+
+.theme-dark .plan-card.is-purple {
+  --plan-shadow: 0 16px 36px rgba(143, 87, 255, 0.24);
+}
+
+.theme-dark .plan-card.is-gold {
+  --plan-shadow: 0 16px 36px rgba(244, 154, 35, 0.22);
+}
+
+.plan-card:hover {
+  --plan-lift: -5px;
+}
+
+.plan-card.is-pressing {
+  --plan-lift: 2px;
+
+  transition-duration: 0.12s;
+}
+
+.plan-card.is-selected {
+  --plan-lift: -8px;
+  --plan-ring: var(--plan-accent);
+}
+
+.plan-card.is-selected.is-blue {
+  --plan-shadow:
+    0 0 0 1px rgba(47, 125, 255, 0.2),
+    0 10px 26px rgba(47, 125, 255, 0.22),
+    0 24px 52px rgba(47, 125, 255, 0.32);
+}
+
+.plan-card.is-selected.is-purple {
+  --plan-shadow:
+    0 0 0 1px rgba(143, 87, 255, 0.22),
+    0 10px 26px rgba(143, 87, 255, 0.24),
+    0 24px 52px rgba(143, 87, 255, 0.34);
+}
+
+.plan-card.is-selected.is-gold {
+  --plan-shadow:
+    0 0 0 1px rgba(244, 154, 35, 0.24),
+    0 10px 26px rgba(244, 154, 35, 0.24),
+    0 24px 52px rgba(244, 154, 35, 0.34);
+}
+
+.plan-card.is-selected::after {
+  opacity: 1;
+}
+
+.plan-card:focus-visible {
+  --plan-ring: var(--plan-accent);
+}
+
+.plan-card:focus-visible::after {
+  opacity: 1;
+}
+
+.plan-card-check {
   position: absolute;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.plan-card.is-blue::before {
-  inset: 0;
-  opacity: 0.4;
-  background:
-    linear-gradient(140deg, transparent 54%, rgba(104, 180, 255, 0.32) 54.5%, transparent 55%),
-    linear-gradient(150deg, transparent 62%, rgba(104, 180, 255, 0.22) 62.5%, transparent 63%),
-    radial-gradient(circle at 78% 50%, rgba(104, 180, 255, 0.5) 0 3px, transparent 4px),
-    radial-gradient(circle at 88% 40%, rgba(104, 180, 255, 0.38) 0 2px, transparent 3px);
-}
-
-.theme-light .plan-card.is-blue::before {
-  opacity: 0.72;
-}
-
-.plan-card.is-blue::after {
-  top: 18px;
-  right: 22px;
-  width: 150px;
-  height: 74px;
-  opacity: 0.34;
-  background-image: radial-gradient(circle, rgba(93, 164, 255, 0.52) 1px, transparent 1.5px);
-  background-size: 12px 12px;
-  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 70%, transparent);
-}
-
-.theme-light .plan-card {
-  background: rgba(255, 255, 255, 0.74);
-}
-
-.plan-card.is-active {
-  border-color: rgba(121, 91, 255, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(121, 91, 255, 0.28);
-}
-
-.theme-light .plan-card.is-active {
-  border-color: rgba(101, 113, 255, 0.74);
-  box-shadow: inset 0 0 0 1px rgba(101, 113, 255, 0.18);
-}
-
-.recommend-badge {
-  position: absolute;
-  top: 10px;
-  right: 16px;
-  padding: 4px 10px;
+  top: clamp(10px, 1vw, 14px);
+  right: clamp(10px, 1vw, 14px);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: clamp(28px, 2.4vw, 34px);
+  height: clamp(28px, 2.4vw, 34px);
   border-radius: 999px;
-  background: linear-gradient(135deg, #6e74ff, #ad58ff);
+  background: var(--plan-accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.plan-main {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: clamp(50px, 3.5vw, 64px) minmax(0, 1fr);
-  gap: clamp(14px, 1.2vw, 18px);
-  align-items: start;
-}
-
-.is-blue .plan-main {
-  grid-template-columns: clamp(118px, 8.5vw, 160px) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(20px, 1.8vw, 28px);
-}
-
-.plan-copy {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.plan-visual-stack {
-  position: relative;
-  width: clamp(112px, 8vw, 148px);
-  height: clamp(104px, 7.2vw, 138px);
-  align-self: center;
-  justify-self: center;
-  filter: drop-shadow(0 18px 18px rgba(47, 127, 238, 0.22));
-}
-
-.stack-base,
-.stack-layer {
-  position: absolute;
-  left: 50%;
-  border-radius: 16px;
-  transform: translateX(-50%) rotateX(58deg) rotateZ(-45deg);
-  transform-style: preserve-3d;
-}
-
-.stack-base {
-  bottom: 4px;
-  width: 104px;
-  height: 104px;
-  border: 1px solid rgba(147, 205, 255, 0.88);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(176, 224, 255, 0.6)),
-    rgba(225, 244, 255, 0.78);
-  box-shadow:
-    0 12px 26px rgba(55, 144, 242, 0.26),
-    inset 0 0 18px rgba(94, 183, 255, 0.32);
-}
-
-.stack-layer {
-  width: 78px;
-  height: 78px;
-  background: linear-gradient(145deg, #8fd9ff, #2f80ff 72%, #1267ef);
-  box-shadow:
-    0 12px 24px rgba(31, 117, 231, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.48);
-}
-
-.stack-layer-bottom {
-  bottom: 38px;
-  opacity: 0.7;
-  filter: blur(0.1px);
-}
-
-.stack-layer-middle {
-  bottom: 58px;
-  width: 84px;
-  height: 84px;
-  opacity: 0.82;
-  background: linear-gradient(145deg, #a8e7ff, #4a98ff 70%, #1c73f5);
-}
-
-.stack-layer-top {
-  bottom: 80px;
-  display: grid;
-  place-items: center;
-  width: 88px;
-  height: 88px;
-  color: rgba(223, 247, 255, 0.92);
-  font-size: 32px;
-}
-
-.stack-layer-top .iconify {
-  transform: rotate(45deg) rotateX(-58deg);
-  filter: drop-shadow(0 4px 8px rgba(255, 255, 255, 0.34));
-}
-
-.plan-icon {
-  display: grid;
-  place-items: center;
-  width: clamp(50px, 3.5vw, 58px);
-  height: clamp(50px, 3.5vw, 58px);
-  border-radius: 14px;
-  font-size: 36px;
-}
-
-.is-blue .plan-icon {
-  background: rgba(52, 124, 255, 0.13);
-  color: var(--recharge-blue);
-}
-
-.is-purple .plan-icon {
-  background: rgba(143, 87, 255, 0.15);
-  color: var(--recharge-purple);
-}
-
-.is-gold .plan-icon {
-  background: rgba(244, 154, 35, 0.14);
-  color: var(--recharge-gold);
-}
-
-.plan-copy h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-  margin: 0;
-  color: var(--recharge-text);
   font-size: 18px;
-  line-height: 1.3;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--plan-accent) 42%, transparent);
+  animation: plan-check-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.plan-badge {
-  flex: 0 0 auto;
-  padding: 2px 7px;
-  border: 1px solid rgba(77, 139, 255, 0.48);
-  border-radius: 999px;
-  background: rgba(59, 137, 255, 0.1);
-  color: #4c88ff;
-  font-size: 12px;
-  line-height: 1.25;
-  font-weight: 800;
+@keyframes plan-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.theme-dark .plan-badge {
-  border-color: rgba(118, 184, 255, 0.46);
-  background: rgba(75, 151, 255, 0.14);
-  color: #95c7ff;
-}
-
-.is-gold .plan-badge {
-  border-color: rgba(244, 154, 35, 0.42);
-  background: rgba(244, 154, 35, 0.1);
-  color: var(--recharge-gold);
-}
-
-.plan-price-row {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 8px;
-  margin-top: 9px;
-}
-
-.plan-price-row strong {
+.plan-card-bg {
   display: block;
-  overflow: hidden;
-  font-size: clamp(28px, 2vw, 34px);
-  line-height: 1.1;
-  font-weight: 900;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-price-row span {
-  flex: 0 0 auto;
-  color: var(--recharge-muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.is-blue .plan-price-row strong {
-  color: var(--recharge-blue);
-}
-
-.is-purple .plan-price-row strong {
-  color: var(--recharge-purple);
-}
-
-.is-gold .plan-price-row strong {
-  color: var(--recharge-gold);
-}
-
-.plan-copy p {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  margin: 10px 0 0;
-  color: var(--recharge-text);
-  font-size: 14px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-gift .iconify {
-  flex: 0 0 auto;
-  color: currentColor;
-  font-size: 16px;
-}
-
-.is-blue .plan-gift {
-  color: #2d78f5;
-}
-
-.theme-dark .is-blue .plan-gift {
-  color: #8dbdff;
-}
-
-.plan-features {
-  display: grid;
-  min-width: 0;
-  gap: 8px;
-  margin: clamp(12px, 1.1vw, 18px) 0 auto;
-  padding: 0 0 0 clamp(68px, 4.8vw, 88px);
-  color: var(--recharge-text);
-  list-style: none;
-}
-
-.is-blue .plan-features {
-  padding-left: clamp(118px, 8.5vw, 160px);
-}
-
-.plan-features li {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.plan-features .iconify {
-  flex: 0 0 auto;
-  color: currentColor;
-  font-size: 16px;
-}
-
-.is-blue .plan-features {
-  color: #163358;
-}
-
-.theme-dark .is-blue .plan-features {
-  color: #d7e8ff;
-}
-
-.is-blue .plan-features .iconify {
-  color: var(--recharge-blue);
-}
-
-.is-purple .plan-features {
-  color: color-mix(in srgb, var(--recharge-text) 88%, var(--recharge-purple));
-}
-
-.is-purple .plan-features .iconify {
-  color: var(--recharge-purple);
-}
-
-.is-gold .plan-features {
-  color: color-mix(in srgb, var(--recharge-text) 88%, var(--recharge-gold));
-}
-
-.is-gold .plan-features .iconify {
-  color: var(--recharge-gold);
-}
-
-.plan-features span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-self: stretch;
-  justify-content: center;
-  min-width: 0;
-  gap: clamp(18px, 1.8vw, 32px);
-  row-gap: 8px;
-  margin: auto 0 14px;
-  color: var(--recharge-muted);
-}
-
-.plan-meta div {
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-  align-items: center;
-  gap: 6px;
-}
-
-.plan-meta dt {
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.plan-button {
-  --n-height: 40px;
-  --n-border-radius: 999px;
-  --n-color: transparent;
-  --n-color-hover: color-mix(in srgb, currentColor 10%, transparent);
-  --n-color-pressed: color-mix(in srgb, currentColor 14%, transparent);
-  --n-color-focus: color-mix(in srgb, currentColor 10%, transparent);
-  --n-border: 1px solid currentColor;
-  --n-border-hover: 1px solid currentColor;
-  --n-border-pressed: 1px solid currentColor;
-  --n-border-focus: 1px solid currentColor;
-  --n-text-color: currentColor;
-  --n-text-color-hover: currentColor;
-  --n-text-color-pressed: currentColor;
-  --n-text-color-focus: currentColor;
-  display: flex;
-  box-sizing: border-box;
-  flex: 0 0 40px;
-  height: 40px;
-  min-width: 0;
   width: 100%;
-  max-width: 100%;
-  align-self: end;
-  justify-self: stretch;
-  overflow: hidden;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-  background: transparent;
-  color: currentColor;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
+  height: auto;
+  object-fit: contain;
+  vertical-align: top;
+  pointer-events: none;
+  transition: filter 0.26s ease;
 }
 
-.plan-button :deep(.n-button__content) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.plan-card:not(.is-selected) .plan-card-bg {
+  filter: saturate(0.94) brightness(0.98);
 }
 
-.plan-button-arrow {
-  flex: 0 0 auto;
-  font-size: 17px;
+.plan-card.is-selected .plan-card-bg {
+  filter: saturate(1.04) brightness(1.02);
 }
 
-.is-blue .plan-button {
-  --n-text-color: var(--recharge-blue);
-  --n-text-color-hover: var(--recharge-blue);
-  --n-text-color-pressed: #1f6ed6;
-  --n-text-color-focus: var(--recharge-blue);
-  --n-border: 1px solid var(--recharge-blue);
-  --n-border-hover: 1px solid var(--recharge-blue);
-  --n-border-pressed: 1px solid #1f6ed6;
-  --n-border-focus: 1px solid var(--recharge-blue);
-  color: var(--recharge-blue);
+.plan-card.is-pressing .plan-card-bg {
+  filter: saturate(1) brightness(0.96);
 }
 
-.is-purple .plan-button {
-  --n-color: #4d74ff;
-  --n-color-hover: #5c82ff;
-  --n-color-pressed: #435fe4;
-  --n-color-focus: #4d74ff;
-  --n-border: 0;
-  --n-border-hover: 0;
-  --n-border-pressed: 0;
-  --n-border-focus: 0;
-  --n-text-color: #fff;
-  --n-text-color-hover: #fff;
-  --n-text-color-pressed: #fff;
-  --n-text-color-focus: #fff;
-  border: 0;
-  background: linear-gradient(100deg, #4d74ff, #b347ff);
-  color: #fff;
-  box-shadow: none;
+@media (prefers-reduced-motion: reduce) {
+  .plan-card,
+  .plan-card::after,
+  .plan-card-bg,
+  .plan-card-check {
+    animation: none;
+    transition: none;
+  }
 }
 
-.is-gold .plan-button {
-  --n-text-color: var(--recharge-gold);
-  --n-text-color-hover: var(--recharge-gold);
-  --n-text-color-pressed: #c87915;
-  --n-text-color-focus: var(--recharge-gold);
-  --n-border: 1px solid var(--recharge-gold);
-  --n-border-hover: 1px solid var(--recharge-gold);
-  --n-border-pressed: 1px solid #c87915;
-  --n-border-focus: 1px solid var(--recharge-gold);
-  color: var(--recharge-gold);
-}
-
-.records-section {
+.records-module {
   position: relative;
-  z-index: 1;
+  z-index: 0;
   display: flex;
   min-width: 0;
-  min-height: 0;
   flex: 1;
   flex-direction: column;
-  padding: 0 clamp(22px, 2.4vw, 34px) clamp(18px, 2vw, 28px);
+  padding: clamp(20px, 1.8vw, 28px);
+  border: 1px solid rgba(188, 205, 223, 0.62);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(166, 210, 255, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgba(255, 214, 153, 0.14), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, #ffffff 38%, #f7faff 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
+    0 16px 42px rgba(71, 99, 132, 0.1);
+}
+
+.theme-dark .records-module {
+  border-color: rgba(73, 106, 148, 0.5);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(48, 128, 255, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(10, 20, 40, 0.96) 0%, rgba(8, 16, 35, 0.98) 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 18px 44px rgba(0, 0, 0, 0.28);
 }
 
 .records-header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 22px;
+  gap: 16px 22px;
+}
+
+.records-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 18px);
+  margin-top: clamp(18px, 1.6vw, 24px);
+  padding: clamp(14px, 1.2vw, 18px);
+  border: 1px solid rgba(188, 205, 223, 0.45);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1.5px) 0 0 / 18px 18px,
+    linear-gradient(135deg, rgba(241, 247, 255, 0.92), rgba(255, 255, 255, 0.88));
+}
+
+.theme-dark .records-summary {
+  border-color: rgba(73, 106, 148, 0.38);
+  background:
+    radial-gradient(circle, rgba(125, 150, 181, 0.16) 1px, transparent 1.5px) 0 0 / 18px 18px,
+    linear-gradient(135deg, rgba(12, 24, 48, 0.92), rgba(8, 16, 35, 0.88));
+}
+
+.summary-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: clamp(10px, 1vw, 14px);
+  padding: clamp(10px, 1vw, 14px) clamp(12px, 1.1vw, 16px);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 22px rgba(71, 99, 132, 0.08);
+}
+
+.theme-dark .summary-card {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.summary-card-icon {
+  display: grid;
+  flex: 0 0 clamp(46px, 4vw, 56px);
+  place-items: center;
+  width: clamp(46px, 4vw, 56px);
+  height: clamp(46px, 4vw, 56px);
+  border-radius: 14px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  color: #fff;
+  clip-path: polygon(25% 6%, 75% 6%, 94% 50%, 75% 94%, 25% 94%, 6% 50%);
+}
+
+.summary-card.is-blue .summary-card-icon {
+  background: linear-gradient(145deg, #5eb0ff, #2f7dff);
+  box-shadow: 0 8px 18px rgba(47, 125, 255, 0.34);
+}
+
+.summary-card.is-purple .summary-card-icon {
+  background: linear-gradient(145deg, #b58cff, #7b4dff);
+  box-shadow: 0 8px 18px rgba(123, 77, 255, 0.34);
+}
+
+.summary-card.is-gold .summary-card-icon {
+  background: linear-gradient(145deg, #ffc857, #f49a23);
+  box-shadow: 0 8px 18px rgba(244, 154, 35, 0.34);
+}
+
+.summary-card.is-navy .summary-card-icon {
+  background: linear-gradient(145deg, #4f7fd6, #1f4f9c);
+  box-shadow: 0 8px 18px rgba(31, 79, 156, 0.34);
+}
+
+.summary-card-copy {
+  min-width: 0;
+}
+
+.summary-card-copy p {
+  margin: 0;
+  color: var(--recharge-muted);
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.summary-card-copy strong {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: clamp(22px, 2.2vw, 30px);
+  line-height: 1.1;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-card.is-blue .summary-card-copy strong {
+  color: #2f7dff;
+}
+
+.summary-card.is-purple .summary-card-copy strong {
+  color: #8f57ff;
+}
+
+.summary-card.is-gold .summary-card-copy strong {
+  color: #f49a23;
+}
+
+.summary-card.is-navy .summary-card-copy strong {
+  color: #1f4f9c;
+}
+
+.theme-dark .summary-card.is-navy .summary-card-copy strong {
+  color: #7eb0ff;
+}
+
+.records-table-panel {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  margin-top: clamp(18px, 1.6vw, 24px);
+  padding: clamp(14px, 1.2vw, 18px);
+  border: 1px solid rgba(188, 205, 223, 0.42);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.theme-dark .records-table-panel {
+  border-color: rgba(73, 106, 148, 0.38);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .records-filter {
@@ -1143,29 +1041,28 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .export-button {
-  --n-color: rgba(52, 124, 255, 0.12);
-  --n-color-hover: rgba(52, 124, 255, 0.18);
-  --n-color-pressed: rgba(52, 124, 255, 0.24);
-  --n-color-focus: rgba(52, 124, 255, 0.16);
-  --n-text-color: var(--recharge-blue);
-  --n-text-color-hover: var(--recharge-blue);
-  --n-text-color-pressed: #1f6ed6;
-  --n-text-color-focus: var(--recharge-blue);
+  --n-height: 38px;
+  --n-border-radius: 8px;
+  --n-color: rgba(255, 248, 238, 0.92);
+  --n-color-hover: rgba(255, 241, 224, 0.98);
+  --n-color-pressed: rgba(255, 232, 204, 0.98);
+  --n-color-focus: rgba(255, 244, 232, 0.96);
+  --n-border: 1px solid rgba(244, 154, 35, 0.52);
+  --n-border-hover: 1px solid rgba(244, 154, 35, 0.72);
+  --n-border-pressed: 1px solid rgba(216, 132, 19, 0.82);
+  --n-border-focus: 1px solid rgba(244, 154, 35, 0.72);
+  --n-text-color: #d88413;
+  --n-text-color-hover: #c87915;
+  --n-text-color-pressed: #a96510;
+  --n-text-color-focus: #d88413;
   width: 100%;
-  align-self: end;
   font-size: 14px;
   font-weight: 800;
 }
 
 .records-table-wrap {
-  flex: 1;
-  height: auto;
-  min-height: clamp(420px, 46vh, 740px);
-  margin-top: 18px;
+  min-width: 0;
   overflow: auto;
-  border: 1px solid var(--recharge-border-soft);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--recharge-panel-strong) 74%, transparent);
   scrollbar-width: thin;
   scrollbar-color: rgba(80, 137, 211, 0.58) transparent;
 }
@@ -1187,39 +1084,115 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .records-data-table {
-  --n-font-size: 15px;
-  --n-th-color: var(--recharge-head);
-  --n-th-color-hover: var(--recharge-head);
-  --n-th-text-color: var(--recharge-text);
+  --n-font-size: 14px;
+  --n-th-color: rgba(241, 246, 252, 0.96);
+  --n-th-color-hover: rgba(241, 246, 252, 0.96);
+  --n-th-text-color: #52647a;
   --n-td-color: transparent;
-  --n-td-color-hover: color-mix(in srgb, var(--recharge-blue) 8%, transparent);
+  --n-td-color-hover: rgba(52, 124, 255, 0.06);
   --n-td-text-color: var(--recharge-text);
-  --n-border-color: var(--recharge-row);
-  --n-border-radius: 8px;
-  height: 100%;
+  --n-border-color: rgba(226, 234, 244, 0.92);
+  --n-border-radius: 0;
   color: var(--recharge-text);
 }
 
-.records-data-table :deep(.n-data-table-wrapper),
-.records-data-table :deep(.n-data-table-base-table) {
-  height: 100%;
+.theme-dark .records-data-table {
+  --n-th-color: rgba(255, 255, 255, 0.05);
+  --n-th-color-hover: rgba(255, 255, 255, 0.05);
+  --n-th-text-color: #9fb0c7;
+  --n-border-color: rgba(125, 150, 181, 0.22);
 }
 
 .records-data-table :deep(.n-data-table-th) {
-  height: 50px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 16px;
+  font-size: 14px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .records-data-table :deep(.n-data-table-td) {
-  height: 54px;
-  padding: 0 14px;
-  font-weight: 600;
+  height: 56px;
+  padding: 0 16px;
+  font-weight: 700;
 }
 
-.status-tag {
+.plan-type-pill {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 8px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1.2;
+}
+
+.plan-type-pill-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
+.plan-type-pill.is-blue {
+  background: rgba(47, 125, 255, 0.1);
+  color: #2f7dff;
+}
+
+.plan-type-pill.is-purple {
+  background: rgba(143, 87, 255, 0.1);
+  color: #8f57ff;
+}
+
+.plan-type-pill.is-gold {
+  background: rgba(244, 154, 35, 0.12);
+  color: #f49a23;
+}
+
+.amount-cell {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.amount-cell.is-blue {
+  color: #2f7dff;
+}
+
+.amount-cell.is-purple {
+  color: #8f57ff;
+}
+
+.amount-cell.is-gold {
+  color: #f49a23;
+}
+
+.points-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.points-cell-icon {
+  color: #f49a23;
+  font-size: 18px;
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.status-text.is-success {
+  color: #18a058;
+}
+
+.status-text.is-pending {
+  color: #347cff;
+}
+
+.status-text.is-failed {
+  color: #d03050;
 }
 
 .detail-button {
@@ -1230,11 +1203,35 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   font-weight: 800;
 }
 
+.detail-button :deep(.n-button__content) {
+  gap: 2px;
+}
+
+.detail-button-icon {
+  font-size: 18px;
+}
+
+.records-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 16px;
+  padding-top: 4px;
+}
+
+.records-total {
+  margin: 0;
+  color: var(--recharge-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .records-pager {
   display: flex;
   flex-shrink: 0;
   justify-content: flex-end;
-  margin-top: 14px;
   --n-item-size: 30px;
   --n-item-border-radius: 5px;
   --n-item-color: var(--recharge-field);
@@ -1270,11 +1267,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   }
 
   .plan-grid {
-    gap: 18px;
-  }
-
-  .plan-card {
-    padding-inline: 20px;
+    --plan-gap: 18px;
   }
 
   .records-filter {
@@ -1283,15 +1276,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 @media (max-width: 1180px) {
-  .plan-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .plan-card {
+    flex-basis: calc((100% - var(--plan-gap)) / 2);
+    max-width: calc((100% - var(--plan-gap)) / 2);
   }
 
-  .plan-visual-stack {
-    margin-top: 12px;
-    transform: scale(0.82);
-    transform-origin: center center;
-  }
 }
 
 @media (max-height: 820px) and (min-width: 981px) {
@@ -1314,47 +1303,13 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     transform-origin: right center;
   }
 
-  .plan-section {
-    padding-block: 14px 16px;
+  .recharge-body {
+    gap: 18px;
+    padding-block: 14px 18px;
   }
 
   .plan-grid {
     margin-top: 12px;
-  }
-
-  .plan-card {
-    height: clamp(280px, 16vw, 306px);
-    min-height: 280px;
-    max-height: 306px;
-    padding-block: 16px;
-  }
-
-  .plan-icon {
-    width: 48px;
-    height: 48px;
-    font-size: 30px;
-  }
-
-  .plan-main {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-
-  .plan-copy strong {
-    font-size: 28px;
-  }
-
-  .plan-features {
-    gap: 6px;
-    margin-top: 10px;
-  }
-
-  .plan-meta {
-    margin-bottom: 12px;
-  }
-
-  .records-table-wrap {
-    height: auto;
-    min-height: 300px;
   }
 }
 
@@ -1385,26 +1340,24 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   }
 
   .plan-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .plan-card {
-    height: clamp(286px, 34vw, 316px);
-    min-height: 286px;
-    max-height: 316px;
+    --plan-gap: 18px;
   }
 
   .export-button {
     width: 100%;
   }
 
-  .records-section {
-    min-height: 0;
+  .records-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .records-table-wrap {
-    height: auto;
-    min-height: clamp(380px, 56vh, 620px);
+  .records-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .records-pager {
+    justify-content: center;
   }
 }
 
@@ -1413,31 +1366,21 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     --recharge-page-pad: 12px;
   }
 
-  .plan-grid,
   .records-filter {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .plan-card {
-    height: 314px;
-    min-height: 314px;
-    max-height: 314px;
+    flex-basis: 100%;
+    max-width: 100%;
   }
 
-  .is-blue .plan-main {
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 16px;
+  .records-summary {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .plan-visual-stack {
-    width: 92px;
-    height: 96px;
-    transform: scale(0.84);
-    transform-origin: center center;
-  }
-
-  .plan-features {
-    padding-left: 0;
+  .records-module {
+    padding: 16px;
   }
 }
 </style>

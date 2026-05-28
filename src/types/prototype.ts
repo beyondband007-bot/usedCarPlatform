@@ -19,13 +19,19 @@ export interface FeatureEntry {
   highlighted?: boolean
 }
 
+export type PricingPlanTone = 'blue' | 'orange' | 'green'
+
 export interface PricingPlan {
   name: string
   price: string
+  description: string
   benefits: string[]
   action: string
+  icon: string
+  tone: PricingPlanTone
   featured?: boolean
   badge?: string
+  backgroundImage?: string
 }
 
 export interface PointTransaction {

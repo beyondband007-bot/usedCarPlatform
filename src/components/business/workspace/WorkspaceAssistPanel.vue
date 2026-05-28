@@ -3,12 +3,51 @@ import { ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
+import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
+import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
-import type { WorkspaceCapability, WorkspaceRecentItem } from "@/types/workspace";
+import type {
+  WorkspaceCapability,
+  WorkspaceGenerateResult,
+  WorkspaceRecentItem,
+} from "@/types/workspace";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
+  selectedOptionId: string;
+  generationResult?: WorkspaceGenerateResult | null;
 }>();
+
+const emit = defineEmits<{
+  backFromResult: [];
+  pickTemplate: [payload: { capabilityCode: string; optionId: string }];
+  pickRecent: [item: WorkspaceRecentItem];
+}>();
+
+function canOpenRecent(item: WorkspaceRecentItem) {
+  return item.status === "success" && Boolean(item.previewImage);
+}
+
+function handleRecentPick(item: WorkspaceRecentItem) {
+  if (!canOpenRecent(item)) return;
+  emit("pickRecent", item);
+}
+
+const templateCards = workspaceTemplateRecommendations;
+
+function isTemplateActive(item: (typeof templateCards)[number]) {
+  return (
+    props.capability.code === item.capabilityCode &&
+    props.selectedOptionId === item.optionId
+  );
+}
+
+function handleTemplatePick(item: (typeof templateCards)[number]) {
+  emit("pickTemplate", {
+    capabilityCode: item.capabilityCode,
+    optionId: item.optionId,
+  });
+}
 
 const appStore = useAppStore();
 const activeTab = ref<"guide" | "recent">("guide");
@@ -29,25 +68,6 @@ const tutorialSteps = [
   {
     title: "生成效果",
     icon: "mdi:car-select",
-  },
-] as const;
-
-const templateCards = [
-  {
-    title: "经典白棚",
-    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "玻璃展厅",
-    image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "城市光廊",
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "户外动态",
-    image: "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=80",
   },
 ] as const;
 
@@ -78,6 +98,11 @@ const deliveryResults = [
     image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
   },
   {
+    title: "竖屏封面 · 全屏",
+    ratio: "9 / 16",
+    image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
+  },
+  {
     title: "宽幅 · 展厅氛围",
     ratio: "16 / 9",
     image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1000&q=82",
@@ -101,38 +126,65 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   success: "已完成",
   fail: "失败",
 };
+
+function formatDeliveryRatio(ratio: string) {
+  return ratio.replace(/\s*\/\s*/g, ":");
+}
+
+function getDeliveryMediaStyle(ratio: string) {
+  return {
+    "--delivery-ratio": ratio,
+  } as Record<string, string>;
+}
 </script>
 
 <template>
-  <aside class="assist-panel" :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'">
-    <template v-if="capability.kind === 'delivery'">
-      <header class="delivery-result-head">
-        <div>
-          <p>成片结果</p>
-          <h2>5月展厅批量上新</h2>
-          <span>已完成 12 张 · 根据生成比例自动排布</span>
-        </div>
-        <button type="button">下载全部</button>
-      </header>
+  <aside
+    class="assist-panel h-full min-h-0"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+  >
+    <WorkspaceGenerateResultPanel
+      v-if="generationResult"
+      :result="generationResult"
+      @back="emit('backFromResult')"
+    />
 
-      <section class="delivery-result-layout" aria-label="成片交付结果">
-        <article
-          v-for="item in deliveryResults"
-          :key="item.title"
-          class="delivery-result-card"
-        >
-          <img
-            :src="item.image"
-            :alt="item.title"
-            loading="lazy"
-            :style="{ aspectRatio: item.ratio }"
-          />
+    <template v-else-if="capability.kind === 'delivery'">
+      <div class="delivery-panel">
+        <header class="delivery-result-head">
           <div>
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.ratio.replace(' / ', ':') }}</span>
+            <p>成片结果</p>
+            <h2>5月展厅批量上新</h2>
+            <span>已完成 12 张 · 根据生成比例自动排布</span>
           </div>
-        </article>
-      </section>
+          <button type="button" class="delivery-download-all">下载全部</button>
+        </header>
+
+        <section class="delivery-result-layout" aria-label="成片交付结果">
+          <article
+            v-for="item in deliveryResults"
+            :key="item.title"
+            class="delivery-result-card"
+          >
+            <div
+              class="delivery-result-media"
+              :style="getDeliveryMediaStyle(item.ratio)"
+            >
+              <img
+                :src="item.image"
+                :alt="item.title"
+                loading="lazy"
+                decoding="async"
+                draggable="false"
+              />
+            </div>
+            <footer class="delivery-result-foot">
+              <strong>{{ item.title }}</strong>
+              <span>{{ formatDeliveryRatio(item.ratio) }}</span>
+            </footer>
+          </article>
+        </section>
+      </div>
     </template>
 
     <template v-else>
@@ -192,8 +244,20 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
       <section class="template-section" aria-label="模板推荐">
         <h2>初次使用？试试这些</h2>
         <div class="template-grid">
-          <article v-for="item in templateCards" :key="item.title" class="template-card">
-            <img :src="item.image" :alt="item.title" loading="lazy" />
+          <article
+            v-for="item in templateCards"
+            :key="item.title"
+            role="button"
+            tabindex="0"
+            class="template-card"
+            :class="{ 'is-active': isTemplateActive(item) }"
+            :aria-pressed="isTemplateActive(item)"
+            :aria-label="`选择${item.title}场景`"
+            @click="handleTemplatePick(item)"
+            @keydown.enter.prevent="handleTemplatePick(item)"
+            @keydown.space.prevent="handleTemplatePick(item)"
+          >
+            <img :src="item.image" :alt="item.title" loading="lazy" draggable="false" />
             <div class="template-title">
               <span>{{ item.title }}</span>
             </div>
@@ -213,12 +277,24 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
     </section>
 
     <section v-else class="recent-layout" aria-label="最近生成">
-      <article v-for="item in capability.recent" :key="item.id" class="recent-card">
+      <article
+        v-for="item in capability.recent"
+        :key="item.id"
+        class="recent-card"
+        :class="{ 'is-clickable': canOpenRecent(item) }"
+        :role="canOpenRecent(item) ? 'button' : undefined"
+        :tabindex="canOpenRecent(item) ? 0 : undefined"
+        :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+        @click="handleRecentPick(item)"
+        @keydown.enter.prevent="handleRecentPick(item)"
+        @keydown.space.prevent="handleRecentPick(item)"
+      >
         <img
           v-if="item.thumbnail"
           :src="item.thumbnail"
           :alt="item.title"
           loading="lazy"
+          draggable="false"
         />
         <div v-else class="recent-empty">
           <Icon icon="mdi:image-outline" />
@@ -256,11 +332,14 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
   display: flex;
   container-type: inline-size;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  padding: 22px 24px;
+  padding: 18px 20px 20px;
   background:
     radial-gradient(720px 180px at 48% 0%, rgba(47, 130, 255, 0.13), transparent 72%),
     var(--assist-bg);
@@ -334,7 +413,15 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   font-weight: 700;
 }
 
-.delivery-result-head button {
+.delivery-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0;
+}
+
+.delivery-download-all {
   flex-shrink: 0;
   height: 40px;
   border: 1px solid rgba(47, 130, 255, 0.34);
@@ -346,18 +433,31 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   font-size: 14px;
   font-weight: 900;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.delivery-download-all:hover {
+  border-color: rgba(47, 130, 255, 0.5);
+  background: rgba(47, 130, 255, 0.2);
 }
 
 .delivery-result-layout {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  columns: 2;
+  column-gap: clamp(14px, 1.6vw, 20px);
   overflow-x: hidden;
-  padding: 2px 4px 18px 0;
-  column-count: 3;
-  column-gap: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 24px 0;
   scrollbar-width: thin;
   scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
+}
+
+@container (min-width: 860px) {
+  .delivery-result-layout {
+    columns: 3;
+  }
 }
 
 .delivery-result-layout::-webkit-scrollbar {
@@ -383,49 +483,71 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 .delivery-result-card {
   display: inline-block;
   width: 100%;
+  margin: 0 0 clamp(14px, 1.6vw, 20px);
   break-inside: avoid;
-  overflow: hidden;
-  margin: 0 0 16px;
   border: 1px solid var(--assist-border);
   border-radius: 12px;
   background: var(--assist-card);
   box-shadow: var(--assist-shadow);
+  overflow: hidden;
 }
 
-.delivery-result-card img {
+.delivery-result-media {
+  --delivery-ratio: 1 / 1;
+
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--delivery-ratio);
+  max-height: min(52vh, 520px);
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(47, 130, 255, 0.08), transparent 42%),
+    var(--assist-card-strong);
+}
+
+.delivery-result-media img {
   display: block;
   width: 100%;
+  height: 100%;
   object-fit: cover;
+  object-position: center;
   background: var(--assist-card-strong);
 }
 
-.delivery-result-card div {
+.delivery-result-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 11px 12px 12px;
+  gap: 12px;
+  padding: 12px 14px 13px;
+  border-top: 1px solid var(--assist-border-soft);
+  background: color-mix(in srgb, var(--assist-card) 92%, white);
 }
 
-.delivery-result-card strong,
-.delivery-result-card span {
+.theme-light .delivery-result-foot {
+  background: #fff;
+}
+
+.delivery-result-foot strong,
+.delivery-result-foot span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.delivery-result-card strong {
+.delivery-result-foot strong {
   min-width: 0;
   color: var(--assist-text);
   font-size: 14px;
   font-weight: 900;
 }
 
-.delivery-result-card span {
+.delivery-result-foot span {
   flex-shrink: 0;
   color: var(--assist-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .tab-group {
@@ -478,9 +600,18 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   gap: 18px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 4px 18px 0;
+  padding: 0 6px 28px 0;
   scrollbar-width: thin;
-  scrollbar-color: rgba(96, 133, 178, 0.5) transparent;
+  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
+}
+
+.guide-layout::-webkit-scrollbar {
+  width: 8px;
+}
+
+.guide-layout::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
 }
 
 .tutorial-section,
@@ -513,7 +644,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr);
   align-items: center;
   gap: clamp(10px, 1.2vw, 22px);
-  min-height: clamp(150px, 18vh, 220px);
+  min-height: clamp(128px, 15vh, 188px);
   margin-top: 14px;
 }
 
@@ -591,8 +722,31 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   aspect-ratio: 1 / 1;
   min-width: 0;
   overflow: hidden;
+  border: 2px solid transparent;
   border-radius: 12px;
   background: var(--assist-card-strong);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.template-card:hover {
+  transform: translateY(-2px);
+}
+
+.template-card.is-active {
+  border-color: var(--assist-blue);
+  box-shadow:
+    0 0 0 2px rgba(47, 130, 255, 0.16),
+    0 12px 28px rgba(47, 130, 255, 0.2);
+}
+
+.template-card:focus-visible {
+  border-color: var(--assist-blue);
+  box-shadow: 0 0 0 3px rgba(47, 130, 255, 0.24);
 }
 
 .template-card img {
@@ -658,15 +812,15 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
 .recent-layout {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   grid-auto-rows: auto;
   gap: 16px;
   align-content: start;
   min-height: 0;
-  max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2px 4px 10px 0;
+  padding: 2px 6px 28px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(96, 133, 178, 0.5) transparent;
 }
@@ -681,6 +835,28 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   border-radius: 10px;
   overflow: hidden;
   padding: 12px;
+}
+
+.recent-card.is-clickable {
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.recent-card.is-clickable:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border));
+  box-shadow:
+    0 0 0 2px rgba(47, 130, 255, 0.12),
+    var(--assist-shadow);
+}
+
+.recent-card.is-clickable:focus-visible {
+  outline: none;
+  border-color: var(--assist-blue);
+  box-shadow: 0 0 0 3px rgba(47, 130, 255, 0.2);
 }
 
 .recent-card img,

@@ -60,7 +60,12 @@ $theme-vars: (
   --app-header-credits-bg: #{map.get($vars, app-header-credits-bg)};
   --app-header-credits-text: #{map.get($vars, app-header-credits-text)};
   --app-header-user: #{map.get($vars, app-header-user)};
-  --app-header-offset: 5.5rem;
+  --app-subnav-offset: 0rem;
+  --app-header-offset: calc(5.5rem + var(--app-subnav-offset));
+}
+
+[data-subnav="true"] {
+  --app-subnav-offset: 2.75rem;
 }
 
 :root {

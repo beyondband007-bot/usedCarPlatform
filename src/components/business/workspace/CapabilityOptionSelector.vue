@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { NCard, NProgress, NTag } from "naive-ui";
+import { computed } from "vue";
+import { NTag } from "naive-ui";
 import { motion } from "motion-v";
 
 import type { WorkspaceCapability } from "@/types/workspace";
 
-defineProps<{
+const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
 }>();
@@ -12,6 +13,16 @@ defineProps<{
 const emit = defineEmits<{
   select: [id: string];
 }>();
+
+const optionRows = computed(() => {
+  const options = props.capability.options;
+  if (!options.length) return [];
+
+  const firstRowCount = Math.ceil(options.length / 2);
+  return [options.slice(0, firstRowCount), options.slice(firstRowCount)].filter(
+    (row) => row.length > 0,
+  );
+});
 </script>
 
 <template>
@@ -20,66 +31,264 @@ const emit = defineEmits<{
     :initial="{ opacity: 0, y: 18 }"
     :animate="{ opacity: 1, y: 0 }"
     :transition="{ duration: 0.42, delay: 0.08 }"
+    class="option-selector-motion"
   >
-    <NCard
+    <section
       v-if="capability.options.length"
-      :bordered="false"
-      class="border border-white/10 bg-white/[0.06] shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl"
+      class="option-selector-card"
+      :aria-label="capability.selectorTitle"
     >
-      <template #header>
-        <div class="flex items-center justify-between gap-4">
-          <h2 class="text-xl font-black text-white">
-            {{ capability.selectorTitle }}
-          </h2>
-          <NTag type="info" :bordered="false" round>{{
-            capability.selectorTag
-          }}</NTag>
-        </div>
-      </template>
+      <header class="option-selector-head">
+        <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
+        <NTag type="info" :bordered="false" round size="small">
+          {{ capability.selectorTag }}
+        </NTag>
+      </header>
 
-      <div class="grid gap-4 sm:grid-cols-2">
-        <motion.div
-          v-for="option in capability.options"
-          :key="option.id"
-          :while-hover="{ y: -4, scale: 1.01 }"
-          role="button"
-          tabindex="0"
-          class="overflow-hidden rounded-2xl border bg-white/[0.04] text-left transition"
-          :class="
-            option.id === selectedOptionId
-              ? 'border-blue-400 shadow-[0_0_28px_rgba(68,132,255,0.22)]'
-              : 'border-white/10'
-          "
-          @click="emit('select', option.id)"
-          @keydown.enter="emit('select', option.id)"
-          @keydown.space.prevent="emit('select', option.id)"
+      <div class="option-scroll-shell">
+        <div
+          class="option-scroll"
+          role="listbox"
+          :aria-label="`${capability.selectorTitle}列表`"
         >
-          <img
-            class="h-28 w-full object-cover"
-            :src="option.image"
-            :alt="option.title"
-            loading="lazy"
-          />
-          <div class="p-3 text-center text-base font-black text-white">
-            {{ option.title }}
+          <div class="option-rows">
+            <div
+              v-for="(row, rowIndex) in optionRows"
+              :key="`row-${rowIndex}`"
+              class="option-row"
+            >
+              <article
+                v-for="option in row"
+                :key="option.id"
+                role="option"
+                tabindex="0"
+                class="option-item"
+                :class="{ 'is-active': option.id === selectedOptionId }"
+                :aria-selected="option.id === selectedOptionId"
+                @click="emit('select', option.id)"
+                @keydown.enter="emit('select', option.id)"
+                @keydown.space.prevent="emit('select', option.id)"
+              >
+                <img
+                  class="option-item-cover"
+                  :src="option.image"
+                  :alt="option.title"
+                  loading="lazy"
+                  decoding="async"
+                  draggable="false"
+                />
+                <strong class="option-item-title">{{ option.title }}</strong>
+              </article>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </div>
-
-      <div class="mt-5">
-        <NProgress
-          type="line"
-          :percentage="58"
-          :show-indicator="false"
-          status="success"
-        />
-      </div>
-    </NCard>
+    </section>
   </motion.div>
 </template>
-<style scoped>
-.n-card {
-  /* border: 0; */
+
+<style scoped lang="scss">
+.option-selector-motion {
+  min-width: 0;
+}
+
+.option-selector-card {
+  --option-gap: 12px;
+  --option-visible: 2.25;
+  --option-scroll-track: rgba(218, 226, 237, 0.72);
+  --option-scroll-track-glow: rgba(47, 124, 255, 0.14);
+  --option-scroll-thumb-start: #19c995;
+  --option-scroll-thumb-end: #2f7cff;
+  --option-scroll-thumb-glow: rgba(47, 124, 255, 0.42);
+
+  padding: 18px 18px 14px;
+  border: 1px solid var(--app-border);
   border-radius: 12px;
+  background: var(--app-surface);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+}
+
+:global([data-theme="dark"]) .option-selector-card {
+  --option-scroll-track: rgba(255, 255, 255, 0.08);
+  --option-scroll-track-glow: rgba(47, 124, 255, 0.22);
+  --option-scroll-thumb-start: #3dcda8;
+  --option-scroll-thumb-end: #5b9dff;
+  --option-scroll-thumb-glow: rgba(91, 157, 255, 0.5);
+
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+}
+
+.option-selector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.option-selector-title {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.option-scroll-shell {
+  position: relative;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.option-scroll-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 2;
+  width: clamp(18px, 4vw, 32px);
+  pointer-events: none;
+  background: linear-gradient(
+    270deg,
+    var(--app-surface) 0%,
+    color-mix(in srgb, var(--app-surface) 72%, transparent) 55%,
+    transparent 100%
+  );
+}
+
+.option-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 20px;
+  scroll-padding-inline: 2px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--option-scroll-thumb-end) var(--option-scroll-track);
+}
+
+.option-scroll::-webkit-scrollbar {
+  height: 9px;
+}
+
+.option-scroll::-webkit-scrollbar-track {
+  margin-inline: 4px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--option-scroll-track-glow) 18%,
+      var(--option-scroll-track-glow) 82%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--app-border) 55%, transparent) 0 1px,
+      transparent 1px 7px
+    ),
+    var(--option-scroll-track);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--option-scroll-thumb-end) 18%, transparent);
+}
+
+.option-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--option-scroll-track);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--option-scroll-thumb-start) 0%,
+    var(--option-scroll-thumb-end) 58%,
+    color-mix(in srgb, var(--option-scroll-thumb-end) 72%, #6b8cff) 100%
+  );
+  box-shadow:
+    0 0 10px var(--option-scroll-thumb-glow),
+    0 0 2px color-mix(in srgb, var(--option-scroll-thumb-start) 65%, transparent);
+}
+
+.option-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--option-scroll-thumb-start) 88%, #fff) 0%,
+    color-mix(in srgb, var(--option-scroll-thumb-end) 90%, #fff) 55%,
+    #6b8cff 100%
+  );
+  box-shadow:
+    0 0 14px var(--option-scroll-thumb-glow),
+    0 0 4px color-mix(in srgb, var(--option-scroll-thumb-start) 75%, transparent);
+}
+
+.option-rows {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  flex-direction: column;
+  gap: var(--option-gap);
+}
+
+.option-row {
+  display: flex;
+  gap: var(--option-gap);
+}
+
+.option-item {
+  flex: 0 0 auto;
+  width: calc((100cqw - var(--option-gap) * 2) / var(--option-visible));
+  scroll-snap-align: start;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--app-border) 88%, transparent);
+  border-radius: 10px;
+  background: var(--app-surface-soft);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.option-item:hover {
+  transform: translateY(-2px);
+}
+
+.option-item.is-active {
+  border-color: #2f7cff;
+  box-shadow:
+    0 0 0 2px rgba(47, 124, 255, 0.14),
+    0 10px 24px rgba(47, 124, 255, 0.16);
+}
+
+.option-item:focus-visible {
+  border-color: #2f7cff;
+  box-shadow: 0 0 0 3px rgba(47, 124, 255, 0.22);
+}
+
+.option-item-cover {
+  display: block;
+  width: 100%;
+  height: clamp(96px, 10vw, 124px);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.option-item-title {
+  display: block;
+  padding: 8px 6px;
+  color: var(--app-text);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option-item {
+    transition: none;
+  }
+
+  .option-item:hover {
+    transform: none;
+  }
 }
 </style>

@@ -22,6 +22,22 @@ export interface WorkspaceRecentItem {
   status: 'waiting' | 'queue' | 'generating' | 'success' | 'fail'
   createdAt: string
   thumbnail?: string
+  previewImage?: string
+  ratioLabel?: string
+  sceneLabel?: string
+  imageWidth?: number
+  imageHeight?: number
+}
+
+export interface WorkspaceGenerateResult {
+  createdAt: string
+  statusText: string
+  ratioLabel: string
+  previewImage: string
+  previewAlt: string
+  downloadUrl: string
+  imageWidth?: number
+  imageHeight?: number
 }
 
 export interface WorkspaceCapability {
@@ -63,3 +79,26 @@ export interface WorkspaceMenuGroup {
   title: string
   items: WorkspaceMenuItem[]
 }
+
+export interface WorkspaceTemplateRecommendation {
+  title: string
+  image: string
+  capabilityCode: string
+  optionId: string
+}
+
+export interface BatchVisualTemplate {
+  id: string
+  name: string
+  enableSceneChange: boolean
+  sceneIndex: number
+  sceneCategory: string
+  outputRatio: string
+  useRecentLogo: boolean
+  lightConsistency: boolean
+  paintRefresh: boolean
+  interiorEnhance: boolean
+  updatedAt: string
+}
+
+export type BatchVisualTemplateInput = Omit<BatchVisualTemplate, 'id' | 'updatedAt'>

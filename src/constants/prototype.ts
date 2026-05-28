@@ -6,13 +6,14 @@ import type {
   PricingPlan,
 } from '@/types/prototype'
 
+import planEnterpriseBasicBg from '@/img/企业基础.png'
+import planEnterpriseTeamBg from '@/img/企业团队.png'
+import planEnterpriseFlagshipBg from '@/img/企业旗舰.png'
+
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
   { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
-  { path: '/workspace', label: '视觉工作台', icon: 'mdi:palette-outline' },
-  { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
   { path: '/enterprise', label: '企业账号登录', icon: 'mdi:account-key-outline' },
-  { path: '/package-points', label: '套餐/积分', icon: 'mdi:package-variant-closed' },
   { path: '/visitor-layer', label: '访客浮层', icon: 'mdi:account-group-outline' },
 ]
 
@@ -55,21 +56,51 @@ export const pricingPlans: PricingPlan[] = [
   {
     name: '企业基础档',
     price: '¥980',
-    benefits: ['赠送 200 积分', '1 个企业账号', '每账号同时上传 1 套外观图组', '单张生成正常使用', '适合小团队试运行'],
+    description: '适合新团队启动视觉生产流程，先验证素材标准与交付节奏。',
+    icon: 'mdi:rocket-launch-outline',
+    tone: 'blue',
+    backgroundImage: planEnterpriseBasicBg,
+    benefits: [
+      '赠送 20,000 积分',
+      '1 个企业账号',
+      '每账号同时上传 1 套外观图组',
+      '单张生成正常使用',
+      '适合小团队试运行',
+    ],
     action: '选择基础档',
   },
   {
     name: '企业团队档',
-    price: '¥2,980',
+    price: '¥3,980',
+    description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
+    icon: 'mdi:account-group-outline',
+    tone: 'orange',
+    backgroundImage: planEnterpriseTeamBg,
     badge: '推荐',
-    benefits: ['赠送 550 积分', '5 个企业账号', '每账号同时上传 5 套外观图组', '单张生成正常使用', '适合车商团队批量上新'],
+    benefits: [
+      '赠送 55,000 积分',
+      '5 个企业账号',
+      '每账号同时上传 5 套外观图组',
+      '单张生成正常使用',
+      '适合车商团队批量上新',
+    ],
     action: '选择团队档',
     featured: true,
   },
   {
     name: '企业旗舰档',
     price: '¥9,800',
-    benefits: ['到账 9,800 积分', '20 个企业账号', '每账号同时上传 20 套外观图组', '可定制 20 个专属场景', '适合集团化和出海团队'],
+    description: '适合集团化业务、出海车源与专属场景长期配置。',
+    icon: 'mdi:shield-crown-outline',
+    tone: 'green',
+    backgroundImage: planEnterpriseFlagshipBg,
+    benefits: [
+      '赠送 980,000 积分',
+      '20 个企业账号',
+      '每账号同时上传 20 套外观图组',
+      '可定制 20 个专属场景',
+      '适合集团化和出海团队',
+    ],
     action: '咨询旗舰档',
   },
 ]
@@ -106,30 +137,49 @@ export const packageOptions: PackageOption[] = [
     action: '选择',
   },
   {
-    price: '¥2,980',
-    description: '赠 550 积分 · 5账号 · 5套并发',
+    price: '¥3,980',
+    description: '赠 55,000 积分 · 5账号 · 5套并发',
     action: '选择',
     active: true,
   },
   {
     price: '¥9,800',
-    description: '9,800 积分 · 20账号 · 20专属场景',
+    description: '980,000 积分 · 20账号 · 20专属场景',
     action: '预约演示',
   },
 ]
-
-export const pricingPageMetrics = [
-  { label: '账号并发', value: '1 - 20', desc: '按套餐支持同时使用账号数' },
-  { label: '积分到账', value: '200 - 9,800', desc: '购买后立即到账，可用于各项功能' },
-  { label: '专属场景', value: '可定制', desc: '按需配置专属场景，满足业务需求' },
-] as const
 
 export const pricingPageCopy = {
   title: '企业套餐',
   subtitle: '面向汽车电商与出海车商，按账号、积分、外观图组并发和专属场景配置团队产能',
   tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
+  plansTitle: '选择适合您的套餐方案',
+  plansSubtitle: '三档套餐覆盖试运行、团队批量上新与集团化交付场景',
   unit: '/ 套餐',
   recommended: '推荐',
   footer: '所有套餐积分自购买之日起 12 个月内有效，过期未使用积分将自动清零。',
   footerAction: '查看套餐说明',
 } as const
+
+export const pricingFooterFeatures = [
+  {
+    title: '权益清晰透明',
+    desc: '账号、积分、图组并发权益在购买前完整展示',
+    icon: 'mdi:diamond-stone',
+  },
+  {
+    title: '积分灵活使用',
+    desc: '可用于单张生成、批量任务与专属场景配置',
+    icon: 'mdi:clock-outline',
+  },
+  {
+    title: '安全稳定可靠',
+    desc: '企业账号权限隔离，任务失败自动退回积分',
+    icon: 'mdi:shield-check-outline',
+  },
+  {
+    title: '专属服务支持',
+    desc: '旗舰档提供场景定制与交付节奏协同',
+    icon: 'mdi:headset',
+  },
+] as const

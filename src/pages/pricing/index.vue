@@ -1,189 +1,285 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { ref } from "vue";
 
 import PricingPlanCard from "@/components/business/pricing/PricingPlanCard.vue";
 import {
+  pricingFooterFeatures,
   pricingPageCopy,
-  pricingPageMetrics,
   pricingPlans,
 } from "@/constants/prototype";
+import { useAppStore } from "@/stores/app";
 
 const copy = pricingPageCopy;
+const appStore = useAppStore();
 
-const metricIcons = [
-  "mdi:account-multiple-outline",
-  "mdi:cash-fast",
-  "mdi:image-filter-center-focus-strong-outline",
-] as const;
+const selectedPlanName = ref("企业团队档");
+const pressingPlanName = ref<string | null>(null);
 
-const metrics = pricingPageMetrics.map((metric, index) => ({
-  ...metric,
-  icon: metricIcons[index] ?? "mdi:chart-line",
-}));
+function handlePlanPointerDown(name: string) {
+  pressingPlanName.value = name;
+}
 
-const heroHighlights = [
-  { label: "开通账号", value: "1 - 20", icon: "mdi:account-key-outline" },
-  { label: "积分额度", value: "200 - 9,800", icon: "mdi:diamond-stone" },
-  { label: "图组并发", value: "1 - 20", icon: "mdi:layers-triple-outline" },
-] as const;
+function clearPlanPress() {
+  pressingPlanName.value = null;
+}
 
-const serviceItems = [
-  {
-    title: "账号协同",
-    desc: "多账号按套餐开通，适合门店与运营团队并行处理。",
-    icon: "mdi:account-network-outline",
-  },
-  {
-    title: "素材产能",
-    desc: "外观图组、单张生成和场景配置可按业务节奏使用。",
-    icon: "mdi:image-multiple-outline",
-  },
-  {
-    title: "采购可控",
-    desc: "套餐权益清晰，积分有效期与使用范围在购买前明确展示。",
-    icon: "mdi:clipboard-check-outline",
-  },
-] as const;
-
-const purchaseNotes = [
-  "套餐购买后积分立即到账",
-  "积分有效期为购买日起 12 个月",
-  "旗舰档支持专属场景配置沟通",
-] as const;
+function handlePlanSelect(name: string) {
+  selectedPlanName.value = name;
+}
 </script>
 
 <template>
   <main
-    class="min-h-[calc(100vh-var(--app-header-offset))] bg-[var(--app-bg)] px-3 py-6 sm:px-4 lg:px-6"
+    class="pricing-page"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <section class="mx-auto w-full max-w-[1320px] space-y-6">
-      <section
-        class="relative w-full max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_24px_90px_rgba(15,23,42,0.12)]"
-      >
-        <div
-          class="grid min-w-0 gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-8 xl:p-10"
-        >
-          <div class="min-w-0 max-w-full">
-            <div
-              class="inline-flex items-center gap-2 rounded-full border border-orange-500/20 bg-orange-500/10 px-4 py-2 text-sm font-black text-orange-500"
-            >
-              <Icon icon="mdi:briefcase-check-outline" class="text-lg" />
-              企业采购方案
-            </div>
-
-            <h1
-              class="mt-6 max-w-3xl break-words text-[2.35rem] font-black leading-tight tracking-normal text-[var(--app-text)] [overflow-wrap:anywhere] sm:text-4xl md:text-5xl"
-            >
-              {{ copy.title }}
-            </h1>
-            <p
-              class="mt-5 max-w-3xl break-words text-[15px] font-semibold leading-7 text-[var(--app-text-soft)] [overflow-wrap:anywhere] sm:text-base sm:leading-8 md:text-lg"
-            >
-              {{ copy.subtitle }}
-            </p>
-            <p
-              class="mt-4 max-w-2xl break-words text-sm font-semibold leading-6 text-[var(--app-text-soft)] [overflow-wrap:anywhere]"
-            >
-              {{ copy.tag }}
-            </p>
-
-            <div class="mt-7 grid gap-3 sm:flex sm:flex-wrap">
-              <a
-                href="#pricing-plans"
-                class="inline-flex h-12 w-full items-center justify-center rounded-full bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(249,115,22,0.24)] transition hover:bg-orange-600 active:translate-y-px sm:w-auto"
-              >
-                查看套餐
-                <Icon icon="mdi:arrow-down" class="ml-2 text-lg" />
-              </a>
-              <RouterLink
-                to="/enterprise"
-                class="inline-flex h-12 w-full items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-6 text-sm font-black text-[var(--app-text)] transition hover:border-orange-400 hover:text-orange-500 active:translate-y-px sm:w-auto"
-              >
-                申请企业账号
-                <Icon icon="mdi:arrow-right" class="ml-2 text-lg" />
-              </RouterLink>
-            </div>
-
-            <dl class="mt-8 grid gap-3 sm:grid-cols-3">
-              <div
-                v-for="item in heroHighlights"
-                :key="item.label"
-                class="min-w-0 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4"
-              >
-                <dt
-                  class="flex items-center gap-2 text-sm font-bold text-[var(--app-text-soft)]"
-                >
-                  <Icon :icon="item.icon" class="text-lg text-orange-500" />
-                  {{ item.label }}
-                </dt>
-                <dd
-                  class="mt-3 text-2xl font-black tracking-normal text-[var(--app-text)]"
-                >
-                  {{ item.value }}
-                </dd>
-              </div>
-            </dl>
+    <section class="pricing-shell">
+      <section class="pricing-panel" aria-label="企业套餐">
+        <header class="pricing-hero">
+          <div>
+            <h1>{{ copy.title }}</h1>
+            <p>{{ copy.plansSubtitle }}</p>
           </div>
+        </header>
 
-          <aside
-            class="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)]"
-            aria-label="套餐服务概览"
-          >
-            <img
-              class="h-40 w-full object-cover"
-              src="https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=82"
-              alt="汽车展厅车辆内容生产场景"
-            />
-            <div class="space-y-4 p-5">
-              <div>
-                <p class="text-sm font-black text-orange-500">团队产能配置</p>
-                <h2
-                  class="mt-2 text-2xl font-black tracking-normal text-[var(--app-text)]"
-                >
-                  从试运行到集团交付
-                </h2>
-              </div>
+        <div class="pricing-body">
+          <section id="pricing-plans" class="pricing-plans-module">
+            <h2 class="section-title">{{ copy.plansTitle }}</h2>
 
-              <div class="grid gap-3">
-                <div
-                  v-for="item in serviceItems"
-                  :key="item.title"
-                  class="flex min-w-0 gap-3 rounded-lg bg-[var(--app-surface)] p-4"
-                >
-                  <Icon
-                    :icon="item.icon"
-                    class="mt-0.5 shrink-0 text-xl text-orange-500"
-                  />
-                  <div class="min-w-0">
-                    <h3
-                      class="break-words text-sm font-black text-[var(--app-text)] [overflow-wrap:anywhere]"
-                    >
-                      {{ item.title }}
-                    </h3>
-                    <p
-                      class="mt-1 break-words text-sm font-semibold leading-6 text-[var(--app-text-soft)] [overflow-wrap:anywhere]"
-                    >
-                      {{ item.desc }}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div class="pricing-plans-grid">
+              <PricingPlanCard
+                v-for="(plan, index) in pricingPlans"
+                :key="plan.name"
+                :plan="plan"
+                :index="index"
+                :selected="selectedPlanName === plan.name"
+                :pressing="pressingPlanName === plan.name"
+                @select="handlePlanSelect(plan.name)"
+                @pointerdown="handlePlanPointerDown(plan.name)"
+                @pointerup="clearPlanPress"
+                @pointerleave="clearPlanPress"
+                @pointercancel="clearPlanPress"
+              />
             </div>
-          </aside>
-        </div>
-      </section>
+          </section>
 
-      <section
-        id="pricing-plans"
-        class="grid scroll-mt-28 gap-5 lg:grid-cols-3"
-      >
-        <PricingPlanCard
-          v-for="(plan, index) in pricingPlans"
-          :key="plan.name"
-          :plan="plan"
-          :index="index"
-        />
+          <section class="pricing-footer-bar" aria-label="套餐服务承诺">
+            <article
+              v-for="item in pricingFooterFeatures"
+              :key="item.title"
+              class="footer-feature"
+            >
+              <span class="footer-feature-icon" aria-hidden="true">
+                <Icon :icon="item.icon" />
+              </span>
+              <div>
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.desc }}</p>
+              </div>
+            </article>
+          </section>
+        </div>
       </section>
     </section>
   </main>
 </template>
+
+<style scoped lang="scss">
+.pricing-page {
+  --pricing-page-pad: clamp(16px, 2vw, 30px);
+  --pricing-page-bg:
+    radial-gradient(820px 220px at 68% 0%, rgba(48, 128, 255, 0.16), transparent 70%),
+    linear-gradient(180deg, #0e1d34, #071226);
+  --pricing-panel: rgba(7, 15, 32, 0.82);
+  --pricing-border: rgba(73, 106, 148, 0.42);
+  --pricing-border-soft: rgba(91, 117, 151, 0.22);
+  --pricing-head: rgba(255, 255, 255, 0.06);
+  --pricing-footer-bg: color-mix(in srgb, var(--app-surface) 88%, var(--app-bg));
+  --pricing-panel-shadow:
+    0 0 0 1px rgba(79, 139, 220, 0.08),
+    0 28px 72px rgba(0, 0, 0, 0.28),
+    0 0 42px rgba(39, 124, 235, 0.12);
+
+  min-height: calc(100vh - var(--app-header-offset));
+  padding: var(--pricing-page-pad);
+  background: var(--pricing-page-bg);
+  color: var(--app-text);
+}
+
+.pricing-page.theme-light {
+  --pricing-page-bg:
+    radial-gradient(860px 220px at 63% 0%, rgba(166, 210, 255, 0.32), transparent 72%),
+    linear-gradient(180deg, #f6fbff, #edf3fa);
+  --pricing-panel: rgba(255, 255, 255, 0.88);
+  --pricing-border: rgba(175, 194, 215, 0.42);
+  --pricing-border-soft: rgba(188, 205, 223, 0.42);
+  --pricing-head: rgba(231, 238, 247, 0.76);
+  --pricing-footer-bg: color-mix(in srgb, var(--app-surface) 90%, var(--app-bg));
+  --pricing-panel-shadow:
+    0 18px 52px rgba(71, 99, 132, 0.12),
+    0 0 30px rgba(125, 184, 238, 0.14);
+}
+
+.pricing-shell {
+  width: 100%;
+  max-width: 1500px;
+  min-height: calc(100vh - var(--app-header-offset) - var(--pricing-page-pad, 30px) * 2);
+  margin: 0 auto;
+}
+
+.pricing-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: visible;
+  border: 1px solid var(--pricing-border);
+  border-radius: 10px;
+  background: var(--pricing-panel);
+  box-shadow: var(--pricing-panel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.pricing-hero {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: clamp(104px, 12vh, 128px);
+  padding: 18px clamp(22px, 2.4vw, 34px);
+  overflow: hidden;
+  border-bottom: 1px solid var(--pricing-border-soft);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(47, 118, 225, 0.13),
+      rgba(47, 118, 225, 0.02) 48%,
+      rgba(54, 132, 245, 0.18)
+    ),
+    var(--pricing-head);
+}
+
+.pricing-page.theme-light .pricing-hero {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(242, 247, 253, 0.94),
+      rgba(238, 246, 255, 0.86) 52%,
+      rgba(214, 231, 252, 0.9)
+    ),
+    var(--pricing-head);
+}
+
+.pricing-hero h1,
+.section-title {
+  margin: 0;
+  color: var(--app-text);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.pricing-hero h1 {
+  font-size: 30px;
+  line-height: 1.25;
+}
+
+.pricing-hero p {
+  margin: 9px 0 0;
+  color: var(--app-text-soft);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.section-title::before {
+  content: "";
+  flex: 0 0 4px;
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #4d9dff, #2f6bff);
+}
+
+.pricing-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: clamp(22px, 2.2vw, 32px);
+  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px) clamp(24px, 2vw, 32px);
+}
+
+.pricing-plans-module {
+  scroll-margin-top: 96px;
+  min-width: 0;
+}
+
+.pricing-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(18px, 1.8vw, 28px);
+  margin-top: 18px;
+}
+
+.pricing-footer-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(14px, 1.4vw, 20px);
+  padding: clamp(18px, 1.8vw, 24px);
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--pricing-footer-bg);
+}
+
+.footer-feature {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+
+.footer-feature-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: 12px;
+  color: #f97316;
+  font-size: 22px;
+}
+
+.footer-feature h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.footer-feature p {
+  margin: 6px 0 0;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .pricing-plans-grid,
+  .pricing-footer-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .pricing-plans-grid,
+  .pricing-footer-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+</style>
