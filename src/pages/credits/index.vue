@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { h } from "vue";
+import {
+  NButton,
+  NDataTable,
+  NDatePicker,
+  NPagination,
+  NSelect,
+  NTag,
+} from "naive-ui";
+import type { DataTableColumns } from "naive-ui";
 
 import { useAppStore } from "@/stores/app";
 import {
@@ -9,6 +19,7 @@ import {
   creditsStats,
   creditsTypeOptions,
 } from "@/constants/credits-page";
+import type { CreditFlowRow } from "@/constants/credits-page";
 
 const appStore = useAppStore();
 const copy = creditsPageCopy;
@@ -31,6 +42,86 @@ const tagClass = (flowType: string) => {
   if (flowType === "单图生成") return "is-warning";
   return "is-cost";
 };
+
+const flowColumns: DataTableColumns<CreditFlowRow> = [
+  {
+    title: copy.colFlowNo,
+    key: "flowNo",
+    width: 180,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: copy.colFlowType,
+    key: "flowType",
+    width: 150,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          class: ["flow-tag", tagClass(row.flowType)],
+        },
+        { default: () => row.flowType },
+      );
+    },
+  },
+  {
+    title: copy.colDelta,
+    key: "delta",
+    width: 130,
+    render(row) {
+      return h(
+        "span",
+        {
+          class: ["delta", row.delta.startsWith("+") ? "is-up" : "is-down"],
+        },
+        row.delta,
+      );
+    },
+  },
+  {
+    title: copy.colBalance,
+    key: "balance",
+    width: 130,
+  },
+  {
+    title: copy.colAccount,
+    key: "account",
+    width: 170,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: copy.colCreatedAt,
+    key: "createdAt",
+    width: 190,
+  },
+  {
+    title: copy.colRemark,
+    key: "remark",
+    width: 210,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: copy.colAction,
+    key: "action",
+    width: 120,
+    fixed: "right",
+    render() {
+      return h(
+        NButton,
+        {
+          text: true,
+          type: "primary",
+          size: "small",
+          attrType: "button",
+          class: "detail-button",
+        },
+        { default: () => copy.viewDetail },
+      );
+    },
+  },
+];
 </script>
 
 <template>
@@ -42,39 +133,43 @@ const tagClass = (flowType: string) => {
             <h1>{{ copy.title }}</h1>
             <p>{{ copy.subtitle }}</p>
           </div>
-          <button class="query-button" type="button">查分查询</button>
+          <NButton class="query-button" type="primary" attr-type="button">
+            查分查询
+          </NButton>
         </header>
 
         <form class="filter-bar" aria-label="积分流水查询条件">
-          <label class="date-range">
-            <span class="sr-only">开始日期</span>
-            <input type="date" value="2026-05-01" />
-            <Icon icon="mdi:arrow-right" />
-            <span class="sr-only">结束日期</span>
-            <input type="date" value="2026-05-27" />
-          </label>
+          <NDatePicker
+            class="date-range"
+            type="daterange"
+            clearable
+            size="large"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+          />
 
-          <label class="filter-select">
-            <span class="sr-only">{{ copy.typePlaceholder }}</span>
-            <select>
-              <option v-for="option in creditsTypeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-            <Icon icon="mdi:chevron-down" />
-          </label>
+          <NSelect
+            class="filter-select"
+            :options="creditsTypeOptions"
+            default-value="all-type"
+            size="large"
+          />
 
-          <label class="filter-select">
-            <span class="sr-only">{{ copy.accountPlaceholder }}</span>
-            <select>
-              <option v-for="option in creditsAccountOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-            <Icon icon="mdi:chevron-down" />
-          </label>
+          <NSelect
+            class="filter-select"
+            :options="creditsAccountOptions"
+            default-value="all-account"
+            size="large"
+          />
 
-          <button class="export-button" type="button">{{ copy.export }}</button>
+          <NButton
+            class="export-button"
+            type="primary"
+            size="large"
+            attr-type="button"
+          >
+            {{ copy.export }}
+          </NButton>
         </form>
 
         <section class="stats-grid" aria-label="积分统计">
@@ -94,49 +189,19 @@ const tagClass = (flowType: string) => {
         <h2>{{ copy.tableTitle }}</h2>
 
         <div class="flow-table-wrap">
-          <table class="flow-table">
-            <thead>
-              <tr>
-                <th>{{ copy.colFlowNo }}</th>
-                <th>{{ copy.colFlowType }}</th>
-                <th>{{ copy.colDelta }}</th>
-                <th>{{ copy.colBalance }}</th>
-                <th>{{ copy.colAccount }}</th>
-                <th>{{ copy.colCreatedAt }}</th>
-                <th>{{ copy.colRemark }}</th>
-                <th>{{ copy.colAction }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in creditsFlowData" :key="row.flowNo">
-                <td>{{ row.flowNo }}</td>
-                <td>
-                  <span class="flow-tag" :class="tagClass(row.flowType)">{{ row.flowType }}</span>
-                </td>
-                <td class="delta" :class="row.delta.startsWith('+') ? 'is-up' : 'is-down'">
-                  {{ row.delta }}
-                </td>
-                <td>{{ row.balance }}</td>
-                <td>{{ row.account }}</td>
-                <td>{{ row.createdAt }}</td>
-                <td>{{ row.remark }}</td>
-                <td>
-                  <button class="detail-button" type="button">{{ copy.viewDetail }}</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <NDataTable
+            class="flow-data-table"
+            :columns="flowColumns"
+            :data="creditsFlowData"
+            :bordered="false"
+            :single-line="false"
+            :pagination="false"
+            :scroll-x="1280"
+            flex-height
+          />
         </div>
 
-        <nav class="pager" aria-label="流水分页">
-          <button type="button" disabled aria-label="上一页">
-            <Icon icon="mdi:chevron-left" />
-          </button>
-          <button class="active" type="button" aria-current="page">1</button>
-          <button type="button" disabled aria-label="下一页">
-            <Icon icon="mdi:chevron-right" />
-          </button>
-        </nav>
+        <NPagination class="pager" :page="1" :page-count="1" />
       </section>
     </div>
   </main>
@@ -144,6 +209,7 @@ const tagClass = (flowType: string) => {
 
 <style scoped lang="scss">
 .credits-page {
+  --credit-page-pad: clamp(16px, 2vw, 30px);
   --credit-bg-a: rgba(20, 31, 50, 0.8);
   --credit-bg-b: rgba(7, 13, 26, 0.98);
   --credit-panel: rgba(16, 25, 40, 0.8);
@@ -163,22 +229,30 @@ const tagClass = (flowType: string) => {
     0 0 34px rgba(26, 123, 205, 0.14);
 
   min-width: 0;
-  height: calc(100vh - var(--app-header-offset));
-  min-height: 0;
-  overflow: hidden;
-  padding: clamp(18px, 2.4vw, 34px);
+  height: auto;
+  min-height: calc(100vh - var(--app-header-offset));
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--credit-page-pad);
   background:
     radial-gradient(840px 140px at 50% 0%, rgba(31, 139, 223, 0.14), transparent 68%),
     linear-gradient(180deg, var(--credit-bg-a), var(--credit-bg-b));
   color: var(--credit-text);
 }
 
+.credits-page,
+.credits-page *,
+.credits-page *::before,
+.credits-page *::after {
+  box-sizing: border-box;
+}
+
 .credits-shell {
-  display: grid;
-  width: min(1760px, 100%);
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: min(2400px, 100%);
+  min-height: calc(100vh - var(--app-header-offset) - var(--credit-page-pad) - var(--credit-page-pad));
   gap: clamp(16px, 1.6vw, 24px);
   margin: 0 auto;
 }
@@ -218,16 +292,15 @@ const tagClass = (flowType: string) => {
   background: rgba(255, 255, 255, 0.68);
 }
 
-.credits-page.theme-light .flow-table th {
-  color: #303a46;
-}
-
-.credits-page.theme-light .flow-table td {
-  color: #2f3a47;
+.credits-page.theme-light .flow-data-table {
+  --n-th-text-color: #303a46;
+  --n-td-text-color: #2f3a47;
 }
 
 .query-panel,
 .flow-panel {
+  min-width: 0;
+  overflow: visible;
   border: 1px solid var(--credit-border);
   border-radius: 10px;
   background: var(--credit-panel);
@@ -244,6 +317,8 @@ const tagClass = (flowType: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 18px;
   min-height: clamp(72px, 8vh, 88px);
   padding: 16px clamp(18px, 2vw, 26px);
@@ -253,25 +328,30 @@ const tagClass = (flowType: string) => {
 }
 
 .query-title h1 {
+  overflow: hidden;
   margin: 0;
   font-size: 27px;
   line-height: 1.25;
   font-weight: 800;
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .query-title p {
+  overflow: hidden;
   margin: 7px 0 0;
   color: var(--credit-text-soft);
   font-size: 14px;
   line-height: 1.5;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .query-button,
 .export-button,
-.detail-button,
-.pager button {
+.detail-button {
   border: 0;
   font-family: inherit;
   cursor: pointer;
@@ -282,8 +362,25 @@ const tagClass = (flowType: string) => {
 }
 
 .query-button {
+  --n-height: clamp(46px, 5vh, 56px);
+  --n-border-radius: 12px;
+  --n-color: #256ed7;
+  --n-color-hover: #3685ef;
+  --n-color-pressed: #1d61c8;
+  --n-color-focus: #256ed7;
+  --n-border: 0;
+  --n-border-hover: 0;
+  --n-border-pressed: 0;
+  --n-border-focus: 0;
+  --n-text-color: #fff;
+  --n-text-color-hover: #fff;
+  --n-text-color-pressed: #fff;
+  --n-text-color-focus: #fff;
   height: clamp(46px, 5vh, 56px);
+  max-width: 100%;
+  flex-shrink: 0;
   min-width: clamp(116px, 8vw, 136px);
+  overflow: hidden;
   border-radius: 12px;
   background: linear-gradient(140deg, #3685ef, #1d61c8);
   box-shadow: 0 12px 26px rgba(33, 99, 202, 0.26);
@@ -303,6 +400,7 @@ const tagClass = (flowType: string) => {
   grid-template-columns: minmax(280px, 1.12fr) minmax(190px, 1fr) minmax(190px, 1fr) minmax(122px, 0.42fr);
   gap: clamp(10px, 1.1vw, 16px);
   align-items: center;
+  min-width: 0;
   margin-top: clamp(14px, 1.5vw, 20px);
   padding: clamp(12px, 1.2vw, 16px) clamp(14px, 1.6vw, 22px);
   border: 1px solid var(--credit-border-soft);
@@ -312,82 +410,77 @@ const tagClass = (flowType: string) => {
 
 .date-range,
 .filter-select {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  height: 46px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: var(--credit-field);
-  color: var(--credit-text-soft);
-}
-
-.date-range {
-  padding: 0 14px;
-  gap: 10px;
-}
-
-.date-range input {
-  width: calc(50% - 17px);
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--credit-text);
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.date-range input::-webkit-calendar-picker-indicator {
-  opacity: 0.58;
-  filter: var(--calendar-filter, invert(1));
-}
-
-.credits-page.theme-light .date-range input::-webkit-calendar-picker-indicator {
-  --calendar-filter: none;
-}
-
-.filter-select select {
   width: 100%;
-  height: 100%;
-  padding: 0 42px 0 16px;
-  appearance: none;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--credit-text);
-  font-family: inherit;
-  font-size: 14px;
+  min-width: 0;
 }
 
-.filter-select .iconify {
-  position: absolute;
-  right: 14px;
-  color: var(--credit-text-soft);
-  font-size: 18px;
-  pointer-events: none;
+.date-range,
+.filter-select,
+.export-button {
+  --n-height: 46px;
+  --n-border-radius: 5px;
+  --n-color: var(--credit-field);
+  --n-color-active: var(--credit-field);
+  --n-color-focus: var(--credit-field);
+  --n-color-hover: color-mix(in srgb, var(--credit-field) 88%, var(--credit-blue));
+  --n-border: 1px solid transparent;
+  --n-border-active: 1px solid rgba(50, 130, 250, 0.72);
+  --n-border-focus: 1px solid rgba(50, 130, 250, 0.76);
+  --n-border-hover: 1px solid rgba(50, 130, 250, 0.52);
+  --n-box-shadow-focus: 0 0 0 2px rgba(50, 130, 250, 0.13);
+  --n-text-color: var(--credit-text);
+  --n-placeholder-color: var(--credit-text-soft);
+  --n-icon-color: var(--credit-text-soft);
+}
+
+.date-range :deep(.n-input__input-el),
+.filter-select :deep(.n-base-selection-label),
+.filter-select :deep(.n-base-selection-placeholder) {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .export-button {
-  height: 42px;
-  border: 1px solid rgba(75, 144, 232, 0.9);
-  border-radius: 22px;
-  background: rgba(34, 104, 207, 0.14);
-  color: #3183ee;
+  --n-border-radius: 23px;
+  --n-color: rgba(34, 104, 207, 0.14);
+  --n-color-hover: rgba(34, 104, 207, 0.2);
+  --n-color-pressed: rgba(34, 104, 207, 0.26);
+  --n-color-focus: rgba(34, 104, 207, 0.18);
+  --n-border: 1px solid rgba(75, 144, 232, 0.9);
+  --n-border-hover: 1px solid rgba(75, 144, 232, 1);
+  --n-border-pressed: 1px solid rgba(62, 126, 221, 1);
+  --n-border-focus: 1px solid rgba(75, 144, 232, 1);
+  --n-text-color: #3183ee;
+  --n-text-color-hover: #4292ff;
+  --n-text-color-pressed: #2474db;
+  --n-text-color-focus: #3183ee;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 700;
 }
 
 .credits-page.theme-light .export-button {
-  border: 0;
-  background: linear-gradient(140deg, #3a8cf5, #266aca);
-  color: #fff;
+  --n-color: #2f7ee8;
+  --n-color-hover: #3a8cf5;
+  --n-color-pressed: #266aca;
+  --n-color-focus: #2f7ee8;
+  --n-border: 0;
+  --n-border-hover: 0;
+  --n-border-pressed: 0;
+  --n-border-focus: 0;
+  --n-text-color: #fff;
+  --n-text-color-hover: #fff;
+  --n-text-color-pressed: #fff;
+  --n-text-color-focus: #fff;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
   gap: clamp(12px, 1.2vw, 18px);
   margin-top: clamp(14px, 1.5vw, 20px);
 }
@@ -396,10 +489,15 @@ const tagClass = (flowType: string) => {
   position: relative;
   isolation: isolate;
   display: flex;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   align-items: center;
-  min-height: clamp(104px, 11vh, 122px);
+  height: clamp(96px, 6vw, 128px);
+  min-height: 96px;
+  max-height: 128px;
   overflow: hidden;
-  padding: clamp(16px, 1.5vw, 22px);
+  padding: clamp(14px, 1.4vw, 22px);
   border-radius: 7px;
   color: #fff;
 }
@@ -445,8 +543,8 @@ const tagClass = (flowType: string) => {
 .stat-glyph {
   display: grid;
   place-items: center;
-  width: 60px;
-  height: 60px;
+  width: clamp(46px, 3.2vw, 60px);
+  height: clamp(46px, 3.2vw, 60px);
   flex-shrink: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.9);
@@ -473,6 +571,7 @@ const tagClass = (flowType: string) => {
 
 .stat-content {
   min-width: 0;
+  overflow: hidden;
   margin-left: 20px;
 }
 
@@ -486,12 +585,15 @@ const tagClass = (flowType: string) => {
 
 .stat-content strong {
   display: block;
+  overflow: hidden;
   margin: 4px 0;
   color: #fff;
-  font-size: clamp(26px, 2vw, 32px);
+  font-size: clamp(24px, 1.8vw, 32px);
   line-height: 1.15;
   font-weight: 800;
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-icon {
@@ -506,6 +608,7 @@ const tagClass = (flowType: string) => {
   display: flex;
   min-width: 0;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
   padding: clamp(18px, 1.6vw, 24px) clamp(16px, 1.5vw, 22px) clamp(14px, 1.4vw, 20px);
 }
@@ -521,10 +624,12 @@ const tagClass = (flowType: string) => {
 
 .flow-table-wrap {
   flex: 1;
-  min-height: 0;
+  height: auto;
+  min-height: clamp(420px, 48vh, 760px);
   overflow: auto;
   border: 1px solid var(--credit-border-soft);
   border-radius: 8px;
+  background: color-mix(in srgb, var(--credit-panel-strong) 74%, transparent);
   scrollbar-width: thin;
   scrollbar-color: rgba(80, 137, 211, 0.58) transparent;
 }
@@ -545,69 +650,44 @@ const tagClass = (flowType: string) => {
   background: linear-gradient(180deg, #3c8cff, #1f6ed6);
 }
 
-.flow-table {
-  width: max(100%, 1120px);
-  min-width: 0;
-  border-collapse: collapse;
-  table-layout: fixed;
+.flow-data-table {
+  --n-font-size: 15px;
+  --n-th-color: var(--credit-head);
+  --n-th-color-hover: var(--credit-head);
+  --n-th-text-color: var(--credit-text);
+  --n-td-color: transparent;
+  --n-td-color-hover: color-mix(in srgb, var(--credit-blue) 8%, transparent);
+  --n-td-text-color: var(--credit-text);
+  --n-border-color: var(--credit-row-border);
+  --n-border-radius: 8px;
+  height: 100%;
   color: var(--credit-text);
-  font-size: 14px;
 }
 
-.flow-table th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  height: 52px;
+.flow-data-table :deep(.n-data-table-wrapper),
+.flow-data-table :deep(.n-data-table-base-table) {
+  height: 100%;
+}
+
+.flow-data-table :deep(.n-data-table-th) {
+  height: 56px;
   padding: 0 16px;
-  background: var(--credit-head);
-  color: var(--credit-text);
-  text-align: left;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.flow-table td {
-  height: 56px;
+.flow-data-table :deep(.n-data-table-td) {
+  height: 60px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--credit-row-border);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 500;
 }
 
-.flow-table th:nth-child(1) {
-  width: 16%;
-}
-
-.flow-table th:nth-child(2) {
-  width: 13%;
-}
-
-.flow-table th:nth-child(3),
-.flow-table th:nth-child(4) {
-  width: 10%;
-}
-
-.flow-table th:nth-child(5) {
-  width: 15%;
-}
-
-.flow-table th:nth-child(6) {
-  width: 18%;
-}
-
-.flow-table th:nth-child(7) {
-  width: 13%;
-}
-
-.flow-table th:nth-child(8) {
-  width: 10%;
-}
-
 .flow-tag {
+  --n-height: 26px;
+  --n-border-radius: 13px;
+  --n-font-size: 13px;
+  --n-font-weight: 700;
   display: inline-flex;
   align-items: center;
   height: 26px;
@@ -618,16 +698,22 @@ const tagClass = (flowType: string) => {
 }
 
 .flow-tag.is-positive {
+  --n-color: rgba(20, 201, 130, 0.14);
+  --n-text-color: #18b77d;
   background: rgba(20, 201, 130, 0.14);
   color: #18b77d;
 }
 
 .flow-tag.is-warning {
+  --n-color: rgba(242, 150, 42, 0.16);
+  --n-text-color: #f1962d;
   background: rgba(242, 150, 42, 0.16);
   color: #f1962d;
 }
 
 .flow-tag.is-cost {
+  --n-color: rgba(223, 98, 29, 0.14);
+  --n-text-color: #e77835;
   background: rgba(223, 98, 29, 0.14);
   color: #e77835;
 }
@@ -645,9 +731,10 @@ const tagClass = (flowType: string) => {
 }
 
 .detail-button {
-  padding: 0;
-  background: transparent;
-  color: var(--credit-link);
+  --n-text-color: var(--credit-link);
+  --n-text-color-hover: #4292ff;
+  --n-text-color-pressed: #2474db;
+  --n-text-color-focus: var(--credit-link);
   font-size: 14px;
   font-weight: 700;
 }
@@ -656,32 +743,25 @@ const tagClass = (flowType: string) => {
   display: flex;
   flex-shrink: 0;
   justify-content: flex-end;
-  gap: 8px;
   margin-top: 16px;
-}
-
-.pager button {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--credit-border);
-  border-radius: 4px;
-  background: var(--credit-field);
-  color: var(--credit-text-soft);
-  font-size: 18px;
-}
-
-.pager .active {
-  background: transparent;
-  color: var(--credit-text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.pager button:disabled {
-  opacity: 0.5;
-  cursor: default;
+  --n-item-size: 30px;
+  --n-item-border-radius: 4px;
+  --n-item-color: var(--credit-field);
+  --n-item-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-blue));
+  --n-item-color-active: transparent;
+  --n-item-color-active-hover: color-mix(in srgb, var(--credit-field) 82%, var(--credit-blue));
+  --n-item-border: 1px solid var(--credit-border);
+  --n-item-border-hover: 1px solid rgba(50, 130, 250, 0.5);
+  --n-item-border-active: 1px solid rgba(50, 130, 250, 0.7);
+  --n-item-text-color: var(--credit-text-soft);
+  --n-item-text-color-hover: var(--credit-text);
+  --n-item-text-color-active: var(--credit-text);
+  --n-button-color: var(--credit-field);
+  --n-button-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-blue));
+  --n-button-border: 1px solid var(--credit-border);
+  --n-button-border-hover: 1px solid rgba(50, 130, 250, 0.5);
+  --n-button-icon-color: var(--credit-text-soft);
+  --n-button-icon-color-hover: var(--credit-text);
 }
 
 .sr-only {
@@ -695,7 +775,7 @@ const tagClass = (flowType: string) => {
 
 @media (max-width: 1279px) {
   .credits-page {
-    padding: 18px;
+    --credit-page-pad: 18px;
   }
 
   .query-panel {
@@ -725,16 +805,83 @@ const tagClass = (flowType: string) => {
   }
 }
 
-@media (max-width: 980px) {
-  .credits-page {
-    height: auto;
-    min-height: calc(100vh - var(--app-header-offset));
-    overflow: auto;
+@media (max-width: 1180px) {
+  .filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .credits-shell {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-height: 820px) and (min-width: 981px) {
+  .credits-page {
+    --credit-page-pad: 14px;
+  }
+
+  .query-panel {
+    padding: 14px;
+  }
+
+  .query-header {
+    min-height: 70px;
+    padding-block: 12px;
+  }
+
+  .query-title h1 {
+    font-size: 24px;
+  }
+
+  .query-button {
+    height: 44px;
+  }
+
+  .filter-bar {
+    margin-top: 12px;
+    padding-block: 10px;
+  }
+
+  .stats-grid {
+    margin-top: 12px;
+  }
+
+  .stat-card {
+    height: clamp(92px, 5.8vw, 112px);
+    min-height: 92px;
+    max-height: 112px;
+    padding-block: 14px;
+  }
+
+  .stat-glyph {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .stat-content strong {
+    font-size: 24px;
+  }
+
+  .flow-panel {
+    min-height: 0;
+    padding-block: 16px 14px;
+  }
+
+  .flow-panel h2 {
+    margin-bottom: 12px;
+    font-size: 22px;
+  }
+
+  .flow-table-wrap {
     height: auto;
-    grid-template-rows: auto auto;
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 980px) {
+  .credits-page {
+    min-height: calc(100vh - var(--app-header-offset));
   }
 
   .query-header {
@@ -750,22 +897,33 @@ const tagClass = (flowType: string) => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-card {
+    height: clamp(96px, 13vw, 118px);
+    min-height: 96px;
+    max-height: 118px;
+  }
+
   .export-button {
     width: 100%;
   }
 
   .flow-panel {
-    min-height: 520px;
+    min-height: 0;
   }
 
   .flow-table-wrap {
-    min-height: 390px;
+    height: auto;
+    min-height: clamp(380px, 56vh, 620px);
   }
 }
 
 @media (max-width: 680px) {
   .credits-page {
-    padding: 12px;
+    --credit-page-pad: 12px;
   }
 
   .filter-bar,
@@ -773,23 +931,14 @@ const tagClass = (flowType: string) => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .date-range {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 46px;
-    padding-block: 9px;
-  }
-
-  .date-range input {
-    width: calc(50% - 18px);
+  .stat-card {
+    height: 102px;
+    min-height: 102px;
+    max-height: 102px;
   }
 }
 
 @media (min-width: 1600px) {
-  .credits-page {
-    padding-top: 36px;
-  }
-
   .query-panel {
     padding: 25px;
   }
