@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { AppError } from "../shared/errors";
+import { interiorCleanRoutes } from "./interior-clean/interiorCleanRoutes";
 import { lightConsistencyRoutes } from "./light-consistency/lightConsistencyRoutes";
 import { outdoorSceneRoutes } from "./outdoor-scene/outdoorSceneRoutes";
 import { paintRefreshRoutes } from "./paint-refresh/paintRefreshRoutes";
@@ -9,7 +10,6 @@ import { showroomLightRoutes } from "./showroom-light/showroomLightRoutes";
 import { skyStudioRoutes } from "./sky-studio/skyStudioRoutes";
 
 const moduleCodes = [
-  "interior-clean",
   "batch-new",
 ] as const;
 
@@ -21,6 +21,7 @@ moduleRoutes.use("/road-motion", roadMotionRoutes);
 moduleRoutes.use("/sky-studio", skyStudioRoutes);
 moduleRoutes.use("/paint-refresh", paintRefreshRoutes);
 moduleRoutes.use("/light-consistency", lightConsistencyRoutes);
+moduleRoutes.use("/interior-clean", interiorCleanRoutes);
 
 for (const moduleCode of moduleCodes) {
   moduleRoutes.post(`/${moduleCode}/tasks`, () => {
