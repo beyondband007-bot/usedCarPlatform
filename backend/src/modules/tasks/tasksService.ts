@@ -11,6 +11,7 @@ import {
   normalizeTaskResults,
   tasksRepository,
   type GenerationTaskRecord,
+  type RecentGenerationRecord,
 } from "./tasksRepository";
 
 const terminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
@@ -25,6 +26,29 @@ const asyncKeyHashMatcher = (accountHash: string) => {
 };
 
 class TasksService {
+  async listRecentTasks(input: {
+    moduleCode?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = Math.max(Number(input.page ?? 1), 1);
+    const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
+    const listed = await tasksRepository.listRecent({
+      moduleCode: input.moduleCode,
+      status: input.status,
+      page,
+      pageSize,
+    });
+
+    return {
+      items: listed.items.map((task) => this.toRecentResponse(task)),
+      page,
+      pageSize,
+      total: listed.total,
+    };
+  }
+
   async getTaskDetail(taskId: string) {
     const task = await tasksRepository.findById(taskId);
     if (!task) throw errors.taskNotFound();
@@ -110,6 +134,52 @@ class TasksService {
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
     };
+  }
+
+  private toRecentResponse(task: RecentGenerationRecord) {
+    const results = normalizeTaskResults(task.resultJson);
+    const previewImage = results[0]?.url ?? task.inputAssetUrl ?? null;
+    return {
+      id: task.id,
+      taskId: task.id,
+      moduleCode: task.moduleCode,
+      title: this.buildRecentTitle(task),
+      status: task.status,
+      uiStatus: task.status === "queued" ? "queue" : task.status,
+      progress: task.progress,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+      thumbnail: previewImage,
+      previewImage,
+      downloadUrl: results[0]?.url ?? null,
+      ratioLabel: `主图 ${task.outputRatio}`,
+      sceneLabel: task.optionId,
+      outputRatio: task.outputRatio,
+      inputAssetId: task.inputAssetId,
+      inputAssetUrl: task.inputAssetUrl,
+      resultCount: results.length,
+      error:
+        task.errorCode || task.errorMessage
+          ? {
+              code: task.errorCode,
+              message: task.errorMessage,
+            }
+          : null,
+    };
+  }
+
+  private buildRecentTitle(task: RecentGenerationRecord) {
+    const labels: Record<string, string> = {
+      "showroom-light": "展厅灯光生成任务",
+      "outdoor-scene": "户外场景生成任务",
+      "road-motion": "道路动态生成任务",
+      "sky-studio": "天空影棚生成任务",
+      "paint-refresh": "烤漆翻新演示",
+      "light-consistency": "光污一致化演示",
+      "interior-clean": "内饰清洁演示",
+      "batch-new": "批量上新子任务",
+    };
+    return labels[task.moduleCode] ?? `${task.moduleCode} 生成任务`;
   }
 }
 
