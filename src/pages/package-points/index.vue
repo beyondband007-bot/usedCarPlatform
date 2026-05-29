@@ -601,7 +601,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--plan-gap);
   margin-top: 18px;
   margin-left: clamp(10px, 1.4vw, 22px);
@@ -1094,14 +1094,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   .plan-grid {
     margin-top: 12px;
   }
-
-  :deep(.recharge-plan-card) {
-    --plan-card-ratio-h: 1184;
-  }
-
-  :deep(.recharge-plan-card.is-gold) {
-    --plan-card-ratio-h: 1216;
-  }
 }
 
 @media (max-width: 980px) {
@@ -1164,12 +1156,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   :deep(.recharge-plan-card) {
     flex-basis: 100%;
     max-width: 100%;
-  }
-
-  :deep(.plan-card-content) {
-    left: clamp(14px, 5%, 28px);
-    width: 58%;
-    max-width: 58%;
   }
 
   .plan-grid {

@@ -75,7 +75,7 @@ function openPreviewModal() {
   >
     <NCard
       :bordered="false"
-      class="border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_18px_60px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+      class="border border-[var(--workspace-line,var(--app-border))] bg-[var(--workspace-panel,var(--app-surface))] shadow-[var(--workspace-shadow,0_18px_60px_rgba(0,0,0,0.14))] backdrop-blur-xl"
       content-class="!p-0"
     >
       <template #header>
@@ -84,7 +84,7 @@ function openPreviewModal() {
             {{ capability.title }}
           </h1>
           <p
-            class="mt-2 text-base font-semibold leading-7 text-[var(--app-text-soft)]"
+            class="mt-2 text-base font-semibold leading-7 text-[var(--workspace-muted,var(--app-text-soft))]"
           >
             {{ capability.description }}
           </p>
@@ -149,7 +149,7 @@ function openPreviewModal() {
           @change="handleUploadChange"
         >
           <NUploadDragger
-            class="!rounded-2xl !border-dashed !border-[var(--app-border)] !bg-[var(--app-surface-soft)] !py-10"
+            class="!rounded-2xl !border-dashed !border-[var(--workspace-line,var(--app-border))] !bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10"
           >
             <div class="flex flex-col items-center text-center">
               <span class="text-4xl">📷</span>
@@ -157,7 +157,7 @@ function openPreviewModal() {
                 {{ capability.uploadTitle }}
               </strong>
               <span
-                class="mt-2 text-sm font-semibold text-[var(--app-text-soft)]"
+                class="mt-2 text-sm font-semibold text-[var(--workspace-muted,var(--app-text-soft))]"
               >
                 {{ capability.uploadHint }}
               </span>
@@ -214,7 +214,7 @@ function openPreviewModal() {
   overflow: hidden;
   border: 1px solid var(--app-border);
   border-radius: 16px;
-  background: var(--app-surface-soft);
+  background: var(--workspace-panel-soft, var(--app-surface-soft));
 }
 
 .upload-preview-image-btn {
@@ -231,7 +231,7 @@ function openPreviewModal() {
   width: 100%;
   max-height: 320px;
   object-fit: contain;
-  background: color-mix(in srgb, var(--app-surface-soft) 88%, #0f172a);
+  background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
 }
 
 .upload-preview-remove {
@@ -244,7 +244,7 @@ function openPreviewModal() {
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
+  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 72%, transparent);
   color: #fff;
   font-size: 18px;
   cursor: pointer;
@@ -273,13 +273,13 @@ function openPreviewModal() {
   overflow: hidden;
   border: 1px dashed var(--app-border);
   border-radius: 16px;
-  background: var(--app-surface-soft);
+  background: var(--workspace-panel-soft, var(--app-surface-soft));
   padding: 28px;
 }
 
 .upload-loading p {
   margin: 0;
-  color: var(--app-text-soft);
+  color: var(--workspace-muted, var(--app-text-soft));
   font-size: 14px;
   font-weight: 700;
 }
@@ -316,6 +316,6 @@ function openPreviewModal() {
   margin: 0 auto;
   object-fit: contain;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--app-surface-soft) 88%, #0f172a);
+  background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
 }
 </style>

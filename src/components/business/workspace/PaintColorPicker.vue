@@ -114,9 +114,9 @@ function selectColor(color: PaintColorOption) {
 <style scoped lang="scss">
 .paint-color-card {
   padding: 16px 18px 18px;
-  border: 1px solid color-mix(in srgb, #2f7cff 18%, var(--app-border));
+  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border));
   border-radius: 12px;
-  background: var(--app-surface);
+  background: var(--workspace-panel, var(--app-surface));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
 
@@ -166,8 +166,8 @@ function selectColor(color: PaintColorOption) {
 }
 
 .paint-color-preview.is-empty {
-  background: var(--app-surface-soft);
-  color: var(--app-text-soft);
+  background: var(--workspace-panel-soft, var(--app-surface-soft));
+  color: var(--workspace-muted, var(--app-text-soft));
   border-style: dashed;
 }
 
@@ -213,8 +213,8 @@ function selectColor(color: PaintColorOption) {
 }
 
 .paint-color-option.is-selected {
-  border-color: #2f7cff;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #2f7cff 16%, transparent);
+  border-color: var(--workspace-accent, #efc24c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
 }
 
 .paint-color-swatch {

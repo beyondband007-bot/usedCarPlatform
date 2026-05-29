@@ -142,25 +142,25 @@ function handleSelectRecent() {
 
 <style scoped lang="scss">
 .workspace-logo-panel {
-  --logo-accent: #2f7cff;
-  --logo-accent-border: color-mix(in srgb, var(--logo-accent) 55%, var(--app-border));
-  --logo-drop-bg: color-mix(in srgb, var(--app-surface) 92%, var(--logo-accent) 8%);
-  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 44%, var(--app-border));
-  --logo-preview-bg: #111722;
-  --logo-preview-text: #f5d37a;
-  --logo-preview-border: rgba(246, 184, 78, 0.62);
-  --logo-icon: #f4a329;
+  --logo-accent: var(--workspace-accent, #efc24c);
+  --logo-accent-border: color-mix(in srgb, var(--logo-accent) 55%, var(--workspace-line, var(--app-border)));
+  --logo-drop-bg: color-mix(in srgb, var(--workspace-panel, var(--app-surface)) 92%, var(--logo-accent) 8%);
+  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 44%, var(--workspace-line, var(--app-border)));
+  --logo-preview-bg: color-mix(in srgb, var(--workspace-panel-deep, #111722) 92%, transparent);
+  --logo-preview-text: var(--workspace-accent-strong, #f5d37a);
+  --logo-preview-border: color-mix(in srgb, var(--workspace-accent-strong, #f5d37a) 62%, transparent);
+  --logo-icon: var(--workspace-accent-strong, #f4a329);
 
   display: grid;
   gap: 12px;
 }
 
 :global([data-theme='dark']) .workspace-logo-panel {
-  --logo-drop-bg: color-mix(in srgb, var(--app-surface) 78%, var(--logo-accent) 22%);
-  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 55%, var(--app-border));
-  --logo-preview-bg: #0a101c;
-  --logo-preview-text: #f8d891;
-  --logo-preview-border: rgba(246, 184, 78, 0.45);
+  --logo-drop-bg: color-mix(in srgb, var(--workspace-panel, var(--app-surface)) 78%, var(--logo-accent) 22%);
+  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 55%, var(--workspace-line, var(--app-border)));
+  --logo-preview-bg: color-mix(in srgb, var(--workspace-panel-deep, #0a101c) 94%, transparent);
+  --logo-preview-text: var(--workspace-accent-strong, #f8d891);
+  --logo-preview-border: color-mix(in srgb, var(--workspace-accent-strong, #f8d891) 45%, transparent);
 }
 
 .logo-file-input {
@@ -175,8 +175,8 @@ function handleSelectRecent() {
 .logo-recent-block {
   display: grid;
   gap: 12px;
-  border-top: 1px solid var(--app-border);
-  background: var(--app-surface);
+  border-top: 1px solid var(--workspace-line, var(--app-border));
+  background: var(--workspace-panel, var(--app-surface));
   padding: 0 20px 20px;
 }
 
@@ -198,8 +198,8 @@ function handleSelectRecent() {
   min-height: 68px;
   margin-top: 16px;
   padding: 12px 16px;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
+  border: 1px solid var(--workspace-line, var(--app-border));
+  background: var(--workspace-panel, var(--app-surface));
   text-align: left;
   cursor: pointer;
 }
@@ -263,15 +263,15 @@ function handleSelectRecent() {
 
 .logo-copy small {
   margin-top: 4px;
-  color: var(--app-text-soft);
+  color: var(--workspace-muted, var(--app-text-soft));
   font-size: 14px;
   font-weight: 700;
 }
 
 .reupload-button {
   height: 48px;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
+  border: 1px solid var(--workspace-line, var(--app-border));
+  background: var(--workspace-panel, var(--app-surface));
   color: var(--app-text);
   text-align: left;
   padding: 0 18px;
@@ -316,7 +316,7 @@ function handleSelectRecent() {
 
 .logo-upload-drop span {
   margin-top: 8px;
-  color: var(--app-text-soft);
+  color: var(--workspace-muted, var(--app-text-soft));
   font-size: 14px;
   font-weight: 700;
 }

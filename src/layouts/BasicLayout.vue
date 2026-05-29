@@ -204,43 +204,47 @@ const {
   --studio-chrome-action-size: clamp(12px, 0.95vw, 15px);
   --studio-chrome-nav-gap: clamp(20px, 2.8vw, 56px);
 
-  --studio-chrome-bg: #020202;
+  --studio-chrome-bg: #060606;
 
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent);
+  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(6, 6, 6, 0.78), transparent);
 
-  --studio-chrome-logo: #f3f3f3;
+  --studio-chrome-logo: #f7f1e4;
 
-  --studio-chrome-nav: #c9c9c9;
+  --studio-chrome-nav: #c8c1b3;
 
-  --studio-chrome-nav-hover: #d7d7d7;
+  --studio-chrome-nav-hover: #efe3c3;
 
-  --studio-chrome-nav-active: #f4c840;
+  --studio-chrome-nav-active: #efc24c;
 
-  --studio-chrome-nav-underline: #f4c840;
+  --studio-chrome-nav-underline: #efc24c;
 
-  --studio-chrome-credit-bg: #ffffff;
+  --studio-chrome-credit-bg: #efc24c;
 
-  --studio-chrome-credit-text: #171100;
+  --studio-chrome-credit-text: #221700;
 
-  --studio-chrome-theme-bg: rgba(255, 255, 255, 0.08);
+  --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
-  --studio-chrome-theme-text: #f3f3f3;
+  --studio-chrome-theme-text: #f7f1e4;
 
-  --studio-chrome-theme-border: rgba(255, 255, 255, 0.14);
+  --studio-chrome-theme-border: rgba(239, 194, 76, 0.18);
 
-  --studio-chrome-user-border: rgba(255, 255, 255, 0.14);
+  --studio-chrome-user-border: rgba(239, 194, 76, 0.18);
 
-  --studio-chrome-user-bg: rgba(255, 255, 255, 0.08);
+  --studio-chrome-user-bg: rgba(255, 255, 255, 0.05);
 
-  --studio-chrome-user-text: #f3f3f3;
+  --studio-chrome-user-text: #f7f1e4;
 
-  --studio-chrome-user-hover-border: rgba(244, 200, 64, 0.42);
+  --studio-chrome-user-hover-border: rgba(239, 194, 76, 0.42);
 
-  --studio-chrome-user-hover-bg: rgba(255, 255, 255, 0.12);
+  --studio-chrome-user-hover-bg: rgba(239, 194, 76, 0.08);
 
-  --studio-chrome-avatar-bg: rgba(244, 200, 64, 0.16);
+  --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
 
-  --studio-chrome-avatar-text: #f4c840;
+  --studio-chrome-avatar-text: #efc24c;
+
+  --studio-chrome-subnav-bg: #040404;
+  --studio-chrome-subnav-border: rgba(239, 194, 76, 0.08);
+  --studio-chrome-subnav-grid: rgba(220, 38, 38, 0.24);
 
 
 
@@ -262,43 +266,47 @@ const {
 
 .home-chrome--light {
 
-  --studio-chrome-bg: #ffffff;
+  --studio-chrome-bg: #fcfaf5;
 
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(255, 255, 255, 0.96), transparent);
+  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(252, 250, 245, 0.96), transparent);
 
-  --studio-chrome-logo: #111111;
+  --studio-chrome-logo: #1e160b;
 
-  --studio-chrome-nav: #666666;
+  --studio-chrome-nav: #6d6456;
 
-  --studio-chrome-nav-hover: #333333;
+  --studio-chrome-nav-hover: #2f271a;
 
-  --studio-chrome-nav-active: #9a7209;
+  --studio-chrome-nav-active: #a26b00;
 
-  --studio-chrome-nav-underline: #d4a017;
+  --studio-chrome-nav-underline: #c98600;
 
-  --studio-chrome-credit-bg: #111111;
+  --studio-chrome-credit-bg: #efc24c;
 
-  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-text: #241700;
 
-  --studio-chrome-theme-bg: rgba(0, 0, 0, 0.05);
+  --studio-chrome-theme-bg: rgba(201, 134, 0, 0.08);
 
-  --studio-chrome-theme-text: #333333;
+  --studio-chrome-theme-text: #382508;
 
-  --studio-chrome-theme-border: rgba(0, 0, 0, 0.1);
+  --studio-chrome-theme-border: rgba(201, 134, 0, 0.16);
 
-  --studio-chrome-user-border: rgba(0, 0, 0, 0.1);
+  --studio-chrome-user-border: rgba(201, 134, 0, 0.16);
 
-  --studio-chrome-user-bg: rgba(0, 0, 0, 0.04);
+  --studio-chrome-user-bg: rgba(201, 134, 0, 0.05);
 
-  --studio-chrome-user-text: #111111;
+  --studio-chrome-user-text: #241700;
 
-  --studio-chrome-user-hover-border: rgba(212, 160, 23, 0.45);
+  --studio-chrome-user-hover-border: rgba(201, 134, 0, 0.45);
 
-  --studio-chrome-user-hover-bg: rgba(0, 0, 0, 0.06);
+  --studio-chrome-user-hover-bg: rgba(201, 134, 0, 0.08);
 
-  --studio-chrome-avatar-bg: rgba(212, 160, 23, 0.14);
+  --studio-chrome-avatar-bg: rgba(201, 134, 0, 0.14);
 
-  --studio-chrome-avatar-text: #9a7209;
+  --studio-chrome-avatar-text: #a26b00;
+
+  --studio-chrome-subnav-bg: #f0e8dc;
+  --studio-chrome-subnav-border: rgba(201, 134, 0, 0.12);
+  --studio-chrome-subnav-grid: rgba(201, 134, 0, 0.14);
 
 }
 
@@ -326,7 +334,7 @@ const {
 
 .app-layout--studio-chrome[data-subnav='true']:not(.app-layout--home) .app-layout-main {
 
-  padding-top: 140px;
+  padding-top: 148px;
 
 }
 
@@ -334,9 +342,19 @@ const {
 
 .home-chrome--with-subnav :deep(.site-header) {
 
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 
   background: var(--studio-chrome-bg);
+
+}
+
+
+
+.home-chrome--with-subnav :deep(.site-header .logo) {
+
+  visibility: hidden;
+
+  pointer-events: none;
 
 }
 
@@ -350,6 +368,27 @@ const {
 
 }
 
-</style>
 
+
+.home-chrome--with-subnav :deep(.subnav-track-grid) {
+
+  background-image:
+
+    linear-gradient(var(--studio-chrome-subnav-grid) 1px, transparent 1px),
+
+    linear-gradient(90deg, var(--studio-chrome-subnav-grid) 1px, transparent 1px);
+
+  opacity: 0.42;
+
+}
+
+
+
+.home-chrome--light.home-chrome--with-subnav :deep(.subnav-track-grid) {
+
+  opacity: 0.55;
+
+}
+
+</style>
 

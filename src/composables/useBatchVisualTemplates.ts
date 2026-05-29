@@ -1,107 +1,139 @@
-import { ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
+import {
+  getBatchPresets,
+  saveBatchPreset,
+  type BatchVisualConfig,
+} from '@/api/visual-workbench'
 import type { BatchVisualTemplate, BatchVisualTemplateInput } from '@/types/workspace'
-
-const STORAGE_KEY = 'workspace-batch-visual-templates'
 
 const NEW_PRESET_VALUE = '__new__'
 
-function createId() {
-  return `tpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-}
+const templates = ref<BatchVisualTemplate[]>([])
+const isLoading = ref(false)
+const isReady = ref(false)
 
-const defaultTemplates: BatchVisualTemplate[] = [
-  {
-    id: 'tpl-may-showroom',
-    name: '5月展厅批量上新',
-    enableSceneChange: true,
-    sceneIndex: 0,
-    sceneCategory: '展厅灯光',
-    outputRatio: '1:1',
-    useRecentLogo: false,
-    lightConsistency: true,
-    paintRefresh: false,
-    interiorEnhance: false,
-    updatedAt: '2026-05-20 09:00',
-  },
-]
-
-function readTemplates(): BatchVisualTemplate[] {
-  if (typeof window === 'undefined') return [...defaultTemplates]
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return [...defaultTemplates]
-
-    const parsed = JSON.parse(raw) as BatchVisualTemplate[]
-    return parsed.length ? parsed : [...defaultTemplates]
-  } catch {
-    return [...defaultTemplates]
+function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
+  return {
+    enableSceneChange: input.enableSceneChange,
+    sceneOptionId: input.enableSceneChange ? batchSceneIdFromIndex(input.sceneIndex) : undefined,
+    sceneIndex: input.sceneIndex,
+    sceneCategory: input.sceneCategory,
+    outputRatio: input.outputRatio,
+    useRecentLogo: input.useRecentLogo,
+    enableLightConsistency: input.lightConsistency,
+    enablePaintRefresh: input.paintRefresh,
+    enableInteriorClean: input.interiorEnhance,
   }
 }
 
-function writeTemplates(templates: BatchVisualTemplate[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(templates))
+function batchSceneIdFromIndex(index: number) {
+  const sceneOptionMap = ['white-studio', 'glass-hall', 'luxury-dark', 'soft-top-light', 'city-night', 'tree-park']
+  return sceneOptionMap[index] ?? sceneOptionMap[0]
 }
 
-const templates = ref<BatchVisualTemplate[]>(readTemplates())
+async function ensureLoaded() {
+  if (isReady.value || isLoading.value) return
+  isLoading.value = true
 
-watch(
-  templates,
-  (value) => {
-    writeTemplates(value)
-  },
-  { deep: true },
-)
+  try {
+    const result = await getBatchPresets()
+    templates.value = result.items.map((item) => ({
+      id: item.presetId,
+      name: item.name,
+      enableSceneChange: item.visualConfig.enableSceneChange,
+      sceneIndex: item.visualConfig.sceneIndex,
+      sceneCategory: item.visualConfig.sceneCategory,
+      outputRatio: item.visualConfig.outputRatio,
+      useRecentLogo: item.visualConfig.useRecentLogo,
+      lightConsistency: item.visualConfig.enableLightConsistency,
+      paintRefresh: item.visualConfig.enablePaintRefresh,
+      interiorEnhance: item.visualConfig.enableInteriorClean,
+      updatedAt: item.updatedAt,
+    }))
+    isReady.value = true
+  } finally {
+    isLoading.value = false
+  }
+}
 
 export function useBatchVisualTemplates() {
+  const presetOptions = computed(() => templates.value)
+
   function getTemplateById(id: string) {
     return templates.value.find((item) => item.id === id)
   }
 
-  function saveTemplate(input: BatchVisualTemplateInput) {
-    const template: BatchVisualTemplate = {
-      ...input,
-      id: createId(),
-      updatedAt: formatNow(),
-    }
-    templates.value = [...templates.value, template]
-    return template
+  async function reloadTemplates() {
+    isReady.value = false
+    await ensureLoaded()
   }
 
-  function updateTemplate(id: string, input: BatchVisualTemplateInput) {
-    const index = templates.value.findIndex((item) => item.id === id)
-    if (index < 0) return null
+  async function saveTemplate(input: BatchVisualTemplateInput) {
+    const created = await saveBatchPreset({
+      name: input.name,
+      visualConfig: normalizeConfig(input),
+    })
 
-    const next: BatchVisualTemplate = {
-      ...input,
-      id,
-      updatedAt: formatNow(),
+    const nextTemplate: BatchVisualTemplate = {
+      id: created.presetId,
+      name: created.name,
+      enableSceneChange: created.visualConfig.enableSceneChange,
+      sceneIndex: created.visualConfig.sceneIndex,
+      sceneCategory: created.visualConfig.sceneCategory,
+      outputRatio: created.visualConfig.outputRatio,
+      useRecentLogo: created.visualConfig.useRecentLogo,
+      lightConsistency: created.visualConfig.enableLightConsistency,
+      paintRefresh: created.visualConfig.enablePaintRefresh,
+      interiorEnhance: created.visualConfig.enableInteriorClean,
+      updatedAt: created.updatedAt,
     }
-    templates.value = templates.value.map((item, itemIndex) =>
-      itemIndex === index ? next : item,
+
+    templates.value = [...templates.value.filter((item) => item.id !== nextTemplate.id), nextTemplate]
+    return nextTemplate
+  }
+
+  async function updateTemplate(id: string, input: BatchVisualTemplateInput) {
+    const updated = await saveBatchPreset({
+      presetId: id,
+      name: input.name,
+      visualConfig: normalizeConfig(input),
+    })
+
+    const nextTemplate: BatchVisualTemplate = {
+      id: updated.presetId,
+      name: updated.name,
+      enableSceneChange: updated.visualConfig.enableSceneChange,
+      sceneIndex: updated.visualConfig.sceneIndex,
+      sceneCategory: updated.visualConfig.sceneCategory,
+      outputRatio: updated.visualConfig.outputRatio,
+      useRecentLogo: updated.visualConfig.useRecentLogo,
+      lightConsistency: updated.visualConfig.enableLightConsistency,
+      paintRefresh: updated.visualConfig.enablePaintRefresh,
+      interiorEnhance: updated.visualConfig.enableInteriorClean,
+      updatedAt: updated.updatedAt,
+    }
+
+    templates.value = templates.value.map((item) =>
+      item.id === id ? nextTemplate : item,
     )
-    return next
+    return nextTemplate
   }
 
   function removeTemplate(id: string) {
     templates.value = templates.value.filter((item) => item.id !== id)
   }
 
+  void ensureLoaded()
+
   return {
     NEW_PRESET_VALUE,
-    templates,
+    templates: presetOptions,
+    isLoading,
+    ensureLoaded: reloadTemplates,
     getTemplateById,
     saveTemplate,
     updateTemplate,
     removeTemplate,
   }
-}
-
-function formatNow() {
-  const date = new Date()
-  const pad = (value: number) => String(value).padStart(2, '0')
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

@@ -6,10 +6,6 @@ import type {
   PricingPlan,
 } from '@/types/prototype'
 
-import planEnterpriseBasicBg from '@/img/企业基础.png'
-import planEnterpriseTeamBg from '@/img/企业团队.png'
-import planEnterpriseFlagshipBg from '@/img/企业旗舰.png'
-
 /** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
 export const studioGuestNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
@@ -75,7 +71,6 @@ export const pricingPlans: PricingPlan[] = [
     description: '适合新团队启动视觉生产流程，先验证素材标准与交付节奏。',
     icon: 'mdi:rocket-launch-outline',
     tone: 'blue',
-    backgroundImage: planEnterpriseBasicBg,
     benefits: [
       '赠送 20,000 积分',
       '1 个企业账号',
@@ -91,7 +86,6 @@ export const pricingPlans: PricingPlan[] = [
     description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
     icon: 'mdi:account-group-outline',
     tone: 'orange',
-    backgroundImage: planEnterpriseTeamBg,
     badge: '推荐',
     benefits: [
       '赠送 55,000 积分',
@@ -109,7 +103,6 @@ export const pricingPlans: PricingPlan[] = [
     description: '适合集团化业务、出海车源与专属场景长期配置。',
     icon: 'mdi:shield-crown-outline',
     tone: 'green',
-    backgroundImage: planEnterpriseFlagshipBg,
     benefits: [
       '赠送 980,000 积分',
       '20 个企业账号',

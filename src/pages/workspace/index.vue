@@ -17,10 +17,12 @@ import type {
   WorkspaceRecentItem,
 } from '@/types/workspace'
 import { buildImagePreviewFromDeliveryTask } from '@/utils/workspace-image-preview'
+import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const appStore = useAppStore()
 const SHORT_VIDEO_CAPABILITY_CODE = 'future-short-video'
 const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
 
@@ -326,7 +328,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="workspace-page bg-[var(--app-bg)]">
+  <main
+    class="workspace-page bg-[var(--app-bg)]"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+  >
     <section class="workspace-shell">
       <div class="workspace-col workspace-col--nav">
         <WorkspaceSidebar :active-code="activeCode" @select="handleSelectCapability" />
@@ -373,6 +378,16 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .workspace-page {
+  --workspace-accent: #efc24c;
+  --workspace-accent-strong: #ffd75a;
+  --workspace-panel: #101010;
+  --workspace-panel-soft: #151515;
+  --workspace-panel-deep: #080808;
+  --workspace-line: rgba(255, 255, 255, 0.12);
+  --workspace-line-strong: rgba(239, 194, 76, 0.42);
+  --workspace-muted: #969186;
+  --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+
   display: flex;
   height: 100%;
   max-height: 100%;
@@ -380,6 +395,32 @@ onMounted(() => {
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+  color: var(--app-text);
+  background:
+    radial-gradient(circle at 30% 0%, rgba(239, 194, 76, 0.08), transparent 28rem),
+    var(--app-bg);
+}
+
+.workspace-page.theme-light {
+  --workspace-accent: #c98600;
+  --workspace-accent-strong: #a86d00;
+  --workspace-panel: #fcfaf5;
+  --workspace-panel-soft: #f5efe4;
+  --workspace-panel-deep: #eee6da;
+  --workspace-line: rgba(47, 35, 12, 0.12);
+  --workspace-line-strong: rgba(201, 134, 0, 0.34);
+  --workspace-muted: #6b6252;
+  --workspace-shadow: 0 20px 46px rgba(67, 47, 16, 0.1);
+
+  background:
+    radial-gradient(circle at 30% 0%, rgba(201, 134, 0, 0.06), transparent 28rem),
+    var(--app-bg);
+}
+
+.workspace-page.theme-light .workspace-col--main {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 42%),
+    var(--workspace-panel);
 }
 
 .workspace-shell {
@@ -390,13 +431,17 @@ onMounted(() => {
   gap: 0;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr);
+  background: var(--workspace-panel-deep);
 
   @media (width >= 1024px) {
+    gap: 14px;
     grid-template-columns: 240px minmax(360px, 500px) minmax(0, 1fr);
+    padding: 16px;
   }
 
   @media (width >= 1536px) {
     grid-template-columns: 260px minmax(380px, 520px) minmax(0, 1fr);
+    padding: 18px;
   }
 }
 
@@ -416,8 +461,12 @@ onMounted(() => {
 .workspace-col--main {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--app-border);
-  background: var(--app-surface-soft);
+  border: 1px solid var(--workspace-line);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 36%),
+    var(--workspace-panel);
+  box-shadow: var(--workspace-shadow);
 }
 
 .workspace-col-scroll {
@@ -458,11 +507,17 @@ onMounted(() => {
     height: auto;
     flex: none;
     overflow: visible;
+    background: var(--app-bg);
   }
 
   .workspace-col {
     height: auto;
     overflow: visible;
+  }
+
+  .workspace-col--main {
+    border-radius: 0;
+    border-inline: 0;
   }
 
   .workspace-col-scroll {

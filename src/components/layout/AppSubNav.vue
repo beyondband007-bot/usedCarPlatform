@@ -38,28 +38,47 @@ function navigate(item: NavItem) {
     class="subnav flex min-h-[44px] w-full items-center"
     :class="
       props.embedded
-        ? 'subnav--embedded'
+        ? 'subnav--embedded subnav--workbench'
         : 'sticky top-[72px] z-40 gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 shadow-sm xl:px-6'
     "
     aria-label="企业业务导航"
   >
-    <div
-      class="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-      :class="props.embedded ? 'gap-[var(--studio-chrome-nav-gap,clamp(20px,2.8vw,56px))]' : 'gap-1'"
+    <RouterLink
+      v-if="props.embedded"
+      class="subnav-brand"
+      to="/home"
     >
-      <button
-        v-for="item in secondaryNavigation"
-        :key="item.path"
-        type="button"
-        class="subnav-link inline-flex shrink-0 items-center rounded-lg font-semibold transition duration-200"
-        :class="[
-          isNavItemActive(item) ? 'is-active' : '',
-          props.embedded ? 'subnav-link--embedded' : 'px-4 py-2 text-sm',
-        ]"
-        @click="navigate(item)"
+      AI CAR STUDIO
+    </RouterLink>
+
+    <div
+      class="subnav-track"
+      :class="{ 'subnav-track--embedded': props.embedded }"
+    >
+      <span
+        v-if="props.embedded"
+        class="subnav-track-grid"
+        aria-hidden="true"
+      />
+
+      <div
+        class="subnav-links flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        :class="props.embedded ? 'subnav-links--embedded' : 'flex-1 gap-1'"
       >
-        {{ item.label }}
-      </button>
+        <button
+          v-for="item in secondaryNavigation"
+          :key="item.path"
+          type="button"
+          class="subnav-link inline-flex shrink-0 items-center rounded-lg font-semibold transition duration-200"
+          :class="[
+            isNavItemActive(item) ? 'is-active' : '',
+            props.embedded ? 'subnav-link--embedded' : 'px-4 py-2 text-sm',
+          ]"
+          @click="navigate(item)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
     </div>
 
     <RouterLink
@@ -80,11 +99,64 @@ function navigate(item: NavItem) {
   position: static;
   top: auto;
   z-index: auto;
-  min-height: clamp(40px, 3.2vw, 48px);
+  min-height: clamp(52px, 4.2vw, 64px);
   border: 0;
   padding-inline: var(--studio-chrome-pad-x, 24px);
-  background: var(--studio-chrome-bg, #020202);
+  background: var(--studio-chrome-subnav-bg, #040404);
+  border-top: 1px solid var(--studio-chrome-subnav-border, rgba(239, 194, 76, 0.08));
   box-shadow: none;
+}
+
+.subnav--workbench {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(20px, 3vw, 44px);
+}
+
+.subnav-brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+  color: var(--studio-chrome-logo, #f7f1e4);
+  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.subnav-track {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: stretch;
+}
+
+.subnav-track--embedded {
+  overflow: hidden;
+}
+
+.subnav-track-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--studio-chrome-subnav-grid, rgba(220, 38, 38, 0.24)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-chrome-subnav-grid, rgba(220, 38, 38, 0.24)) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 100%);
+  opacity: 0.34;
+}
+
+.subnav-links--embedded {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  gap: var(--studio-chrome-nav-gap, clamp(20px, 2.8vw, 56px));
+  padding-inline: clamp(8px, 1.2vw, 16px);
 }
 
 .subnav-link:not(.subnav-link--embedded).is-active {
@@ -102,34 +174,56 @@ function navigate(item: NavItem) {
 }
 
 .subnav-link--embedded {
-  color: var(--studio-chrome-nav, #c9c9c9);
+  position: relative;
+  border-radius: 0;
   background: transparent;
+  color: var(--studio-chrome-nav, #c8c1b3);
   font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
   font-weight: 700;
   line-height: 1.2;
-  padding: clamp(6px, 0.55vw, 8px) clamp(12px, 1.1vw, 18px);
+  padding:
+    clamp(12px, 1vw, 16px)
+    clamp(12px, 1.1vw, 18px)
+    clamp(14px, 1.1vw, 18px);
+}
+
+.subnav-link--embedded::after {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: clamp(3px, 0.22vw, 4px);
+  content: '';
+  background: var(--studio-chrome-nav-underline, #efc24c);
+  transform: translateX(-50%);
+  transition: width 0.25s ease;
 }
 
 .subnav-link--embedded:hover {
-  color: var(--studio-chrome-nav-hover, #f3f3f3);
+  color: var(--studio-chrome-nav-hover, #efe3c3);
+}
+
+.subnav-link--embedded:hover::after,
+.subnav-link--embedded.is-active::after {
+  width: calc(100% - 12px);
 }
 
 .subnav-link--embedded.is-active {
-  color: var(--studio-chrome-nav-active, #f4c840);
+  color: var(--studio-chrome-nav-active, #efc24c);
   background: transparent;
 }
 
 .subnav--embedded .subnav-credits {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f3f3f3;
+  background: rgba(239, 194, 76, 0.1);
+  color: #f7f1e4;
 }
 
 .subnav--embedded .subnav-credits-icon {
-  color: #f4c840;
+  color: #efc24c;
 }
 
 .subnav--embedded .subnav-credits-value {
-  color: #ffd94d;
+  color: #ffd75a;
 }
 
 .subnav-credits {
@@ -151,12 +245,12 @@ function navigate(item: NavItem) {
 }
 
 .subnav-credits:hover {
-  box-shadow: 0 4px 14px color-mix(in srgb, #f97316 14%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--studio-chrome-nav-active, #efc24c) 14%, transparent);
 }
 
 .subnav-credits-icon {
   flex-shrink: 0;
-  color: #3b82f6;
+  color: var(--studio-chrome-nav-active, #efc24c);
   font-size: 14px;
 }
 

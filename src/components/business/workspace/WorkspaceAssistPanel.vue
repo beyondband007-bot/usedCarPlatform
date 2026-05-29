@@ -368,20 +368,19 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
 <style scoped lang="scss">
 .assist-panel {
-  --assist-bg: rgba(10, 18, 32, 0.82);
+  --assist-bg: var(--workspace-panel, rgba(10, 10, 10, 0.92));
   --assist-card: rgba(255, 255, 255, 0.05);
   --assist-card-strong: rgba(255, 255, 255, 0.075);
-  --assist-border: rgba(90, 122, 164, 0.32);
-  --assist-border-soft: rgba(97, 122, 155, 0.2);
-  --assist-text: #edf5ff;
-  --assist-muted: #9badc5;
-  --assist-blue: #2f82ff;
-  --assist-green: #27b77d;
+  --assist-border: var(--workspace-line, rgba(255, 255, 255, 0.12));
+  --assist-border-soft: rgba(255, 255, 255, 0.08);
+  --assist-text: var(--app-text);
+  --assist-muted: var(--workspace-muted, var(--app-text-soft));
+  --assist-blue: var(--workspace-accent, #efc24c);
+  --assist-green: var(--workspace-accent-strong, #ffd75a);
   --assist-scroll-track: rgba(255, 255, 255, 0.08);
-  --assist-scroll-thumb: rgba(126, 164, 216, 0.58);
-  --assist-scroll-thumb-hover: rgba(151, 186, 233, 0.82);
-  --assist-shadow:
-    0 18px 52px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --assist-scroll-thumb: rgba(239, 194, 76, 0.42);
+  --assist-scroll-thumb-hover: rgba(255, 215, 90, 0.72);
+  --assist-shadow: var(--workspace-shadow, 0 18px 52px rgba(0, 0, 0, 0.2));
 
   display: flex;
   container-type: inline-size;
@@ -393,10 +392,12 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   flex-direction: column;
   overflow: hidden;
   padding: 18px 20px 20px;
+  border: 1px solid var(--workspace-line, var(--assist-border));
+  border-radius: 18px;
   background:
     radial-gradient(
       720px 180px at 48% 0%,
-      rgba(47, 130, 255, 0.13),
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent),
       transparent 72%
     ),
     var(--assist-bg);
@@ -404,26 +405,25 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 }
 
 .assist-panel.theme-light {
-  --assist-bg: rgba(255, 255, 255, 0.74);
-  --assist-card: rgba(255, 255, 255, 0.82);
-  --assist-card-strong: rgba(248, 251, 255, 0.92);
-  --assist-border: rgba(181, 199, 220, 0.42);
-  --assist-border-soft: rgba(196, 211, 228, 0.56);
-  --assist-text: #10233c;
-  --assist-muted: #5f7188;
-  --assist-scroll-track: rgba(214, 226, 240, 0.82);
-  --assist-scroll-thumb: rgba(85, 133, 194, 0.48);
-  --assist-scroll-thumb-hover: rgba(47, 130, 255, 0.68);
-  --assist-shadow:
-    0 14px 34px rgba(78, 111, 148, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --assist-bg: var(--workspace-panel, #fcfaf5);
+  --assist-card: rgba(255, 255, 255, 0.72);
+  --assist-card-strong: rgba(255, 252, 244, 0.92);
+  --assist-border: var(--workspace-line, rgba(47, 35, 12, 0.12));
+  --assist-border-soft: rgba(47, 35, 12, 0.08);
+  --assist-text: var(--app-text);
+  --assist-muted: var(--workspace-muted, var(--app-text-soft));
+  --assist-scroll-track: rgba(235, 224, 206, 0.82);
+  --assist-scroll-thumb: rgba(201, 134, 0, 0.42);
+  --assist-scroll-thumb-hover: rgba(168, 109, 0, 0.68);
+  --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 
   background:
     radial-gradient(
       760px 180px at 45% 0%,
-      rgba(176, 215, 255, 0.24),
+      color-mix(in srgb, var(--workspace-accent, #c98600) 14%, transparent),
       transparent 74%
     ),
-    #f8fbff;
+    var(--assist-bg);
 }
 
 .assist-tabs {
@@ -447,7 +447,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   border: 1px solid var(--assist-border);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(47, 130, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
     var(--assist-card);
   box-shadow: var(--assist-shadow);
 }
@@ -461,7 +461,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   border: 1px dashed color-mix(in srgb, var(--assist-blue) 28%, var(--assist-border));
   border-radius: 18px;
   background:
-    radial-gradient(circle at 50% 42%, rgba(47, 130, 255, 0.16), transparent 38%),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent), transparent 38%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
     var(--assist-card-strong);
   overflow: hidden;
@@ -469,7 +469,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
 .theme-light .waiting-visual {
   background:
-    radial-gradient(circle at 50% 42%, rgba(47, 130, 255, 0.13), transparent 38%),
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent), transparent 38%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(241, 247, 255, 0.82)),
     var(--assist-card-strong);
 }
@@ -479,7 +479,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   z-index: 2;
   color: var(--assist-blue);
   font-size: clamp(58px, 7vw, 92px);
-  filter: drop-shadow(0 8px 24px rgba(47, 130, 255, 0.18));
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, transparent));
   animation: waiting-pulse 1.6s ease-in-out infinite;
 }
 
@@ -491,8 +491,8 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
     linear-gradient(
       180deg,
       transparent 0%,
-      rgba(47, 130, 255, 0.16) 48%,
-      rgba(47, 130, 255, 0.04) 52%,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent) 48%,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 4%, transparent) 52%,
       transparent 100%
     );
   opacity: 0.75;
@@ -503,7 +503,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   position: absolute;
   width: 28px;
   height: 28px;
-  border: 2px solid rgba(47, 130, 255, 0.45);
+  border: 2px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 45%, transparent);
 }
 
 .waiting-corner--tl {
@@ -641,9 +641,9 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 .delivery-download-all {
   flex-shrink: 0;
   height: 40px;
-  border: 1px solid rgba(47, 130, 255, 0.34);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 34%, transparent);
   border-radius: 10px;
-  background: rgba(47, 130, 255, 0.13);
+  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent);
   color: var(--assist-blue);
   padding: 0 16px;
   font-family: inherit;
@@ -656,8 +656,8 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 }
 
 .delivery-download-all:hover:not(:disabled) {
-  border-color: rgba(47, 130, 255, 0.5);
-  background: rgba(47, 130, 255, 0.2);
+  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 50%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
 }
 
 .delivery-download-all:disabled {
@@ -754,7 +754,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
 .delivery-result-card.is-clickable:hover {
   border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
-  box-shadow: 0 10px 24px rgba(47, 130, 255, 0.12);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent);
   transform: translateY(-1px);
 }
 
@@ -769,7 +769,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background:
-    linear-gradient(145deg, rgba(47, 130, 255, 0.08), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
     var(--assist-card-strong);
 }
 
@@ -975,7 +975,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   width: 30px;
   height: 24px;
   border-radius: 999px;
-  background: rgba(47, 130, 255, 0.14);
+  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   color: var(--assist-blue);
   font-size: 13px;
   font-weight: 900;
@@ -1025,13 +1025,13 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 .template-card.is-active {
   border-color: var(--assist-blue);
   box-shadow:
-    0 0 0 2px rgba(47, 130, 255, 0.16),
-    0 12px 28px rgba(47, 130, 255, 0.2);
+    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent),
+    0 12px 28px color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
 }
 
 .template-card:focus-visible {
   border-color: var(--assist-blue);
-  box-shadow: 0 0 0 3px rgba(47, 130, 255, 0.24);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, transparent);
 }
 
 .template-card img {
@@ -1138,14 +1138,14 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
     var(--assist-border)
   );
   box-shadow:
-    0 0 0 2px rgba(47, 130, 255, 0.12),
+    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent),
     var(--assist-shadow);
 }
 
 .recent-card.is-clickable:focus-visible {
   outline: none;
   border-color: var(--assist-blue);
-  box-shadow: 0 0 0 3px rgba(47, 130, 255, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
 }
 
 .recent-card img,
@@ -1202,7 +1202,7 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   overflow: hidden;
   padding: 4px 9px;
   border-radius: 999px;
-  background: rgba(47, 130, 255, 0.14);
+  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   color: var(--assist-blue);
   text-overflow: ellipsis;
   white-space: nowrap;

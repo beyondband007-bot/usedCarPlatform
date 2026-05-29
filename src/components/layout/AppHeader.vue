@@ -408,7 +408,7 @@ const navItems = computed(() => {
 }
 
 .theme-toggle:hover {
-  border-color: var(--studio-chrome-user-hover-border, rgba(244, 200, 64, 0.42));
+  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
   background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
 }
 
@@ -429,14 +429,14 @@ const navItems = computed(() => {
 }
 
 .user-menu-trigger--studio:hover {
-  border-color: var(--studio-chrome-user-hover-border, rgba(244, 200, 64, 0.42));
+  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
   background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 4px 14px rgba(244, 200, 64, 0.12);
+  box-shadow: 0 4px 14px rgba(239, 194, 76, 0.12);
 }
 
 .user-menu-avatar--studio {
-  background: var(--studio-chrome-avatar-bg, rgba(244, 200, 64, 0.16));
-  color: var(--studio-chrome-avatar-text, #f4c840);
+  background: var(--studio-chrome-avatar-bg, rgba(239, 194, 76, 0.16));
+  color: var(--studio-chrome-avatar-text, #efc24c);
 }
 
 @media (max-width: 1100px) {
@@ -490,9 +490,9 @@ const navItems = computed(() => {
 }
 
 .user-menu-trigger:hover {
-  border-color: color-mix(in srgb, #f97316 32%, var(--app-border));
+  border-color: color-mix(in srgb, var(--app-header-nav-active) 32%, var(--app-border));
   background: var(--app-header-nav-active-bg);
-  box-shadow: 0 4px 14px color-mix(in srgb, #f97316 12%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--app-header-nav-active) 12%, transparent);
 }
 
 .user-menu-avatar {
@@ -502,7 +502,7 @@ const navItems = computed(() => {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: color-mix(in srgb, #f97316 14%, var(--app-header-chip-bg));
+  background: color-mix(in srgb, var(--app-header-nav-active) 14%, var(--app-header-chip-bg));
   color: var(--app-header-nav-active);
   font-size: 18px;
 }
