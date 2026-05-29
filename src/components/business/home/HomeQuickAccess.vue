@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import HomePromoBanner from '@/components/business/home/HomePromoBanner.vue'
 import { homeQuickEntries } from '@/constants/home-page'
 import type { HomeQuickEntry } from '@/constants/home-page'
@@ -61,7 +62,13 @@ onMounted(() => {
         :key="entry.title"
         class="suite-card"
       >
-        <img :src="entry.image" :alt="entry.title" loading="lazy" />
+        <PreloadImage
+          class="suite-card-image"
+          :src="entry.image"
+          :alt="entry.title"
+          loading="lazy"
+          decoding="async"
+        />
         <div>
           <h2>{{ entry.title }}</h2>
           <p>{{ entry.description }}</p>
@@ -120,6 +127,7 @@ onMounted(() => {
   border: 1px solid var(--home-line);
   border-radius: 35px;
   background: var(--home-panel);
+  box-shadow: var(--home-card-shadow);
 }
 
 .suite-card::after {
@@ -127,7 +135,7 @@ onMounted(() => {
   inset: 0;
   content: '';
   pointer-events: none;
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  background: var(--home-card-shine);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -136,12 +144,11 @@ onMounted(() => {
   opacity: 1;
 }
 
-.suite-card img {
+.suite-card-image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   opacity: 0.94;
   border-radius: 35px;
 }
@@ -155,17 +162,18 @@ onMounted(() => {
   justify-content: flex-end;
   min-height: 259px;
   padding: 35px;
-  background: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
+  background: var(--home-media-overlay);
 }
 
 .suite-card h2 {
   margin: 0 0 12px;
+  color: var(--home-media-title);
   font-size: 22px;
 }
 
 .suite-card p {
   margin: 0 0 48px;
-  color: #d7d7d7;
+  color: var(--home-media-desc);
   font-size: 13px;
 }
 

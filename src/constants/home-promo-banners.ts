@@ -24,8 +24,8 @@ export const homePromoBannerSlides: HomePromoBannerSlide[] = [
   {
     id: 'enterprise-suite',
     image: banner02EnterpriseSuite,
-    alt: '企业套管开通海报',
-    title: '企业套管',
+    alt: '企业套餐开通海报',
+    title: '企业套餐',
     subtitle: '账号、积分、品牌外观同步开通',
     to: '/pricing',
   },

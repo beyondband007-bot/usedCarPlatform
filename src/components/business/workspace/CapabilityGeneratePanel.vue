@@ -24,12 +24,14 @@ import { formatDate } from "@/utils/dayjs";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
+  WorkspaceBatchCreatedPayload,
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
   WorkspaceDeliveryTaskPreview,
   WorkspaceGeneratePayload,
 } from "@/types/workspace";
 
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
 import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
@@ -46,6 +48,7 @@ const emit = defineEmits<{
   selectOption: [id: string];
   generate: [payload: WorkspaceGeneratePayload];
   previewDeliveryTask: [task: WorkspaceDeliveryTaskPreview];
+  batchCreated: [payload: WorkspaceBatchCreatedPayload];
 }>();
 
 const outputRatioLabelMap: Record<string, string> = {
@@ -83,8 +86,9 @@ const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const presetInput = ref(visualTemplates.value[0]?.name ?? "");
 const isApplyingTemplate = ref(false);
-const selectedPaintColorId = ref("");
+const selectedPaintColor = ref("");
 const uploadedAsset = ref<UploadedAsset | null>(null);
+const batchExteriorUploads = ref<BatchExteriorUploadItem[]>([]);
 const uploadedInteriorAssets = ref<UploadedAsset[]>([]);
 const uploadedPreviewUrl = ref<string | null>(null);
 const isUploadingVehicle = ref(false);
@@ -96,8 +100,63 @@ const isLoadingDeliveryAssets = ref(false);
 const isCreatingBatchTask = ref(false);
 const isDeletingDeliveryAssets = ref(false);
 const lastCreatedBatchId = ref<string | null>(null);
+const batchExteriorInputRef = ref<HTMLInputElement | null>(null);
+const MAX_BATCH_EXTERIOR_IMAGES = 5;
+const creativeReferenceInputRef = ref<HTMLInputElement | null>(null);
+const creativePrompt = ref(
+  "一辆白色新能源 SUV 停在现代展厅中央，柔和侧光，画面用于汽车电商首页主视觉，真实商业摄影质感。",
+);
+const creativeRatio = ref("1:1");
+const creativeQuality = ref("高清");
+const creativeReferencePreviewUrl = ref<string | null>(null);
 
 let previewObjectUrl: string | null = null;
+let creativeReferenceObjectUrl: string | null = null;
+
+const creativeRatioOptions = [
+  { label: "1:1", value: "1:1", hint: "主图" },
+  { label: "3:4", value: "3:4", hint: "竖图" },
+  { label: "9:16", value: "9:16", hint: "封面" },
+  { label: "16:9", value: "16:9", hint: "横幅" },
+];
+
+const creativeQualityOptions = ["标准", "高清", "超清"];
+
+const creativePromptPresets = [
+  "电商海报主图",
+  "城市夜景光影",
+  "节日促销背景",
+  "极简白底棚拍",
+];
+
+const creativePreviewSamples = [
+  {
+    title: "主视觉",
+    image:
+      "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=900&q=82",
+  },
+  {
+    title: "竖屏封面",
+    image:
+      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
+  },
+  {
+    title: "横幅物料",
+    image:
+      "https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=1000&q=82",
+  },
+];
+
+type BatchExteriorUploadItem = {
+  id: string;
+  name: string;
+  previewUrl: string;
+  status: "uploading" | "success" | "fail";
+  size: number;
+  asset?: UploadedAsset;
+  objectUrl?: string;
+  error?: string;
+};
 
 function revokePreviewObjectUrl() {
   if (!previewObjectUrl) return;
@@ -110,6 +169,35 @@ function resetUploadedVehicle() {
   revokePreviewObjectUrl();
   uploadedAsset.value = null;
   uploadedPreviewUrl.value = null;
+}
+
+function revokeCreativeReferenceObjectUrl() {
+  if (!creativeReferenceObjectUrl) return;
+
+  URL.revokeObjectURL(creativeReferenceObjectUrl);
+  creativeReferenceObjectUrl = null;
+}
+
+function resetCreativeReference() {
+  revokeCreativeReferenceObjectUrl();
+  creativeReferencePreviewUrl.value = null;
+}
+
+function revokeBatchExteriorObjectUrl(item: BatchExteriorUploadItem) {
+  if (!item.objectUrl) return;
+  URL.revokeObjectURL(item.objectUrl);
+}
+
+function resetBatchExteriorUploads() {
+  batchExteriorUploads.value.forEach(revokeBatchExteriorObjectUrl);
+  batchExteriorUploads.value = [];
+}
+
+function resetBatchCreateSection() {
+  resetBatchExteriorUploads();
+  resetUploadedInterior();
+  uploadInterior.value = false;
+  projectName.value = getTemplateById(createTaskPresetId.value)?.name ?? "批量上新任务";
 }
 
 function resetUploadedInterior() {
@@ -159,6 +247,44 @@ const createPresetOptions = computed(() =>
     value: item.id,
   })),
 );
+
+const uploadedExteriorAssets = computed(() =>
+  batchExteriorUploads.value
+    .filter((item): item is BatchExteriorUploadItem & { asset: UploadedAsset } =>
+      item.status === "success" && Boolean(item.asset),
+    )
+    .map((item) => item.asset),
+);
+
+const batchExteriorFirstPreviewUrl = computed(
+  () => batchExteriorUploads.value.find((item) => item.status !== "fail")?.previewUrl ?? "",
+);
+
+const batchExteriorRemainingCount = computed(
+  () => Math.max(0, MAX_BATCH_EXTERIOR_IMAGES - batchExteriorUploads.value.length),
+);
+
+const canAddBatchExteriorImages = computed(
+  () => batchExteriorRemainingCount.value > 0 && !isUploadingVehicle.value,
+);
+
+const creativeActiveOption = computed(
+  () =>
+    props.capability.options.find((item) => item.id === props.selectedOptionId) ??
+    props.capability.options[0],
+);
+
+const creativePreviewImage = computed(
+  () => creativeActiveOption.value?.image ?? creativePreviewSamples[0].image,
+);
+
+const batchEstimatedCost = computed(() => {
+  const inputCount =
+    uploadedExteriorAssets.value.length +
+    (uploadInterior.value ? uploadedInteriorAssets.value.length : 0);
+
+  return inputCount * 120;
+});
 
 function buildTemplateInput(): BatchVisualTemplateInput {
   return {
@@ -277,6 +403,166 @@ function handleVehicleImageRemove() {
   message.info("已删除车辆图片");
 }
 
+function createBatchExteriorUploadItem(file: File): BatchExteriorUploadItem {
+  const objectUrl = URL.createObjectURL(file);
+
+  return {
+    id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+    name: file.name,
+    previewUrl: objectUrl,
+    objectUrl,
+    size: file.size,
+    status: "uploading",
+  };
+}
+
+function updateBatchExteriorUpload(
+  id: string,
+  patch: Partial<BatchExteriorUploadItem>,
+) {
+  const index = batchExteriorUploads.value.findIndex((item) => item.id === id);
+  if (index < 0) return;
+
+  batchExteriorUploads.value[index] = {
+    ...batchExteriorUploads.value[index],
+    ...patch,
+  };
+}
+
+function openBatchExteriorPicker() {
+  if (!canAddBatchExteriorImages.value) return;
+  batchExteriorInputRef.value?.click();
+}
+
+function normalizeImageFiles(files: File[]) {
+  return files.filter((file) =>
+    file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name),
+  );
+}
+
+function openCreativeReferencePicker() {
+  creativeReferenceInputRef.value?.click();
+}
+
+function handleCreativeReferenceInputChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+
+  if (!file) return;
+
+  const [imageFile] = normalizeImageFiles([file]);
+  if (!imageFile) {
+    message.warning("请选择 JPG、PNG 或 WebP 图片");
+    return;
+  }
+
+  resetCreativeReference();
+  creativeReferenceObjectUrl = URL.createObjectURL(imageFile);
+  creativeReferencePreviewUrl.value = creativeReferenceObjectUrl;
+  message.success("参考图已添加");
+}
+
+function handleCreativeReferenceRemove() {
+  resetCreativeReference();
+  message.info("已移除参考图");
+}
+
+function applyCreativePromptPreset(preset: string) {
+  creativePrompt.value = `${preset}：${creativePrompt.value.replace(/^[^：]+：/, "")}`;
+}
+
+function handleCreativeGenerate() {
+  if (!creativePrompt.value.trim()) {
+    message.warning("请输入创意描述");
+    return;
+  }
+
+  message.success("创意生图样式已生成，接口待接入");
+}
+
+async function handleBatchExteriorFilesSelected(files: File[]) {
+  const imageFiles = normalizeImageFiles(files);
+
+  if (!imageFiles.length) {
+    message.warning("请选择 JPG、PNG 或 WebP 图片");
+    return;
+  }
+
+  const remaining = batchExteriorRemainingCount.value;
+  if (remaining <= 0) {
+    message.warning(`外观图最多上传 ${MAX_BATCH_EXTERIOR_IMAGES} 张`);
+    return;
+  }
+
+  const selectedFiles = imageFiles.slice(0, remaining);
+  if (imageFiles.length > remaining) {
+    message.warning(`最多支持 ${MAX_BATCH_EXTERIOR_IMAGES} 张，已自动保留前 ${remaining} 张`);
+  }
+
+  const pendingItems = selectedFiles.map(createBatchExteriorUploadItem);
+  batchExteriorUploads.value = [...batchExteriorUploads.value, ...pendingItems];
+  isUploadingVehicle.value = true;
+
+  const results = await Promise.allSettled(
+    pendingItems.map(async (item, index) => {
+      const asset = await uploadAsset(selectedFiles[index], "car_exterior");
+      revokeBatchExteriorObjectUrl(item);
+      updateBatchExteriorUpload(item.id, {
+        asset,
+        previewUrl: asset.url,
+        objectUrl: undefined,
+        status: "success",
+      });
+    }),
+  );
+
+  const successCount = results.filter((result) => result.status === "fulfilled").length;
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+
+    updateBatchExteriorUpload(pendingItems[index].id, {
+      status: "fail",
+      error: result.reason instanceof Error ? result.reason.message : "上传失败",
+    });
+  });
+
+  if (successCount > 0) {
+    message.success(`已上传 ${successCount} 张外观图`);
+  }
+
+  const failedCount = results.length - successCount;
+  if (failedCount > 0) {
+    message.error(`${failedCount} 张外观图上传失败，请删除后重试`);
+  }
+
+  isUploadingVehicle.value = false;
+}
+
+function handleBatchExteriorInputChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+
+  void handleBatchExteriorFilesSelected(files);
+}
+
+function handleBatchExteriorDrop(event: DragEvent) {
+  if (!canAddBatchExteriorImages.value) return;
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  void handleBatchExteriorFilesSelected(files);
+}
+
+function handleBatchExteriorRemove(id: string) {
+  const target = batchExteriorUploads.value.find((item) => item.id === id);
+  if (target) {
+    revokeBatchExteriorObjectUrl(target);
+  }
+
+  batchExteriorUploads.value = batchExteriorUploads.value.filter((item) => item.id !== id);
+}
+
 function handleInteriorFileSelected(file: File) {
   isUploadingInterior.value = true;
 
@@ -311,8 +597,8 @@ function handleGenerate() {
     optionId: props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
     colorCode:
-      props.capability.code === "paint-refresh" && selectedPaintColorId.value
-        ? selectedPaintColorId.value
+      props.capability.code === "paint-refresh" && selectedPaintColor.value
+        ? selectedPaintColor.value
         : undefined,
   });
 }
@@ -333,7 +619,12 @@ function mapBatchVisualConfig() {
 }
 
 async function handleCreateBatchTask() {
-  if (!uploadedAsset.value) {
+  if (isUploadingVehicle.value) {
+    message.warning("外观图仍在上传，请稍候");
+    return;
+  }
+
+  if (!uploadedExteriorAssets.value.length) {
     message.warning("请先上传外观图组");
     return;
   }
@@ -352,7 +643,7 @@ async function handleCreateBatchTask() {
       carGroups: [
         {
           groupTitle: projectName.value.trim() || "车辆图组",
-          exteriorAssetIds: [uploadedAsset.value.assetId],
+          exteriorAssetIds: uploadedExteriorAssets.value.map((item) => item.assetId),
           interiorAssetIds: uploadInterior.value
             ? uploadedInteriorAssets.value.map((item) => item.assetId)
             : [],
@@ -363,6 +654,18 @@ async function handleCreateBatchTask() {
 
     lastCreatedBatchId.value = created.batchId;
     message.success(`批量任务已创建：${created.batchId}`);
+    emit("batchCreated", {
+      batchId: created.batchId,
+      projectName: projectName.value.trim() || "批量上新任务",
+      previewUrl: batchExteriorFirstPreviewUrl.value,
+      createdAt: created.createdAt,
+      status: created.status,
+      total: created.total,
+      completed: created.completed,
+      failed: created.failed,
+      progress: created.progress,
+    });
+    resetBatchCreateSection();
     await refreshDeliveryTasks();
   } catch (error) {
     const text = error instanceof Error ? error.message : "批量任务创建失败";
@@ -377,13 +680,16 @@ async function refreshDeliveryTasks() {
 
   try {
     const result = await getDeliveryTasks({ page: 1, pageSize: 20 });
-    deliveryTasks.value = result.items.map((item, index) => ({
-      ...item,
-      selected: deliveryTasks.value[index]?.selected ?? index === 0,
-      meta: `${item.completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
-      image: deliveryTaskAssets.value[item.taskId]?.[0]?.thumbnailUrl ?? deliveryTaskAssets.value[item.taskId]?.[0]?.url ?? '',
-      imageCount: item.assetCount,
-    }));
+    deliveryTasks.value = await Promise.all(
+      result.items.map(async (item, index) => ({
+        ...item,
+        selected: deliveryTasks.value[index]?.selected ?? index === 0,
+        meta: `${item.completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
+        image: await resolveDeliveryTaskImage(item),
+        imageCount: item.assetCount,
+      })),
+    );
+    brokenDeliveryThumbs.value = new Set();
   } catch (error) {
     const text = error instanceof Error ? error.message : "成片交付列表加载失败";
     message.error(text);
@@ -432,11 +738,15 @@ watch(
   () => props.capability.code,
   () => {
     resetUploadedVehicle();
+    resetBatchExteriorUploads();
+    resetCreativeReference();
   },
 );
 
 onUnmounted(() => {
   revokePreviewObjectUrl();
+  resetBatchExteriorUploads();
+  resetCreativeReference();
 });
 
 watch(
@@ -475,6 +785,41 @@ type DeliveryTask = DeliveryTaskItem & {
 };
 
 const deliveryTasks = ref<DeliveryTask[]>([]);
+const brokenDeliveryThumbs = ref<Set<string>>(new Set());
+
+function hasDeliveryThumbnail(task: DeliveryTask) {
+  if (task.progress < 100) return false;
+  if (brokenDeliveryThumbs.value.has(task.taskId)) return false;
+  return Boolean(task.image?.trim());
+}
+
+function handleDeliveryThumbError(taskId: string) {
+  const next = new Set(brokenDeliveryThumbs.value);
+  next.add(taskId);
+  brokenDeliveryThumbs.value = next;
+}
+
+async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
+  const cached = deliveryTaskAssets.value[task.taskId]?.[0];
+  const cachedUrl = cached?.thumbnailUrl ?? cached?.url ?? "";
+  if (cachedUrl) return cachedUrl;
+
+  if (task.progress < 100 || task.assetCount <= 0) return "";
+
+  try {
+    const result = await getDeliveryTaskAssets(task.taskId, { page: 1, pageSize: 1 });
+    if (!result.items.length) return "";
+
+    deliveryTaskAssets.value = {
+      ...deliveryTaskAssets.value,
+      [task.taskId]: result.items,
+    };
+
+    return result.items[0]?.thumbnailUrl ?? result.items[0]?.url ?? "";
+  } catch {
+    return "";
+  }
+}
 
 const deliverySelectedCount = computed(
   () => deliveryTasks.value.filter((task) => task.selected).length,
@@ -720,17 +1065,71 @@ const activeCreateRatioLabel = computed(() => {
           <input v-model="projectName" class="plain-input" type="text" />
         </section>
 
-        <UploadTaskCard
-          compact
-          :capability="props.capability"
-          upload-title="上传外观图组"
-          upload-hint="支持多角度外观图 · 每套车图作为 1 个图组"
-          required-label="必选"
-          :upload-preview-url="uploadedPreviewUrl"
-          :is-uploading="isUploadingVehicle"
-          @select-file="handleVehicleFileSelected"
-          @remove="handleVehicleImageRemove"
-        />
+        <section class="batch-card batch-upload-card">
+          <input
+            ref="batchExteriorInputRef"
+            type="file"
+            class="batch-upload-input"
+            :accept="props.capability.accept"
+            multiple
+            @change="handleBatchExteriorInputChange"
+          />
+
+          <header class="batch-upload-head">
+            <div>
+              <h3>上传外观图组</h3>
+              <p>支持一次多选，最多上传 {{ MAX_BATCH_EXTERIOR_IMAGES }} 张。</p>
+            </div>
+            <span class="batch-upload-count">
+              {{ batchExteriorUploads.length }}/{{ MAX_BATCH_EXTERIOR_IMAGES }}
+            </span>
+          </header>
+
+          <button
+            type="button"
+            class="batch-upload-drop"
+            :class="{ 'is-disabled': !canAddBatchExteriorImages }"
+            :disabled="!canAddBatchExteriorImages"
+            @click="openBatchExteriorPicker"
+            @dragover.prevent
+            @drop.prevent="handleBatchExteriorDrop"
+          >
+            <Icon icon="mdi:camera-plus" />
+            <strong>{{ batchExteriorUploads.length ? "继续添加外观图" : "上传外观图组" }}</strong>
+            <span>JPG / PNG / WebP · 剩余 {{ batchExteriorRemainingCount }} 张</span>
+          </button>
+
+          <div v-if="batchExteriorUploads.length" class="batch-upload-grid">
+            <article
+              v-for="item in batchExteriorUploads"
+              :key="item.id"
+              class="batch-upload-item"
+              :class="`is-${item.status}`"
+            >
+              <PreloadImage
+                class="batch-upload-image"
+                :src="item.previewUrl"
+                :alt="item.name"
+                loading="lazy"
+                decoding="async"
+              />
+              <span v-if="item.status === 'uploading'" class="batch-upload-status">
+                <Icon icon="mdi:loading" />
+              </span>
+              <span v-else-if="item.status === 'fail'" class="batch-upload-status is-error">
+                <Icon icon="mdi:alert-circle-outline" />
+              </span>
+              <button
+                type="button"
+                class="batch-upload-remove"
+                :aria-label="`删除${item.name}`"
+                @click="handleBatchExteriorRemove(item.id)"
+              >
+                <Icon icon="mdi:close" />
+              </button>
+            </article>
+          </div>
+        </section>
 
         <section class="batch-card switch-card">
           <div>
@@ -799,7 +1198,14 @@ const activeCreateRatioLabel = computed(() => {
               :class="{ active: index === batchSceneIndex }"
               @click="batchSceneIndex = index"
             >
-              <img :src="scene.image" :alt="scene.title" />
+              <PreloadImage
+                class="scene-image"
+                :src="scene.image"
+                :alt="scene.title"
+                loading="lazy"
+                decoding="async"
+                :draggable="false"
+              />
               <strong>{{ scene.title }}</strong>
             </article>
           </div>
@@ -845,14 +1251,207 @@ const activeCreateRatioLabel = computed(() => {
             type="primary"
             size="large"
             block
-            :disabled="batchTab === 'create' && !createTaskPresetId"
+            :loading="batchTab === 'create' && isCreatingBatchTask"
+            :disabled="
+              batchTab === 'create' &&
+              (!createTaskPresetId || !uploadedExteriorAssets.length || isUploadingVehicle)
+            "
             @click="handleStickyAction"
           >
             {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
-            <span class="ml-2">预计 120</span>
+            <span v-if="batchTab === 'create'" class="ml-2">预计 {{ batchEstimatedCost }}</span>
           </NButton>
         </footer>
       </div>
+    </template>
+
+    <template v-else-if="props.capability.code === 'creative-image'">
+      <section class="creative-image-panel" aria-label="创意生图">
+        <header class="creative-model-card">
+          <div class="creative-model-mark">
+            <span class="creative-model-icon" aria-hidden="true">
+              <Icon icon="mdi:sparkles" />
+            </span>
+            <div>
+              <p>GPT Image Studio</p>
+              <h2>{{ props.capability.title }}</h2>
+            </div>
+          </div>
+          <span class="creative-model-badge">Beta</span>
+        </header>
+
+        <section class="creative-prompt-card" aria-label="创意提示词">
+          <div class="creative-section-head">
+            <span>提示词</span>
+            <div class="creative-prompt-presets">
+              <button
+                v-for="preset in creativePromptPresets"
+                :key="preset"
+                type="button"
+                @click="applyCreativePromptPreset(preset)"
+              >
+                {{ preset }}
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            v-model="creativePrompt"
+            class="creative-prompt-input"
+            rows="6"
+            maxlength="600"
+            placeholder="描述你想生成的营销主图、海报背景或广告创意图..."
+          ></textarea>
+
+          <footer class="creative-prompt-footer">
+            <span>{{ creativePrompt.length }}/600</span>
+            <strong>ChatGPT 图像生成风格</strong>
+          </footer>
+        </section>
+
+        <section class="creative-reference-card" aria-label="参考图">
+          <input
+            ref="creativeReferenceInputRef"
+            type="file"
+            class="creative-reference-input"
+            :accept="props.capability.accept"
+            @change="handleCreativeReferenceInputChange"
+          />
+
+          <button
+            type="button"
+            class="creative-reference-drop"
+            :class="{ 'has-image': creativeReferencePreviewUrl }"
+            @click="openCreativeReferencePicker"
+          >
+            <PreloadImage
+              v-if="creativeReferencePreviewUrl"
+              class="creative-reference-image"
+              :src="creativeReferencePreviewUrl"
+              alt="参考图"
+              loading="lazy"
+              decoding="async"
+              fit="cover"
+            />
+            <span v-else class="creative-reference-empty">
+              <Icon icon="mdi:image-plus-outline" />
+            </span>
+          </button>
+
+          <div class="creative-reference-copy">
+            <strong>参考图</strong>
+            <span>可选上传车辆、风格或构图参考。</span>
+          </div>
+
+          <button
+            v-if="creativeReferencePreviewUrl"
+            type="button"
+            class="creative-reference-remove"
+            aria-label="移除参考图"
+            @click="handleCreativeReferenceRemove"
+          >
+            <Icon icon="mdi:close" />
+          </button>
+        </section>
+
+        <section class="creative-controls-card" aria-label="生图参数">
+          <div class="creative-control-block">
+            <p>画幅</p>
+            <div class="creative-segment-grid">
+              <button
+                v-for="item in creativeRatioOptions"
+                :key="item.value"
+                type="button"
+                :class="{ active: creativeRatio === item.value }"
+                @click="creativeRatio = item.value"
+              >
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.hint }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="creative-control-block">
+            <p>质量</p>
+            <div class="creative-quality-row">
+              <button
+                v-for="item in creativeQualityOptions"
+                :key="item"
+                type="button"
+                :class="{ active: creativeQuality === item }"
+                @click="creativeQuality = item"
+              >
+                {{ item }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
+
+        <section class="creative-preview-card" aria-label="生成预览">
+          <header class="creative-preview-head">
+            <div>
+              <p>预览</p>
+              <h3>{{ creativeActiveOption?.title ?? "自由创意" }}</h3>
+            </div>
+            <span>{{ creativeRatio }} · {{ creativeQuality }}</span>
+          </header>
+
+          <div class="creative-preview-media">
+            <PreloadImage
+              class="creative-preview-image"
+              :src="creativePreviewImage"
+              :alt="creativeActiveOption?.title ?? '创意生图预览'"
+              loading="lazy"
+              decoding="async"
+              fit="cover"
+            />
+            <div class="creative-preview-overlay">
+              <span>GPT Image</span>
+              <strong>{{ creativeActiveOption?.title ?? "Creative" }}</strong>
+            </div>
+          </div>
+
+          <div class="creative-sample-strip">
+            <article v-for="item in creativePreviewSamples" :key="item.title">
+              <PreloadImage
+                class="creative-sample-image"
+                :src="item.image"
+                :alt="item.title"
+                loading="lazy"
+                decoding="async"
+                fit="cover"
+              />
+              <span>{{ item.title }}</span>
+            </article>
+          </div>
+        </section>
+
+        <div v-if="hasBlock('actions')" class="creative-action-row">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="creative-generate-button"
+            :loading="props.isGenerating"
+            :disabled="props.isGenerating"
+            @click="handleCreativeGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </section>
     </template>
 
     <template v-else-if="props.capability.code === 'future-short-video'">
@@ -936,13 +1535,30 @@ const activeCreateRatioLabel = computed(() => {
                 :aria-label="`查看${task.title}大图`"
                 @click="handlePreviewDeliveryTask(task)"
               >
-                <img
-                  class="delivery-thumb"
-                  :src="task.image"
-                  :alt="task.title"
-                  loading="lazy"
-                  draggable="false"
-                />
+                <div class="delivery-thumb-wrap">
+                  <PreloadImage
+                    v-if="hasDeliveryThumbnail(task)"
+                    class="delivery-thumb"
+                    :src="task.image"
+                    :alt="task.title"
+                    loading="lazy"
+                    decoding="async"
+                    :draggable="false"
+                    @error="handleDeliveryThumbError(task.taskId)"
+                  />
+                  <div
+                    v-else
+                    class="delivery-thumb delivery-thumb--pending"
+                    :class="{ 'is-generating': task.progress < 100 }"
+                    aria-hidden="true"
+                  >
+                    <Icon
+                      icon="mdi:image-sync-outline"
+                      class="delivery-thumb-pending-icon"
+                    />
+                    <span>待生成</span>
+                  </div>
+                </div>
 
                 <div class="delivery-copy">
                   <h3>{{ task.title }}</h3>
@@ -1014,7 +1630,7 @@ const activeCreateRatioLabel = computed(() => {
 
       <PaintColorPicker
         v-if="showPaintColorPicker"
-        v-model="selectedPaintColorId"
+        v-model="selectedPaintColor"
       />
 
       <CapabilityOptionSelector
@@ -1393,6 +2009,177 @@ const activeCreateRatioLabel = computed(() => {
     box-shadow 0.2s ease;
 }
 
+.batch-upload-card {
+  display: grid;
+  gap: 14px;
+}
+
+.batch-upload-input {
+  display: none;
+}
+
+.batch-upload-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.batch-upload-head h3 {
+  margin-bottom: 6px;
+}
+
+.batch-upload-head p {
+  margin: 0;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.batch-upload-count {
+  display: inline-flex;
+  min-width: 54px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--app-surface));
+  color: var(--workspace-accent-strong, #a86d00);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.batch-upload-drop {
+  display: grid;
+  min-height: 148px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--workspace-accent, #efc24c) 48%, var(--app-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%);
+  color: var(--app-text);
+  padding: 22px 16px;
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.batch-upload-drop:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 72%, var(--app-border));
+  background: color-mix(in srgb, var(--app-surface) 88%, var(--workspace-accent, #efc24c) 12%);
+  transform: translateY(-1px);
+}
+
+.batch-upload-drop.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.batch-upload-drop .iconify {
+  color: var(--workspace-accent-strong, #a86d00);
+  font-size: 32px;
+}
+
+.batch-upload-drop strong {
+  color: var(--app-text);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.batch-upload-drop span {
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.batch-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 10px;
+}
+
+.batch-upload-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
+  border-radius: 10px;
+  background: var(--app-surface-soft);
+}
+
+.batch-upload-item.is-fail {
+  border-color: color-mix(in srgb, #e25555 70%, var(--app-border));
+}
+
+.batch-upload-image {
+  width: 100%;
+  height: 100%;
+}
+
+.batch-upload-status,
+.batch-upload-remove {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.batch-upload-status {
+  left: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 74%, transparent);
+  color: #fff;
+  font-size: 18px;
+}
+
+.batch-upload-status .iconify {
+  animation: batch-upload-spin 0.9s linear infinite;
+}
+
+.batch-upload-status.is-error {
+  background: rgba(226, 85, 85, 0.9);
+}
+
+.batch-upload-status.is-error .iconify {
+  animation: none;
+}
+
+.batch-upload-remove {
+  right: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 74%, transparent);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.batch-upload-remove:hover {
+  background: rgba(220, 38, 38, 0.9);
+  transform: scale(1.04);
+}
+
+@keyframes batch-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .plain-input:hover {
   border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, var(--app-border));
 }
@@ -1583,10 +2370,9 @@ const activeCreateRatioLabel = computed(() => {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
 }
 
-.scene-grid img {
+.scene-image {
   width: 100%;
   height: clamp(96px, 28cqw, 132px);
-  object-fit: cover;
 }
 
 .scene-grid strong {
@@ -1727,13 +2513,63 @@ const activeCreateRatioLabel = computed(() => {
   border-bottom: 0;
 }
 
+.delivery-thumb-wrap {
+  width: 72px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
 .delivery-thumb {
   width: 72px;
   height: 56px;
   border: 1px solid color-mix(in srgb, var(--app-border) 80%, transparent);
   border-radius: 10px;
-  object-fit: cover;
   background: var(--app-surface-soft);
+}
+
+.delivery-thumb--pending {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border-style: dashed;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--app-surface-soft)),
+      var(--app-surface-soft)
+    );
+  color: var(--app-text-soft);
+}
+
+.delivery-thumb--pending.is-generating .delivery-thumb-pending-icon {
+  animation: delivery-thumb-pulse 1.4s ease-in-out infinite;
+}
+
+.delivery-thumb-pending-icon {
+  font-size: 18px;
+  color: var(--workspace-accent, #efc24c);
+  opacity: 0.88;
+}
+
+.delivery-thumb--pending span {
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+@keyframes delivery-thumb-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.72;
+  }
+
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
 }
 
 .delivery-copy {

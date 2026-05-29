@@ -133,6 +133,33 @@ export interface CreatedBatchTask {
   createdAt: string
 }
 
+export interface BatchTaskDetailItem {
+  itemId: string
+  groupTitle: string
+  itemKind: 'exterior' | 'interior'
+  inputAssetId: string
+  generationTaskId: string
+  status: GenerationTaskStatus
+  progress: number
+  resultCount: number
+  error?: { message?: string | null } | null
+}
+
+export interface BatchTaskDetail {
+  batchId: string
+  projectName: string
+  presetId: string
+  status: GenerationTaskStatus
+  total: number
+  completed: number
+  failed: number
+  progress: number
+  assetCount: number
+  items: BatchTaskDetailItem[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DeliveryTaskItem {
   taskId: string
   taskType: 'batch'
@@ -295,6 +322,11 @@ export async function saveBatchPreset(payload: {
 
 export async function createBatchTask(payload: CreateBatchTaskPayload) {
   const response = await request.post<ApiResponse<CreatedBatchTask>>('/modules/batch-new/tasks', payload)
+  return unwrapApiResponse(response)
+}
+
+export async function getBatchTaskDetail(batchId: string) {
+  const response = await request.get<ApiResponse<BatchTaskDetail>>(`/modules/batch-new/tasks/${batchId}`)
   return unwrapApiResponse(response)
 }
 

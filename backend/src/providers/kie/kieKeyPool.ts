@@ -22,9 +22,7 @@ class KieKeyPool {
         VALUES
           (:accountHash, :label, 'active', :maxConcurrency)
         ON DUPLICATE KEY UPDATE
-          status = 'active',
           max_concurrency = VALUES(max_concurrency),
-          ${env.nodeEnv !== "production" ? "current_concurrency = 0, failure_count = 0, cooldown_until = NULL," : ""}
           updated_at = CURRENT_TIMESTAMP(3)`,
         {
           accountHash,

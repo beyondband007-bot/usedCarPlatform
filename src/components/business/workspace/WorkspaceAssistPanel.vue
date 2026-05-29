@@ -6,6 +6,7 @@ import { useMessage } from "naive-ui";
 
 import { getRecentGenerationTasks, type RecentGenerationTask } from "@/api/visual-workbench";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import {
@@ -18,7 +19,13 @@ import { useAppStore } from "@/stores/app";
 import { downloadAllDeliveryResults } from "@/utils/delivery-download";
 import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
 import { formatDate } from '@/utils/dayjs'
+import {
+  recentStatusIconMap,
+  recentStatusLabelMap,
+  resolveWorkspaceOptionTitle,
+} from '@/utils/workspace-recent'
 import type {
+  WorkspaceBatchActiveJob,
   WorkspaceCapability,
   WorkspaceGenerateResult,
   WorkspaceImagePreview,
@@ -32,6 +39,7 @@ const props = defineProps<{
   generationResult?: WorkspaceGenerateResult | null;
   deliveryImagePreview?: WorkspaceImagePreview | null;
   shortVideoPlayRequest?: number;
+  batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
 
 const emit = defineEmits<{
@@ -68,16 +76,66 @@ function handleTemplatePick(item: (typeof templateCards)[number]) {
 }
 
 const appStore = useAppStore();
-const activeTab = ref<"guide" | "generating" | "recent">("guide");
+const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">("guide");
 const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
 let recentRefreshTimer: number | null = null;
 
+const isBatchProcessingView = computed(
+  () => props.capability.kind === "batch" && (props.batchActiveJobs?.length ?? 0) > 0,
+);
+
+interface BatchDisplayCard {
+  id: string;
+  title: string;
+  sceneLabel?: string;
+  createdAt: string;
+  status: WorkspaceRecentItem["status"];
+  thumbnail?: string;
+  progress?: number;
+}
+
+const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
+  const cards: BatchDisplayCard[] = [];
+
+  for (const job of props.batchActiveJobs ?? []) {
+    const createdAt = formatDate(job.createdAt, "YYYY-MM-DD HH:mm");
+
+    if (job.items.length) {
+      for (const item of job.items) {
+        cards.push({
+          id: `${job.batchId}-${item.itemId}`,
+          title: item.groupTitle || job.projectName,
+          sceneLabel: item.itemKind === "interior" ? "内饰增强" : job.projectName,
+          createdAt,
+          status: item.status,
+          thumbnail: item.thumbnail || job.previewUrl || undefined,
+          progress: item.progress,
+        });
+      }
+      continue;
+    }
+
+    cards.push({
+      id: job.batchId,
+      title: job.projectName,
+      createdAt,
+      status: job.status,
+      thumbnail: job.previewUrl || undefined,
+      progress: job.progress,
+    });
+  }
+
+  return cards;
+});
+
 const showTemplateRecommendations = computed(
   () =>
-    props.capability.kind !== "beauty" && props.capability.kind !== "interior",
-);
+    props.capability.kind !== 'beauty' &&
+    props.capability.kind !== 'interior' &&
+    props.capability.kind !== 'batch',
+)
 
 const tutorialSteps = [
   {
@@ -131,34 +189,31 @@ async function handleDownloadAllDelivery() {
   }
 }
 
-const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
-  waiting: "Waiting",
-  queued: "Queued",
-  queue: "Queued",
-  generating: "Generating",
-  success: "Completed",
-  fail: "Failed",
-  canceled: "Canceled",
-};
+const statusLabelMap = recentStatusLabelMap;
+const statusIconMap = recentStatusIconMap;
 
 function mapRecentStatus(item: RecentGenerationTask): WorkspaceRecentItem["status"] {
-  return item.uiStatus ?? item.status ?? "waiting";
+  return item.status ?? item.uiStatus ?? "waiting";
 }
 
 function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
+  const sceneTitle = resolveWorkspaceOptionTitle(item.moduleCode, item.sceneLabel);
+  const thumbnail = item.thumbnail ?? item.inputAssetUrl ?? undefined;
+  const previewImage = item.previewImage ?? item.inputAssetUrl ?? undefined;
+
   return {
     id: item.id || item.taskId,
     taskId: item.taskId,
     moduleCode: item.moduleCode,
     title: item.title,
     status: mapRecentStatus(item),
-    createdAt: formatDate(item.createdAt),
-    updatedAt: item.updatedAt ? formatDate(item.updatedAt) : undefined,
-    thumbnail: item.thumbnail ?? undefined,
-    previewImage: item.previewImage ?? undefined,
-    downloadUrl: item.downloadUrl ?? undefined,
+    createdAt: formatDate(item.createdAt, 'YYYY-MM-DD HH:mm'),
+    updatedAt: item.updatedAt ? formatDate(item.updatedAt, 'YYYY-MM-DD HH:mm') : undefined,
+    thumbnail,
+    previewImage,
+    downloadUrl: item.downloadUrl ?? previewImage,
     ratioLabel: item.ratioLabel ?? undefined,
-    sceneLabel: item.sceneLabel ?? undefined,
+    sceneLabel: sceneTitle ?? item.sceneLabel ?? undefined,
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
     inputAssetUrl: item.inputAssetUrl ?? undefined,
@@ -177,21 +232,28 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
   );
 }
 
+function shouldPollRecent() {
+  if (props.isGenerating) return true;
+  if (activeTab.value !== "recent") return false;
+  return canAutoRefreshRecent(recentItems.value);
+}
+
 async function loadRecentItems() {
   recentLoading.value = true;
 
   try {
     const result = await getRecentGenerationTasks({
-      moduleCode: props.capability.code,
       page: 1,
-      pageSize: 8,
+      pageSize: 20,
     });
     recentItems.value = result.items.map(mapRecentItem);
     recentLoaded.value = true;
-  } catch {
+  } catch (error) {
     if (!recentLoaded.value) {
       recentItems.value = [];
     }
+    const text = error instanceof Error ? error.message : "最近生成加载失败";
+    message.error(text);
   } finally {
     recentLoading.value = false;
   }
@@ -207,10 +269,10 @@ function stopRecentAutoRefresh() {
 function startRecentAutoRefresh() {
   stopRecentAutoRefresh();
 
-  if (activeTab.value !== "recent") return;
+  if (!shouldPollRecent()) return;
 
   recentRefreshTimer = window.setInterval(() => {
-    if (activeTab.value !== "recent" || !canAutoRefreshRecent(recentItems.value)) {
+    if (!shouldPollRecent()) {
       stopRecentAutoRefresh();
       return;
     }
@@ -220,53 +282,60 @@ function startRecentAutoRefresh() {
 }
 
 watch(
+  () => props.batchActiveJobs?.length ?? 0,
+  (length, previousLength) => {
+    if (props.capability.kind === "batch" && length > previousLength) {
+      activeTab.value = "batchProcessing";
+    }
+  },
+);
+
+watch(
   () => props.isGenerating,
-  (generating) => {
+  (generating, wasGenerating) => {
     if (generating) {
       activeTab.value = "generating";
+      void loadRecentItems();
       return;
     }
 
     if (activeTab.value === "generating") {
       activeTab.value = "guide";
     }
-  },
-);
 
-watch(
-  () => [activeTab.value, props.capability.code] as const,
-  ([tab]) => {
-    if (tab === "recent") {
-      if (!recentLoaded.value) {
-        void loadRecentItems();
-      }
-      startRecentAutoRefresh();
-    } else {
-      stopRecentAutoRefresh();
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => props.capability.code,
-  () => {
-    recentLoaded.value = false;
-    recentItems.value = [];
-    if (activeTab.value === "recent") {
+    if (wasGenerating) {
       void loadRecentItems();
     }
   },
 );
 
+watch(
+  () => [activeTab.value, props.isGenerating, isBatchProcessingView.value] as const,
+  ([tab]) => {
+    if (tab === "recent" || tab === "generating" || tab === "batchProcessing") {
+      if (!recentLoaded.value) {
+        void loadRecentItems();
+        return;
+      }
+      startRecentAutoRefresh();
+      return;
+    }
+
+    stopRecentAutoRefresh();
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
-  if (activeTab.value === "recent") {
-    void loadRecentItems();
-  }
+  void loadRecentItems();
 });
 
 onUnmounted(() => {
   stopRecentAutoRefresh();
+});
+
+defineExpose({
+  refreshRecentItems: loadRecentItems,
 });
 
 
@@ -325,12 +394,13 @@ onUnmounted(() => {
             @keydown.space.prevent="openDeliveryResultPreview(item)"
           >
             <div class="delivery-result-media">
-              <img
+              <PreloadImage
+                class="delivery-result-image"
                 :src="item.image"
                 :alt="item.title"
                 loading="lazy"
                 decoding="async"
-                draggable="false"
+                :draggable="false"
               />
             </div>
             <footer class="delivery-result-foot">
@@ -345,9 +415,30 @@ onUnmounted(() => {
     </template>
 
     <template v-else>
-      <header class="assist-tabs">
-        <div class="tab-group" role="tablist" aria-label="辅助面板">
-          <template v-if="isGenerating">
+      <div class="assist-shell">
+        <header class="assist-tabs">
+          <div class="tab-group" role="tablist" aria-label="辅助面板">
+          <template v-if="isBatchProcessingView">
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'batchProcessing'"
+              :class="{ active: activeTab === 'batchProcessing' }"
+              @click="activeTab = 'batchProcessing'"
+            >
+              正在处理
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'recent'"
+              :class="{ active: activeTab === 'recent' }"
+              @click="activeTab = 'recent'"
+            >
+              最近生成
+            </button>
+          </template>
+          <template v-else-if="isGenerating">
             <button
               type="button"
               role="tab"
@@ -390,8 +481,53 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <div class="assist-body">
       <section
-        v-if="isGenerating && activeTab === 'generating'"
+        v-if="isBatchProcessingView && activeTab === 'batchProcessing'"
+        class="recent-layout batch-processing-layout"
+        aria-label="批量任务处理中"
+      >
+        <article
+          v-for="item in batchDisplayCards"
+          :key="item.id"
+          class="recent-card"
+        >
+          <div class="recent-media">
+            <PreloadImage
+              v-if="item.thumbnail"
+              class="recent-image"
+              :src="item.thumbnail"
+              :alt="item.title"
+              loading="lazy"
+              decoding="async"
+              :draggable="false"
+              fit="cover"
+              object-position="center"
+            />
+            <div v-else class="recent-empty">
+              <Icon icon="mdi:image-outline" />
+            </div>
+            <span class="recent-status" :class="`is-${item.status}`">
+              <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
+              {{ statusLabelMap[item.status] }}
+            </span>
+          </div>
+          <footer class="recent-foot">
+            <strong class="recent-name">{{ item.title }}</strong>
+            <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
+            <span class="recent-time">
+              <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+              {{ item.createdAt }}
+              <template v-if="item.progress !== undefined && item.progress < 100">
+                · 进度 {{ item.progress }}%
+              </template>
+            </span>
+          </footer>
+        </article>
+      </section>
+
+      <section
+        v-else-if="isGenerating && activeTab === 'generating'"
         class="generation-waiting"
         aria-live="polite"
       >
@@ -414,7 +550,7 @@ onUnmounted(() => {
       </section>
 
       <section
-        v-else-if="!isGenerating && activeTab === 'guide'"
+        v-else-if="!isGenerating && activeTab === 'guide' && !isBatchProcessingView"
         class="guide-layout"
         :class="{ 'is-compact-guide': !showTemplateRecommendations }"
       >
@@ -466,11 +602,12 @@ onUnmounted(() => {
               @keydown.enter.prevent="handleTemplatePick(item)"
               @keydown.space.prevent="handleTemplatePick(item)"
             >
-              <img
+              <PreloadImage
+                class="template-image"
                 :src="item.image"
                 :alt="item.title"
                 loading="lazy"
-                draggable="false"
+                :draggable="false"
               />
               <div class="template-title">
                 <span>{{ item.title }}</span>
@@ -511,25 +648,38 @@ onUnmounted(() => {
           @keydown.enter.prevent="handleRecentPick(item)"
           @keydown.space.prevent="handleRecentPick(item)"
         >
-          <img
-            v-if="item.thumbnail"
-            :src="item.thumbnail"
-            :alt="item.title"
-            loading="lazy"
-            draggable="false"
-          />
-          <div v-else class="recent-empty">
-            <Icon icon="mdi:image-outline" />
+          <div class="recent-media">
+            <PreloadImage
+              v-if="item.thumbnail"
+              class="recent-image"
+              :src="item.thumbnail"
+              :alt="item.title"
+              loading="lazy"
+              decoding="async"
+              :draggable="false"
+              fit="cover"
+              object-position="center"
+            />
+            <div v-else class="recent-empty">
+              <Icon icon="mdi:image-outline" />
+            </div>
+            <span class="recent-status" :class="`is-${item.status}`">
+              <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
+              {{ statusLabelMap[item.status] }}
+            </span>
           </div>
-          <div class="recent-copy">
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.createdAt }}</p>
-          </div>
-          <span class="recent-status" :class="`is-${item.status}`">
-            {{ statusLabelMap[item.status] }}
-          </span>
+          <footer class="recent-foot">
+            <strong class="recent-name">{{ item.title }}</strong>
+            <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
+            <span class="recent-time">
+              <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+              {{ item.createdAt }}
+            </span>
+          </footer>
         </article>
       </section>
+      </div>
+      </div>
     </template>
   </aside>
 </template>
@@ -552,6 +702,7 @@ onUnmounted(() => {
 
   display: flex;
   container-type: inline-size;
+  container-name: assist;
   width: 100%;
   height: 100%;
   max-height: 100%;
@@ -602,6 +753,22 @@ onUnmounted(() => {
   gap: 18px;
   min-height: 36px;
   margin-bottom: 16px;
+}
+
+.assist-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.assist-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .generation-waiting {
@@ -941,12 +1108,10 @@ onUnmounted(() => {
     var(--assist-card-strong);
 }
 
-.delivery-result-media img {
+.delivery-result-image {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center;
   background: var(--assist-card-strong);
 }
 
@@ -1032,6 +1197,7 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   grid-template-rows: auto auto auto;
+  align-content: start;
   gap: 18px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1202,10 +1368,9 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, transparent);
 }
 
-.template-card img {
+.template-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .template-title {
@@ -1266,19 +1431,58 @@ onUnmounted(() => {
 .recent-layout {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  grid-auto-rows: auto;
-  gap: 16px;
-  align-content: start;
   min-height: 0;
-  overflow-y: auto;
+  align-content: start;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   overflow-x: hidden;
-  padding: 2px 6px 28px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 20px 0;
   scrollbar-width: thin;
-  scrollbar-color: rgba(96, 133, 178, 0.5) transparent;
+  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
+}
+
+@container assist (max-width: 480px) {
+  .recent-layout {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container assist (max-width: 360px) {
+  .recent-layout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container assist (max-width: 280px) {
+  .recent-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.recent-layout::-webkit-scrollbar {
+  width: 10px;
+}
+
+.recent-layout::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--assist-scroll-track);
+}
+
+.recent-layout::-webkit-scrollbar-thumb {
+  border: 2px solid var(--assist-scroll-track);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--assist-blue),
+    var(--assist-scroll-thumb)
+  );
 }
 
 .recent-empty-state {
+  grid-column: 1 / -1;
   display: grid;
   min-height: 180px;
   place-items: center;
@@ -1308,15 +1512,19 @@ onUnmounted(() => {
 }
 
 .recent-card {
-  position: relative;
   display: flex;
-  aspect-ratio: 1 / 1;
-  flex-direction: column;
+  width: 100%;
   min-width: 0;
-  min-height: 0;
+  flex-direction: column;
+  border: 1px solid var(--assist-border);
   border-radius: 10px;
+  background: color-mix(in srgb, var(--assist-card) 92%, white);
+  box-shadow: var(--assist-shadow);
   overflow: hidden;
-  padding: 12px;
+}
+
+.theme-light .recent-card {
+  background: #fff;
 }
 
 .recent-card.is-clickable {
@@ -1328,7 +1536,7 @@ onUnmounted(() => {
 }
 
 .recent-card.is-clickable:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: color-mix(
     in srgb,
     var(--assist-blue) 45%,
@@ -1340,86 +1548,201 @@ onUnmounted(() => {
 }
 
 .recent-card.is-clickable:focus-visible {
-  outline: none;
-  border-color: var(--assist-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--assist-blue) 55%, transparent);
+  outline-offset: 2px;
 }
 
-.recent-card img,
-.recent-empty {
+.recent-media {
+  position: relative;
   width: 100%;
-  height: 58%;
-  border-radius: 8px;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 10px 10px 0 0;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
+    var(--assist-card-strong);
+
+  :deep(.preload-image) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
 }
 
-.recent-card img {
-  object-fit: cover;
+.recent-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px 10px 0 0;
+  background: var(--assist-card-strong);
 }
 
 .recent-empty {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  background: var(--assist-card-strong);
   color: var(--assist-muted);
   font-size: 26px;
 }
 
-.recent-copy {
-  min-width: 0;
-  padding-top: 10px;
+.recent-foot {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 68px;
+  padding: 9px 10px 11px;
+  background: inherit;
 }
 
-.recent-copy h3 {
+.recent-name,
+.recent-scene,
+.recent-time {
   margin: 0;
-  overflow: hidden;
-  color: var(--assist-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px;
-  line-height: 1.25;
-  font-weight: 900;
+  min-width: 0;
+  line-height: 1.4;
 }
 
-.recent-copy p {
-  margin: 6px 0 0;
+.recent-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--assist-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recent-scene {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  color: var(--assist-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.recent-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
   overflow: hidden;
   color: var(--assist-muted);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  line-height: 1.25;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.recent-time-icon {
+  flex-shrink: 0;
+  font-size: 13px;
+  opacity: 0.72;
 }
 
 .recent-status {
   position: absolute;
-  right: 12px;
-  top: 12px;
-  max-width: calc(100% - 24px);
+  left: 8px;
+  top: 8px;
+  z-index: 1;
+  display: inline-flex;
+  max-width: calc(100% - 16px);
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
-  color: var(--assist-blue);
+  padding: 4px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.recent-status-icon {
+  flex-shrink: 0;
   font-size: 12px;
-  font-weight: 900;
+}
+
+.recent-status.is-generating {
+  background: rgba(255, 193, 7, 0.92);
+  color: #7a4f00;
 }
 
 .recent-status.is-success {
-  background: rgba(39, 183, 125, 0.15);
-  color: var(--assist-green);
+  background: rgba(39, 183, 125, 0.92);
+  color: #fff;
+}
+
+.recent-status.is-waiting {
+  background: rgba(255, 214, 102, 0.94);
+  color: #7a5b00;
+}
+
+.recent-status.is-queued,
+.recent-status.is-queue {
+  background: rgba(255, 167, 64, 0.94);
+  color: #7a3b00;
 }
 
 .recent-status.is-fail {
-  background: rgba(238, 85, 85, 0.15);
-  color: #ef6363;
+  background: rgba(239, 99, 99, 0.92);
+  color: #fff;
+}
+
+.recent-status.is-canceled {
+  background: rgba(120, 120, 120, 0.88);
+  color: #fff;
+}
+
+@media (max-height: 820px) {
+  .assist-panel {
+    padding: 12px 14px 14px;
+  }
+
+  .assist-tabs {
+    margin-bottom: 10px;
+    min-height: 32px;
+  }
+
+  .recent-layout {
+    gap: 8px;
+    padding-bottom: 16px;
+  }
+
+  .recent-foot {
+    min-height: 58px;
+    padding: 7px 8px 9px;
+  }
+
+  .recent-media {
+    aspect-ratio: 4 / 3;
+  }
+
+  .recent-name {
+    font-size: 11px;
+    -webkit-line-clamp: 1;
+  }
+
+  .recent-status {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
 }
 
 @media (max-width: 1500px) {
   .assist-panel {
-    padding: 18px 18px;
+    padding: 14px 16px 16px;
+  }
+
+  .assist-tabs {
+    margin-bottom: 12px;
   }
 
   .guide-layout {
@@ -1436,12 +1759,6 @@ onUnmounted(() => {
   .flow-arrow {
     font-size: 22px;
   }
-
-  .recent-layout {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 14px;
-  }
-
 }
 
 @media (max-width: 1180px) {
@@ -1492,24 +1809,6 @@ onUnmounted(() => {
   }
   100% {
     transform: translateX(330%);
-  }
-}
-
-@container (min-width: 380px) {
-  .recent-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container (min-width: 620px) {
-  .recent-layout {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@container (min-width: 900px) {
-  .recent-layout {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 </style>

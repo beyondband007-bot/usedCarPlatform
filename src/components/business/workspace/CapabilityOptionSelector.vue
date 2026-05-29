@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { motion } from "motion-v";
 
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceCapability } from "@/types/workspace";
 
 const props = defineProps<{
@@ -65,13 +66,13 @@ const optionRows = computed(() => {
                 @keydown.enter="emit('select', option.id)"
                 @keydown.space.prevent="emit('select', option.id)"
               >
-                <img
+                <PreloadImage
                   class="option-item-cover"
                   :src="option.image"
                   :alt="option.title"
                   loading="lazy"
                   decoding="async"
-                  draggable="false"
+                  :draggable="false"
                 />
                 <strong class="option-item-title">{{ option.title }}</strong>
               </article>
@@ -264,7 +265,6 @@ const optionRows = computed(() => {
   display: block;
   width: 100%;
   height: clamp(96px, 10vw, 124px);
-  object-fit: cover;
   pointer-events: none;
 }
 

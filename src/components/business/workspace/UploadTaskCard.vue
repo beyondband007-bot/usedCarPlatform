@@ -13,6 +13,7 @@ import {
 } from "naive-ui";
 import { motion } from "motion-v";
 
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceCapability } from "@/types/workspace";
 
 const props = defineProps<{
@@ -124,11 +125,13 @@ function openPreviewModal() {
               aria-label="查看车辆大图"
               @click="openPreviewModal"
             >
-              <img
+              <PreloadImage
+                class="upload-preview-image"
                 :src="uploadPreviewUrl!"
                 :alt="displayUploadTitle"
                 loading="lazy"
                 decoding="async"
+                fit="contain"
               />
             </button>
 
@@ -156,11 +159,14 @@ function openPreviewModal() {
         <div v-else-if="isPreviewLoading" class="upload-loading">
           <NSpin size="large" />
           <p>正在上传车辆图片...</p>
-          <img
+          <PreloadImage
             v-if="uploadPreviewUrl"
             class="upload-loading-image"
             :src="uploadPreviewUrl"
             :alt="displayUploadTitle"
+            loading="lazy"
+            decoding="async"
+            fit="contain"
           />
         </div>
 
@@ -235,10 +241,13 @@ function openPreviewModal() {
       :bordered="false"
       :segmented="{ content: true }"
     >
-      <img
+      <PreloadImage
         class="upload-preview-modal-image"
         :src="uploadPreviewUrl ?? ''"
         :alt="displayUploadTitle"
+        loading="eager"
+        decoding="async"
+        fit="contain"
       />
     </NModal>
   </motion.div>
@@ -332,11 +341,10 @@ function openPreviewModal() {
   cursor: zoom-in;
 }
 
-.upload-preview-image-btn img {
+.upload-preview-image {
   display: block;
   width: 100%;
-  max-height: 320px;
-  object-fit: contain;
+  height: clamp(178px, 30vw, 320px);
   background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
 }
 
@@ -395,7 +403,6 @@ function openPreviewModal() {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
   opacity: 0.18;
 }
 
@@ -418,9 +425,8 @@ function openPreviewModal() {
 .upload-preview-modal-image {
   display: block;
   width: 100%;
-  max-height: min(72vh, 720px);
+  height: min(72vh, 720px);
   margin: 0 auto;
-  object-fit: contain;
   border-radius: 12px;
   background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
 }

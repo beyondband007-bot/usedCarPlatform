@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import { homeCaseTabs } from '@/constants/home-page'
 
 const activeTabId = ref(homeCaseTabs[0]?.id ?? '')
@@ -65,10 +66,12 @@ onMounted(() => {
     </div>
 
     <div v-if="activeCase" ref="layoutRef" class="case-layout">
-      <img
+      <PreloadImage
+        class="case-image"
         :src="activeCase.image"
         :alt="`${activeCase.title}案例成片`"
         loading="lazy"
+        decoding="async"
       />
       <article class="case-panel">
         <h3>{{ activeCase.title }}</h3>
@@ -106,6 +109,7 @@ onMounted(() => {
 
 .section-title h2 {
   margin: 0 0 18px;
+  color: var(--home-text);
   font-size: clamp(28px, 3.2vw, 42px);
   line-height: 1.12;
 }
@@ -123,14 +127,14 @@ onMounted(() => {
   width: min(430px, 100%);
   padding: 8px;
   margin: -28px auto 72px;
-  background: #101010;
+  background: var(--home-tabs-bg);
   border: 1px solid var(--home-line);
   border-radius: 999px;
 }
 
 .tab {
   min-height: 42px;
-  color: #d7d7d7;
+  color: var(--home-tab-text);
   background: transparent;
   border: 0;
   border-radius: 999px;
@@ -141,8 +145,8 @@ onMounted(() => {
 }
 
 .tab.active {
-  color: #111;
-  background: #fff;
+  color: var(--home-tab-active-text);
+  background: var(--home-tab-active-bg);
 }
 
 .case-layout {
@@ -154,17 +158,16 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.case-layout > img,
+.case-image,
 .case-panel {
   min-height: 480px;
   border: 1px solid var(--home-line);
   border-radius: 24px;
 }
 
-.case-layout > img {
+.case-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .case-panel {
@@ -172,23 +175,26 @@ onMounted(() => {
   flex-direction: column;
   justify-content: center;
   padding: clamp(34px, 5vw, 64px);
-  background: linear-gradient(145deg, #121212, #080808);
+  background: var(--home-case-panel-bg);
+  box-shadow: var(--home-card-shadow);
 }
 
 .case-panel h3 {
   margin: 0 0 40px;
+  color: var(--home-card-title);
   font-size: clamp(28px, 3vw, 42px);
 }
 
 .case-panel strong {
   display: block;
   margin-bottom: 10px;
+  color: var(--home-card-title);
   font-size: 17px;
 }
 
 .case-panel p {
   margin: 0 0 32px;
-  color: var(--home-muted);
+  color: var(--home-card-muted);
   line-height: 1.8;
 }
 
@@ -197,7 +203,7 @@ onMounted(() => {
   grid-template-columns: repeat(2, 1fr);
   margin: 14px 0 0;
   padding: 42px 24px;
-  background: #151515;
+  background: var(--home-metric-bg);
   border: 1px solid var(--home-line);
   border-radius: 24px;
 }
@@ -207,7 +213,7 @@ onMounted(() => {
 }
 
 .metric-card dt {
-  color: var(--home-gold-strong);
+  color: var(--home-gold);
   font-size: clamp(44px, 5vw, 62px);
   font-weight: 900;
   text-align: center;
@@ -215,7 +221,7 @@ onMounted(() => {
 
 .metric-card dd {
   margin: 8px 0 0;
-  color: var(--home-muted);
+  color: var(--home-card-muted);
   font-size: 13px;
   font-weight: 800;
   text-align: center;
@@ -226,7 +232,7 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .case-layout > img,
+  .case-image,
   .case-panel {
     min-height: 380px;
   }

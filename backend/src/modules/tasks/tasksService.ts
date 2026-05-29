@@ -177,6 +177,7 @@ class TasksService {
       "paint-refresh": "烤漆翻新演示",
       "light-consistency": "光污一致化演示",
       "interior-clean": "内饰清洁演示",
+      "watermark-remove": "去水印演示",
       "batch-new": "批量上新子任务",
     };
     return labels[task.moduleCode] ?? `${task.moduleCode} 生成任务`;

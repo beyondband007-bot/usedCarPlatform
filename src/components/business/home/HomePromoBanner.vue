@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
   homePromoBannerIntervalMs,
   homePromoBannerSlides,
@@ -100,7 +101,13 @@ onUnmounted(() => {
         :aria-current="index === activeIndex ? 'true' : undefined"
         @click="handleSlideClick(slide)"
       >
-        <img :src="slide.image" :alt="slide.alt" loading="lazy" decoding="async" />
+        <PreloadImage
+          class="promo-banner-image"
+          :src="slide.image"
+          :alt="slide.alt"
+          loading="lazy"
+          decoding="async"
+        />
         <div class="promo-banner-copy">
           <h2>{{ slide.title }}</h2>
           <p v-if="slide.subtitle">{{ slide.subtitle }}</p>
@@ -159,12 +166,11 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-.promo-banner-slide img {
+.promo-banner-image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   opacity: 0.94;
   border-radius: 35px;
 }
@@ -179,17 +185,18 @@ onUnmounted(() => {
   min-height: 259px;
   padding: 35px;
   text-align: left;
-  background: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
+  background: var(--home-media-overlay);
 }
 
 .promo-banner-copy h2 {
   margin: 0 0 12px;
+  color: var(--home-media-title);
   font-size: 22px;
 }
 
 .promo-banner-copy p {
   margin: 0 0 40px;
-  color: #d7d7d7;
+  color: var(--home-media-desc);
   font-size: 13px;
 }
 

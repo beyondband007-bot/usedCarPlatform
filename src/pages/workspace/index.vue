@@ -1,15 +1,17 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 
-import { createGenerationTask, getGenerationTask, type GenerationTaskDetail, type CreateGenerationTaskPayload } from '@/api/visual-workbench'
+import { createGenerationTask, getBatchTaskDetail, getGenerationTask, type BatchTaskDetail, type CreateGenerationTaskPayload, type GenerationTaskDetail, type GenerationTaskStatus } from '@/api/visual-workbench'
 import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
 import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
 import type {
+  WorkspaceBatchActiveJob,
+  WorkspaceBatchCreatedPayload,
   WorkspaceDeliveryTaskPreview,
   WorkspaceGeneratePayload,
   WorkspaceGenerateResult,
@@ -44,6 +46,9 @@ const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
 const shortVideoPlayRequest = ref(0)
+const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(null)
+const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([])
+let batchPollTimer: number | null = null
 
 function readActiveGenerationTask() {
   const raw = window.localStorage.getItem(ACTIVE_GENERATION_TASK_KEY)
@@ -76,6 +81,94 @@ function clearActiveGenerationTask(taskId?: string) {
 
 function isTerminalGenerationStatus(task: GenerationTaskDetail) {
   return task.status === 'success' || task.status === 'fail' || task.status === 'canceled'
+}
+
+function isTerminalBatchStatus(status: GenerationTaskStatus | WorkspaceRecentItem['status']) {
+  return status === 'success' || status === 'fail' || status === 'canceled'
+}
+
+function mapBatchStatus(status: GenerationTaskStatus): WorkspaceRecentItem['status'] {
+  if (status === 'queued') return 'queued'
+  return status
+}
+
+function mapBatchDetailToJob(
+  detail: BatchTaskDetail,
+  existing: WorkspaceBatchActiveJob,
+): WorkspaceBatchActiveJob {
+  return {
+    ...existing,
+    status: mapBatchStatus(detail.status),
+    total: detail.total,
+    completed: detail.completed,
+    failed: detail.failed,
+    progress: detail.progress,
+    items: detail.items.map((item) => ({
+      itemId: item.itemId,
+      groupTitle: item.groupTitle,
+      itemKind: item.itemKind,
+      status: mapBatchStatus(item.status),
+      progress: item.progress,
+      thumbnail: existing.previewUrl || undefined,
+    })),
+  }
+}
+
+async function refreshBatchJob(batchId: string) {
+  try {
+    const detail = await getBatchTaskDetail(batchId)
+    const index = batchActiveJobs.value.findIndex((job) => job.batchId === batchId)
+    if (index < 0) return
+    batchActiveJobs.value[index] = mapBatchDetailToJob(detail, batchActiveJobs.value[index])
+  } catch {
+    // Keep placeholder card visible while polling retries.
+  }
+}
+
+function stopBatchPolling() {
+  if (batchPollTimer !== null) {
+    window.clearInterval(batchPollTimer)
+    batchPollTimer = null
+  }
+}
+
+function shouldPollBatchJobs() {
+  return batchActiveJobs.value.some((job) => !isTerminalBatchStatus(job.status))
+}
+
+function startBatchPolling() {
+  stopBatchPolling()
+  if (!shouldPollBatchJobs()) return
+
+  batchPollTimer = window.setInterval(() => {
+    if (!shouldPollBatchJobs()) {
+      stopBatchPolling()
+      return
+    }
+
+    for (const job of batchActiveJobs.value) {
+      if (!isTerminalBatchStatus(job.status)) {
+        void refreshBatchJob(job.batchId)
+      }
+    }
+  }, 4000)
+}
+
+function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
+  batchActiveJobs.value.push({
+    batchId: payload.batchId,
+    projectName: payload.projectName,
+    previewUrl: payload.previewUrl,
+    createdAt: payload.createdAt,
+    status: payload.status,
+    total: payload.total,
+    completed: payload.completed,
+    failed: payload.failed,
+    progress: payload.progress,
+    items: [],
+  })
+  void refreshBatchJob(payload.batchId)
+  startBatchPolling()
 }
 
 function syncWorkspaceFromTask(task: Pick<GenerationTaskDetail, 'moduleCode' | 'optionId'>) {
@@ -233,6 +326,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     if (!options.restored) {
       message.success('生成完成')
     }
+    await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask(taskId)
     const text = error instanceof Error ? error.message : '生成任务查询失败'
@@ -282,9 +376,11 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResult | null {
   if (item.status !== 'success' || !item.previewImage) return null
 
+  const sceneTitle = item.sceneLabel ?? item.title
+
   return {
     createdAt: formatDate(item.createdAt),
-    statusText: `已完成 · ${item.sceneLabel ?? item.title} · 单图生成结果`,
+    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel: item.ratioLabel ?? '主图',
     previewImage: item.previewImage,
     previewAlt: item.title,
@@ -295,8 +391,15 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
 }
 
 function handlePickRecent(item: WorkspaceRecentItem) {
-  const result = buildResultFromRecent(item)
-  if (result) generationResult.value = result
+  if (item.status === 'success') {
+    const result = buildResultFromRecent(item)
+    if (result) generationResult.value = result
+    return
+  }
+
+  if (item.taskId) {
+    void resolveGenerationTask(item.taskId, { restored: true })
+  }
 }
 
 function clearGenerationResult() {
@@ -319,6 +422,10 @@ onMounted(() => {
   })
 
   void resolveGenerationTask(activeTask.taskId, { restored: true })
+})
+
+onUnmounted(() => {
+  stopBatchPolling()
 })
 
 </script>
@@ -349,18 +456,21 @@ onMounted(() => {
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
             @preview-delivery-task="handlePreviewDeliveryTask"
+            @batch-created="handleBatchCreated"
           />
         </div>
       </section>
 
       <div class="workspace-col workspace-col--assist">
         <WorkspaceAssistPanel
+          ref="assistPanelRef"
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
           :is-generating="isGenerating"
           :generation-result="generationResult"
           :delivery-image-preview="deliveryImagePreview"
           :short-video-play-request="shortVideoPlayRequest"
+          :batch-active-jobs="batchActiveJobs"
           @back-from-result="clearGenerationResult"
           @close-delivery-image-preview="clearDeliveryImagePreview"
           @open-delivery-image-preview="handleOpenDeliveryImagePreview"
@@ -452,6 +562,12 @@ onMounted(() => {
 .workspace-col--assist {
   display: flex;
   flex-direction: column;
+}
+
+.workspace-col--assist > :deep(*) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .workspace-col--main {

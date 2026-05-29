@@ -42,7 +42,7 @@ onMounted(() => {
 <template>
   <section ref="ctaRef" class="final-cta" aria-label="预约演示">
     <h2>企业视觉内容生产，从一套车图开始</h2>
-    <p>企业套管 ¥980 起，账号、积分、图组并发同步开通</p>
+    <p>企业套餐 ¥980 起，账号、积分、图组并发同步开通</p>
     <button type="button" class="button gold" @click="$emit('enterWorkbench')">
       预约演示
     </button>
@@ -59,6 +59,7 @@ onMounted(() => {
 
 .final-cta h2 {
   margin: 0 0 14px;
+  color: var(--home-text);
   font-size: clamp(28px, 3vw, 42px);
 }
 

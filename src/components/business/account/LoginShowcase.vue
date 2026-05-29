@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { NCard, NTag } from 'naive-ui'
 import { motion } from 'motion-v'
+
+import PreloadImage from '@/components/common/PreloadImage.vue'
 </script>
 
 <template>
@@ -16,10 +18,12 @@ import { motion } from 'motion-v'
       content-class="!p-0"
     >
       <div class="relative">
-        <img
+        <PreloadImage
           class="h-[455px] w-full object-cover"
           src="https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=920&q=82"
           alt="车辆外观优化案例"
+          loading="lazy"
+          decoding="async"
         />
         <div class="absolute inset-y-0 left-0 w-[45%] bg-[var(--app-bg)]/55"></div>
         <div class="absolute inset-y-0 left-[45%] w-px bg-white/70"></div>

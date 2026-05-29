@@ -26,31 +26,6 @@ const tutorial = [
   },
 ] satisfies WorkspaceCapability['tutorial']
 
-const recent = [
-  {
-    id: 'recent-1',
-    title: '经典白棚生成任务',
-    status: 'success',
-    createdAt: '2026-05-20 09:32:18',
-    sceneLabel: '经典白棚',
-    ratioLabel: '主图 16:9',
-    thumbnail:
-      'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=220&q=80',
-    previewImage:
-      'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1600&h=900&q=85',
-    imageWidth: 1600,
-    imageHeight: 900,
-  },
-  {
-    id: 'recent-2',
-    title: '烤漆翻新演示',
-    status: 'generating',
-    createdAt: '2026-05-20 09:18',
-    thumbnail:
-      'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=220&q=80',
-  },
-] satisfies WorkspaceCapability['recent']
-
 const commonRequirements = ['车辆完整入镜', '画面清晰无遮挡', '光线均匀少反光']
 
 const createOptions = (items: Array<[string, string, string]>): WorkspaceOption[] =>
@@ -258,9 +233,55 @@ const interiorOptions = createOptions([
   ],
 ])
 
+const watermarkOptions = createOptions([
+  [
+    'platform-mark',
+    '平台角标',
+    'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'text-watermark',
+    '文字水印',
+    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'account-badge',
+    '账号标识',
+    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'sticker-cover',
+    '遮挡贴纸',
+    'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=520&q=80',
+  ],
+])
+
+const creativeImageOptions = createOptions([
+  [
+    'commerce-poster',
+    '电商海报',
+    'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'studio-realistic',
+    '写实棚拍',
+    'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'city-neon',
+    '城市霓虹',
+    'https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=520&q=80',
+  ],
+  [
+    'minimal-white',
+    '极简白底',
+    'https://images.unsplash.com/photo-1583121274602-3e2820c58988?auto=format&fit=crop&w=520&q=80',
+  ],
+])
+
 type CapabilityInput = Omit<
   WorkspaceCapability,
-  'accept' | 'requiredLabel' | 'balance' | 'cost' | 'tutorial' | 'recent' | 'requirements'
+  'accept' | 'requiredLabel' | 'balance' | 'cost' | 'tutorial' | 'requirements'
 >
 
 const createCapability = (capability: CapabilityInput): WorkspaceCapability => ({
@@ -270,7 +291,6 @@ const createCapability = (capability: CapabilityInput): WorkspaceCapability => (
   balance: 1250,
   cost: 15,
   tutorial,
-  recent,
   requirements: commonRequirements,
 })
 
@@ -412,6 +432,44 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     actionLabel: '生成演示',
   }),
   createCapability({
+    code: 'watermark-remove',
+    apiCode: 'marketing_watermark_remove',
+    kind: 'interior',
+    groupTitle: '营销工具',
+    icon: 'mdi:water-off-outline',
+    label: '去水印',
+    tag: '演示',
+    tagType: 'warning',
+    title: '去水印',
+    description: '上传带平台水印的车图，智能去除角标、文字与遮挡痕迹，保留车辆与背景细节。',
+    uploadTitle: '上传车图',
+    uploadHint: '支持平台角标/文字水印车图 · JPG / PNG / WebP',
+    selectorTitle: '水印类型',
+    selectorTag: '营销',
+    middleBlocks: onlyActions,
+    options: watermarkOptions,
+    actionLabel: '生成演示',
+  }),
+  createCapability({
+    code: 'creative-image',
+    apiCode: 'marketing_creative_image',
+    kind: 'future',
+    groupTitle: '营销工具',
+    icon: 'mdi:image-edit-outline',
+    label: '创意生图',
+    tag: 'Beta',
+    tagType: 'info',
+    title: '创意生图',
+    description: '用提示词和参考图生成营销海报、主图背景与广告创意图，当前先提供界面样式。',
+    uploadTitle: '参考图',
+    uploadHint: '可选上传车辆或风格参考图 · JPG / PNG / WebP',
+    selectorTitle: '风格模板',
+    selectorTag: '创意',
+    middleBlocks: ['selector', 'actions'],
+    options: creativeImageOptions,
+    actionLabel: '生成创意图',
+  }),
+  createCapability({
     code: 'batch-new',
     apiCode: 'batch_listing',
     kind: 'batch',
@@ -453,7 +511,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'future-short-video',
     apiCode: 'future_short_video',
     kind: 'future',
-    groupTitle: '营销内容',
+    groupTitle: '营销工具',
     icon: 'mdi:movie-open-outline',
     label: '短视频生成',
     tag: 'Beta',
@@ -588,7 +646,7 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
     items: pickMenuItems(['batch-new', 'delivery']),
   },
   {
-    title: '营销内容',
-    items: futureSidebarItems,
+    title: '营销工具',
+    items: [...pickMenuItems(['watermark-remove', 'creative-image']), ...futureSidebarItems],
   },
 ]

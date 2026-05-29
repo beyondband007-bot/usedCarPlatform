@@ -80,6 +80,40 @@ export interface WorkspaceGeneratePayload {
   colorCode?: string
 }
 
+export interface WorkspaceBatchActiveItem {
+  itemId: string
+  groupTitle: string
+  itemKind: 'exterior' | 'interior'
+  status: WorkspaceRecentItem['status']
+  progress: number
+  thumbnail?: string
+}
+
+export interface WorkspaceBatchActiveJob {
+  batchId: string
+  projectName: string
+  previewUrl: string
+  createdAt: string
+  status: WorkspaceRecentItem['status']
+  total: number
+  completed: number
+  failed: number
+  progress: number
+  items: WorkspaceBatchActiveItem[]
+}
+
+export interface WorkspaceBatchCreatedPayload {
+  batchId: string
+  projectName: string
+  previewUrl: string
+  createdAt: string
+  status: WorkspaceRecentItem['status']
+  total: number
+  completed: number
+  failed: number
+  progress: number
+}
+
 export interface WorkspaceCapability {
   code: string
   apiCode: string
@@ -100,7 +134,6 @@ export interface WorkspaceCapability {
   middleBlocks?: WorkspaceCapabilityBlock[]
   options: WorkspaceOption[]
   tutorial: WorkspaceTutorialStep[]
-  recent: WorkspaceRecentItem[]
   requirements: string[]
   cost: number
   balance: number

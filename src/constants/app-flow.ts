@@ -70,6 +70,13 @@ export const workspaceFlowModules = [
     defaultCapabilityCode: 'batch-new',
     capabilityCodes: ['batch-new', 'delivery'],
   },
+  {
+    id: 'marketing',
+    title: '营销工具',
+    description: '去水印 · 短视频等营销素材处理',
+    defaultCapabilityCode: 'watermark-remove',
+    capabilityCodes: ['watermark-remove', 'creative-image', 'future-short-video'],
+  },
 ] as const
 
 export type WorkspaceFlowModuleId = (typeof workspaceFlowModules)[number]['id']

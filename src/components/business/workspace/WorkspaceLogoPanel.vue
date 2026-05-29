@@ -3,6 +3,7 @@ import { Icon } from '@iconify/vue'
 import { NSwitch, useMessage } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import { useWorkspaceLogo } from '@/composables/useWorkspaceLogo'
 
 const props = withDefaults(
@@ -141,10 +142,14 @@ function handleSelectRecent() {
           @click="handleSelectRecent"
         >
           <span class="logo-preview">
-            <img
+            <PreloadImage
               v-if="recentLogo?.dataUrl"
+              class="logo-preview-image"
               :src="recentLogo.dataUrl"
               :alt="recentLogo.fileName"
+              loading="lazy"
+              decoding="async"
+              fit="contain"
             />
             <span v-else class="logo-preview-placeholder">Logo</span>
           </span>
@@ -304,11 +309,10 @@ function handleSelectRecent() {
     var(--logo-preview-bg);
 }
 
-.logo-preview img {
+.logo-preview-image {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
   padding: 2px 4px;
   background: var(--logo-preview-bg);
 }

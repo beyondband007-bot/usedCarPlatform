@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import { homeMainCapabilities, homeTechBadges } from '@/constants/home-page'
 
 const gridRef = ref<HTMLElement | null>(null)
@@ -50,7 +51,13 @@ onMounted(() => {
         :key="item.title"
         class="feature-card"
       >
-        <img :src="item.image" :alt="item.title" loading="lazy" />
+        <PreloadImage
+          class="feature-card-image"
+          :src="item.image"
+          :alt="item.title"
+          loading="lazy"
+          decoding="async"
+        />
         <h3>{{ item.title }}</h3>
         <p>{{ item.description }}</p>
       </article>
@@ -77,6 +84,7 @@ onMounted(() => {
 
 .section-title h2 {
   margin: 0 0 18px;
+  color: var(--home-text);
   font-size: clamp(28px, 3.2vw, 42px);
   line-height: 1.12;
 }
@@ -100,12 +108,14 @@ onMounted(() => {
   position: relative;
   overflow: hidden;
   padding: 10px 10px 24px;
-  background: linear-gradient(180deg, #151515, #0b0b0b);
+  background: var(--home-card-bg);
   border: 1px solid var(--home-line);
   border-radius: 35px;
+  box-shadow: var(--home-card-shadow);
   transition:
     transform 0.25s ease,
-    border-color 0.25s ease;
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .feature-card::after {
@@ -113,13 +123,13 @@ onMounted(() => {
   inset: 0;
   content: '';
   pointer-events: none;
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  background: var(--home-card-shine);
   opacity: 0;
   transition: opacity 0.25s ease;
 }
 
 .feature-card:hover {
-  border-color: rgba(244, 200, 64, 0.38);
+  border-color: var(--home-card-hover-border);
   transform: translateY(-6px);
 }
 
@@ -127,21 +137,23 @@ onMounted(() => {
   opacity: 1;
 }
 
-.feature-card img {
+.feature-card-image {
+  display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 341 / 183;
-  object-fit: cover;
   border-radius: 30px;
 }
 
 .feature-card h3 {
   margin: 24px 18px 6px;
+  color: var(--home-card-title);
   font-size: 22px;
 }
 
 .feature-card p {
   margin: 0 18px;
-  color: var(--home-muted);
+  color: var(--home-card-muted);
   font-size: 15px;
   line-height: 1.7;
 }
@@ -161,9 +173,9 @@ onMounted(() => {
   align-items: center;
   min-height: 29px;
   padding: 0 15px;
-  color: #d7d7d7;
-  background: #111;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--home-badge-text);
+  background: var(--home-badge-bg);
+  border: 1px solid var(--home-badge-border);
   border-radius: 999px;
   font-size: 18px;
   font-weight: 800;

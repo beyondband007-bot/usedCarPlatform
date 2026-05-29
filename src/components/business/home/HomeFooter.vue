@@ -22,11 +22,13 @@ import { homeFooterLinks } from '@/constants/home-page'
 .footer {
   padding: 112px 20px 62px;
   text-align: center;
-  background: #121212;
+  color: var(--home-text);
+  background: var(--home-footer-bg);
 }
 
 .footer h2 {
   margin: 0 0 38px;
+  color: var(--home-text);
   font-size: clamp(34px, 4vw, 50px);
 }
 
@@ -36,7 +38,7 @@ import { homeFooterLinks } from '@/constants/home-page'
   gap: clamp(22px, 4vw, 72px);
   flex-wrap: wrap;
   margin-bottom: 26px;
-  color: #a8a8a8;
+  color: var(--home-footer-nav);
   font-size: 14px;
   font-weight: 800;
 }
@@ -53,7 +55,7 @@ import { homeFooterLinks } from '@/constants/home-page'
 
 .footer p {
   margin: 0;
-  color: #8b8b8b;
+  color: var(--home-footer-copy);
   font-size: 13px;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import { homeHeroPosterSrc, homeHeroVideoSrc } from '@/constants/home-page'
 
 defineEmits<{
@@ -82,11 +83,12 @@ onUnmounted(() => {
     </div>
 
     <div class="hero-media" aria-hidden="true">
-      <img
+      <PreloadImage
         class="hero-poster"
         :class="{ 'is-hidden': isVideoReady }"
         :src="homeHeroPosterSrc"
         alt=""
+        loading="eager"
         fetchpriority="high"
         decoding="async"
       />
@@ -126,7 +128,7 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at 50% 26%, rgba(121, 115, 105, 0.3), transparent 31rem),
     radial-gradient(circle at 70% 36%, rgba(244, 200, 64, 0.08), transparent 28rem),
-    #080808;
+    var(--home-hero-bg);
 }
 
 .hero::after {
@@ -159,7 +161,7 @@ onUnmounted(() => {
 
 .hero h1 {
   margin: 0 0 18px;
-  color: #f3f3f3;
+  color: var(--home-hero-title);
   font-size: clamp(34px, 2.8vw, 55px);
   line-height: 1.08;
   letter-spacing: 0;
@@ -167,7 +169,7 @@ onUnmounted(() => {
 
 .hero p:not(.eyebrow) {
   margin: 0;
-  color: #d5d5d5;
+  color: var(--home-hero-sub);
   font-size: clamp(16px, 1.27vw, 25px);
 }
 

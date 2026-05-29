@@ -2,6 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import LoginPanel from '@/components/business/account/LoginPanel.vue'
 import {
   enterpriseLoginFeatures,
@@ -19,7 +20,15 @@ const isDark = computed(() => appStore.isDarkMode)
     :class="isDark ? 'theme-dark' : 'theme-light'"
   >
     <div class="enterprise-login-bg" aria-hidden="true">
-      <img :src="enterpriseLoginHeroImage" alt="" />
+      <PreloadImage
+        class="enterprise-login-bg-image"
+        :src="enterpriseLoginHeroImage"
+        alt=""
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+        object-position="center 40%"
+      />
     </div>
     <div class="enterprise-login-overlay" aria-hidden="true"></div>
 
@@ -106,16 +115,16 @@ const isDark = computed(() => appStore.isDarkMode)
 }
 
 .enterprise-login-bg {
-  img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 40%;
-    filter: var(--login-image-filter);
-    transform: scale(1.03);
-    transition: filter 0.28s ease;
-  }
+  overflow: hidden;
+}
+
+.enterprise-login-bg-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: var(--login-image-filter);
+  transform: scale(1.03);
+  transition: filter 0.28s ease;
 }
 
 .enterprise-login-overlay {

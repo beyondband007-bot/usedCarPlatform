@@ -51,7 +51,7 @@ export const homeQuickEntries: HomeQuickEntry[] = [
     image: suiteWorkbenchImage,
   },
   {
-    title: '企业套管',
+    title: '企业套餐',
     description: '账号、积分、品牌外观同步开通',
     action: '查看更多',
     to: '/pricing',
