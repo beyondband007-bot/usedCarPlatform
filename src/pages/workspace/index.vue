@@ -193,10 +193,10 @@ function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResul
 
   return {
     createdAt: task.updatedAt ?? task.createdAt ?? formatGenerateTime(),
-    statusText: `宸插畬鎴?路 ${sceneTitle} 路 鍗曞浘鐢熸垚缁撴灉`,
-    ratioLabel: `${task.outputRatio} 路 ${task.resolution}`,
+    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
+    ratioLabel: `${task.outputRatio} · ${task.resolution}`,
     previewImage: image.url,
-    previewAlt: `${sceneTitle}鐢熸垚缁撴灉`,
+    previewAlt: `${sceneTitle}生成结果`,
     downloadUrl: image.url,
     imageWidth: 1600,
     imageHeight: 900,
@@ -223,23 +223,23 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     syncWorkspaceFromTask(task)
 
     if (task.status !== 'success') {
-      message.error(task.error?.message || '鐢熸垚浠诲姟澶辫触')
+      message.error(task.error?.message || '生成任务失败')
       return
     }
 
     const result = buildResultFromTask(task)
     if (!result) {
-      message.warning('浠诲姟瀹屾垚锛屼絾娌℃湁杩斿洖鍥剧墖')
+      message.warning('任务完成，但没有返回图片')
       return
     }
 
     generationResult.value = result
     if (!options.restored) {
-      message.success('鐢熸垚瀹屾垚')
+      message.success('生成完成')
     }
   } catch (error) {
     clearActiveGenerationTask(taskId)
-    const text = error instanceof Error ? error.message : '鐢熸垚浠诲姟鏌ヨ澶辫触'
+    const text = error instanceof Error ? error.message : '生成任务查询失败'
     message.error(text)
   } finally {
     clearActiveGenerationTask(taskId)
@@ -288,8 +288,8 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
 
   return {
     createdAt: item.createdAt,
-    statusText: `宸插畬鎴?路 ${item.sceneLabel ?? item.title} 路 鍗曞浘鐢熸垚缁撴灉`,
-    ratioLabel: item.ratioLabel ?? '涓诲浘',
+    statusText: `已完成 · ${item.sceneLabel ?? item.title} · 单图生成结果`,
+    ratioLabel: item.ratioLabel ?? '主图',
     previewImage: item.previewImage,
     previewAlt: item.title,
     downloadUrl: item.previewImage,

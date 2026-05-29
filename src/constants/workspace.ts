@@ -148,6 +148,70 @@ const skyOptions = createOptions([
   ],
 ])
 
+export interface BatchSceneItem {
+  title: string
+  optionId: string
+  image: string
+}
+
+export interface BatchSceneCategory {
+  category: string
+  apiCode: string
+  scenes: BatchSceneItem[]
+}
+
+const mapWorkspaceOptions = (options: WorkspaceOption[]): BatchSceneItem[] =>
+  options.map((item) => ({
+    title: item.title,
+    optionId: item.id,
+    image: item.image,
+  }))
+
+export const batchSceneCatalog: BatchSceneCategory[] = [
+  {
+    category: '展厅灯光',
+    apiCode: 'scene_showroom_light',
+    scenes: mapWorkspaceOptions(showroomOptions),
+  },
+  {
+    category: '户外场景',
+    apiCode: 'scene_outdoor',
+    scenes: mapWorkspaceOptions(outdoorOptions),
+  },
+  {
+    category: '道路动态',
+    apiCode: 'scene_road_motion',
+    scenes: mapWorkspaceOptions(roadOptions),
+  },
+  {
+    category: '天空影棚',
+    apiCode: 'scene_sky_studio',
+    scenes: mapWorkspaceOptions(skyOptions),
+  },
+]
+
+export const batchSceneCategoryOptions = batchSceneCatalog.map((item) => ({
+  label: item.category,
+  value: item.category,
+}))
+
+export function getBatchScenesByCategory(category: string): BatchSceneItem[] {
+  return (
+    batchSceneCatalog.find((item) => item.category === category)?.scenes ??
+    batchSceneCatalog[0].scenes
+  )
+}
+
+export function getBatchSceneOptionId(category: string, sceneIndex: number): string {
+  const scenes = getBatchScenesByCategory(category)
+  return scenes[sceneIndex]?.optionId ?? scenes[0]?.optionId ?? 'white-studio'
+}
+
+export function getBatchSceneTitle(category: string, sceneIndex: number): string {
+  const scenes = getBatchScenesByCategory(category)
+  return scenes[sceneIndex]?.title ?? scenes[0]?.title ?? ''
+}
+
 const beautyOptions = createOptions([
   [
     'balanced',

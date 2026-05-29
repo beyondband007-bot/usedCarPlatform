@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { NSwitch, useMessage } from 'naive-ui'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { useWorkspaceLogo } from '@/composables/useWorkspaceLogo'
+
+const props = withDefaults(
+  defineProps<{
+    variant?: 'scene' | 'batch'
+  }>(),
+  {
+    variant: 'scene',
+  },
+)
 
 const enabled = defineModel<boolean>('enabled', { default: false })
 
@@ -20,6 +29,32 @@ const {
   uploadLogoFile,
   selectRecentLogo,
 } = useWorkspaceLogo()
+
+const isBatch = computed(() => props.variant === 'batch')
+const panelTitle = computed(() =>
+  isBatch.value ? '使用最近 Logo' : '使用 Logo',
+)
+const panelDescription = computed(() =>
+  isBatch.value
+    ? '开启后可沿用最近上传 Logo，也可重新上传。'
+    : '开启后创建任务会传 useLogo，后端自动使用当前账号默认 Logo。',
+)
+const recentTitle = computed(() => {
+  if (!recentLogo.value) {
+    return isBatch.value ? '暂无最近 Logo' : '暂无默认 Logo'
+  }
+
+  return isBatch.value ? '使用最近 Logo' : '使用默认 Logo'
+})
+const recentHint = computed(() => {
+  if (recentLogo.value) return uploadedAtLabel.value
+  return '请先上传 PNG / SVG Logo'
+})
+const reuploadLabel = computed(() => {
+  if (isUploading.value) return '上传中...'
+  if (recentLogo.value) return '重新上传'
+  return '上传 Logo'
+})
 
 watch(
   enabled,
@@ -67,7 +102,10 @@ function handleSelectRecent() {
 </script>
 
 <template>
-  <div class="workspace-logo-panel">
+  <div
+    class="workspace-logo-panel"
+    :class="{ 'workspace-logo-panel--batch': isBatch }"
+  >
     <input
       ref="fileInputRef"
       type="file"
@@ -83,9 +121,11 @@ function handleSelectRecent() {
       <div class="logo-setting-head px-6 py-5">
         <div class="flex items-start justify-between gap-5">
           <div class="min-w-0">
-            <h3 class="text-base font-black tracking-normal text-[var(--app-text)]">使用 Logo</h3>
+            <h3 class="text-base font-black tracking-normal text-[var(--app-text)]">
+              {{ panelTitle }}
+            </h3>
             <p class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]">
-              开启后创建任务会传 useLogo，后端自动使用当前账号默认 Logo。
+              {{ panelDescription }}
             </p>
           </div>
           <NSwitch v-model:value="enabled" size="large" />
@@ -109,25 +149,25 @@ function handleSelectRecent() {
             <span v-else class="logo-preview-placeholder">Logo</span>
           </span>
           <span class="logo-copy">
-            <strong>{{ recentLogo ? '使用默认 Logo' : '暂无默认 Logo' }}</strong>
-            <small>{{ recentLogo ? uploadedAtLabel : '请先上传 PNG / SVG Logo' }}</small>
+            <strong>{{ recentTitle }}</strong>
+            <small>{{ recentHint }}</small>
           </span>
         </button>
 
         <button
-          v-if="recentLogo"
+          v-if="isBatch || recentLogo"
           type="button"
           class="reupload-button"
           :disabled="isUploading"
           @click="openUpload"
         >
-          {{ isUploading ? '上传中...' : '重新上传' }}
+          {{ reuploadLabel }}
         </button>
       </div>
     </section>
 
     <button
-      v-if="enabled"
+      v-if="enabled && !isBatch"
       type="button"
       class="logo-upload-drop"
       :disabled="isUploading"
@@ -161,6 +201,42 @@ function handleSelectRecent() {
   --logo-preview-bg: color-mix(in srgb, var(--workspace-panel-deep, #0a101c) 94%, transparent);
   --logo-preview-text: var(--workspace-accent-strong, #f8d891);
   --logo-preview-border: color-mix(in srgb, var(--workspace-accent-strong, #f8d891) 45%, transparent);
+}
+
+.workspace-logo-panel--batch {
+  gap: 0;
+}
+
+.workspace-logo-panel--batch .logo-setting-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-logo-panel--batch .logo-setting-head {
+  padding: 0;
+}
+
+.workspace-logo-panel--batch .logo-setting-head h3 {
+  font-size: 16px;
+}
+
+.workspace-logo-panel--batch .logo-setting-head p {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.workspace-logo-panel--batch .logo-recent-block {
+  margin-top: 4px;
+  border-top: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.workspace-logo-panel--batch .recent-logo-row {
+  margin-top: 14px;
+  background: color-mix(in srgb, var(--app-surface-soft) 88%, transparent);
 }
 
 .logo-file-input {

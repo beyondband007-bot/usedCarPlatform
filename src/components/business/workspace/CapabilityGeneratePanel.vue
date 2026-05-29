@@ -14,6 +14,11 @@ import {
   type DeliveryTaskItem,
   type UploadedAsset,
 } from "@/api/visual-workbench";
+import {
+  batchSceneCategoryOptions,
+  getBatchScenesByCategory,
+  getBatchSceneTitle,
+} from "@/constants/workspace";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import type {
   BatchVisualTemplate,
@@ -43,11 +48,11 @@ const emit = defineEmits<{
 }>();
 
 const outputRatioLabelMap: Record<string, string> = {
-  "1:1": "涓诲浘 1:1",
-  "3:4": "涓诲浘 3:4",
-  "4:3": "涓诲浘 4:3",
-  "9:16": "涓诲浘 9:16",
-  "16:9": "涓诲浘 16:9",
+  "1:1": "主图 1:1",
+  "3:4": "主图 3:4",
+  "4:3": "主图 4:3",
+  "9:16": "主图 9:16",
+  "16:9": "主图 16:9",
 };
 
 const message = useMessage();
@@ -66,7 +71,8 @@ const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
 const batchSceneIndex = ref(0);
-const batchSceneCategory = ref("灞曞巺鐏厜");
+const batchSceneCategory = ref("展厅灯光");
+const batchScenes = computed(() => getBatchScenesByCategory(batchSceneCategory.value));
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
@@ -114,11 +120,11 @@ const showPaintColorPicker = computed(
 );
 
 const outputRatioOptions = [
-  { label: "1:1 涓诲浘", value: "1:1" },
-  { label: "3:4 绔栧睆", value: "3:4" },
-  { label: "4:3 妯増", value: "4:3" },
-  { label: "9:16 绔栧睆", value: "9:16" },
-  { label: "16:9 妯増", value: "16:9" },
+  { label: "1:1 主图", value: "1:1" },
+  { label: "3:4 竖图", value: "3:4" },
+  { label: "4:3 横图", value: "4:3" },
+  { label: "9:16 竖图", value: "9:16" },
+  { label: "16:9 横图", value: "16:9" },
 ];
 
 const presetAutocompleteOptions = computed(() => {
@@ -193,6 +199,11 @@ watch(presetInput, (value) => {
   syncPresetSelectionFromInput(value);
 });
 
+watch(batchSceneCategory, () => {
+  if (isApplyingTemplate.value) return;
+  batchSceneIndex.value = 0;
+});
+
 function handlePresetSelect(value: string) {
   presetInput.value = value;
   syncPresetSelectionFromInput(value);
@@ -217,7 +228,7 @@ async function handleSaveVisualPreset() {
 
   const updated = await updateTemplate(visualPreset.value, input);
   if (!updated) {
-    message.error("棰勮淇濆瓨澶辫触锛岃閲嶈瘯");
+    message.error("预设保存失败，请重试");
     return;
   }
 
@@ -250,10 +261,10 @@ async function handleVehicleFileSelected(file: File) {
     uploadedAsset.value = asset;
     revokePreviewObjectUrl();
     uploadedPreviewUrl.value = asset.url;
-    message.success("杞﹁締鍥剧墖涓婁紶鎴愬姛");
+    message.success("车辆图片上传成功");
   } catch (error) {
     resetUploadedVehicle();
-    const text = error instanceof Error ? error.message : "杞﹁締鍥剧墖涓婁紶澶辫触";
+    const text = error instanceof Error ? error.message : "车辆图片上传失败";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
@@ -295,7 +306,7 @@ function handleGenerate() {
 
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
-    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `涓诲浘 ${outputRatio.value}`,
+    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
     optionId: props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
     colorCode:
@@ -306,9 +317,10 @@ function handleGenerate() {
 }
 
 function mapBatchVisualConfig() {
+  const scenes = batchScenes.value;
   return {
     enableSceneChange: enableSceneChange.value,
-    sceneOptionId: batchScenes[batchSceneIndex.value]?.optionId ?? batchScenes[0].optionId,
+    sceneOptionId: scenes[batchSceneIndex.value]?.optionId ?? scenes[0]?.optionId,
     sceneIndex: batchSceneIndex.value,
     sceneCategory: batchSceneCategory.value,
     outputRatio: outputRatio.value,
@@ -453,39 +465,6 @@ onMounted(() => {
   void ensureLoaded();
   void refreshDeliveryTasks();
 });
-
-const batchScenes = [
-  {
-    title: "缁忓吀鐧芥",
-    optionId: "white-studio",
-    image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=520&q=80",
-  },
-  {
-    title: "鐜荤拑灞曞巺",
-    optionId: "glass-hall",
-    image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=520&q=80",
-  },
-  {
-    title: "鏆楄皟璞崕",
-    optionId: "luxury-dark",
-    image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=520&q=80",
-  },
-  {
-    title: "鏌斿厜椤剁伅",
-    optionId: "soft-top-light",
-    image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=520&q=80",
-  },
-  {
-    title: "鍩庡競澶滄櫙",
-    optionId: "city-night",
-    image: "https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=520&q=80",
-  },
-  {
-    title: "鏋楄崼鎴峰",
-    optionId: "tree-park",
-    image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=520&q=80",
-  },
-];
 
 type DeliveryTask = DeliveryTaskItem & {
   selected: boolean;
@@ -665,7 +644,7 @@ const activeCreateRatioLabel = computed(() => {
             :class="{ active: batchTab === 'create' }"
             @click="batchTab = 'create'"
           >
-            鏂板缓浠诲姟
+            新建任务
           </button>
           <button
             type="button"
@@ -709,8 +688,8 @@ const activeCreateRatioLabel = computed(() => {
               class="preset-tag is-scene"
             >
               <Icon icon="mdi:image-filter-hdr" />
-              {{ activeCreateTemplate.sceneCategory }} 路
-              {{ batchScenes[activeCreateTemplate.sceneIndex]?.title }}
+              {{ activeCreateTemplate.sceneCategory }} ·
+              {{ getBatchSceneTitle(activeCreateTemplate.sceneCategory, activeCreateTemplate.sceneIndex) }}
             </span>
             <span class="preset-tag is-ratio">
               <Icon icon="mdi:aspect-ratio" />
@@ -726,11 +705,11 @@ const activeCreateRatioLabel = computed(() => {
             </span>
             <span v-if="activeCreateTemplate.paintRefresh" class="preset-tag is-on">
               <Icon icon="mdi:spray" />
-              鐑ゆ紗缈绘柊
+              漆面翻新
             </span>
             <span v-if="activeCreateTemplate.interiorEnhance" class="preset-tag is-on">
               <Icon icon="mdi:seat-passenger" />
-              鍐呴グ娓呮磥
+              内饰清洁
             </span>
           </div>
         </section>
@@ -740,14 +719,12 @@ const activeCreateRatioLabel = computed(() => {
           <input v-model="projectName" class="plain-input" type="text" />
         </section>
 
-        <button type="button" class="batch-upload" @click="handleVehicleImageRemove">
-          <Icon icon="mdi:camera" />
-          <strong>上传外观图组</strong>
-          <span>支持多角度外观图 · 每套车图作为 1 个图组</span>
-          <b>必填</b>
-        </button>
         <UploadTaskCard
+          compact
           :capability="props.capability"
+          upload-title="上传外观图组"
+          upload-hint="支持多角度外观图 · 每套车图作为 1 个图组"
+          required-label="必选"
           :upload-preview-url="uploadedPreviewUrl"
           :is-uploading="isUploadingVehicle"
           @select-file="handleVehicleFileSelected"
@@ -762,15 +739,14 @@ const activeCreateRatioLabel = computed(() => {
           <NSwitch v-model:value="uploadInterior" size="large" />
         </section>
 
-        <button v-if="uploadInterior" type="button" class="batch-upload interior-upload" @click="handleInteriorImageRemove">
-          <Icon icon="mdi:seat-passenger" />
-          <strong>上传内饰图组</strong>
-          <span>用于成片交付中的内饰展示图，可选上传</span>
-          <b>选填</b>
-        </button>
         <UploadTaskCard
           v-if="uploadInterior"
+          compact
           :capability="props.capability"
+          upload-title="上传内饰图组"
+          upload-hint="用于成片交付中的内饰展示图，可选上传"
+          required-label="选填"
+          upload-icon="mdi:seat-passenger"
           :upload-preview-url="uploadedInteriorAssets[0]?.url ?? null"
           :is-uploading="isUploadingInterior"
           @select-file="handleInteriorFileSelected"
@@ -808,12 +784,17 @@ const activeCreateRatioLabel = computed(() => {
         <section v-if="enableSceneChange" class="batch-scene-card">
           <div class="scene-head">
             <h3>批量场景选择</h3>
-            <button type="button">{{ batchSceneCategory }} <Icon icon="mdi:chevron-down" /></button>
+            <NSelect
+              v-model:value="batchSceneCategory"
+              :options="batchSceneCategoryOptions"
+              size="medium"
+              class="scene-category-select"
+            />
           </div>
           <div class="scene-grid">
             <article
               v-for="(scene, index) in batchScenes"
-              :key="scene.title"
+              :key="scene.optionId"
               :class="{ active: index === batchSceneIndex }"
               @click="batchSceneIndex = index"
             >
@@ -828,12 +809,8 @@ const activeCreateRatioLabel = computed(() => {
           <NSelect v-model:value="outputRatio" :options="outputRatioOptions" size="large" />
         </section>
 
-        <section class="batch-card switch-card">
-          <div>
-            <h3>使用最近 Logo</h3>
-            <p>开启后可沿用最近上传 Logo，也可重新上传。</p>
-          </div>
-          <NSwitch v-model:value="useRecentLogo" size="large" />
+        <section class="batch-card batch-logo-card">
+          <WorkspaceLogoPanel v-model:enabled="useRecentLogo" variant="batch" />
         </section>
 
         <section class="batch-card switch-card">
@@ -1441,49 +1418,6 @@ const activeCreateRatioLabel = computed(() => {
     0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
 }
 
-.batch-upload {
-  display: grid;
-  place-items: center;
-  min-height: 178px;
-  border: 1px dashed color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, var(--app-border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%);
-  color: var(--app-text);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.batch-upload .iconify {
-  color: var(--workspace-accent-strong, #ffd75a);
-  font-size: 34px;
-}
-
-.batch-upload strong {
-  margin-top: 8px;
-  font-size: 17px;
-  font-weight: 900;
-}
-
-.batch-upload span {
-  margin-top: 6px;
-  color: var(--app-text-soft);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.batch-upload b {
-  margin-top: 10px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: var(--app-surface-soft);
-  color: var(--app-text-soft);
-  font-size: 12px;
-}
-
-.interior-upload .iconify {
-  color: #a56966;
-}
-
 .switch-card {
   display: flex;
   align-items: center;
@@ -1526,6 +1460,21 @@ const activeCreateRatioLabel = computed(() => {
   font-size: 18px;
   font-weight: 900;
   line-height: 1.35;
+}
+
+.scene-head button,
+.scene-category-select {
+  width: 148px;
+}
+
+.scene-category-select :deep(.n-base-selection) {
+  --n-height: 38px !important;
+  --n-border-radius: 8px !important;
+  --n-border: 1px solid var(--app-border) !important;
+  --n-color: var(--app-surface) !important;
+  --n-text-color: var(--workspace-accent-strong, #a86d00) !important;
+  --n-arrow-color: var(--workspace-accent-strong, #a86d00) !important;
+  font-weight: 800;
 }
 
 .scene-head button {

@@ -5,6 +5,7 @@ import {
   saveBatchPreset,
   type BatchVisualConfig,
 } from '@/api/visual-workbench'
+import { getBatchSceneOptionId } from '@/constants/workspace'
 import type { BatchVisualTemplate, BatchVisualTemplateInput } from '@/types/workspace'
 
 const NEW_PRESET_VALUE = '__new__'
@@ -16,7 +17,9 @@ const isReady = ref(false)
 function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
   return {
     enableSceneChange: input.enableSceneChange,
-    sceneOptionId: input.enableSceneChange ? batchSceneIdFromIndex(input.sceneIndex) : undefined,
+    sceneOptionId: input.enableSceneChange
+      ? getBatchSceneOptionId(input.sceneCategory, input.sceneIndex)
+      : undefined,
     sceneIndex: input.sceneIndex,
     sceneCategory: input.sceneCategory,
     outputRatio: input.outputRatio,
@@ -25,11 +28,6 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     enablePaintRefresh: input.paintRefresh,
     enableInteriorClean: input.interiorEnhance,
   }
-}
-
-function batchSceneIdFromIndex(index: number) {
-  const sceneOptionMap = ['white-studio', 'glass-hall', 'luxury-dark', 'soft-top-light', 'city-night', 'tree-park']
-  return sceneOptionMap[index] ?? sceneOptionMap[0]
 }
 
 async function ensureLoaded() {
