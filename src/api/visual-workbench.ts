@@ -184,6 +184,28 @@ export interface DeliveryPackage {
   updatedAt?: string
 }
 
+export interface RecentGenerationTask {
+  id: string
+  taskId: string
+  moduleCode: string
+  title: string
+  status: GenerationTaskStatus | 'queued'
+  uiStatus?: 'waiting' | 'queue' | 'queued' | 'generating' | 'success' | 'fail' | 'canceled'
+  progress?: number
+  createdAt: string
+  updatedAt?: string
+  thumbnail?: string | null
+  previewImage?: string | null
+  downloadUrl?: string | null
+  ratioLabel?: string | null
+  sceneLabel?: string | null
+  outputRatio?: string | null
+  inputAssetId?: string | null
+  inputAssetUrl?: string | null
+  resultCount?: number | null
+  error?: string | { code?: string; message?: string } | null
+}
+
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
     throw new Error(response.message || 'request failed')
@@ -242,6 +264,18 @@ export async function createGenerationTask(
 
 export async function getGenerationTask(taskId: string) {
   const response = await request.get<ApiResponse<GenerationTaskDetail>>(`/tasks/${taskId}`)
+  return unwrapApiResponse(response)
+}
+
+export async function getRecentGenerationTasks(params?: {
+  moduleCode?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}) {
+  const response = await request.get<ApiResponse<PagedResult<RecentGenerationTask>>>('/tasks', {
+    params,
+  })
   return unwrapApiResponse(response)
 }
 

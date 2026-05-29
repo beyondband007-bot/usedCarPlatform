@@ -43,24 +43,10 @@ function navigate(item: NavItem) {
     "
     aria-label="企业业务导航"
   >
-    <RouterLink
-      v-if="props.embedded"
-      class="subnav-brand"
-      to="/home"
-    >
-      AI CAR STUDIO
-    </RouterLink>
-
     <div
       class="subnav-track"
       :class="{ 'subnav-track--embedded': props.embedded }"
     >
-      <span
-        v-if="props.embedded"
-        class="subnav-track-grid"
-        aria-hidden="true"
-      />
-
       <div
         class="subnav-links flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         :class="props.embedded ? 'subnav-links--embedded' : 'flex-1 gap-1'"
@@ -110,21 +96,6 @@ function navigate(item: NavItem) {
 .subnav--workbench {
   display: flex;
   align-items: stretch;
-  gap: clamp(20px, 3vw, 44px);
-}
-
-.subnav-brand {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  align-self: center;
-  color: var(--studio-chrome-logo, #f7f1e4);
-  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .subnav-track {
@@ -137,18 +108,6 @@ function navigate(item: NavItem) {
 
 .subnav-track--embedded {
   overflow: hidden;
-}
-
-.subnav-track-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--studio-chrome-subnav-grid, rgba(220, 38, 38, 0.24)) 1px, transparent 1px),
-    linear-gradient(90deg, var(--studio-chrome-subnav-grid, rgba(220, 38, 38, 0.24)) 1px, transparent 1px);
-  background-size: 18px 18px;
-  mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 100%);
-  opacity: 0.34;
 }
 
 .subnav-links--embedded {

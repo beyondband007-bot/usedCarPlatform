@@ -16,6 +16,7 @@ import type {
   WorkspaceImagePreview,
   WorkspaceRecentItem,
 } from '@/types/workspace'
+import { formatDate } from '@/utils/dayjs'
 import { buildImagePreviewFromDeliveryTask } from '@/utils/workspace-image-preview'
 import { useAppStore } from '@/stores/app'
 
@@ -158,11 +159,6 @@ function clearDeliveryImagePreview() {
   previewedDeliveryTaskId.value = null
 }
 
-function formatGenerateTime(date = new Date()) {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
@@ -192,7 +188,7 @@ function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResul
   const sceneTitle = option?.title ?? activeCapability.value.label
 
   return {
-    createdAt: task.updatedAt ?? task.createdAt ?? formatGenerateTime(),
+    createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
     statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel: `${task.outputRatio} · ${task.resolution}`,
     previewImage: image.url,
@@ -287,12 +283,12 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
   if (item.status !== 'success' || !item.previewImage) return null
 
   return {
-    createdAt: item.createdAt,
+    createdAt: formatDate(item.createdAt),
     statusText: `已完成 · ${item.sceneLabel ?? item.title} · 单图生成结果`,
     ratioLabel: item.ratioLabel ?? '主图',
     previewImage: item.previewImage,
     previewAlt: item.title,
-    downloadUrl: item.previewImage,
+    downloadUrl: item.downloadUrl ?? item.previewImage,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,
   }

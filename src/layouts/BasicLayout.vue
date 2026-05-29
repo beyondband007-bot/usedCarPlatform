@@ -244,7 +244,6 @@ const {
 
   --studio-chrome-subnav-bg: #040404;
   --studio-chrome-subnav-border: rgba(239, 194, 76, 0.08);
-  --studio-chrome-subnav-grid: rgba(220, 38, 38, 0.24);
 
 
 
@@ -306,7 +305,6 @@ const {
 
   --studio-chrome-subnav-bg: #f0e8dc;
   --studio-chrome-subnav-border: rgba(201, 134, 0, 0.12);
-  --studio-chrome-subnav-grid: rgba(201, 134, 0, 0.14);
 
 }
 
@@ -350,43 +348,11 @@ const {
 
 
 
-.home-chrome--with-subnav :deep(.site-header .logo) {
-
-  visibility: hidden;
-
-  pointer-events: none;
-
-}
-
-
-
 .home-chrome--with-subnav :deep(.subnav--embedded) {
 
   padding-top: 0;
 
   margin-top: 0;
-
-}
-
-
-
-.home-chrome--with-subnav :deep(.subnav-track-grid) {
-
-  background-image:
-
-    linear-gradient(var(--studio-chrome-subnav-grid) 1px, transparent 1px),
-
-    linear-gradient(90deg, var(--studio-chrome-subnav-grid) 1px, transparent 1px);
-
-  opacity: 0.42;
-
-}
-
-
-
-.home-chrome--light.home-chrome--with-subnav :deep(.subnav-track-grid) {
-
-  opacity: 0.55;
 
 }
 

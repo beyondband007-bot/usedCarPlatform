@@ -1,4 +1,5 @@
 import type { DeliveryResultItem } from '@/constants/delivery-results'
+import { formatDate } from '@/utils/dayjs'
 import type {
   WorkspaceDeliveryTaskPreview,
   WorkspaceGenerateResult,
@@ -31,11 +32,11 @@ export function buildImagePreviewFromGenerateResult(
 export function buildImagePreviewFromDeliveryTask(
   task: WorkspaceDeliveryTaskPreview,
 ): WorkspaceImagePreview {
-  const dateMatch = task.meta.match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/)
+  const dateMatch = task.meta.match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/)
   const imageUrl = toLargePreviewUrl(task.previewImage ?? task.image)
 
   return {
-    createdAt: dateMatch?.[0] ?? '2026-05-20 09:32',
+    createdAt: dateMatch?.[0] ?? formatDate(task.meta),
     statusText: `已完成 · ${task.title}`,
     ratioLabel: `${task.imageCount} 张成片`,
     imageUrl,
@@ -53,7 +54,7 @@ export function buildImagePreviewFromDeliveryResult(
   const imageUrl = toLargePreviewUrl(item.image)
 
   return {
-    createdAt: '2026-05-20 09:32',
+    createdAt: '2026-05-20 09:32:18',
     statusText: `已完成 · ${item.title} · 成片预览`,
     ratioLabel: formatRatio(item.ratio),
     imageUrl,

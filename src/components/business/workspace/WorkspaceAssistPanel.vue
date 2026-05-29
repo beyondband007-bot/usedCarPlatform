@@ -1,9 +1,10 @@
 ﻿<script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 import { useMessage } from "naive-ui";
 
+import { getRecentGenerationTasks, type RecentGenerationTask } from "@/api/visual-workbench";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
@@ -16,6 +17,7 @@ import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadAllDeliveryResults } from "@/utils/delivery-download";
 import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
+import { formatDate } from '@/utils/dayjs'
 import type {
   WorkspaceCapability,
   WorkspaceGenerateResult,
@@ -66,7 +68,11 @@ function handleTemplatePick(item: (typeof templateCards)[number]) {
 }
 
 const appStore = useAppStore();
-const activeTab = ref<"guide" | "recent">("guide");
+const activeTab = ref<"guide" | "generating" | "recent">("guide");
+const recentItems = ref<WorkspaceRecentItem[]>([]);
+const recentLoading = ref(false);
+const recentLoaded = ref(false);
+let recentRefreshTimer: number | null = null;
 
 const showTemplateRecommendations = computed(
   () =>
@@ -127,11 +133,141 @@ async function handleDownloadAllDelivery() {
 
 const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   waiting: "Waiting",
+  queued: "Queued",
   queue: "Queued",
   generating: "Generating",
   success: "Completed",
   fail: "Failed",
+  canceled: "Canceled",
 };
+
+function mapRecentStatus(item: RecentGenerationTask): WorkspaceRecentItem["status"] {
+  return item.uiStatus ?? item.status ?? "waiting";
+}
+
+function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
+  return {
+    id: item.id || item.taskId,
+    taskId: item.taskId,
+    moduleCode: item.moduleCode,
+    title: item.title,
+    status: mapRecentStatus(item),
+    createdAt: formatDate(item.createdAt),
+    updatedAt: item.updatedAt ? formatDate(item.updatedAt) : undefined,
+    thumbnail: item.thumbnail ?? undefined,
+    previewImage: item.previewImage ?? undefined,
+    downloadUrl: item.downloadUrl ?? undefined,
+    ratioLabel: item.ratioLabel ?? undefined,
+    sceneLabel: item.sceneLabel ?? undefined,
+    outputRatio: item.outputRatio ?? undefined,
+    inputAssetId: item.inputAssetId ?? undefined,
+    inputAssetUrl: item.inputAssetUrl ?? undefined,
+    progress: item.progress ?? undefined,
+    resultCount: item.resultCount ?? undefined,
+    error:
+      typeof item.error === "string"
+        ? item.error
+        : item.error?.message ?? undefined,
+  };
+}
+
+function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
+  return items.some((item) =>
+    ["waiting", "queued", "queue", "generating"].includes(item.status),
+  );
+}
+
+async function loadRecentItems() {
+  recentLoading.value = true;
+
+  try {
+    const result = await getRecentGenerationTasks({
+      moduleCode: props.capability.code,
+      page: 1,
+      pageSize: 8,
+    });
+    recentItems.value = result.items.map(mapRecentItem);
+    recentLoaded.value = true;
+  } catch {
+    if (!recentLoaded.value) {
+      recentItems.value = [];
+    }
+  } finally {
+    recentLoading.value = false;
+  }
+}
+
+function stopRecentAutoRefresh() {
+  if (recentRefreshTimer !== null) {
+    window.clearInterval(recentRefreshTimer);
+    recentRefreshTimer = null;
+  }
+}
+
+function startRecentAutoRefresh() {
+  stopRecentAutoRefresh();
+
+  if (activeTab.value !== "recent") return;
+
+  recentRefreshTimer = window.setInterval(() => {
+    if (activeTab.value !== "recent" || !canAutoRefreshRecent(recentItems.value)) {
+      stopRecentAutoRefresh();
+      return;
+    }
+
+    void loadRecentItems();
+  }, 4000);
+}
+
+watch(
+  () => props.isGenerating,
+  (generating) => {
+    if (generating) {
+      activeTab.value = "generating";
+      return;
+    }
+
+    if (activeTab.value === "generating") {
+      activeTab.value = "guide";
+    }
+  },
+);
+
+watch(
+  () => [activeTab.value, props.capability.code] as const,
+  ([tab]) => {
+    if (tab === "recent") {
+      if (!recentLoaded.value) {
+        void loadRecentItems();
+      }
+      startRecentAutoRefresh();
+    } else {
+      stopRecentAutoRefresh();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.capability.code,
+  () => {
+    recentLoaded.value = false;
+    recentItems.value = [];
+    if (activeTab.value === "recent") {
+      void loadRecentItems();
+    }
+  },
+);
+
+onMounted(() => {
+  if (activeTab.value === "recent") {
+    void loadRecentItems();
+  }
+});
+
+onUnmounted(() => {
+  stopRecentAutoRefresh();
+});
 
 
 </script>
@@ -158,34 +294,13 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
       :play-request="shortVideoPlayRequest"
     />
 
-    <section v-else-if="isGenerating" class="generation-waiting" aria-live="polite">
-      <div class="waiting-visual" aria-hidden="true">
-        <span class="waiting-scan"></span>
-        <span class="waiting-corner waiting-corner--tl"></span>
-        <span class="waiting-corner waiting-corner--tr"></span>
-        <span class="waiting-corner waiting-corner--bl"></span>
-        <span class="waiting-corner waiting-corner--br"></span>
-        <Icon icon="mdi:image-sync-outline" />
-      </div>
-      <div class="waiting-copy">
-        <p>图片待生成</p>
-        <h2>正在生成效果图</h2>
-        <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
-      </div>
-      <div class="waiting-progress" aria-hidden="true">
-        <span></span>
-      </div>
-    </section>
-
     <template v-else-if="capability.kind === 'delivery'">
       <div class="delivery-panel">
         <header class="delivery-result-head">
           <div>
             <p>成片结果</p>
             <h2>5月展厅批量上新</h2>
-            <span
-              >已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span
-            >
+            <span>已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span>
           </div>
           <button
             type="button"
@@ -232,29 +347,74 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
     <template v-else>
       <header class="assist-tabs">
         <div class="tab-group" role="tablist" aria-label="辅助面板">
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="activeTab === 'guide'"
-            :class="{ active: activeTab === 'guide' }"
-            @click="activeTab = 'guide'"
-          >
-            使用教程
-          </button>
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="activeTab === 'recent'"
-            :class="{ active: activeTab === 'recent' }"
-            @click="activeTab = 'recent'"
-          >
-            最近生成
-          </button>
+          <template v-if="isGenerating">
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'generating'"
+              :class="{ active: activeTab === 'generating' }"
+              @click="activeTab = 'generating'"
+            >
+              正在生成
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'recent'"
+              :class="{ active: activeTab === 'recent' }"
+              @click="activeTab = 'recent'"
+            >
+              最近生成
+            </button>
+          </template>
+          <template v-else>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'guide'"
+              :class="{ active: activeTab === 'guide' }"
+              @click="activeTab = 'guide'"
+            >
+              使用教程
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'recent'"
+              :class="{ active: activeTab === 'recent' }"
+              @click="activeTab = 'recent'"
+            >
+              最近生成
+            </button>
+          </template>
         </div>
       </header>
 
       <section
-        v-if="activeTab === 'guide'"
+        v-if="isGenerating && activeTab === 'generating'"
+        class="generation-waiting"
+        aria-live="polite"
+      >
+        <div class="waiting-visual" aria-hidden="true">
+          <span class="waiting-scan"></span>
+          <span class="waiting-corner waiting-corner--tl"></span>
+          <span class="waiting-corner waiting-corner--tr"></span>
+          <span class="waiting-corner waiting-corner--bl"></span>
+          <span class="waiting-corner waiting-corner--br"></span>
+          <Icon icon="mdi:image-sync-outline" />
+        </div>
+        <div class="waiting-copy">
+          <p>图片待生成</p>
+          <h2>正在生成效果图</h2>
+          <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
+        </div>
+        <div class="waiting-progress" aria-hidden="true">
+          <span></span>
+        </div>
+      </section>
+
+      <section
+        v-else-if="!isGenerating && activeTab === 'guide'"
         class="guide-layout"
         :class="{ 'is-compact-guide': !showTemplateRecommendations }"
       >
@@ -331,8 +491,16 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
       </section>
 
       <section v-else class="recent-layout" aria-label="最近生成">
+        <div v-if="recentLoading && !recentItems.length" class="recent-empty-state">
+          <Icon icon="mdi:loading" class="recent-loading-icon" />
+          <span>正在加载最近生成</span>
+        </div>
+        <div v-else-if="!recentItems.length" class="recent-empty-state">
+          <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
+          <span>暂无最近生成记录</span>
+        </div>
         <article
-          v-for="item in capability.recent"
+          v-for="item in recentItems"
           :key="item.id"
           class="recent-card"
           :class="{ 'is-clickable': canOpenRecent(item) }"
@@ -1108,6 +1276,35 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   padding: 2px 6px 28px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(96, 133, 178, 0.5) transparent;
+}
+
+.recent-empty-state {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px dashed var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  color: var(--assist-muted);
+  font-size: 13px;
+}
+
+.recent-loading-icon {
+  width: 26px;
+  height: 26px;
+  color: var(--assist-blue);
+}
+
+.recent-empty-state .recent-loading-icon {
+  animation: recent-loading-spin 1s linear infinite;
+}
+
+@keyframes recent-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .recent-card {

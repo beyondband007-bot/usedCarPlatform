@@ -20,6 +20,7 @@ import {
   getBatchSceneTitle,
 } from "@/constants/workspace";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
+import { formatDate } from "@/utils/dayjs";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
@@ -379,7 +380,7 @@ async function refreshDeliveryTasks() {
     deliveryTasks.value = result.items.map((item, index) => ({
       ...item,
       selected: deliveryTasks.value[index]?.selected ?? index === 0,
-      meta: `${item.completed} / ${item.total} 套 · ${item.updatedAt.slice(0, 16).replace('T', ' ')}`,
+      meta: `${item.completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
       image: deliveryTaskAssets.value[item.taskId]?.[0]?.thumbnailUrl ?? deliveryTaskAssets.value[item.taskId]?.[0]?.url ?? '',
       imageCount: item.assetCount,
     }));
@@ -607,7 +608,7 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
   emit("previewDeliveryTask", {
     id: task.taskId,
     title: task.title,
-    meta: task.updatedAt,
+    meta: formatDate(task.updatedAt),
     image: firstAsset.thumbnailUrl ?? firstAsset.url,
     previewImage: firstAsset.url,
     progress: task.progress,

@@ -5,6 +5,7 @@ import {
   uploadDefaultLogo,
   type UserLogoSetting,
 } from '@/api/visual-workbench'
+import { formatDate } from '@/utils/dayjs'
 
 const STORAGE_KEY = 'workspace-recent-logo'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024
@@ -58,11 +59,8 @@ function persistLogo(asset: WorkspaceLogoAsset | null) {
 }
 
 function formatUploadLabel(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} 上传`
+  const formatted = formatDate(iso)
+  return formatted === 'Invalid Date' ? '' : formatted
 }
 
 export function useWorkspaceLogo() {

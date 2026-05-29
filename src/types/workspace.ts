@@ -18,13 +18,23 @@ export interface WorkspaceTutorialStep {
 
 export interface WorkspaceRecentItem {
   id: string
+  taskId?: string
+  moduleCode?: string
   title: string
-  status: 'waiting' | 'queue' | 'generating' | 'success' | 'fail'
+  status: 'waiting' | 'queued' | 'queue' | 'generating' | 'success' | 'fail' | 'canceled'
   createdAt: string
+  updatedAt?: string
   thumbnail?: string
   previewImage?: string
+  downloadUrl?: string
   ratioLabel?: string
   sceneLabel?: string
+  outputRatio?: string
+  inputAssetId?: string
+  inputAssetUrl?: string
+  progress?: number
+  resultCount?: number
+  error?: string
   imageWidth?: number
   imageHeight?: number
 }

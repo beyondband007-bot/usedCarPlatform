@@ -31,7 +31,7 @@ const recent = [
     id: 'recent-1',
     title: '经典白棚生成任务',
     status: 'success',
-    createdAt: '2026-05-20 09:32',
+    createdAt: '2026-05-20 09:32:18',
     sceneLabel: '经典白棚',
     ratioLabel: '主图 16:9',
     thumbnail:
