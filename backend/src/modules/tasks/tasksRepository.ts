@@ -25,6 +25,11 @@ export interface GenerationTaskRecord {
   updatedAt: Date;
 }
 
+export interface RecentGenerationRecord extends GenerationTaskRecord {
+  inputAssetUrl?: string | null;
+  inputAssetFileName?: string | null;
+}
+
 interface GenerationTaskRow extends RowDataPacket {
   id: string;
   module_code: string;
@@ -43,6 +48,11 @@ interface GenerationTaskRow extends RowDataPacket {
   error_message: string | null;
   created_at: Date;
   updated_at: Date;
+}
+
+interface RecentGenerationRow extends GenerationTaskRow {
+  input_asset_url: string | null;
+  input_asset_file_name: string | null;
 }
 
 const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
@@ -65,6 +75,12 @@ const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   updatedAt: row.updated_at,
 });
 
+const mapRecentRow = (row: RecentGenerationRow): RecentGenerationRecord => ({
+  ...mapRow(row),
+  inputAssetUrl: row.input_asset_url,
+  inputAssetFileName: row.input_asset_file_name,
+});
+
 export class TasksRepository extends Repository {
   async findById(id: string) {
     const rows = await this.query<GenerationTaskRow[]>(
@@ -72,6 +88,52 @@ export class TasksRepository extends Repository {
       { id },
     );
     return rows[0] ? mapRow(rows[0]) : null;
+  }
+
+  async listRecent(input: {
+    moduleCode?: string;
+    status?: string;
+    page: number;
+    pageSize: number;
+  }) {
+    const clauses = [];
+    const params: Record<string, unknown> = {
+      limit: input.pageSize,
+      offset: (input.page - 1) * input.pageSize,
+    };
+
+    if (input.moduleCode) {
+      clauses.push("gt.module_code = :moduleCode");
+      params.moduleCode = input.moduleCode;
+    }
+
+    if (input.status) {
+      clauses.push("gt.status = :status");
+      params.status = input.status;
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+    const rows = await this.query<RecentGenerationRow[]>(
+      `SELECT
+          gt.*,
+          a.public_url AS input_asset_url,
+          a.file_name AS input_asset_file_name
+       FROM generation_tasks gt
+       LEFT JOIN assets a ON a.id = gt.input_asset_id
+       ${where}
+       ORDER BY gt.created_at DESC
+       LIMIT :limit OFFSET :offset`,
+      params,
+    );
+    const totalRows = await this.query<Array<RowDataPacket & { total: number }>>(
+      `SELECT COUNT(*) total FROM generation_tasks gt ${where}`,
+      params,
+    );
+
+    return {
+      items: rows.map(mapRecentRow),
+      total: Number(totalRows[0]?.total ?? 0),
+    };
   }
 
   async createWaitingTask(input: {
