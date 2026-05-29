@@ -1,9 +1,22 @@
+import caseUsedImage from '@/img/home/case-used.png'
+import featureBatchImage from '@/img/home/feature-batch.png'
+import featureOutdoorImage from '@/img/home/feature-outdoor.png'
+import featureRefineImage from '@/img/home/feature-refine.png'
+import featureRoadImage from '@/img/home/feature-road.png'
+import featureSceneImage from '@/img/home/feature-scene.png'
+import featureShowroomImage from '@/img/home/feature-showroom.png'
+import featureSkyImage from '@/img/home/feature-sky.png'
+import featureVideoImage from '@/img/home/feature-video.png'
+import homeHeroImage from '@/img/home/hero-car.png'
+import homeHeroVideo from '@/img/首页视频.mp4'
+import suiteEnterpriseImage from '@/img/home/suite-enterprise.png'
+import suiteWorkbenchImage from '@/img/home/suite-workbench.png'
+
 export interface HomeQuickEntry {
   title: string
   description: string
   action: string
   image: string
-  tag?: string
   to?: string
   workbenchEntry?: boolean
   disabled?: boolean
@@ -15,168 +28,125 @@ export interface HomeCapabilityCard {
   image: string
 }
 
-export interface HomeSceneChip {
-  title: string
-  image: string
-}
-
-export interface HomeTechItem {
-  icon: string
-  label: string
-}
-
 export interface HomeCaseTab {
   id: string
   label: string
   title: string
-  summary: string
-  painPoints: string[]
+  pain: string
+  service: string
+  image: string
   stats: Array<{ value: string; label: string }>
-  beforeImage: string
-  afterImage: string
 }
 
-export const homeHeroImage =
-  'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=2400&q=85'
+export const homeHeroImageSrc = homeHeroImage
+export const homeHeroVideoSrc = homeHeroVideo
+export const homeHeroPosterSrc = homeHeroImage
 
 export const homeQuickEntries: HomeQuickEntry[] = [
   {
     title: '视觉工作台',
-    description: '场景影棚、车辆美容、成片交付一站式生产',
-    action: '进入工作台',
+    description: '场景照、精修图、成片交付',
+    action: '开始设计',
     workbenchEntry: true,
-    image:
-      'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=80',
+    image: suiteWorkbenchImage,
   },
   {
-    title: '企业套餐',
-    description: '账号、积分、图组并发同步开通',
-    action: '查看企业套餐',
+    title: '企业套管',
+    description: '账号、积分、品牌外观同步开通',
+    action: '查看更多',
     to: '/pricing',
-    image:
-      'https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    title: '短视频生成',
-    description: '由车图一键生成营销短视频，多平台规格导出',
-    action: '即将开放',
-    tag: 'Beta',
-    disabled: true,
-    image:
-      'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=900&q=80',
+    image: suiteEnterpriseImage,
   },
 ]
 
 export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
-    title: '场景影像',
-    description: '一键生成专业级展厅与户外场景主图',
-    image:
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=800&q=80',
+    title: 'AI 智能场景影棚',
+    description: '一键生成汽车展厅、多场景素材核心切换',
+    image: featureSceneImage,
   },
   {
-    title: '外观修饰',
-    description: '轮毂、玻璃、漆面质感智能增强',
-    image:
-      'https://images.unsplash.com/photo-1503376780353-7e6692767f70?auto=format&fit=crop&w=800&q=80',
+    title: '汽车外观精修',
+    description: '车漆、轮毂、玻璃等细节一键焕新',
+    image: featureRefineImage,
   },
   {
-    title: '批量交付',
-    description: '多车源、多尺寸规格批量处理与导出',
-    image:
-      'https://images.unsplash.com/photo-1486262715619-67b85e44308f?auto=format&fit=crop&w=800&q=80',
+    title: '批量内容智能交付',
+    description: '多车型、多尺寸内容一键批量生成、打包交付',
+    image: featureBatchImage,
   },
   {
-    title: '短视频生成',
-    description: '由静态车图生成营销短视频素材',
-    image:
-      'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=800&q=80',
+    title: '一键生成营销短视频',
+    description: '自动生成动态镜头汽车营销短视频',
+    image: featureVideoImage,
+  },
+  {
+    title: '展厅灯光棚拍',
+    description: '还原专业展厅灯光，打造精细级质感',
+    image: featureShowroomImage,
+  },
+  {
+    title: '户外自然光场景',
+    description: '自然环境实景合成，还原真实光影效果',
+    image: featureOutdoorImage,
+  },
+  {
+    title: '道路动态特效',
+    description: '模拟车辆行驶动态，打造速度感视觉画面',
+    image: featureRoadImage,
+  },
+  {
+    title: '天空纯净影棚',
+    description: '用于净透天空背景，突出车辆主体视觉焦点',
+    image: featureSkyImage,
   },
 ]
 
-export const homeSceneChips: HomeSceneChip[] = [
-  {
-    title: '展厅灯光',
-    image:
-      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=520&q=80',
-  },
-  {
-    title: '户外场景',
-    image:
-      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=520&q=80',
-  },
-  {
-    title: '道路动态',
-    image:
-      'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=520&q=80',
-  },
-  {
-    title: '天空影棚',
-    image:
-      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=520&q=80',
-  },
-]
-
-export const homeTechItems: HomeTechItem[] = [
-  { icon: 'mdi:tune-variant', label: '后期校正' },
-  { icon: 'mdi:file-image-outline', label: '详情素材' },
-  { icon: 'mdi:vector-polygon', label: '智能抠图' },
-  { icon: 'mdi:resize', label: '高清尺寸' },
-  { icon: 'mdi:high-definition-box', label: 'HD AI 超分' },
-  { icon: 'mdi:lightbulb-on-outline', label: '智能补光' },
-]
+export const homeTechBadges = ['姿态矫正', '智能抠图', '高清改尺寸', 'HD AI 超清']
 
 export const homeCaseTabs: HomeCaseTab[] = [
   {
-    id: 'used-overseas',
+    id: 'used',
     label: '二手车出海',
-    title: '二手车出海效率提升',
-    summary: '将传统拍摄流程升级为 AI 影棚批量化生产，显著缩短上架周期。',
-    painPoints: ['拍摄成本高', '场景不统一', '多平台尺寸重复劳动'],
+    title: '手车出海提交',
+    pain: '出海 listing 需要多语言文案、统一场景图、人工修图周期长、成本高',
+    service: 'AI 场景影棚｜成片交付包｜外观图批量精修',
+    image: caseUsedImage,
     stats: [
       { value: '300%', label: '上架效率提升' },
-      { value: '75%', label: '单套成片耗时节省' },
+      { value: '75%', label: '成片周期缩短' },
     ],
-    beforeImage:
-      'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1200&q=80',
   },
   {
-    id: 'new-car',
-    label: '新车发售',
-    title: '新车发售视觉标准化',
-    summary: '统一品牌展厅风格，支撑多渠道同步投放。',
-    painPoints: ['风格不一致', '交付周期长', '人工修图成本高'],
+    id: 'showroom',
+    label: '展厅拍摄',
+    title: '展厅批量拍摄',
+    pain: '门店车辆周转快，传统拍摄排期慢，难以统一灯光、角度和画面质感',
+    service: '展厅棚拍｜姿态矫正｜统一背景与质感增强',
+    image: featureShowroomImage,
     stats: [
-      { value: '4x', label: '素材产出倍率' },
-      { value: '60%', label: '修图人力节省' },
+      { value: '300%', label: '上架效率提升' },
+      { value: '75%', label: '成片周期缩短' },
     ],
-    beforeImage:
-      'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=1200&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80',
   },
   {
-    id: 'cross-border',
-    label: '跨境电商',
-    title: '跨境电商多规格交付',
-    summary: '一次生成覆盖主图、详情、短视频封面等多规格素材。',
-    painPoints: ['规格繁多', '返工频繁', '协作链路长'],
+    id: 'new',
+    label: '新车套图',
+    title: '新车标准套图',
+    pain: '新车宣传需要覆盖官网、短视频封面、详情页和广告投放多种尺寸',
+    service: '高清改尺寸｜天空影棚｜营销短视频封面',
+    image: featureSkyImage,
     stats: [
-      { value: '12+', label: '平台规格覆盖' },
-      { value: '80%', label: '返工率下降' },
+      { value: '300%', label: '上架效率提升' },
+      { value: '75%', label: '成片周期缩短' },
     ],
-    beforeImage:
-      'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=1200&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1503376780353-7e6692767f70?auto=format&fit=crop&w=1200&q=80',
   },
 ]
 
-export const homeFooterLinks = [
-  { label: '产品', href: '#' },
-  { label: '定价', to: '/pricing' },
-  { label: '机构', href: '#' },
-  { label: '团队', href: '#' },
+export const homeFooterLinks: Array<{ label: string; to?: string; href?: string }> = [
+  { label: '产品介绍', href: '#suite' },
+  { label: '解决方案', href: '#engine' },
+  { label: '技术支持', href: '#cases' },
+  { label: '隐私政策', href: '#cases' },
+  { label: '服务条款', href: '#footer' },
 ]

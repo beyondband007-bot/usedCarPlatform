@@ -1,15 +1,16 @@
-<script setup lang="ts">
-import { computed, ref, watch } from "vue";
+﻿<script setup lang="ts">
+import { computed, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NButton, NInput, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
+import { NAutoComplete, NButton, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
 
-import { uploadCarExterior } from "@/api/visual-workbench";
+import { uploadCarExterior, type UploadedAsset } from "@/api/visual-workbench";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
+  WorkspaceDeliveryTaskPreview,
   WorkspaceGeneratePayload,
 } from "@/types/workspace";
 
@@ -17,26 +18,27 @@ import CapabilityOptionSelector from "@/components/business/workspace/Capability
 import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
-import { paintColorOptions } from "@/constants/paint-colors";
 import { downloadDeliveryTasks } from "@/utils/delivery-download";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
   isGenerating?: boolean;
+  previewedDeliveryTaskId?: string | null;
 }>();
 
 const emit = defineEmits<{
   selectOption: [id: string];
   generate: [payload: WorkspaceGeneratePayload];
+  previewDeliveryTask: [task: WorkspaceDeliveryTaskPreview];
 }>();
 
 const outputRatioLabelMap: Record<string, string> = {
-  "1:1": "主图 1:1",
-  "3:4": "主图 3:4",
-  "4:3": "主图 4:3",
-  "9:16": "主图 9:16",
-  "16:9": "主图 16:9",
+  "1:1": "涓诲浘 1:1",
+  "3:4": "涓诲浘 3:4",
+  "4:3": "涓诲浘 4:3",
+  "9:16": "涓诲浘 9:16",
+  "16:9": "涓诲浘 16:9",
 };
 
 const message = useMessage();
@@ -54,40 +56,72 @@ const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
 const batchSceneIndex = ref(0);
-const batchSceneCategory = ref("展厅灯光");
+const batchSceneCategory = ref("灞曞巺鐏厜");
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
 const interiorEnhance = ref(false);
-const newPresetName = ref("");
 const projectName = ref("5月展厅批量上新");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
+const presetInput = ref(visualTemplates.value[0]?.name ?? "");
 const isApplyingTemplate = ref(false);
-const selectedPaintColorId = ref(paintColorOptions[0]?.id ?? "");
-const uploadedAsset = ref<{ assetId: string; fileName: string } | null>(null);
-const uploadedFileName = ref("");
+const selectedPaintColorId = ref("");
+const uploadedAsset = ref<UploadedAsset | null>(null);
+const uploadedPreviewUrl = ref<string | null>(null);
 const isUploadingVehicle = ref(false);
+
+let previewObjectUrl: string | null = null;
+
+function revokePreviewObjectUrl() {
+  if (!previewObjectUrl) return;
+
+  URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = null;
+}
+
+function resetUploadedVehicle() {
+  revokePreviewObjectUrl();
+  uploadedAsset.value = null;
+  uploadedPreviewUrl.value = null;
+}
 
 const showPaintColorPicker = computed(
   () => props.capability.code === "paint-refresh",
 );
 
 const outputRatioOptions = [
-  { label: "1:1 主图", value: "1:1" },
-  { label: "3:4 竖屏", value: "3:4" },
-  { label: "4:3 横版", value: "4:3" },
-  { label: "9:16 竖屏", value: "9:16" },
-  { label: "16:9 横版", value: "16:9" },
+  { label: "1:1 涓诲浘", value: "1:1" },
+  { label: "3:4 绔栧睆", value: "3:4" },
+  { label: "4:3 妯増", value: "4:3" },
+  { label: "9:16 绔栧睆", value: "9:16" },
+  { label: "16:9 妯増", value: "16:9" },
 ];
 
-const visualPresetOptions = computed(() => [
-  { label: "输入名称", value: NEW_PRESET_VALUE },
-  ...visualTemplates.value.map((item) => ({
-    label: item.name,
-    value: item.id,
-  })),
-]);
+const presetAutocompleteOptions = computed(() => {
+  const query = presetInput.value.trim();
+  const normalizedQuery = query.toLowerCase();
+
+  const matches = visualTemplates.value
+    .filter(
+      (item) =>
+        !query || item.name.toLowerCase().includes(normalizedQuery),
+    )
+    .map((item) => ({
+      label: item.name,
+      value: item.name,
+    }));
+
+  if (!query) {
+    return matches;
+  }
+
+  if (matches.length === 0) {
+    return [{ label: query, value: query }];
+  }
+
+  return matches;
+});
 
 const createPresetOptions = computed(() =>
   visualTemplates.value.map((item) => ({
@@ -98,10 +132,7 @@ const createPresetOptions = computed(() =>
 
 function buildTemplateInput(): BatchVisualTemplateInput {
   return {
-    name:
-      visualPreset.value === NEW_PRESET_VALUE
-        ? newPresetName.value.trim()
-        : getTemplateById(visualPreset.value)?.name ?? newPresetName.value.trim(),
+    name: presetInput.value.trim(),
     enableSceneChange: enableSceneChange.value,
     sceneIndex: batchSceneIndex.value,
     sceneCategory: batchSceneCategory.value,
@@ -126,31 +157,50 @@ function applyTemplate(template: BatchVisualTemplate) {
   isApplyingTemplate.value = false;
 }
 
+function syncPresetSelectionFromInput(value: string) {
+  const trimmed = value.trim();
+  const matchedTemplate = visualTemplates.value.find(
+    (item) => item.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+
+  visualPreset.value = matchedTemplate?.id ?? NEW_PRESET_VALUE;
+}
+
+watch(presetInput, (value) => {
+  syncPresetSelectionFromInput(value);
+});
+
+function handlePresetSelect(value: string) {
+  presetInput.value = value;
+  syncPresetSelectionFromInput(value);
+}
+
 function handleSaveVisualPreset() {
   const input = buildTemplateInput();
 
   if (!input.name) {
-    message.warning("请输入预设名称");
+    message.warning("Please select completed tasks first");
     return;
   }
 
   if (visualPreset.value === NEW_PRESET_VALUE) {
     const created = saveTemplate(input);
     visualPreset.value = created.id;
-    newPresetName.value = "";
+    presetInput.value = created.name;
     createTaskPresetId.value = created.id;
-    message.success(`预设「${created.name}」已保存`);
+    message.success("Preset saved");
     return;
   }
 
   const updated = updateTemplate(visualPreset.value, input);
   if (!updated) {
-    message.error("预设保存失败，请重试");
+    message.error("棰勮淇濆瓨澶辫触锛岃閲嶈瘯");
     return;
   }
 
+  presetInput.value = updated.name;
   createTaskPresetId.value = updated.id;
-  message.success(`预设「${updated.name}」已更新`);
+  message.success("Preset updated");
 }
 
 function handleSaveVisualConfig() {
@@ -164,40 +214,46 @@ function handleStickyAction() {
 }
 
 async function handleVehicleFileSelected(file: File) {
+  revokePreviewObjectUrl();
+  previewObjectUrl = URL.createObjectURL(file);
+  uploadedPreviewUrl.value = previewObjectUrl;
   isUploadingVehicle.value = true;
-  uploadedFileName.value = file.name;
 
   try {
     const asset = await uploadCarExterior(file);
-    uploadedAsset.value = {
-      assetId: asset.assetId,
-      fileName: asset.fileName,
-    };
-    uploadedFileName.value = asset.fileName;
-    message.success("车辆图片上传成功");
+    uploadedAsset.value = asset;
+    revokePreviewObjectUrl();
+    uploadedPreviewUrl.value = asset.url;
+    message.success("杞﹁締鍥剧墖涓婁紶鎴愬姛");
   } catch (error) {
-    uploadedAsset.value = null;
-    uploadedFileName.value = "";
-    const text = error instanceof Error ? error.message : "车辆图片上传失败";
+    resetUploadedVehicle();
+    const text = error instanceof Error ? error.message : "杞﹁締鍥剧墖涓婁紶澶辫触";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
   }
 }
 
+function handleVehicleImageRemove() {
+  resetUploadedVehicle();
+  message.info("已删除车辆图片");
+}
+
 function handleGenerate() {
   if (!uploadedAsset.value) {
-    message.warning("请先上传车辆外观图");
+    message.warning("Please select completed tasks first");
     return;
   }
 
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
-    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `涓诲浘 ${outputRatio.value}`,
     optionId: props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
     colorCode:
-      props.capability.code === "paint-refresh" ? selectedPaintColorId.value : undefined,
+      props.capability.code === "paint-refresh" && selectedPaintColorId.value
+        ? selectedPaintColorId.value
+        : undefined,
   });
 }
 
@@ -207,7 +263,10 @@ watch(
     if (isApplyingTemplate.value || presetId === NEW_PRESET_VALUE) return;
 
     const template = getTemplateById(presetId);
-    if (template) applyTemplate(template);
+    if (!template) return;
+
+    presetInput.value = template.name;
+    applyTemplate(template);
   },
   { immediate: true },
 );
@@ -217,6 +276,17 @@ watch(createTaskPresetId, (presetId) => {
   if (!template) return;
 
   projectName.value = template.name;
+});
+
+watch(
+  () => props.capability.code,
+  () => {
+    resetUploadedVehicle();
+  },
+);
+
+onUnmounted(() => {
+  revokePreviewObjectUrl();
 });
 
 watch(
@@ -236,6 +306,7 @@ watch(
       !list.some((item) => item.id === visualPreset.value)
     ) {
       visualPreset.value = list[0].id;
+      presetInput.value = list[0].name;
     }
   },
   { deep: true },
@@ -243,67 +314,66 @@ watch(
 
 const batchScenes = [
   {
-    title: "经典白棚",
+    title: "缁忓吀鐧芥",
     image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=520&q=80",
   },
   {
-    title: "玻璃展厅",
+    title: "鐜荤拑灞曞巺",
     image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=520&q=80",
   },
   {
-    title: "暗调豪华",
+    title: "鏆楄皟璞崕",
     image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=520&q=80",
   },
   {
-    title: "柔光顶灯",
+    title: "鏌斿厜椤剁伅",
     image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=520&q=80",
   },
   {
-    title: "城市夜景",
+    title: "鍩庡競澶滄櫙",
     image: "https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=520&q=80",
   },
   {
-    title: "林荫户外",
+    title: "鏋楄崼鎴峰",
     image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=520&q=80",
   },
 ];
 
-type DeliveryTask = {
-  title: string;
-  meta: string;
-  image: string;
+type DeliveryTask = WorkspaceDeliveryTaskPreview & {
   selected: boolean;
-  progress: number;
-  imageCount: number;
 };
 
 const deliveryTasks = ref<DeliveryTask[]>([
   {
-    title: "5月展厅批量上新 · 成片交付",
-    meta: "12 张成片 · 2026-05-20 09:32",
+    id: "delivery-task-may-showroom",
+    title: "5鏈堝睍鍘呮壒閲忎笂鏂?路 鎴愮墖浜や粯",
+    meta: "12 寮犳垚鐗?路 2026-05-20 09:32",
     image: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=180&q=80",
     selected: true,
     progress: 100,
     imageCount: 12,
   },
   {
-    title: "宝马 5系 · 暗调展厅",
-    meta: "10 张成片 · 2026-05-20 09:18",
+    id: "delivery-task-bmw-5",
+    title: "瀹濋┈ 5绯?路 鏆楄皟灞曞巺",
+    meta: "10 寮犳垚鐗?路 2026-05-20 09:18",
     image: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
     imageCount: 10,
   },
   {
-    title: "丰田 凯美瑞 · 玻璃展厅",
-    meta: "8 张成片 · 2026-05-19 18:44",
+    id: "delivery-task-camry",
+    title: "涓扮敯 鍑編鐟?路 鐜荤拑灞曞巺",
+    meta: "8 寮犳垚鐗?路 2026-05-19 18:44",
     image: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
     imageCount: 8,
   },
   {
-    title: "理想 L8 · 柔光顶灯",
+    id: "delivery-task-l8",
+    title: "鐞嗘兂 L8 路 鏌斿厜椤剁伅",
     meta: "预计 6 分钟 · 暂不可下载",
     image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=180&q=80",
     selected: false,
@@ -311,24 +381,27 @@ const deliveryTasks = ref<DeliveryTask[]>([
     imageCount: 0,
   },
   {
-    title: "奔驰 E级 · 夜景街道",
-    meta: "14 张成片 · 2026-05-18 16:02",
+    id: "delivery-task-e-class",
+    title: "濂旈┌ E绾?路 澶滄櫙琛楅亾",
+    meta: "14 寮犳垚鐗?路 2026-05-18 16:02",
     image: "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
     imageCount: 14,
   },
   {
-    title: "奥迪 A6 · 纯白影棚",
-    meta: "9 张成片 · 2026-05-17 11:26",
+    id: "delivery-task-a6",
+    title: "濂ヨ开 A6 路 绾櫧褰辨",
+    meta: "9 寮犳垚鐗?路 2026-05-17 11:26",
     image: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
     imageCount: 9,
   },
   {
-    title: "蔚来 ET5 · 户外林荫",
-    meta: "11 张成片 · 2026-05-16 20:41",
+    id: "delivery-task-et5",
+    title: "钄氭潵 ET5 路 鎴峰鏋楄崼",
+    meta: "11 寮犳垚鐗?路 2026-05-16 20:41",
     image: "https://images.unsplash.com/photo-1617814076665-65e6f9995f35?auto=format&fit=crop&w=180&q=80",
     selected: false,
     progress: 100,
@@ -366,6 +439,22 @@ function toggleDeliveryTask(index: number) {
   task.selected = !task.selected;
 }
 
+function handlePreviewDeliveryTask(task: DeliveryTask) {
+  if (task.progress < 100) {
+    message.info("任务未完成，暂不可预览");
+    return;
+  }
+
+  emit("previewDeliveryTask", {
+    id: task.id,
+    title: task.title,
+    meta: task.meta,
+    image: task.image,
+    progress: task.progress,
+    imageCount: task.imageCount,
+  });
+}
+
 function toggleSelectAllDelivery() {
   const nextValue = !isAllDeliverySelected.value;
   deliveryTasks.value.forEach((task) => {
@@ -379,7 +468,7 @@ async function handleDeliveryBatchDownload() {
   );
 
   if (!selectedTasks.length) {
-    message.warning("请先勾选已完成的任务");
+    message.warning("Please select completed tasks first");
     return;
   }
 
@@ -387,7 +476,7 @@ async function handleDeliveryBatchDownload() {
 
   try {
     const count = await downloadDeliveryTasks(selectedTasks);
-    message.success(`已开始下载 ${count} 张成片`);
+    message.success(`Batch download started for ${count} images`);
   } finally {
     isDeliveryBatchDownloading.value = false;
   }
@@ -422,7 +511,7 @@ const activeCreateRatioLabel = computed(() => {
             :class="{ active: batchTab === 'create' }"
             @click="batchTab = 'create'"
           >
-            新建任务
+            鏂板缓浠诲姟
           </button>
           <button
             type="button"
@@ -434,7 +523,7 @@ const activeCreateRatioLabel = computed(() => {
         </div>
 
         <section class="batch-card batch-notice">
-          当前套餐：企业团队档 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传 3 套。单张生成仍可正常使用。
+          当前套餐：企业团队版 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传 3 套。单张生成仍可正常使用。
         </section>
 
         <div class="batch-panel-scroll">
@@ -466,7 +555,7 @@ const activeCreateRatioLabel = computed(() => {
               class="preset-tag is-scene"
             >
               <Icon icon="mdi:image-filter-hdr" />
-              {{ activeCreateTemplate.sceneCategory }} ·
+              {{ activeCreateTemplate.sceneCategory }} 路
               {{ batchScenes[activeCreateTemplate.sceneIndex]?.title }}
             </span>
             <span class="preset-tag is-ratio">
@@ -483,11 +572,11 @@ const activeCreateRatioLabel = computed(() => {
             </span>
             <span v-if="activeCreateTemplate.paintRefresh" class="preset-tag is-on">
               <Icon icon="mdi:spray" />
-              烤漆翻新
+              鐑ゆ紗缈绘柊
             </span>
             <span v-if="activeCreateTemplate.interiorEnhance" class="preset-tag is-on">
               <Icon icon="mdi:seat-passenger" />
-              内饰清洁
+              鍐呴グ娓呮磥
             </span>
           </div>
         </section>
@@ -501,7 +590,7 @@ const activeCreateRatioLabel = computed(() => {
           <Icon icon="mdi:camera" />
           <strong>上传外观图组</strong>
           <span>支持多角度外观图 · 每套车图作为 1 个图组</span>
-          <b>必选</b>
+          <b>必填</b>
         </button>
 
         <section class="batch-card switch-card">
@@ -524,22 +613,19 @@ const activeCreateRatioLabel = computed(() => {
         <section class="batch-card preset-save-card">
           <div class="preset-save-row">
             <span>预设</span>
-            <NSelect
-              v-model:value="visualPreset"
-              :options="visualPresetOptions"
+            <NAutoComplete
+              v-model:value="presetInput"
+              class="preset-combobox"
+              :options="presetAutocompleteOptions"
               size="large"
+              placeholder="输入或选择预设名称"
+              clearable
+              @select="handlePresetSelect"
             />
             <NButton type="primary" size="large" @click="handleSaveVisualPreset">
               保存
             </NButton>
           </div>
-          <NInput
-            v-if="visualPreset === NEW_PRESET_VALUE"
-            v-model:value="newPresetName"
-            class="preset-name-input"
-            size="large"
-            placeholder="输入预设名称，例如 5月展厅批量上新"
-          />
         </section>
 
         <section class="batch-card switch-card">
@@ -591,7 +677,7 @@ const activeCreateRatioLabel = computed(() => {
 
         <section class="batch-card switch-card">
           <div>
-            <h3>烤漆翻新预览</h3>
+            <h3>漆面翻新预览</h3>
             <p>增强漆面亮度和轮毂金属质感，作为演示型美容开关。</p>
           </div>
           <NSwitch v-model:value="paintRefresh" size="large" />
@@ -616,7 +702,7 @@ const activeCreateRatioLabel = computed(() => {
             @click="handleStickyAction"
           >
             {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
-            <span class="ml-2">💎 预计 120</span>
+            <span class="ml-2">预计 120</span>
           </NButton>
         </footer>
       </div>
@@ -624,14 +710,15 @@ const activeCreateRatioLabel = computed(() => {
 
     <template v-else-if="props.capability.code === 'future-short-video'">
       <section class="batch-card batch-notice short-video-notice">
-        短视频生成为 Beta 能力：可上传车图预览流程，点击「生成演示」不会创建真实任务，右侧可查看演示视频。
+        短视频生成为 Beta 能力：可上传车图预览流程，点击生成演示不会创建真实任务，右侧可查看演示视频。
       </section>
 
       <UploadTaskCard
         :capability="props.capability"
-        :uploaded-file-name="uploadedFileName"
+        :upload-preview-url="uploadedPreviewUrl"
         :is-uploading="isUploadingVehicle"
         @select-file="handleVehicleFileSelected"
+        @remove="handleVehicleImageRemove"
       />
 
       <CapabilityOptionSelector
@@ -659,7 +746,7 @@ const activeCreateRatioLabel = computed(() => {
           :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
           @click="handleGenerate"
         >
-          {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}
+          {{ props.capability.actionLabel }} {{ props.capability.cost }}
         </NButton>
       </div>
     </template>
@@ -670,22 +757,21 @@ const activeCreateRatioLabel = computed(() => {
           <button type="button" class="active">成片交付</button>
         </div>
 
-        <section class="batch-card batch-notice delivery-notice">
-          这里展示批量上新里已完成的任务。点击任务后，右侧结果框查看该任务出图；勾选多个任务后可批量下载。
+        <section class="batch-notice delivery-notice">
+          这里展示批量上新里已完成的任务。点击任务卡片可在右侧查看大图；仅勾选复选框用于批量下载。
         </section>
 
         <section class="delivery-board" aria-label="成片交付任务列表">
           <div class="delivery-list">
             <article
               v-for="(task, index) in deliveryTasks"
-              :key="task.title"
+              :key="task.id"
               class="delivery-item"
-              :class="{ 'is-selected': task.selected, 'is-loading': task.progress < 100 }"
-              role="button"
-              tabindex="0"
-              @click="toggleDeliveryTask(index)"
-              @keydown.enter.prevent="toggleDeliveryTask(index)"
-              @keydown.space.prevent="toggleDeliveryTask(index)"
+              :class="{
+                'is-checked': task.selected,
+                'is-previewing': props.previewedDeliveryTaskId === task.id,
+                'is-loading': task.progress < 100,
+              }"
             >
               <label class="delivery-check" @click.stop>
                 <input
@@ -696,35 +782,43 @@ const activeCreateRatioLabel = computed(() => {
                 />
               </label>
 
-              <img
-                class="delivery-thumb"
-                :src="task.image"
-                :alt="task.title"
-                loading="lazy"
-                draggable="false"
-              />
+              <button
+                type="button"
+                class="delivery-item-body"
+                :disabled="task.progress < 100"
+                :aria-label="`查看${task.title}大图`"
+                @click="handlePreviewDeliveryTask(task)"
+              >
+                <img
+                  class="delivery-thumb"
+                  :src="task.image"
+                  :alt="task.title"
+                  loading="lazy"
+                  draggable="false"
+                />
 
-              <div class="delivery-copy">
-                <h3>{{ task.title }}</h3>
-                <p>{{ task.meta }}</p>
-              </div>
+                <div class="delivery-copy">
+                  <h3>{{ task.title }}</h3>
+                  <p>{{ task.meta }}</p>
+                </div>
 
-              <div class="delivery-status">
-                <template v-if="task.progress >= 100">
-                  <span class="delivery-status-ring" aria-hidden="true"></span>
-                  <strong>已完成</strong>
-                </template>
-                <template v-else>
-                  <span
-                    class="delivery-status-progress"
-                    :style="{ '--progress': `${task.progress}%` }"
-                    aria-hidden="true"
-                  >
-                    <b>{{ task.progress }}%</b>
-                  </span>
-                  <strong class="delivery-status-meta">{{ task.progress }}%</strong>
-                </template>
-              </div>
+                <div class="delivery-status">
+                  <template v-if="task.progress >= 100">
+                    <span class="delivery-status-ring" aria-hidden="true"></span>
+                    <strong>已完成</strong>
+                  </template>
+                  <template v-else>
+                    <span
+                      class="delivery-status-progress"
+                      :style="{ '--progress': `${task.progress}%` }"
+                      aria-hidden="true"
+                    >
+                      <b>{{ task.progress }}%</b>
+                    </span>
+                    <strong class="delivery-status-meta">{{ task.progress }}%</strong>
+                  </template>
+                </div>
+              </button>
             </article>
           </div>
 
@@ -764,9 +858,10 @@ const activeCreateRatioLabel = computed(() => {
     <template v-else>
       <UploadTaskCard
         :capability="props.capability"
-        :uploaded-file-name="uploadedFileName"
+        :upload-preview-url="uploadedPreviewUrl"
         :is-uploading="isUploadingVehicle"
         @select-file="handleVehicleFileSelected"
+        @remove="handleVehicleImageRemove"
       />
 
       <PaintColorPicker
@@ -823,7 +918,7 @@ const activeCreateRatioLabel = computed(() => {
           :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
           @click="handleGenerate"
         >
-          {{ props.capability.actionLabel }} 💎 {{ props.capability.cost }}
+          {{ props.capability.actionLabel }} {{ props.capability.cost }}
         </NButton>
       </div>
     </template>
@@ -882,6 +977,10 @@ const activeCreateRatioLabel = computed(() => {
   padding-bottom: 4px;
   scrollbar-width: thin;
   scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
+}
+
+.batch-panel-scroll > * {
+  flex-shrink: 0;
 }
 
 .batch-panel-scroll::-webkit-scrollbar {
@@ -956,7 +1055,6 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .batch-card,
-.batch-scene-card,
 .batch-notice {
   padding: 16px 18px;
   border-color: rgba(74, 144, 255, 0.38);
@@ -992,8 +1090,9 @@ const activeCreateRatioLabel = computed(() => {
   gap: 12px;
 }
 
-.preset-name-input {
+.preset-combobox {
   width: 100%;
+  min-width: 0;
 }
 
 .preset-summary {
@@ -1233,7 +1332,11 @@ const activeCreateRatioLabel = computed(() => {
   container-type: inline-size;
   min-width: 0;
   padding: 16px;
-  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #2f7cff 24%, var(--app-border));
+  border-radius: 12px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  overflow: visible;
 }
 
 .scene-head {
@@ -1242,17 +1345,21 @@ const activeCreateRatioLabel = computed(() => {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 14px;
+  min-height: 38px;
 }
 
 .scene-head h3 {
   margin: 0;
+  min-width: 0;
   color: var(--app-text);
   font-size: 18px;
   font-weight: 900;
+  line-height: 1.35;
 }
 
 .scene-head button {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
   height: 38px;
@@ -1263,6 +1370,7 @@ const activeCreateRatioLabel = computed(() => {
   padding: 0 14px;
   font-family: inherit;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .scene-grid {
@@ -1423,40 +1531,61 @@ const activeCreateRatioLabel = computed(() => {
   box-sizing: border-box;
   height: var(--delivery-row-height, 88px);
   min-height: var(--delivery-row-height, 88px);
-  grid-template-columns: 32px 72px minmax(0, 1fr) 72px;
-  align-items: center;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: stretch;
   gap: 14px;
   padding: 14px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--app-border) 88%, transparent);
   background: var(--app-surface);
-  cursor: pointer;
-  outline: none;
   transition:
     background 0.2s ease,
     box-shadow 0.2s ease;
 }
 
-.delivery-item:last-child {
-  border-bottom: 0;
+.delivery-item-body {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.delivery-item-body:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.delivery-item:hover .delivery-item-body:not(:disabled) {
+  background: transparent;
 }
 
 .delivery-item:hover {
   background: color-mix(in srgb, #2f7cff 4%, var(--app-surface));
 }
 
-.delivery-item.is-selected {
+.delivery-item.is-checked {
+  background: color-mix(in srgb, #2f7cff 6%, var(--app-surface-soft));
+}
+
+.delivery-item.is-previewing {
   background: color-mix(in srgb, #2f7cff 9%, var(--app-surface-soft));
   box-shadow: inset 3px 0 0 #2f7cff;
 }
 
-.delivery-item:focus-visible {
-  background: color-mix(in srgb, #2f7cff 8%, var(--app-surface-soft));
-  box-shadow: inset 0 0 0 2px rgba(47, 124, 255, 0.22);
+.delivery-item.is-previewing .delivery-item-body:focus-visible {
+  outline: none;
 }
 
 .delivery-check {
   display: grid;
   place-items: center;
+  align-self: center;
 }
 
 .delivery-check input {
@@ -1465,6 +1594,16 @@ const activeCreateRatioLabel = computed(() => {
   margin: 0;
   accent-color: #2f7cff;
   cursor: pointer;
+}
+
+.delivery-item-body:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px rgba(47, 124, 255, 0.22);
+}
+
+.delivery-item:last-child {
+  border-bottom: 0;
 }
 
 .delivery-thumb {

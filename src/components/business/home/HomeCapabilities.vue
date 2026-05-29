@@ -1,202 +1,212 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { motion } from 'motion-v'
+import { onMounted, ref } from 'vue'
 
-import {
-  homeMainCapabilities,
-  homeSceneChips,
-  homeTechItems,
-} from '@/constants/home-page'
+import { homeMainCapabilities, homeTechBadges } from '@/constants/home-page'
+
+const gridRef = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  const root = gridRef.value
+  if (!root) {
+    return
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.animate(
+            [
+              { opacity: 0, transform: 'translateY(22px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            {
+              duration: 620,
+              easing: 'cubic-bezier(.16,1,.3,1)',
+              fill: 'both',
+            },
+          )
+          observer.unobserve(entry.target)
+        }
+      })
+    },
+    { threshold: 0.12 },
+  )
+
+  root.querySelectorAll('.feature-card').forEach((item) => observer.observe(item))
+})
 </script>
 
 <template>
-  <section class="home-capabilities" aria-label="全链路能力">
-    <div class="home-capabilities-inner">
-      <header class="home-capabilities-header">
-        <h2>全链路 AI 汽车电商内容生成</h2>
-        <p>从单图上传到企业级并发交付，围绕汽车电商素材生产建立稳定工作流</p>
-      </header>
+  <section id="engine" class="section-block" aria-label="全链路能力">
+    <div class="section-title">
+      <h2>链路 AI 汽车电商内容生成引擎</h2>
+      <p>聚焦汽车视觉内容全流程，打造从单张精修到批量交付的一站式生成能力</p>
+    </div>
 
-      <div class="home-capabilities-main">
-        <motion.article
-          v-for="(item, index) in homeMainCapabilities"
-          :key="item.title"
-          :initial="{ opacity: 0, y: 18 }"
-          :animate="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.42, delay: index * 0.06 }"
-          class="home-capability-card"
-        >
-          <img :src="item.image" :alt="item.title" loading="lazy" />
-          <div class="home-capability-card-mask">
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.description }}</p>
-          </div>
-        </motion.article>
-      </div>
+    <div ref="gridRef" class="feature-grid">
+      <article
+        v-for="item in homeMainCapabilities"
+        :key="item.title"
+        class="feature-card"
+      >
+        <img :src="item.image" :alt="item.title" loading="lazy" />
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.description }}</p>
+      </article>
+    </div>
 
-      <div class="home-scene-chips">
-        <article v-for="chip in homeSceneChips" :key="chip.title" class="home-scene-chip">
-          <img :src="chip.image" :alt="chip.title" loading="lazy" />
-          <span>{{ chip.title }}</span>
-        </article>
-      </div>
-
-      <div class="home-tech-bar" aria-label="技术能力">
-        <div v-for="item in homeTechItems" :key="item.label" class="home-tech-item">
-          <Icon :icon="item.icon" />
-          <span>{{ item.label }}</span>
-        </div>
-      </div>
+    <div class="badge-row" aria-label="能力标签">
+      <span v-for="badge in homeTechBadges" :key="badge">{{ badge }}</span>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.home-capabilities {
-  padding: clamp(48px, 6vw, 80px) clamp(20px, 4vw, 48px);
-  background: var(--home-section-bg);
-}
-
-.home-capabilities-inner {
-  max-width: 1280px;
+.section-block {
+  width: min(1520px, calc(100% - 40px));
   margin: 0 auto;
+  padding-bottom: 130px;
 }
 
-.home-capabilities-header {
+.section-title {
+  width: min(760px, 100%);
+  margin: 0 auto 64px;
   text-align: center;
 }
 
-.home-capabilities-header h2 {
-  margin: 0;
-  color: var(--home-text);
-  font-size: clamp(28px, 3.2vw, 40px);
-  font-weight: 950;
+.section-title h2 {
+  margin: 0 0 18px;
+  font-size: clamp(28px, 3.2vw, 42px);
+  line-height: 1.12;
 }
 
-.home-capabilities-header p {
-  max-width: 720px;
-  margin: 12px auto 0;
+.section-title p {
+  margin: 0;
   color: var(--home-muted);
-  font-size: 16px;
-  line-height: 1.65;
-  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.8;
 }
 
-.home-capabilities-main {
+.feature-grid {
   display: grid;
-  gap: 16px;
-  margin-top: 36px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, 1fr);
+  gap: 36px;
+  width: min(1575px, 100%);
+  margin: 0 auto;
 }
 
-.home-capability-card {
+.feature-card {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
-  aspect-ratio: 4 / 5;
-  background: var(--home-soft);
+  padding: 10px 10px 24px;
+  background: linear-gradient(180deg, #151515, #0b0b0b);
+  border: 1px solid var(--home-line);
+  border-radius: 35px;
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease;
 }
 
-.home-capability-card img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: var(--home-card-image-filter);
-}
-
-.home-capability-card-mask {
+.feature-card::after {
   position: absolute;
-  inset: auto 0 0;
-  padding: 16px;
-  background: linear-gradient(180deg, transparent, rgba(8, 12, 22, 0.88));
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
-.home-capability-card-mask h3 {
-  margin: 0;
-  color: #fff;
-  font-size: 17px;
-  font-weight: 900;
+.feature-card:hover {
+  border-color: rgba(244, 200, 64, 0.38);
+  transform: translateY(-6px);
 }
 
-.home-capability-card-mask p {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 12px;
-  line-height: 1.5;
-  font-weight: 600;
+.feature-card:hover::after {
+  opacity: 1;
 }
 
-.home-scene-chips {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.feature-card img {
+  width: 100%;
+  aspect-ratio: 341 / 183;
+  object-fit: cover;
+  border-radius: 30px;
 }
 
-.home-scene-chip {
+.feature-card h3 {
+  margin: 24px 18px 6px;
+  font-size: 22px;
+}
+
+.feature-card p {
+  margin: 0 18px;
+  color: var(--home-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.badge-row {
+  display: flex;
+  justify-content: center;
+  gap: 80px;
+  flex-wrap: wrap;
+  width: min(808px, 100%);
+  margin: 38px auto 0;
+}
+
+.badge-row span {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--home-border);
-  border-radius: 12px;
-  aspect-ratio: 16 / 10;
-  background: var(--home-surface);
-}
-
-.home-scene-chip img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.home-scene-chip span {
-  position: absolute;
-  inset: auto 0 0;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, transparent, rgba(8, 12, 22, 0.82));
-  color: #fff;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+  padding: 0 15px;
+  color: #d7d7d7;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  font-size: 18px;
   font-weight: 800;
 }
 
-.home-tech-bar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 24px;
-  margin-top: 28px;
-  padding: 18px 20px;
-  border: 1px solid var(--home-border);
-  border-radius: 12px;
-  background: var(--home-surface);
+.badge-row span::before {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 9px;
+  content: '';
+  background: linear-gradient(180deg, var(--home-gold-strong), #d6a617);
+  border-radius: 5px;
 }
 
-.home-tech-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--home-muted);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.home-tech-item :deep(svg) {
-  font-size: 20px;
-  color: var(--home-blue);
-}
-
-@media (max-width: 1024px) {
-  .home-capabilities-main,
-  .home-scene-chips {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1100px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 560px) {
-  .home-capabilities-main,
-  .home-scene-chips {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 700px) {
+  .section-block {
+    width: min(100% - 28px, 1520px);
+    padding-bottom: 86px;
+  }
+
+  .section-title {
+    margin-bottom: 34px;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .badge-row {
+    justify-content: flex-start;
+    gap: 18px;
+  }
+
+  .badge-row span {
+    font-size: 13px;
   }
 }
 </style>

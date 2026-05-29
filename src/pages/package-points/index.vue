@@ -389,13 +389,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--recharge-page-pad);
-  background:
-    radial-gradient(
-      820px 220px at 68% 0%,
-      rgba(48, 128, 255, 0.16),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #0e1d34, var(--recharge-bg));
+  background: var(--app-bg);
   color: var(--recharge-text);
 }
 

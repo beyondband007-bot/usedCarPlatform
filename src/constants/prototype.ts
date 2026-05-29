@@ -10,6 +10,15 @@ import planEnterpriseBasicBg from '@/img/企业基础.png'
 import planEnterpriseTeamBg from '@/img/企业团队.png'
 import planEnterpriseFlagshipBg from '@/img/企业旗舰.png'
 
+/** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
+export const studioGuestNavigation: NavItem[] = [
+  { path: '/home', label: '首页' },
+  { path: '/pricing', label: '企业套管' },
+  { path: '/credits', label: '积分查询' },
+  { path: '/auth', label: '企业账号登录' },
+  { path: '/package-points', label: '套餐/积分' },
+]
+
 /** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },

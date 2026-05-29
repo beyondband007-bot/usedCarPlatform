@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 
@@ -9,12 +9,26 @@ import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssis
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
 import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
-import type { WorkspaceGeneratePayload, WorkspaceGenerateResult, WorkspaceRecentItem } from '@/types/workspace'
+import type {
+  WorkspaceDeliveryTaskPreview,
+  WorkspaceGeneratePayload,
+  WorkspaceGenerateResult,
+  WorkspaceImagePreview,
+  WorkspaceRecentItem,
+} from '@/types/workspace'
+import { buildImagePreviewFromDeliveryTask } from '@/utils/workspace-image-preview'
 
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const SHORT_VIDEO_CAPABILITY_CODE = 'future-short-video'
+const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
+
+interface ActiveGenerationTaskSnapshot {
+  taskId: string
+  moduleCode: string
+  optionId?: string
+}
 
 function resolveCapabilityCode(code: unknown) {
   if (typeof code !== 'string') return defaultWorkspaceCapabilityCode
@@ -23,7 +37,61 @@ function resolveCapabilityCode(code: unknown) {
 
 const activeCode = ref(resolveCapabilityCode(route.params.code))
 const generationResult = ref<WorkspaceGenerateResult | null>(null)
+const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
+const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
+const shortVideoPlayRequest = ref(0)
+
+function readActiveGenerationTask() {
+  const raw = window.localStorage.getItem(ACTIVE_GENERATION_TASK_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<ActiveGenerationTaskSnapshot>
+    if (!parsed.taskId || !parsed.moduleCode) return null
+    return parsed as ActiveGenerationTaskSnapshot
+  } catch {
+    return null
+  }
+}
+
+function saveActiveGenerationTask(task: ActiveGenerationTaskSnapshot) {
+  window.localStorage.setItem(ACTIVE_GENERATION_TASK_KEY, JSON.stringify(task))
+}
+
+function clearActiveGenerationTask(taskId?: string) {
+  if (!taskId) {
+    window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY)
+    return
+  }
+
+  const activeTask = readActiveGenerationTask()
+  if (activeTask?.taskId === taskId) {
+    window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY)
+  }
+}
+
+function isTerminalGenerationStatus(task: GenerationTaskDetail) {
+  return task.status === 'success' || task.status === 'fail' || task.status === 'canceled'
+}
+
+function syncWorkspaceFromTask(task: Pick<GenerationTaskDetail, 'moduleCode' | 'optionId'>) {
+  const matchedCapability = workspaceCapabilities.find(
+    (capability) => capability.code === task.moduleCode || capability.apiCode === task.moduleCode,
+  )
+
+  if (!matchedCapability) return
+
+  activeCode.value = matchedCapability.code
+
+  if (route.params.code !== matchedCapability.code) {
+    router.replace({ name: 'Workspace', params: { code: matchedCapability.code } })
+  }
+
+  if (task.optionId && matchedCapability.options.some((item) => item.id === task.optionId)) {
+    selectedOptionId.value = task.optionId
+  }
+}
 
 watch(
   () => route.params.code,
@@ -69,7 +137,24 @@ watch(activeCode, () => {
   }
 
   generationResult.value = null
+  deliveryImagePreview.value = null
+  previewedDeliveryTaskId.value = null
 })
+
+function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview) {
+  deliveryImagePreview.value = buildImagePreviewFromDeliveryTask(task)
+  previewedDeliveryTaskId.value = task.id
+}
+
+function handleOpenDeliveryImagePreview(preview: WorkspaceImagePreview) {
+  deliveryImagePreview.value = preview
+  previewedDeliveryTaskId.value = null
+}
+
+function clearDeliveryImagePreview() {
+  deliveryImagePreview.value = null
+  previewedDeliveryTaskId.value = null
+}
 
 function formatGenerateTime(date = new Date()) {
   const pad = (value: number) => String(value).padStart(2, '0')
@@ -87,7 +172,7 @@ async function pollGenerationTask(taskId: string) {
     const task = await getGenerationTask(taskId)
     latest = task
 
-    if (task.status === 'success' || task.status === 'fail' || task.status === 'canceled') {
+    if (isTerminalGenerationStatus(task)) {
       return task
     }
 
@@ -106,19 +191,64 @@ function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResul
 
   return {
     createdAt: task.updatedAt ?? task.createdAt ?? formatGenerateTime(),
-    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: `${task.outputRatio} · ${task.resolution}`,
+    statusText: `宸插畬鎴?路 ${sceneTitle} 路 鍗曞浘鐢熸垚缁撴灉`,
+    ratioLabel: `${task.outputRatio} 路 ${task.resolution}`,
     previewImage: image.url,
-    previewAlt: `${sceneTitle}生成结果`,
+    previewAlt: `${sceneTitle}鐢熸垚缁撴灉`,
     downloadUrl: image.url,
     imageWidth: 1600,
     imageHeight: 900,
   }
 }
 
+async function resolveGenerationTask(taskId: string, options: { restored?: boolean } = {}) {
+  isGenerating.value = true
+  generationResult.value = null
+
+  try {
+    const initialTask = await getGenerationTask(taskId)
+    syncWorkspaceFromTask(initialTask)
+
+    const task = isTerminalGenerationStatus(initialTask)
+      ? initialTask
+      : await pollGenerationTask(taskId)
+
+    if (!task) {
+      message.warning('任务仍在处理中，请稍后刷新查看')
+      return
+    }
+
+    syncWorkspaceFromTask(task)
+
+    if (task.status !== 'success') {
+      message.error(task.error?.message || '鐢熸垚浠诲姟澶辫触')
+      return
+    }
+
+    const result = buildResultFromTask(task)
+    if (!result) {
+      message.warning('浠诲姟瀹屾垚锛屼絾娌℃湁杩斿洖鍥剧墖')
+      return
+    }
+
+    generationResult.value = result
+    if (!options.restored) {
+      message.success('鐢熸垚瀹屾垚')
+    }
+  } catch (error) {
+    clearActiveGenerationTask(taskId)
+    const text = error instanceof Error ? error.message : '鐢熸垚浠诲姟鏌ヨ澶辫触'
+    message.error(text)
+  } finally {
+    clearActiveGenerationTask(taskId)
+    isGenerating.value = false
+  }
+}
+
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
   if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
-    notifyShortVideoBeta()
+    shortVideoPlayRequest.value += 1
+    message.success('演示视频已开始播放')
     return
   }
 
@@ -134,28 +264,16 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     }
 
     const created = await createGenerationTask(activeCapability.value.code, createPayload)
+    saveActiveGenerationTask({
+      taskId: created.taskId,
+      moduleCode: created.moduleCode || activeCapability.value.code,
+      optionId: created.optionId ?? payload.optionId,
+    })
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
 
-    const task = await pollGenerationTask(created.taskId)
-    if (!task) {
-      message.warning('任务仍在处理中，请稍后刷新查看')
-      return
-    }
-
-    if (task.status !== 'success') {
-      message.error(task.error?.message || '生成任务失败')
-      return
-    }
-
-    const result = buildResultFromTask(task)
-    if (!result) {
-      message.warning('任务完成，但没有返回图片')
-      return
-    }
-
-    generationResult.value = result
-    message.success('生成完成')
+    await resolveGenerationTask(created.taskId)
   } catch (error) {
+    clearActiveGenerationTask()
     const text = error instanceof Error ? error.message : '生成任务创建失败'
     message.error(text)
   } finally {
@@ -168,8 +286,8 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
 
   return {
     createdAt: item.createdAt,
-    statusText: `已完成 · ${item.sceneLabel ?? item.title} · 单图生成结果`,
-    ratioLabel: item.ratioLabel ?? '主图',
+    statusText: `宸插畬鎴?路 ${item.sceneLabel ?? item.title} 路 鍗曞浘鐢熸垚缁撴灉`,
+    ratioLabel: item.ratioLabel ?? '涓诲浘',
     previewImage: item.previewImage,
     previewAlt: item.title,
     downloadUrl: item.previewImage,
@@ -192,6 +310,19 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
   activeCode.value = payload.capabilityCode
   generationResult.value = null
 }
+
+onMounted(() => {
+  const activeTask = readActiveGenerationTask()
+  if (!activeTask) return
+
+  syncWorkspaceFromTask({
+    moduleCode: activeTask.moduleCode,
+    optionId: activeTask.optionId,
+  })
+
+  void resolveGenerationTask(activeTask.taskId, { restored: true })
+})
+
 </script>
 
 <template>
@@ -213,8 +344,10 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
             :is-generating="isGenerating"
+            :previewed-delivery-task-id="previewedDeliveryTaskId"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
+            @preview-delivery-task="handlePreviewDeliveryTask"
           />
         </div>
       </section>
@@ -223,8 +356,13 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
         <WorkspaceAssistPanel
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
+          :is-generating="isGenerating"
           :generation-result="generationResult"
+          :delivery-image-preview="deliveryImagePreview"
+          :short-video-play-request="shortVideoPlayRequest"
           @back-from-result="clearGenerationResult"
+          @close-delivery-image-preview="clearDeliveryImagePreview"
+          @open-delivery-image-preview="handleOpenDeliveryImagePreview"
           @pick-template="handlePickTemplate"
           @pick-recent="handlePickRecent"
         />

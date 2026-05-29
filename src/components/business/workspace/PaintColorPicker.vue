@@ -15,7 +15,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const selectedId = ref(props.modelValue ?? paintColorOptions[0]?.id ?? '')
+const selectedId = ref(props.modelValue ?? '')
 
 const selectedColor = computed(() =>
   paintColorOptions.find((item) => item.id === selectedId.value),
@@ -24,8 +24,8 @@ const selectedColor = computed(() =>
 watch(
   () => props.modelValue,
   (value) => {
-    if (value && value !== selectedId.value) {
-      selectedId.value = value
+    if ((value ?? '') !== selectedId.value) {
+      selectedId.value = value ?? ''
     }
   },
 )
@@ -40,6 +40,12 @@ function isLightColor(hex: string) {
 }
 
 function selectColor(color: PaintColorOption) {
+  if (selectedId.value === color.id) {
+    selectedId.value = ''
+    emit('update:modelValue', '')
+    return
+  }
+
   selectedId.value = color.id
   emit('update:modelValue', color.id)
 }
@@ -54,18 +60,21 @@ function selectColor(color: PaintColorOption) {
           选择车身改色目标，生成时将按所选色号进行烤漆翻新演示
         </p>
       </div>
-      <div v-if="selectedColor" class="paint-color-current">
-        <span
-          class="paint-color-current-swatch"
-          :style="{ backgroundColor: selectedColor.hex }"
-          aria-hidden="true"
-        />
-        <div class="paint-color-current-copy">
-          <strong>{{ selectedColor.nameCn }}</strong>
-          <span>{{ selectedColor.nameEn }} · {{ selectedColor.hex }}</span>
-        </div>
-      </div>
     </header>
+
+    <div
+      v-if="selectedColor"
+      class="paint-color-preview"
+      :class="{ 'is-light': isLightColor(selectedColor.hex) }"
+      :style="{ backgroundColor: selectedColor.hex }"
+      aria-live="polite"
+    >
+      <span class="paint-color-preview-name">{{ selectedColor.nameCn }}</span>
+      <span class="paint-color-preview-hex">{{ selectedColor.hex }}</span>
+    </div>
+    <div v-else class="paint-color-preview is-empty">
+      <span class="paint-color-preview-placeholder">未选择色号</span>
+    </div>
 
     <div class="paint-color-grid" role="listbox" aria-label="色号列表">
       <button
@@ -87,14 +96,16 @@ function selectColor(color: PaintColorOption) {
           :style="{ backgroundColor: color.hex }"
           aria-hidden="true"
         >
+          <span class="paint-color-label">
+            <span class="paint-color-name">{{ color.nameCn }}</span>
+            <span class="paint-color-hex">{{ color.hex }}</span>
+          </span>
           <Icon
             v-if="selectedId === color.id"
             icon="mdi:check"
             class="paint-color-check"
           />
         </span>
-        <span class="paint-color-name">{{ color.nameCn }}</span>
-        <span class="paint-color-hex">{{ color.hex }}</span>
       </button>
     </div>
   </section>
@@ -114,12 +125,7 @@ function selectColor(color: PaintColorOption) {
 }
 
 .paint-color-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px 16px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .paint-color-title {
@@ -139,58 +145,63 @@ function selectColor(color: PaintColorOption) {
   line-height: 1.55;
 }
 
-.paint-color-current {
-  display: inline-flex;
+.paint-color-preview {
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: var(--app-surface-soft);
-}
-
-.paint-color-current-swatch {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
+  min-height: 40px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
   border: 1px solid color-mix(in srgb, var(--app-text) 12%, transparent);
   border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: background-color 0.2s ease;
 }
 
-.paint-color-current-copy {
-  display: grid;
-  gap: 2px;
+.paint-color-preview.is-light {
+  color: #111827;
 }
 
-.paint-color-current-copy strong {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.paint-color-current-copy span {
+.paint-color-preview.is-empty {
+  background: var(--app-surface-soft);
   color: var(--app-text-soft);
-  font-size: 11px;
+  border-style: dashed;
+}
+
+.paint-color-preview-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.paint-color-preview-hex {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.88;
+  letter-spacing: 0.02em;
+}
+
+.paint-color-preview-placeholder {
+  font-size: 13px;
   font-weight: 700;
 }
 
 .paint-color-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .paint-color-option {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  padding: 10px 8px 8px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: var(--app-surface-soft);
+  display: block;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   font-family: inherit;
-  text-align: center;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
@@ -198,60 +209,67 @@ function selectColor(color: PaintColorOption) {
 }
 
 .paint-color-option:hover {
-  border-color: color-mix(in srgb, #2f7cff 42%, var(--app-border));
   transform: translateY(-1px);
 }
 
 .paint-color-option.is-selected {
   border-color: #2f7cff;
-  background: color-mix(in srgb, #2f7cff 8%, var(--app-surface));
   box-shadow: 0 0 0 3px color-mix(in srgb, #2f7cff 16%, transparent);
 }
 
 .paint-color-swatch {
   position: relative;
-  display: grid;
-  width: 100%;
-  aspect-ratio: 1.35;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--app-text) 10%, transparent);
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
+  color: #fff;
+}
+
+.paint-color-option.is-light .paint-color-swatch {
+  color: #111827;
+}
+
+.paint-color-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
 }
 
 .paint-color-check {
-  font-size: 22px;
-  color: #fff;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 16px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 .paint-color-option.is-light .paint-color-check {
-  color: #111827;
   filter: none;
 }
 
 .paint-color-name {
-  color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.25;
 }
 
 .paint-color-hex {
-  color: var(--app-text-soft);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
+  opacity: 0.88;
   letter-spacing: 0.02em;
 }
 
 @media (max-width: 520px) {
   .paint-color-grid {
-    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-    gap: 8px;
-  }
-
-  .paint-color-current {
-    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }
 </style>

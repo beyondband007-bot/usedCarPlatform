@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
@@ -6,6 +6,7 @@ import { useMessage } from "naive-ui";
 
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
+import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import {
   deliveryResults,
   formatDeliveryRatio,
@@ -14,20 +15,27 @@ import {
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadAllDeliveryResults } from "@/utils/delivery-download";
+import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
 import type {
   WorkspaceCapability,
   WorkspaceGenerateResult,
+  WorkspaceImagePreview,
   WorkspaceRecentItem,
 } from "@/types/workspace";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
+  isGenerating?: boolean;
   generationResult?: WorkspaceGenerateResult | null;
+  deliveryImagePreview?: WorkspaceImagePreview | null;
+  shortVideoPlayRequest?: number;
 }>();
 
 const emit = defineEmits<{
   backFromResult: [];
+  closeDeliveryImagePreview: [];
+  openDeliveryImagePreview: [preview: WorkspaceImagePreview];
   pickTemplate: [payload: { capabilityCode: string; optionId: string }];
   pickRecent: [item: WorkspaceRecentItem];
 }>();
@@ -86,35 +94,24 @@ const tutorialSteps = [
 
 const deliveryResultCount = deliveryResults.length;
 const message = useMessage();
-const selectedDeliveryItem = ref<DeliveryResultItem | null>(null);
 const isDownloadingAllDelivery = ref(false);
 
 watch(
   () => props.capability.kind,
   () => {
-    selectedDeliveryItem.value = null;
+    emit("closeDeliveryImagePreview");
   },
 );
 
-function buildDeliveryGenerateResult(
-  item: DeliveryResultItem,
-): WorkspaceGenerateResult {
-  return {
-    createdAt: "2026-05-20 09:32",
-    statusText: `已完成 · ${item.title} · 成片预览`,
-    ratioLabel: formatDeliveryRatio(item.ratio),
-    previewImage: item.image,
-    previewAlt: item.title,
-    downloadUrl: item.image,
-  };
+function openDeliveryResultPreview(item: DeliveryResultItem) {
+  emit(
+    "openDeliveryImagePreview",
+    buildImagePreviewFromDeliveryResult(item, formatDeliveryRatio),
+  );
 }
 
-function openDeliveryPreview(item: DeliveryResultItem) {
-  selectedDeliveryItem.value = item;
-}
-
-function closeDeliveryPreview() {
-  selectedDeliveryItem.value = null;
+function closeDeliveryImagePreview() {
+  emit("closeDeliveryImagePreview");
 }
 
 async function handleDownloadAllDelivery() {
@@ -122,18 +119,18 @@ async function handleDownloadAllDelivery() {
 
   try {
     const count = await downloadAllDeliveryResults();
-    message.success(`已开始下载 ${count} 张成片`);
+    message.success(`Batch download started for ${count} images`);
   } finally {
     isDownloadingAllDelivery.value = false;
   }
 }
 
 const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
-  waiting: "等待中",
-  queue: "排队中",
-  generating: "生成中",
-  success: "已完成",
-  fail: "失败",
+  waiting: "Waiting",
+  queue: "Queued",
+  generating: "Generating",
+  success: "Completed",
+  fail: "Failed",
 };
 
 
@@ -150,13 +147,35 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
       @back="emit('backFromResult')"
     />
 
-    <WorkspaceGenerateResultPanel
-      v-else-if="selectedDeliveryItem"
-      :result="buildDeliveryGenerateResult(selectedDeliveryItem)"
-      @back="closeDeliveryPreview"
+    <WorkspaceImagePreviewPanel
+      v-else-if="deliveryImagePreview"
+      :preview="deliveryImagePreview"
+      @back="closeDeliveryImagePreview"
     />
 
-    <ShortVideoBetaPanel v-else-if="capability.code === 'future-short-video'" />
+    <ShortVideoBetaPanel
+      v-else-if="capability.code === 'future-short-video'"
+      :play-request="shortVideoPlayRequest"
+    />
+
+    <section v-else-if="isGenerating" class="generation-waiting" aria-live="polite">
+      <div class="waiting-visual" aria-hidden="true">
+        <span class="waiting-scan"></span>
+        <span class="waiting-corner waiting-corner--tl"></span>
+        <span class="waiting-corner waiting-corner--tr"></span>
+        <span class="waiting-corner waiting-corner--bl"></span>
+        <span class="waiting-corner waiting-corner--br"></span>
+        <Icon icon="mdi:image-sync-outline" />
+      </div>
+      <div class="waiting-copy">
+        <p>图片待生成</p>
+        <h2>正在生成效果图</h2>
+        <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
+      </div>
+      <div class="waiting-progress" aria-hidden="true">
+        <span></span>
+      </div>
+    </section>
 
     <template v-else-if="capability.kind === 'delivery'">
       <div class="delivery-panel">
@@ -186,9 +205,9 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
             role="button"
             tabindex="0"
             :aria-label="`查看大图：${item.title}`"
-            @click="openDeliveryPreview(item)"
-            @keydown.enter.prevent="openDeliveryPreview(item)"
-            @keydown.space.prevent="openDeliveryPreview(item)"
+            @click="openDeliveryResultPreview(item)"
+            @keydown.enter.prevent="openDeliveryResultPreview(item)"
+            @keydown.space.prevent="openDeliveryResultPreview(item)"
           >
             <div class="delivery-result-media">
               <img
@@ -415,6 +434,163 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
   gap: 18px;
   min-height: 36px;
   margin-bottom: 16px;
+}
+
+.generation-waiting {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 0;
+  flex: 1;
+  gap: 18px;
+  padding: clamp(24px, 3vw, 40px);
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(47, 130, 255, 0.08), transparent 42%),
+    var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.waiting-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 320px);
+  aspect-ratio: 16 / 10;
+  border: 1px dashed color-mix(in srgb, var(--assist-blue) 28%, var(--assist-border));
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(47, 130, 255, 0.16), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--assist-card-strong);
+  overflow: hidden;
+}
+
+.theme-light .waiting-visual {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(47, 130, 255, 0.13), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(241, 247, 255, 0.82)),
+    var(--assist-card-strong);
+}
+
+.waiting-visual .iconify {
+  position: relative;
+  z-index: 2;
+  color: var(--assist-blue);
+  font-size: clamp(58px, 7vw, 92px);
+  filter: drop-shadow(0 8px 24px rgba(47, 130, 255, 0.18));
+  animation: waiting-pulse 1.6s ease-in-out infinite;
+}
+
+.waiting-scan {
+  position: absolute;
+  inset: 12% 16%;
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(47, 130, 255, 0.16) 48%,
+      rgba(47, 130, 255, 0.04) 52%,
+      transparent 100%
+    );
+  opacity: 0.75;
+  animation: waiting-scan 1.8s linear infinite;
+}
+
+.waiting-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(47, 130, 255, 0.45);
+}
+
+.waiting-corner--tl {
+  left: 16px;
+  top: 16px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: 12px;
+}
+
+.waiting-corner--tr {
+  right: 16px;
+  top: 16px;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: 12px;
+}
+
+.waiting-corner--bl {
+  left: 16px;
+  bottom: 16px;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: 12px;
+}
+
+.waiting-corner--br {
+  right: 16px;
+  bottom: 16px;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: 12px;
+}
+
+.waiting-copy {
+  display: grid;
+  width: min(100%, 520px);
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.waiting-copy p,
+.waiting-copy h2,
+.waiting-copy span {
+  margin: 0;
+}
+
+.waiting-copy p {
+  color: var(--assist-blue);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.waiting-copy h2 {
+  color: var(--assist-text);
+  font-size: clamp(20px, 1.8vw, 28px);
+  line-height: 1.2;
+  font-weight: 950;
+}
+
+.waiting-copy span {
+  width: 100%;
+  max-width: none;
+  color: var(--assist-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.waiting-progress {
+  width: min(100%, 320px);
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assist-blue) 12%, var(--assist-border-soft));
+  overflow: hidden;
+}
+
+.waiting-progress span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--assist-blue), #63a6ff 60%, #9bc6ff);
+  animation: waiting-progress 1.5s ease-in-out infinite;
 }
 
 .delivery-result-head {
@@ -1078,6 +1254,47 @@ const statusLabelMap: Record<WorkspaceRecentItem["status"], string> = {
 
   .delivery-result-head button {
     width: 100%;
+  }
+}
+
+@keyframes waiting-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.82;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes waiting-scan {
+  0% {
+    transform: translateY(-24%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(24%);
+    opacity: 0;
+  }
+}
+
+@keyframes waiting-progress {
+  0% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(330%);
   }
 }
 

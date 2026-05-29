@@ -79,7 +79,7 @@ const isDark = computed(() => appStore.isDarkMode)
 }
 
 .enterprise-login-page.theme-dark {
-  --login-bg: #050b14;
+  --login-bg: var(--app-bg);
   --login-text: #f8fbff;
   --login-muted: rgba(198, 214, 236, 0.72);
   --login-kicker: rgba(198, 214, 236, 0.82);

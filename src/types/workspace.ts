@@ -40,6 +40,28 @@ export interface WorkspaceGenerateResult {
   imageHeight?: number
 }
 
+/** 通用大图预览面板数据，可用于生成结果、成片交付等场景 */
+export interface WorkspaceImagePreview {
+  createdAt: string
+  statusText: string
+  ratioLabel: string
+  imageUrl: string
+  imageAlt: string
+  downloadUrl: string
+  imageWidth?: number
+  imageHeight?: number
+}
+
+export interface WorkspaceDeliveryTaskPreview {
+  id: string
+  title: string
+  meta: string
+  image: string
+  previewImage?: string
+  progress: number
+  imageCount: number
+}
+
 export interface WorkspaceGeneratePayload {
   inputAssetId: string
   outputRatio: string

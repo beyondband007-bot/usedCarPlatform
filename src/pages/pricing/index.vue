@@ -88,9 +88,7 @@ function handlePlanSelect(name: string) {
 <style scoped lang="scss">
 .pricing-page {
   --pricing-page-pad: clamp(16px, 2vw, 30px);
-  --pricing-page-bg:
-    radial-gradient(820px 220px at 68% 0%, rgba(48, 128, 255, 0.16), transparent 70%),
-    linear-gradient(180deg, #0e1d34, #071226);
+  --pricing-page-bg: var(--app-bg);
   --pricing-panel: rgba(7, 15, 32, 0.82);
   --pricing-border: rgba(73, 106, 148, 0.42);
   --pricing-border-soft: rgba(91, 117, 151, 0.22);

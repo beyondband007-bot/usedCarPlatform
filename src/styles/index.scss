@@ -21,13 +21,13 @@ $theme-vars: (
     app-header-user: #374151,
   ),
   dark: (
-    app-bg: #080a10,
-    app-surface: #11131b,
-    app-surface-soft: #0d1018,
+    app-bg: #020202,
+    app-surface: #101010,
+    app-surface-soft: #0d0d0d,
     app-border: rgba(255, 255, 255, 0.1),
-    app-text: #f8fafc,
-    app-text-soft: #94a3b8,
-    app-header-bg: #111827,
+    app-text: #f3f3f3,
+    app-text-soft: #8a8a8a,
+    app-header-bg: #020202,
     app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.35),
     app-header-nav: #9ca3af,
     app-header-nav-active-bg: #1f2937,
@@ -66,6 +66,14 @@ $theme-vars: (
 
 [data-subnav="true"] {
   --app-subnav-offset: 2.75rem;
+}
+
+.app-layout--studio-chrome[data-subnav="true"] {
+  --app-header-offset: 140px;
+}
+
+.app-layout--studio-chrome:not([data-subnav="true"]) {
+  --app-header-offset: 96px;
 }
 
 :root {
