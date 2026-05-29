@@ -13,11 +13,20 @@ const router = createRouter({
   },
 })
 
+const INTRO_VIDEO_STORAGE_KEY = 'used-car-platform:intro-video-played'
+
 function resolveRedirectPath(redirect: unknown, fallback: string) {
   return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : fallback
 }
 
 router.beforeEach((to) => {
+  const hasPlayedIntroVideo = window.localStorage.getItem(INTRO_VIDEO_STORAGE_KEY) === 'true'
+  const hideIntroVideo = to.matched.some((record) => record.meta.hideIntroVideo)
+
+  if (!hasPlayedIntroVideo && !hideIntroVideo) {
+    return '/intro-video'
+  }
+
   const authStore = useAuthStore()
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const guestOnly = to.matched.some((record) => record.meta.guestOnly)
