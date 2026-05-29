@@ -31,7 +31,14 @@ class TasksService {
     status?: string;
     page?: number;
     pageSize?: number;
+    scope?: string;
   }) {
+    if (!input.moduleCode && input.scope !== "all") {
+      throw errors.invalidParameter(
+        "moduleCode is required for module recent list. Use scope=all only for global recent list.",
+      );
+    }
+
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
     const listed = await tasksRepository.listRecent({
