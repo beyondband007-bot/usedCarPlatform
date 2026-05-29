@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { AppError } from "../shared/errors";
+import { batchRoutes } from "./batch-new/batchRoutes";
+import { deliveryRoutes } from "./delivery/deliveryRoutes";
 import { interiorCleanRoutes } from "./interior-clean/interiorCleanRoutes";
 import { lightConsistencyRoutes } from "./light-consistency/lightConsistencyRoutes";
 import { outdoorSceneRoutes } from "./outdoor-scene/outdoorSceneRoutes";
@@ -9,9 +11,7 @@ import { roadMotionRoutes } from "./road-motion/roadMotionRoutes";
 import { showroomLightRoutes } from "./showroom-light/showroomLightRoutes";
 import { skyStudioRoutes } from "./sky-studio/skyStudioRoutes";
 
-const moduleCodes = [
-  "batch-new",
-] as const;
+const moduleCodes = [] as const;
 
 export const moduleRoutes = Router();
 
@@ -22,6 +22,8 @@ moduleRoutes.use("/sky-studio", skyStudioRoutes);
 moduleRoutes.use("/paint-refresh", paintRefreshRoutes);
 moduleRoutes.use("/light-consistency", lightConsistencyRoutes);
 moduleRoutes.use("/interior-clean", interiorCleanRoutes);
+moduleRoutes.use("/batch-new", batchRoutes);
+moduleRoutes.use("/delivery", deliveryRoutes);
 
 for (const moduleCode of moduleCodes) {
   moduleRoutes.post(`/${moduleCode}/tasks`, () => {
@@ -29,6 +31,3 @@ for (const moduleCode of moduleCodes) {
   });
 }
 
-moduleRoutes.get("/delivery/tasks", () => {
-  throw new AppError(501, 50100, "delivery module is not implemented yet");
-});

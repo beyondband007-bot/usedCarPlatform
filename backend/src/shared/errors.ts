@@ -19,7 +19,11 @@ export const errors = {
   fileTooLarge: (details?: unknown) => new AppError(400, 40002, "file is too large", details),
   assetNotFound: () => new AppError(404, 40401, "asset not found"),
   taskNotFound: () => new AppError(404, 40402, "task not found"),
+  batchNotFound: () => new AppError(404, 40403, "batch task not found"),
+  packageNotFound: () => new AppError(404, 40404, "delivery package not found"),
   generationFailed: (message = "generation failed", details?: unknown) =>
     new AppError(500, 50001, message, details),
+  packageFailed: (message = "package failed", details?: unknown) =>
+    new AppError(500, 50002, message, details),
   kieKeyUnavailable: () => new AppError(503, 50301, "no available kie api key"),
 };

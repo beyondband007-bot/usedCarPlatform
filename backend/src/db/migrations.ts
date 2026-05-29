@@ -53,6 +53,35 @@ export const migrations = [
     INDEX idx_batch_tasks_status_created (status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS batch_task_items (
+    id VARCHAR(64) PRIMARY KEY,
+    batch_id VARCHAR(64) NOT NULL,
+    group_title VARCHAR(255) NOT NULL,
+    item_kind VARCHAR(24) NOT NULL,
+    input_asset_id VARCHAR(64) NOT NULL,
+    generation_task_id VARCHAR(64) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status VARCHAR(24) NOT NULL DEFAULT 'waiting',
+    progress INT NOT NULL DEFAULT 0,
+    result_count INT NOT NULL DEFAULT 0,
+    error_message TEXT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_batch_task_items_batch (batch_id, sort_order),
+    INDEX idx_batch_task_items_generation (generation_task_id),
+    INDEX idx_batch_task_items_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS batch_visual_presets (
+    id VARCHAR(120) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'default_user',
+    name VARCHAR(255) NOT NULL,
+    visual_config_json JSON NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_batch_visual_presets_user_updated (user_id, updated_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS kie_accounts (
     account_hash VARCHAR(128) PRIMARY KEY,
     label VARCHAR(120) NULL,

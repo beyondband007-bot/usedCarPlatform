@@ -1,7 +1,0 @@
-
-> used-car-platform-backend@0.1.0 dev
-> tsx watch src/server.ts
-
-Backend API listening on http://localhost:3101
-13:49:13 [tsx] change in ./src\modules\moduleRoutes.ts Restarting...
-cBackend API listening on http://localhost:3101

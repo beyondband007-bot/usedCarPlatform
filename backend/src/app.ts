@@ -18,6 +18,7 @@ export const createApp = () => {
   app.use(requestIdMiddleware);
   app.use("/uploads", express.static(path.resolve(env.uploadDir)));
   app.use("/results", express.static(path.resolve(env.resultsDir)));
+  app.use("/packages", express.static(path.resolve(env.packagesDir)));
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
