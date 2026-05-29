@@ -26,8 +26,6 @@ import {
 } from '@/utils/workspace-recent'
 import watermarkBeforeOne from '@/assets/img/水印图1.png'
 import watermarkAfterOne from '@/assets/img/无水印图1.png'
-import watermarkAfterTwo from '@/assets/img/无水印图2.png'
-import watermarkAfterThree from '@/assets/img/无水印图3.png'
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -55,7 +53,7 @@ const emit = defineEmits<{
 }>();
 
 function canOpenRecent(item: WorkspaceRecentItem) {
-  return item.status === "success" && Boolean(item.previewImage);
+  return Boolean(item.taskId) || (item.status === "success" && Boolean(item.previewImage));
 }
 
 function handleRecentPick(item: WorkspaceRecentItem) {
@@ -66,7 +64,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 const templateCards = workspaceTemplateRecommendations;
 
 const watermarkCompareCards = [
-  { title: "抖音水印去除", before: watermarkBeforeOne, after: watermarkAfterOne },
+  { before: watermarkBeforeOne, after: watermarkAfterOne },
 ] as const;
 const watermarkCompareProgress = ref([50]);
 const watermarkCompareMediaRefs = ref<(HTMLElement | null)[]>([]);
@@ -76,13 +74,6 @@ const activeWatermarkCompareDrag = ref<{
 } | null>(null);
 const watermarkActiveView = ref<"features" | "recent">("features");
 
-const watermarkRecentCards = [
-  { title: "宝马 X3", time: "10分钟前", image: watermarkAfterOne },
-  { title: "奥迪 A6L", time: "18分钟前", image: watermarkAfterTwo },
-  { title: "Model Y", time: "30分钟前", image: watermarkAfterThree },
-  { title: "丰田 凯美瑞", time: "1小时前", image: watermarkAfterOne },
-  { title: "奔驰 C260L", time: "2小时前", image: watermarkAfterTwo },
-] as const;
 function isTemplateActive(item: (typeof templateCards)[number]) {
   return (
     props.capability.code === item.capabilityCode &&
@@ -257,9 +248,25 @@ async function handleDownloadAllDelivery() {
 
 const statusLabelMap = recentStatusLabelMap;
 const statusIconMap = recentStatusIconMap;
+const recentTaskModuleCodes = new Set([
+  "showroom-light",
+  "outdoor-scene",
+  "road-motion",
+  "sky-studio",
+  "paint-refresh",
+  "light-consistency",
+  "interior-clean",
+  "watermark-remove",
+  "batch-new",
+]);
+
+function canLoadRecentTasks() {
+  return recentTaskModuleCodes.has(props.capability.code);
+}
 
 function mapRecentStatus(item: RecentGenerationTask): WorkspaceRecentItem["status"] {
-  return item.status ?? item.uiStatus ?? "waiting";
+  const status = (item.uiStatus ?? item.status ?? "waiting") as WorkspaceRecentItem["status"];
+  return status === "queue" ? "queued" : status;
 }
 
 function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
@@ -300,15 +307,26 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
 
 function shouldPollRecent() {
   if (props.isGenerating) return true;
+  if (props.capability.code === "watermark-remove" && watermarkActiveView.value === "recent") {
+    return canAutoRefreshRecent(recentItems.value);
+  }
   if (activeTab.value !== "recent") return false;
   return canAutoRefreshRecent(recentItems.value);
 }
 
 async function loadRecentItems() {
+  if (!canLoadRecentTasks()) {
+    recentItems.value = [];
+    recentLoaded.value = true;
+    recentLoading.value = false;
+    return;
+  }
+
   recentLoading.value = true;
 
   try {
     const result = await getRecentGenerationTasks({
+      moduleCode: props.capability.code,
       page: 1,
       pageSize: 20,
     });
@@ -376,6 +394,41 @@ watch(
 );
 
 watch(
+  () => props.capability.code,
+  () => {
+    stopRecentAutoRefresh();
+    recentItems.value = [];
+    recentLoaded.value = false;
+
+    if (
+      props.isGenerating ||
+      activeTab.value === "recent" ||
+      props.capability.code === "watermark-remove"
+    ) {
+      void loadRecentItems();
+    }
+  },
+);
+
+watch(
+  () => watermarkActiveView.value,
+  (view) => {
+    if (props.capability.code !== "watermark-remove") return;
+
+    if (view === "recent") {
+      if (!recentLoaded.value) {
+        void loadRecentItems();
+        return;
+      }
+      startRecentAutoRefresh();
+      return;
+    }
+
+    startRecentAutoRefresh();
+  },
+);
+
+watch(
   () => [activeTab.value, props.isGenerating, isBatchProcessingView.value] as const,
   ([tab]) => {
     if (tab === "recent" || tab === "generating" || tab === "batchProcessing") {
@@ -427,24 +480,24 @@ defineExpose({
 
     <template v-else-if="capability.code === 'watermark-remove'">
       <section class="watermark-assist-panel" aria-label="去水印工作台">
-        <header class="watermark-view-tabs" aria-label="去水印视图切换">
-          <button
-            type="button"
-            :class="{ active: watermarkActiveView === 'features' }"
-            @click="watermarkActiveView = 'features'"
-          >
-            功能描述
-          </button>
-          <button
-            type="button"
-            :class="{ active: watermarkActiveView === 'recent' }"
-            @click="watermarkActiveView = 'recent'"
-          >
-            最近生成
-          </button>
-        </header>
+        <section class="watermark-assist-top">
+          <header class="watermark-view-tabs" aria-label="去水印视图切换">
+            <button
+              type="button"
+              :class="{ active: watermarkActiveView === 'features' }"
+              @click="watermarkActiveView = 'features'"
+            >
+              功能描述
+            </button>
+            <button
+              type="button"
+              :class="{ active: watermarkActiveView === 'recent' }"
+              @click="watermarkActiveView = 'recent'"
+            >
+              最近生成
+            </button>
+          </header>
 
-        <template v-if="watermarkActiveView === 'features'">
           <section class="watermark-assist-hero">
             <div class="watermark-assist-copy">
               <p>AI 去水印能力</p>
@@ -452,7 +505,9 @@ defineExpose({
               <span>适用于平台角标、文字与遮挡痕迹处理，输出更干净的车图素材。</span>
             </div>
           </section>
+        </section>
 
+        <template v-if="watermarkActiveView === 'features'">
           <section class="watermark-compare-section" aria-label="效果对比">
             <header class="watermark-section-head">
               <div>
@@ -462,15 +517,15 @@ defineExpose({
             </header>
 
             <div class="watermark-compare-grid">
-              <article v-for="(card, index) in watermarkCompareCards" :key="card.title" class="watermark-compare-card">
+              <article v-for="(card, index) in watermarkCompareCards" :key="card.before" class="watermark-compare-card">
                 <div
                   :ref="(element) => setWatermarkCompareMediaRef(index, element)"
                   class="watermark-compare-media"
                   :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
                   @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
                 >
-                  <PreloadImage class="watermark-compare-image" :src="card.before" :alt="`${card.title}处理前`" loading="lazy" decoding="async" />
-                  <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" :alt="`${card.title}处理后`" loading="lazy" decoding="async" />
+                  <PreloadImage class="watermark-compare-image" :src="card.before" alt="去水印处理前" loading="lazy" decoding="async" />
+                  <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="去水印处理后" loading="lazy" decoding="async" />
                   <div class="watermark-compare-divider" aria-hidden="true">
                     <span></span>
                   </div>
@@ -479,13 +534,12 @@ defineExpose({
                   <button
                     type="button"
                     class="watermark-compare-handle"
-                    :aria-label="`${card.title}前后对比拖拽滑杆`"
+                    aria-label="去水印前后对比拖拽滑杆"
                     @pointerdown.prevent.stop="startWatermarkCompareDrag(index, $event)"
                   >
                     <Icon icon="mdi:unfold-more-horizontal" />
                   </button>
                 </div>
-                <strong>{{ card.title }}</strong>
               </article>
             </div>
           </section>
@@ -499,12 +553,31 @@ defineExpose({
             </div>
           </header>
 
-          <div class="watermark-recent-grid">
-            <article v-for="item in watermarkRecentCards" :key="item.title" class="watermark-recent-card">
-              <PreloadImage class="watermark-recent-image" :src="item.image" :alt="item.title" loading="lazy" decoding="async" />
+          <div v-if="recentLoading && !recentItems.length" class="watermark-recent-empty">
+            <Icon icon="mdi:loading" class="watermark-recent-loading-icon" />
+            <span>正在加载最近生成</span>
+          </div>
+          <div v-else-if="!recentItems.length" class="watermark-recent-empty">
+            <Icon icon="mdi:image-off-outline" />
+            <span>暂无最近生成记录</span>
+          </div>
+          <div v-else class="watermark-recent-grid">
+            <article
+              v-for="item in recentItems"
+              :key="item.id"
+              class="watermark-recent-card"
+              :class="{ 'is-clickable': canOpenRecent(item) }"
+              :role="canOpenRecent(item) ? 'button' : undefined"
+              :tabindex="canOpenRecent(item) ? 0 : undefined"
+              :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+              @click="handleRecentPick(item)"
+              @keydown.enter.prevent="handleRecentPick(item)"
+              @keydown.space.prevent="handleRecentPick(item)"
+            >
+              <PreloadImage class="watermark-recent-image" :src="item.thumbnail || item.previewImage" :alt="item.title" loading="lazy" decoding="async" />
               <div class="watermark-recent-copy">
                 <strong>{{ item.title }}</strong>
-                <span>{{ item.time }}</span>
+                <span>{{ item.createdAt }}</span>
               </div>
             </article>
           </div>
@@ -904,8 +977,8 @@ defineExpose({
   justify-content: space-between;
   flex-shrink: 0;
   gap: 18px;
-  min-height: 36px;
-  margin-bottom: 16px;
+  min-height: 32px;
+  margin-bottom: 14px;
 }
 
 .assist-shell {
@@ -1324,20 +1397,30 @@ defineExpose({
   background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
 }
 
-.watermark-view-tabs {
-  display: flex;
-  width: 100%;
-  gap: 8px;
-  padding: 6px;
+.watermark-assist-top {
+  display: grid;
+  grid-template-rows: auto auto;
   border: 1px solid var(--assist-border);
   border-radius: 14px;
   background: var(--assist-card);
   box-shadow: var(--assist-shadow);
 }
 
+.watermark-view-tabs {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--assist-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .watermark-view-tabs button {
   min-width: 104px;
-  height: 38px;
+  height: 32px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -1354,7 +1437,6 @@ defineExpose({
   color: var(--assist-blue);
 }
 
-.watermark-assist-hero,
 .watermark-compare-section,
 .watermark-recent-section {
   border: 1px solid var(--assist-border);
@@ -1367,11 +1449,16 @@ defineExpose({
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  min-height: 148px;
-  padding: 24px;
+  min-height: 104px;
+  padding: 14px 18px 16px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .watermark-assist-copy {
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -1389,20 +1476,18 @@ defineExpose({
 }
 
 .watermark-assist-copy h2 {
-  margin-top: 8px;
   color: var(--assist-text);
-  font-size: 26px;
+  font-size: 21px;
   font-weight: 950;
-  line-height: 1.16;
+  line-height: 1.28;
 }
 
 .watermark-assist-copy span {
   display: block;
-  margin-top: 10px;
   color: var(--assist-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.7;
+  line-height: 1.45;
 }
 
 .watermark-compare-section,
@@ -1451,7 +1536,7 @@ defineExpose({
 .watermark-compare-media {
   position: relative;
   overflow: hidden;
-  aspect-ratio: 16 / 7.6;
+  aspect-ratio: 16 / 6.75;
   border: 1px solid var(--assist-border);
   border-radius: 14px;
   background: var(--assist-card-strong);
@@ -1540,15 +1625,6 @@ defineExpose({
   color: #fff;
 }
 
-.watermark-compare-card strong {
-  display: block;
-  margin-top: 12px;
-  color: var(--assist-text);
-  font-size: 14px;
-  font-weight: 900;
-  text-align: center;
-}
-
 .watermark-recent-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1560,6 +1636,18 @@ defineExpose({
   border: 1px solid var(--assist-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--assist-card) 92%, white);
+}
+
+.watermark-recent-card.is-clickable {
+  cursor: pointer;
+}
+
+.watermark-recent-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--assist-blue) 40%, var(--assist-border));
+  transform: translateY(-2px);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
 }
 
 .theme-light .watermark-recent-card {
@@ -1597,6 +1685,28 @@ defineExpose({
   color: var(--assist-muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.watermark-recent-empty {
+  display: grid;
+  min-height: 170px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px dashed var(--assist-border);
+  border-radius: 12px;
+  color: var(--assist-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.watermark-recent-empty .iconify {
+  color: var(--assist-blue);
+  font-size: 24px;
+}
+
+.watermark-recent-loading-icon {
+  animation: recent-loading-spin 1s linear infinite;
 }
 
 .tab-group {
@@ -1647,10 +1757,10 @@ defineExpose({
   min-height: 0;
   grid-template-rows: auto auto auto;
   align-content: start;
-  gap: 18px;
+  gap: 14px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 6px 28px 0;
+  padding: 0 6px 18px 0;
   scrollbar-width: thin;
   scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
@@ -1685,14 +1795,14 @@ defineExpose({
 .template-section {
   overflow: hidden;
   border-radius: 10px;
-  padding: 18px;
+  padding: 14px 16px 16px;
 }
 
 .tutorial-section h2,
 .template-section h2 {
   margin: 0;
   color: var(--assist-text);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.3;
   font-weight: 900;
 }
@@ -1700,12 +1810,12 @@ defineExpose({
 .tutorial-flow {
   display: grid;
   grid-template-columns:
-    minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr)
-    42px minmax(0, 1fr);
+    minmax(120px, 1fr) 32px minmax(120px, 1fr) 32px minmax(120px, 1fr)
+    32px minmax(120px, 1fr);
   align-items: center;
-  gap: clamp(10px, 1.2vw, 22px);
-  min-height: clamp(128px, 15vh, 188px);
-  margin-top: 14px;
+  gap: 12px;
+  min-height: 120px;
+  margin-top: 12px;
 }
 
 .tutorial-step {
@@ -1720,9 +1830,9 @@ defineExpose({
   position: relative;
   display: grid;
   place-items: center;
-  width: min(100%, 172px);
-  height: min(100%, 138px);
-  min-height: 118px;
+  width: min(100%, 178px);
+  height: 86px;
+  min-height: 86px;
   border: 1px dashed rgba(73, 130, 218, 0.34);
   border-radius: 14px;
   background:
@@ -1746,7 +1856,7 @@ defineExpose({
 
 .tutorial-placeholder > .iconify {
   color: var(--assist-blue);
-  font-size: clamp(42px, 4.5vw, 68px);
+  font-size: 38px;
 }
 
 .tutorial-placeholder span {
@@ -1755,8 +1865,8 @@ defineExpose({
   bottom: 10px;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 24px;
+  width: 28px;
+  height: 22px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   color: var(--assist-blue);
@@ -1765,29 +1875,29 @@ defineExpose({
 }
 
 .tutorial-step p {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: var(--assist-text);
   text-align: center;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
 }
 
 .flow-arrow {
   justify-self: center;
   color: rgba(142, 162, 190, 0.68);
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .template-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(14px, 1.4vw, 24px);
-  margin-top: 14px;
+  gap: 14px;
+  margin-top: 12px;
 }
 
 .template-card {
   position: relative;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 16 / 10;
   min-width: 0;
   overflow: hidden;
   border: 2px solid transparent;
@@ -1828,25 +1938,31 @@ defineExpose({
   bottom: 0;
   display: flex;
   align-items: end;
-  min-height: 68px;
-  padding: 16px;
+  min-height: 52px;
+  padding: 12px;
   background: linear-gradient(180deg, transparent, rgba(5, 14, 28, 0.74));
 }
 
 .template-title span {
   color: #fff;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
 }
 
 .requirement-section {
   display: flex;
-  min-height: 48px;
+  min-height: 64px;
   align-items: center;
   justify-content: flex-start;
   gap: 16px;
-  border-radius: 10px;
-  padding: 10px 16px;
+  border-radius: 12px;
+  padding: 14px 18px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--assist-card) 94%, white),
+      var(--assist-card)
+    );
 }
 
 .requirement-section strong {
@@ -1861,15 +1977,15 @@ defineExpose({
   flex: 1;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 10px;
 }
 
 .requirement-list span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 0 10px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 13px;
   border-radius: 999px;
   background: rgba(39, 183, 125, 0.15);
   color: var(--assist-green);
@@ -2195,7 +2311,9 @@ defineExpose({
   }
 
   .guide-layout {
-    gap: 14px;
+    gap: 12px;
+    padding-right: 4px;
+    padding-bottom: 14px;
   }
 
   .tutorial-flow {
@@ -2203,6 +2321,15 @@ defineExpose({
     grid-template-columns:
       minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr)
       28px minmax(0, 1fr);
+  }
+
+  .tutorial-placeholder {
+    height: 78px;
+    min-height: 78px;
+  }
+
+  .template-grid {
+    gap: 12px;
   }
 
   .flow-arrow {
@@ -2234,7 +2361,7 @@ defineExpose({
   }
 
   .watermark-assist-hero {
-    padding: 14px;
+    padding: 14px 14px 16px;
   }
 
   .watermark-compare-grid,

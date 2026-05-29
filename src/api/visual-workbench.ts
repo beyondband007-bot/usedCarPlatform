@@ -299,7 +299,17 @@ export async function getRecentGenerationTasks(params?: {
   status?: string
   page?: number
   pageSize?: number
+  scope?: 'all'
 }) {
+  if (params?.moduleCode) {
+    const { moduleCode, ...query } = params
+    const response = await request.get<ApiResponse<PagedResult<RecentGenerationTask>>>(
+      `/modules/${encodeURIComponent(moduleCode)}/recent-tasks`,
+      { params: query },
+    )
+    return unwrapApiResponse(response)
+  }
+
   const response = await request.get<ApiResponse<PagedResult<RecentGenerationTask>>>('/tasks', {
     params,
   })
