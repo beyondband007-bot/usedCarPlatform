@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NAutoComplete, NButton, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
+import { NButton, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
 
 import {
   createBatchTask,
@@ -67,6 +67,7 @@ const {
   saveTemplate,
   updateTemplate,
   ensureLoaded,
+  isLoading: isLoadingVisualPresets,
 } = useBatchVisualTemplates();
 
 const useLogo = ref(false);
@@ -102,50 +103,8 @@ const isDeletingDeliveryAssets = ref(false);
 const lastCreatedBatchId = ref<string | null>(null);
 const batchExteriorInputRef = ref<HTMLInputElement | null>(null);
 const MAX_BATCH_EXTERIOR_IMAGES = 5;
-const creativeReferenceInputRef = ref<HTMLInputElement | null>(null);
-const creativePrompt = ref(
-  "一辆白色新能源 SUV 停在现代展厅中央，柔和侧光，画面用于汽车电商首页主视觉，真实商业摄影质感。",
-);
-const creativeRatio = ref("1:1");
-const creativeQuality = ref("高清");
-const creativeReferencePreviewUrl = ref<string | null>(null);
 
 let previewObjectUrl: string | null = null;
-let creativeReferenceObjectUrl: string | null = null;
-
-const creativeRatioOptions = [
-  { label: "1:1", value: "1:1", hint: "主图" },
-  { label: "3:4", value: "3:4", hint: "竖图" },
-  { label: "9:16", value: "9:16", hint: "封面" },
-  { label: "16:9", value: "16:9", hint: "横幅" },
-];
-
-const creativeQualityOptions = ["标准", "高清", "超清"];
-
-const creativePromptPresets = [
-  "电商海报主图",
-  "城市夜景光影",
-  "节日促销背景",
-  "极简白底棚拍",
-];
-
-const creativePreviewSamples = [
-  {
-    title: "主视觉",
-    image:
-      "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "竖屏封面",
-    image:
-      "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=82",
-  },
-  {
-    title: "横幅物料",
-    image:
-      "https://images.unsplash.com/photo-1485291571154-772bc14410bb?auto=format&fit=crop&w=1000&q=82",
-  },
-];
 
 type BatchExteriorUploadItem = {
   id: string;
@@ -169,18 +128,6 @@ function resetUploadedVehicle() {
   revokePreviewObjectUrl();
   uploadedAsset.value = null;
   uploadedPreviewUrl.value = null;
-}
-
-function revokeCreativeReferenceObjectUrl() {
-  if (!creativeReferenceObjectUrl) return;
-
-  URL.revokeObjectURL(creativeReferenceObjectUrl);
-  creativeReferenceObjectUrl = null;
-}
-
-function resetCreativeReference() {
-  revokeCreativeReferenceObjectUrl();
-  creativeReferencePreviewUrl.value = null;
 }
 
 function revokeBatchExteriorObjectUrl(item: BatchExteriorUploadItem) {
@@ -216,29 +163,37 @@ const outputRatioOptions = [
   { label: "16:9 横图", value: "16:9" },
 ];
 
-const presetAutocompleteOptions = computed(() => {
-  const query = presetInput.value.trim();
-  const normalizedQuery = query.toLowerCase();
+const visualPresetOptions = computed(() =>
+  visualTemplates.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+  })),
+);
 
-  const matches = visualTemplates.value
-    .filter(
-      (item) =>
-        !query || item.name.toLowerCase().includes(normalizedQuery),
-    )
-    .map((item) => ({
-      label: item.name,
-      value: item.name,
-    }));
+const selectedPresetKey = computed({
+  get() {
+    if (visualPreset.value === NEW_PRESET_VALUE) {
+      return presetInput.value || null;
+    }
 
-  if (!query) {
-    return matches;
-  }
+    return visualPreset.value;
+  },
+  set(value: string | null) {
+    if (!value) {
+      resetVisualConfigSelection();
+      return;
+    }
 
-  if (matches.length === 0) {
-    return [{ label: query, value: query }];
-  }
+    const template = getTemplateById(value);
+    if (template) {
+      visualPreset.value = template.id;
+      presetInput.value = template.name;
+      return;
+    }
 
-  return matches;
+    visualPreset.value = NEW_PRESET_VALUE;
+    presetInput.value = value;
+  },
 });
 
 const createPresetOptions = computed(() =>
@@ -266,16 +221,6 @@ const batchExteriorRemainingCount = computed(
 
 const canAddBatchExteriorImages = computed(
   () => batchExteriorRemainingCount.value > 0 && !isUploadingVehicle.value,
-);
-
-const creativeActiveOption = computed(
-  () =>
-    props.capability.options.find((item) => item.id === props.selectedOptionId) ??
-    props.capability.options[0],
-);
-
-const creativePreviewImage = computed(
-  () => creativeActiveOption.value?.image ?? creativePreviewSamples[0].image,
 );
 
 const batchEstimatedCost = computed(() => {
@@ -322,6 +267,21 @@ function syncPresetSelectionFromInput(value: string) {
   visualPreset.value = matchedTemplate?.id ?? NEW_PRESET_VALUE;
 }
 
+function resetVisualConfigSelection() {
+  isApplyingTemplate.value = true;
+  visualPreset.value = NEW_PRESET_VALUE;
+  presetInput.value = "";
+  enableSceneChange.value = false;
+  batchSceneIndex.value = 0;
+  batchSceneCategory.value = "展厅灯光";
+  outputRatio.value = "1:1";
+  useRecentLogo.value = false;
+  lightConsistency.value = true;
+  paintRefresh.value = false;
+  interiorEnhance.value = false;
+  isApplyingTemplate.value = false;
+}
+
 watch(presetInput, (value) => {
   syncPresetSelectionFromInput(value);
 });
@@ -331,37 +291,34 @@ watch(batchSceneCategory, () => {
   batchSceneIndex.value = 0;
 });
 
-function handlePresetSelect(value: string) {
-  presetInput.value = value;
-  syncPresetSelectionFromInput(value);
-}
-
 async function handleSaveVisualPreset() {
   const input = buildTemplateInput();
 
   if (!input.name) {
-    message.warning("Please select completed tasks first");
+    message.warning("请输入预设名称");
     return;
   }
 
-  if (visualPreset.value === NEW_PRESET_VALUE) {
-    const created = await saveTemplate(input);
-    visualPreset.value = created.id;
-    presetInput.value = created.name;
-    createTaskPresetId.value = created.id;
-    message.success("Preset saved");
-    return;
-  }
+  try {
+    if (visualPreset.value === NEW_PRESET_VALUE) {
+      const created = await saveTemplate(input);
+      createTaskPresetId.value = created.id;
+    } else {
+      const updated = await updateTemplate(visualPreset.value, input);
+      if (!updated) {
+        message.error("预设保存失败，请重试");
+        return;
+      }
 
-  const updated = await updateTemplate(visualPreset.value, input);
-  if (!updated) {
-    message.error("预设保存失败，请重试");
-    return;
-  }
+      createTaskPresetId.value = updated.id;
+    }
 
-  presetInput.value = updated.name;
-  createTaskPresetId.value = updated.id;
-  message.success("Preset updated");
+    message.success("视觉配置保存成功");
+    resetVisualConfigSelection();
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "预设保存失败，请重试";
+    message.error(text);
+  }
 }
 
 function handleSaveVisualConfig() {
@@ -438,47 +395,6 @@ function normalizeImageFiles(files: File[]) {
   return files.filter((file) =>
     file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name),
   );
-}
-
-function openCreativeReferencePicker() {
-  creativeReferenceInputRef.value?.click();
-}
-
-function handleCreativeReferenceInputChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-
-  if (!file) return;
-
-  const [imageFile] = normalizeImageFiles([file]);
-  if (!imageFile) {
-    message.warning("请选择 JPG、PNG 或 WebP 图片");
-    return;
-  }
-
-  resetCreativeReference();
-  creativeReferenceObjectUrl = URL.createObjectURL(imageFile);
-  creativeReferencePreviewUrl.value = creativeReferenceObjectUrl;
-  message.success("参考图已添加");
-}
-
-function handleCreativeReferenceRemove() {
-  resetCreativeReference();
-  message.info("已移除参考图");
-}
-
-function applyCreativePromptPreset(preset: string) {
-  creativePrompt.value = `${preset}：${creativePrompt.value.replace(/^[^：]+：/, "")}`;
-}
-
-function handleCreativeGenerate() {
-  if (!creativePrompt.value.trim()) {
-    message.warning("请输入创意描述");
-    return;
-  }
-
-  message.success("创意生图样式已生成，接口待接入");
 }
 
 async function handleBatchExteriorFilesSelected(files: File[]) {
@@ -739,14 +655,12 @@ watch(
   () => {
     resetUploadedVehicle();
     resetBatchExteriorUploads();
-    resetCreativeReference();
   },
 );
 
 onUnmounted(() => {
   revokePreviewObjectUrl();
   resetBatchExteriorUploads();
-  resetCreativeReference();
 });
 
 watch(
@@ -771,6 +685,12 @@ watch(
   },
   { deep: true },
 );
+
+watch(batchTab, (tab) => {
+  if (tab === "visual") {
+    void ensureLoaded();
+  }
+});
 
 onMounted(() => {
   void ensureLoaded();
@@ -1158,14 +1078,16 @@ const activeCreateRatioLabel = computed(() => {
         <section class="batch-card preset-save-card">
           <div class="preset-save-row">
             <span>预设</span>
-            <NAutoComplete
-              v-model:value="presetInput"
+            <NSelect
+              v-model:value="selectedPresetKey"
               class="preset-combobox"
-              :options="presetAutocompleteOptions"
+              :options="visualPresetOptions"
+              :loading="isLoadingVisualPresets"
               size="large"
-              placeholder="输入或选择预设名称"
+              filterable
+              tag
               clearable
-              @select="handlePresetSelect"
+              placeholder="输入或选择预设名称"
             />
             <NButton type="primary" size="large" @click="handleSaveVisualPreset">
               保存
@@ -1263,195 +1185,6 @@ const activeCreateRatioLabel = computed(() => {
           </NButton>
         </footer>
       </div>
-    </template>
-
-    <template v-else-if="props.capability.code === 'creative-image'">
-      <section class="creative-image-panel" aria-label="创意生图">
-        <header class="creative-model-card">
-          <div class="creative-model-mark">
-            <span class="creative-model-icon" aria-hidden="true">
-              <Icon icon="mdi:sparkles" />
-            </span>
-            <div>
-              <p>GPT Image Studio</p>
-              <h2>{{ props.capability.title }}</h2>
-            </div>
-          </div>
-          <span class="creative-model-badge">Beta</span>
-        </header>
-
-        <section class="creative-prompt-card" aria-label="创意提示词">
-          <div class="creative-section-head">
-            <span>提示词</span>
-            <div class="creative-prompt-presets">
-              <button
-                v-for="preset in creativePromptPresets"
-                :key="preset"
-                type="button"
-                @click="applyCreativePromptPreset(preset)"
-              >
-                {{ preset }}
-              </button>
-            </div>
-          </div>
-
-          <textarea
-            v-model="creativePrompt"
-            class="creative-prompt-input"
-            rows="6"
-            maxlength="600"
-            placeholder="描述你想生成的营销主图、海报背景或广告创意图..."
-          ></textarea>
-
-          <footer class="creative-prompt-footer">
-            <span>{{ creativePrompt.length }}/600</span>
-            <strong>ChatGPT 图像生成风格</strong>
-          </footer>
-        </section>
-
-        <section class="creative-reference-card" aria-label="参考图">
-          <input
-            ref="creativeReferenceInputRef"
-            type="file"
-            class="creative-reference-input"
-            :accept="props.capability.accept"
-            @change="handleCreativeReferenceInputChange"
-          />
-
-          <button
-            type="button"
-            class="creative-reference-drop"
-            :class="{ 'has-image': creativeReferencePreviewUrl }"
-            @click="openCreativeReferencePicker"
-          >
-            <PreloadImage
-              v-if="creativeReferencePreviewUrl"
-              class="creative-reference-image"
-              :src="creativeReferencePreviewUrl"
-              alt="参考图"
-              loading="lazy"
-              decoding="async"
-              fit="cover"
-            />
-            <span v-else class="creative-reference-empty">
-              <Icon icon="mdi:image-plus-outline" />
-            </span>
-          </button>
-
-          <div class="creative-reference-copy">
-            <strong>参考图</strong>
-            <span>可选上传车辆、风格或构图参考。</span>
-          </div>
-
-          <button
-            v-if="creativeReferencePreviewUrl"
-            type="button"
-            class="creative-reference-remove"
-            aria-label="移除参考图"
-            @click="handleCreativeReferenceRemove"
-          >
-            <Icon icon="mdi:close" />
-          </button>
-        </section>
-
-        <section class="creative-controls-card" aria-label="生图参数">
-          <div class="creative-control-block">
-            <p>画幅</p>
-            <div class="creative-segment-grid">
-              <button
-                v-for="item in creativeRatioOptions"
-                :key="item.value"
-                type="button"
-                :class="{ active: creativeRatio === item.value }"
-                @click="creativeRatio = item.value"
-              >
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.hint }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="creative-control-block">
-            <p>质量</p>
-            <div class="creative-quality-row">
-              <button
-                v-for="item in creativeQualityOptions"
-                :key="item"
-                type="button"
-                :class="{ active: creativeQuality === item }"
-                @click="creativeQuality = item"
-              >
-                {{ item }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <CapabilityOptionSelector
-          v-if="hasBlock('selector')"
-          :capability="props.capability"
-          :selected-option-id="props.selectedOptionId"
-          @select="emit('selectOption', $event)"
-        />
-
-        <section class="creative-preview-card" aria-label="生成预览">
-          <header class="creative-preview-head">
-            <div>
-              <p>预览</p>
-              <h3>{{ creativeActiveOption?.title ?? "自由创意" }}</h3>
-            </div>
-            <span>{{ creativeRatio }} · {{ creativeQuality }}</span>
-          </header>
-
-          <div class="creative-preview-media">
-            <PreloadImage
-              class="creative-preview-image"
-              :src="creativePreviewImage"
-              :alt="creativeActiveOption?.title ?? '创意生图预览'"
-              loading="lazy"
-              decoding="async"
-              fit="cover"
-            />
-            <div class="creative-preview-overlay">
-              <span>GPT Image</span>
-              <strong>{{ creativeActiveOption?.title ?? "Creative" }}</strong>
-            </div>
-          </div>
-
-          <div class="creative-sample-strip">
-            <article v-for="item in creativePreviewSamples" :key="item.title">
-              <PreloadImage
-                class="creative-sample-image"
-                :src="item.image"
-                :alt="item.title"
-                loading="lazy"
-                decoding="async"
-                fit="cover"
-              />
-              <span>{{ item.title }}</span>
-            </article>
-          </div>
-        </section>
-
-        <div v-if="hasBlock('actions')" class="creative-action-row">
-          <NTag type="warning" round :bordered="false">
-            预计消耗 {{ props.capability.cost }} 积分
-          </NTag>
-          <NTag type="success" round :bordered="false">
-            余额 {{ props.capability.balance }} 积分
-          </NTag>
-          <NButton
-            type="warning"
-            size="large"
-            class="creative-generate-button"
-            :loading="props.isGenerating"
-            :disabled="props.isGenerating"
-            @click="handleCreativeGenerate"
-          >
-            {{ props.capability.actionLabel }} {{ props.capability.cost }}
-          </NButton>
-        </div>
-      </section>
     </template>
 
     <template v-else-if="props.capability.code === 'future-short-video'">

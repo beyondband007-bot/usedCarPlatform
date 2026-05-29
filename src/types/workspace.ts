@@ -48,6 +48,7 @@ export interface WorkspaceGenerateResult {
   downloadUrl: string
   imageWidth?: number
   imageHeight?: number
+  caption?: string
 }
 
 /** 通用大图预览面板数据，可用于生成结果、成片交付等场景 */
@@ -73,11 +74,12 @@ export interface WorkspaceDeliveryTaskPreview {
 }
 
 export interface WorkspaceGeneratePayload {
-  inputAssetId: string
+  inputAssetId?: string
   outputRatio: string
   optionId?: string
   useLogo?: boolean
   colorCode?: string
+  prompt?: string
 }
 
 export interface WorkspaceBatchActiveItem {

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
@@ -24,6 +24,10 @@ import {
   recentStatusLabelMap,
   resolveWorkspaceOptionTitle,
 } from '@/utils/workspace-recent'
+import watermarkBeforeOne from '@/assets/img/水印图1.png'
+import watermarkAfterOne from '@/assets/img/无水印图1.png'
+import watermarkAfterTwo from '@/assets/img/无水印图2.png'
+import watermarkAfterThree from '@/assets/img/无水印图3.png'
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -61,6 +65,24 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 const templateCards = workspaceTemplateRecommendations;
 
+const watermarkCompareCards = [
+  { title: "抖音水印去除", before: watermarkBeforeOne, after: watermarkAfterOne },
+] as const;
+const watermarkCompareProgress = ref([50]);
+const watermarkCompareMediaRefs = ref<(HTMLElement | null)[]>([]);
+const activeWatermarkCompareDrag = ref<{
+  index: number;
+  pointerId: number;
+} | null>(null);
+const watermarkActiveView = ref<"features" | "recent">("features");
+
+const watermarkRecentCards = [
+  { title: "宝马 X3", time: "10分钟前", image: watermarkAfterOne },
+  { title: "奥迪 A6L", time: "18分钟前", image: watermarkAfterTwo },
+  { title: "Model Y", time: "30分钟前", image: watermarkAfterThree },
+  { title: "丰田 凯美瑞", time: "1小时前", image: watermarkAfterOne },
+  { title: "奔驰 C260L", time: "2小时前", image: watermarkAfterTwo },
+] as const;
 function isTemplateActive(item: (typeof templateCards)[number]) {
   return (
     props.capability.code === item.capabilityCode &&
@@ -73,6 +95,50 @@ function handleTemplatePick(item: (typeof templateCards)[number]) {
     capabilityCode: item.capabilityCode,
     optionId: item.optionId,
   });
+}
+
+function clampWatermarkCompareProgress(value: number) {
+  return Math.min(88, Math.max(12, value));
+}
+
+function setWatermarkCompareMediaRef(index: number, element: unknown) {
+  watermarkCompareMediaRefs.value[index] = element instanceof HTMLElement ? element : null;
+}
+
+function updateWatermarkCompareProgress(index: number, clientX: number) {
+  const element = watermarkCompareMediaRefs.value[index];
+  if (!element) return;
+
+  const rect = element.getBoundingClientRect();
+  if (!rect.width) return;
+
+  const next = ((clientX - rect.left) / rect.width) * 100;
+  watermarkCompareProgress.value[index] = clampWatermarkCompareProgress(next);
+}
+
+function handleWatermarkComparePointerMove(event: PointerEvent) {
+  const drag = activeWatermarkCompareDrag.value;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+
+  updateWatermarkCompareProgress(drag.index, event.clientX);
+}
+
+function endWatermarkCompareDrag() {
+  activeWatermarkCompareDrag.value = null;
+  window.removeEventListener("pointermove", handleWatermarkComparePointerMove);
+  window.removeEventListener("pointerup", endWatermarkCompareDrag);
+  window.removeEventListener("pointercancel", endWatermarkCompareDrag);
+}
+
+function startWatermarkCompareDrag(index: number, event: PointerEvent) {
+  activeWatermarkCompareDrag.value = {
+    index,
+    pointerId: event.pointerId,
+  };
+  updateWatermarkCompareProgress(index, event.clientX);
+  window.addEventListener("pointermove", handleWatermarkComparePointerMove);
+  window.addEventListener("pointerup", endWatermarkCompareDrag);
+  window.addEventListener("pointercancel", endWatermarkCompareDrag);
 }
 
 const appStore = useAppStore();
@@ -332,6 +398,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopRecentAutoRefresh();
+  endWatermarkCompareDrag();
 });
 
 defineExpose({
@@ -358,6 +425,92 @@ defineExpose({
       @back="closeDeliveryImagePreview"
     />
 
+    <template v-else-if="capability.code === 'watermark-remove'">
+      <section class="watermark-assist-panel" aria-label="去水印工作台">
+        <header class="watermark-view-tabs" aria-label="去水印视图切换">
+          <button
+            type="button"
+            :class="{ active: watermarkActiveView === 'features' }"
+            @click="watermarkActiveView = 'features'"
+          >
+            功能描述
+          </button>
+          <button
+            type="button"
+            :class="{ active: watermarkActiveView === 'recent' }"
+            @click="watermarkActiveView = 'recent'"
+          >
+            最近生成
+          </button>
+        </header>
+
+        <template v-if="watermarkActiveView === 'features'">
+          <section class="watermark-assist-hero">
+            <div class="watermark-assist-copy">
+              <p>AI 去水印能力</p>
+              <h2>智能识别水印并完整保留画面细节</h2>
+              <span>适用于平台角标、文字与遮挡痕迹处理，输出更干净的车图素材。</span>
+            </div>
+          </section>
+
+          <section class="watermark-compare-section" aria-label="效果对比">
+            <header class="watermark-section-head">
+              <div>
+                <h3>效果对比</h3>
+                <p>拖动滑杆查看去水印前后效果对比</p>
+              </div>
+            </header>
+
+            <div class="watermark-compare-grid">
+              <article v-for="(card, index) in watermarkCompareCards" :key="card.title" class="watermark-compare-card">
+                <div
+                  :ref="(element) => setWatermarkCompareMediaRef(index, element)"
+                  class="watermark-compare-media"
+                  :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
+                  @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
+                >
+                  <PreloadImage class="watermark-compare-image" :src="card.before" :alt="`${card.title}处理前`" loading="lazy" decoding="async" />
+                  <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" :alt="`${card.title}处理后`" loading="lazy" decoding="async" />
+                  <div class="watermark-compare-divider" aria-hidden="true">
+                    <span></span>
+                  </div>
+                  <span class="watermark-compare-badge watermark-compare-badge--before">处理前</span>
+                  <span class="watermark-compare-badge watermark-compare-badge--after">处理后</span>
+                  <button
+                    type="button"
+                    class="watermark-compare-handle"
+                    :aria-label="`${card.title}前后对比拖拽滑杆`"
+                    @pointerdown.prevent.stop="startWatermarkCompareDrag(index, $event)"
+                  >
+                    <Icon icon="mdi:unfold-more-horizontal" />
+                  </button>
+                </div>
+                <strong>{{ card.title }}</strong>
+              </article>
+            </div>
+          </section>
+        </template>
+
+        <section v-else class="watermark-recent-section" aria-label="最近生成记录">
+          <header class="watermark-section-head">
+            <div>
+              <h3>最近生成记录</h3>
+              <p>查看最近处理过的去水印车辆素材</p>
+            </div>
+          </header>
+
+          <div class="watermark-recent-grid">
+            <article v-for="item in watermarkRecentCards" :key="item.title" class="watermark-recent-card">
+              <PreloadImage class="watermark-recent-image" :src="item.image" :alt="item.title" loading="lazy" decoding="async" />
+              <div class="watermark-recent-copy">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.time }}</span>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
+    </template>
     <ShortVideoBetaPanel
       v-else-if="capability.code === 'future-short-video'"
       :play-request="shortVideoPlayRequest"
@@ -1150,6 +1303,302 @@ defineExpose({
   line-height: 1.25;
 }
 
+.watermark-assist-panel {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 6px 24px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
+}
+
+.watermark-assist-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.watermark-assist-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
+}
+
+.watermark-view-tabs {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.watermark-view-tabs button {
+  min-width: 104px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--assist-muted);
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.watermark-view-tabs button.active {
+  background: color-mix(in srgb, var(--assist-blue) 16%, transparent);
+  color: var(--assist-blue);
+}
+
+.watermark-assist-hero,
+.watermark-compare-section,
+.watermark-recent-section {
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.watermark-assist-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-height: 148px;
+  padding: 24px;
+}
+
+.watermark-assist-copy {
+  min-width: 0;
+}
+
+.watermark-assist-copy p,
+.watermark-assist-copy h2,
+.watermark-assist-copy span {
+  margin: 0;
+}
+
+.watermark-assist-copy p {
+  color: var(--assist-blue);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.3;
+}
+
+.watermark-assist-copy h2 {
+  margin-top: 8px;
+  color: var(--assist-text);
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1.16;
+}
+
+.watermark-assist-copy span {
+  display: block;
+  margin-top: 10px;
+  color: var(--assist-muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.watermark-compare-section,
+.watermark-recent-section {
+  padding: 18px;
+}
+
+.watermark-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.watermark-section-head h3,
+.watermark-section-head p {
+  margin: 0;
+}
+
+.watermark-section-head h3 {
+  color: var(--assist-text);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.3;
+}
+
+.watermark-section-head p {
+  margin-top: 4px;
+  color: var(--assist-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.watermark-compare-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.watermark-compare-card {
+  min-width: 0;
+  width: 100%;
+}
+
+.watermark-compare-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 7.6;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card-strong);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.watermark-compare-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.watermark-compare-image--after {
+  z-index: 1;
+  clip-path: inset(0 0 0 var(--compare-progress, 50%));
+}
+
+.watermark-compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--compare-progress, 50%);
+  z-index: 2;
+  display: block;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.watermark-compare-divider span {
+  display: block;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, var(--assist-blue), transparent);
+}
+
+.watermark-compare-handle {
+  position: absolute;
+  top: 50%;
+  left: var(--compare-progress, 50%);
+  z-index: 3;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assist-blue) 88%, #000);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.watermark-compare-handle .iconify {
+  font-size: 18px;
+}
+
+.watermark-compare-badge {
+  position: absolute;
+  top: 10px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.watermark-compare-badge--before {
+  left: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+}
+
+.watermark-compare-badge--after {
+  right: 10px;
+  background: color-mix(in srgb, var(--assist-blue) 90%, #000);
+  color: #fff;
+}
+
+.watermark-compare-card strong {
+  display: block;
+  margin-top: 12px;
+  color: var(--assist-text);
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.watermark-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.watermark-recent-card {
+  overflow: hidden;
+  border: 1px solid var(--assist-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--assist-card) 92%, white);
+}
+
+.theme-light .watermark-recent-card {
+  background: #fff;
+}
+
+.watermark-recent-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--assist-card-strong);
+}
+
+.watermark-recent-copy {
+  display: grid;
+  gap: 4px;
+  padding: 10px 10px 12px;
+}
+
+.watermark-recent-copy strong,
+.watermark-recent-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watermark-recent-copy strong {
+  color: var(--assist-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.watermark-recent-copy span {
+  color: var(--assist-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .tab-group {
   display: flex;
   gap: 34px;
@@ -1768,6 +2217,34 @@ defineExpose({
 
   .delivery-result-head button {
     width: 100%;
+  }
+
+  .watermark-assist-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .watermark-recent-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .watermark-assist-panel {
+    padding-right: 0;
+  }
+
+  .watermark-assist-hero {
+    padding: 14px;
+  }
+
+  .watermark-compare-grid,
+  .watermark-recent-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .watermark-section-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

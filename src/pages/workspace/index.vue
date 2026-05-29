@@ -1,13 +1,15 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 
 import { createGenerationTask, getBatchTaskDetail, getGenerationTask, type BatchTaskDetail, type CreateGenerationTaskPayload, type GenerationTaskDetail, type GenerationTaskStatus } from '@/api/visual-workbench'
 import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
+import CreativeImageStudioPanel from '@/components/business/workspace/CreativeImageStudioPanel.vue'
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
+import { creativeImageDefaultPreview } from '@/constants/creative-image-studio'
 import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
 import type {
   WorkspaceBatchActiveJob,
@@ -42,6 +44,7 @@ function resolveCapabilityCode(code: unknown) {
 
 const activeCode = ref(resolveCapabilityCode(route.params.code))
 const generationResult = ref<WorkspaceGenerateResult | null>(null)
+const creativeImageCaption = ref<string | null>(null)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
@@ -233,6 +236,7 @@ watch(activeCode, () => {
   }
 
   generationResult.value = null
+  creativeImageCaption.value = null
   deliveryImagePreview.value = null
   previewedDeliveryTaskId.value = null
 })
@@ -337,10 +341,46 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
   }
 }
 
+async function handleCreativeGenerate(payload: { prompt: string; outputRatio: string }) {
+  if (!payload.prompt.trim()) {
+    message.warning('请输入生成提示词')
+    return
+  }
+
+  isGenerating.value = true
+  generationResult.value = null
+  creativeImageCaption.value = null
+
+  try {
+    message.info('创意生图 Beta：正在生成演示效果', { duration: 2800 })
+    await sleep(2200)
+
+    creativeImageCaption.value = payload.prompt
+    generationResult.value = {
+      createdAt: formatDate(new Date()),
+      statusText: '已完成 · 创意生图',
+      ratioLabel: payload.outputRatio,
+      previewImage: creativeImageDefaultPreview.image,
+      previewAlt: payload.prompt,
+      downloadUrl: creativeImageDefaultPreview.image,
+      caption: payload.prompt,
+    }
+    message.success('生成完成')
+    await assistPanelRef.value?.refreshRecentItems()
+  } finally {
+    isGenerating.value = false
+  }
+}
+
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
   if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
     shortVideoPlayRequest.value += 1
     message.success('演示视频已开始播放')
+    return
+  }
+
+  if (!payload.inputAssetId) {
+    message.warning('请先上传车辆图片')
     return
   }
 
@@ -433,9 +473,18 @@ onUnmounted(() => {
 <template>
   <main
     class="workspace-page bg-[var(--app-bg)]"
-    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    :class="[
+      appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      {
+        'workspace-page--watermark': activeCode === 'watermark-remove',
+        'workspace-page--creative-image': activeCode === 'creative-image',
+      },
+    ]"
   >
-    <section class="workspace-shell">
+    <section
+      class="workspace-shell"
+      :class="{ 'workspace-shell--studio': activeCode === 'creative-image' }"
+    >
       <div class="workspace-col workspace-col--nav">
         <WorkspaceSidebar :active-code="activeCode" @select="handleSelectCapability" />
       </div>
@@ -445,10 +494,20 @@ onUnmounted(() => {
         :class="{
           'workspace-col--batch': activeCapability.kind === 'batch',
           'workspace-col--delivery': activeCapability.kind === 'delivery',
+          'workspace-col--studio': activeCode === 'creative-image',
         }"
       >
         <div class="workspace-col-scroll">
+          <CreativeImageStudioPanel
+            v-if="activeCode === 'creative-image'"
+            :capability="activeCapability"
+            :is-generating="isGenerating"
+            :generation-result="generationResult"
+            :caption="creativeImageCaption"
+            @generate="handleCreativeGenerate"
+          />
           <CapabilityGeneratePanel
+            v-else
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
             :is-generating="isGenerating"
@@ -461,7 +520,7 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <div class="workspace-col workspace-col--assist">
+      <div v-if="activeCode !== 'creative-image'" class="workspace-col workspace-col--assist">
         <WorkspaceAssistPanel
           ref="assistPanelRef"
           :capability="activeCapability"
@@ -635,5 +694,51 @@ onUnmounted(() => {
   .workspace-col-scroll {
     overflow: visible;
   }
+}
+
+.workspace-page--watermark .workspace-shell {
+  @media (width >= 1024px) {
+    grid-template-columns: 240px minmax(340px, 430px) minmax(0, 1fr);
+  }
+
+  @media (width >= 1536px) {
+    grid-template-columns: 260px minmax(360px, 440px) minmax(0, 1fr);
+  }
+}
+
+.workspace-page--watermark .workspace-col--main {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42)),
+    var(--workspace-panel);
+}
+
+.workspace-page--creative-image .workspace-shell {
+  @media (width >= 1024px) {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  @media (width >= 1536px) {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+.workspace-col--studio {
+  border-radius: 18px;
+}
+
+.workspace-col--studio .workspace-col-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(16px, 2vw, 24px);
+
+  @media (width >= 1024px) {
+    padding: clamp(20px, 2.2vw, 28px);
+  }
+}
+
+.workspace-col--studio .workspace-col-scroll > :deep(*) {
+  flex: 1;
+  min-height: 0;
 }
 </style>
