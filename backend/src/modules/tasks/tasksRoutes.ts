@@ -14,6 +14,7 @@ tasksRoutes.get(
       status: typeof req.query.status === "string" ? req.query.status : undefined,
       page: Number(req.query.page ?? 1),
       pageSize: Number(req.query.pageSize ?? 20),
+      scope: typeof req.query.scope === "string" ? req.query.scope : undefined,
     });
     ok(res, tasks);
   }),
