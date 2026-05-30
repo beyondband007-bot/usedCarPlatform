@@ -38,6 +38,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 Detailed phase notes:
 
 - [Phase 1 contract](./reusable-credits-integration-contract.md)
+- [Phase 2 credits platform setup](./reusable-credits-phase-2-credits-platform-setup.md)
 - [Phase 3 DB fields](./reusable-credits-phase-3-db-fields.md)
 - [Phase 4 backend client](./reusable-credits-phase-4-backend-client.md)
 - [Phase 5 terminal billing](./reusable-credits-phase-5-terminal-billing.md)
@@ -186,4 +187,3 @@ Expected deliverable:
 Continue with Phase 7 next.
 
 The backend billing lifecycle is now far enough along that proxy APIs will unlock the frontend, recharge page, and admin console work without forcing the frontend to call two services directly.
-
