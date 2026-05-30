@@ -21,6 +21,7 @@ export const errors = {
   taskNotFound: () => new AppError(404, 40402, "task not found"),
   batchNotFound: () => new AppError(404, 40403, "batch task not found"),
   packageNotFound: () => new AppError(404, 40404, "delivery package not found"),
+  creativeConversationNotFound: () => new AppError(404, 40405, "creative conversation not found"),
   generationFailed: (message = "generation failed", details?: unknown) =>
     new AppError(500, 50001, message, details),
   packageFailed: (message = "package failed", details?: unknown) =>

@@ -185,6 +185,8 @@ class TasksService {
       "light-consistency": "光污一致化演示",
       "interior-clean": "内饰清洁演示",
       "watermark-remove": "去水印演示",
+      "creative-image": "创意生图任务",
+      "short-video": "短视频生成任务",
       "batch-new": "批量上新子任务",
     };
     return labels[task.moduleCode] ?? `${task.moduleCode} 生成任务`;

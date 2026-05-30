@@ -19,6 +19,10 @@ const addColumnIfMissing = async (tableName: string, columnName: string, definit
   await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
 };
 
+const makeColumnNullable = async (tableName: string, columnName: string, definition: string) => {
+  await pool.query(`ALTER TABLE ${tableName} MODIFY COLUMN ${columnName} ${definition}`);
+};
+
 const run = async () => {
   const connection = await pool.getConnection();
   try {
@@ -30,6 +34,7 @@ const run = async () => {
     await addColumnIfMissing("delivery_packages", "task_id", "VARCHAR(64) NULL");
     await addColumnIfMissing("delivery_packages", "package_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_packages", "expires_at", "DATETIME(3) NULL");
+    await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();

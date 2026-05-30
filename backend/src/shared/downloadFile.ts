@@ -8,6 +8,10 @@ const extensionFromContentType = (contentType: string | null) => {
   if (contentType.includes("png")) return ".png";
   if (contentType.includes("webp")) return ".webp";
   if (contentType.includes("jpeg") || contentType.includes("jpg")) return ".jpg";
+  if (contentType.includes("mp4") || contentType.includes("mpeg-4")) return ".mp4";
+  if (contentType.includes("quicktime")) return ".mov";
+  if (contentType.includes("webm")) return ".webm";
+  if (contentType.includes("video")) return ".mp4";
   return ".jpg";
 };
 

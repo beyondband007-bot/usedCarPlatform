@@ -12,6 +12,20 @@ export interface CreateKieImageTaskInput {
   resolution: Resolution;
 }
 
+export interface CreateKieTextToImageTaskInput {
+  prompt: string;
+  aspectRatio: OutputRatio;
+  resolution: Resolution;
+}
+
+export interface CreateKieImageToVideoTaskInput {
+  prompt: string;
+  imageUrl: string;
+  aspectRatio: "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
+  resolution: "480p" | "720p" | "1080p";
+  duration: 5 | 10;
+}
+
 export interface CreateKieImageTaskResult {
   kieTaskId: string;
   accountHash: string;

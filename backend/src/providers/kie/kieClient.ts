@@ -4,8 +4,10 @@ import path from "node:path";
 import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
 import type {
+  CreateKieImageToVideoTaskInput,
   CreateKieImageTaskInput,
   CreateKieImageTaskResult,
+  CreateKieTextToImageTaskInput,
   KieAccountLease,
   KieTaskDetail,
   KieUploadedFile,
@@ -33,8 +35,12 @@ const collectUrls = (value: unknown): string[] => {
     record.result_urls,
     record.imageUrls,
     record.image_urls,
+    record.videoUrls,
+    record.video_urls,
     record.outputUrls,
     record.output_urls,
+    record.resultVideoUrls,
+    record.result_video_urls,
     record.urls,
   ];
 
@@ -60,6 +66,56 @@ class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
     const lease = await kieKeyPool.acquire();
     return this.createImageToImageTaskWithLease(lease, input);
+  }
+
+  async createTextToImageTaskWithLease(
+    lease: KieAccountLease,
+    input: CreateKieTextToImageTaskInput,
+  ): Promise<CreateKieImageTaskResult> {
+    const requestBody = {
+      model: "gpt-image-2-text-to-image",
+      input: {
+        prompt: input.prompt,
+        aspect_ratio: input.aspectRatio,
+        resolution: input.resolution,
+      },
+    };
+
+    try {
+      const response = await fetch(env.kie.createTaskUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lease.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie create text-to-image task failed", raw);
+      }
+
+      const rawRecord = asRecord(raw);
+      const data = asRecord(rawRecord.data ?? rawRecord);
+      const kieTaskId = data.taskId ?? data.task_id ?? data.id;
+      if (typeof kieTaskId !== "string" || !kieTaskId) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie text-to-image response missing taskId", raw);
+      }
+
+      return {
+        kieTaskId,
+        accountHash: lease.accountHash,
+        raw,
+      };
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("kie create text-to-image task failed"))) {
+        await kieKeyPool.markFailure(lease.accountHash);
+      }
+      throw error;
+    }
   }
 
   async uploadLocalFileWithLease(
@@ -148,6 +204,58 @@ class KieClient {
       };
     } catch (error) {
       if (!(error instanceof Error && error.message.includes("kie create task failed"))) {
+        await kieKeyPool.markFailure(lease.accountHash);
+      }
+      throw error;
+    }
+  }
+
+  async createImageToVideoTaskWithLease(
+    lease: KieAccountLease,
+    input: CreateKieImageToVideoTaskInput,
+  ): Promise<CreateKieImageTaskResult> {
+    const requestBody = {
+      model: "bytedance/seedance-2",
+      input: {
+        prompt: input.prompt,
+        reference_image_urls: [input.imageUrl],
+        aspect_ratio: input.aspectRatio,
+        resolution: input.resolution,
+        duration: input.duration,
+      },
+    };
+
+    try {
+      const response = await fetch(env.kie.createTaskUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lease.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie create video task failed", raw);
+      }
+
+      const rawRecord = asRecord(raw);
+      const data = asRecord(rawRecord.data ?? rawRecord);
+      const kieTaskId = data.taskId ?? data.task_id ?? data.id;
+      if (typeof kieTaskId !== "string" || !kieTaskId) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie video response missing taskId", raw);
+      }
+
+      return {
+        kieTaskId,
+        accountHash: lease.accountHash,
+        raw,
+      };
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("kie create video task failed"))) {
         await kieKeyPool.markFailure(lease.accountHash);
       }
       throw error;
