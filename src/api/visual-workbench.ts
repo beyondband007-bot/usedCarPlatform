@@ -40,6 +40,11 @@ export interface CreateGenerationTaskPayload {
   colorCode?: string
   outputRatio?: string
   resolution?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
   extra?: Record<string, unknown>
 }
 
@@ -55,6 +60,10 @@ export interface CreatedGenerationTask {
   logoAssetId?: string | null
   colorCode?: string | null
   inputImageCount: number
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
   pollingUrl: string
   createdAt: string
 }

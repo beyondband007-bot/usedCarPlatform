@@ -176,6 +176,35 @@ export class TasksRepository extends Repository {
     );
   }
 
+  async updateBilling(input: {
+    id: string;
+    creditsUserId: number;
+    creditsTenantId?: number | null;
+    accountScope: "personal" | "tenant";
+    billingTaskId: number;
+    billingStatus: string;
+    estimatedPoints?: string | null;
+    settledPoints?: string | null;
+  }) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET credits_user_id = :creditsUserId,
+           credits_tenant_id = :creditsTenantId,
+           account_scope = :accountScope,
+           billing_task_id = :billingTaskId,
+           billing_status = :billingStatus,
+           estimated_points = :estimatedPoints,
+           settled_points = :settledPoints
+       WHERE id = :id`,
+      {
+        ...input,
+        creditsTenantId: input.creditsTenantId ?? null,
+        estimatedPoints: input.estimatedPoints ?? null,
+        settledPoints: input.settledPoints ?? null,
+      },
+    );
+  }
+
   async markSubmitted(input: {
     id: string;
     kieTaskId: string;

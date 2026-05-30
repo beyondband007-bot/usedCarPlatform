@@ -9,7 +9,7 @@ export const interiorCleanRoutes = Router();
 interiorCleanRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await interiorCleanService.createTask(req.body);
+    const result = await interiorCleanService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );

@@ -4,6 +4,14 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { buildPaintRefreshColorPrompt, paintRefreshPrompt } from "./paintRefreshPrompts";
 
@@ -19,7 +27,7 @@ const resolveColorCode = (body: PaintRefreshRequest) => {
 };
 
 class PaintRefreshService {
-  async createTask(body: PaintRefreshRequest) {
+  async createTask(body: PaintRefreshRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -52,6 +60,23 @@ class PaintRefreshService {
       logoAssetId: null,
       prompt,
     });
+
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: "paint-refresh",
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
 
     const lease = await kieKeyPool.acquire();
     try {
@@ -92,10 +117,16 @@ class PaintRefreshService {
         kieTaskId: kieTask.kieTaskId,
         colorCode,
         inputImageCount: inputUrls.length,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "PAINT_REFRESH_CREATE_FAILED",
@@ -107,4 +138,3 @@ class PaintRefreshService {
 }
 
 export const paintRefreshService = new PaintRefreshService();
-
