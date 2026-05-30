@@ -87,6 +87,10 @@ export interface GenerationTaskDetail {
   outputRatio: string
   resolution: string
   resultImages: GenerationResultImage[]
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   error: {
     code?: string
     message?: string
@@ -285,6 +289,10 @@ export interface RecentGenerationTask {
   inputAssetId?: string | null
   inputAssetUrl?: string | null
   resultCount?: number | null
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   error?: string | { code?: string; message?: string } | null
 }
 

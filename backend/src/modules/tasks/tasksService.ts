@@ -8,6 +8,10 @@ import { downloadFile } from "../../shared/downloadFile";
 import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
 import {
+  finalizeGenerationBilling,
+  shouldFinalizeGenerationBilling,
+} from "../billing/billingLifecycle";
+import {
   normalizeTaskResults,
   tasksRepository,
   type GenerationTaskRecord,
@@ -69,7 +73,20 @@ class TasksService {
       await this.refreshFromKie(task);
       const refreshed = await tasksRepository.findById(taskId);
       if (!refreshed) throw errors.taskNotFound();
+      if (shouldFinalizeGenerationBilling(refreshed)) {
+        await finalizeGenerationBilling(refreshed);
+        const finalized = await tasksRepository.findById(taskId);
+        if (!finalized) throw errors.taskNotFound();
+        return this.toResponse(finalized);
+      }
       return this.toResponse(refreshed);
+    }
+
+    if (shouldFinalizeGenerationBilling(task)) {
+      await finalizeGenerationBilling(task);
+      const finalized = await tasksRepository.findById(taskId);
+      if (!finalized) throw errors.taskNotFound();
+      return this.toResponse(finalized);
     }
 
     return this.toResponse(task);
@@ -94,7 +111,7 @@ class TasksService {
       errorMessage: status === "fail" ? detail.errorMessage ?? "Kie task failed" : null,
     });
 
-    if (status === "success" || status === "fail") {
+    if (terminalStatuses.includes(status)) {
       await kieKeyPool.release(task.kieAccountHash ?? "");
     }
   }
@@ -131,6 +148,10 @@ class TasksService {
       outputRatio: task.outputRatio,
       resolution: task.resolution,
       resultImages: results,
+      billingTaskId: task.billingTaskId ?? null,
+      billingStatus: task.billingStatus ?? null,
+      estimatedPoints: task.estimatedPoints ?? null,
+      settledPoints: task.settledPoints ?? null,
       error:
         task.errorCode || task.errorMessage
           ? {
@@ -165,6 +186,10 @@ class TasksService {
       inputAssetId: task.inputAssetId,
       inputAssetUrl: task.inputAssetUrl,
       resultCount: results.length,
+      billingTaskId: task.billingTaskId ?? null,
+      billingStatus: task.billingStatus ?? null,
+      estimatedPoints: task.estimatedPoints ?? null,
+      settledPoints: task.settledPoints ?? null,
       error:
         task.errorCode || task.errorMessage
           ? {

@@ -62,6 +62,10 @@ class CreditsClient {
     return this.post<BillingTaskResponse>("/billing/freeze", input);
   }
 
+  async settle(input: BillingTaskMutationInput) {
+    return this.post<BillingTaskResponse>("/billing/settle", input);
+  }
+
   async refund(input: BillingTaskMutationInput) {
     return this.post<BillingTaskResponse>("/billing/refund", input);
   }
