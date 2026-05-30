@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { motion } from "motion-v";
 
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceCapability } from "@/types/workspace";
 
 const props = defineProps<{
@@ -65,13 +66,13 @@ const optionRows = computed(() => {
                 @keydown.enter="emit('select', option.id)"
                 @keydown.space.prevent="emit('select', option.id)"
               >
-                <img
+                <PreloadImage
                   class="option-item-cover"
                   :src="option.image"
                   :alt="option.title"
                   loading="lazy"
                   decoding="async"
-                  draggable="false"
+                  :draggable="false"
                 />
                 <strong class="option-item-title">{{ option.title }}</strong>
               </article>
@@ -91,27 +92,27 @@ const optionRows = computed(() => {
 .option-selector-card {
   --option-gap: 12px;
   --option-visible: 2.25;
-  --option-scroll-track: rgba(218, 226, 237, 0.72);
-  --option-scroll-track-glow: rgba(47, 124, 255, 0.14);
-  --option-scroll-thumb-start: #19c995;
-  --option-scroll-thumb-end: #2f7cff;
-  --option-scroll-thumb-glow: rgba(47, 124, 255, 0.42);
+  --option-scroll-track: color-mix(in srgb, var(--workspace-muted, #969186) 16%, transparent);
+  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
+  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
+  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
+  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, transparent);
 
   padding: 18px 18px 14px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: var(--app-surface);
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--workspace-line, var(--app-border));
+  border-radius: 14px;
+  background: var(--workspace-panel, var(--app-surface));
+  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(15, 23, 42, 0.08));
 }
 
 :global([data-theme="dark"]) .option-selector-card {
   --option-scroll-track: rgba(255, 255, 255, 0.08);
-  --option-scroll-track-glow: rgba(47, 124, 255, 0.22);
-  --option-scroll-thumb-start: #3dcda8;
-  --option-scroll-thumb-end: #5b9dff;
-  --option-scroll-thumb-glow: rgba(91, 157, 255, 0.5);
+  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
+  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
+  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
+  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 42%, transparent);
 
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
 }
 
 .option-selector-head {
@@ -233,7 +234,7 @@ const optionRows = computed(() => {
   width: calc((100cqw - var(--option-gap) * 2) / var(--option-visible));
   scroll-snap-align: start;
   overflow: hidden;
-  border: 2px solid color-mix(in srgb, var(--app-border) 88%, transparent);
+  border: 2px solid color-mix(in srgb, var(--workspace-line, var(--app-border)) 88%, transparent);
   border-radius: 10px;
   background: var(--app-surface-soft);
   cursor: pointer;
@@ -249,22 +250,21 @@ const optionRows = computed(() => {
 }
 
 .option-item.is-active {
-  border-color: #2f7cff;
+  border-color: var(--workspace-accent, #efc24c);
   box-shadow:
-    0 0 0 2px rgba(47, 124, 255, 0.14),
-    0 10px 24px rgba(47, 124, 255, 0.16);
+    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent),
+    0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
 }
 
 .option-item:focus-visible {
-  border-color: #2f7cff;
-  box-shadow: 0 0 0 3px rgba(47, 124, 255, 0.22);
+  border-color: var(--workspace-accent, #efc24c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
 }
 
 .option-item-cover {
   display: block;
   width: 100%;
   height: clamp(96px, 10vw, 124px);
-  object-fit: cover;
   pointer-events: none;
 }
 

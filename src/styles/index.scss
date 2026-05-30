@@ -2,42 +2,42 @@
 
 $theme-vars: (
   light: (
-    app-bg: #f3f5f8,
-    app-surface: #ffffff,
-    app-surface-soft: #eef2f7,
-    app-border: rgba(15, 23, 42, 0.12),
-    app-text: #0f172a,
-    app-text-soft: #475569,
-    app-header-bg: #ffffff,
-    app-header-shadow: 0 4px 24px rgba(15, 23, 42, 0.08),
-    app-header-nav: #4b5563,
-    app-header-nav-active-bg: #fff7ed,
-    app-header-nav-active: #f97316,
-    app-header-brand-sub: #6b7280,
-    app-header-chip-bg: #f3f4f6,
-    app-header-chip-text: #374151,
-    app-header-credits-bg: #fff7ed,
-    app-header-credits-text: #374151,
-    app-header-user: #374151,
+    app-bg: #f4f0e8,
+    app-surface: #fcfaf5,
+    app-surface-soft: #f2ede4,
+    app-border: rgba(37, 27, 10, 0.12),
+    app-text: #18120a,
+    app-text-soft: #5e5647,
+    app-header-bg: rgba(252, 250, 245, 0.92),
+    app-header-shadow: 0 10px 34px rgba(52, 39, 16, 0.08),
+    app-header-nav: #6a6251,
+    app-header-nav-active-bg: rgba(239, 194, 76, 0.14),
+    app-header-nav-active: #a26b00,
+    app-header-brand-sub: #7b7362,
+    app-header-chip-bg: rgba(239, 194, 76, 0.12),
+    app-header-chip-text: #4c3a08,
+    app-header-credits-bg: rgba(239, 194, 76, 0.16),
+    app-header-credits-text: #4c3a08,
+    app-header-user: #392b10,
   ),
   dark: (
-    app-bg: #080a10,
-    app-surface: #11131b,
-    app-surface-soft: #0d1018,
+    app-bg: #050505,
+    app-surface: #101010,
+    app-surface-soft: #0b0b0b,
     app-border: rgba(255, 255, 255, 0.1),
-    app-text: #f8fafc,
-    app-text-soft: #94a3b8,
-    app-header-bg: #111827,
-    app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.35),
-    app-header-nav: #9ca3af,
-    app-header-nav-active-bg: #1f2937,
-    app-header-nav-active: #f97316,
-    app-header-brand-sub: #9ca3af,
-    app-header-chip-bg: #1f2937,
-    app-header-chip-text: #d1d5db,
-    app-header-credits-bg: #292524,
-    app-header-credits-text: #fbbf24,
-    app-header-user: #f9fafb,
+    app-text: #f4f1e9,
+    app-text-soft: #959083,
+    app-header-bg: rgba(5, 5, 5, 0.9),
+    app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.42),
+    app-header-nav: #9c9788,
+    app-header-nav-active-bg: rgba(239, 194, 76, 0.12),
+    app-header-nav-active: #f0c44f,
+    app-header-brand-sub: #9c9788,
+    app-header-chip-bg: rgba(255, 255, 255, 0.06),
+    app-header-chip-text: #e8e1cf,
+    app-header-credits-bg: rgba(239, 194, 76, 0.14),
+    app-header-credits-text: #f4d36a,
+    app-header-user: #f8f3e7,
   ),
 );
 
@@ -66,6 +66,14 @@ $theme-vars: (
 
 [data-subnav="true"] {
   --app-subnav-offset: 2.75rem;
+}
+
+.app-layout--studio-chrome[data-subnav="true"] {
+  --app-header-offset: 148px;
+}
+
+.app-layout--studio-chrome:not([data-subnav="true"]) {
+  --app-header-offset: 96px;
 }
 
 :root {

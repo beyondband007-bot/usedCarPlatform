@@ -16,6 +16,23 @@ export const AUTH_ROUTE = '/auth'
 
 export const WORKSPACE_ROUTE = '/workspace'
 
+export const CREDITS_ROUTE = '/credits'
+
+export const PACKAGE_POINTS_ROUTE = '/package-points'
+
+/** 视觉工作台一级导航下的页面（含二级菜单） */
+export const WORKBENCH_SECTION_ROUTES = [
+  WORKSPACE_ROUTE,
+  CREDITS_ROUTE,
+  PACKAGE_POINTS_ROUTE,
+] as const
+
+export function isWorkbenchSectionPath(path: string) {
+  return WORKBENCH_SECTION_ROUTES.some(
+    (base) => path === base || path.startsWith(`${base}/`),
+  )
+}
+
 export const WORKSPACE_DEFAULT_CAPABILITY = 'showroom-light'
 
 /** 工作台业务模块（与左侧子菜单分组对应） */
@@ -52,6 +69,13 @@ export const workspaceFlowModules = [
     description: '批量上新任务 · 成片交付包',
     defaultCapabilityCode: 'batch-new',
     capabilityCodes: ['batch-new', 'delivery'],
+  },
+  {
+    id: 'marketing',
+    title: '营销工具',
+    description: '去水印 · 短视频等营销素材处理',
+    defaultCapabilityCode: 'watermark-remove',
+    capabilityCodes: ['watermark-remove', 'creative-image', 'future-short-video'],
   },
 ] as const
 

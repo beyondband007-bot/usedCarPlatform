@@ -389,13 +389,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--recharge-page-pad);
-  background:
-    radial-gradient(
-      820px 220px at 68% 0%,
-      rgba(48, 128, 255, 0.16),
-      transparent 70%
-    ),
-    linear-gradient(180deg, #0e1d34, var(--recharge-bg));
+  background: var(--app-bg);
   color: var(--recharge-text);
 }
 
@@ -607,7 +601,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--plan-gap);
   margin-top: 18px;
   margin-left: clamp(10px, 1.4vw, 22px);
@@ -1100,14 +1094,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   .plan-grid {
     margin-top: 12px;
   }
-
-  :deep(.recharge-plan-card) {
-    --plan-card-ratio-h: 1184;
-  }
-
-  :deep(.recharge-plan-card.is-gold) {
-    --plan-card-ratio-h: 1216;
-  }
 }
 
 @media (max-width: 980px) {
@@ -1170,12 +1156,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   :deep(.recharge-plan-card) {
     flex-basis: 100%;
     max-width: 100%;
-  }
-
-  :deep(.plan-card-content) {
-    left: clamp(14px, 5%, 28px);
-    width: 58%;
-    max-width: 58%;
   }
 
   .plan-grid {

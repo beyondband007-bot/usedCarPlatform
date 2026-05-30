@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { NButton, NTag } from 'naive-ui'
-import { motion } from 'motion-v'
+import { onMounted, ref } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
+import HomePromoBanner from '@/components/business/home/HomePromoBanner.vue'
 import { homeQuickEntries } from '@/constants/home-page'
 import type { HomeQuickEntry } from '@/constants/home-page'
 
@@ -10,8 +10,10 @@ const emit = defineEmits<{
   enterWorkbench: []
 }>()
 
+const gridRef = ref<HTMLElement | null>(null)
+
 function handleClick(entry: HomeQuickEntry) {
-  if (entry.disabled || entry.to) {
+  if (entry.disabled) {
     return
   }
 
@@ -19,152 +21,226 @@ function handleClick(entry: HomeQuickEntry) {
     emit('enterWorkbench')
   }
 }
+
+onMounted(() => {
+  const root = gridRef.value
+  if (!root) {
+    return
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.animate(
+            [
+              { opacity: 0, transform: 'translateY(22px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            {
+              duration: 620,
+              easing: 'cubic-bezier(.16,1,.3,1)',
+              fill: 'both',
+            },
+          )
+          observer.unobserve(entry.target)
+        }
+      })
+    },
+    { threshold: 0.12 },
+  )
+
+  root.querySelectorAll('.suite-card, .promo-banner').forEach((item) => observer.observe(item))
+})
 </script>
 
 <template>
-  <section class="home-quick-access" aria-label="快捷入口">
-    <div class="home-quick-access-grid">
-      <motion.article
-        v-for="(entry, index) in homeQuickEntries"
+  <section id="suite" class="suite-shell" aria-label="快捷入口">
+    <div ref="gridRef" class="suite-grid">
+      <article
+        v-for="entry in homeQuickEntries"
         :key="entry.title"
-        :initial="{ opacity: 0, y: 20 }"
-        :animate="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.45, delay: index * 0.07 }"
-        class="home-quick-card"
+        class="suite-card"
       >
-        <div class="home-quick-card-copy">
-          <div class="home-quick-card-head">
-            <h2>{{ entry.title }}</h2>
-            <NTag v-if="entry.tag" size="small" round :bordered="false" type="info">
-              {{ entry.tag }}
-            </NTag>
-          </div>
+        <PreloadImage
+          class="suite-card-image"
+          :src="entry.image"
+          :alt="entry.title"
+          loading="lazy"
+          decoding="async"
+        />
+        <div>
+          <h2>{{ entry.title }}</h2>
           <p>{{ entry.description }}</p>
-
-          <RouterLink v-if="entry.to" :to="entry.to" class="home-quick-action">
-            <NButton type="primary" text class="home-quick-button">
-              {{ entry.action }}
-              <Icon icon="mdi:arrow-right" class="ml-1 text-base" />
-            </NButton>
+          <RouterLink
+            v-if="entry.to"
+            :to="entry.to"
+            class="button gold small"
+          >
+            {{ entry.action }}
           </RouterLink>
-          <NButton
+          <button
             v-else-if="entry.workbenchEntry"
-            type="primary"
-            text
-            class="home-quick-button"
+            type="button"
+            class="button gold small"
             @click="handleClick(entry)"
           >
             {{ entry.action }}
-            <Icon icon="mdi:arrow-right" class="ml-1 text-base" />
-          </NButton>
-          <NButton v-else text disabled class="home-quick-button">
+          </button>
+          <button
+            v-else
+            type="button"
+            class="button gold small"
+            disabled
+          >
             {{ entry.action }}
-          </NButton>
+          </button>
         </div>
+      </article>
 
-        <div class="home-quick-card-visual">
-          <img :src="entry.image" :alt="entry.title" loading="lazy" />
-        </div>
-      </motion.article>
+      <HomePromoBanner />
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.home-quick-access {
-  padding: clamp(24px, 3vw, 40px) clamp(20px, 4vw, 48px) 0;
+.suite-shell {
+  position: relative;
+  z-index: 3;
+  width: min(1520px, calc(100% - 40px));
+  margin: 70px auto 0;
+  padding-bottom: 126px;
 }
 
-.home-quick-access-grid {
+.suite-grid {
   display: grid;
-  max-width: 1280px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  width: min(1575px, 100%);
   margin: 0 auto;
-  gap: clamp(16px, 2vw, 24px);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.home-quick-card {
-  display: grid;
-  min-height: 200px;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 42%);
-  gap: 12px;
+.suite-card {
+  position: relative;
+  min-height: 259px;
   overflow: hidden;
-  border: 1px solid var(--home-border);
-  border-radius: 16px;
-  background: var(--home-surface);
-  box-shadow: var(--home-shadow-soft);
+  border: 1px solid var(--home-line);
+  border-radius: 35px;
+  background: var(--home-panel);
+  box-shadow: var(--home-card-shadow);
 }
 
-.home-quick-card-copy {
-  display: flex;
-  flex-direction: column;
-  padding: clamp(20px, 2.2vw, 28px);
+.suite-card::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: var(--home-card-shine);
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
-.home-quick-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.suite-card:hover::after {
+  opacity: 1;
 }
 
-.home-quick-card-head h2 {
-  margin: 0;
-  color: var(--home-text);
-  font-size: clamp(20px, 1.8vw, 24px);
-  font-weight: 900;
-}
-
-.home-quick-card-copy > p {
-  flex: 1;
-  margin: 10px 0 16px;
-  color: var(--home-muted);
-  font-size: 14px;
-  line-height: 1.6;
-  font-weight: 600;
-}
-
-.home-quick-button {
-  justify-content: flex-start !important;
-  padding: 0 !important;
-  font-weight: 800 !important;
-}
-
-.home-quick-card-visual {
-  overflow: hidden;
-  border-left: 1px solid var(--home-border);
-}
-
-.home-quick-card-visual img {
-  display: block;
+.suite-card-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  min-height: 200px;
-  object-fit: cover;
-  filter: var(--home-card-image-filter);
+  opacity: 0.94;
+  border-radius: 35px;
 }
 
-@media (max-width: 1080px) {
-  .home-quick-access-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.suite-card div {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-height: 259px;
+  padding: 35px;
+  background: var(--home-media-overlay);
+}
 
-  .home-quick-card {
-    grid-template-columns: minmax(0, 1fr) minmax(140px, 38%);
+.suite-card h2 {
+  margin: 0 0 12px;
+  color: var(--home-media-title);
+  font-size: 22px;
+}
+
+.suite-card p {
+  margin: 0 0 48px;
+  color: var(--home-media-desc);
+  font-size: 13px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+  transition:
+    transform 0.22s ease,
+    filter 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: saturate(1.08);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button.gold {
+  color: #171100;
+  background: linear-gradient(180deg, var(--home-gold-strong), #e9b82c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 12px 34px rgba(244, 200, 64, 0.18);
+}
+
+.button.small {
+  min-height: 36px;
+  padding: 0 20px;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .suite-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 640px) {
-  .home-quick-card {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 700px) {
+  .suite-shell {
+    width: min(100% - 28px, 1520px);
+    margin-top: 26px;
+    padding-bottom: 80px;
   }
 
-  .home-quick-card-visual {
-    border-top: 1px solid var(--home-border);
-    border-left: 0;
+  .suite-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
   }
 
-  .home-quick-card-visual img {
-    min-height: 160px;
+  .suite-card,
+  .suite-card div {
+    min-height: 210px;
   }
 }
 </style>

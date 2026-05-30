@@ -1,6 +1,6 @@
 import { deliveryResults } from '@/constants/delivery-results'
 import {
-  downloadFilesSequentially,
+  downloadFilesAsZip,
   sanitizeFilename,
   type DownloadFileItem,
 } from '@/utils/download'
@@ -44,12 +44,12 @@ export async function downloadDeliveryTasks(tasks: DeliveryDownloadTask[]) {
   const files = buildDeliveryDownloadFiles(tasks)
   if (!files.length) return 0
 
-  await downloadFilesSequentially(files)
+  await downloadFilesAsZip(files, 'delivery-results.zip')
   return files.length
 }
 
 export async function downloadAllDeliveryResults() {
   const files = buildAllDeliveryDownloadFiles()
-  await downloadFilesSequentially(files)
+  await downloadFilesAsZip(files, 'delivery-results.zip')
   return files.length
 }

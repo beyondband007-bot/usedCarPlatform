@@ -1,5 +1,41 @@
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
+
 import { shortVideoBetaDemo } from '@/constants/short-video-beta'
+
+const props = defineProps<{
+  playRequest?: number
+}>()
+
+const videoRef = ref<HTMLVideoElement | null>(null)
+
+async function playDemoVideo() {
+  await nextTick()
+
+  const video = videoRef.value
+  if (!video) {
+    return
+  }
+
+  video.currentTime = 0
+
+  try {
+    await video.play()
+  } catch {
+    // 浏览器可能拦截自动播放，保留控件供用户手动播放。
+  }
+}
+
+watch(
+  () => props.playRequest,
+  (request) => {
+    if (!request) {
+      return
+    }
+
+    void playDemoVideo()
+  },
+)
 </script>
 
 <template>
@@ -14,6 +50,7 @@ import { shortVideoBetaDemo } from '@/constants/short-video-beta'
 
     <div class="short-video-stage">
       <video
+        ref="videoRef"
         class="short-video-player"
         controls
         playsinline

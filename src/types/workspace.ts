@@ -18,13 +18,23 @@ export interface WorkspaceTutorialStep {
 
 export interface WorkspaceRecentItem {
   id: string
+  taskId?: string
+  moduleCode?: string
   title: string
-  status: 'waiting' | 'queue' | 'generating' | 'success' | 'fail'
+  status: 'waiting' | 'queued' | 'queue' | 'generating' | 'success' | 'fail' | 'canceled'
   createdAt: string
+  updatedAt?: string
   thumbnail?: string
   previewImage?: string
+  downloadUrl?: string
   ratioLabel?: string
   sceneLabel?: string
+  outputRatio?: string
+  inputAssetId?: string
+  inputAssetUrl?: string
+  progress?: number
+  resultCount?: number
+  error?: string
   imageWidth?: number
   imageHeight?: number
 }
@@ -38,6 +48,72 @@ export interface WorkspaceGenerateResult {
   downloadUrl: string
   imageWidth?: number
   imageHeight?: number
+  caption?: string
+}
+
+/** 通用大图预览面板数据，可用于生成结果、成片交付等场景 */
+export interface WorkspaceImagePreview {
+  createdAt: string
+  statusText: string
+  ratioLabel: string
+  imageUrl: string
+  imageAlt: string
+  downloadUrl: string
+  imageWidth?: number
+  imageHeight?: number
+}
+
+export interface WorkspaceDeliveryTaskPreview {
+  id: string
+  title: string
+  meta: string
+  image: string
+  previewImage?: string
+  progress: number
+  imageCount: number
+}
+
+export interface WorkspaceGeneratePayload {
+  inputAssetId?: string
+  outputRatio: string
+  optionId?: string
+  useLogo?: boolean
+  colorCode?: string
+  prompt?: string
+}
+
+export interface WorkspaceBatchActiveItem {
+  itemId: string
+  groupTitle: string
+  itemKind: 'exterior' | 'interior'
+  status: WorkspaceRecentItem['status']
+  progress: number
+  thumbnail?: string
+}
+
+export interface WorkspaceBatchActiveJob {
+  batchId: string
+  projectName: string
+  previewUrl: string
+  createdAt: string
+  status: WorkspaceRecentItem['status']
+  total: number
+  completed: number
+  failed: number
+  progress: number
+  items: WorkspaceBatchActiveItem[]
+}
+
+export interface WorkspaceBatchCreatedPayload {
+  batchId: string
+  projectName: string
+  previewUrl: string
+  createdAt: string
+  status: WorkspaceRecentItem['status']
+  total: number
+  completed: number
+  failed: number
+  progress: number
 }
 
 export interface WorkspaceCapability {
@@ -60,7 +136,6 @@ export interface WorkspaceCapability {
   middleBlocks?: WorkspaceCapabilityBlock[]
   options: WorkspaceOption[]
   tutorial: WorkspaceTutorialStep[]
-  recent: WorkspaceRecentItem[]
   requirements: string[]
   cost: number
   balance: number

@@ -1,131 +1,312 @@
 <script setup lang="ts">
-import { NButton } from 'naive-ui'
-import { motion } from 'motion-v'
+import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 
-import { homeHeroImage } from '@/constants/home-page'
+import PreloadImage from '@/components/common/PreloadImage.vue'
+import { homeHeroPosterSrc, homeHeroVideoSrc } from '@/constants/home-page'
 
 defineEmits<{
   enterWorkbench: []
 }>()
+
+const heroRef = useTemplateRef<HTMLElement>('heroRef')
+const videoRef = useTemplateRef<HTMLVideoElement>('videoRef')
+const shouldLoadVideo = ref(false)
+const isVideoReady = ref(false)
+const prefersReducedMotion = ref(false)
+
+let observer: IntersectionObserver | null = null
+
+async function playHeroVideo() {
+  const video = videoRef.value
+  if (!video || prefersReducedMotion.value) {
+    return
+  }
+
+  try {
+    await video.play()
+  } catch {
+    // Autoplay may be blocked; poster remains visible until user interaction.
+  }
+}
+
+function handleVideoReady() {
+  isVideoReady.value = true
+}
+
+onMounted(() => {
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const root = heroRef.value
+  if (!root || prefersReducedMotion.value) {
+    return
+  }
+
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        return
+      }
+
+      shouldLoadVideo.value = true
+      observer?.disconnect()
+      observer = null
+    },
+    {
+      rootMargin: '120px 0px',
+      threshold: 0.01,
+    },
+  )
+
+  observer.observe(root)
+})
+
+watch(shouldLoadVideo, async (load) => {
+  if (!load) {
+    return
+  }
+
+  await nextTick()
+  await playHeroVideo()
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+})
 </script>
 
 <template>
-  <section class="home-hero">
-    <img class="home-hero-image" :src="homeHeroImage" alt="" />
-    <div class="home-hero-overlay" aria-hidden="true"></div>
+  <section id="top" ref="heroRef" class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">AI CAR STUDIO</p>
+      <h1>让每一辆车，都值得被精心呈现</h1>
+      <p>针对汽车电商、出海商朝打造专业级的内容生成平台</p>
+    </div>
 
-    <motion.div
-      :initial="{ opacity: 0, y: 28 }"
-      :animate="{ opacity: 1, y: 0 }"
-      :transition="{ duration: 0.62, ease: 'easeOut' }"
-      class="home-hero-content"
-    >
-      <span class="home-hero-kicker">AI CAR STUDIO</span>
-      <h1>让每一辆车，<br />都值得被精心呈现</h1>
-      <p>针对汽车电商、出海车商打造专业级的内容生成平台</p>
-      <div class="home-hero-action">
-        <NButton size="large" class="home-primary-button" @click="$emit('enterWorkbench')">
-          进入视觉工作台
-        </NButton>
-      </div>
-    </motion.div>
+    <div class="hero-media" aria-hidden="true">
+      <PreloadImage
+        class="hero-poster"
+        :class="{ 'is-hidden': isVideoReady }"
+        :src="homeHeroPosterSrc"
+        alt=""
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+      />
+      <video
+        v-if="shouldLoadVideo"
+        ref="videoRef"
+        class="hero-video"
+        :class="{ 'is-ready': isVideoReady }"
+        muted
+        loop
+        playsinline
+        autoplay
+        preload="none"
+        :poster="homeHeroPosterSrc"
+        @loadeddata="handleVideoReady"
+        @canplay="handleVideoReady"
+      >
+        <source :src="homeHeroVideoSrc" type="video/mp4" />
+      </video>
+    </div>
+
+    <div class="hero-action">
+      <button type="button" class="button gold" @click="$emit('enterWorkbench')">
+        进入视觉工作台
+      </button>
+    </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.home-hero {
+.hero {
   position: relative;
-  isolation: isolate;
-  min-height: clamp(520px, 58vh, 640px);
+  height: clamp(680px, 56.28vw, 1107px);
+  min-height: 0;
+  padding-top: clamp(148px, 11.3vw, 222px);
   overflow: hidden;
-  background: #080d16;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(121, 115, 105, 0.3), transparent 31rem),
+    radial-gradient(circle at 70% 36%, rgba(244, 200, 64, 0.08), transparent 28rem),
+    var(--home-hero-bg);
 }
 
-.home-hero-image,
-.home-hero-overlay {
+.hero::after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 220px;
+  content: '';
+  background: linear-gradient(to bottom, transparent, var(--home-bg) 84%);
+  pointer-events: none;
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 3;
+  width: min(900px, calc(100% - 40px));
+  margin: 0 auto;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 24px;
+  color: var(--home-gold);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.hero h1 {
+  margin: 0 0 18px;
+  color: var(--home-hero-title);
+  font-size: clamp(34px, 2.8vw, 55px);
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.hero p:not(.eyebrow) {
+  margin: 0;
+  color: var(--home-hero-sub);
+  font-size: clamp(16px, 1.27vw, 25px);
+}
+
+.hero-action {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(36px, 4.2vw, 68px);
+  z-index: 3;
+  transform: translateX(-50%);
+}
+
+.hero-action .button {
+  min-height: 56px;
+  padding: 0 40px;
+  font-size: 16px;
+}
+
+.hero-media {
   position: absolute;
   inset: 0;
+  z-index: 1;
+  overflow: hidden;
 }
 
-.home-hero-image {
+.hero-poster,
+.hero-video {
+  position: absolute;
+  left: 50%;
+  top: clamp(42px, 3.4vw, 66px);
   width: 100%;
   height: 100%;
+  max-width: none;
   object-fit: cover;
-  object-position: center 55%;
-  filter: saturate(1.1) brightness(0.72);
-  transform: scale(1.04);
+  object-position: center center;
+  transform: translateX(-50%);
 }
 
-.home-hero-overlay {
-  z-index: 1;
-  background:
-    linear-gradient(90deg, rgba(6, 10, 18, 0.92) 0%, rgba(8, 12, 22, 0.72) 42%, rgba(8, 12, 22, 0.35) 100%),
-    linear-gradient(180deg, rgba(4, 8, 14, 0.2) 0%, rgba(4, 8, 14, 0.75) 100%);
+.hero-poster {
+  transition: opacity 0.45s ease;
 }
 
-.home-hero-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  min-height: clamp(520px, 58vh, 640px);
-  max-width: min(780px, 92vw);
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  margin: 0 auto;
-  padding: clamp(48px, 6vw, 88px) clamp(24px, 5vw, 64px);
+.hero-poster.is-hidden {
+  opacity: 0;
 }
 
-.home-hero-kicker {
+.hero-video {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.hero-video.is-ready {
+  opacity: 1;
+}
+
+.button {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  transition:
+    transform 0.22s ease,
+    filter 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
-.home-hero-content h1 {
-  margin: 20px 0 0;
-  color: #ffffff;
-  font-size: clamp(40px, 5vw, 64px);
-  line-height: 1.14;
-  font-weight: 950;
-  letter-spacing: -0.02em;
+.button:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.08);
 }
 
-.home-hero-content > p {
-  max-width: 560px;
-  margin: 20px 0 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: clamp(16px, 1.6vw, 20px);
-  line-height: 1.6;
-  font-weight: 600;
+.button:active {
+  transform: translateY(0);
 }
 
-.home-hero-action {
-  margin-top: 36px;
+.button.gold {
+  color: #171100;
+  background: linear-gradient(180deg, var(--home-gold-strong), #e9b82c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 12px 34px rgba(244, 200, 64, 0.18);
 }
 
-.home-primary-button {
-  --n-color: var(--home-accent) !important;
-  --n-color-hover: #f6d68d !important;
-  --n-color-pressed: var(--home-accent-strong) !important;
-  --n-color-focus: var(--home-accent) !important;
-  --n-border: 1px solid transparent !important;
-  --n-border-hover: 1px solid transparent !important;
-  --n-border-pressed: 1px solid transparent !important;
-  --n-border-focus: 1px solid transparent !important;
-  --n-text-color: #15120a !important;
-  --n-text-color-hover: #15120a !important;
-  --n-text-color-pressed: #15120a !important;
-  --n-text-color-focus: #15120a !important;
+@media (max-width: 1100px) {
+  .hero {
+    height: 720px;
+    padding-top: 144px;
+  }
+}
 
-  min-width: 200px;
-  height: 48px !important;
-  border-radius: 8px !important;
-  font-size: 16px !important;
-  font-weight: 800 !important;
-  box-shadow: 0 16px 40px rgba(244, 200, 111, 0.28);
+@media (max-width: 700px) {
+  .hero {
+    height: 620px;
+    padding-top: 120px;
+  }
+
+  .hero-copy {
+    width: min(100% - 28px, 900px);
+  }
+
+  .hero h1 {
+    font-size: 36px;
+  }
+
+  .hero-action {
+    bottom: 32px;
+    width: calc(100% - 28px);
+  }
+
+  .hero-action .button {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 32px;
+    font-size: 15px;
+  }
+
+  .hero-poster,
+  .hero-video {
+    width: 980px;
+    height: 100%;
+    top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-video {
+    display: none;
+  }
+
+  .hero-poster {
+    opacity: 1 !important;
+  }
 }
 </style>

@@ -234,9 +234,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--credit-page-pad);
-  background:
-    radial-gradient(840px 140px at 50% 0%, rgba(31, 139, 223, 0.14), transparent 68%),
-    linear-gradient(180deg, var(--credit-bg-a), var(--credit-bg-b));
+  background: var(--app-bg);
   color: var(--credit-text);
 }
 

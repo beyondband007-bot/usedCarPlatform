@@ -27,7 +27,6 @@ const cardClass = computed(() => [
     "is-featured": props.plan.featured,
     "is-selected": props.selected,
     "is-pressing": props.pressing,
-    "has-bg-image": Boolean(props.plan.backgroundImage),
   },
 ]);
 </script>
@@ -54,16 +53,6 @@ const cardClass = computed(() => [
       @pointerleave="emit('pointerleave')"
       @pointercancel="emit('pointercancel')"
     >
-      <img
-        v-if="plan.backgroundImage"
-        class="plan-card-bg"
-        :src="plan.backgroundImage"
-        :alt="`${plan.name}背景`"
-        loading="lazy"
-        decoding="async"
-        draggable="false"
-      />
-
       <div class="plan-card-content">
       <span v-if="selected" class="plan-check" aria-hidden="true">
         <Icon icon="mdi:check" />
@@ -155,71 +144,6 @@ const cardClass = computed(() => [
   overflow: hidden;
 }
 
-.pricing-plan-card.has-bg-image {
-  background: #f7fbff;
-}
-
-.pricing-plan-card.has-bg-image.is-orange {
-  background: #fff8f3;
-}
-
-.pricing-plan-card.has-bg-image.is-green {
-  background: #f4fcf8;
-}
-
-.pricing-plan-card.has-bg-image::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.88) 0%,
-    rgba(255, 255, 255, 0.62) 38%,
-    rgba(247, 251, 255, 0.28) 72%,
-    rgba(247, 251, 255, 0.08) 100%
-  );
-  pointer-events: none;
-}
-
-:global(.theme-dark) .pricing-plan-card.has-bg-image {
-  background: #151c2d;
-}
-
-:global(.theme-dark) .pricing-plan-card.has-bg-image::before {
-  background: linear-gradient(
-    165deg,
-    rgba(21, 28, 45, 0.92) 0%,
-    rgba(21, 28, 45, 0.72) 38%,
-    rgba(21, 28, 45, 0.36) 72%,
-    rgba(21, 28, 45, 0.12) 100%
-  );
-}
-
-.plan-card-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: right bottom;
-  pointer-events: none;
-  transition: filter 0.26s ease;
-}
-
-.pricing-plan-card:not(.is-selected) .plan-card-bg {
-  filter: saturate(0.86) brightness(0.94);
-}
-
-.pricing-plan-card.is-selected .plan-card-bg {
-  filter: saturate(1.1) brightness(1.05) contrast(1.02);
-}
-
-.pricing-plan-card.is-pressing .plan-card-bg {
-  filter: saturate(1) brightness(0.96);
-}
-
 .plan-card-content {
   position: relative;
   z-index: 2;
@@ -289,14 +213,6 @@ const cardClass = computed(() => [
   filter: saturate(0.86) brightness(0.88);
 }
 
-.pricing-plan-card.has-bg-image.is-selected {
-  filter: saturate(1.06) brightness(1.03);
-}
-
-:global(.theme-dark) .pricing-plan-card.has-bg-image.is-selected {
-  filter: saturate(1.08) brightness(1.04);
-}
-
 .pricing-plan-card:hover {
   --plan-lift: -5px;
 }
@@ -311,26 +227,6 @@ const cardClass = computed(() => [
   border-color: transparent;
   --plan-lift: -14px;
   --plan-scale: 1.035;
-}
-
-.pricing-plan-card.has-bg-image.is-selected::before {
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(255, 255, 255, 0.48) 36%,
-    rgba(247, 251, 255, 0.18) 70%,
-    rgba(247, 251, 255, 0.04) 100%
-  );
-}
-
-:global(.theme-dark) .pricing-plan-card.has-bg-image.is-selected::before {
-  background: linear-gradient(
-    165deg,
-    rgba(21, 28, 45, 0.86) 0%,
-    rgba(21, 28, 45, 0.58) 36%,
-    rgba(21, 28, 45, 0.24) 70%,
-    rgba(21, 28, 45, 0.06) 100%
-  );
 }
 
 .pricing-plan-card.is-selected.is-blue {
@@ -555,7 +451,6 @@ const cardClass = computed(() => [
 @media (prefers-reduced-motion: reduce) {
   .pricing-plan-card,
   .pricing-plan-card::after,
-  .plan-card-bg,
   .plan-check {
     animation: none;
     transition: none;

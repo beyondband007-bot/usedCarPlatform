@@ -3,50 +3,59 @@ import { homeFooterLinks } from '@/constants/home-page'
 </script>
 
 <template>
-  <footer class="home-footer">
-    <nav class="home-footer-links" aria-label="页脚导航">
+  <footer id="footer" class="footer">
+    <h2>AI CAR STUDIO</h2>
+    <nav aria-label="页脚导航">
       <template v-for="item in homeFooterLinks" :key="item.label">
-        <RouterLink v-if="item.to" :to="item.to" class="home-footer-link">
-          {{ item.label }}
-        </RouterLink>
-        <a v-else :href="item.href ?? '#'" class="home-footer-link">{{ item.label }}</a>
+        <RouterLink v-if="item.to" :to="item.to">{{ item.label }}</RouterLink>
+        <a v-else :href="item.href ?? '#'">{{ item.label }}</a>
       </template>
     </nav>
-    <p class="home-footer-copy">© {{ new Date().getFullYear() }} 脸谱AI汽车电商内容平台</p>
+    <p>
+      © {{ new Date().getFullYear() }} AI CAR STUDIO. All rights reserved.
+      Professional Automotive AI Content Generation.
+    </p>
   </footer>
 </template>
 
 <style scoped lang="scss">
-.home-footer {
-  padding: 32px clamp(20px, 4vw, 48px) 40px;
-  border-top: 1px solid var(--home-border);
-  background: var(--home-surface);
+.footer {
+  padding: 112px 20px 62px;
   text-align: center;
+  color: var(--home-text);
+  background: var(--home-footer-bg);
 }
 
-.home-footer-links {
+.footer h2 {
+  margin: 0 0 38px;
+  color: var(--home-text);
+  font-size: clamp(34px, 4vw, 50px);
+}
+
+.footer nav {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 28px;
+  gap: clamp(22px, 4vw, 72px);
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+  color: var(--home-footer-nav);
+  font-size: 14px;
+  font-weight: 800;
 }
 
-.home-footer-link {
-  color: var(--home-muted);
-  font-size: 14px;
-  font-weight: 700;
+.footer nav a {
+  color: inherit;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
-.home-footer-link:hover {
-  color: var(--home-blue);
+.footer nav a:hover {
+  color: var(--home-gold);
 }
 
-.home-footer-copy {
-  margin: 20px 0 0;
-  color: var(--home-muted);
+.footer p {
+  margin: 0;
+  color: var(--home-footer-copy);
   font-size: 13px;
-  font-weight: 600;
 }
 </style>

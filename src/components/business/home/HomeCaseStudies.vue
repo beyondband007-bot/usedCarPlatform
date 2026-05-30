@@ -1,374 +1,267 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { NButton } from 'naive-ui'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
 import { homeCaseTabs } from '@/constants/home-page'
 
 const activeTabId = ref(homeCaseTabs[0]?.id ?? '')
+const layoutRef = ref<HTMLElement | null>(null)
 
 const activeCase = computed(
   () => homeCaseTabs.find((tab) => tab.id === activeTabId.value) ?? homeCaseTabs[0],
 )
 
-const compareEl = ref<HTMLElement | null>(null)
-const comparePosition = ref(52)
-const isDragging = ref(false)
-
-function clampPosition(ratio: number) {
-  comparePosition.value = Math.min(92, Math.max(8, ratio))
-}
-
-function updatePositionFromClientX(clientX: number) {
-  const root = compareEl.value
+onMounted(() => {
+  const root = layoutRef.value
   if (!root) {
     return
   }
 
-  const rect = root.getBoundingClientRect()
-  const ratio = ((clientX - rect.left) / rect.width) * 100
-  clampPosition(ratio)
-}
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.animate(
+            [
+              { opacity: 0, transform: 'translateY(22px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            {
+              duration: 620,
+              easing: 'cubic-bezier(.16,1,.3,1)',
+              fill: 'both',
+            },
+          )
+          observer.unobserve(entry.target)
+        }
+      })
+    },
+    { threshold: 0.12 },
+  )
 
-function onPointerMove(event: MouseEvent | TouchEvent) {
-  if (!isDragging.value) {
-    return
-  }
-
-  const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX
-  if (clientX == null) {
-    return
-  }
-
-  updatePositionFromClientX(clientX)
-}
-
-function stopDrag() {
-  isDragging.value = false
-  window.removeEventListener('mousemove', onPointerMove)
-  window.removeEventListener('mouseup', stopDrag)
-  window.removeEventListener('touchmove', onPointerMove)
-  window.removeEventListener('touchend', stopDrag)
-  document.body.classList.remove('home-case-dragging')
-}
-
-function startDrag(event: MouseEvent | TouchEvent) {
-  isDragging.value = true
-  document.body.classList.add('home-case-dragging')
-
-  const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX
-  if (clientX != null) {
-    updatePositionFromClientX(clientX)
-  }
-
-  window.addEventListener('mousemove', onPointerMove)
-  window.addEventListener('mouseup', stopDrag)
-  window.addEventListener('touchmove', onPointerMove, { passive: false })
-  window.addEventListener('touchend', stopDrag)
-}
-
-watch(activeTabId, () => {
-  comparePosition.value = 52
-})
-
-onUnmounted(() => {
-  stopDrag()
+  observer.observe(root)
 })
 </script>
 
 <template>
-  <section class="home-cases" aria-label="真实成片交付案例">
-    <div class="home-cases-inner">
-      <header class="home-cases-header">
-        <h2>真实成片交付案例</h2>
-        <div class="home-cases-tabs" role="tablist">
-          <button
-            v-for="tab in homeCaseTabs"
-            :key="tab.id"
-            type="button"
-            role="tab"
-            class="home-cases-tab"
-            :class="{ 'is-active': tab.id === activeTabId }"
-            :aria-selected="tab.id === activeTabId"
-            @click="activeTabId = tab.id"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-      </header>
+  <section id="cases" class="section-block cases" aria-label="真实成片交付案例">
+    <div class="section-title">
+      <h2>真实成片交付案例</h2>
+      <p>专为汽车电商打造的 AI 内容交付方案，帮助车辆快速出图上架</p>
+    </div>
 
-      <article v-if="activeCase" class="home-case-card">
-        <div
-          ref="compareEl"
-          class="home-case-compare"
-          :class="{ 'is-dragging': isDragging }"
-        >
-          <img class="home-case-before" :src="activeCase.beforeImage" alt="处理前" draggable="false" />
-          <img
-            class="home-case-after"
-            :src="activeCase.afterImage"
-            alt="AI 影棚效果"
-            draggable="false"
-            :style="{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }"
-          />
-          <div
-            class="home-case-divider"
-            :style="{ left: `${comparePosition}%` }"
-            aria-hidden="true"
-          ></div>
-          <button
-            type="button"
-            class="home-case-handle"
-            :class="{ 'is-dragging': isDragging }"
-            :style="{ left: `${comparePosition}%` }"
-            aria-label="拖动对比处理前后效果"
-            @mousedown.prevent="startDrag"
-            @touchstart.prevent="startDrag"
-          >
-            <Icon icon="mdi:chevron-left" />
-            <Icon icon="mdi:chevron-right" />
-          </button>
-          <span class="home-case-label home-case-label--before">处理前</span>
-          <span class="home-case-label home-case-label--after">AI 影棚</span>
-        </div>
+    <div class="tabs" role="tablist" aria-label="案例分类">
+      <button
+        v-for="tab in homeCaseTabs"
+        :key="tab.id"
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ active: tab.id === activeTabId }"
+        :aria-selected="tab.id === activeTabId"
+        @click="activeTabId = tab.id"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
 
-        <div class="home-case-copy">
-          <h3>{{ activeCase.title }}</h3>
-          <p>{{ activeCase.summary }}</p>
-          <ul>
-            <li v-for="point in activeCase.painPoints" :key="point">{{ point }}</li>
-          </ul>
-          <div class="home-case-stats">
-            <div v-for="stat in activeCase.stats" :key="stat.label">
-              <strong>{{ stat.value }}</strong>
-              <span>{{ stat.label }}</span>
-            </div>
+    <div v-if="activeCase" ref="layoutRef" class="case-layout">
+      <PreloadImage
+        class="case-image"
+        :src="activeCase.image"
+        :alt="`${activeCase.title}案例成片`"
+        loading="lazy"
+        decoding="async"
+      />
+      <article class="case-panel">
+        <h3>{{ activeCase.title }}</h3>
+        <div>
+          <strong>核心痛点</strong>
+          <p>{{ activeCase.pain }}</p>
+        </div>
+        <div>
+          <strong>交付服务项</strong>
+          <p>{{ activeCase.service }}</p>
+        </div>
+        <dl class="metric-card">
+          <div v-for="stat in activeCase.stats" :key="stat.label">
+            <dt>{{ stat.value }}</dt>
+            <dd>{{ stat.label }}</dd>
           </div>
-          <NButton type="primary" class="home-case-cta">查看案例详情</NButton>
-        </div>
+        </dl>
       </article>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.home-cases {
-  padding: clamp(48px, 6vw, 80px) clamp(20px, 4vw, 48px);
-}
-
-.home-cases-inner {
-  max-width: 1280px;
+.section-block {
+  width: min(1520px, calc(100% - 40px));
   margin: 0 auto;
+  padding-bottom: 130px;
 }
 
-.home-cases-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+.section-title {
+  width: min(760px, 100%);
+  margin: 0 auto 64px;
+  text-align: center;
 }
 
-.home-cases-header h2 {
-  margin: 0;
+.section-title h2 {
+  margin: 0 0 18px;
   color: var(--home-text);
-  font-size: clamp(26px, 3vw, 36px);
-  font-weight: 950;
+  font-size: clamp(28px, 3.2vw, 42px);
+  line-height: 1.12;
 }
 
-.home-cases-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.home-cases-tab {
-  border: 1px solid var(--home-border);
-  border-radius: 999px;
-  background: var(--home-surface);
+.section-title p {
+  margin: 0;
   color: var(--home-muted);
-  padding: 8px 18px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  font-size: 15px;
+  line-height: 1.8;
 }
 
-.home-cases-tab.is-active {
-  border-color: transparent;
-  background: var(--home-blue);
-  color: #fff;
-}
-
-.home-case-card {
+.tabs {
   display: grid;
-  gap: 24px;
-  margin-top: 28px;
-  padding: clamp(20px, 2.5vw, 28px);
-  border: 1px solid var(--home-border);
-  border-radius: 20px;
-  background: var(--home-surface);
-  box-shadow: var(--home-shadow-soft);
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-columns: repeat(3, 1fr);
+  width: min(430px, 100%);
+  padding: 8px;
+  margin: -28px auto 72px;
+  background: var(--home-tabs-bg);
+  border: 1px solid var(--home-line);
+  border-radius: 999px;
 }
 
-.home-case-compare {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  aspect-ratio: 16 / 11;
-  background: var(--home-soft);
-  user-select: none;
-  touch-action: none;
-}
-
-.home-case-compare.is-dragging {
-  cursor: ew-resize;
-}
-
-.home-case-before,
-.home-case-after {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-.home-case-divider {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  width: 2px;
-  background: #fff;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.home-case-handle {
-  position: absolute;
-  top: 50%;
-  z-index: 2;
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
+.tab {
+  min-height: 42px;
+  color: var(--home-tab-text);
+  background: transparent;
   border: 0;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--home-blue);
-  box-shadow: 0 8px 24px rgba(15, 35, 60, 0.22);
-  transform: translate(-50%, -50%);
-  cursor: grab;
-  transition: box-shadow 0.15s ease;
-}
-
-.home-case-handle.is-dragging {
-  cursor: grabbing;
-  box-shadow: 0 10px 28px rgba(15, 35, 60, 0.32);
-}
-
-.home-case-handle :deep(svg) {
-  font-size: 18px;
-}
-
-.home-case-label {
-  position: absolute;
-  top: 12px;
-  z-index: 2;
-  border-radius: 6px;
-  background: rgba(8, 12, 22, 0.65);
-  color: #fff;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  pointer-events: none;
-}
-
-.home-case-label--before {
-  left: 12px;
-}
-
-.home-case-label--after {
-  right: 12px;
-}
-
-.home-case-copy h3 {
-  margin: 0;
-  color: var(--home-text);
-  font-size: clamp(22px, 2.2vw, 28px);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 900;
 }
 
-.home-case-copy > p {
-  margin: 12px 0 0;
-  color: var(--home-muted);
-  font-size: 15px;
-  line-height: 1.65;
-  font-weight: 600;
+.tab.active {
+  color: var(--home-tab-active-text);
+  background: var(--home-tab-active-bg);
 }
 
-.home-case-copy ul {
-  margin: 16px 0 0;
-  padding-left: 18px;
-  color: var(--home-muted);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.home-case-stats {
+.case-layout {
   display: grid;
-  gap: 12px;
-  margin-top: 24px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 0.96fr 1.04fr;
+  gap: 56px;
+  align-items: stretch;
+  width: min(1220px, 100%);
+  margin: 0 auto;
 }
 
-.home-case-stats div {
-  padding: 16px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--home-blue) 10%, var(--home-surface));
+.case-image,
+.case-panel {
+  min-height: 480px;
+  border: 1px solid var(--home-line);
+  border-radius: 24px;
 }
 
-.home-case-stats strong {
+.case-image {
+  width: 100%;
+  height: 100%;
+}
+
+.case-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(34px, 5vw, 64px);
+  background: var(--home-case-panel-bg);
+  box-shadow: var(--home-card-shadow);
+}
+
+.case-panel h3 {
+  margin: 0 0 40px;
+  color: var(--home-card-title);
+  font-size: clamp(28px, 3vw, 42px);
+}
+
+.case-panel strong {
   display: block;
-  color: var(--home-blue);
-  font-size: clamp(24px, 2.5vw, 32px);
-  font-weight: 950;
-  line-height: 1.1;
+  margin-bottom: 10px;
+  color: var(--home-card-title);
+  font-size: 17px;
 }
 
-.home-case-stats span {
-  display: block;
-  margin-top: 6px;
-  color: var(--home-muted);
+.case-panel p {
+  margin: 0 0 32px;
+  color: var(--home-card-muted);
+  line-height: 1.8;
+}
+
+.metric-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin: 14px 0 0;
+  padding: 42px 24px;
+  background: var(--home-metric-bg);
+  border: 1px solid var(--home-line);
+  border-radius: 24px;
+}
+
+.metric-card div + div {
+  border-left: 1px solid var(--home-line);
+}
+
+.metric-card dt {
+  color: var(--home-gold);
+  font-size: clamp(44px, 5vw, 62px);
+  font-weight: 900;
+  text-align: center;
+}
+
+.metric-card dd {
+  margin: 8px 0 0;
+  color: var(--home-card-muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
+  text-align: center;
 }
 
-.home-case-cta {
-  margin-top: 24px;
-  min-width: 140px;
-  height: 42px !important;
-  border-radius: 8px !important;
-  font-weight: 800 !important;
-}
+@media (max-width: 1100px) {
+  .case-layout {
+    grid-template-columns: 1fr;
+  }
 
-@media (max-width: 960px) {
-  .home-case-card {
-    grid-template-columns: minmax(0, 1fr);
+  .case-image,
+  .case-panel {
+    min-height: 380px;
   }
 }
-</style>
 
-<style lang="scss">
-body.home-case-dragging {
-  cursor: grabbing !important;
-  user-select: none;
+@media (max-width: 700px) {
+  .section-block {
+    width: min(100% - 28px, 1520px);
+    padding-bottom: 86px;
+  }
+
+  .tabs {
+    margin-bottom: 38px;
+  }
+
+  .case-layout {
+    gap: 20px;
+  }
+
+  .case-panel {
+    padding: 28px;
+  }
+
+  .metric-card {
+    padding: 28px 12px;
+  }
+
+  .metric-card dt {
+    font-size: 38px;
+  }
 }
 </style>

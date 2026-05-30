@@ -6,6 +6,15 @@ import BasicLayout from '@/layouts/BasicLayout.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: '/intro-video',
+    name: 'IntroVideo',
+    component: () => import('@/pages/intro-video/index.vue'),
+    meta: {
+      title: '首页视频',
+      hideIntroVideo: true,
+    },
+  },
+  {
     path: '/',
     component: BasicLayout,
     redirect: '/home',

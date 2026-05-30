@@ -2,6 +2,7 @@
 import { NButton } from "naive-ui";
 import { motion } from "motion-v";
 
+import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { FeatureEntry } from "@/types/prototype";
 
 const props = defineProps<{
@@ -58,10 +59,12 @@ function handleAction() {
       </div>
 
       <div class="home-feature-visual">
-        <img
+        <PreloadImage
+          class="home-feature-image"
           :src="entry.image"
           :alt="entry.title"
           loading="lazy"
+          decoding="async"
         />
       </div>
     </article>
@@ -195,12 +198,11 @@ function handleAction() {
   background: var(--home-soft);
 }
 
-.home-feature-visual img {
+.home-feature-image {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 224px;
-  object-fit: cover;
   filter: var(--home-card-image-filter);
 }
 

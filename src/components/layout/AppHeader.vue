@@ -5,8 +5,10 @@ import { ref } from "vue";
 import { computed, inject } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { topNavigation } from "@/constants/prototype";
+import { isWorkbenchSectionPath } from "@/constants/app-flow";
+import { studioGuestNavigation, topNavigation } from "@/constants/prototype";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
+import { useStudioChrome } from "@/composables/useStudioChrome";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import type { NavItem } from "@/types/prototype";
@@ -18,10 +20,11 @@ const route = useRoute();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const userMenuOpen = ref(false);
+const { usesStudioChrome } = useStudioChrome();
 
 function isNavItemActive(item: NavItem) {
   if (item.workbenchEntry) {
-    return route.path.startsWith("/workspace");
+    return isWorkbenchSectionPath(route.path);
   }
 
   return route.path === item.path || route.path.startsWith(`${item.path}/`);
@@ -42,16 +45,118 @@ function handleLogout() {
   router.push("/home");
 }
 
-const navItems = computed(() =>
-  authStore.isLoggedIn
+const navItems = computed(() => {
+  if (usesStudioChrome.value) {
+    if (!authStore.isLoggedIn) {
+      return studioGuestNavigation;
+    }
+
+    return topNavigation.filter((item) => item.path !== "/auth");
+  }
+
+  return authStore.isLoggedIn
     ? topNavigation.filter((item) => item.path !== "/auth")
-    : topNavigation,
-);
+    : topNavigation;
+});
 </script>
 
 <template>
-  <div class="sticky top-0 z-50 ra-0">
+  <div class="app-header-wrap" :class="{ 'app-header-wrap--home': usesStudioChrome }">
     <header
+      v-if="usesStudioChrome"
+      class="site-header"
+      aria-label="顶部导航"
+    >
+      <RouterLink class="logo" to="/home">AI CAR STUDIO</RouterLink>
+      <nav class="nav-links" aria-label="主导航">
+        <button
+          v-for="item in navItems"
+          :key="item.path + item.label"
+          type="button"
+          class="nav-link"
+          :class="{ active: isNavItemActive(item) }"
+          @click="handleNavClick(item)"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
+      <div class="site-header-actions">
+        <RouterLink
+          v-if="authStore.isLoggedIn"
+          class="credit-pill"
+          to="/credits"
+          aria-label="查看积分余额与流水"
+        >
+          积分余额 {{ authStore.credits }}
+        </RouterLink>
+        <RouterLink
+          v-else-if="route.path !== '/auth'"
+          class="credit-pill"
+          to="/auth"
+        >
+          企业账号登录
+        </RouterLink>
+        <button
+          type="button"
+          class="theme-toggle"
+          @click="appStore.toggleTheme()"
+        >
+          <Icon
+            :icon="
+              appStore.isDarkMode
+                ? 'mdi:white-balance-sunny'
+                : 'mdi:moon-waning-crescent'
+            "
+          />
+          <span class="theme-toggle-label">
+            {{ appStore.isDarkMode ? "日间模式" : "夜间模式" }}
+          </span>
+        </button>
+        <NPopover
+          v-if="authStore.isLoggedIn"
+          v-model:show="userMenuOpen"
+          trigger="click"
+          placement="bottom-end"
+          :show-arrow="false"
+          raw
+          to="body"
+        >
+          <template #trigger>
+            <button
+              type="button"
+              class="user-menu-trigger user-menu-trigger--studio"
+              :aria-expanded="userMenuOpen"
+              aria-haspopup="menu"
+            >
+              <span class="user-menu-avatar user-menu-avatar--studio" aria-hidden="true">
+                <Icon icon="mdi:account-circle-outline" />
+              </span>
+              <span class="user-menu-name">{{ authStore.userName }}</span>
+              <Icon icon="mdi:chevron-down" class="user-menu-chevron" />
+            </button>
+          </template>
+
+          <div
+            class="user-menu-panel"
+            :class="appStore.isDarkMode ? 'is-dark' : 'is-light'"
+            role="menu"
+          >
+            <button
+              type="button"
+              class="user-menu-logout"
+              role="menuitem"
+              @click="handleLogout"
+            >
+              <Icon icon="mdi:logout" class="user-menu-logout-icon" />
+              退出登录
+            </button>
+          </div>
+        </NPopover>
+      </div>
+    </header>
+
+    <header
+      v-else
       class="flex min-h-[72px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
     >
       <RouterLink
@@ -177,6 +282,193 @@ const navItems = computed(() =>
 </template>
 
 <style scoped lang="scss">
+.app-header-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.app-header-wrap--home {
+  position: relative;
+  left: auto;
+  right: auto;
+}
+
+.site-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(16px, 2.5vw, 32px);
+  width: 100%;
+  max-width: none;
+  padding: clamp(24px, 2.5vw, 34px) var(--studio-chrome-pad-x, 24px);
+  margin: 0;
+  background: var(--studio-chrome-header-bg, linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent));
+  color: var(--studio-chrome-logo, #f3f3f3);
+  font-family:
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+.logo {
+  justify-self: start;
+  color: var(--studio-chrome-logo, #f3f3f3);
+  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
+  font-weight: 900;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.nav-links {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--studio-chrome-nav-gap, clamp(20px, 2.8vw, 56px));
+  color: var(--studio-chrome-nav, #c9c9c9);
+  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  font-weight: 700;
+}
+
+.nav-link {
+  position: relative;
+  padding: 0 0 clamp(6px, 0.45vw, 8px);
+  border: 0;
+  background: transparent;
+  color: var(--studio-chrome-nav, #c9c9c9);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color 0.25s ease;
+}
+
+.nav-link:hover {
+  color: var(--studio-chrome-nav-hover, #d7d7d7);
+}
+
+.nav-link::after {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: clamp(2px, 0.15vw, 3px);
+  content: '';
+  background: var(--studio-chrome-nav-underline, #f4c840);
+  transform: translateX(-50%);
+  transition: width 0.25s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+.nav-link.active {
+  color: var(--studio-chrome-nav-active, #f4c840);
+}
+
+.credit-pill {
+  padding: clamp(8px, 0.65vw, 10px) clamp(14px, 1.2vw, 20px);
+  color: var(--studio-chrome-credit-text, #171100);
+  background: var(--studio-chrome-credit-bg, #fff);
+  border-radius: 999px;
+  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(5px, 0.45vw, 8px);
+  padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
+  border: 1px solid var(--studio-chrome-theme-border, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  background: var(--studio-chrome-theme-bg, rgba(255, 255, 255, 0.08));
+  color: var(--studio-chrome-theme-text, #f3f3f3);
+  font-family: inherit;
+  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
+  background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
+}
+
+.theme-toggle :deep(svg) {
+  font-size: clamp(15px, 1.1vw, 18px);
+}
+
+.theme-toggle-label {
+  white-space: nowrap;
+}
+
+.user-menu-trigger--studio {
+  border-color: var(--studio-chrome-user-border, rgba(255, 255, 255, 0.14));
+  background: var(--studio-chrome-user-bg, rgba(255, 255, 255, 0.08));
+  color: var(--studio-chrome-user-text, #f3f3f3);
+  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  font-weight: 700;
+}
+
+.user-menu-trigger--studio:hover {
+  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
+  background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 4px 14px rgba(239, 194, 76, 0.12);
+}
+
+.user-menu-avatar--studio {
+  background: var(--studio-chrome-avatar-bg, rgba(239, 194, 76, 0.16));
+  color: var(--studio-chrome-avatar-text, #efc24c);
+}
+
+@media (max-width: 1100px) {
+  .site-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .nav-links {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .site-header {
+    padding: 20px var(--studio-chrome-pad-x, 18px);
+  }
+
+  .credit-pill {
+    padding: 8px 12px;
+    font-size: clamp(11px, 3.2vw, 13px);
+  }
+
+  .site-header-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+}
+
 .user-menu-trigger {
   display: inline-flex;
   max-width: min(100%, 200px);
@@ -198,9 +490,9 @@ const navItems = computed(() =>
 }
 
 .user-menu-trigger:hover {
-  border-color: color-mix(in srgb, #f97316 32%, var(--app-border));
+  border-color: color-mix(in srgb, var(--app-header-nav-active) 32%, var(--app-border));
   background: var(--app-header-nav-active-bg);
-  box-shadow: 0 4px 14px color-mix(in srgb, #f97316 12%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--app-header-nav-active) 12%, transparent);
 }
 
 .user-menu-avatar {
@@ -210,7 +502,7 @@ const navItems = computed(() =>
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: color-mix(in srgb, #f97316 14%, var(--app-header-chip-bg));
+  background: color-mix(in srgb, var(--app-header-nav-active) 14%, var(--app-header-chip-bg));
   color: var(--app-header-nav-active);
   font-size: 18px;
 }
@@ -254,7 +546,7 @@ const navItems = computed(() =>
 
 .user-menu-panel.is-dark {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: #11131b;
+  background: var(--app-surface, #101010);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
 
