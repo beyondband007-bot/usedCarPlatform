@@ -4,6 +4,7 @@ import { AppError } from "../shared/errors";
 import { asyncHandler } from "../shared/asyncHandler";
 import { ok } from "../shared/response";
 import { batchRoutes } from "./batch-new/batchRoutes";
+import { creativeImageRoutes } from "./creative-image/creativeImageRoutes";
 import { deliveryRoutes } from "./delivery/deliveryRoutes";
 import { interiorCleanRoutes } from "./interior-clean/interiorCleanRoutes";
 import { watermarkRemoveRoutes } from "./watermark-remove/watermarkRemoveRoutes";
@@ -12,6 +13,7 @@ import { outdoorSceneRoutes } from "./outdoor-scene/outdoorSceneRoutes";
 import { paintRefreshRoutes } from "./paint-refresh/paintRefreshRoutes";
 import { roadMotionRoutes } from "./road-motion/roadMotionRoutes";
 import { showroomLightRoutes } from "./showroom-light/showroomLightRoutes";
+import { shortVideoRoutes } from "./short-video/shortVideoRoutes";
 import { skyStudioRoutes } from "./sky-studio/skyStudioRoutes";
 import { tasksService } from "./tasks/tasksService";
 
@@ -27,6 +29,8 @@ moduleRoutes.use("/paint-refresh", paintRefreshRoutes);
 moduleRoutes.use("/light-consistency", lightConsistencyRoutes);
 moduleRoutes.use("/interior-clean", interiorCleanRoutes);
 moduleRoutes.use("/watermark-remove", watermarkRemoveRoutes);
+moduleRoutes.use("/creative-image", creativeImageRoutes);
+moduleRoutes.use("/short-video", shortVideoRoutes);
 moduleRoutes.use("/batch-new", batchRoutes);
 moduleRoutes.use("/delivery", deliveryRoutes);
 

@@ -20,7 +20,7 @@ export const migrations = [
     module_code VARCHAR(80) NOT NULL,
     status VARCHAR(24) NOT NULL,
     progress INT NOT NULL DEFAULT 0,
-    input_asset_id VARCHAR(64) NOT NULL,
+    input_asset_id VARCHAR(64) NULL,
     option_id VARCHAR(120) NULL,
     output_ratio VARCHAR(16) NOT NULL DEFAULT '1:1',
     resolution VARCHAR(16) NOT NULL DEFAULT '1K',
@@ -142,5 +142,44 @@ export const migrations = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_user_logo_asset (logo_asset_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS creative_conversations (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'default_user',
+    title VARCHAR(255) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    last_message TEXT NULL,
+    last_task_id VARCHAR(64) NULL,
+    last_result_url VARCHAR(1024) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_creative_conversations_user_updated (user_id, updated_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS creative_messages (
+    id VARCHAR(64) PRIMARY KEY,
+    conversation_id VARCHAR(64) NOT NULL,
+    role VARCHAR(24) NOT NULL,
+    content TEXT NOT NULL,
+    task_id VARCHAR(64) NULL,
+    reference_asset_id VARCHAR(64) NULL,
+    source_task_id VARCHAR(64) NULL,
+    source_image_url VARCHAR(1024) NULL,
+    generation_mode VARCHAR(32) NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_creative_messages_conversation_created (conversation_id, created_at),
+    INDEX idx_creative_messages_task (task_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS creative_conversation_assets (
+    id VARCHAR(64) PRIMARY KEY,
+    conversation_id VARCHAR(64) NOT NULL,
+    asset_id VARCHAR(64) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'reference',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_creative_assets_conversation_created (conversation_id, created_at),
+    INDEX idx_creative_assets_asset (asset_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];

@@ -294,6 +294,7 @@ class BatchService {
   private async submitItem(config: BatchVisualConfig, item: BatchItemSummary) {
     const task = await tasksRepository.findById(item.generationTaskId);
     if (!task) throw errors.taskNotFound();
+    if (!task.inputAssetId) throw errors.assetNotFound();
     const asset = await assetsRepository.findById(task.inputAssetId);
     if (!asset) throw errors.assetNotFound();
 

@@ -10,7 +10,7 @@ export interface GenerationTaskRecord {
   moduleCode: string;
   status: TaskStatus;
   progress: number;
-  inputAssetId: string;
+  inputAssetId?: string | null;
   optionId?: string | null;
   outputRatio: OutputRatio;
   resolution: Resolution;
@@ -35,7 +35,7 @@ interface GenerationTaskRow extends RowDataPacket {
   module_code: string;
   status: TaskStatus;
   progress: number;
-  input_asset_id: string;
+  input_asset_id: string | null;
   option_id: string | null;
   output_ratio: OutputRatio;
   resolution: Resolution;
@@ -139,7 +139,7 @@ export class TasksRepository extends Repository {
   async createWaitingTask(input: {
     id: string;
     moduleCode: string;
-    inputAssetId: string;
+    inputAssetId?: string | null;
     optionId?: string | null;
     outputRatio: OutputRatio;
     resolution: Resolution;
