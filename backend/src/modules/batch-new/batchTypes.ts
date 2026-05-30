@@ -28,6 +28,11 @@ export interface CreateBatchTaskRequest {
   presetId: string;
   carGroups: BatchCarGroupInput[];
   visualConfig: BatchVisualConfig;
+  userId?: number | string;
+  creditsUserId?: number | string;
+  tenantId?: number | string;
+  creditsTenantId?: number | string;
+  accountScope?: "personal" | "tenant";
 }
 
 export interface BatchItemSummary {

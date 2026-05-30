@@ -60,7 +60,8 @@ class TasksService {
     };
   }
 
-  async getTaskDetail(taskId: string) {
+  async getTaskDetail(taskId: string, options: { finalizeBilling?: boolean } = {}) {
+    const finalizeBilling = options.finalizeBilling ?? true;
     const task = await tasksRepository.findById(taskId);
     if (!task) throw errors.taskNotFound();
 
@@ -73,7 +74,7 @@ class TasksService {
       await this.refreshFromKie(task);
       const refreshed = await tasksRepository.findById(taskId);
       if (!refreshed) throw errors.taskNotFound();
-      if (shouldFinalizeGenerationBilling(refreshed)) {
+      if (finalizeBilling && shouldFinalizeGenerationBilling(refreshed)) {
         await finalizeGenerationBilling(refreshed);
         const finalized = await tasksRepository.findById(taskId);
         if (!finalized) throw errors.taskNotFound();
@@ -82,7 +83,7 @@ class TasksService {
       return this.toResponse(refreshed);
     }
 
-    if (shouldFinalizeGenerationBilling(task)) {
+    if (finalizeBilling && shouldFinalizeGenerationBilling(task)) {
       await finalizeGenerationBilling(task);
       const finalized = await tasksRepository.findById(taskId);
       if (!finalized) throw errors.taskNotFound();

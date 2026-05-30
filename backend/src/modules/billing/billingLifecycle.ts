@@ -19,6 +19,25 @@ export type FrozenGenerationBilling = {
   task: BillingTaskResponse;
 };
 
+type BillingOperationScope = {
+  bizType?: string;
+  bizId?: string;
+  idempotencyType?: string;
+  idempotencyId?: string;
+};
+
+const resolveBillingScope = (taskId: string, scope?: BillingOperationScope) => ({
+  bizType: scope?.bizType ?? "generation_task",
+  bizId: scope?.bizId ?? taskId,
+  idempotencyType: scope?.idempotencyType ?? "generation_task",
+  idempotencyId: scope?.idempotencyId ?? taskId,
+});
+
+const billingIdempotencyKey = (
+  operation: "estimate" | "freeze" | "settle" | "refund",
+  scope: ReturnType<typeof resolveBillingScope>,
+) => `${operation}:${scope.idempotencyType}:${scope.idempotencyId}`;
+
 const snapshotTaskBilling = async (
   taskId: string,
   input: FrozenGenerationBilling,
@@ -41,16 +60,18 @@ export const freezeGenerationBilling = async (input: {
   functionCode: string;
   body: BillingBody;
   context?: BillingRequestContext;
+  scope?: BillingOperationScope;
 }): Promise<FrozenGenerationBilling | null> => {
   const identity = resolveBillingIdentity(input.body, input.context);
   if (!identity) return null;
+  const scope = resolveBillingScope(input.taskId, input.scope);
 
   const estimate = await creditsClient.estimate({
     ...identity,
     functionCode: input.functionCode,
-    bizType: "generation_task",
-    bizId: input.taskId,
-    idempotencyKey: `estimate:generation_task:${input.taskId}`,
+    bizType: scope.bizType,
+    bizId: scope.bizId,
+    idempotencyKey: billingIdempotencyKey("estimate", scope),
   });
 
   const estimatedBilling = {
@@ -62,7 +83,7 @@ export const freezeGenerationBilling = async (input: {
   const frozen = await creditsClient.freeze({
     userId: identity.userId,
     billingTaskId: estimate.billingTaskId,
-    idempotencyKey: `freeze:generation_task:${input.taskId}`,
+    idempotencyKey: billingIdempotencyKey("freeze", scope),
   });
 
   const frozenBilling = {
@@ -77,13 +98,15 @@ export const freezeGenerationBilling = async (input: {
 export const refundFrozenGenerationBilling = async (
   taskId: string,
   billing: FrozenGenerationBilling | null,
+  scopeInput?: BillingOperationScope,
 ) => {
   if (!billing) return null;
+  const scope = resolveBillingScope(taskId, scopeInput);
 
   const refunded = await creditsClient.refund({
     userId: billing.identity.userId,
     billingTaskId: billing.task.billingTaskId,
-    idempotencyKey: `refund:generation_task:${taskId}`,
+    idempotencyKey: billingIdempotencyKey("refund", scope),
   });
 
   const refundedBilling = {
@@ -117,8 +140,12 @@ export const shouldFinalizeGenerationBilling = (task: GenerationTaskRecord) => {
   return false;
 };
 
-export const finalizeGenerationBilling = async (task: GenerationTaskRecord) => {
+export const finalizeGenerationBilling = async (
+  task: GenerationTaskRecord,
+  scopeInput?: BillingOperationScope,
+) => {
   if (!shouldFinalizeGenerationBilling(task)) return null;
+  const scope = resolveBillingScope(task.id, scopeInput);
 
   const billing = {
     identity: {
@@ -148,7 +175,7 @@ export const finalizeGenerationBilling = async (task: GenerationTaskRecord) => {
       const settled = await creditsClient.settle({
         userId: billing.identity.userId,
         billingTaskId: billing.task.billingTaskId,
-        idempotencyKey: `settle:generation_task:${task.id}`,
+        idempotencyKey: billingIdempotencyKey("settle", scope),
       });
       const settledBilling = { ...billing, task: settled };
       await snapshotTaskBilling(task.id, settledBilling, settled.status);
@@ -158,7 +185,7 @@ export const finalizeGenerationBilling = async (task: GenerationTaskRecord) => {
     const refunded = await creditsClient.refund({
       userId: billing.identity.userId,
       billingTaskId: billing.task.billingTaskId,
-      idempotencyKey: `refund:generation_task:${task.id}`,
+      idempotencyKey: billingIdempotencyKey("refund", scope),
     });
     const refundedBilling = { ...billing, task: refunded };
     await snapshotTaskBilling(task.id, refundedBilling, refunded.status);

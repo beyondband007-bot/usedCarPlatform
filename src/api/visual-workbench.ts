@@ -176,6 +176,11 @@ export interface CreateBatchTaskPayload {
     interiorAssetIds?: string[]
   }>
   visualConfig: BatchVisualConfig
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
 }
 
 export interface CreatedBatchTask {
@@ -188,6 +193,8 @@ export interface CreatedBatchTask {
   progress: number
   pollingUrl: string
   estimatedCost: number
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   balance: number
   createdAt: string
 }
@@ -214,6 +221,11 @@ export interface BatchTaskDetail {
   failed: number
   progress: number
   assetCount: number
+  creditsUserId?: number | null
+  creditsTenantId?: number | null
+  accountScope?: 'personal' | 'tenant' | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   items: BatchTaskDetailItem[]
   createdAt: string
   updatedAt: string

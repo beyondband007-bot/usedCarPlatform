@@ -142,13 +142,24 @@ export class BatchRepository extends Repository {
     presetId: string;
     total: number;
     visualConfig: BatchVisualConfig;
+    creditsUserId?: number | null;
+    creditsTenantId?: number | null;
+    accountScope?: "personal" | "tenant" | null;
   }) {
     await this.execute(
       `INSERT INTO batch_tasks
-        (id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json)
+        (id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json,
+         credits_user_id, credits_tenant_id, account_scope)
        VALUES
-        (:id, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig)`,
-      { ...input, visualConfig: JSON.stringify(input.visualConfig) },
+        (:id, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig,
+         :creditsUserId, :creditsTenantId, :accountScope)`,
+      {
+        ...input,
+        visualConfig: JSON.stringify(input.visualConfig),
+        creditsUserId: input.creditsUserId ?? null,
+        creditsTenantId: input.creditsTenantId ?? null,
+        accountScope: input.accountScope ?? null,
+      },
     );
   }
 
@@ -250,6 +261,26 @@ export class BatchRepository extends Repository {
              WHEN agg.completed + agg.failed = 0 AND agg.progress = 0 THEN 'waiting'
              ELSE 'generating'
            END
+       WHERE bt.id = :batchId`,
+      { batchId },
+    );
+  }
+
+  async recalcBatchBilling(batchId: string) {
+    await this.execute(
+      `UPDATE batch_tasks bt
+       LEFT JOIN (
+        SELECT
+          bti.batch_id,
+          SUM(COALESCE(gt.estimated_points, 0)) estimated_points,
+          SUM(COALESCE(gt.settled_points, 0)) settled_points
+        FROM batch_task_items bti
+        JOIN generation_tasks gt ON gt.id = bti.generation_task_id
+        WHERE bti.batch_id = :batchId
+        GROUP BY bti.batch_id
+       ) billing ON billing.batch_id = bt.id
+       SET bt.estimated_points = billing.estimated_points,
+           bt.settled_points = billing.settled_points
        WHERE bt.id = :batchId`,
       { batchId },
     );
