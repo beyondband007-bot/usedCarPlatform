@@ -34,10 +34,13 @@ export type GenerationTaskStatus =
   | 'canceled'
 
 export interface CreateGenerationTaskPayload {
-  inputAssetId: string
+  inputAssetId: string | null
   optionId?: string
   useLogo?: boolean
   colorCode?: string
+  outputRatio?: string
+  resolution?: string
+  extra?: Record<string, unknown>
 }
 
 export interface CreatedGenerationTask {
@@ -81,6 +84,49 @@ export interface GenerationTaskDetail {
   } | null
   createdAt?: string
   updatedAt?: string
+}
+
+export interface CreativeImageConversation {
+  conversationId: string
+  title: string
+  status: 'active' | string
+  lastMessage: string | null
+  lastTaskId: string | null
+  lastResultUrl: string | null
+  lastReferenceAssetId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreativeImageMessage {
+  messageId: string
+  conversationId: string
+  role: string
+  prompt: string
+  taskId: string
+  referenceAssetId: string | null
+  sourceTaskId: string | null
+  sourceImageUrl: string | null
+  generationMode: 'text_to_image' | 'image_to_image' | 'revise'
+  createdAt: string
+}
+
+export interface CreateCreativeGenerationPayload {
+  prompt: string
+  referenceAssetId?: string
+  useLastReference?: boolean
+  sourceTaskId?: string
+  sourceImageUrl?: string
+  outputRatio?: string
+  resolution?: string
+}
+
+export interface CreatedCreativeGeneration extends CreatedGenerationTask {
+  conversationId: string
+  generationMode: 'text_to_image' | 'image_to_image' | 'revise'
+  referenceAssetId: string | null
+  sourceTaskId: string | null
+  sourceImageUrl: string | null
 }
 
 export interface BatchVisualConfig {
@@ -286,6 +332,63 @@ export async function createGenerationTask(
     payload,
   )
 
+  return unwrapApiResponse(response)
+}
+
+export async function createCreativeImageConversation(payload?: { title?: string }) {
+  const response = await request.post<ApiResponse<CreativeImageConversation>>(
+    '/modules/creative-image/conversations',
+    payload ?? {},
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getCreativeImageConversations(params?: {
+  page?: number
+  pageSize?: number
+}) {
+  const response = await request.get<ApiResponse<PagedResult<CreativeImageConversation>>>(
+    '/modules/creative-image/conversations',
+    { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getCreativeImageConversation(conversationId: string) {
+  const response = await request.get<ApiResponse<CreativeImageConversation>>(
+    `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getCreativeImageMessages(conversationId: string) {
+  const response = await request.get<ApiResponse<{ items: CreativeImageMessage[] }>>(
+    `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/messages`,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function uploadCreativeImageReference(conversationId: string, file: File) {
+  const formData = new FormData()
+  formData.append('purpose', 'car_exterior')
+  formData.append('file', file)
+
+  const response = await request.post<ApiResponse<UploadedAsset>>(
+    `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/assets`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function createCreativeImageGeneration(
+  conversationId: string,
+  payload: CreateCreativeGenerationPayload,
+) {
+  const response = await request.post<ApiResponse<CreatedCreativeGeneration>>(
+    `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/generations`,
+    payload,
+  )
   return unwrapApiResponse(response)
 }
 

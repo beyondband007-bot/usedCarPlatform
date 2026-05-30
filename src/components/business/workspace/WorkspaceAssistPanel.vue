@@ -585,8 +585,9 @@ defineExpose({
       </section>
     </template>
     <ShortVideoBetaPanel
-      v-else-if="capability.code === 'future-short-video'"
+      v-else-if="capability.code === 'short-video'"
       :play-request="shortVideoPlayRequest"
+      :generation-result="props.generationResult"
     />
 
     <template v-else-if="capability.kind === 'delivery'">
@@ -1890,7 +1891,7 @@ defineExpose({
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   margin-top: 12px;
 }

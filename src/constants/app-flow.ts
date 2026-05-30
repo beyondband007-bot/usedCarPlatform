@@ -75,7 +75,7 @@ export const workspaceFlowModules = [
     title: '营销工具',
     description: '去水印 · 短视频等营销素材处理',
     defaultCapabilityCode: 'watermark-remove',
-    capabilityCodes: ['watermark-remove', 'creative-image', 'future-short-video'],
+    capabilityCodes: ['watermark-remove', 'creative-image', 'short-video'],
   },
 ] as const
 

@@ -22,13 +22,14 @@ const emit = defineEmits<{
 
 const cardClass = computed(() => [
   "pricing-plan-card",
-  `is-${props.plan.tone}`,
   {
     "is-featured": props.plan.featured,
     "is-selected": props.selected,
     "is-pressing": props.pressing,
   },
 ]);
+
+const showBadge = computed(() => props.plan.badge && !props.selected);
 </script>
 
 <template>
@@ -53,38 +54,35 @@ const cardClass = computed(() => [
       @pointerleave="emit('pointerleave')"
       @pointercancel="emit('pointercancel')"
     >
-      <div class="plan-card-content">
+      <span v-if="showBadge" class="plan-badge">{{ plan.badge }}</span>
+
       <span v-if="selected" class="plan-check" aria-hidden="true">
         <Icon icon="mdi:check" />
       </span>
 
-      <span v-else-if="plan.badge" class="plan-badge">{{ plan.badge }}</span>
+      <div class="plan-card-content">
+        <h3 class="plan-name">{{ plan.name }}</h3>
 
-      <span class="plan-icon" aria-hidden="true">
-        <Icon :icon="plan.icon" />
-      </span>
+        <div class="plan-price-row">
+          <strong>{{ plan.price }}</strong>
+          <span>/ 套餐</span>
+        </div>
 
-      <h3 class="plan-name">{{ plan.name }}</h3>
-      <p class="plan-desc">{{ plan.description }}</p>
+        <ul class="plan-benefits">
+          <li v-for="benefit in plan.benefits" :key="benefit">
+            <Icon icon="mdi:check" class="benefit-icon" />
+            <span>{{ benefit }}</span>
+          </li>
+        </ul>
 
-      <div class="plan-price-row">
-        <strong>{{ plan.price }}</strong>
-        <span>/ 套餐</span>
-      </div>
-
-      <ul class="plan-benefits">
-        <li v-for="benefit in plan.benefits" :key="benefit">
-          <Icon icon="mdi:check-circle" class="benefit-icon" />
-          <span>{{ benefit }}</span>
-        </li>
-      </ul>
-
-      <div class="plan-action-spacer" aria-hidden="true" />
-
-      <button type="button" class="plan-action" @click.stop="emit('select')">
-        {{ plan.action }}
-        <Icon icon="mdi:arrow-right" class="plan-action-icon" />
-      </button>
+        <button
+          type="button"
+          class="plan-action"
+          :class="{ 'is-solid': plan.featured }"
+          @click.stop="emit('select')"
+        >
+          {{ plan.action }}
+        </button>
       </div>
     </article>
   </motion.div>
@@ -92,6 +90,7 @@ const cardClass = computed(() => [
 
 <style scoped lang="scss">
 .pricing-plan-motion {
+  width: 100%;
   height: 100%;
   min-width: 0;
   transition: z-index 0s;
@@ -103,216 +102,89 @@ const cardClass = computed(() => [
 }
 
 .pricing-plan-card {
-  --plan-accent: #2f7dff;
-  --plan-accent-soft: rgba(47, 125, 255, 0.12);
-  --plan-accent-border: rgba(47, 125, 255, 0.42);
-  --plan-shadow: 0 18px 48px rgba(47, 125, 255, 0.1);
-  --plan-ring: transparent;
+  --plan-accent: var(--pricing-accent-strong, #efc24c);
+  --plan-card-bg: rgba(255, 255, 255, 0.04);
+  --plan-card-border: rgba(255, 255, 255, 0.1);
+  --plan-card-text: #f8fafc;
+  --plan-card-muted: rgba(248, 250, 252, 0.58);
+  --plan-card-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   --plan-lift: 0px;
   --plan-scale: 1;
-  --plan-card-surface-top: #ffffff;
-  --plan-card-surface-bottom: #f7fbff;
-  --plan-card-text: #0f172a;
-  --plan-card-text-muted: #64748b;
-  --plan-card-divider: #e2e8f0;
 
+  box-sizing: border-box;
   position: relative;
   display: flex;
+  width: 100%;
   height: 100%;
-  min-height: clamp(580px, 42vw, 640px);
+  min-width: 0;
+  min-height: 0;
   flex-direction: column;
-  padding: clamp(26px, 2.4vw, 34px);
-  border: 1px solid var(--plan-accent-border);
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    var(--plan-card-surface-top),
-    var(--plan-card-surface-bottom)
-  );
-  box-shadow: var(--plan-shadow);
+  padding: clamp(20px, 2vw, 32px);
+  border: 1px solid var(--plan-card-border);
+  border-radius: 16px;
+  background: var(--plan-card-bg);
+  box-shadow: var(--plan-card-shadow);
+  backdrop-filter: blur(18px);
   transform: translateY(var(--plan-lift)) scale(var(--plan-scale));
-  transform-origin: center bottom;
+  transform-origin: center center;
   cursor: pointer;
   outline: none;
   transition:
     transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.26s ease,
     border-color 0.26s ease,
-    filter 0.26s ease;
+    background 0.26s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
 }
 
-.plan-card-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  height: 100%;
-  flex: 1;
-  flex-direction: column;
-  min-height: inherit;
+:global(.theme-light) .pricing-plan-card {
+  --plan-card-bg: rgba(255, 255, 255, 0.88);
+  --plan-card-border: rgba(15, 23, 42, 0.08);
+  --plan-card-text: #0f172a;
+  --plan-card-muted: #64748b;
+  --plan-card-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
-.pricing-plan-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  border: 3px solid var(--plan-ring);
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  transition:
-    opacity 0.26s ease,
-    border-color 0.26s ease;
-}
-
-:global(.theme-dark) .pricing-plan-card {
-  --plan-card-surface-top: #1c2438;
-  --plan-card-surface-bottom: #151c2d;
-  --plan-card-text: #f1f5f9;
-  --plan-card-text-muted: #94a3b8;
-  --plan-card-divider: rgba(148, 163, 184, 0.24);
-}
-
-.pricing-plan-card.is-orange {
-  --plan-accent: #f97316;
-  --plan-accent-soft: rgba(249, 115, 22, 0.12);
-  --plan-accent-border: rgba(249, 115, 22, 0.55);
-  --plan-shadow: 0 22px 56px rgba(249, 115, 22, 0.16);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-orange {
-  --plan-accent-soft: rgba(249, 115, 22, 0.18);
-  --plan-shadow: 0 22px 56px rgba(249, 115, 22, 0.22);
-}
-
-.pricing-plan-card.is-green {
-  --plan-accent: #10b981;
-  --plan-accent-soft: rgba(16, 185, 129, 0.12);
-  --plan-accent-border: rgba(16, 185, 129, 0.42);
-  --plan-shadow: 0 18px 48px rgba(16, 185, 129, 0.12);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-green {
-  --plan-accent-soft: rgba(16, 185, 129, 0.18);
-  --plan-shadow: 0 18px 56px rgba(16, 185, 129, 0.2);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-blue {
-  --plan-accent-soft: rgba(47, 125, 255, 0.18);
-  --plan-shadow: 0 18px 48px rgba(47, 125, 255, 0.18);
-}
-
-.pricing-plan-card:not(.is-selected) {
-  filter: saturate(0.88) brightness(0.92);
-}
-
-:global(.theme-dark) .pricing-plan-card:not(.is-selected) {
-  filter: saturate(0.86) brightness(0.88);
+.pricing-plan-card.is-featured {
+  border-color: color-mix(in srgb, var(--plan-accent) 58%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--plan-accent) 8%, var(--plan-card-bg)),
+      var(--plan-card-bg)
+    );
+  box-shadow:
+    var(--plan-card-shadow),
+    0 0 0 1px color-mix(in srgb, var(--plan-accent) 22%, transparent),
+    0 0 48px color-mix(in srgb, var(--plan-accent) 16%, transparent);
 }
 
 .pricing-plan-card:hover {
-  --plan-lift: -5px;
+  --plan-lift: -4px;
 }
 
 .pricing-plan-card.is-pressing {
   --plan-lift: 2px;
-
   transition-duration: 0.12s;
 }
 
 .pricing-plan-card.is-selected {
-  border-color: transparent;
-  --plan-lift: -14px;
-  --plan-scale: 1.035;
-}
-
-.pricing-plan-card.is-selected.is-blue {
-  --plan-shadow:
-    0 18px 36px rgba(47, 125, 255, 0.34),
-    0 32px 72px rgba(47, 125, 255, 0.42),
-    0 0 96px rgba(47, 125, 255, 0.28);
-}
-
-.pricing-plan-card.is-selected.is-orange {
-  --plan-shadow:
-    0 18px 36px rgba(249, 115, 22, 0.36),
-    0 32px 72px rgba(249, 115, 22, 0.44),
-    0 0 96px rgba(249, 115, 22, 0.3);
-}
-
-.pricing-plan-card.is-selected.is-green {
-  --plan-shadow:
-    0 18px 36px rgba(16, 185, 129, 0.34),
-    0 32px 72px rgba(16, 185, 129, 0.42),
-    0 0 96px rgba(16, 185, 129, 0.28);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-selected.is-blue {
-  --plan-shadow:
-    0 18px 40px rgba(47, 125, 255, 0.42),
-    0 34px 78px rgba(47, 125, 255, 0.5),
-    0 0 110px rgba(47, 125, 255, 0.34);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-selected.is-orange {
-  --plan-shadow:
-    0 18px 40px rgba(249, 115, 22, 0.44),
-    0 34px 78px rgba(249, 115, 22, 0.52),
-    0 0 110px rgba(249, 115, 22, 0.36);
-}
-
-:global(.theme-dark) .pricing-plan-card.is-selected.is-green {
-  --plan-shadow:
-    0 18px 40px rgba(16, 185, 129, 0.42),
-    0 34px 78px rgba(16, 185, 129, 0.5),
-    0 0 110px rgba(16, 185, 129, 0.34);
-}
-
-.pricing-plan-card:focus-visible:not(.is-selected) {
-  --plan-ring: var(--plan-accent);
-}
-
-.pricing-plan-card:focus-visible:not(.is-selected)::after {
-  opacity: 1;
-}
-
-.plan-check {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: clamp(32px, 2.8vw, 40px);
-  height: clamp(32px, 2.8vw, 40px);
-  border-radius: 999px;
-  background: var(--plan-accent);
-  color: #fff;
-  font-size: 20px;
+  --plan-lift: -4px;
+  --plan-scale: 1;
+  border-color: color-mix(in srgb, var(--plan-accent) 72%, transparent);
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--plan-accent) 22%, transparent),
-    0 10px 24px color-mix(in srgb, var(--plan-accent) 55%, transparent),
-    0 0 28px color-mix(in srgb, var(--plan-accent) 38%, transparent);
-  animation: plan-check-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    0 24px 56px rgba(0, 0, 0, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--plan-accent) 34%, transparent),
+    0 0 64px color-mix(in srgb, var(--plan-accent) 24%, transparent);
 }
 
-@keyframes plan-check-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-
-  70% {
-    transform: scale(1.08);
-  }
-
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+:global(.theme-light) .pricing-plan-card.is-selected {
+  box-shadow:
+    0 20px 48px rgba(15, 23, 42, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--plan-accent) 34%, transparent),
+    0 0 48px color-mix(in srgb, var(--plan-accent) 16%, transparent);
 }
 
 .plan-badge {
@@ -323,136 +195,144 @@ const cardClass = computed(() => [
   padding: 5px 12px;
   border-radius: 999px;
   background: var(--plan-accent);
-  color: #fff;
+  color: #1a1204;
   font-size: 12px;
   font-weight: 800;
 }
 
-.plan-icon {
+.plan-check {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: var(--plan-accent-soft);
-  color: var(--plan-accent);
-  font-size: 28px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--plan-accent);
+  color: #1a1204;
+  font-size: 18px;
+}
+
+.plan-card-content {
+  display: flex;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
 .plan-name {
-  margin: 18px 0 0;
+  margin: 0;
+  padding-right: clamp(48px, 12%, 72px);
   color: var(--plan-card-text);
-  font-size: 20px;
+  font-size: clamp(16px, 1rem + 0.4vw, 22px);
   font-weight: 900;
   line-height: 1.35;
-  letter-spacing: 0;
-}
-
-.plan-desc {
-  min-height: 52px;
-  margin: 12px 0 0;
-  color: var(--plan-card-text-muted);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.65;
 }
 
 .plan-price-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-top: clamp(24px, 2.2vw, 30px);
+  margin-top: clamp(18px, 2vw, 24px);
 }
 
 .plan-price-row strong {
   color: var(--plan-accent);
-  font-size: clamp(34px, 3.6vw, 44px);
+  font-size: clamp(28px, 1.6rem + 1.2vw, 44px);
   font-weight: 900;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .plan-price-row span {
-  color: var(--plan-card-text-muted);
-  font-size: 14px;
+  color: var(--plan-card-muted);
+  font-size: clamp(12px, 0.75rem + 0.15vw, 14px);
   font-weight: 700;
 }
 
 .plan-benefits {
   display: grid;
-  gap: clamp(14px, 1.2vw, 18px);
-  margin: clamp(26px, 2.4vw, 32px) 0 0;
-  padding: clamp(24px, 2.2vw, 30px) 0 0;
-  border-top: 1px solid color-mix(in srgb, var(--plan-accent) 18%, var(--plan-card-divider));
+  gap: clamp(10px, 1vw, 14px);
+  margin: clamp(18px, 2vw, 28px) 0 clamp(18px, 2vw, 28px);
+  padding: 0;
   list-style: none;
 }
 
 .plan-benefits li {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   color: var(--plan-card-text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.6;
+  font-size: clamp(12px, 0.78rem + 0.2vw, 14px);
+  font-weight: 600;
+  line-height: 1.65;
 }
 
 .benefit-icon {
   flex: 0 0 auto;
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--plan-accent);
-  font-size: 20px;
-}
-
-.plan-action-spacer {
-  flex: 1 1 clamp(20px, 2.5vw, 36px);
-  min-height: clamp(20px, 2.5vw, 36px);
+  font-size: 16px;
 }
 
 .plan-action {
   display: inline-flex;
-  flex: 0 0 auto;
   width: 100%;
-  height: clamp(50px, 4vw, 56px);
+  min-height: 48px;
+  height: auto;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: clamp(20px, 2vw, 28px);
-  border: 1px solid transparent;
+  margin-top: auto;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--plan-card-text) 24%, transparent);
   border-radius: 999px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--plan-accent) 82%, white),
-    var(--plan-accent)
-  );
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--plan-accent) 32%, transparent);
-  color: #fff;
+  background: transparent;
+  color: var(--plan-card-text);
   font-family: inherit;
-  font-size: 15px;
+  font-size: clamp(13px, 0.82rem + 0.2vw, 15px);
   font-weight: 800;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.pricing-plan-card.is-selected .plan-action {
-  box-shadow:
-    0 14px 32px color-mix(in srgb, var(--plan-accent) 48%, transparent),
-    0 0 24px color-mix(in srgb, var(--plan-accent) 32%, transparent);
-  transform: translateY(-1px);
+.plan-action.is-solid {
+  border-color: transparent;
+  background: linear-gradient(180deg, #f0cc62, var(--plan-accent));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--plan-accent) 34%, transparent);
+  color: #1a1204;
+}
+
+.pricing-plan-card:hover .plan-action.is-solid {
+  filter: brightness(1.04);
+}
+
+.pricing-plan-card:hover .plan-action:not(.is-solid) {
+  border-color: color-mix(in srgb, var(--plan-accent) 42%, transparent);
+  color: var(--plan-accent);
 }
 
 .plan-action:active {
   transform: translateY(1px);
 }
 
-.plan-action-icon {
-  font-size: 18px;
+@media (max-width: 720px) {
+  .pricing-plan-card:hover,
+  .pricing-plan-card.is-selected {
+    --plan-lift: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pricing-plan-card,
-  .pricing-plan-card::after,
-  .plan-check {
-    animation: none;
+  .pricing-plan-card {
     transition: none;
   }
 }

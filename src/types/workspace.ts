@@ -40,12 +40,14 @@ export interface WorkspaceRecentItem {
 }
 
 export interface WorkspaceGenerateResult {
+  taskId?: string
   createdAt: string
   statusText: string
   ratioLabel: string
   previewImage: string
   previewAlt: string
   downloadUrl: string
+  resultImages?: Array<{ url: string; sourceUrl?: string }>
   imageWidth?: number
   imageHeight?: number
   caption?: string

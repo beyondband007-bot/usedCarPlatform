@@ -1187,9 +1187,9 @@ const activeCreateRatioLabel = computed(() => {
       </div>
     </template>
 
-    <template v-else-if="props.capability.code === 'future-short-video'">
+    <template v-else-if="props.capability.code === 'short-video'">
       <section class="batch-card batch-notice short-video-notice">
-        短视频生成为 Beta 能力：可上传车图预览流程，点击生成演示不会创建真实任务，右侧可查看演示视频。
+        上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
       </section>
 
       <UploadTaskCard

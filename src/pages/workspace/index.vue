@@ -3,13 +3,26 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 
-import { createGenerationTask, getBatchTaskDetail, getGenerationTask, type BatchTaskDetail, type CreateGenerationTaskPayload, type GenerationTaskDetail, type GenerationTaskStatus } from '@/api/visual-workbench'
+import {
+  createCreativeImageConversation,
+  createCreativeImageGeneration,
+  createGenerationTask,
+  getBatchTaskDetail,
+  getCreativeImageConversations,
+  getGenerationTask,
+  uploadCreativeImageReference,
+  type BatchTaskDetail,
+  type CreateGenerationTaskPayload,
+  type CreativeImageConversation,
+  type GenerationTaskDetail,
+  type GenerationTaskStatus,
+  type UploadedAsset,
+} from '@/api/visual-workbench'
 import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
 import CreativeImageStudioPanel from '@/components/business/workspace/CreativeImageStudioPanel.vue'
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
-import { creativeImageDefaultPreview } from '@/constants/creative-image-studio'
 import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
 import type {
   WorkspaceBatchActiveJob,
@@ -28,7 +41,7 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const appStore = useAppStore()
-const SHORT_VIDEO_CAPABILITY_CODE = 'future-short-video'
+const SHORT_VIDEO_CAPABILITY_CODE = 'short-video'
 const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
 
 interface ActiveGenerationTaskSnapshot {
@@ -45,6 +58,10 @@ function resolveCapabilityCode(code: unknown) {
 const activeCode = ref(resolveCapabilityCode(route.params.code))
 const generationResult = ref<WorkspaceGenerateResult | null>(null)
 const creativeImageCaption = ref<string | null>(null)
+const creativeConversations = ref<CreativeImageConversation[]>([])
+const activeCreativeConversationId = ref<string | null>(null)
+const creativeReferenceAsset = ref<UploadedAsset | null>(null)
+const isUploadingCreativeReference = ref(false)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
@@ -291,6 +308,8 @@ function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResul
     previewImage: image.url,
     previewAlt: `${sceneTitle}生成结果`,
     downloadUrl: image.url,
+    resultImages: task.resultImages,
+    taskId: task.taskId,
     imageWidth: 1600,
     imageHeight: 900,
   }
@@ -341,7 +360,80 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
   }
 }
 
-async function handleCreativeGenerate(payload: { prompt: string; outputRatio: string }) {
+async function refreshCreativeConversations() {
+  try {
+    const result = await getCreativeImageConversations({ page: 1, pageSize: 20 })
+    creativeConversations.value = result.items
+    if (!activeCreativeConversationId.value && result.items[0]) {
+      activeCreativeConversationId.value = result.items[0].conversationId
+    }
+  } catch {
+    // 创意生图历史不影响当前生成流程。
+  }
+}
+
+async function ensureCreativeConversation(prompt?: string) {
+  if (activeCreativeConversationId.value) return activeCreativeConversationId.value
+
+  const title = prompt?.trim().slice(0, 24) || '创意生图对话'
+  const conversation = await createCreativeImageConversation({ title })
+  activeCreativeConversationId.value = conversation.conversationId
+  creativeConversations.value = [conversation, ...creativeConversations.value]
+  return conversation.conversationId
+}
+
+async function handleNewCreativeConversation() {
+  try {
+    const conversation = await createCreativeImageConversation({ title: '创意生图对话' })
+    activeCreativeConversationId.value = conversation.conversationId
+    creativeReferenceAsset.value = null
+    generationResult.value = null
+    creativeImageCaption.value = null
+    creativeConversations.value = [conversation, ...creativeConversations.value]
+    message.success('已新建对话')
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '新建对话失败'
+    message.error(text)
+  }
+}
+
+function handleSelectCreativeConversation(conversationId: string) {
+  activeCreativeConversationId.value = conversationId
+  const conversation = creativeConversations.value.find((item) => item.conversationId === conversationId)
+  creativeImageCaption.value = conversation?.lastMessage ?? null
+  generationResult.value = null
+
+  if (conversation?.lastTaskId) {
+    void resolveGenerationTask(conversation.lastTaskId, { restored: true })
+  }
+}
+
+async function handleUploadCreativeReference(file: File) {
+  isUploadingCreativeReference.value = true
+
+  try {
+    const conversationId = await ensureCreativeConversation()
+    const asset = await uploadCreativeImageReference(conversationId, file)
+    creativeReferenceAsset.value = asset
+    message.success('参考图上传成功')
+    await refreshCreativeConversations()
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '参考图上传失败'
+    message.error(text)
+  } finally {
+    isUploadingCreativeReference.value = false
+  }
+}
+
+async function handleCreativeGenerate(payload: {
+  prompt: string
+  outputRatio: string
+  resolution?: string
+  referenceAssetId?: string
+  useLastReference?: boolean
+  sourceTaskId?: string
+  sourceImageUrl?: string
+}) {
   if (!payload.prompt.trim()) {
     message.warning('请输入生成提示词')
     return
@@ -352,33 +444,35 @@ async function handleCreativeGenerate(payload: { prompt: string; outputRatio: st
   creativeImageCaption.value = null
 
   try {
-    message.info('创意生图 Beta：正在生成演示效果', { duration: 2800 })
-    await sleep(2200)
-
+    const conversationId = await ensureCreativeConversation(payload.prompt)
+    const created = await createCreativeImageGeneration(conversationId, {
+      prompt: payload.prompt,
+      outputRatio: payload.outputRatio,
+      resolution: payload.resolution ?? '2K',
+      referenceAssetId: payload.referenceAssetId ?? creativeReferenceAsset.value?.assetId,
+      useLastReference: payload.useLastReference,
+      sourceTaskId: payload.sourceTaskId,
+      sourceImageUrl: payload.sourceImageUrl,
+    })
+    saveActiveGenerationTask({
+      taskId: created.taskId,
+      moduleCode: created.moduleCode,
+    })
+    message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
     creativeImageCaption.value = payload.prompt
-    generationResult.value = {
-      createdAt: formatDate(new Date()),
-      statusText: '已完成 · 创意生图',
-      ratioLabel: payload.outputRatio,
-      previewImage: creativeImageDefaultPreview.image,
-      previewAlt: payload.prompt,
-      downloadUrl: creativeImageDefaultPreview.image,
-      caption: payload.prompt,
-    }
-    message.success('生成完成')
+    await resolveGenerationTask(created.taskId)
+    await refreshCreativeConversations()
     await assistPanelRef.value?.refreshRecentItems()
+  } catch (error) {
+    clearActiveGenerationTask()
+    const text = error instanceof Error ? error.message : '创意生图任务创建失败'
+    message.error(text)
   } finally {
     isGenerating.value = false
   }
 }
 
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
-  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
-    shortVideoPlayRequest.value += 1
-    message.success('演示视频已开始播放')
-    return
-  }
-
   if (!payload.inputAssetId) {
     message.warning('请先上传车辆图片')
     return
@@ -393,6 +487,9 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       optionId: payload.optionId,
       useLogo: payload.useLogo,
       colorCode: payload.colorCode,
+      outputRatio: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '16:9' : undefined,
+      resolution: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '720p' : undefined,
+      extra: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? { videoResolution: '720p' } : undefined,
     }
 
     const created = await createGenerationTask(activeCapability.value.code, createPayload)
@@ -425,6 +522,7 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
     previewImage: item.previewImage,
     previewAlt: item.title,
     downloadUrl: item.downloadUrl ?? item.previewImage,
+    taskId: item.taskId,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,
   }
@@ -453,6 +551,8 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
 }
 
 onMounted(() => {
+  void refreshCreativeConversations()
+
   const activeTask = readActiveGenerationTask()
   if (!activeTask) return
 
@@ -502,9 +602,16 @@ onUnmounted(() => {
             v-if="activeCode === 'creative-image'"
             :capability="activeCapability"
             :is-generating="isGenerating"
+            :is-uploading-reference="isUploadingCreativeReference"
             :generation-result="generationResult"
             :caption="creativeImageCaption"
+            :conversations="creativeConversations"
+            :active-conversation-id="activeCreativeConversationId"
+            :reference-asset="creativeReferenceAsset"
             @generate="handleCreativeGenerate"
+            @new-conversation="handleNewCreativeConversation"
+            @select-conversation="handleSelectCreativeConversation"
+            @upload-reference="handleUploadCreativeReference"
           />
           <CapabilityGeneratePanel
             v-else
@@ -722,19 +829,22 @@ onUnmounted(() => {
   }
 }
 
+.workspace-page--creative-image .workspace-col--main {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .workspace-col--studio {
-  border-radius: 18px;
+  border-radius: 0;
 }
 
 .workspace-col--studio .workspace-col-scroll {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: clamp(16px, 2vw, 24px);
-
-  @media (width >= 1024px) {
-    padding: clamp(20px, 2.2vw, 28px);
-  }
+  padding: 0;
 }
 
 .workspace-col--studio .workspace-col-scroll > :deep(*) {
