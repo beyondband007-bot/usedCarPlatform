@@ -7,6 +7,13 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
+import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
+import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
+import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
+import showroomSoftTop from '@/assets/img/展厅灯光/柔光灯顶.png'
+import showroomMinimal from '@/assets/img/展厅灯光/极简留白.png'
+import showroomWideAngle from '@/assets/img/展厅灯光/广角空间.png'
+
 const tutorial = [
   {
     title: '上传车图',
@@ -32,26 +39,12 @@ const createOptions = (items: Array<[string, string, string]>): WorkspaceOption[
   items.map(([id, title, image]) => ({ id, title, image }))
 
 const showroomOptions = createOptions([
-  [
-    'white-studio',
-    '经典白棚',
-    'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'glass-hall',
-    '玻璃展厅',
-    'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'luxury-dark',
-    '暗调豪华',
-    'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'soft-top-light',
-    '柔光顶灯',
-    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['white-studio', '经典白棚', showroomClassicWhite],
+  ['glass-hall', '玻璃展厅', showroomGlass],
+  ['luxury-dark', '暗调奢华', showroomLuxuryDark],
+  ['soft-top-light', '柔光灯顶', showroomSoftTop],
+  ['minimal-space', '极简留白', showroomMinimal],
+  ['wide-angle', '广角空间', showroomWideAngle],
 ])
 
 const outdoorOptions = createOptions([
@@ -508,8 +501,8 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     actionLabel: '生成交付包',
   }),
   createCapability({
-    code: 'future-short-video',
-    apiCode: 'future_short_video',
+    code: 'short-video',
+    apiCode: 'short-video',
     kind: 'future',
     groupTitle: '营销工具',
     icon: 'mdi:movie-open-outline',
@@ -517,47 +510,24 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     tag: 'Beta',
     tagType: 'info',
     title: '短视频生成',
-    description: '由静态车图生成营销短视频素材，当前为 Beta 演示入口，不进入真实任务队列。',
+    description: '由静态车图生成 10 秒营销短视频素材，默认输出 16:9、720p。',
     uploadTitle: '车辆外观图',
     uploadHint: '点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB',
     middleBlocks: onlyActions,
     options: showroomOptions,
-    actionLabel: '生成演示',
+    actionLabel: '生成短视频',
   }),
 ]
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
 
-export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
-  {
-    title: '经典白棚',
+export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] =
+  showroomOptions.map((option) => ({
+    title: option.title,
     capabilityCode: 'showroom-light',
-    optionId: 'white-studio',
-    image:
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    title: '玻璃展厅',
-    capabilityCode: 'showroom-light',
-    optionId: 'glass-hall',
-    image:
-      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    title: '城市光廊',
-    capabilityCode: 'outdoor-scene',
-    optionId: 'tree-park',
-    image:
-      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80',
-  },
-  {
-    title: '户外动态',
-    capabilityCode: 'road-motion',
-    optionId: 'urban-road',
-    image:
-      'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=900&q=80',
-  },
-]
+    optionId: option.id,
+    image: option.image,
+  }))
 
 function menuTagVariant(
   tag: string,
@@ -599,7 +569,7 @@ const futureSidebarItems: WorkspaceMenuItem[] = [
     disabled: true,
   },
   {
-    code: 'future-short-video',
+    code: 'short-video',
     icon: 'mdi:movie-open-outline',
     label: '短视频生成',
     tag: 'Beta',

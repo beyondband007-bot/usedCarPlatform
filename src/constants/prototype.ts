@@ -76,7 +76,7 @@ export const pricingPlans: PricingPlan[] = [
       '单张生成正常使用',
       '适合小团队试运行',
     ],
-    action: '选择基础档',
+    action: '订阅基础档',
   },
   {
     name: '企业团队档',
@@ -84,7 +84,7 @@ export const pricingPlans: PricingPlan[] = [
     description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
     icon: 'mdi:account-group-outline',
     tone: 'orange',
-    badge: '推荐',
+    badge: '最划算',
     benefits: [
       '赠送 55,000 积分',
       '5 个企业账号',
@@ -92,7 +92,7 @@ export const pricingPlans: PricingPlan[] = [
       '单张生成正常使用',
       '适合车商团队批量上新',
     ],
-    action: '选择团队档',
+    action: '订阅团队档',
     featured: true,
   },
   {

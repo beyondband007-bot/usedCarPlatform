@@ -2,9 +2,11 @@
 import { nextTick, ref, watch } from 'vue'
 
 import { shortVideoBetaDemo } from '@/constants/short-video-beta'
+import type { WorkspaceGenerateResult } from '@/types/workspace'
 
 const props = defineProps<{
   playRequest?: number
+  generationResult?: WorkspaceGenerateResult | null
 }>()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -56,7 +58,7 @@ watch(
         playsinline
         preload="metadata"
         :poster="shortVideoBetaDemo.poster"
-        :src="shortVideoBetaDemo.src"
+        :src="props.generationResult?.downloadUrl ?? shortVideoBetaDemo.src"
       >
         您的浏览器暂不支持视频播放。
       </video>
