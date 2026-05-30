@@ -14,6 +14,11 @@ export interface BatchTaskRecord {
   failed: number;
   progress: number;
   visualConfig: BatchVisualConfig;
+  creditsUserId?: number | null;
+  creditsTenantId?: number | null;
+  accountScope?: "personal" | "tenant" | null;
+  estimatedPoints?: string | null;
+  settledPoints?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +33,11 @@ interface BatchTaskRow extends RowDataPacket {
   failed: number;
   progress: number;
   visual_config_json: BatchVisualConfig | string | null;
+  credits_user_id: number | null;
+  credits_tenant_id: number | null;
+  account_scope: "personal" | "tenant" | null;
+  estimated_points: string | null;
+  settled_points: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -77,6 +87,11 @@ const mapBatch = (row: BatchTaskRow): BatchTaskRecord => ({
   failed: row.failed,
   progress: row.progress,
   visualConfig: parseJson(row.visual_config_json, {}),
+  creditsUserId: row.credits_user_id,
+  creditsTenantId: row.credits_tenant_id,
+  accountScope: row.account_scope,
+  estimatedPoints: row.estimated_points,
+  settledPoints: row.settled_points,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
