@@ -247,18 +247,20 @@ const optionRows = computed(() => {
 
 .option-item:hover {
   transform: translateY(-2px);
+  background: var(--workspace-hover-bg, var(--app-surface-soft));
 }
 
 .option-item.is-active {
-  border-color: var(--workspace-accent, #efc24c);
+  border-color: var(--workspace-accent-border, var(--workspace-accent, #efc24c));
+  background: var(--workspace-accent-bg, var(--app-surface-soft));
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent),
-    0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
+    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent)),
+    0 10px 24px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent));
 }
 
 .option-item:focus-visible {
-  border-color: var(--workspace-accent, #efc24c);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
+  border-color: var(--workspace-accent-border, var(--workspace-accent, #efc24c));
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent));
 }
 
 .option-item-cover {
@@ -271,11 +273,15 @@ const optionRows = computed(() => {
 .option-item-title {
   display: block;
   padding: 8px 6px;
-  color: var(--app-text);
+  color: var(--workspace-text-secondary, var(--app-text-soft));
   text-align: center;
   font-size: 13px;
   font-weight: 900;
   line-height: 1.35;
+}
+
+.option-item.is-active .option-item-title {
+  color: var(--workspace-accent, var(--app-text));
 }
 
 @media (prefers-reduced-motion: reduce) {

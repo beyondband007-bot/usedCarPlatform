@@ -269,46 +269,46 @@ const {
 
 .home-chrome--light {
 
-  --studio-chrome-bg: #fcfaf5;
+  --studio-chrome-bg: #ffffff;
 
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(252, 250, 245, 0.96), transparent);
+  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(255, 255, 255, 0.96), transparent);
 
-  --studio-chrome-logo: #1e160b;
+  --studio-chrome-logo: #172033;
 
-  --studio-chrome-nav: #6d6456;
+  --studio-chrome-nav: #475569;
 
-  --studio-chrome-nav-hover: #2f271a;
+  --studio-chrome-nav-hover: #172033;
 
-  --studio-chrome-nav-active: #a26b00;
+  --studio-chrome-nav-active: #b98200;
 
-  --studio-chrome-nav-underline: #c98600;
+  --studio-chrome-nav-underline: #d89a00;
 
-  --studio-chrome-credit-bg: #efc24c;
+  --studio-chrome-credit-bg: #d89a00;
 
-  --studio-chrome-credit-text: #241700;
+  --studio-chrome-credit-text: #172033;
 
-  --studio-chrome-theme-bg: rgba(201, 134, 0, 0.08);
+  --studio-chrome-theme-bg: #fff6e0;
 
-  --studio-chrome-theme-text: #382508;
+  --studio-chrome-theme-text: #b98200;
 
-  --studio-chrome-theme-border: rgba(201, 134, 0, 0.16);
+  --studio-chrome-theme-border: rgba(216, 154, 0, 0.16);
 
-  --studio-chrome-user-border: rgba(201, 134, 0, 0.16);
+  --studio-chrome-user-border: rgba(216, 154, 0, 0.16);
 
-  --studio-chrome-user-bg: rgba(201, 134, 0, 0.05);
+  --studio-chrome-user-bg: #f3f7fc;
 
-  --studio-chrome-user-text: #241700;
+  --studio-chrome-user-text: #172033;
 
-  --studio-chrome-user-hover-border: rgba(201, 134, 0, 0.45);
+  --studio-chrome-user-hover-border: rgba(216, 154, 0, 0.28);
 
-  --studio-chrome-user-hover-bg: rgba(201, 134, 0, 0.08);
+  --studio-chrome-user-hover-bg: #f3f7fc;
 
-  --studio-chrome-avatar-bg: rgba(201, 134, 0, 0.14);
+  --studio-chrome-avatar-bg: #fff6e0;
 
-  --studio-chrome-avatar-text: #a26b00;
+  --studio-chrome-avatar-text: #b98200;
 
-  --studio-chrome-subnav-bg: #f0e8dc;
-  --studio-chrome-subnav-border: rgba(201, 134, 0, 0.12);
+  --studio-chrome-subnav-bg: #edf4ff;
+  --studio-chrome-subnav-border: #e8edf5;
 
 }
 

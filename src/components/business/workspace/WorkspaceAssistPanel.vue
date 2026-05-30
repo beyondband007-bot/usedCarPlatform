@@ -164,7 +164,7 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
         cards.push({
           id: `${job.batchId}-${item.itemId}`,
           title: item.groupTitle || job.projectName,
-          sceneLabel: item.itemKind === "interior" ? "鍐呴グ澧炲己" : job.projectName,
+          sceneLabel: item.itemKind === "interior" ? "内饰增强" : job.projectName,
           createdAt,
           status: item.status,
           thumbnail: item.thumbnail || job.previewUrl || undefined,
@@ -196,19 +196,19 @@ const showTemplateRecommendations = computed(
 
 const tutorialSteps = [
   {
-    title: "涓婁紶杞﹀浘",
+    title: "上传车图",
     icon: "mdi:cloud-upload-outline",
   },
   {
-    title: "閫夋嫨灞曞巺妯℃澘",
+    title: "选择展厅模板",
     icon: "mdi:view-gallery-outline",
   },
   {
-    title: "閫夋嫨 Logo",
+    title: "选择 Logo",
     icon: "mdi:badge-account-horizontal-outline",
   },
   {
-    title: "鐢熸垚鏁堟灉",
+    title: "生成效果",
     icon: "mdi:car-select",
   },
 ] as const;
@@ -505,7 +505,7 @@ defineExpose({
                 :class="{ active: watermarkActiveView === 'generating' }"
                 @click="watermarkActiveView = 'generating'"
               >
-                姝ｅ湪鐢熸垚
+                正在生成
               </button>
               <button
                 type="button"
@@ -514,7 +514,8 @@ defineExpose({
                 :class="{ active: watermarkActiveView === 'recent' }"
                 @click="watermarkActiveView = 'recent'"
               >
-                鏈€杩戠敓鎴?              </button>
+                最近生成
+              </button>
             </template>
             <template v-else>
               <button
@@ -524,7 +525,7 @@ defineExpose({
                 :class="{ active: watermarkActiveView === 'features' }"
                 @click="watermarkActiveView = 'features'"
               >
-                鍔熻兘鎻忚堪
+                功能描述
               </button>
               <button
                 type="button"
@@ -533,7 +534,8 @@ defineExpose({
                 :class="{ active: watermarkActiveView === 'recent' }"
                 @click="watermarkActiveView = 'recent'"
               >
-                鏈€杩戠敓鎴?              </button>
+                最近生成
+              </button>
             </template>
           </div>
         </header>
@@ -554,7 +556,7 @@ defineExpose({
             </div>
             <div class="waiting-copy">
               <p>图片待处理</p>
-              <h2>姝ｅ湪鍘婚櫎姘村嵃</h2>
+              <h2>正在去除水印</h2>
               <span>AI 正在识别并处理水印区域，请稍候。</span>
             </div>
             <div class="waiting-progress" aria-hidden="true">
@@ -575,10 +577,10 @@ defineExpose({
               </div>
             </section>
 
-            <section class="watermark-compare-section" aria-label="鏁堟灉瀵规瘮">
+            <section class="watermark-compare-section" aria-label="效果对比">
               <header class="watermark-section-head">
                 <div>
-                  <h3>鏁堟灉瀵规瘮</h3>
+                  <h3>效果对比</h3>
                   <p>拖动滑杆查看去水印前后效果对比</p>
                 </div>
               </header>
@@ -591,8 +593,8 @@ defineExpose({
                     :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
                     @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
                   >
-                    <PreloadImage class="watermark-compare-image" :src="card.before" alt="鍘绘按鍗板鐞嗗墠" loading="lazy" decoding="async" />
-                    <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="鍘绘按鍗板鐞嗗悗" loading="lazy" decoding="async" />
+                    <PreloadImage class="watermark-compare-image" :src="card.before" alt="去水印处理前" loading="lazy" decoding="async" />
+                    <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="去水印处理后" loading="lazy" decoding="async" />
                     <div class="watermark-compare-divider" aria-hidden="true">
                       <span></span>
                     </div>
@@ -628,7 +630,7 @@ defineExpose({
               :class="{ 'is-clickable': canOpenRecent(item) }"
               :role="canOpenRecent(item) ? 'button' : undefined"
               :tabindex="canOpenRecent(item) ? 0 : undefined"
-              :aria-label="canOpenRecent(item) ? `鏌ョ湅${item.title}` : item.title"
+              :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
               @click="handleRecentPick(item)"
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
@@ -676,9 +678,9 @@ defineExpose({
       <div class="delivery-panel">
         <header class="delivery-result-head">
           <div>
-            <p>鎴愮墖缁撴灉</p>
+            <p>成片结果</p>
             <h2>5月展厅批量上新</h2>
-            <span>宸插畬鎴?{{ deliveryResultCount }} 寮?路 1:1 棰勮灞曠ず</span>
+            <span>已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span>
           </div>
           <button
             type="button"
@@ -686,11 +688,11 @@ defineExpose({
             :disabled="isDownloadingAllDelivery"
             @click="handleDownloadAllDelivery"
           >
-            {{ isDownloadingAllDelivery ? "涓嬭浇涓?.." : "涓嬭浇鍏ㄩ儴" }}
+            {{ isDownloadingAllDelivery ? "下载中..." : "下载全部" }}
           </button>
         </header>
 
-        <section class="delivery-result-layout" aria-label="鎴愮墖浜や粯缁撴灉">
+        <section class="delivery-result-layout" aria-label="成片交付结果">
           <article
             v-for="item in deliveryResults"
             :key="item.title"
@@ -726,7 +728,7 @@ defineExpose({
     <template v-else>
       <div class="assist-shell">
         <header class="assist-tabs">
-          <div class="tab-group" role="tablist" aria-label="杈呭姪闈㈡澘">
+          <div class="tab-group" role="tablist" aria-label="辅助面板">
           <template v-if="isBatchProcessingView">
             <button
               type="button"
@@ -735,7 +737,7 @@ defineExpose({
               :class="{ active: activeTab === 'batchProcessing' }"
               @click="activeTab = 'batchProcessing'"
             >
-              姝ｅ湪澶勭悊
+              正在处理
             </button>
             <button
               type="button"
@@ -744,7 +746,8 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              鏈€杩戠敓鎴?            </button>
+              最近生成
+            </button>
           </template>
           <template v-else-if="isGenerating">
             <button
@@ -754,7 +757,7 @@ defineExpose({
               :class="{ active: activeTab === 'generating' }"
               @click="activeTab = 'generating'"
             >
-              姝ｅ湪鐢熸垚
+              正在生成
             </button>
             <button
               type="button"
@@ -763,7 +766,8 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              鏈€杩戠敓鎴?            </button>
+              最近生成
+            </button>
           </template>
           <template v-else>
             <button
@@ -773,7 +777,7 @@ defineExpose({
               :class="{ active: activeTab === 'guide' }"
               @click="activeTab = 'guide'"
             >
-              浣跨敤鏁欑▼
+              使用教程
             </button>
             <button
               type="button"
@@ -782,7 +786,8 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              鏈€杩戠敓鎴?            </button>
+              最近生成
+            </button>
           </template>
         </div>
       </header>
@@ -825,7 +830,7 @@ defineExpose({
               <Icon icon="mdi:clock-outline" class="recent-time-icon" />
               {{ item.createdAt }}
               <template v-if="item.progress !== undefined && item.progress < 100">
-                路 杩涘害 {{ item.progress }}%
+                · 进度 {{ item.progress }}%
               </template>
             </span>
           </footer>
@@ -860,8 +865,8 @@ defineExpose({
         class="guide-layout"
         :class="{ 'is-compact-guide': !showTemplateRecommendations }"
       >
-        <section class="tutorial-section" aria-label="浣跨敤鏁欑▼娴佺▼">
-          <h2>浣跨敤鏁欑▼</h2>
+        <section class="tutorial-section" aria-label="使用教程流程">
+          <h2>使用教程</h2>
           <div class="tutorial-flow">
             <template
               v-for="(step, index) in tutorialSteps"
@@ -891,7 +896,7 @@ defineExpose({
         <section
           v-if="showTemplateRecommendations"
           class="template-section"
-          aria-label="妯℃澘鎺ㄨ崘"
+          aria-label="模板推荐"
         >
           <h2>初次使用？试试这些</h2>
           <div class="template-grid">
@@ -903,7 +908,7 @@ defineExpose({
               class="template-card"
               :class="{ 'is-active': isTemplateActive(item) }"
               :aria-pressed="isTemplateActive(item)"
-              :aria-label="`閫夋嫨${item.title}鍦烘櫙`"
+              :aria-label="`选择${item.title}场景`"
               @click="handleTemplatePick(item)"
               @keydown.enter.prevent="handleTemplatePick(item)"
               @keydown.space.prevent="handleTemplatePick(item)"
@@ -922,8 +927,8 @@ defineExpose({
           </div>
         </section>
 
-        <section class="requirement-section" aria-label="绱犳潗瑕佹眰">
-          <strong>绱犳潗瑕佹眰</strong>
+        <section class="requirement-section" aria-label="素材要求">
+          <strong>素材要求</strong>
           <div class="requirement-list">
             <span v-for="item in capability.requirements" :key="item">
               <Icon icon="mdi:check" />
@@ -949,7 +954,7 @@ defineExpose({
           :class="{ 'is-clickable': canOpenRecent(item) }"
           :role="canOpenRecent(item) ? 'button' : undefined"
           :tabindex="canOpenRecent(item) ? 0 : undefined"
-          :aria-label="canOpenRecent(item) ? `鏌ョ湅${item.title}` : item.title"
+          :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
           @click="handleRecentPick(item)"
           @keydown.enter.prevent="handleRecentPick(item)"
           @keydown.space.prevent="handleRecentPick(item)"
@@ -1030,22 +1035,24 @@ defineExpose({
 }
 
 .assist-panel.theme-light {
-  --assist-bg: var(--workspace-panel, #fcfaf5);
-  --assist-card: rgba(255, 255, 255, 0.72);
-  --assist-card-strong: rgba(255, 252, 244, 0.92);
-  --assist-border: var(--workspace-line, rgba(47, 35, 12, 0.12));
-  --assist-border-soft: rgba(47, 35, 12, 0.08);
-  --assist-text: var(--app-text);
-  --assist-muted: var(--workspace-muted, var(--app-text-soft));
-  --assist-scroll-track: rgba(235, 224, 206, 0.82);
-  --assist-scroll-thumb: rgba(201, 134, 0, 0.42);
-  --assist-scroll-thumb-hover: rgba(168, 109, 0, 0.68);
+  --assist-bg: var(--workspace-panel, #ffffff);
+  --assist-card: rgba(255, 255, 255, 0.92);
+  --assist-card-strong: #f7fafd;
+  --assist-border: var(--workspace-line, #e8edf5);
+  --assist-border-soft: #edf4ff;
+  --assist-text: var(--workspace-text, var(--app-text));
+  --assist-muted: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
+  --assist-blue: var(--workspace-accent, #b98200);
+  --assist-green: var(--workspace-accent-strong, #b98200);
+  --assist-scroll-track: #edf4ff;
+  --assist-scroll-thumb: rgba(216, 154, 0, 0.42);
+  --assist-scroll-thumb-hover: rgba(184, 130, 0, 0.68);
   --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 
   background:
     radial-gradient(
       760px 180px at 45% 0%,
-      color-mix(in srgb, var(--workspace-accent, #c98600) 14%, transparent),
+      var(--workspace-accent-glow, rgba(216, 154, 0, 0.16)),
       transparent 74%
     ),
     var(--assist-bg);
@@ -1678,13 +1685,17 @@ defineExpose({
 .tab-group button {
   position: relative;
   padding: 0 0 10px;
-  color: var(--assist-muted);
+  color: var(--workspace-text-secondary, var(--assist-muted));
   font-size: 15px;
   font-weight: 900;
 }
 
+.tab-group button:hover {
+  color: var(--workspace-text, var(--assist-text));
+}
+
 .tab-group button.active {
-  color: var(--assist-blue);
+  color: var(--workspace-accent, var(--assist-blue));
 }
 
 .tab-group button.active::after {
@@ -1695,7 +1706,7 @@ defineExpose({
   bottom: 0;
   height: 3px;
   border-radius: 999px;
-  background: var(--assist-blue);
+  background: var(--workspace-accent-border, var(--assist-blue));
 }
 
 .expand-button {
@@ -1869,15 +1880,16 @@ defineExpose({
 }
 
 .template-card.is-active {
-  border-color: var(--assist-blue);
+  border-color: var(--workspace-accent-border, var(--assist-blue));
+  background: var(--workspace-accent-bg, transparent);
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent),
-    0 12px 28px color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
+    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent)),
+    0 12px 28px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent));
 }
 
 .template-card:focus-visible {
-  border-color: var(--assist-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, transparent);
+  border-color: var(--workspace-accent-border, var(--assist-blue));
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, transparent));
 }
 
 .template-image {
@@ -2055,13 +2067,10 @@ defineExpose({
 
 .recent-card.is-clickable:hover {
   transform: translateY(-1px);
-  border-color: color-mix(
-    in srgb,
-    var(--assist-blue) 45%,
-    var(--assist-border)
-  );
+  border-color: var(--workspace-accent-border, color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border)));
+  background: var(--workspace-hover-bg, inherit);
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent),
+    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent)),
     var(--assist-shadow);
 }
 

@@ -680,18 +680,27 @@ onUnmounted(() => {
 }
 
 .workspace-page.theme-light {
-  --workspace-accent: #c98600;
-  --workspace-accent-strong: #a86d00;
-  --workspace-panel: #fcfaf5;
-  --workspace-panel-soft: #f5efe4;
-  --workspace-panel-deep: #eee6da;
-  --workspace-line: rgba(47, 35, 12, 0.12);
-  --workspace-line-strong: rgba(201, 134, 0, 0.34);
-  --workspace-muted: #6b6252;
-  --workspace-shadow: 0 20px 46px rgba(67, 47, 16, 0.1);
+  --workspace-text: #172033;
+  --workspace-text-secondary: #475569;
+  --workspace-muted: #7c8a9e;
+  --workspace-text-disabled: #c3cbd6;
+  --workspace-accent: #b98200;
+  --workspace-accent-strong: #b98200;
+  --workspace-accent-border: #d89a00;
+  --workspace-accent-bg: #fff6e0;
+  --workspace-accent-glow: rgba(216, 154, 0, 0.16);
+  --workspace-hover-bg: #f3f7fc;
+  --workspace-panel: #ffffff;
+  --workspace-panel-soft: #f7fafd;
+  --workspace-panel-deep: #f7fafd;
+  --workspace-line: #e8edf5;
+  --workspace-line-strong: #d89a00;
+  --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
+
+  color: var(--workspace-text);
 
   background:
-    radial-gradient(circle at 30% 0%, rgba(201, 134, 0, 0.06), transparent 28rem),
+    radial-gradient(circle at 30% 0%, rgba(216, 154, 0, 0.06), transparent 28rem),
     var(--app-bg);
 }
 

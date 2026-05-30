@@ -78,7 +78,7 @@ function handleSelect(item: WorkspaceMenuItem) {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 32%),
     var(--workspace-panel, var(--app-surface));
-  box-shadow: var(--workspace-shadow, 0 14px 34px rgba(67, 47, 16, 0.08));
+  box-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 }
 
 .workspace-sidebar-body {
@@ -96,7 +96,7 @@ function handleSelect(item: WorkspaceMenuItem) {
 .sidebar-group-title {
   margin: 0 0 10px;
   padding: 0 8px;
-  color: var(--workspace-muted, var(--app-text-soft));
+  color: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -120,35 +120,40 @@ function handleSelect(item: WorkspaceMenuItem) {
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  color: var(--app-text);
+  color: var(--workspace-text-secondary, var(--app-text-soft));
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .sidebar-menu-item:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--workspace-panel-soft, var(--app-surface-soft)));
+  background: var(--workspace-hover-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-text, var(--app-text));
 }
 
 .sidebar-menu-item.is-active {
-  border-color: var(--workspace-line-strong, color-mix(in srgb, #efc24c 24%, transparent));
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  border-color: var(--workspace-accent-border, var(--workspace-line-strong, color-mix(in srgb, #efc24c 24%, transparent)));
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
+  box-shadow: 0 0 0 1px var(--workspace-accent-glow, transparent);
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.is-active {
   border-color: var(--workspace-line-strong, rgba(239, 194, 76, 0.42));
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
   color: var(--workspace-accent-strong, #ffd75a);
+  box-shadow: none;
 }
 
 .sidebar-menu-item.is-disabled {
   cursor: not-allowed;
-  opacity: 0.52;
+  color: var(--workspace-text-disabled, var(--app-text-disabled, var(--app-text-soft)));
+  opacity: 1;
 }
 
 .sidebar-menu-icon {
@@ -159,7 +164,7 @@ function handleSelect(item: WorkspaceMenuItem) {
 }
 
 .sidebar-menu-item.is-active .sidebar-menu-icon {
-  color: var(--workspace-accent-strong, #ffd75a);
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.is-active .sidebar-menu-icon {
@@ -187,28 +192,28 @@ function handleSelect(item: WorkspaceMenuItem) {
 }
 
 .sidebar-menu-item.tag-available .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 .sidebar-menu-item.tag-demo .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 .sidebar-menu-item.tag-package .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 .sidebar-menu-item.tag-beta .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 .sidebar-menu-item.tag-planned .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-muted, var(--app-text-soft)) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-muted, var(--app-text-soft));
+  background: color-mix(in srgb, var(--workspace-muted, var(--app-text-soft)) 10%, var(--workspace-panel-soft, var(--app-surface-soft)));
+  color: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.tag-available .sidebar-menu-tag {

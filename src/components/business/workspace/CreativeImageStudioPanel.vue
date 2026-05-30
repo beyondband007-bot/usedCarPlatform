@@ -555,30 +555,30 @@ function toggleSidebar() {
 }
 
 .creative-app.theme-light {
-  --creative-bg: #fcfaf5;
-  --creative-sidebar-bg: #f5efe4;
-  --creative-main-bg: #fcfaf5;
-  --creative-text: #1f1a14;
-  --creative-text-soft: #5c5346;
-  --creative-muted: #8a8072;
-  --creative-line: rgba(47, 35, 12, 0.1);
-  --creative-surface: #eee6da;
-  --creative-surface-soft: #f8f4ec;
+  --creative-bg: #f7fafd;
+  --creative-sidebar-bg: #ffffff;
+  --creative-main-bg: #f7fafd;
+  --creative-text: #172033;
+  --creative-text-soft: #475569;
+  --creative-muted: #7c8a9e;
+  --creative-line: #e8edf5;
+  --creative-surface: #ffffff;
+  --creative-surface-soft: #f7fafd;
   --creative-surface-elevated: #ffffff;
   --creative-composer-bg: #ffffff;
-  --creative-upload-bg: #f0e8dc;
-  --creative-icon: #5c5346;
+  --creative-upload-bg: #edf4ff;
+  --creative-icon: #475569;
   --creative-accent: #0a8fb8;
   --creative-accent-border: rgba(10, 143, 184, 0.22);
-  --creative-ratio-active-border: rgba(201, 134, 0, 0.55);
-  --creative-ratio-active-bg: rgba(201, 134, 0, 0.1);
-  --creative-ratio-active-text: #a86d00;
-  --creative-submit-bg: #1f1a14;
-  --creative-submit-text: #fcfaf5;
-  --creative-submit-disabled-bg: #d8d0c4;
-  --creative-submit-disabled-text: #8a8072;
-  --creative-composer-shadow: 0 18px 48px rgba(67, 47, 16, 0.1);
-  --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(201, 134, 0, 0.05), transparent 32%);
+  --creative-ratio-active-border: #d89a00;
+  --creative-ratio-active-bg: #fff6e0;
+  --creative-ratio-active-text: #b98200;
+  --creative-submit-bg: #172033;
+  --creative-submit-text: #ffffff;
+  --creative-submit-disabled-bg: #e8edf5;
+  --creative-submit-disabled-text: #c3cbd6;
+  --creative-composer-shadow: 0 18px 48px rgba(78, 111, 148, 0.09);
+  --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(216, 154, 0, 0.05), transparent 32%);
 }
 
 .creative-sidebar {
