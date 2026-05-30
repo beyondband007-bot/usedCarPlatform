@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
@@ -72,7 +72,7 @@ const activeWatermarkCompareDrag = ref<{
   index: number;
   pointerId: number;
 } | null>(null);
-const watermarkActiveView = ref<"features" | "recent">("features");
+const watermarkActiveView = ref<"features" | "recent" | "generating">("features");
 
 function isTemplateActive(item: (typeof templateCards)[number]) {
   return (
@@ -164,7 +164,7 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
         cards.push({
           id: `${job.batchId}-${item.itemId}`,
           title: item.groupTitle || job.projectName,
-          sceneLabel: item.itemKind === "interior" ? "内饰增强" : job.projectName,
+          sceneLabel: item.itemKind === "interior" ? "鍐呴グ澧炲己" : job.projectName,
           createdAt,
           status: item.status,
           thumbnail: item.thumbnail || job.previewUrl || undefined,
@@ -196,19 +196,19 @@ const showTemplateRecommendations = computed(
 
 const tutorialSteps = [
   {
-    title: "上传车图",
+    title: "涓婁紶杞﹀浘",
     icon: "mdi:cloud-upload-outline",
   },
   {
-    title: "选择展厅模板",
+    title: "閫夋嫨灞曞巺妯℃澘",
     icon: "mdi:view-gallery-outline",
   },
   {
-    title: "选择 Logo",
+    title: "閫夋嫨 Logo",
     icon: "mdi:badge-account-horizontal-outline",
   },
   {
-    title: "生成效果",
+    title: "鐢熸垚鏁堟灉",
     icon: "mdi:car-select",
   },
 ] as const;
@@ -257,6 +257,7 @@ const recentTaskModuleCodes = new Set([
   "light-consistency",
   "interior-clean",
   "watermark-remove",
+  "short-video",
   "batch-new",
 ]);
 
@@ -271,7 +272,10 @@ function mapRecentStatus(item: RecentGenerationTask): WorkspaceRecentItem["statu
 
 function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
   const sceneTitle = resolveWorkspaceOptionTitle(item.moduleCode, item.sceneLabel);
-  const thumbnail = item.thumbnail ?? item.inputAssetUrl ?? undefined;
+  const isShortVideo = item.moduleCode === "short-video";
+  const thumbnail = isShortVideo
+    ? item.inputAssetUrl ?? item.thumbnail ?? undefined
+    : item.thumbnail ?? item.inputAssetUrl ?? undefined;
   const previewImage = item.previewImage ?? item.inputAssetUrl ?? undefined;
 
   return {
@@ -285,8 +289,8 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     thumbnail,
     previewImage,
     downloadUrl: item.downloadUrl ?? previewImage,
-    ratioLabel: item.ratioLabel ?? undefined,
-    sceneLabel: sceneTitle ?? item.sceneLabel ?? undefined,
+    ratioLabel: isShortVideo ? '16:9 · 720p · 10秒' : item.ratioLabel ?? undefined,
+    sceneLabel: isShortVideo ? '营销短视频' : sceneTitle ?? item.sceneLabel ?? undefined,
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
     inputAssetUrl: item.inputAssetUrl ?? undefined,
@@ -307,7 +311,10 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
 
 function shouldPollRecent() {
   if (props.isGenerating) return true;
-  if (props.capability.code === "watermark-remove" && watermarkActiveView.value === "recent") {
+  if (
+    props.capability.code === "watermark-remove" &&
+    (watermarkActiveView.value === "recent" || watermarkActiveView.value === "generating")
+  ) {
     return canAutoRefreshRecent(recentItems.value);
   }
   if (activeTab.value !== "recent") return false;
@@ -378,12 +385,20 @@ watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
     if (generating) {
-      activeTab.value = "generating";
+      if (props.capability.code === "watermark-remove") {
+        watermarkActiveView.value = "generating";
+      } else {
+        activeTab.value = "generating";
+      }
       void loadRecentItems();
       return;
     }
 
-    if (activeTab.value === "generating") {
+    if (props.capability.code === "watermark-remove") {
+      if (watermarkActiveView.value === "generating") {
+        watermarkActiveView.value = "features";
+      }
+    } else if (activeTab.value === "generating") {
       activeTab.value = "guide";
     }
 
@@ -415,7 +430,7 @@ watch(
   (view) => {
     if (props.capability.code !== "watermark-remove") return;
 
-    if (view === "recent") {
+    if (view === "recent" || view === "generating") {
       if (!recentLoaded.value) {
         void loadRecentItems();
         return;
@@ -424,7 +439,7 @@ watch(
       return;
     }
 
-    startRecentAutoRefresh();
+    stopRecentAutoRefresh();
   },
 );
 
@@ -479,110 +494,177 @@ defineExpose({
     />
 
     <template v-else-if="capability.code === 'watermark-remove'">
-      <section class="watermark-assist-panel" aria-label="去水印工作台">
-        <section class="watermark-assist-top">
-          <header class="watermark-view-tabs" aria-label="去水印视图切换">
-            <button
-              type="button"
-              :class="{ active: watermarkActiveView === 'features' }"
-              @click="watermarkActiveView = 'features'"
-            >
-              功能描述
-            </button>
-            <button
-              type="button"
-              :class="{ active: watermarkActiveView === 'recent' }"
-              @click="watermarkActiveView = 'recent'"
-            >
-              最近生成
-            </button>
-          </header>
+      <div class="assist-shell">
+        <header class="assist-tabs">
+          <div class="tab-group" role="tablist" aria-label="去水印视图切换">
+            <template v-if="isGenerating">
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="watermarkActiveView === 'generating'"
+                :class="{ active: watermarkActiveView === 'generating' }"
+                @click="watermarkActiveView = 'generating'"
+              >
+                姝ｅ湪鐢熸垚
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="watermarkActiveView === 'recent'"
+                :class="{ active: watermarkActiveView === 'recent' }"
+                @click="watermarkActiveView = 'recent'"
+              >
+                鏈€杩戠敓鎴?              </button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="watermarkActiveView === 'features'"
+                :class="{ active: watermarkActiveView === 'features' }"
+                @click="watermarkActiveView = 'features'"
+              >
+                鍔熻兘鎻忚堪
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="watermarkActiveView === 'recent'"
+                :class="{ active: watermarkActiveView === 'recent' }"
+                @click="watermarkActiveView = 'recent'"
+              >
+                鏈€杩戠敓鎴?              </button>
+            </template>
+          </div>
+        </header>
 
-          <section class="watermark-assist-hero">
-            <div class="watermark-assist-copy">
-              <p>AI 去水印能力</p>
-              <h2>智能识别水印并完整保留画面细节</h2>
-              <span>适用于平台角标、文字与遮挡痕迹处理，输出更干净的车图素材。</span>
+        <div class="assist-body">
+          <section
+            v-if="isGenerating && watermarkActiveView === 'generating'"
+            class="generation-waiting"
+            aria-live="polite"
+          >
+            <div class="waiting-visual" aria-hidden="true">
+              <span class="waiting-scan"></span>
+              <span class="waiting-corner waiting-corner--tl"></span>
+              <span class="waiting-corner waiting-corner--tr"></span>
+              <span class="waiting-corner waiting-corner--bl"></span>
+              <span class="waiting-corner waiting-corner--br"></span>
+              <Icon icon="mdi:image-sync-outline" />
+            </div>
+            <div class="waiting-copy">
+              <p>图片待处理</p>
+              <h2>姝ｅ湪鍘婚櫎姘村嵃</h2>
+              <span>AI 正在识别并处理水印区域，请稍候。</span>
+            </div>
+            <div class="waiting-progress" aria-hidden="true">
+              <span></span>
             </div>
           </section>
-        </section>
 
-        <template v-if="watermarkActiveView === 'features'">
-          <section class="watermark-compare-section" aria-label="效果对比">
-            <header class="watermark-section-head">
-              <div>
-                <h3>效果对比</h3>
-                <p>拖动滑杆查看去水印前后效果对比</p>
+          <section
+            v-else-if="watermarkActiveView === 'features'"
+            class="watermark-feature-layout"
+            aria-label="去水印功能描述"
+          >
+            <section class="watermark-assist-hero">
+              <div class="watermark-assist-copy">
+                <p>AI 去水印能力</p>
+                <h2>智能识别水印并完整保留画面细节</h2>
+                <span>适用于平台角标、文字与遮挡痕迹处理，输出更干净的车图素材。</span>
               </div>
-            </header>
+            </section>
 
-            <div class="watermark-compare-grid">
-              <article v-for="(card, index) in watermarkCompareCards" :key="card.before" class="watermark-compare-card">
-                <div
-                  :ref="(element) => setWatermarkCompareMediaRef(index, element)"
-                  class="watermark-compare-media"
-                  :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
-                  @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
-                >
-                  <PreloadImage class="watermark-compare-image" :src="card.before" alt="去水印处理前" loading="lazy" decoding="async" />
-                  <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="去水印处理后" loading="lazy" decoding="async" />
-                  <div class="watermark-compare-divider" aria-hidden="true">
-                    <span></span>
-                  </div>
-                  <span class="watermark-compare-badge watermark-compare-badge--before">处理前</span>
-                  <span class="watermark-compare-badge watermark-compare-badge--after">处理后</span>
-                  <button
-                    type="button"
-                    class="watermark-compare-handle"
-                    aria-label="去水印前后对比拖拽滑杆"
-                    @pointerdown.prevent.stop="startWatermarkCompareDrag(index, $event)"
-                  >
-                    <Icon icon="mdi:unfold-more-horizontal" />
-                  </button>
+            <section class="watermark-compare-section" aria-label="鏁堟灉瀵规瘮">
+              <header class="watermark-section-head">
+                <div>
+                  <h3>鏁堟灉瀵规瘮</h3>
+                  <p>拖动滑杆查看去水印前后效果对比</p>
                 </div>
-              </article>
-            </div>
+              </header>
+
+              <div class="watermark-compare-grid">
+                <article v-for="(card, index) in watermarkCompareCards" :key="card.before" class="watermark-compare-card">
+                  <div
+                    :ref="(element) => setWatermarkCompareMediaRef(index, element)"
+                    class="watermark-compare-media"
+                    :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
+                    @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
+                  >
+                    <PreloadImage class="watermark-compare-image" :src="card.before" alt="鍘绘按鍗板鐞嗗墠" loading="lazy" decoding="async" />
+                    <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="鍘绘按鍗板鐞嗗悗" loading="lazy" decoding="async" />
+                    <div class="watermark-compare-divider" aria-hidden="true">
+                      <span></span>
+                    </div>
+                    <span class="watermark-compare-badge watermark-compare-badge--before">处理前</span>
+                    <span class="watermark-compare-badge watermark-compare-badge--after">处理后</span>
+                    <button
+                      type="button"
+                      class="watermark-compare-handle"
+                      aria-label="去水印前后对比拖拽滑杆"
+                      @pointerdown.prevent.stop="startWatermarkCompareDrag(index, $event)"
+                    >
+                      <Icon icon="mdi:unfold-more-horizontal" />
+                    </button>
+                  </div>
+                </article>
+              </div>
+            </section>
           </section>
-        </template>
 
-        <section v-else class="watermark-recent-section" aria-label="最近生成记录">
-          <header class="watermark-section-head">
-            <div>
-              <h3>最近生成记录</h3>
-              <p>查看最近处理过的去水印车辆素材</p>
+          <section v-else class="recent-layout" aria-label="最近生成">
+            <div v-if="recentLoading && !recentItems.length" class="recent-empty-state">
+              <Icon icon="mdi:loading" class="recent-loading-icon" />
+              <span>正在加载最近生成</span>
             </div>
-          </header>
-
-          <div v-if="recentLoading && !recentItems.length" class="watermark-recent-empty">
-            <Icon icon="mdi:loading" class="watermark-recent-loading-icon" />
-            <span>正在加载最近生成</span>
-          </div>
-          <div v-else-if="!recentItems.length" class="watermark-recent-empty">
-            <Icon icon="mdi:image-off-outline" />
-            <span>暂无最近生成记录</span>
-          </div>
-          <div v-else class="watermark-recent-grid">
+            <div v-else-if="!recentItems.length" class="recent-empty-state">
+              <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
+              <span>暂无最近生成记录</span>
+            </div>
             <article
               v-for="item in recentItems"
               :key="item.id"
-              class="watermark-recent-card"
+              class="recent-card"
               :class="{ 'is-clickable': canOpenRecent(item) }"
               :role="canOpenRecent(item) ? 'button' : undefined"
               :tabindex="canOpenRecent(item) ? 0 : undefined"
-              :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+              :aria-label="canOpenRecent(item) ? `鏌ョ湅${item.title}` : item.title"
               @click="handleRecentPick(item)"
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
             >
-              <PreloadImage class="watermark-recent-image" :src="item.thumbnail || item.previewImage" :alt="item.title" loading="lazy" decoding="async" />
-              <div class="watermark-recent-copy">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.createdAt }}</span>
+              <div class="recent-media">
+                <PreloadImage
+                  v-if="item.thumbnail"
+                  class="recent-image"
+                  :src="item.thumbnail"
+                  :alt="item.title"
+                  loading="lazy"
+                  decoding="async"
+                  :draggable="false"
+                  fit="cover"
+                  object-position="center"
+                />
+                <div v-else class="recent-empty">
+                  <Icon icon="mdi:image-outline" />
+                </div>
+                <span class="recent-status" :class="`is-${item.status}`">
+                  <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
+                  {{ statusLabelMap[item.status] }}
+                </span>
               </div>
+              <footer class="recent-foot">
+                <strong class="recent-name">{{ item.title }}</strong>
+                <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
+                <span class="recent-time">
+                  <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+                  {{ item.createdAt }}
+                </span>
+              </footer>
             </article>
-          </div>
-        </section>
-      </section>
+          </section>
+        </div>
+      </div>
     </template>
     <ShortVideoBetaPanel
       v-else-if="capability.code === 'short-video'"
@@ -594,9 +676,9 @@ defineExpose({
       <div class="delivery-panel">
         <header class="delivery-result-head">
           <div>
-            <p>成片结果</p>
+            <p>鎴愮墖缁撴灉</p>
             <h2>5月展厅批量上新</h2>
-            <span>已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span>
+            <span>宸插畬鎴?{{ deliveryResultCount }} 寮?路 1:1 棰勮灞曠ず</span>
           </div>
           <button
             type="button"
@@ -604,11 +686,11 @@ defineExpose({
             :disabled="isDownloadingAllDelivery"
             @click="handleDownloadAllDelivery"
           >
-            {{ isDownloadingAllDelivery ? "下载中..." : "下载全部" }}
+            {{ isDownloadingAllDelivery ? "涓嬭浇涓?.." : "涓嬭浇鍏ㄩ儴" }}
           </button>
         </header>
 
-        <section class="delivery-result-layout" aria-label="成片交付结果">
+        <section class="delivery-result-layout" aria-label="鎴愮墖浜や粯缁撴灉">
           <article
             v-for="item in deliveryResults"
             :key="item.title"
@@ -644,7 +726,7 @@ defineExpose({
     <template v-else>
       <div class="assist-shell">
         <header class="assist-tabs">
-          <div class="tab-group" role="tablist" aria-label="辅助面板">
+          <div class="tab-group" role="tablist" aria-label="杈呭姪闈㈡澘">
           <template v-if="isBatchProcessingView">
             <button
               type="button"
@@ -653,7 +735,7 @@ defineExpose({
               :class="{ active: activeTab === 'batchProcessing' }"
               @click="activeTab = 'batchProcessing'"
             >
-              正在处理
+              姝ｅ湪澶勭悊
             </button>
             <button
               type="button"
@@ -662,8 +744,7 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              最近生成
-            </button>
+              鏈€杩戠敓鎴?            </button>
           </template>
           <template v-else-if="isGenerating">
             <button
@@ -673,7 +754,7 @@ defineExpose({
               :class="{ active: activeTab === 'generating' }"
               @click="activeTab = 'generating'"
             >
-              正在生成
+              姝ｅ湪鐢熸垚
             </button>
             <button
               type="button"
@@ -682,8 +763,7 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              最近生成
-            </button>
+              鏈€杩戠敓鎴?            </button>
           </template>
           <template v-else>
             <button
@@ -693,7 +773,7 @@ defineExpose({
               :class="{ active: activeTab === 'guide' }"
               @click="activeTab = 'guide'"
             >
-              使用教程
+              浣跨敤鏁欑▼
             </button>
             <button
               type="button"
@@ -702,8 +782,7 @@ defineExpose({
               :class="{ active: activeTab === 'recent' }"
               @click="activeTab = 'recent'"
             >
-              最近生成
-            </button>
+              鏈€杩戠敓鎴?            </button>
           </template>
         </div>
       </header>
@@ -746,7 +825,7 @@ defineExpose({
               <Icon icon="mdi:clock-outline" class="recent-time-icon" />
               {{ item.createdAt }}
               <template v-if="item.progress !== undefined && item.progress < 100">
-                · 进度 {{ item.progress }}%
+                路 杩涘害 {{ item.progress }}%
               </template>
             </span>
           </footer>
@@ -781,8 +860,8 @@ defineExpose({
         class="guide-layout"
         :class="{ 'is-compact-guide': !showTemplateRecommendations }"
       >
-        <section class="tutorial-section" aria-label="使用教程流程">
-          <h2>使用教程</h2>
+        <section class="tutorial-section" aria-label="浣跨敤鏁欑▼娴佺▼">
+          <h2>浣跨敤鏁欑▼</h2>
           <div class="tutorial-flow">
             <template
               v-for="(step, index) in tutorialSteps"
@@ -812,7 +891,7 @@ defineExpose({
         <section
           v-if="showTemplateRecommendations"
           class="template-section"
-          aria-label="模板推荐"
+          aria-label="妯℃澘鎺ㄨ崘"
         >
           <h2>初次使用？试试这些</h2>
           <div class="template-grid">
@@ -824,7 +903,7 @@ defineExpose({
               class="template-card"
               :class="{ 'is-active': isTemplateActive(item) }"
               :aria-pressed="isTemplateActive(item)"
-              :aria-label="`选择${item.title}场景`"
+              :aria-label="`閫夋嫨${item.title}鍦烘櫙`"
               @click="handleTemplatePick(item)"
               @keydown.enter.prevent="handleTemplatePick(item)"
               @keydown.space.prevent="handleTemplatePick(item)"
@@ -843,8 +922,8 @@ defineExpose({
           </div>
         </section>
 
-        <section class="requirement-section" aria-label="素材要求">
-          <strong>素材要求</strong>
+        <section class="requirement-section" aria-label="绱犳潗瑕佹眰">
+          <strong>绱犳潗瑕佹眰</strong>
           <div class="requirement-list">
             <span v-for="item in capability.requirements" :key="item">
               <Icon icon="mdi:check" />
@@ -870,7 +949,7 @@ defineExpose({
           :class="{ 'is-clickable': canOpenRecent(item) }"
           :role="canOpenRecent(item) ? 'button' : undefined"
           :tabindex="canOpenRecent(item) ? 0 : undefined"
-          :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+          :aria-label="canOpenRecent(item) ? `鏌ョ湅${item.title}` : item.title"
           @click="handleRecentPick(item)"
           @keydown.enter.prevent="handleRecentPick(item)"
           @keydown.space.prevent="handleRecentPick(item)"
@@ -1377,10 +1456,11 @@ defineExpose({
   line-height: 1.25;
 }
 
-.watermark-assist-panel {
+.watermark-feature-layout {
   display: grid;
   flex: 1;
   min-height: 0;
+  align-content: start;
   gap: 16px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1389,61 +1469,13 @@ defineExpose({
   scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
 
-.watermark-assist-panel::-webkit-scrollbar {
+.watermark-feature-layout::-webkit-scrollbar {
   width: 8px;
 }
 
-.watermark-assist-panel::-webkit-scrollbar-thumb {
+.watermark-feature-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
-}
-
-.watermark-assist-top {
-  display: grid;
-  grid-template-rows: auto auto;
-  border: 1px solid var(--assist-border);
-  border-radius: 14px;
-  background: var(--assist-card);
-  box-shadow: var(--assist-shadow);
-}
-
-.watermark-view-tabs {
-  display: flex;
-  width: 100%;
-  gap: 8px;
-  padding: 4px 6px;
-  border: 0;
-  border-bottom: 1px solid var(--assist-border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.watermark-view-tabs button {
-  min-width: 104px;
-  height: 32px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--assist-muted);
-  padding: 0 18px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.watermark-view-tabs button.active {
-  background: color-mix(in srgb, var(--assist-blue) 16%, transparent);
-  color: var(--assist-blue);
-}
-
-.watermark-compare-section,
-.watermark-recent-section {
-  border: 1px solid var(--assist-border);
-  border-radius: 14px;
-  background: var(--assist-card);
-  box-shadow: var(--assist-shadow);
 }
 
 .watermark-assist-hero {
@@ -1452,9 +1484,10 @@ defineExpose({
   align-items: center;
   min-height: 104px;
   padding: 14px 18px 16px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
 }
 
 .watermark-assist-copy {
@@ -1491,9 +1524,12 @@ defineExpose({
   line-height: 1.45;
 }
 
-.watermark-compare-section,
-.watermark-recent-section {
+.watermark-compare-section {
   padding: 18px;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
 }
 
 .watermark-section-head {
@@ -1624,90 +1660,6 @@ defineExpose({
   right: 10px;
   background: color-mix(in srgb, var(--assist-blue) 90%, #000);
   color: #fff;
-}
-
-.watermark-recent-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.watermark-recent-card {
-  overflow: hidden;
-  border: 1px solid var(--assist-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--assist-card) 92%, white);
-}
-
-.watermark-recent-card.is-clickable {
-  cursor: pointer;
-}
-
-.watermark-recent-card.is-clickable:hover {
-  border-color: color-mix(in srgb, var(--assist-blue) 40%, var(--assist-border));
-  transform: translateY(-2px);
-  transition:
-    border-color 0.18s ease,
-    transform 0.18s ease;
-}
-
-.theme-light .watermark-recent-card {
-  background: #fff;
-}
-
-.watermark-recent-image {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: var(--assist-card-strong);
-}
-
-.watermark-recent-copy {
-  display: grid;
-  gap: 4px;
-  padding: 10px 10px 12px;
-}
-
-.watermark-recent-copy strong,
-.watermark-recent-copy span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.watermark-recent-copy strong {
-  color: var(--assist-text);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.watermark-recent-copy span {
-  color: var(--assist-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.watermark-recent-empty {
-  display: grid;
-  min-height: 170px;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
-  border: 1px dashed var(--assist-border);
-  border-radius: 12px;
-  color: var(--assist-muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.watermark-recent-empty .iconify {
-  color: var(--assist-blue);
-  font-size: 24px;
-}
-
-.watermark-recent-loading-icon {
-  animation: recent-loading-spin 1s linear infinite;
 }
 
 .tab-group {

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -23,7 +23,6 @@ import CreativeImageStudioPanel from '@/components/business/workspace/CreativeIm
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
-import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
@@ -211,30 +210,17 @@ function syncWorkspaceFromTask(task: Pick<GenerationTaskDetail, 'moduleCode' | '
 
 watch(
   () => route.params.code,
-  (code, previousCode) => {
+  (code) => {
     const resolved = resolveCapabilityCode(code)
     activeCode.value = resolved
-
-    if (resolved === SHORT_VIDEO_CAPABILITY_CODE && previousCode !== code) {
-      notifyShortVideoBeta()
-    }
   },
 )
-
-function notifyShortVideoBeta() {
-  message.info(SHORT_VIDEO_BETA_MESSAGE, { duration: 4500 })
-}
 
 function handleSelectCapability(code: string) {
   activeCode.value = code
 
   if (route.params.code !== code) {
     router.replace({ name: 'Workspace', params: { code } })
-    return
-  }
-
-  if (code === SHORT_VIDEO_CAPABILITY_CODE) {
-    notifyShortVideoBeta()
   }
 }
 
@@ -295,19 +281,34 @@ async function pollGenerationTask(taskId: string) {
 }
 
 function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResult | null {
+  const isShortVideo = task.moduleCode === SHORT_VIDEO_CAPABILITY_CODE
   const image = task.resultImages[0]
-  if (!image?.url) return null
+  const videoUrl =
+    task.resultVideos?.[0]?.url ??
+    task.videoUrl ??
+    task.previewVideo ??
+    task.downloadUrl ??
+    image?.url
+  const resultUrl = isShortVideo ? videoUrl : image?.url
+  if (!resultUrl) return null
 
   const option = activeCapability.value.options.find((item) => item.id === task.optionId)
-  const sceneTitle = option?.title ?? activeCapability.value.label
+  const sceneTitle = isShortVideo ? '短视频生成' : option?.title ?? activeCapability.value.label
+  const ratioLabel = isShortVideo
+    ? `${task.outputRatio || '16:9'} · 720p · 10秒`
+    : `${task.outputRatio} · ${task.resolution}`
 
   return {
     createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
-    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: `${task.outputRatio} · ${task.resolution}`,
-    previewImage: image.url,
+    statusText: isShortVideo
+      ? `已完成 · ${sceneTitle} · 营销视频`
+      : `已完成 · ${sceneTitle} · 单图生成结果`,
+    ratioLabel,
+    mediaType: isShortVideo ? 'video' : 'image',
+    previewImage: isShortVideo ? '' : resultUrl,
+    previewVideo: isShortVideo ? resultUrl : undefined,
     previewAlt: `${sceneTitle}生成结果`,
-    downloadUrl: image.url,
+    downloadUrl: resultUrl,
     resultImages: task.resultImages,
     taskId: task.taskId,
     imageWidth: 1600,
@@ -488,7 +489,6 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       useLogo: payload.useLogo,
       colorCode: payload.colorCode,
       outputRatio: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '16:9' : undefined,
-      resolution: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '720p' : undefined,
       extra: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? { videoResolution: '720p' } : undefined,
     }
 
@@ -513,15 +513,21 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResult | null {
   if (item.status !== 'success' || !item.previewImage) return null
 
-  const sceneTitle = item.sceneLabel ?? item.title
+  const isShortVideo = item.moduleCode === SHORT_VIDEO_CAPABILITY_CODE
+  const sceneTitle = isShortVideo ? '短视频生成' : item.sceneLabel ?? item.title
+  const mediaUrl = item.downloadUrl ?? item.previewImage
 
   return {
     createdAt: formatDate(item.createdAt),
-    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: item.ratioLabel ?? '主图',
-    previewImage: item.previewImage,
+    statusText: isShortVideo
+      ? `已完成 · ${sceneTitle} · 营销视频`
+      : `已完成 · ${sceneTitle} · 单图生成结果`,
+    ratioLabel: isShortVideo ? `${item.outputRatio ?? '16:9'} · 720p · 10秒` : item.ratioLabel ?? '主图',
+    mediaType: isShortVideo ? 'video' : 'image',
+    previewImage: isShortVideo ? '' : item.previewImage,
+    previewVideo: isShortVideo ? mediaUrl : undefined,
     previewAlt: item.title,
-    downloadUrl: item.downloadUrl ?? item.previewImage,
+    downloadUrl: mediaUrl,
     taskId: item.taskId,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,

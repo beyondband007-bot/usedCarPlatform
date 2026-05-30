@@ -78,6 +78,10 @@ export interface GenerationTaskDetail {
   outputRatio: string
   resolution: string
   resultImages: GenerationResultImage[]
+  resultVideos?: GenerationResultImage[]
+  videoUrl?: string
+  previewVideo?: string
+  downloadUrl?: string
   error: {
     code?: string
     message?: string
@@ -102,12 +106,17 @@ export interface CreativeImageMessage {
   messageId: string
   conversationId: string
   role: string
-  prompt: string
-  taskId: string
-  referenceAssetId: string | null
-  sourceTaskId: string | null
-  sourceImageUrl: string | null
-  generationMode: 'text_to_image' | 'image_to_image' | 'revise'
+  content: string
+  taskId?: string | null
+  referenceAssetId?: string | null
+  sourceTaskId?: string | null
+  sourceImageUrl?: string | null
+  generationMode?: 'text_to_image' | 'image_to_image' | 'revise' | null
+  metadata?: {
+    outputRatio?: string
+    resolution?: string
+    [key: string]: unknown
+  } | null
   createdAt: string
 }
 

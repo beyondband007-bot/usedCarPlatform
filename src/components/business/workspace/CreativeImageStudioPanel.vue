@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { NInput } from 'naive-ui'
 
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
@@ -8,9 +9,12 @@ import {
   creativeImageDefaultPreview,
   creativeImagePromptMaxLength,
 } from '@/constants/creative-image-studio'
-import type { WorkspaceCapability, WorkspaceGenerateResult } from '@/types/workspace'
+import type { CreativeThreadTurn, WorkspaceCapability, WorkspaceGenerateResult } from '@/types/workspace'
 import { useAppStore } from '@/stores/app'
 import type { CreativeImageConversation, UploadedAsset } from '@/api/visual-workbench'
+import { downloadFile } from '@/utils/download'
+
+const CREATIVE_DOWNLOAD_FILENAME = '汽车图片.jpg'
 
 const appStore = useAppStore()
 
@@ -21,6 +25,8 @@ const props = defineProps<{
   generationResult?: WorkspaceGenerateResult | null
   caption?: string | null
   conversations?: CreativeImageConversation[]
+  threadTurns?: CreativeThreadTurn[]
+  isLoadingConversation?: boolean
   activeConversationId?: string | null
   referenceAsset?: UploadedAsset | null
 }>()
@@ -44,6 +50,10 @@ const prompt = ref('')
 const selectedRatio = ref(creativeImageAspectRatios[0].value)
 const lastSubmittedPrompt = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const threadScrollRef = ref<HTMLElement | null>(null)
+const sidebarCollapsed = ref(false)
+const previewModalVisible = ref(false)
+const previewImageUrl = ref('')
 
 const activeRatio = computed(
   () =>
@@ -53,15 +63,39 @@ const activeRatio = computed(
 
 const promptLength = computed(() => prompt.value.length)
 const canSubmit = computed(() => prompt.value.trim().length > 0 && !props.isGenerating)
-const hasResult = computed(() => Boolean(props.generationResult?.previewImage))
-const hasConversation = computed(() => props.isGenerating || hasResult.value)
+
+const activeConversation = computed(() =>
+  props.conversations?.find((item) => item.conversationId === props.activeConversationId) ?? null,
+)
+
+const primaryResultImage = computed(
+  () =>
+    props.generationResult?.previewImage ??
+    activeConversation.value?.lastResultUrl ??
+    '',
+)
+
+const hasResult = computed(() => Boolean(primaryResultImage.value))
+const hasHistoryContext = computed(
+  () =>
+    Boolean(
+      props.activeConversationId &&
+        (props.threadTurns?.length ||
+          props.caption ||
+          activeConversation.value?.lastMessage ||
+          activeConversation.value?.lastTaskId),
+    ),
+)
+const hasConversation = computed(
+  () => props.isGenerating || hasResult.value || hasHistoryContext.value,
+)
 
 const displayPrompt = computed(
   () =>
     props.caption ??
     props.generationResult?.caption ??
     lastSubmittedPrompt.value ??
-    '生成一张具有高级汽车广告质感的创意图片',
+    '',
 )
 
 const ratioMetaLabel = computed(() => {
@@ -69,21 +103,48 @@ const ratioMetaLabel = computed(() => {
   return `${activeRatio.value.label} · ${activeRatio.value.resolution}`
 })
 
-const resultCards = computed(() => {
-  const captions = ['主视觉', '细节版', '海报版', '社媒版']
-  const images = props.generationResult?.resultImages?.length
-    ? props.generationResult.resultImages.map((item) => item.url)
-    : [props.generationResult?.previewImage ?? creativeImageDefaultPreview.image]
+const threadItems = computed<CreativeThreadTurn[]>(() => {
+  if (props.threadTurns?.length) return props.threadTurns
 
-  return images.map((image, index) => ({
-    id: `${captions[index] ?? '结果'}-${index}`,
-    title: captions[index] ?? `结果 ${index + 1}`,
-    image,
-  }))
+  if (!hasHistoryContext.value && !hasResult.value) return []
+
+  return [
+    {
+      id: 'current',
+      prompt: displayPrompt.value,
+      resultUrl: primaryResultImage.value || null,
+      ratioLabel: ratioMetaLabel.value,
+      taskId: props.generationResult?.taskId ?? null,
+      isGenerating: props.isGenerating,
+    },
+  ]
 })
 
 const recentConversations = computed(() => props.conversations ?? [])
 const referencePreview = computed(() => props.referenceAsset?.url ?? null)
+
+function resolveConversationTitle(conversation: CreativeImageConversation) {
+  return conversation.title?.trim() || '创意生图对话'
+}
+
+function resolveConversationThumb(conversation: CreativeImageConversation) {
+  if (
+    conversation.conversationId === props.activeConversationId &&
+    props.generationResult?.previewImage
+  ) {
+    return props.generationResult.previewImage
+  }
+  return conversation.lastResultUrl ?? creativeImageDefaultPreview.image
+}
+
+watch(
+  () => props.activeConversationId,
+  () => {
+    prompt.value = ''
+    lastSubmittedPrompt.value = ''
+    threadScrollRef.value?.scrollTo({ top: 0 })
+  },
+)
 
 watch(
   () => props.generationResult,
@@ -101,6 +162,7 @@ function handleSubmit() {
   if (!text || props.isGenerating) return
 
   lastSubmittedPrompt.value = text
+  prompt.value = ''
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
@@ -108,6 +170,29 @@ function handleSubmit() {
     referenceAssetId: props.referenceAsset?.assetId,
     useLastReference: Boolean(props.referenceAsset?.assetId),
   })
+}
+
+function handleRegenerateTurn(turn: CreativeThreadTurn) {
+  const text = turn.prompt.trim()
+  if (!text || props.isGenerating) return
+
+  lastSubmittedPrompt.value = text
+  prompt.value = ''
+  emit('generate', {
+    prompt: text,
+    outputRatio: activeRatio.value.value,
+    resolution: '2K',
+    referenceAssetId: props.referenceAsset?.assetId,
+    useLastReference: Boolean(props.referenceAsset?.assetId),
+  })
+}
+
+function resolveTurnRatioLabel(turn: CreativeThreadTurn) {
+  return turn.ratioLabel || ratioMetaLabel.value
+}
+
+function shouldShowResultCard(turn: CreativeThreadTurn) {
+  return Boolean(turn.resultUrl || turn.taskId || turn.isLoadingImage)
 }
 
 function handlePromptKeydown(event: KeyboardEvent) {
@@ -134,33 +219,42 @@ function handleReferenceSelected(event: Event) {
   emit('uploadReference', file)
 }
 
-function handleReviseResult(imageUrl?: string) {
-  const sourceTaskId = props.generationResult?.taskId
-  const sourceImageUrl = imageUrl ?? props.generationResult?.previewImage
-  if (!sourceTaskId || !sourceImageUrl || props.isGenerating) return
+function openImagePreview(imageUrl?: string | null) {
+  const url = imageUrl || primaryResultImage.value
+  if (!url) return
+  previewImageUrl.value = url
+  previewModalVisible.value = true
+}
 
-  const text = prompt.value.trim() || '继续优化这张图，保持主体一致，提升真实感和地面反射'
-  lastSubmittedPrompt.value = text
-  emit('generate', {
-    prompt: text,
-    outputRatio: activeRatio.value.value,
-    resolution: '2K',
-    sourceTaskId,
-    sourceImageUrl,
-  })
+async function handleDownloadResult(imageUrl?: string | null) {
+  const url =
+    imageUrl ??
+    props.generationResult?.downloadUrl ??
+    props.generationResult?.previewImage ??
+    previewImageUrl.value
+  if (!url) return
+
+  await downloadFile(url, CREATIVE_DOWNLOAD_FILENAME)
+}
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
 }
 </script>
 
 <template>
   <section
     class="creative-app"
-    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    :class="[
+      appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      { 'sidebar-collapsed': sidebarCollapsed },
+    ]"
     aria-label="创意生图工作台"
   >
-    <aside class="creative-sidebar" aria-label="创意生图会话">
+    <aside class="creative-sidebar" aria-label="创意生图会话" :aria-hidden="sidebarCollapsed">
       <header class="creative-sidebar-head">
         <strong>开启创作</strong>
-        <button type="button" aria-label="折叠会话栏">
+        <button type="button" aria-label="折叠会话栏" @click="toggleSidebar">
           <Icon icon="mdi:dock-left" />
         </button>
       </header>
@@ -172,24 +266,26 @@ function handleReviseResult(imageUrl?: string) {
 
       <section class="creative-recent">
         <p>最近</p>
-        <button
-          v-for="conversation in recentConversations"
-          :key="conversation.conversationId"
-          type="button"
-          class="creative-recent-item"
-          :class="{ active: conversation.conversationId === props.activeConversationId }"
-          @click="emit('selectConversation', conversation.conversationId)"
-        >
-          <span class="creative-recent-thumb">
-            <PreloadImage
-              :src="props.generationResult?.previewImage ?? creativeImageDefaultPreview.image"
-              :alt="conversation.title"
-              fit="cover"
-            />
-          </span>
-          <span>{{ conversation.title }}</span>
-          <Icon icon="mdi:dots-horizontal" />
-        </button>
+        <div class="creative-recent-list">
+          <button
+            v-for="conversation in recentConversations"
+            :key="conversation.conversationId"
+            type="button"
+            class="creative-recent-item"
+            :class="{ active: conversation.conversationId === props.activeConversationId }"
+            @click="emit('selectConversation', conversation.conversationId)"
+          >
+            <span class="creative-recent-thumb">
+              <PreloadImage
+                :key="`${conversation.conversationId}-${resolveConversationThumb(conversation)}`"
+                :src="resolveConversationThumb(conversation)"
+                :alt="resolveConversationTitle(conversation)"
+                fit="cover"
+              />
+            </span>
+            <span>{{ resolveConversationTitle(conversation) }}</span>
+          </button>
+        </div>
       </section>
 
       <footer class="creative-sidebar-foot">
@@ -200,106 +296,169 @@ function handleReviseResult(imageUrl?: string) {
       </footer>
     </aside>
 
-    <main class="creative-main">
-      <header class="creative-toolbar">
-        <div class="creative-search">
-          <Icon icon="mdi:magnify" />
-          <span></span>
-          <button type="button">时间 <Icon icon="mdi:chevron-down" /></button>
-          <button type="button">生成模式 <Icon icon="mdi:chevron-down" /></button>
-          <button type="button">操作类型 <Icon icon="mdi:chevron-down" /></button>
-          <button type="button" class="creative-assets">
-            <Icon icon="mdi:folder-outline" />
-            资产库
-          </button>
-        </div>
-      </header>
+    <main class="creative-main" :class="{ 'is-empty': !hasConversation }">
+      <button
+        v-if="sidebarCollapsed"
+        type="button"
+        class="creative-sidebar-expand"
+        aria-label="展开会话栏"
+        @click="toggleSidebar"
+      >
+        <Icon icon="mdi:dock-right" />
+      </button>
 
-      <section v-if="!hasConversation" class="creative-empty-state">
-        <h1>你好，想创作什么?</h1>
-        <div class="creative-suggestion-row">
-          <button
-            type="button"
-            @click="applyPromptSuggestion('生成一张汽车电商主图，白色 SUV 停在现代展厅内，干净背景，高级广告光影')"
-          >
-            汽车电商主图
-          </button>
-          <button
-            type="button"
-            @click="applyPromptSuggestion('为二手车生成一张暗调豪华展厅海报，车辆居中，电影级灯光，背景克制')"
-          >
-            暗调展厅海报
-          </button>
-          <button
-            type="button"
-            @click="applyPromptSuggestion('生成一张户外道路动态汽车图，强烈速度感，适合社媒投放')"
-          >
-            道路动态广告
-          </button>
-        </div>
-      </section>
-
-      <section v-else class="creative-thread" aria-live="polite">
-        <header class="creative-day-head">
-          <h1>{{ hasResult ? '今天' : '正在创作' }}</h1>
-          <button type="button">{{ displayPrompt || '生成一张汽车创意图' }}</button>
-        </header>
-
-        <div v-if="props.isGenerating" class="creative-thinking">
-          <span aria-hidden="true"></span>
-          <strong>认真思考中...</strong>
-        </div>
-
-        <article v-if="hasResult && props.generationResult" class="creative-result-card">
-          <p class="creative-result-status">已完成 <Icon icon="mdi:chevron-right" /></p>
-          <h2>
-            已提交生成创意图片，输出 {{ ratioMetaLabel }}，提示词：{{ displayPrompt }}
-          </h2>
-
-          <div class="creative-result-grid">
+      <div class="creative-main-stack">
+        <section v-if="!hasConversation" class="creative-empty-state creative-content-shell">
+          <h1>你好，想创作什么?</h1>
+          <div class="creative-suggestion-row">
             <button
-              v-for="item in resultCards"
-              :key="item.id"
               type="button"
-              class="creative-result-image"
+              @click="applyPromptSuggestion('生成一张汽车电商主图，白色 SUV 停在现代展厅内，干净背景，高级广告光影')"
             >
-              <PreloadImage :src="item.image" :alt="item.title" fit="cover" />
-              <span>AI 生成</span>
+              汽车电商主图
+            </button>
+            <button
+              type="button"
+              @click="applyPromptSuggestion('为二手车生成一张暗调豪华展厅海报，车辆居中，电影级灯光，背景克制')"
+            >
+              暗调展厅海报
+            </button>
+            <button
+              type="button"
+              @click="applyPromptSuggestion('生成一张户外道路动态汽车图，强烈速度感，适合社媒投放')"
+            >
+              道路动态广告
             </button>
           </div>
+        </section>
 
-          <p class="creative-result-meta">
-            以上内容由 AI 生成 · 本次消耗 {{ props.capability.cost }} 积分
-          </p>
-
-          <div class="creative-result-actions">
-            <button type="button" @click="handleSubmit">
-              <Icon icon="mdi:reload" />
-              重新生成
-            </button>
-            <button type="button" @click="handleReviseResult()">
-              <Icon icon="mdi:image-sync-outline" />
-              修改这张图
-            </button>
-            <button type="button" aria-label="引用提示词">
-              <Icon icon="mdi:format-quote-close" />
-            </button>
-            <button type="button" aria-label="更多操作">
-              <Icon icon="mdi:dots-horizontal" />
-            </button>
+        <section v-else ref="threadScrollRef" class="creative-thread" aria-live="polite">
+          <div class="creative-content-shell">
+          <div
+            v-if="props.isLoadingConversation && !threadItems.length"
+            class="creative-turn"
+          >
+            <div class="creative-result-placeholder" aria-label="图片加载中">
+              <span class="creative-result-placeholder-spinner" aria-hidden="true"></span>
+              <span>图片加载中</span>
+            </div>
           </div>
-        </article>
-      </section>
 
-      <section class="creative-composer" aria-label="创意输入">
-        <div class="creative-composer-input">
+          <div
+            v-for="turn in threadItems"
+            :key="turn.id"
+            class="creative-turn"
+          >
+            <div v-if="turn.prompt" class="creative-user-message">
+              <p>{{ turn.prompt }}</p>
+            </div>
+
+            <div v-if="turn.isGenerating" class="creative-thinking">
+              <span aria-hidden="true"></span>
+              <strong>认真思考中...</strong>
+            </div>
+
+            <article
+              v-else-if="shouldShowResultCard(turn)"
+              class="creative-result-card"
+            >
+              <p class="creative-result-status">已完成 <Icon icon="mdi:chevron-right" /></p>
+              <h2>
+                已提交生成创意图片，输出 {{ resolveTurnRatioLabel(turn) }}，提示词：{{ turn.prompt }}
+              </h2>
+
+              <button
+                v-if="turn.resultUrl"
+                type="button"
+                class="creative-result-preview"
+                aria-label="放大查看生成图片"
+                @click="openImagePreview(turn.resultUrl)"
+              >
+                <img
+                  :src="turn.resultUrl"
+                  :alt="turn.prompt"
+                  class="creative-result-preview-img"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span>AI 生成</span>
+              </button>
+              <div
+                v-else
+                class="creative-result-placeholder"
+                aria-label="图片加载中"
+              >
+                <span class="creative-result-placeholder-spinner" aria-hidden="true"></span>
+                <span>图片加载中</span>
+              </div>
+
+              <p class="creative-result-meta">
+                以上内容由 AI 生成 · 本次消耗 {{ props.capability.cost }} 积分
+              </p>
+
+              <div class="creative-result-actions">
+                <button type="button" @click="handleRegenerateTurn(turn)">
+                  <Icon icon="mdi:reload" />
+                  重新生成
+                </button>
+                <button
+                  type="button"
+                  :disabled="!turn.resultUrl"
+                  @click="handleDownloadResult(turn.resultUrl)"
+                >
+                  <Icon icon="mdi:download-outline" />
+                  下载
+                </button>
+              </div>
+            </article>
+          </div>
+          </div>
+        </section>
+      </div>
+
+      <Teleport to="body">
+        <div
+          v-if="previewModalVisible"
+          class="creative-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+          @click.self="previewModalVisible = false"
+        >
+          <div class="creative-lightbox-frame">
+            <button
+              type="button"
+              class="creative-lightbox-close"
+              aria-label="关闭预览"
+              @click="previewModalVisible = false"
+            >
+              <Icon icon="mdi:close" />
+            </button>
+            <img
+              :src="previewImageUrl"
+              :alt="displayPrompt"
+              class="creative-lightbox-img"
+            />
+          </div>
+        </div>
+      </Teleport>
+
+      <section
+        class="creative-composer creative-content-shell"
+        :class="{ 'is-inline': !hasConversation, 'is-docked': hasConversation }"
+        aria-label="创意输入"
+      >
+        <div class="creative-composer-row">
           <button
             type="button"
             class="creative-upload"
+            :class="{ 'is-spinning': props.isGenerating || props.isUploadingReference }"
+            :disabled="props.isGenerating"
             aria-label="上传参考图"
             @click="openReferencePicker"
           >
-            <Icon icon="mdi:plus" />
+            <Icon v-if="props.isUploadingReference" icon="mdi:loading" />
+            <Icon v-else icon="mdi:plus" />
           </button>
           <input
             ref="fileInputRef"
@@ -308,39 +467,29 @@ function handleReviseResult(imageUrl?: string) {
             accept="image/jpeg,image/png,image/webp"
             @change="handleReferenceSelected"
           />
-          <textarea
-            v-model="prompt"
+          <NInput
+            v-model:value="prompt"
+            class="creative-prompt-input"
+            type="textarea"
+            size="small"
             :maxlength="creativeImagePromptMaxLength"
-            placeholder="输入想法、脚本或上传参考，支持 “/” 使用技能，@ 添加主体，和 Agent 一起创作"
-            rows="3"
+            placeholder="输入想法、脚本或上传参考图，描述你想生成的汽车创意图片"
+            :autosize="{ minRows: 3, maxRows: 5 }"
             @keydown="handlePromptKeydown"
           />
+          <button
+            type="button"
+            class="creative-submit"
+            :disabled="!canSubmit"
+            :aria-label="`生成创意图，消耗 ${props.capability.cost} 积分`"
+            @click="handleSubmit"
+          >
+            <Icon :icon="props.isGenerating ? 'mdi:stop' : 'mdi:arrow-up'" />
+          </button>
         </div>
 
         <footer class="creative-composer-foot">
-          <div class="creative-mode-row">
-            <button type="button" class="is-accent">
-              <Icon icon="mdi:waves" />
-              Agent 模式
-              <Icon icon="mdi:chevron-down" />
-            </button>
-            <button type="button">
-              <Icon icon="mdi:tune-variant" />
-              自动
-            </button>
-            <button type="button">
-              <Icon icon="mdi:wrench-outline" />
-              使用技能
-            </button>
-            <button type="button">
-              <Icon icon="mdi:at" />
-            </button>
-          </div>
-
           <div class="creative-submit-row">
-            <span v-if="referencePreview" class="creative-reference-pill">
-              已选参考图
-            </span>
             <div class="creative-ratio-group" role="group" aria-label="输出比例">
               <button
                 v-for="item in creativeImageAspectRatios"
@@ -354,16 +503,12 @@ function handleReviseResult(imageUrl?: string) {
                 <span>{{ item.resolution }}</span>
               </button>
             </div>
-            <span>{{ promptLength }}/{{ creativeImagePromptMaxLength }}</span>
-            <button
-              type="button"
-              class="creative-submit"
-              :disabled="!canSubmit"
-              :aria-label="`生成创意图，消耗 ${props.capability.cost} 积分`"
-              @click="handleSubmit"
-            >
-              <Icon :icon="props.isGenerating ? 'mdi:stop' : 'mdi:arrow-up'" />
-            </button>
+            <span v-if="referencePreview" class="creative-reference-pill">
+              已选参考图
+            </span>
+            <span class="creative-prompt-count">
+              {{ promptLength }}/{{ creativeImagePromptMaxLength }}
+            </span>
           </div>
         </footer>
       </section>
@@ -374,6 +519,8 @@ function handleReviseResult(imageUrl?: string) {
 <style scoped lang="scss">
 .creative-app {
   --creative-bg: #101114;
+  --creative-content-max: 1800px;
+  --creative-content-width: min(var(--creative-content-max), 80%);
   --creative-sidebar-bg: #15171c;
   --creative-main-bg: #101114;
   --creative-text: #f4f7fb;
@@ -401,7 +548,7 @@ function handleReviseResult(imageUrl?: string) {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--creative-bg);
   color: var(--creative-text);
@@ -436,21 +583,34 @@ function handleReviseResult(imageUrl?: string) {
 
 .creative-sidebar {
   display: grid;
+  width: 280px;
+  min-width: 0;
   min-height: 0;
   grid-template-rows: auto auto 1fr auto;
   gap: 22px;
+  overflow: hidden;
   border-right: 1px solid var(--creative-line);
   background: var(--creative-sidebar-bg);
   padding: 24px 22px;
+  transition:
+    width 0.24s ease,
+    padding 0.24s ease,
+    opacity 0.2s ease,
+    border-color 0.24s ease;
+}
+
+.creative-app.sidebar-collapsed .creative-sidebar {
+  width: 0;
+  padding-inline: 0;
+  opacity: 0;
+  border-right-color: transparent;
+  pointer-events: none;
 }
 
 .creative-sidebar-head,
-.creative-toolbar,
 .creative-composer-foot,
 .creative-submit-row,
-.creative-mode-row,
-.creative-result-actions,
-.creative-day-head {
+.creative-result-actions {
   display: flex;
   align-items: center;
 }
@@ -465,12 +625,10 @@ function handleReviseResult(imageUrl?: string) {
 }
 
 .creative-sidebar button,
-.creative-toolbar button,
 .creative-composer button,
 .creative-result-actions button,
-.creative-day-head button,
 .creative-suggestion-row button,
-.creative-result-image {
+.creative-result-preview {
   border: 0;
   font-family: inherit;
   cursor: pointer;
@@ -485,6 +643,41 @@ function handleReviseResult(imageUrl?: string) {
   background: transparent;
   color: var(--creative-icon);
   font-size: 18px;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.creative-sidebar-head button:hover {
+  background: color-mix(in srgb, var(--creative-text) 8%, transparent);
+  color: var(--creative-text);
+}
+
+.creative-sidebar-expand {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--creative-line);
+  border-radius: 10px;
+  background: var(--creative-surface-elevated);
+  color: var(--creative-icon);
+  font-family: inherit;
+  font-size: 20px;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.creative-sidebar-expand:hover {
+  border-color: var(--creative-accent-border);
+  color: var(--creative-accent);
 }
 
 .creative-new-chat {
@@ -512,7 +705,23 @@ function handleReviseResult(imageUrl?: string) {
 }
 
 .creative-recent {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.creative-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
 }
 
 .creative-recent p {
@@ -526,7 +735,7 @@ function handleReviseResult(imageUrl?: string) {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 42px minmax(0, 1fr) 24px;
+  grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   border-radius: 10px;
@@ -551,13 +760,8 @@ function handleReviseResult(imageUrl?: string) {
   font-weight: 800;
 }
 
-.creative-recent-item > .iconify {
-  color: var(--creative-muted);
-}
-
 .creative-recent-item.active {
-  outline: 2px solid var(--creative-accent-border);
-  background: var(--creative-surface-soft);
+  background: color-mix(in srgb, var(--creative-accent) 10%, var(--creative-surface));
 }
 
 .creative-sidebar-foot {
@@ -581,55 +785,56 @@ function handleReviseResult(imageUrl?: string) {
 .creative-main {
   position: relative;
   display: grid;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   overflow: hidden;
   background: var(--creative-main-glow), var(--creative-main-bg);
 }
 
-.creative-toolbar {
-  justify-content: flex-end;
-  min-height: 78px;
-  padding: 16px 28px 0;
+.creative-content-shell {
+  width: var(--creative-content-width);
+  max-width: var(--creative-content-max);
+  margin-inline: auto;
 }
 
-.creative-search {
-  display: inline-flex;
+.creative-main-stack {
+  grid-row: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  min-height: 48px;
-  border: 1px solid var(--creative-line);
-  border-radius: 12px;
-  background: var(--creative-surface-elevated);
-  padding: 0 14px;
-  color: var(--creative-text);
 }
 
-.creative-search > span {
-  width: 1px;
-  height: 20px;
-  background: var(--creative-line);
-}
-
-.creative-search button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: transparent;
-  color: var(--creative-text);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.creative-assets {
-  border-left: 1px solid var(--creative-line) !important;
-  padding-left: 14px;
+.creative-main.is-empty .creative-main-stack {
+  flex: 0 0 auto;
+  width: 100%;
+  overflow: visible;
 }
 
 .creative-empty-state,
 .creative-thread {
   min-height: 0;
-  overflow: auto;
+  width: 100%;
+}
+
+.creative-thread {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px 0 32px;
+}
+
+.creative-composer.is-docked {
+  grid-row: 2;
+  flex-shrink: 0;
+  margin-bottom: 28px;
 }
 
 .creative-empty-state {
@@ -637,7 +842,13 @@ function handleReviseResult(imageUrl?: string) {
   align-content: center;
   justify-items: center;
   gap: 34px;
-  padding: 40px 32px 24px;
+  padding: 40px 0 0;
+}
+
+.creative-main.is-empty .creative-composer.is-inline {
+  flex: 0 0 auto;
+  margin-top: 34px;
+  margin-bottom: 40px;
 }
 
 .creative-empty-state h1 {
@@ -665,38 +876,40 @@ function handleReviseResult(imageUrl?: string) {
   font-weight: 800;
 }
 
-.creative-thread {
-  padding: 0 clamp(40px, 7vw, 96px) 26px;
+.creative-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
-.creative-day-head {
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 38px;
+.creative-turn + .creative-turn {
+  margin-top: 48px;
 }
 
-.creative-day-head h1 {
-  margin: 0;
-  color: var(--creative-muted);
-  font-size: 32px;
-  font-weight: 950;
-}
-
-.creative-day-head button {
-  max-width: 360px;
+.creative-user-message {
+  align-self: flex-end;
+  width: fit-content;
+  max-width: min(100%, 520px);
+  margin-bottom: 28px;
   border-radius: 18px;
   background: var(--creative-surface-soft);
+  padding: 14px 20px;
+}
+
+.creative-user-message p {
+  margin: 0;
   color: var(--creative-text);
-  padding: 18px 24px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
+  line-height: 1.65;
+  word-break: break-word;
 }
 
 .creative-thinking {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 120px;
+  margin-top: 24px;
   color: var(--creative-text);
 }
 
@@ -709,9 +922,18 @@ function handleReviseResult(imageUrl?: string) {
   animation: creative-spin 0.9s linear infinite;
 }
 
+.creative-main.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
 .creative-result-card {
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: var(--creative-content-max);
+  margin: 0;
 }
 
 .creative-result-status,
@@ -738,25 +960,53 @@ function handleReviseResult(imageUrl?: string) {
   line-height: 1.75;
 }
 
-.creative-result-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2px;
-  overflow: hidden;
-  border-radius: 2px;
-}
-
-.creative-result-image {
+.creative-result-preview {
   position: relative;
   display: block;
-  min-width: 0;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  background: var(--creative-surface-soft);
+  width: fit-content;
+  max-width: 100%;
   padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
-.creative-result-image span {
+.creative-result-preview-img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(72vh, 1200px);
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.creative-result-empty,
+.creative-result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: min(100%, 320px);
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background: var(--creative-surface-soft);
+  color: var(--creative-muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.creative-result-placeholder-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid color-mix(in srgb, var(--creative-accent) 20%, transparent);
+  border-top-color: var(--creative-accent);
+  border-radius: 999px;
+  animation: creative-spin 0.9s linear infinite;
+}
+
+.creative-result-preview span {
   position: absolute;
   top: 10px;
   left: 10px;
@@ -766,6 +1016,56 @@ function handleReviseResult(imageUrl?: string) {
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 800;
+  pointer-events: none;
+}
+
+.creative-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 10, 14, 0.88);
+}
+
+.creative-lightbox-frame {
+  position: relative;
+  display: inline-flex;
+  max-width: min(96vw, 1200px);
+  max-height: 92vh;
+}
+
+.creative-lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.creative-lightbox-close:hover {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.creative-lightbox-img {
+  display: block;
+  max-width: min(96vw, 1200px);
+  max-height: 92vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .creative-result-meta {
@@ -791,85 +1091,114 @@ function handleReviseResult(imageUrl?: string) {
 }
 
 .creative-composer {
-  width: min(860px, calc(100% - 72px));
-  justify-self: center;
-  margin-bottom: 28px;
+  box-sizing: border-box;
   border: 1px solid var(--creative-line);
-  border-radius: 28px;
+  border-radius: 16px;
   background: var(--creative-composer-bg);
-  padding: 20px 22px 22px;
+  padding: 16px 18px 14px;
   box-shadow: var(--creative-composer-shadow);
 }
 
-.creative-composer-input {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
+.creative-composer-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .creative-upload {
   display: grid;
-  width: 62px;
-  height: 84px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--creative-upload-bg);
   color: var(--creative-muted);
-  font-size: 24px;
-  transform: rotate(-7deg);
+  font-size: 20px;
+  margin-top: 2px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.creative-upload.is-spinning {
+  color: var(--creative-accent);
+  animation: creative-upload-spin 1.1s linear infinite;
+}
+
+.creative-upload:disabled {
+  cursor: not-allowed;
+  opacity: 0.88;
 }
 
 .creative-hidden-input {
   display: none;
 }
 
-.creative-composer textarea {
-  min-height: 94px;
-  border: 0;
-  background: transparent;
-  color: var(--creative-text);
-  padding: 8px 0 0;
-  font: inherit;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.7;
-  resize: none;
-  outline: none;
+.creative-prompt-input {
+  flex: 1;
+  min-width: 0;
 }
 
-.creative-composer textarea::placeholder {
+.creative-prompt-input :deep(.n-input) {
+  background: transparent;
+}
+
+.creative-prompt-input :deep(.n-input__border),
+.creative-prompt-input :deep(.n-input__state-border) {
+  display: none;
+}
+
+.creative-prompt-input :deep(.n-input-wrapper) {
+  padding: 0 !important;
+}
+
+.creative-prompt-input :deep(.n-input__textarea-el) {
+  padding: 2px 0;
+  color: var(--creative-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.creative-prompt-input :deep(.n-input__placeholder) {
   color: var(--creative-muted);
 }
 
 .creative-composer-foot {
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 14px;
   margin-top: 14px;
+  padding-top: 2px;
 }
 
-.creative-mode-row,
 .creative-submit-row {
   gap: 8px;
-}
-
-.creative-mode-row button,
-.creative-ratio-group button {
-  display: inline-flex;
+  width: 100%;
+  justify-content: flex-start;
   align-items: center;
-  gap: 6px;
-  min-height: 42px;
-  border: 1px solid var(--creative-line);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--creative-text-soft);
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 900;
 }
 
-.creative-mode-row button.is-accent {
-  color: var(--creative-accent);
+.creative-prompt-count {
+  margin-left: auto;
+  color: var(--creative-muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.creative-submit {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--creative-submit-bg);
+  color: var(--creative-submit-text);
+  font-size: 18px;
+  margin-top: 2px;
 }
 
 .creative-ratio-group {
@@ -880,8 +1209,15 @@ function handleReviseResult(imageUrl?: string) {
 .creative-ratio-group button {
   display: grid;
   gap: 1px;
-  min-width: 74px;
-  padding: 7px 9px;
+  min-width: 64px;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 1px solid var(--creative-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--creative-text-soft);
+  font-size: 13px;
+  font-weight: 900;
   text-align: left;
 }
 
@@ -905,38 +1241,14 @@ function handleReviseResult(imageUrl?: string) {
   font-size: 10px;
 }
 
-.creative-submit-row > span {
-  color: var(--creative-muted);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
 .creative-reference-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 30px;
   border: 1px solid var(--creative-accent-border);
   border-radius: 999px;
   color: var(--creative-accent) !important;
   padding: 0 10px;
-}
-
-.creative-submit {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--creative-submit-bg);
-  color: var(--creative-submit-text);
-  font-size: 22px;
-}
-
-.creative-submit:disabled {
-  background: var(--creative-submit-disabled-bg);
-  color: var(--creative-submit-disabled-text);
-  cursor: not-allowed;
 }
 
 @keyframes creative-spin {
@@ -945,21 +1257,33 @@ function handleReviseResult(imageUrl?: string) {
   }
 }
 
-@media (max-width: 1200px) {
-  .creative-app {
-    grid-template-columns: 240px minmax(0, 1fr);
+.creative-submit:disabled {
+  background: var(--creative-submit-disabled-bg);
+  color: var(--creative-submit-disabled-text);
+  cursor: not-allowed;
+}
+
+@keyframes creative-upload-spin {
+  from {
+    transform: rotate(0deg);
   }
 
-  .creative-result-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1200px) {
+  .creative-sidebar {
+    width: 240px;
   }
 
   .creative-composer-foot {
     align-items: stretch;
-    flex-direction: column;
   }
 
   .creative-submit-row {
+    flex-wrap: wrap;
     justify-content: space-between;
   }
 }
@@ -969,21 +1293,16 @@ function handleReviseResult(imageUrl?: string) {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .creative-sidebar {
+  .creative-sidebar,
+  .creative-app.sidebar-collapsed .creative-sidebar {
     display: none;
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
   }
 
-  .creative-toolbar {
-    justify-content: flex-start;
-    overflow-x: auto;
-  }
-
-  .creative-search {
-    min-width: max-content;
-  }
-
-  .creative-composer {
-    width: calc(100% - 28px);
+  .creative-sidebar-expand {
+    display: none;
   }
 }
 </style>

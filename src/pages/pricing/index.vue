@@ -15,7 +15,7 @@ import pricingHeroBg from "@/assets/img/pricing-hero-bg.png";
 const copy = pricingPageCopy;
 const appStore = useAppStore();
 
-const selectedPlanName = ref("企业团队档");
+const selectedPlanName = ref<string | null>(null);
 const pressingPlanName = ref<string | null>(null);
 
 const pageStyle = {
@@ -86,45 +86,46 @@ function handlePlanSelect(name: string) {
 
 <style scoped lang="scss">
 .pricing-page {
-  --pricing-accent: #d4a843;
-  --pricing-accent-strong: #efc24c;
-  --pricing-accent-soft: rgba(239, 194, 76, 0.14);
+  --pricing-accent: #d6aa2f;
+  --pricing-accent-strong: #f4c84a;
   --pricing-hero-text: #f8fafc;
-  --pricing-hero-sub: rgba(248, 250, 252, 0.62);
-  --pricing-footer-bg: rgba(8, 10, 16, 0.62);
-  --pricing-footer-border: rgba(255, 255, 255, 0.1);
-  --pricing-footer-icon-bg: rgba(239, 194, 76, 0.1);
-  --pricing-footer-icon-border: rgba(239, 194, 76, 0.24);
-  --pricing-bg-fallback: #06080e;
+  --pricing-hero-sub: rgba(248, 250, 252, 0.76);
+  --pricing-footer-bg: rgba(5, 6, 8, 0.64);
+  --pricing-footer-border: rgba(255, 255, 255, 0.18);
+  --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
+  --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
+  --pricing-bg-fallback: #020303;
   --pricing-bg-overlay:
-    linear-gradient(180deg, rgba(6, 8, 14, 0.18) 0%, rgba(6, 8, 14, 0.42) 48%, rgba(6, 8, 14, 0.72) 100%);
-  --pricing-shell-max: min(1280px, 100%);
-  --pricing-card-min: min(100%, 300px);
+    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.04), transparent 26%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.68) 100%);
 
   box-sizing: border-box;
-  position: relative;
+  display: flex;
   width: 100%;
-  max-width: 100%;
-  min-height: calc(100dvh - var(--app-header-offset));
-  padding: clamp(20px, 3vw, 48px) clamp(16px, 2.5vw, 40px) clamp(32px, 4vw, 64px);
-  overflow-x: clip;
-  background: transparent;
-  color: var(--app-text);
+  height: auto;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: clamp(58px, 8.6vh, 100px) clamp(14px, 4.9vw, 102px) clamp(20px, 3.4vh, 44px);
+  overflow: visible;
+  background: var(--pricing-bg-fallback);
+  color: #f8fafc;
 }
 
 .pricing-page.theme-light {
-  --pricing-accent: #b8860b;
-  --pricing-accent-strong: #c9972e;
-  --pricing-accent-soft: rgba(201, 151, 46, 0.12);
-  --pricing-hero-text: #0f172a;
-  --pricing-hero-sub: #64748b;
-  --pricing-footer-bg: rgba(255, 255, 255, 0.82);
-  --pricing-footer-border: rgba(15, 23, 42, 0.08);
-  --pricing-footer-icon-bg: rgba(201, 151, 46, 0.1);
-  --pricing-footer-icon-border: rgba(201, 151, 46, 0.22);
-  --pricing-bg-fallback: #eef2f6;
+  --pricing-accent: #d6aa2f;
+  --pricing-accent-strong: #f4c84a;
+  --pricing-hero-text: #f8fafc;
+  --pricing-hero-sub: rgba(248, 250, 252, 0.76);
+  --pricing-footer-bg: rgba(5, 6, 8, 0.64);
+  --pricing-footer-border: rgba(255, 255, 255, 0.18);
+  --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
+  --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
+  --pricing-bg-fallback: #020303;
   --pricing-bg-overlay:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.52) 0%, rgba(241, 245, 249, 0.72) 48%, rgba(238, 242, 246, 0.88) 100%);
+    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.04), transparent 26%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.68) 100%);
 }
 
 .pricing-bg {
@@ -149,65 +150,75 @@ function handlePlanSelect(name: string) {
 .pricing-shell {
   position: relative;
   z-index: 1;
-  container-type: inline-size;
-  container-name: pricing-shell;
-  width: var(--pricing-shell-max);
-  max-width: 100%;
+  display: flex;
+  width: min(calc(100vw - 56px), calc((100dvh - 96px) * 1.65));
+  height: auto;
   min-width: 0;
-  margin: 0 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: clamp(24px, 3.5vh, 54px);
+  align-items: center;
 }
 
 .pricing-hero {
+  flex: 0 0 auto;
   text-align: center;
-  margin-bottom: clamp(24px, 3vw, 48px);
 }
 
 .pricing-hero h1 {
   margin: 0;
   color: var(--pricing-hero-text);
-  font-size: clamp(28px, 2.2rem + 1.2vw, 48px);
-  font-weight: 900;
+  font-size: clamp(30px, min(3.2vw, 4.6vh), 50px);
+  font-weight: 950;
   letter-spacing: 0.02em;
-  line-height: 1.2;
+  line-height: 1.08;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.42);
 }
 
 .pricing-hero p {
-  max-width: min(640px, 100%);
-  margin: 14px auto 0;
+  max-width: min(720px, 100%);
+  margin: clamp(12px, 1.5vh, 18px) auto 0;
   color: var(--pricing-hero-sub);
-  font-size: clamp(13px, 0.85rem + 0.3vw, 16px);
-  font-weight: 600;
-  line-height: 1.7;
+  font-size: clamp(15px, min(1.55vw, 2.2vh), 24px);
+  font-weight: 500;
+  line-height: 1.35;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.58);
 }
 
 .pricing-plans-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(14px, 1.6vw, 24px);
-  align-items: stretch;
+  gap: clamp(18px, 3.1vw, 42px);
+  align-items: center;
   width: 100%;
   min-width: 0;
-  scroll-margin-top: 96px;
 }
 
 .pricing-footer-bar {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(12px, 1.4vw, 20px);
+  gap: clamp(16px, 3.2vw, 58px);
   width: 100%;
   min-width: 0;
-  margin-top: clamp(28px, 3vw, 48px);
-  padding: clamp(16px, 1.8vw, 24px);
+  min-height: clamp(88px, 9.8vh, 108px);
+  padding: clamp(19px, 2.2vh, 26px) clamp(26px, 4.8vw, 84px);
   border: 1px solid var(--pricing-footer-border);
-  border-radius: 16px;
+  border-radius: 28px;
   background: var(--pricing-footer-bg);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 20px 70px rgba(0, 0, 0, 0.28);
 }
 
 .footer-feature {
   display: flex;
-  gap: 14px;
+  justify-content: center;
+  gap: clamp(10px, 1.3vw, 18px);
   min-width: 0;
+  align-items: center;
+  text-align: center;
 }
 
 .footer-feature > div {
@@ -215,89 +226,100 @@ function handlePlanSelect(name: string) {
 }
 
 .footer-feature-icon {
-  display: grid;
+  display: none;
   flex: 0 0 auto;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: clamp(34px, 3.4vw, 48px);
+  height: clamp(34px, 3.4vw, 48px);
   border: 1px solid var(--pricing-footer-icon-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--pricing-footer-icon-bg);
   color: var(--pricing-accent-strong);
-  font-size: 22px;
+  font-size: clamp(18px, 1.7vw, 24px);
 }
 
 .footer-feature h3 {
   margin: 0;
   color: var(--pricing-hero-text);
-  font-size: clamp(13px, 0.8rem + 0.2vw, 15px);
-  font-weight: 800;
+  font-size: clamp(14px, 1.15vw, 20px);
+  font-weight: 900;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .footer-feature p {
-  margin: 6px 0 0;
+  margin: 2px 0 0;
   color: var(--pricing-hero-sub);
-  font-size: clamp(12px, 0.75rem + 0.15vw, 13px);
+  font-size: clamp(10px, 0.68vw, 12px);
   font-weight: 600;
-  line-height: 1.55;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
-@container pricing-shell (max-width: 1024px) {
-  .pricing-plans-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-height: 760px) {
+  .pricing-hero p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
   }
 
-  .pricing-footer-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container pricing-shell (max-width: 640px) {
-  .pricing-plans-grid,
-  .pricing-footer-bar {
-    grid-template-columns: minmax(0, 1fr);
+  .footer-feature p {
+    display: none;
   }
 }
 
-@media (max-width: 1024px) {
-  .pricing-plans-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .pricing-footer-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .pricing-plans-grid,
-  .pricing-footer-bar {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 720px) {
-  .pricing-bg {
-    background-position: center 38%;
-  }
-}
-
-@media (max-width: 480px) {
+@media (max-height: 820px) {
   .pricing-page {
-    padding-inline: 14px;
+    padding-top: clamp(26px, 4.2vh, 36px);
+    padding-bottom: clamp(12px, 2vh, 18px);
+  }
+
+  .pricing-shell {
+    gap: clamp(14px, 2.1vh, 22px);
+  }
+
+  .pricing-hero h1 {
+    font-size: clamp(26px, 4.3vh, 34px);
+  }
+
+  .pricing-hero p {
+    margin-top: 8px;
+    font-size: clamp(13px, 2vh, 16px);
+  }
+
+  .pricing-footer-bar {
+    min-height: 64px;
+    padding-block: 14px;
+  }
+
+  .footer-feature p {
+    display: none;
   }
 }
 
-@media (min-aspect-ratio: 21/9) {
-  .pricing-bg {
-    background-size: cover;
-    background-position: center 55%;
+@media (max-width: 900px) {
+  .pricing-page {
+    padding: 28px 14px 18px;
+    overflow-x: auto;
   }
-}
 
-@media (max-aspect-ratio: 3/4) {
-  .pricing-bg {
-    background-position: center 32%;
+  .pricing-shell {
+    width: min(980px, calc(100vw - 28px), calc((100dvh - 96px) * 1.65));
+    gap: 18px;
+  }
+
+  .pricing-footer-bar {
+    padding-inline: 18px;
+    gap: 12px;
+  }
+
+  .footer-feature {
+    justify-content: flex-start;
+  }
+
+  .footer-feature h3 {
+    font-size: 12px;
   }
 }
 </style>

@@ -44,16 +44,16 @@ export const homeHeroPosterSrc = homeHeroImage
 
 export const homeQuickEntries: HomeQuickEntry[] = [
   {
-    title: '视觉工作台',
+    title: 'AI工作台',
     description: '场景照、精修图、成片交付',
-    action: '开始设计',
+    action: '开始探索',
     workbenchEntry: true,
     image: suiteWorkbenchImage,
   },
   {
     title: '企业套餐',
-    description: '账号、积分、品牌外观同步开通',
-    action: '查看更多',
+    description: '三档套餐，权限灵活、功能多元',
+    action: '查看套餐',
     to: '/pricing',
     image: suiteEnterpriseImage,
   },
