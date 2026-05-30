@@ -34,6 +34,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 4: Add billing client and single-task freeze | Done | `5e81549`, `phase-4-used-car-billing-client-20260530` | Added backend credits client and froze credits before submitting supported single generation tasks to KIE. |
 | Phase 5: Single-task terminal billing | Done | `e8c3462`, `phase-5-terminal-billing-20260530` | Settles successful single generation tasks and refunds failed/canceled tasks with idempotency guards. |
 | Phase 6: Integrate batch creation | Done | `e47969b`, `phase-6-batch-creation-20260531` | Freezes credits for each batch item before KIE submission and reports batch estimated cost from frozen subtasks. |
+| Phase 7: UsedCar credit proxy APIs | Done | `phase-7-proxy-apis-20260531` | Adds `/api/v1/credits/*` proxy routes for accounts, transactions, recharge products, and payment orders. |
 
 Detailed phase notes:
 
@@ -43,6 +44,7 @@ Detailed phase notes:
 - [Phase 4 backend client](./reusable-credits-phase-4-backend-client.md)
 - [Phase 5 terminal billing](./reusable-credits-phase-5-terminal-billing.md)
 - [Phase 6 batch creation](./reusable-credits-phase-6-batch-billing.md)
+- [Phase 7 proxy APIs](./reusable-credits-phase-7-proxy-apis.md)
 
 ## Important Implementation Notes
 
@@ -71,6 +73,8 @@ The environment fallback is for local development only. It should not become the
 The original plan is still directionally correct, but the next phases should now focus on frontend/admin visibility and identity, because backend task billing is mostly in place.
 
 ### Phase 7: UsedCar Credit Proxy APIs
+
+Status: done in this branch.
 
 Add usedCar backend routes that proxy Reusable Credits Platform data:
 
@@ -184,6 +188,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 7 next.
+Continue with Phase 8 next.
 
-The backend billing lifecycle is now far enough along that proxy APIs will unlock the frontend, recharge page, and admin console work without forcing the frontend to call two services directly.
+The usedCar backend now exposes the credit proxy boundary, so the next step is to replace frontend mock/static credit data with these APIs.

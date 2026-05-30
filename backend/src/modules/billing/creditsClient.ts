@@ -26,6 +26,66 @@ export interface BillingTaskResponse {
   idempotentReplay: boolean;
 }
 
+export interface CreditAccountResponse {
+  id: number;
+  tenantId: number | null;
+  userId: number | null;
+  accountScope: "personal" | "tenant";
+  totalBalance: string;
+  lockedBalance: string;
+  availableBalance: string;
+  currency: string;
+  status: string;
+}
+
+export interface CreditTransactionResponse {
+  id: number;
+  tenantId: number | null;
+  userId: number;
+  accountId: number;
+  billingTaskId: number | null;
+  paymentOrderId: number | null;
+  applicationId: number | null;
+  functionId: number | null;
+  txnType: string;
+  points: string;
+  balanceBefore: string;
+  balanceAfter: string;
+  bizType: string | null;
+  bizId: string | null;
+  refTxnId: number | null;
+  remark: string | null;
+  createdAt: string;
+}
+
+export interface RechargeProductResponse {
+  id: number;
+  name: string;
+  amount: string;
+  points: string;
+  bonusPoints: string;
+  currency: string;
+  sort: number;
+  enabled: boolean;
+}
+
+export interface PaymentOrderResponse {
+  paymentOrderId: number;
+  tenantId: number | null;
+  userId: number;
+  accountId: number;
+  productId: number;
+  orderNo: string;
+  amount: string;
+  points: string;
+  bonusPoints: string;
+  payChannel: "alipay" | "wechat" | "card";
+  status: "pending" | "paid" | "failed" | "refunded";
+  paidAt: string | null;
+  notifyId: string | null;
+  idempotentReplay: boolean;
+}
+
 type EstimateBillingInput = BillingIdentity & {
   functionCode: string;
   bizType: string;
@@ -45,6 +105,37 @@ type CreditsErrorBody = {
 };
 
 class CreditsClient {
+  async listAccounts(input: { userId: number }) {
+    return this.get<{ accounts: CreditAccountResponse[] }>("/me/accounts", {
+      userId: input.userId,
+    });
+  }
+
+  async listAccountTransactions(input: { accountId: number; userId: number; limit?: number }) {
+    return this.get<{ transactions: CreditTransactionResponse[] }>(
+      `/accounts/${input.accountId}/transactions`,
+      {
+        userId: input.userId,
+        limit: input.limit,
+      },
+    );
+  }
+
+  async listRechargeProducts() {
+    return this.get<{ products: RechargeProductResponse[] }>("/recharge-products");
+  }
+
+  async createPaymentOrder(input: {
+    userId: number;
+    accountScope: "personal" | "tenant";
+    tenantId?: number;
+    productId: number;
+    payChannel: "alipay" | "wechat" | "card";
+    idempotencyKey: string;
+  }) {
+    return this.post<PaymentOrderResponse>("/payment-orders", input);
+  }
+
   async estimate(input: EstimateBillingInput) {
     return this.post<BillingTaskResponse>("/billing/estimate", {
       userId: input.userId,
@@ -70,17 +161,28 @@ class CreditsClient {
     return this.post<BillingTaskResponse>("/billing/refund", input);
   }
 
+  private async get<T>(path: string, query?: Record<string, unknown>) {
+    const search = this.toSearchParams(query);
+    return this.request<T>(`${path}${search}`, { method: "GET" });
+  }
+
   private async post<T>(path: string, body: Record<string, unknown>) {
+    return this.request<T>(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  private async request<T>(path: string, init: RequestInit) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), env.credits.requestTimeoutMs);
 
     try {
       const response = await fetch(`${env.credits.baseUrl}${path}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
+        ...init,
         signal: controller.signal,
       });
 
@@ -108,6 +210,17 @@ class CreditsClient {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private toSearchParams(query?: Record<string, unknown>) {
+    if (!query) return "";
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null || value === "") continue;
+      params.set(key, String(value));
+    }
+    const encoded = params.toString();
+    return encoded ? `?${encoded}` : "";
   }
 
   private async parseBody(response: Response): Promise<CreditsErrorBody & Record<string, unknown>> {

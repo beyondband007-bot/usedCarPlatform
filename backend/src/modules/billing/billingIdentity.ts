@@ -42,8 +42,9 @@ const parseAccountScope = (value: unknown): AccountScope | null => {
 export const resolveBillingIdentity = (
   body: BillingIdentityBody,
   context?: BillingRequestContext,
+  options: { requireEnabled?: boolean } = {},
 ): BillingIdentity | null => {
-  if (!env.credits.enabled) return null;
+  if ((options.requireEnabled ?? true) && !env.credits.enabled) return null;
 
   const userId =
     parsePositiveInteger(firstHeader(context?.headers, "x-credits-user-id")) ??
