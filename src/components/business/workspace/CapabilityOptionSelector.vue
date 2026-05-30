@@ -251,16 +251,16 @@ const optionRows = computed(() => {
 }
 
 .option-item.is-active {
-  border-color: var(--workspace-accent-border, var(--workspace-accent, #efc24c));
+  border-color: var(--workspace-accent, #2f6bff);
   background: var(--workspace-accent-bg, var(--app-surface-soft));
   box-shadow:
-    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent)),
-    0 10px 24px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent));
+    0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
+    0 10px 24px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
 }
 
 .option-item:focus-visible {
-  border-color: var(--workspace-accent-border, var(--workspace-accent, #efc24c));
-  box-shadow: 0 0 0 3px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent));
+  border-color: var(--workspace-accent, #2f6bff);
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
 }
 
 .option-item-cover {

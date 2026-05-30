@@ -559,8 +559,8 @@ function toggleSidebar() {
   --creative-sidebar-bg: #ffffff;
   --creative-main-bg: #f7fafd;
   --creative-text: #172033;
-  --creative-text-soft: #475569;
-  --creative-muted: #7c8a9e;
+  --creative-text-soft: #334155;
+  --creative-muted: #64748b;
   --creative-line: #e8edf5;
   --creative-surface: #ffffff;
   --creative-surface-soft: #f7fafd;
@@ -570,15 +570,15 @@ function toggleSidebar() {
   --creative-icon: #475569;
   --creative-accent: #0a8fb8;
   --creative-accent-border: rgba(10, 143, 184, 0.22);
-  --creative-ratio-active-border: #d89a00;
-  --creative-ratio-active-bg: #fff6e0;
-  --creative-ratio-active-text: #b98200;
+  --creative-ratio-active-border: #2f6bff;
+  --creative-ratio-active-bg: #f2f7ff;
+  --creative-ratio-active-text: #2f6bff;
   --creative-submit-bg: #172033;
   --creative-submit-text: #ffffff;
   --creative-submit-disabled-bg: #e8edf5;
-  --creative-submit-disabled-text: #c3cbd6;
+  --creative-submit-disabled-text: #cbd5e1;
   --creative-composer-shadow: 0 18px 48px rgba(78, 111, 148, 0.09);
-  --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(216, 154, 0, 0.05), transparent 32%);
+  --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(47, 107, 255, 0.05), transparent 32%);
 }
 
 .creative-sidebar {

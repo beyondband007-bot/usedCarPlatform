@@ -275,37 +275,37 @@ const {
 
   --studio-chrome-logo: #172033;
 
-  --studio-chrome-nav: #475569;
+  --studio-chrome-nav: #64748b;
 
   --studio-chrome-nav-hover: #172033;
 
-  --studio-chrome-nav-active: #b98200;
+  --studio-chrome-nav-active: #2f6bff;
 
-  --studio-chrome-nav-underline: #d89a00;
+  --studio-chrome-nav-underline: #4f7fff;
 
   --studio-chrome-credit-bg: #d89a00;
 
   --studio-chrome-credit-text: #172033;
 
-  --studio-chrome-theme-bg: #fff6e0;
+  --studio-chrome-theme-bg: #f2f7ff;
 
-  --studio-chrome-theme-text: #b98200;
+  --studio-chrome-theme-text: #334155;
 
-  --studio-chrome-theme-border: rgba(216, 154, 0, 0.16);
+  --studio-chrome-theme-border: #cfe0ff;
 
-  --studio-chrome-user-border: rgba(216, 154, 0, 0.16);
+  --studio-chrome-user-border: #e8edf5;
 
   --studio-chrome-user-bg: #f3f7fc;
 
   --studio-chrome-user-text: #172033;
 
-  --studio-chrome-user-hover-border: rgba(216, 154, 0, 0.28);
+  --studio-chrome-user-hover-border: #cfe0ff;
 
   --studio-chrome-user-hover-bg: #f3f7fc;
 
-  --studio-chrome-avatar-bg: #fff6e0;
+  --studio-chrome-avatar-bg: #eef4ff;
 
-  --studio-chrome-avatar-text: #b98200;
+  --studio-chrome-avatar-text: #2f6bff;
 
   --studio-chrome-subnav-bg: #edf4ff;
   --studio-chrome-subnav-border: #e8edf5;

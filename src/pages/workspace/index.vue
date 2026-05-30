@@ -681,26 +681,39 @@ onUnmounted(() => {
 
 .workspace-page.theme-light {
   --workspace-text: #172033;
-  --workspace-text-secondary: #475569;
-  --workspace-muted: #7c8a9e;
-  --workspace-text-disabled: #c3cbd6;
-  --workspace-accent: #b98200;
-  --workspace-accent-strong: #b98200;
-  --workspace-accent-border: #d89a00;
-  --workspace-accent-bg: #fff6e0;
-  --workspace-accent-glow: rgba(216, 154, 0, 0.16);
+  --workspace-text-secondary: #334155;
+  --workspace-muted: #64748b;
+  --workspace-text-placeholder: #94a3b8;
+  --workspace-text-disabled: #cbd5e1;
+  --workspace-accent: #2f6bff;
+  --workspace-accent-strong: #2f6bff;
+  --workspace-accent-border: #cfe0ff;
+  --workspace-accent-bg: #f2f7ff;
+  --workspace-accent-glow: rgba(47, 107, 255, 0.16);
+  --workspace-accent-underline: #4f7fff;
   --workspace-hover-bg: #f3f7fc;
+  --workspace-commercial: #d89a00;
+  --workspace-commercial-strong: #b98200;
+  --workspace-commercial-bg: #fff6e0;
+  --workspace-tag-available-bg: #eaf8f1;
+  --workspace-tag-available-text: #00a870;
+  --workspace-tag-demo-bg: #fff4e5;
+  --workspace-tag-demo-text: #f59e0b;
+  --workspace-tag-beta-bg: #eef4ff;
+  --workspace-tag-beta-text: #2f6bff;
+  --workspace-tag-planned-bg: #f1f5f9;
+  --workspace-tag-planned-text: #94a3b8;
   --workspace-panel: #ffffff;
   --workspace-panel-soft: #f7fafd;
   --workspace-panel-deep: #f7fafd;
   --workspace-line: #e8edf5;
-  --workspace-line-strong: #d89a00;
+  --workspace-line-strong: #cfe0ff;
   --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
 
   color: var(--workspace-text);
 
   background:
-    radial-gradient(circle at 30% 0%, rgba(216, 154, 0, 0.06), transparent 28rem),
+    radial-gradient(circle at 30% 0%, rgba(47, 107, 255, 0.06), transparent 28rem),
     var(--app-bg);
 }
 

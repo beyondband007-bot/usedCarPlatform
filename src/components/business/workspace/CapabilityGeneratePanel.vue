@@ -2453,4 +2453,54 @@ const activeCreateRatioLabel = computed(() => {
     conic-gradient(var(--workspace-accent-strong, #ffd75a) var(--progress), rgba(255, 255, 255, 0.12) 0);
 }
 
+:global(.workspace-page.theme-light) .batch-card,
+:global(.workspace-page.theme-light) .batch-notice {
+  border-color: var(--workspace-line, #e8edf5);
+  background: var(--workspace-panel-soft, #f7fafd);
+  color: var(--workspace-text-secondary, #334155);
+}
+
+:global(.workspace-page.theme-light) .batch-tabs button.active,
+:global(.workspace-page.theme-light) .delivery-tabs button.active {
+  color: var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .batch-tabs button.active::after,
+:global(.workspace-page.theme-light) .delivery-tabs button.active::after {
+  background: var(--workspace-accent-underline, #4f7fff);
+}
+
+:global(.workspace-page.theme-light) .preset-summary {
+  border-color: var(--workspace-line, #e8edf5);
+  background:
+    linear-gradient(135deg, var(--workspace-accent-bg, #f2f7ff) 0%, var(--app-surface) 58%),
+    var(--app-surface);
+}
+
+:global(.workspace-page.theme-light) .preset-tag.is-scene,
+:global(.workspace-page.theme-light) .preset-tag.is-ratio,
+:global(.workspace-page.theme-light) .preset-tag.is-on {
+  border-color: var(--workspace-accent-border, #cfe0ff);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .scene-grid article.active {
+  border-color: var(--workspace-accent, #2f6bff);
+  box-shadow: 0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16));
+}
+
+:global(.workspace-page.theme-light) .delivery-item.is-checked {
+  background: var(--workspace-accent-bg, #f2f7ff);
+}
+
+:global(.workspace-page.theme-light) .delivery-item.is-previewing {
+  background: var(--workspace-accent-bg, #f2f7ff);
+  box-shadow: inset 3px 0 0 var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .delivery-item:hover {
+  background: var(--workspace-hover-bg, #f3f7fc);
+}
+
 </style>

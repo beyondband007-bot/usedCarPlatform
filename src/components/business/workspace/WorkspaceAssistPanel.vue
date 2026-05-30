@@ -1042,17 +1042,17 @@ defineExpose({
   --assist-border-soft: #edf4ff;
   --assist-text: var(--workspace-text, var(--app-text));
   --assist-muted: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
-  --assist-blue: var(--workspace-accent, #b98200);
-  --assist-green: var(--workspace-accent-strong, #b98200);
+  --assist-blue: var(--workspace-accent, #2f6bff);
+  --assist-green: var(--workspace-accent-strong, #2f6bff);
   --assist-scroll-track: #edf4ff;
-  --assist-scroll-thumb: rgba(216, 154, 0, 0.42);
-  --assist-scroll-thumb-hover: rgba(184, 130, 0, 0.68);
+  --assist-scroll-thumb: rgba(47, 107, 255, 0.42);
+  --assist-scroll-thumb-hover: rgba(47, 107, 255, 0.68);
   --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 
   background:
     radial-gradient(
       760px 180px at 45% 0%,
-      var(--workspace-accent-glow, rgba(216, 154, 0, 0.16)),
+      var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
       transparent 74%
     ),
     var(--assist-bg);
@@ -1706,7 +1706,7 @@ defineExpose({
   bottom: 0;
   height: 3px;
   border-radius: 999px;
-  background: var(--workspace-accent-border, var(--assist-blue));
+  background: var(--workspace-accent-underline, var(--workspace-accent, var(--assist-blue)));
 }
 
 .expand-button {
@@ -1880,16 +1880,16 @@ defineExpose({
 }
 
 .template-card.is-active {
-  border-color: var(--workspace-accent-border, var(--assist-blue));
-  background: var(--workspace-accent-bg, transparent);
+  border-color: var(--workspace-accent, var(--assist-blue));
+  background: transparent;
   box-shadow:
-    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent)),
-    0 12px 28px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent));
+    0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
+    0 12px 28px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
 }
 
 .template-card:focus-visible {
-  border-color: var(--workspace-accent-border, var(--assist-blue));
-  box-shadow: 0 0 0 3px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, transparent));
+  border-color: var(--workspace-accent, var(--assist-blue));
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
 }
 
 .template-image {
