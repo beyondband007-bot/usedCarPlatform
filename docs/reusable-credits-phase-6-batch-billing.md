@@ -1,11 +1,11 @@
-# Phase 6: Batch Item Billing
+# Phase 6: Integrate Batch Creation
 
 Status: implemented
 Date: 2026-05-31
 
 ## Purpose
 
-Connect `batch-new` item submission to Reusable Credits Platform billing.
+Connect `batch-new` creation and item submission to Reusable Credits Platform billing.
 
 Phase 6 keeps the Phase 1 decision that each batch item maps to one credits billing task:
 
@@ -32,7 +32,11 @@ Each waiting batch item freezes credits immediately before KIE submission. If cr
 
 If KIE submission fails after a freeze succeeds, usedCarPlatform refunds the frozen billing task immediately and marks the generation task as failed.
 
+The batch create response reports `estimatedCost` from the sum of locally frozen subtasks, not from a static `total * unitPrice` calculation.
+
 ## Terminal Finalization
+
+This was included as a boundary guard because single-task terminal finalization already exists. Batch polling must settle/refund with `batch_item` idempotency keys instead of the default `generation_task` keys.
 
 Batch item polling refreshes the underlying `generation_tasks` row without using the default single-task finalizer. It then finalizes billing with batch item scope:
 

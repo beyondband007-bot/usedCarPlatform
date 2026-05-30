@@ -170,7 +170,7 @@ class BatchService {
       failed: detail.failed,
       progress: detail.progress,
       pollingUrl: `/api/v1/modules/batch-new/tasks/${batchId}`,
-      estimatedCost: total * 120,
+      estimatedCost: Number(detail.estimatedPoints ?? 0),
       estimatedPoints: detail.estimatedPoints,
       settledPoints: detail.settledPoints,
       balance: 0,
