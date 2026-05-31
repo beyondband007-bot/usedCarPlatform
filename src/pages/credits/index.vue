@@ -210,18 +210,18 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 <style scoped lang="scss">
 .credits-page {
   --credit-page-pad: clamp(16px, 2vw, 30px);
-  --credit-panel: #0b1220;
-  --credit-panel-strong: #0e1628;
-  --credit-border: rgba(59, 130, 246, 0.12);
-  --credit-border-soft: rgba(255, 255, 255, 0.06);
-  --credit-text: #f1f5f9;
-  --credit-text-soft: #94a3b8;
-  --credit-field: #111827;
-  --credit-head: #0e1628;
-  --credit-row-border: rgba(255, 255, 255, 0.06);
-  --credit-link: #4f7fff;
-  --credit-blue: #2f6bff;
-  --panel-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --credit-panel: #101010;
+  --credit-panel-strong: #151515;
+  --credit-border: rgba(255, 255, 255, 0.1);
+  --credit-border-soft: rgba(255, 255, 255, 0.08);
+  --credit-text: #f4f1e9;
+  --credit-text-soft: #959083;
+  --credit-field: #0b0b0b;
+  --credit-head: #151515;
+  --credit-row-border: rgba(255, 255, 255, 0.08);
+  --credit-link: #efc24c;
+  --credit-blue: #efc24c;
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 
   min-width: 0;
   height: auto;
@@ -293,10 +293,15 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   overflow: visible;
   border: 1px solid var(--credit-border);
   border-radius: 20px;
+  background: var(--credit-panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.credits-page.theme-light .query-panel,
+.credits-page.theme-light .flow-panel {
   background:
     radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
     var(--credit-panel);
-  box-shadow: var(--panel-shadow);
 }
 
 .query-panel {

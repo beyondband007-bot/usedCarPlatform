@@ -592,10 +592,6 @@ defineExpose({
           >
             <div class="waiting-visual" aria-hidden="true">
               <span class="waiting-scan"></span>
-              <span class="waiting-corner waiting-corner--tl"></span>
-              <span class="waiting-corner waiting-corner--tr"></span>
-              <span class="waiting-corner waiting-corner--bl"></span>
-              <span class="waiting-corner waiting-corner--br"></span>
               <Icon icon="mdi:image-sync-outline" />
             </div>
             <div class="waiting-copy">
@@ -889,10 +885,6 @@ defineExpose({
       >
         <div class="waiting-visual" aria-hidden="true">
           <span class="waiting-scan"></span>
-          <span class="waiting-corner waiting-corner--tl"></span>
-          <span class="waiting-corner waiting-corner--tr"></span>
-          <span class="waiting-corner waiting-corner--bl"></span>
-          <span class="waiting-corner waiting-corner--br"></span>
           <Icon icon="mdi:image-sync-outline" />
         </div>
         <div class="waiting-copy">
@@ -1081,16 +1073,16 @@ defineExpose({
 
 <style scoped lang="scss">
 .assist-panel {
-  --assist-bg: var(--workspace-panel, #0b1220);
-  --assist-card: #111827;
-  --assist-card-strong: #0e1628;
-  --assist-border: rgba(255, 255, 255, 0.06);
-  --assist-border-soft: rgba(255, 255, 255, 0.06);
+  --assist-bg: var(--workspace-panel, rgba(10, 10, 10, 0.92));
+  --assist-card: rgba(255, 255, 255, 0.05);
+  --assist-card-strong: rgba(255, 255, 255, 0.075);
+  --assist-border: var(--workspace-line, rgba(255, 255, 255, 0.12));
+  --assist-border-soft: rgba(255, 255, 255, 0.08);
   --assist-text: var(--app-text);
   --assist-muted: var(--workspace-muted, var(--app-text-soft));
-  --assist-blue: var(--color-accent-blue, #2f6bff);
-  --assist-green: var(--color-accent-blue-strong, #4f7fff);
-  --assist-shadow: var(--workspace-shadow, 0 10px 40px rgba(0, 0, 0, 0.35));
+  --assist-blue: var(--workspace-accent, #efc24c);
+  --assist-green: var(--workspace-accent-strong, #ffd75a);
+  --assist-shadow: var(--workspace-shadow, 0 24px 60px rgba(0, 0, 0, 0.34));
 
   display: flex;
   container-type: inline-size;
@@ -1103,15 +1095,9 @@ defineExpose({
   flex-direction: column;
   overflow: hidden;
   padding: 18px 20px 20px;
-  border: 1px solid rgba(59, 130, 246, 0.12);
+  border: 1px solid var(--workspace-line, var(--assist-border));
   border-radius: 20px;
-  background:
-    radial-gradient(
-      circle at center,
-      rgba(59, 130, 246, 0.08),
-      transparent 70%
-    ),
-    var(--assist-bg);
+  background: var(--assist-bg);
   color: var(--assist-text);
 }
 
@@ -1127,13 +1113,7 @@ defineExpose({
   --assist-green: var(--workspace-accent-strong, #2f6bff);
   --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 
-  background:
-    radial-gradient(
-      760px 180px at 45% 0%,
-      var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
-      transparent 74%
-    ),
-    var(--assist-bg);
+  background: var(--assist-bg);
 }
 
 .assist-tabs {
@@ -1223,45 +1203,6 @@ defineExpose({
     );
   opacity: 0.75;
   animation: waiting-scan 1.8s linear infinite;
-}
-
-.waiting-corner {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border: 2px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 45%, transparent);
-}
-
-.waiting-corner--tl {
-  left: 16px;
-  top: 16px;
-  border-right: 0;
-  border-bottom: 0;
-  border-top-left-radius: 12px;
-}
-
-.waiting-corner--tr {
-  right: 16px;
-  top: 16px;
-  border-left: 0;
-  border-bottom: 0;
-  border-top-right-radius: 12px;
-}
-
-.waiting-corner--bl {
-  left: 16px;
-  bottom: 16px;
-  border-right: 0;
-  border-top: 0;
-  border-bottom-left-radius: 12px;
-}
-
-.waiting-corner--br {
-  right: 16px;
-  bottom: 16px;
-  border-left: 0;
-  border-top: 0;
-  border-bottom-right-radius: 12px;
 }
 
 .waiting-copy {

@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 const cardClass = computed(() => [
   "pricing-plan-card",
+  `is-${props.plan.tone}`,
   {
     "is-featured": props.plan.featured,
     "is-selected": props.selected,
@@ -107,6 +108,14 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-card-muted: rgba(248, 250, 252, 0.72);
   --plan-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   --plan-selected-ring: transparent;
+  --plan-divider: rgba(255, 255, 255, 0.18);
+  --plan-action-border: rgba(255, 255, 255, 0.38);
+  --plan-action-text: var(--plan-card-text);
+  --plan-action-hover-border: rgba(255, 255, 255, 0.54);
+  --plan-action-hover-text: #ffffff;
+  --plan-action-solid-bg: linear-gradient(180deg, #f5cf65, #f1c646);
+  --plan-action-solid-text: #241700;
+  --plan-action-solid-shadow: 0 12px 28px color-mix(in srgb, var(--plan-accent) 28%, transparent);
 
   box-sizing: border-box;
   position: relative;
@@ -159,11 +168,51 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 }
 
 :global(.theme-light) .pricing-plan-card {
-  --plan-card-bg: rgba(255, 255, 255, 0.03);
-  --plan-card-border: rgba(255, 255, 255, 0.08);
-  --plan-card-text: #f8fafc;
-  --plan-card-muted: rgba(248, 250, 252, 0.72);
-  --plan-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --plan-card-bg: rgba(255, 255, 255, 0.94);
+  --plan-card-border: #e2e8f0;
+  --plan-card-text: #0f172a;
+  --plan-card-muted: #64748b;
+  --plan-card-shadow: 0 14px 40px rgba(78, 111, 148, 0.12);
+  --plan-divider: #e2e8f0;
+  --plan-action-border: #cbd5e1;
+  --plan-action-text: #0f172a;
+  --plan-action-hover-border: #94a3b8;
+  --plan-action-hover-text: #0f172a;
+}
+
+:global(.theme-light) .pricing-plan-card.is-blue {
+  --plan-accent: #2f6bff;
+  --plan-card-bg: rgba(255, 255, 255, 0.96);
+  --plan-card-border: #dbeafe;
+  --plan-card-shadow: 0 12px 36px rgba(47, 107, 255, 0.1);
+}
+
+:global(.theme-light) .pricing-plan-card.is-orange {
+  --plan-accent: #2f6bff;
+  --plan-card-bg: linear-gradient(
+    180deg,
+    rgba(237, 244, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+  --plan-card-border: rgba(47, 107, 255, 0.28);
+  --plan-card-shadow: 0 18px 48px rgba(47, 107, 255, 0.14);
+  --plan-action-solid-bg: linear-gradient(180deg, #4f7fff, #2f6bff);
+  --plan-action-solid-text: #ffffff;
+  --plan-action-solid-shadow: 0 12px 28px rgba(47, 107, 255, 0.28);
+}
+
+:global(.theme-light) .pricing-plan-card.is-green {
+  --plan-accent: #d4a017;
+  --plan-card-bg: linear-gradient(
+    180deg,
+    rgba(255, 251, 235, 0.96) 0%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+  --plan-card-border: rgba(212, 160, 23, 0.28);
+  --plan-card-shadow: 0 14px 42px rgba(212, 160, 23, 0.12);
+  --plan-action-border: rgba(212, 160, 23, 0.42);
+  --plan-action-hover-border: rgba(212, 160, 23, 0.62);
+  --plan-action-hover-text: #92400e;
 }
 
 .pricing-plan-card.is-featured {
@@ -180,6 +229,19 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     0 0 22px color-mix(in srgb, var(--plan-accent) 8%, transparent);
 }
 
+:global(.theme-light) .pricing-plan-card.is-featured {
+  border-color: rgba(47, 107, 255, 0.32);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(237, 244, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.96) 100%
+    );
+  box-shadow:
+    0 18px 48px rgba(47, 107, 255, 0.14),
+    0 0 0 1px rgba(47, 107, 255, 0.08);
+}
+
 .pricing-plan-card.is-selected {
   --plan-selected-ring: color-mix(in srgb, var(--plan-accent) 86%, transparent);
 
@@ -192,6 +254,13 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   animation: selected-card-pop 0.38s cubic-bezier(0.2, 0.9, 0.22, 1.22);
 }
 
+:global(.theme-light) .pricing-plan-card.is-selected {
+  box-shadow:
+    0 24px 56px rgba(78, 111, 148, 0.16),
+    0 0 0 2px color-mix(in srgb, var(--plan-accent) 52%, transparent),
+    0 0 32px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+}
+
 .pricing-plan-card.is-featured.is-selected {
   --plan-selected-ring: color-mix(in srgb, var(--plan-accent) 92%, transparent);
 
@@ -200,6 +269,13 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     0 32px 86px rgba(0, 0, 0, 0.44),
     0 0 0 2px color-mix(in srgb, var(--plan-accent) 78%, transparent),
     0 0 84px color-mix(in srgb, var(--plan-accent) 34%, transparent);
+}
+
+:global(.theme-light) .pricing-plan-card.is-featured.is-selected {
+  box-shadow:
+    0 28px 64px rgba(47, 107, 255, 0.18),
+    0 0 0 2px rgba(47, 107, 255, 0.42),
+    0 0 36px rgba(47, 107, 255, 0.14);
 }
 
 .pricing-plan-card.is-selected::before,
@@ -289,7 +365,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   width: 100%;
   height: 1px;
   margin: clamp(18px, 6.2cqw, 38px) 0 clamp(14px, 4.8cqw, 30px);
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--plan-divider);
 }
 
 .plan-benefits {
@@ -331,10 +407,10 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   justify-content: center;
   margin-top: clamp(16px, 4.5cqw, 28px);
   padding: clamp(10px, 3.5cqw, 19px) clamp(14px, 4.8cqw, 28px);
-  border: 1px solid rgba(255, 255, 255, 0.38);
+  border: 1px solid var(--plan-action-border);
   border-radius: clamp(12px, 3.3cqw, 18px);
   background: transparent;
-  color: var(--plan-card-text);
+  color: var(--plan-action-text);
   font-family: inherit;
   font-size: clamp(14px, 4cqw, 24px);
   font-weight: 900;
@@ -347,9 +423,9 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
 .plan-action.is-solid {
   border-color: transparent;
-  background: linear-gradient(180deg, #f5cf65, #f1c646);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--plan-accent) 28%, transparent);
-  color: #241700;
+  background: var(--plan-action-solid-bg);
+  box-shadow: var(--plan-action-solid-shadow);
+  color: var(--plan-action-solid-text);
 }
 
 .pricing-plan-card.is-selected .plan-action.is-solid,
@@ -361,9 +437,17 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   filter: brightness(1.04);
 }
 
+:global(.theme-light) .pricing-plan-card:hover .plan-action.is-solid {
+  filter: brightness(1.06);
+}
+
 .pricing-plan-card:hover .plan-action:not(.is-solid) {
-  border-color: rgba(255, 255, 255, 0.54);
-  color: #ffffff;
+  border-color: var(--plan-action-hover-border);
+  color: var(--plan-action-hover-text);
+}
+
+:global(.theme-light) .pricing-plan-card:hover .plan-action:not(.is-solid) {
+  background: color-mix(in srgb, var(--plan-accent) 6%, #ffffff);
 }
 
 .plan-action:active {

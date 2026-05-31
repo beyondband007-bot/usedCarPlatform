@@ -115,17 +115,27 @@ function handlePlanSelect(name: string) {
 
 .pricing-page.theme-light {
   --pricing-accent: #d4a017;
-  --pricing-accent-strong: #f4c84a;
-  --pricing-hero-text: #f8fafc;
-  --pricing-hero-sub: rgba(248, 250, 252, 0.76);
-  --pricing-footer-bg: rgba(5, 6, 8, 0.64);
-  --pricing-footer-border: rgba(255, 255, 255, 0.18);
-  --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
-  --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
-  --pricing-bg-fallback: #020303;
+  --pricing-accent-strong: #e5b85c;
+  --pricing-primary: #2f6bff;
+  --pricing-primary-strong: #1d5ae8;
+  --pricing-primary-soft: #edf4ff;
+  --pricing-hero-text: #0f172a;
+  --pricing-hero-sub: #64748b;
+  --pricing-footer-bg: rgba(255, 255, 255, 0.9);
+  --pricing-footer-border: #e2e8f0;
+  --pricing-footer-icon-bg: rgba(47, 107, 255, 0.08);
+  --pricing-footer-icon-border: rgba(47, 107, 255, 0.2);
+  --pricing-bg-fallback: #f6f9fc;
   --pricing-bg-overlay:
-    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.04), transparent 26%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.68) 100%);
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.78), transparent 52%),
+    linear-gradient(
+      180deg,
+      rgba(246, 249, 252, 0.84) 0%,
+      rgba(246, 249, 252, 0.52) 46%,
+      rgba(246, 249, 252, 0.9) 100%
+    );
+
+  color: var(--pricing-hero-text);
 }
 
 .pricing-bg {
@@ -172,6 +182,10 @@ function handlePlanSelect(name: string) {
   font-weight: 950;
   letter-spacing: 0.02em;
   line-height: 1.08;
+  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.72);
+}
+
+.pricing-page.theme-dark .pricing-hero h1 {
   text-shadow: 0 3px 18px rgba(0, 0, 0, 0.42);
 }
 
@@ -182,6 +196,10 @@ function handlePlanSelect(name: string) {
   font-size: clamp(15px, min(1.55vw, 2.2vh), 24px);
   font-weight: 500;
   line-height: 1.35;
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.65);
+}
+
+.pricing-page.theme-dark .pricing-hero p {
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.58);
 }
 
@@ -207,6 +225,12 @@ function handlePlanSelect(name: string) {
   border-radius: 28px;
   background: var(--pricing-footer-bg);
   backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 12px 40px rgba(15, 23, 42, 0.08);
+}
+
+.pricing-page.theme-dark .pricing-footer-bar {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 20px 70px rgba(0, 0, 0, 0.28);

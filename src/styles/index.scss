@@ -23,25 +23,25 @@ $theme-vars: (
     app-header-user: #0f172a,
   ),
   dark: (
-    app-bg: #070b12,
-    app-surface: #0b1220,
-    app-surface-soft: #0e1628,
-    app-border: rgba(255, 255, 255, 0.06),
-    app-text: #f1f5f9,
-    app-text-soft: #94a3b8,
-    app-text-muted: #64748b,
-    app-text-disabled: rgba(148, 163, 184, 0.45),
-    app-header-bg: rgba(5, 7, 10, 0.88),
-    app-header-shadow: none,
-    app-header-nav: #94a3b8,
-    app-header-nav-active-bg: rgba(212, 160, 23, 0.1),
-    app-header-nav-active: #d4a017,
-    app-header-brand-sub: #64748b,
-    app-header-chip-bg: rgba(255, 255, 255, 0.05),
-    app-header-chip-text: #cbd5e1,
-    app-header-credits-bg: #d4a017,
-    app-header-credits-text: #ffffff,
-    app-header-user: #f1f5f9,
+    app-bg: #050505,
+    app-surface: #101010,
+    app-surface-soft: #0b0b0b,
+    app-border: rgba(255, 255, 255, 0.1),
+    app-text: #f4f1e9,
+    app-text-soft: #959083,
+    app-text-muted: #7a7568,
+    app-text-disabled: rgba(244, 241, 233, 0.38),
+    app-header-bg: rgba(5, 5, 5, 0.9),
+    app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.42),
+    app-header-nav: #9c9788,
+    app-header-nav-active-bg: rgba(239, 194, 76, 0.12),
+    app-header-nav-active: #f0c44f,
+    app-header-brand-sub: #9c9788,
+    app-header-chip-bg: rgba(255, 255, 255, 0.06),
+    app-header-chip-text: #e8e1cf,
+    app-header-credits-bg: rgba(239, 194, 76, 0.14),
+    app-header-credits-text: #f4d36a,
+    app-header-user: #f8f3e7,
   ),
 );
 
@@ -85,22 +85,22 @@ $theme-vars: (
 :root {
   color-scheme: dark;
   @include apply-theme-vars(dark);
-  --color-bg-primary: #070b12;
-  --color-bg-secondary: #0b1220;
-  --color-bg-module: #0e1628;
-  --color-bg-card: #111827;
-  --color-bg-card-strong: #0e1628;
-  --color-bg-card-soft: #172033;
-  --color-bg-hover: #172033;
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #64748b;
-  --color-border-primary: rgba(255, 255, 255, 0.06);
-  --color-border-soft: rgba(255, 255, 255, 0.06);
-  --color-border-strong: rgba(59, 130, 246, 0.25);
-  --color-border-gold: rgba(212, 160, 23, 0.25);
-  --color-brand-primary: #d4a017;
-  --color-brand-strong: #e5b85c;
+  --color-bg-primary: #050505;
+  --color-bg-secondary: #101010;
+  --color-bg-module: #0b0b0b;
+  --color-bg-card: #101010;
+  --color-bg-card-strong: #151515;
+  --color-bg-card-soft: #0b0b0b;
+  --color-bg-hover: #151515;
+  --color-text-primary: #f4f1e9;
+  --color-text-secondary: #959083;
+  --color-text-muted: #7a7568;
+  --color-border-primary: rgba(255, 255, 255, 0.1);
+  --color-border-soft: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(239, 194, 76, 0.42);
+  --color-border-gold: rgba(239, 194, 76, 0.42);
+  --color-brand-primary: #efc24c;
+  --color-brand-strong: #ffd75a;
   --color-accent-blue: #2f6bff;
   --color-accent-blue-strong: #4f7fff;
   --color-success: #35c28a;
@@ -108,8 +108,8 @@ $theme-vars: (
   --color-error: #ef6a5b;
   --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.25);
   --shadow-panel-strong: 0 10px 40px rgba(0, 0, 0, 0.35);
-  --shadow-brand-glow: 0 0 26px rgba(212, 160, 23, 0.14);
-  --shadow-blue-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+  --shadow-brand-glow: 0 0 26px rgba(239, 194, 76, 0.14);
+  --shadow-blue-glow: 0 0 26px rgba(239, 194, 76, 0.1);
   --radius-card: 16px;
   --radius-control: 10px;
   --motion-fast: 160ms ease;
@@ -155,22 +155,22 @@ $theme-vars: (
 [data-theme="dark"] {
   color-scheme: dark;
   @include apply-theme-vars(dark);
-  --color-bg-primary: #070b12;
-  --color-bg-secondary: #0b1220;
-  --color-bg-module: #0e1628;
-  --color-bg-card: #111827;
-  --color-bg-card-strong: #0e1628;
-  --color-bg-card-soft: #172033;
-  --color-bg-hover: #172033;
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #64748b;
-  --color-border-primary: rgba(255, 255, 255, 0.06);
-  --color-border-soft: rgba(255, 255, 255, 0.06);
-  --color-border-strong: rgba(59, 130, 246, 0.25);
-  --color-border-gold: rgba(212, 160, 23, 0.25);
-  --color-brand-primary: #d4a017;
-  --color-brand-strong: #e5b85c;
+  --color-bg-primary: #050505;
+  --color-bg-secondary: #101010;
+  --color-bg-module: #0b0b0b;
+  --color-bg-card: #101010;
+  --color-bg-card-strong: #151515;
+  --color-bg-card-soft: #0b0b0b;
+  --color-bg-hover: #151515;
+  --color-text-primary: #f4f1e9;
+  --color-text-secondary: #959083;
+  --color-text-muted: #7a7568;
+  --color-border-primary: rgba(255, 255, 255, 0.1);
+  --color-border-soft: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(239, 194, 76, 0.42);
+  --color-border-gold: rgba(239, 194, 76, 0.42);
+  --color-brand-primary: #efc24c;
+  --color-brand-strong: #ffd75a;
   --color-accent-blue: #2f6bff;
   --color-accent-blue-strong: #4f7fff;
   --color-success: #35c28a;
@@ -178,8 +178,8 @@ $theme-vars: (
   --color-error: #ef6a5b;
   --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.25);
   --shadow-panel-strong: 0 10px 40px rgba(0, 0, 0, 0.35);
-  --shadow-brand-glow: 0 0 26px rgba(212, 160, 23, 0.14);
-  --shadow-blue-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+  --shadow-brand-glow: 0 0 26px rgba(239, 194, 76, 0.14);
+  --shadow-blue-glow: 0 0 26px rgba(239, 194, 76, 0.1);
   --radius-card: 16px;
   --radius-control: 10px;
   --motion-fast: 160ms ease;

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -714,13 +714,13 @@ onUnmounted(() => {
 .workspace-page {
   --workspace-accent: #efc24c;
   --workspace-accent-strong: #ffd75a;
-  --workspace-panel: #0b1220;
-  --workspace-panel-soft: #0e1628;
-  --workspace-panel-deep: #070b12;
-  --workspace-line: rgba(255, 255, 255, 0.06);
-  --workspace-line-strong: rgba(59, 130, 246, 0.25);
-  --workspace-muted: #64748b;
-  --workspace-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --workspace-panel: #101010;
+  --workspace-panel-soft: #151515;
+  --workspace-panel-deep: #080808;
+  --workspace-line: rgba(255, 255, 255, 0.12);
+  --workspace-line-strong: rgba(239, 194, 76, 0.42);
+  --workspace-muted: #969186;
+  --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 
   display: flex;
   height: 100%;
@@ -730,9 +730,7 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   color: var(--app-text);
-  background:
-    radial-gradient(circle at 30% 0%, rgba(59, 130, 246, 0.08), transparent 28rem),
-    var(--app-bg);
+  background: var(--app-bg);
 }
 
 .workspace-page.theme-light {
@@ -768,16 +766,12 @@ onUnmounted(() => {
 
   color: var(--workspace-text);
 
-  background:
-    radial-gradient(circle at 30% 0%, rgba(47, 107, 255, 0.06), transparent 28rem),
-    var(--app-bg);
+  background: var(--app-bg);
 }
 
 .workspace-page.theme-light .workspace-col--main {
   border-color: var(--workspace-line);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 42%),
-    var(--workspace-panel);
+  background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
 }
 
@@ -825,11 +819,9 @@ onUnmounted(() => {
 .workspace-col--main {
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(59, 130, 246, 0.12);
+  border: 1px solid var(--workspace-line);
   border-radius: 20px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
-    var(--workspace-panel);
+  background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
 }
 
@@ -897,12 +889,6 @@ onUnmounted(() => {
   @media (width >= 1536px) {
     grid-template-columns: 260px minmax(360px, 440px) minmax(0, 1fr);
   }
-}
-
-.workspace-page--watermark .workspace-col--main {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42)),
-    var(--workspace-panel);
 }
 
 .workspace-page--creative-image .workspace-shell {

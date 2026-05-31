@@ -6,19 +6,16 @@ import type { DataTableColumns } from 'naive-ui'
 
 import { useAppStore } from '@/stores/app'
 import { usePointsStore } from '@/stores/points'
-import { useRechargeStore } from '@/stores/recharge'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { PointRecord, PointRecordType } from '@/types/points'
 
 const appStore = useAppStore()
 const pointsStore = usePointsStore()
-const rechargeStore = useRechargeStore()
 const subscriptionStore = useSubscriptionStore()
 
 onMounted(async () => {
   await subscriptionStore.hydrate()
   await pointsStore.hydrate()
-  await rechargeStore.hydrate()
 })
 
 const planName = computed(() =>
@@ -28,8 +25,6 @@ const planName = computed(() =>
       ? '企业旗舰版'
       : '企业团队版',
 )
-
-const consumeRecords = computed(() => pointsStore.records.filter((item) => item.amount < 0))
 
 const flowKeyword = ref('')
 const selectedFlowType = ref<'all' | PointRecordType>('all')
@@ -313,44 +308,6 @@ const summary = computed(() => [
             :item-count="filteredRecords.length"
           />
         </footer>
-      </section>
-
-      <section class="record-columns">
-        <article class="points-table compact-table">
-          <header class="points-table-head">
-            <h2>充值记录</h2>
-            <span>{{ rechargeStore.orders.length }} 条记录</span>
-          </header>
-          <div class="points-table-body">
-            <article v-for="item in rechargeStore.orders" :key="item.orderId" class="points-row three-col">
-              <div>
-                <strong>{{ item.plan === 'basic' ? '企业基础版' : item.plan === 'flagship' ? '企业旗舰版' : '企业团队版' }}</strong>
-                <p>{{ item.orderId }}</p>
-              </div>
-              <span class="up">+{{ item.giftPoints.toLocaleString('zh-CN') }}</span>
-              <time>{{ item.paidAt ?? item.createdAt }}</time>
-            </article>
-            <p v-if="!rechargeStore.orders.length" class="empty-text">暂无充值记录</p>
-          </div>
-        </article>
-
-        <article class="points-table compact-table">
-          <header class="points-table-head">
-            <h2>消费记录</h2>
-            <span>{{ consumeRecords.length }} 条记录</span>
-          </header>
-          <div class="points-table-body">
-            <article v-for="item in consumeRecords" :key="item.id" class="points-row three-col">
-              <div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.remark }}</p>
-              </div>
-              <span class="down">{{ item.amount.toLocaleString('zh-CN') }}</span>
-              <time>{{ item.createdAt }}</time>
-            </article>
-            <p v-if="!consumeRecords.length" class="empty-text">暂无消费记录</p>
-          </div>
-        </article>
       </section>
     </section>
   </main>

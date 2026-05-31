@@ -350,19 +350,19 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 <style scoped lang="scss">
 .recharge-page {
   --recharge-page-pad: clamp(16px, 2vw, 30px);
-  --recharge-bg: #070b12;
-  --recharge-panel: #0b1220;
-  --recharge-panel-strong: #0e1628;
-  --recharge-border: rgba(59, 130, 246, 0.12);
-  --recharge-border-soft: rgba(255, 255, 255, 0.06);
-  --recharge-text: #f1f5f9;
-  --recharge-muted: #64748b;
-  --recharge-head: #0e1628;
-  --recharge-row: rgba(255, 255, 255, 0.06);
-  --recharge-field: #111827;
-  --recharge-blue: #2f6bff;
-  --recharge-gold: #d4a017;
-  --shell-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --recharge-bg: #050505;
+  --recharge-panel: #101010;
+  --recharge-panel-strong: #151515;
+  --recharge-border: rgba(255, 255, 255, 0.1);
+  --recharge-border-soft: rgba(255, 255, 255, 0.08);
+  --recharge-text: #f4f1e9;
+  --recharge-muted: #969186;
+  --recharge-head: #151515;
+  --recharge-row: rgba(255, 255, 255, 0.08);
+  --recharge-field: #0b0b0b;
+  --recharge-blue: #efc24c;
+  --recharge-gold: #efc24c;
+  --shell-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 
   min-width: 0;
   height: auto;
@@ -420,10 +420,14 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   overflow: visible;
   border: 1px solid var(--recharge-border);
   border-radius: 20px;
+  background: var(--recharge-panel);
+  box-shadow: var(--shell-shadow);
+}
+
+.recharge-page.theme-light .recharge-panel {
   background:
     radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
     var(--recharge-panel);
-  box-shadow: var(--shell-shadow);
 }
 
 .recharge-hero {
@@ -436,6 +440,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   padding: 14px clamp(22px, 2.4vw, 34px);
   overflow: hidden;
   border-bottom: 1px solid var(--recharge-border-soft);
+  background: var(--recharge-head);
+}
+
+.recharge-page.theme-light .recharge-hero {
   background:
     radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.08), transparent 55%),
     var(--recharge-head);
@@ -611,11 +619,9 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-module {
-  border-color: rgba(59, 130, 246, 0.12);
-  background:
-    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 70%),
-    #111827;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #101010;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
 .records-header {
@@ -642,10 +648,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-summary {
-  border-color: rgba(255, 255, 255, 0.06);
-  background:
-    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 70%),
-    #0e1628;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #151515;
 }
 
 .summary-card {
@@ -660,9 +664,9 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .summary-card {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: #111827;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #101010;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
 .summary-card-icon {
@@ -744,8 +748,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-table-panel {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: #111827;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #101010;
 }
 
 .records-filter {
@@ -828,11 +832,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-data-table {
-  --n-th-color: #0e1628;
-  --n-th-color-hover: #0e1628;
-  --n-th-text-color: #94a3b8;
-  --n-td-color-hover: rgba(59, 130, 246, 0.06);
-  --n-border-color: rgba(255, 255, 255, 0.06);
+  --n-th-color: #151515;
+  --n-th-color-hover: #151515;
+  --n-th-text-color: #959083;
+  --n-td-color-hover: rgba(239, 194, 76, 0.08);
+  --n-border-color: rgba(255, 255, 255, 0.08);
 }
 
 .records-data-table :deep(.n-data-table-th) {

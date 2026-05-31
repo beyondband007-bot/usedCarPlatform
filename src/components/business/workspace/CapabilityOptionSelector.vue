@@ -126,23 +126,6 @@ const optionRows = computed(() => {
   container-type: inline-size;
 }
 
-.option-scroll-shell::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 22px;
-  z-index: 2;
-  width: clamp(18px, 4vw, 32px);
-  pointer-events: none;
-  background: linear-gradient(
-    270deg,
-    var(--app-surface) 0%,
-    color-mix(in srgb, var(--app-surface) 72%, transparent) 55%,
-    transparent 100%
-  );
-}
-
 .option-scroll {
   overflow-x: auto;
   overflow-y: hidden;
