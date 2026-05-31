@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { h } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import {
   NButton,
   NDataTable,
@@ -11,7 +11,14 @@ import {
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
+import {
+  getCreditAccounts,
+  getCreditTransactions,
+  type CreditAccount,
+  type CreditTransaction,
+} from "@/api/visual-workbench";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
 import {
   creditsAccountOptions,
   creditsFlowData,
@@ -22,9 +29,86 @@ import {
 import type { CreditFlowRow } from "@/constants/credits-page";
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const copy = creditsPageCopy;
+const isLoadingCredits = ref(false);
+const accounts = ref<CreditAccount[]>([]);
+const transactions = ref<CreditTransaction[]>([]);
+const flowRows = ref<CreditFlowRow[]>(creditsFlowData);
 
-const stats = creditsStats.map((stat) => {
+const formatPoints = (value: string | number | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return "0";
+  return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(parsed);
+};
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date).replace(/\//g, "-");
+};
+
+const accountName = (account: CreditAccount | undefined) => {
+  if (!account) return "—";
+  if (account.accountScope === "tenant") return `企业账户 #${account.tenantId ?? account.id}`;
+  return `个人账户 #${account.id}`;
+};
+
+const transactionTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    grant: "套餐赠送",
+    recharge: "套餐赠送",
+    estimate: "费用预估",
+    freeze: "任务冻结",
+    settle: "任务结算",
+    refund: "失败退款",
+    release: "释放冻结",
+  };
+  return labels[type] ?? type;
+};
+
+const signedPoints = (points: string) => {
+  const parsed = Number(points);
+  if (!Number.isFinite(parsed)) return points;
+  return `${parsed > 0 ? "+" : ""}${formatPoints(parsed)}`;
+};
+
+const mapTransaction = (transaction: CreditTransaction): CreditFlowRow => ({
+  flowNo: String(transaction.id),
+  flowType: transactionTypeLabel(transaction.txnType),
+  delta: signedPoints(transaction.points),
+  balance: formatPoints(transaction.balanceAfter),
+  account: accountName(accounts.value.find((account) => account.id === transaction.accountId)),
+  createdAt: formatDateTime(transaction.createdAt),
+  remark: transaction.remark ?? transaction.bizType ?? "—",
+});
+
+const stats = computed(() => creditsStats.map((stat) => {
+  const positiveTotal = transactions.value.reduce((sum, transaction) => {
+    const points = Number(transaction.points);
+    return points > 0 ? sum + points : sum;
+  }, 0);
+  const negativeTotal = transactions.value.reduce((sum, transaction) => {
+    const points = Number(transaction.points);
+    return points < 0 ? sum + Math.abs(points) : sum;
+  }, 0);
+  const currentAccount =
+    accounts.value.find((account) => account.accountScope === "personal") ?? accounts.value[0] ?? null;
+  const recentTotal = transactions.value.reduce((sum, transaction) => sum + Number(transaction.points || 0), 0);
+  const values: Record<string, string> = {
+    累计获得: `+${formatPoints(positiveTotal)}`,
+    累计消耗: `-${formatPoints(negativeTotal)}`,
+    当前可用: formatPoints(currentAccount?.availableBalance ?? 0),
+    近30天流水: `${recentTotal >= 0 ? "+" : ""}${formatPoints(recentTotal)}`,
+  };
   const visual =
     stat.tone === "success"
       ? { className: "is-green", glyph: "累", icon: "mdi:leaf" }
@@ -34,8 +118,45 @@ const stats = creditsStats.map((stat) => {
           ? { className: "is-blue", glyph: "当", icon: "mdi:diamond-stone" }
           : { className: "is-purple", glyph: "近", icon: "mdi:chart-timeline-variant-shimmer" };
 
-  return { ...stat, ...visual };
+  return { ...stat, value: values[stat.label] ?? stat.value, ...visual };
+}));
+
+const accountOptions = computed(() => {
+  if (!accounts.value.length) return creditsAccountOptions;
+  return [
+    { label: "全部账号", value: "all-account" },
+    ...accounts.value.map((account) => ({
+      label: accountName(account),
+      value: String(account.id),
+    })),
+  ];
 });
+
+async function loadCreditsPage() {
+  isLoadingCredits.value = true;
+  try {
+    const accountResult = await getCreditAccounts();
+    accounts.value = accountResult.accounts;
+    const account = accountResult.accounts.find((item) => item.accountScope === "personal") ?? accountResult.accounts[0];
+    if (account) {
+      authStore.credits = formatPoints(account.availableBalance);
+      const transactionResult = await getCreditTransactions({
+        accountId: account.id,
+        limit: 50,
+      });
+      transactions.value = transactionResult.transactions;
+      flowRows.value = transactionResult.transactions.map(mapTransaction);
+    } else {
+      transactions.value = [];
+      flowRows.value = [];
+    }
+  } catch (error) {
+    console.warn("failed to load credits page data", error);
+    flowRows.value = creditsFlowData;
+  } finally {
+    isLoadingCredits.value = false;
+  }
+}
 
 const tagClass = (flowType: string) => {
   if (flowType === "套餐赠送" || flowType === "失败退款") return "is-positive";
@@ -122,6 +243,10 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
     },
   },
 ];
+
+onMounted(() => {
+  void loadCreditsPage();
+});
 </script>
 
 <template>
@@ -133,7 +258,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
             <h1>{{ copy.title }}</h1>
             <p>{{ copy.subtitle }}</p>
           </div>
-          <NButton class="query-button" type="primary" attr-type="button">
+          <NButton class="query-button" type="primary" attr-type="button" :loading="isLoadingCredits" @click="loadCreditsPage">
             查分查询
           </NButton>
         </header>
@@ -157,7 +282,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 
           <NSelect
             class="filter-select"
-            :options="creditsAccountOptions"
+            :options="accountOptions"
             default-value="all-account"
             size="large"
           />
@@ -192,7 +317,8 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
           <NDataTable
             class="flow-data-table"
             :columns="flowColumns"
-            :data="creditsFlowData"
+            :data="flowRows"
+            :loading="isLoadingCredits"
             :bordered="false"
             :single-line="false"
             :pagination="false"

@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue";
 import { NPopover } from "naive-ui";
 import { ref } from "vue";
-import { computed, inject } from "vue";
+import { computed, inject, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { isWorkbenchSectionPath } from "@/constants/app-flow";
@@ -57,6 +57,10 @@ const navItems = computed(() => {
   return authStore.isLoggedIn
     ? topNavigation.filter((item) => item.path !== "/auth")
     : topNavigation;
+});
+
+onMounted(() => {
+  void authStore.refreshCredits();
 });
 </script>
 

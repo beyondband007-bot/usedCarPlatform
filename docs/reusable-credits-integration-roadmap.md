@@ -35,6 +35,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 5: Single-task terminal billing | Done | `e8c3462`, `phase-5-terminal-billing-20260530` | Settles successful single generation tasks and refunds failed/canceled tasks with idempotency guards. |
 | Phase 6: Integrate batch creation | Done | `e47969b`, `phase-6-batch-creation-20260531` | Freezes credits for each batch item before KIE submission and reports batch estimated cost from frozen subtasks. |
 | Phase 7: UsedCar credit proxy APIs | Done | `phase-7-proxy-apis-20260531` | Adds `/api/v1/credits/*` proxy routes for accounts, transactions, recharge products, and payment orders. |
+| Phase 8: Frontend balance and recharge | Done | `phase-8-frontend-credit-data-20260531` | Replaces visible mock credit balance, credit ledger, recharge products, and payment order creation with proxy API data. |
 
 Detailed phase notes:
 
@@ -45,6 +46,7 @@ Detailed phase notes:
 - [Phase 5 terminal billing](./reusable-credits-phase-5-terminal-billing.md)
 - [Phase 6 batch creation](./reusable-credits-phase-6-batch-billing.md)
 - [Phase 7 proxy APIs](./reusable-credits-phase-7-proxy-apis.md)
+- [Phase 8 frontend credit data](./reusable-credits-phase-8-frontend-credit-data.md)
 
 ## Important Implementation Notes
 
@@ -98,6 +100,8 @@ Expected deliverable:
 - smoke tests against the local credits platform
 
 ### Phase 8: Frontend Balance And Recharge
+
+Status: done in this branch.
 
 Replace mock/static credit data in usedCar frontend:
 
@@ -188,6 +192,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 8 next.
+Continue with Phase 9 next.
 
-The usedCar backend now exposes the credit proxy boundary, so the next step is to replace frontend mock/static credit data with these APIs.
+The user-facing credit balance, credit ledger page, recharge product list, and payment-order creation now use the proxy APIs. The next step is to connect the Credits Admin Console prototype to live operational APIs.
