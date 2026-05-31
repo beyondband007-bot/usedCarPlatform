@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
@@ -14,6 +15,22 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+
+const permissionMap: Record<string, string> = {
+  '/home': 'menu:home',
+  '/workspace': 'menu:workspace',
+  '/points': 'menu:points',
+  '/credits': 'menu:points',
+  '/recharge': 'menu:recharge',
+  '/package-points': 'menu:recharge',
+}
+
+const visibleNavigation = computed(() =>
+  secondaryNavigation.filter((item) => {
+    const permission = permissionMap[item.path]
+    return !permission || authStore.permissions.includes(permission)
+  }),
+)
 
 function isNavItemActive(item: NavItem) {
   if (item.path === '/workspace') {
@@ -48,11 +65,11 @@ function navigate(item: NavItem) {
       :class="{ 'subnav-track--embedded': props.embedded }"
     >
       <div
-        class="subnav-links flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        class="subnav-links flex min-w-0 items-center overflow-x-auto"
         :class="props.embedded ? 'subnav-links--embedded' : 'flex-1 gap-1'"
       >
         <button
-          v-for="item in secondaryNavigation"
+          v-for="item in visibleNavigation"
           :key="item.path"
           type="button"
           class="subnav-link inline-flex shrink-0 items-center rounded-lg font-semibold transition duration-200"
@@ -119,8 +136,9 @@ function navigate(item: NavItem) {
 }
 
 .subnav-link:not(.subnav-link--embedded).is-active {
-  background: var(--app-header-nav-active-bg);
+  background: transparent;
   color: var(--app-header-nav-active);
+  font-weight: 600;
 }
 
 .subnav-link:not(.subnav-link--embedded):not(.is-active) {
@@ -136,9 +154,9 @@ function navigate(item: NavItem) {
   position: relative;
   border-radius: 0;
   background: transparent;
-  color: var(--studio-chrome-nav, #c8c1b3);
+  color: var(--studio-chrome-nav, #475569);
   font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   padding:
     clamp(12px, 1vw, 16px)
@@ -151,15 +169,16 @@ function navigate(item: NavItem) {
   left: 50%;
   bottom: 0;
   width: 0;
-  height: clamp(3px, 0.22vw, 4px);
+  height: 2px;
   content: '';
-  background: var(--studio-chrome-nav-underline, #efc24c);
+  border-radius: 2px;
+  background: var(--studio-chrome-nav-underline, #2f6bff);
   transform: translateX(-50%);
   transition: width 0.25s ease;
 }
 
 .subnav-link--embedded:hover {
-  color: var(--studio-chrome-nav-hover, #efe3c3);
+  color: var(--studio-chrome-nav-hover, #2f6bff);
 }
 
 .subnav-link--embedded:hover::after,
@@ -168,8 +187,9 @@ function navigate(item: NavItem) {
 }
 
 .subnav-link--embedded.is-active {
-  color: var(--studio-chrome-nav-active, #efc24c);
+  color: var(--studio-chrome-nav-active, #2f6bff);
   background: transparent;
+  font-weight: 600;
 }
 
 .subnav--embedded .subnav-credits {
@@ -209,7 +229,7 @@ function navigate(item: NavItem) {
 
 .subnav-credits-icon {
   flex-shrink: 0;
-  color: var(--studio-chrome-nav-active, #efc24c);
+  color: inherit;
   font-size: 14px;
 }
 

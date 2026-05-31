@@ -45,17 +45,32 @@ function handleLogout() {
   router.push("/home");
 }
 
+function resolveNavPermission(path: string) {
+  if (path === "/home") return "menu:home";
+  if (path === "/workspace" || path.startsWith("/workspace/")) return "menu:workspace";
+  if (path === "/pricing") return "menu:pricing";
+  if (path === "/points" || path === "/credits") return "menu:points";
+  if (path === "/recharge" || path === "/package-points") return "menu:recharge";
+  return "";
+}
+
+function canShowNavItem(item: NavItem) {
+  if (!authStore.isLoggedIn) return true;
+  const permission = resolveNavPermission(item.path);
+  return !permission || authStore.permissions.includes(permission);
+}
+
 const navItems = computed(() => {
   if (usesStudioChrome.value) {
     if (!authStore.isLoggedIn) {
       return studioGuestNavigation;
     }
 
-    return topNavigation.filter((item) => item.path !== "/auth");
+    return topNavigation.filter((item) => item.path !== "/login" && canShowNavItem(item));
   }
 
   return authStore.isLoggedIn
-    ? topNavigation.filter((item) => item.path !== "/auth")
+    ? topNavigation.filter((item) => item.path !== "/login" && canShowNavItem(item))
     : topNavigation;
 });
 </script>
@@ -90,9 +105,9 @@ const navItems = computed(() => {
           积分余额 {{ authStore.credits }}
         </RouterLink>
         <RouterLink
-          v-else-if="route.path !== '/auth'"
+          v-else-if="route.path !== '/login'"
           class="credit-pill"
-          to="/auth"
+          to="/login"
         >
           企业账号登录
         </RouterLink>
@@ -183,7 +198,7 @@ const navItems = computed(() => {
       </RouterLink>
 
       <nav
-        class="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] xl:gap-2 [&::-webkit-scrollbar]:hidden"
+        class="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto overflow-y-hidden xl:gap-2"
         aria-label="主导航"
       >
         <button
@@ -193,8 +208,8 @@ const navItems = computed(() => {
           class="inline-flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 xl:min-w-[80px] xl:px-4"
           :class="
             isNavItemActive(item)
-              ? 'bg-[var(--app-header-nav-active-bg)] text-[var(--app-header-nav-active)]'
-              : 'text-[var(--app-header-nav)] hover:bg-[var(--app-header-nav-active-bg)]/60 hover:text-[var(--app-header-nav-active)]'
+              ? 'text-[var(--app-header-nav-active)]'
+              : 'text-[var(--app-header-nav)] hover:text-[var(--app-header-nav-active)]'
           "
           @click="handleNavClick(item)"
         >
@@ -269,9 +284,9 @@ const navItems = computed(() => {
         </NPopover>
 
         <RouterLink
-          v-else-if="route.path !== '/auth'"
-          to="/auth"
-          class="inline-flex items-center gap-1.5 rounded-full bg-[var(--app-header-nav-active-bg)] px-3 py-2 text-xs font-semibold text-[var(--app-header-nav-active)] no-underline transition hover:opacity-90"
+          v-else-if="route.path !== '/login'"
+          to="/login"
+          class="header-login-link inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold no-underline transition hover:opacity-90"
         >
           <Icon icon="mdi:account-key-outline" class="text-base" />
           <span class="hidden sm:inline">登录</span>
@@ -337,17 +352,17 @@ const navItems = computed(() => {
   padding: 0 0 clamp(6px, 0.45vw, 8px);
   border: 0;
   background: transparent;
-  color: var(--studio-chrome-nav, #c9c9c9);
+  color: var(--studio-chrome-nav, #475569);
   font-family: inherit;
   font-size: inherit;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
   transition: color 0.25s ease;
 }
 
 .nav-link:hover {
-  color: var(--studio-chrome-nav-hover, #d7d7d7);
+  color: var(--studio-chrome-nav-hover, #2f6bff);
 }
 
 .nav-link::after {
@@ -355,9 +370,10 @@ const navItems = computed(() => {
   left: 50%;
   bottom: 0;
   width: 0;
-  height: clamp(2px, 0.15vw, 3px);
+  height: 2px;
   content: '';
-  background: var(--studio-chrome-nav-underline, #f4c840);
+  border-radius: 2px;
+  background: var(--studio-chrome-nav-underline, #2f6bff);
   transform: translateX(-50%);
   transition: width 0.25s ease;
 }
@@ -368,18 +384,24 @@ const navItems = computed(() => {
 }
 
 .nav-link.active {
-  color: var(--studio-chrome-nav-active, #f4c840);
+  color: var(--studio-chrome-nav-active, #2f6bff);
+  font-weight: 600;
 }
 
 .credit-pill {
   padding: clamp(8px, 0.65vw, 10px) clamp(14px, 1.2vw, 20px);
-  color: var(--studio-chrome-credit-text, #171100);
-  background: var(--studio-chrome-credit-bg, #fff);
+  color: var(--studio-chrome-credit-text, #ffffff);
+  background: var(--studio-chrome-credit-bg, #d4a017);
   border-radius: 999px;
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.credit-pill:hover {
+  background: var(--studio-chrome-credit-hover, #e5b85c);
 }
 
 .site-header-actions {
@@ -490,9 +512,9 @@ const navItems = computed(() => {
 }
 
 .user-menu-trigger:hover {
-  border-color: color-mix(in srgb, var(--app-header-nav-active) 32%, var(--app-border));
-  background: var(--app-header-nav-active-bg);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--app-header-nav-active) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 32%, var(--app-border));
+  background: var(--app-surface-soft, #f8fafd);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-accent-blue, #2f6bff) 12%, transparent);
 }
 
 .user-menu-avatar {
@@ -502,8 +524,8 @@ const navItems = computed(() => {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--app-header-nav-active) 14%, var(--app-header-chip-bg));
-  color: var(--app-header-nav-active);
+  background: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 12%, var(--app-header-chip-bg));
+  color: var(--color-accent-blue, #2f6bff);
   font-size: 18px;
 }
 
@@ -575,8 +597,8 @@ const navItems = computed(() => {
 }
 
 .user-menu-panel.is-light .user-menu-logout:hover {
-  background: #fff7ed;
-  color: #ea580c;
+  background: #f8fafd;
+  color: #2f6bff;
 }
 
 .user-menu-panel.is-dark .user-menu-logout:hover {
@@ -586,5 +608,20 @@ const navItems = computed(() => {
 
 .user-menu-logout-icon {
   font-size: 18px;
+}
+
+.header-login-link {
+  background: var(--color-action-primary, #2f6bff);
+  color: #ffffff;
+}
+
+.header-login-link:hover {
+  background: var(--color-action-primary-hover, #4f7fff);
+  opacity: 1;
+}
+
+[data-theme='dark'] .header-login-link {
+  background: var(--app-header-nav-active-bg);
+  color: var(--app-header-nav-active);
 }
 </style>

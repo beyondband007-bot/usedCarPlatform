@@ -28,6 +28,7 @@ const props = defineProps<{
   threadTurns?: CreativeThreadTurn[]
   isLoadingConversation?: boolean
   activeConversationId?: string | null
+  isNewConversationDisabled?: boolean
   referenceAsset?: UploadedAsset | null
 }>()
 
@@ -259,7 +260,12 @@ function toggleSidebar() {
         </button>
       </header>
 
-      <button type="button" class="creative-new-chat" @click="emit('newConversation')">
+      <button
+        type="button"
+        class="creative-new-chat"
+        :disabled="props.isNewConversationDisabled"
+        @click="emit('newConversation')"
+      >
         <Icon icon="mdi:pencil-outline" />
         新对话
       </button>
@@ -704,6 +710,11 @@ function toggleSidebar() {
   font-size: 22px;
 }
 
+.creative-new-chat:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .creative-recent {
   display: flex;
   flex-direction: column;
@@ -721,7 +732,6 @@ function toggleSidebar() {
   overflow-x: hidden;
   overflow-y: auto;
   padding-right: 2px;
-  scrollbar-gutter: stable;
 }
 
 .creative-recent p {

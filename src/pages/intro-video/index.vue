@@ -26,6 +26,7 @@ function finishIntro() {
       autoplay
       playsinline
       muted
+      preload="auto"
       @ended="finishIntro"
     />
 
@@ -57,7 +58,7 @@ function finishIntro() {
   display: block;
   width: 100vw;
   height: 100vh;
-  object-fit: cover;
+  object-fit: contain;
   background: #000;
 }
 

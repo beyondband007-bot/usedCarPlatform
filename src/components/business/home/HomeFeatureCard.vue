@@ -91,6 +91,10 @@ function handleAction() {
     var(--home-surface);
   padding: clamp(24px, 2.5vw, 34px);
   box-shadow: var(--home-shadow);
+  transition:
+    transform var(--home-motion-normal, 240ms ease),
+    border-color var(--home-motion-normal, 240ms ease),
+    box-shadow var(--home-motion-normal, 240ms ease);
 }
 
 .home-feature-card::before {
@@ -100,7 +104,14 @@ function handleAction() {
   pointer-events: none;
   background:
     linear-gradient(90deg, rgba(244, 200, 111, 0.1), transparent 28%),
-    radial-gradient(circle at 82% 12%, rgba(47, 124, 255, 0.1), transparent 34%);
+    radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--home-gold) 10%, transparent), transparent 34%);
+}
+
+.home-feature-card:hover {
+  border-color: var(--home-card-hover-border);
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--home-gold) 16%, transparent);
 }
 
 .home-feature-card.is-wide {
@@ -126,16 +137,16 @@ function handleAction() {
   min-height: 34px;
   align-items: center;
   border-radius: 999px;
-  background: rgba(31, 185, 129, 0.14);
-  color: var(--home-green);
+  background: color-mix(in srgb, var(--home-gold) 12%, transparent);
+  color: var(--home-gold-strong);
   padding: 0 13px;
   font-size: 14px;
   font-weight: 900;
 }
 
 .home-feature-card.is-highlighted .home-feature-copy > span {
-  background: rgba(244, 200, 111, 0.16);
-  color: var(--home-accent-strong);
+  background: color-mix(in srgb, var(--home-gold) 14%, transparent);
+  color: var(--home-gold-strong);
 }
 
 .home-feature-copy h2 {
@@ -162,10 +173,10 @@ function handleAction() {
 }
 
 .home-feature-button {
-  --n-color: var(--home-accent) !important;
-  --n-color-hover: #f6d68d !important;
-  --n-color-pressed: var(--home-accent-strong) !important;
-  --n-color-focus: var(--home-accent) !important;
+  --n-color: var(--home-gold) !important;
+  --n-color-hover: var(--home-gold-strong) !important;
+  --n-color-pressed: color-mix(in srgb, var(--home-gold) 84%, #000) !important;
+  --n-color-focus: var(--home-gold) !important;
   --n-border: 1px solid transparent !important;
   --n-border-hover: 1px solid transparent !important;
   --n-border-pressed: 1px solid transparent !important;
@@ -178,6 +189,12 @@ function handleAction() {
   min-width: 132px;
   height: 44px !important;
   font-weight: 900 !important;
+  transition: transform var(--home-motion-normal, 240ms ease), box-shadow var(--home-motion-normal, 240ms ease);
+}
+
+.home-feature-button:hover:not(.is-disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--home-gold) 24%, transparent);
 }
 
 .home-feature-button.is-disabled {
@@ -194,7 +211,7 @@ function handleAction() {
   min-height: 224px;
   overflow: hidden;
   border: 1px solid var(--home-border);
-  border-radius: 18px;
+  border-radius: var(--home-radius-media, 22px);
   background: var(--home-soft);
 }
 
@@ -204,6 +221,11 @@ function handleAction() {
   height: 100%;
   min-height: 224px;
   filter: var(--home-card-image-filter);
+  transition: transform var(--home-motion-normal, 240ms ease);
+}
+
+.home-feature-card:hover .home-feature-image {
+  transform: scale(1.03);
 }
 
 @media (max-width: 1480px) {

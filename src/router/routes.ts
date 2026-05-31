@@ -25,7 +25,7 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/home/index.vue'),
         meta: {
           title: '首页',
-          description: '平台展示、能力介绍',
+          permission: 'menu:home',
         },
       },
       {
@@ -34,22 +34,26 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/pricing/index.vue'),
         meta: {
           title: '企业套餐',
-          description: '套餐购买、积分体系',
+          permission: 'menu:pricing',
+        },
+      },
+      {
+        path: 'login',
+        name: 'Login',
+        component: () => import('@/pages/enterprise/index.vue'),
+        meta: {
+          title: '企业账号登录',
+          guestOnly: true,
+          hideIntroVideo: true,
         },
       },
       {
         path: 'auth',
-        name: 'Auth',
-        component: () => import('@/pages/enterprise/index.vue'),
-        meta: {
-          title: '企业账号登录',
-          description: '企业账号登录',
-          guestOnly: true,
-        },
+        redirect: '/login',
       },
       {
         path: 'enterprise',
-        redirect: '/auth',
+        redirect: '/login',
       },
       {
         path: '',
@@ -70,21 +74,24 @@ export const routes: RouteRecordRaw[] = [
             name: 'Workspace',
             component: () => import('@/pages/workspace/index.vue'),
             meta: {
-              title: '视觉工作台',
-              description: '场景影棚 · 批量上新 · 成片交付',
+              title: 'AI工作台',
               requiresAuth: true,
+              permission: 'menu:workspace',
             },
           },
           {
             path: 'credits',
             name: 'Credits',
-            component: () => import('@/pages/credits/index.vue'),
+            component: () => import('@/pages/points/index.vue'),
             meta: {
               title: '积分查询',
-              description: '积分流水查询',
               requiresAuth: true,
-              hiddenNav: true,
+              permission: 'menu:points',
             },
+          },
+          {
+            path: 'points',
+            redirect: '/credits',
           },
           {
             path: 'package-points',
@@ -92,10 +99,13 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/package-points/index.vue'),
             meta: {
               title: '套餐/积分',
-              description: '当前套餐和积分概览',
               requiresAuth: true,
-              hiddenNav: true,
+              permission: 'menu:recharge',
             },
+          },
+          {
+            path: 'recharge',
+            redirect: '/package-points',
           },
         ],
       },

@@ -34,8 +34,12 @@ function openWorkbench() {
 
 <style scoped lang="scss">
 .home-page {
-  --home-gold: #efc24c;
-  --home-gold-strong: #ffd94d;
+  --home-gold: var(--color-brand-primary);
+  --home-gold-strong: var(--color-brand-strong);
+  --home-radius-card: 28px;
+  --home-radius-media: 22px;
+  --home-motion-fast: var(--motion-fast);
+  --home-motion-normal: var(--motion-normal);
 
   position: relative;
   overflow-x: hidden;
@@ -47,79 +51,79 @@ function openWorkbench() {
 }
 
 .home-page.theme-dark {
-  --home-bg: var(--app-bg);
-  --home-panel: #101010;
-  --home-line: rgba(255, 255, 255, 0.13);
-  --home-text: var(--app-text);
-  --home-muted: #8a8a8a;
-  --home-glow: rgba(255, 196, 48, 0.1);
-  --home-grid-line: rgba(255, 255, 255, 0.018);
-  --home-grid-line-alt: rgba(255, 255, 255, 0.014);
-  --home-hero-bg: #080808;
-  --home-hero-title: #f3f3f3;
-  --home-hero-sub: #d5d5d5;
-  --home-card-bg: linear-gradient(180deg, #151515, #0b0b0b);
-  --home-card-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
-  --home-media-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
+  --home-bg: var(--color-bg-primary);
+  --home-panel: var(--color-bg-card);
+  --home-line: var(--color-border-primary);
+  --home-text: var(--color-text-primary);
+  --home-muted: var(--color-text-muted);
+  --home-glow: rgba(59, 130, 246, 0.08);
+  --home-grid-line: rgba(59, 130, 246, 0.04);
+  --home-grid-line-alt: rgba(59, 130, 246, 0.03);
+  --home-hero-bg: #070b12;
+  --home-hero-title: #f1f5f9;
+  --home-hero-sub: #94a3b8;
+  --home-card-bg: linear-gradient(180deg, #111827, #0e1628);
+  --home-card-overlay: linear-gradient(90deg, rgba(7, 11, 18, 0.92), rgba(7, 11, 18, 0.24));
+  --home-media-overlay: linear-gradient(90deg, rgba(7, 11, 18, 0.92), rgba(7, 11, 18, 0.24));
   --home-media-title: #fff;
-  --home-media-desc: #d7d7d7;
-  --home-card-title: #f3f3f3;
-  --home-card-desc: #d7d7d7;
-  --home-card-muted: #8a8a8a;
-  --home-card-shine: linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 42%);
-  --home-card-hover-border: rgba(244, 200, 64, 0.38);
-  --home-card-shadow: 0 18px 52px rgba(0, 0, 0, 0.2);
-  --home-badge-bg: #111;
-  --home-badge-text: #d7d7d7;
-  --home-badge-border: rgba(255, 255, 255, 0.08);
-  --home-tabs-bg: #101010;
-  --home-tab-text: #d7d7d7;
-  --home-tab-active-text: #111;
-  --home-tab-active-bg: #fff;
-  --home-case-panel-bg: linear-gradient(145deg, #121212, #080808);
-  --home-metric-bg: #151515;
-  --home-footer-bg: #121212;
-  --home-footer-nav: #a8a8a8;
-  --home-footer-copy: #8b8b8b;
+  --home-media-desc: #94a3b8;
+  --home-card-title: var(--color-text-primary);
+  --home-card-desc: var(--color-text-secondary);
+  --home-card-muted: var(--color-text-muted);
+  --home-card-shine: linear-gradient(110deg, rgba(59, 130, 246, 0.08), transparent 42%);
+  --home-card-hover-border: rgba(59, 130, 246, 0.25);
+  --home-card-shadow: var(--shadow-panel);
+  --home-badge-bg: #111827;
+  --home-badge-text: #cbd5e1;
+  --home-badge-border: rgba(255, 255, 255, 0.06);
+  --home-tabs-bg: #0e1628;
+  --home-tab-text: #94a3b8;
+  --home-tab-active-text: #f1f5f9;
+  --home-tab-active-bg: #172033;
+  --home-case-panel-bg: linear-gradient(145deg, #111827, #0b1220);
+  --home-metric-bg: #0e1628;
+  --home-footer-bg: #0b1220;
+  --home-footer-nav: #64748b;
+  --home-footer-copy: #475569;
 }
 
 .home-page.theme-light {
   --home-bg: var(--app-bg);
-  --home-panel: #fcfaf5;
-  --home-line: rgba(47, 35, 12, 0.12);
-  --home-text: var(--app-text);
-  --home-muted: var(--app-text-soft);
-  --home-gold: #c98600;
-  --home-gold-strong: #efc24c;
-  --home-glow: rgba(201, 134, 0, 0.08);
-  --home-grid-line: rgba(47, 35, 12, 0.045);
-  --home-grid-line-alt: rgba(47, 35, 12, 0.035);
+  --home-panel: var(--color-bg-card);
+  --home-line: var(--color-border-primary);
+  --home-text: var(--color-text-primary);
+  --home-muted: var(--color-text-muted);
+  --home-gold: var(--color-brand-primary);
+  --home-gold-strong: var(--color-brand-strong);
+  --home-glow: color-mix(in srgb, var(--color-accent-blue) 8%, transparent);
+  --home-grid-line: rgba(47, 107, 255, 0.04);
+  --home-grid-line-alt: rgba(47, 107, 255, 0.03);
   --home-hero-bg: #080808;
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
-  --home-card-bg: linear-gradient(180deg, #ffffff, #f8f4ec);
-  --home-card-overlay: linear-gradient(90deg, rgba(252, 250, 245, 0.96), rgba(252, 250, 245, 0.42));
+  --home-card-bg: linear-gradient(180deg, #ffffff, #f8fafd);
+  --home-card-overlay: linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.42));
   --home-media-overlay: linear-gradient(90deg, rgba(24, 18, 10, 0.8), rgba(24, 18, 10, 0.18));
   --home-media-title: #fff;
   --home-media-desc: rgba(255, 255, 255, 0.84);
-  --home-card-title: var(--app-text);
-  --home-card-desc: var(--app-text-soft);
-  --home-card-muted: var(--app-text-soft);
-  --home-card-shine: linear-gradient(110deg, rgba(201, 134, 0, 0.08), transparent 42%);
-  --home-card-hover-border: rgba(201, 134, 0, 0.34);
-  --home-card-shadow: 0 14px 34px rgba(78, 111, 148, 0.09);
-  --home-badge-bg: #fcfaf5;
-  --home-badge-text: #4a4032;
-  --home-badge-border: rgba(47, 35, 12, 0.1);
-  --home-tabs-bg: #f0e8dc;
-  --home-tab-text: #6d6456;
-  --home-tab-active-text: #241700;
-  --home-tab-active-bg: #efc24c;
-  --home-case-panel-bg: linear-gradient(145deg, #ffffff, #f5efe4);
-  --home-metric-bg: #f0e8dc;
-  --home-footer-bg: #ebe4d8;
-  --home-footer-nav: #6d6456;
-  --home-footer-copy: #8a8274;
+  --home-card-title: var(--color-text-primary);
+  --home-card-desc: var(--color-text-secondary);
+  --home-card-muted: var(--color-text-muted);
+  --home-card-shine: linear-gradient(110deg, rgba(47, 107, 255, 0.06), transparent 42%);
+  --home-card-hover-border: color-mix(in srgb, var(--color-accent-blue) 34%, transparent);
+  --home-card-shadow: var(--shadow-panel);
+  --home-badge-bg: #f8fafd;
+  --home-badge-text: #334155;
+  --home-badge-border: #e6ecf5;
+  --home-tabs-bg: #f8fafd;
+  --home-tab-text: #64748b;
+  --home-tab-active-text: #2f6bff;
+  --home-tab-active-bg: #f2f7ff;
+  --home-case-panel-bg: linear-gradient(145deg, #ffffff, #f8fafd);
+  --home-metric-bg: #f8fafd;
+  --home-footer-bg: #f8fafd;
+  --home-footer-nav: #64748b;
+  --home-footer-copy: #94a3b8;
 }
 
 .home-page::before {

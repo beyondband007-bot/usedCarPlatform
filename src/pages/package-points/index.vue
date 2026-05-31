@@ -246,25 +246,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   >
     <section class="recharge-shell">
       <section class="recharge-panel" aria-label="充值套餐选择">
-        <header class="recharge-hero">
-          <div>
-            <h1>充值中心</h1>
-            <p>选择充值套餐，快速获取积分</p>
-          </div>
-          <div class="hero-visual" aria-hidden="true">
-            <span class="orbit orbit-one"></span>
-            <span class="orbit orbit-two"></span>
-            <span class="shield">
-              <Icon icon="mdi:check-decagram" />
-            </span>
-            <span class="chip chip-one"><Icon icon="mdi:diamond-stone" /></span>
-            <span class="chip chip-two"><Icon icon="mdi:plus-circle" /></span>
-          </div>
-        </header>
-
         <div class="recharge-body">
           <section class="plan-module" aria-label="选择充值套餐">
-            <h2 class="section-title">选择充值套餐</h2>
             <div class="plan-grid">
               <RechargePlanCard
                 v-for="plan in rechargePlans"
@@ -367,21 +350,19 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 <style scoped lang="scss">
 .recharge-page {
   --recharge-page-pad: clamp(16px, 2vw, 30px);
-  --recharge-bg: #071226;
-  --recharge-panel: rgba(7, 15, 32, 0.78);
-  --recharge-panel-strong: rgba(8, 16, 35, 0.92);
-  --recharge-border: rgba(73, 106, 148, 0.42);
-  --recharge-border-soft: rgba(91, 117, 151, 0.22);
-  --recharge-text: #eef6ff;
-  --recharge-muted: #9fb0c7;
-  --recharge-head: rgba(255, 255, 255, 0.06);
-  --recharge-row: rgba(125, 150, 181, 0.18);
-  --recharge-field: rgba(255, 255, 255, 0.055);
-  --recharge-blue: #347cff;
+  --recharge-bg: #070b12;
+  --recharge-panel: #0b1220;
+  --recharge-panel-strong: #0e1628;
+  --recharge-border: rgba(59, 130, 246, 0.12);
+  --recharge-border-soft: rgba(255, 255, 255, 0.06);
+  --recharge-text: #f1f5f9;
+  --recharge-muted: #64748b;
+  --recharge-head: #0e1628;
+  --recharge-row: rgba(255, 255, 255, 0.06);
+  --recharge-field: #111827;
+  --recharge-blue: #2f6bff;
   --recharge-gold: #d4a017;
-  --shell-shadow:
-    0 0 0 1px rgba(79, 139, 220, 0.08), 0 28px 72px rgba(0, 0, 0, 0.28),
-    0 0 42px rgba(39, 124, 235, 0.12);
+  --shell-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 
   min-width: 0;
   height: auto;
@@ -404,8 +385,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   --recharge-bg: #f6f9fc;
   --recharge-panel: #ffffff;
   --recharge-panel-strong: #ffffff;
-  --recharge-border: #e8edf5;
-  --recharge-border-soft: #e8edf5;
+  --recharge-border: #e6ecf5;
+  --recharge-border-soft: #e6ecf5;
   --recharge-text: #172033;
   --recharge-muted: #64748b;
   --recharge-head: #ffffff;
@@ -438,10 +419,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   flex-direction: column;
   overflow: visible;
   border: 1px solid var(--recharge-border);
-  border-radius: 10px;
-  background: var(--recharge-panel);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
+    var(--recharge-panel);
   box-shadow: var(--shell-shadow);
-  backdrop-filter: blur(18px);
 }
 
 .recharge-hero {
@@ -455,12 +437,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   overflow: hidden;
   border-bottom: 1px solid var(--recharge-border-soft);
   background:
-    linear-gradient(
-      90deg,
-      rgba(238, 244, 255, 0.96),
-      rgba(242, 247, 255, 0.88) 52%,
-      rgba(207, 224, 255, 0.72)
-    ),
+    radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.08), transparent 55%),
     var(--recharge-head);
 }
 
@@ -612,7 +589,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   align-items: stretch;
   justify-content: center;
   gap: var(--plan-gap);
-  margin-top: 18px;
+  margin-top: 0;
   margin-inline: auto;
 }
 
@@ -634,13 +611,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-module {
-  border-color: rgba(73, 106, 148, 0.5);
+  border-color: rgba(59, 130, 246, 0.12);
   background:
-    radial-gradient(circle at 12% 0%, rgba(48, 128, 255, 0.14), transparent 34%),
-    linear-gradient(180deg, rgba(10, 20, 40, 0.96) 0%, rgba(8, 16, 35, 0.98) 100%);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-    0 18px 44px rgba(0, 0, 0, 0.28);
+    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 70%),
+    #111827;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
 }
 
 .records-header {
@@ -667,10 +642,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-summary {
-  border-color: rgba(73, 106, 148, 0.38);
+  border-color: rgba(255, 255, 255, 0.06);
   background:
-    radial-gradient(circle, rgba(125, 150, 181, 0.16) 1px, transparent 1.5px) 0 0 / 18px 18px,
-    linear-gradient(135deg, rgba(12, 24, 48, 0.92), rgba(8, 16, 35, 0.88));
+    radial-gradient(circle at center, rgba(59, 130, 246, 0.08), transparent 70%),
+    #0e1628;
 }
 
 .summary-card {
@@ -685,8 +660,9 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .summary-card {
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #111827;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
 }
 
 .summary-card-icon {
@@ -768,8 +744,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-table-panel {
-  border-color: rgba(73, 106, 148, 0.38);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+  background: #111827;
 }
 
 .records-filter {
@@ -816,18 +792,18 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 .export-button {
   --n-height: 38px;
   --n-border-radius: 8px;
-  --n-color: #fff6e0;
-  --n-color-hover: #fff9ec;
-  --n-color-pressed: #fff3d6;
-  --n-color-focus: #fff6e0;
-  --n-border: 1px solid rgba(212, 160, 23, 0.42);
-  --n-border-hover: 1px solid rgba(212, 160, 23, 0.62);
-  --n-border-pressed: 1px solid rgba(212, 160, 23, 0.72);
-  --n-border-focus: 1px solid rgba(212, 160, 23, 0.62);
-  --n-text-color: #d4a017;
-  --n-text-color-hover: #b88912;
-  --n-text-color-pressed: #a67a10;
-  --n-text-color-focus: #d4a017;
+  --n-color: #ffffff;
+  --n-color-hover: #f8fafd;
+  --n-color-pressed: #f1f5f9;
+  --n-color-focus: #ffffff;
+  --n-border: 1px solid #d8e2f0;
+  --n-border-hover: 1px solid #d8e2f0;
+  --n-border-pressed: 1px solid #d8e2f0;
+  --n-border-focus: 1px solid #d8e2f0;
+  --n-text-color: #64748b;
+  --n-text-color-hover: #64748b;
+  --n-text-color-pressed: #64748b;
+  --n-text-color-focus: #64748b;
   width: 100%;
   font-size: 14px;
   font-weight: 800;
@@ -836,24 +812,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 .records-table-wrap {
   min-width: 0;
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(80, 137, 211, 0.58) transparent;
-}
-
-.records-table-wrap::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.records-table-wrap::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--recharge-field) 82%, transparent);
-}
-
-.records-table-wrap::-webkit-scrollbar-thumb {
-  border: 2px solid color-mix(in srgb, var(--recharge-field) 82%, transparent);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #3c8cff, #1f6ed6);
 }
 
 .records-data-table {
@@ -870,10 +828,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .theme-dark .records-data-table {
-  --n-th-color: rgba(255, 255, 255, 0.05);
-  --n-th-color-hover: rgba(255, 255, 255, 0.05);
-  --n-th-text-color: #9fb0c7;
-  --n-border-color: rgba(125, 150, 181, 0.22);
+  --n-th-color: #0e1628;
+  --n-th-color-hover: #0e1628;
+  --n-th-text-color: #94a3b8;
+  --n-td-color-hover: rgba(59, 130, 246, 0.06);
+  --n-border-color: rgba(255, 255, 255, 0.06);
 }
 
 .records-data-table :deep(.n-data-table-th) {

@@ -125,9 +125,13 @@ onMounted(() => {
   min-height: 259px;
   overflow: hidden;
   border: 1px solid var(--home-line);
-  border-radius: 35px;
+  border-radius: var(--home-radius-card, 28px);
   background: var(--home-panel);
   box-shadow: var(--home-card-shadow);
+  transition:
+    transform var(--home-motion-normal, 240ms ease),
+    border-color var(--home-motion-normal, 240ms ease),
+    box-shadow var(--home-motion-normal, 240ms ease);
 }
 
 .suite-card::after {
@@ -137,11 +141,17 @@ onMounted(() => {
   pointer-events: none;
   background: var(--home-card-shine);
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity var(--home-motion-normal, 240ms ease);
 }
 
 .suite-card:hover::after {
   opacity: 1;
+}
+
+.suite-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--home-card-hover-border);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--home-gold) 8%, transparent);
 }
 
 .suite-card-image {
@@ -150,7 +160,12 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   opacity: 0.94;
-  border-radius: 35px;
+  border-radius: var(--home-radius-card, 28px);
+  transition: transform var(--home-motion-normal, 240ms ease), opacity var(--home-motion-normal, 240ms ease);
+}
+
+.suite-card:hover .suite-card-image {
+  transform: scale(1.03);
 }
 
 .suite-card div {
@@ -191,14 +206,23 @@ onMounted(() => {
   font-weight: 900;
   text-decoration: none;
   transition:
-    transform 0.22s ease,
-    filter 0.22s ease,
-    box-shadow 0.22s ease;
+    transform var(--home-motion-normal, 240ms ease),
+    filter var(--home-motion-normal, 240ms ease),
+    box-shadow var(--home-motion-normal, 240ms ease),
+    background var(--home-motion-normal, 240ms ease);
 }
 
 .button:hover:not(:disabled) {
   transform: translateY(-2px);
   filter: saturate(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 14px 34px color-mix(in srgb, var(--home-gold) 24%, transparent);
+}
+
+.button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 72%, transparent);
+  outline-offset: 4px;
 }
 
 .button:disabled {
@@ -208,7 +232,7 @@ onMounted(() => {
 
 .button.gold {
   color: #171100;
-  background: linear-gradient(180deg, var(--home-gold-strong), #e9b82c);
+  background: linear-gradient(180deg, var(--home-gold-strong), var(--home-gold));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     0 12px 34px rgba(244, 200, 64, 0.18);

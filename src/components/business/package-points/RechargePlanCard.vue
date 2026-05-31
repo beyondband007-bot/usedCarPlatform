@@ -69,14 +69,18 @@ const cardClass = computed(() => [
 
         <p class="plan-gift">
           <Icon icon="mdi:gift-outline" class="plan-gift-icon" />
-          <span>赠送 <em class="plan-gift-points">{{ plan.giftPoints }}</em> 积分</span>
+          <span>
+            赠送
+            <em class="plan-gift-points">{{ plan.giftPoints }}</em>
+            积分
+          </span>
         </p>
 
         <p class="plan-subtitle" :title="plan.subtitle">{{ plan.subtitle }}</p>
 
         <ul class="plan-benefits">
           <li v-for="benefit in plan.benefits" :key="benefit">
-            <Icon icon="mdi:check-circle" class="benefit-icon" />
+            <Icon icon="mdi:check-circle-outline" class="benefit-icon" />
             <span>{{ benefit }}</span>
           </li>
         </ul>
@@ -92,333 +96,248 @@ const cardClass = computed(() => [
 
 <style scoped lang="scss">
 .recharge-plan-card {
-  --plan-accent: #2f6bff;
-  --plan-accent-hover: #4f7fff;
-  --plan-shadow: none;
+  --plan-accent: var(--color-accent-blue);
+  --plan-border: var(--color-border-primary);
   --plan-ring: transparent;
   --plan-lift: 0px;
-  --plan-text: #172033;
-  --plan-text-muted: #64748b;
-  --plan-divider: #e8edf5;
-  --plan-surface: #ffffff;
-  --plan-border: #e8edf5;
+  --plan-shadow: var(--shadow-panel);
 
   position: relative;
   display: flex;
-  flex-direction: column;
-  flex: 0 1 calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
-  min-width: 0;
-  min-height: clamp(420px, 38vh, 480px);
+  flex: 0 1 calc((100% - var(--plan-gap) * 2) / 3);
   width: 100%;
-  max-width: calc((100% - var(--plan-gap) - var(--plan-gap)) / 3);
+  min-width: 0;
+  min-height: clamp(430px, 39vh, 496px);
+  max-width: calc((100% - var(--plan-gap) * 2) / 3);
   overflow: hidden;
   border: 1px solid var(--plan-border);
-  border-radius: 16px;
-  background: var(--plan-surface);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 38%),
+    var(--color-bg-card);
   box-shadow: var(--plan-shadow);
   transform: translateY(var(--plan-lift));
   cursor: pointer;
   outline: none;
-  transition: all 0.25s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--motion-normal),
+    border-color var(--motion-normal),
+    box-shadow var(--motion-normal),
+    background var(--motion-normal);
 }
 
-.recharge-plan-card.is-gold {
-  --plan-accent: #d4a017;
-  --plan-accent-hover: #e5b85c;
-}
-
-/* 主推仅保留「推荐」角标，未选中时与普通卡片一致 */
-.recharge-plan-card.is-featured:not(.is-selected) {
-  min-height: clamp(420px, 38vh, 480px);
-}
-
-:global(.recharge-page.theme-dark) .recharge-plan-card {
-  --plan-text: #eef6ff;
-  --plan-text-muted: #9fb0c7;
-  --plan-divider: rgba(148, 163, 184, 0.22);
-  --plan-surface: rgba(255, 255, 255, 0.04);
-  --plan-border: rgba(73, 106, 148, 0.42);
-}
-
-:global(.recharge-page.theme-dark) .recharge-plan-card.is-blue {
-  --plan-shadow: 0 16px 36px rgba(47, 107, 255, 0.22);
-}
-
-:global(.recharge-page.theme-dark) .recharge-plan-card.is-gold {
-  --plan-shadow: 0 16px 36px rgba(212, 160, 23, 0.22);
-}
-
-:global(.recharge-page.theme-dark) .recharge-plan-card.is-selected {
-  box-shadow:
-    0 18px 44px rgba(47, 107, 255, 0.24),
-    0 4px 12px rgba(47, 107, 255, 0.1);
-}
-
-:global(.recharge-page.theme-dark) .recharge-plan-card.is-selected.is-gold {
-  box-shadow:
-    0 18px 44px rgba(212, 160, 23, 0.22),
-    0 4px 12px rgba(212, 160, 23, 0.1);
+.recharge-plan-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 0 1px var(--plan-ring);
+  transition: opacity var(--motion-normal);
 }
 
 .recharge-plan-card::after {
   content: '';
   position: absolute;
-  inset: 0;
-  z-index: 4;
-  border: 2px solid var(--plan-ring);
-  border-radius: inherit;
+  inset: -18%;
   pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--plan-accent) 14%, transparent), transparent 32%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--plan-accent) 12%, transparent), transparent 34%);
   opacity: 0;
-  transition: all 0.25s ease;
+  transition: opacity var(--motion-normal);
+}
+
+.recharge-plan-card.is-blue {
+  --plan-accent: var(--color-accent-blue);
+  --plan-shadow: var(--shadow-panel);
+}
+
+.recharge-plan-card.is-gold {
+  --plan-accent: var(--recharge-gold, #d89a00);
+  --plan-shadow: var(--shadow-panel);
+}
+
+.recharge-plan-card.is-featured {
+  --plan-border: color-mix(in srgb, var(--color-accent-blue) 42%, var(--color-border-primary));
+  --plan-ring: color-mix(in srgb, var(--color-accent-blue) 68%, transparent);
+}
+
+.recharge-plan-card.is-gold.is-featured {
+  --plan-border: color-mix(in srgb, var(--recharge-gold, #d89a00) 42%, var(--color-border-primary));
+  --plan-ring: color-mix(in srgb, var(--recharge-gold, #d89a00) 68%, transparent);
+}
+
+.recharge-plan-card.is-featured:not(.is-selected) {
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px color-mix(in srgb, var(--color-accent-blue) 18%, transparent),
+    var(--shadow-blue-glow);
+}
+
+.recharge-plan-card.is-gold:not(.is-featured):not(.is-selected) {
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px color-mix(in srgb, var(--recharge-gold, #d89a00) 16%, transparent),
+    0 0 28px color-mix(in srgb, var(--recharge-gold, #d89a00) 16%, transparent);
+}
+
+.recharge-plan-card.is-pressing {
+  --plan-lift: -1px;
+}
+
+.recharge-plan-card.is-selected {
+  --plan-lift: -10px;
+  --plan-ring: color-mix(in srgb, var(--plan-accent) 62%, transparent);
+  border-color: color-mix(in srgb, var(--plan-accent) 54%, var(--plan-border));
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.36),
+    0 0 0 1px color-mix(in srgb, var(--plan-accent) 22%, transparent),
+    0 0 38px color-mix(in srgb, var(--plan-accent) 20%, transparent);
+}
+
+.recharge-plan-card.is-selected.is-featured {
+  --plan-lift: -12px;
+  box-shadow:
+    0 24px 68px rgba(0, 0, 0, 0.4),
+    0 0 0 1px color-mix(in srgb, var(--color-accent-blue) 28%, transparent),
+    var(--shadow-blue-glow);
+}
+
+.recharge-plan-card.is-selected.is-gold {
+  box-shadow:
+    0 24px 68px rgba(0, 0, 0, 0.38),
+    0 0 0 1px color-mix(in srgb, var(--recharge-gold, #d89a00) 28%, transparent),
+    0 0 32px color-mix(in srgb, var(--recharge-gold, #d89a00) 18%, transparent);
+}
+
+.recharge-plan-card.is-selected::before,
+.recharge-plan-card.is-selected::after {
+  opacity: 1;
+}
+
+.recharge-plan-card:focus-visible {
+  --plan-ring: color-mix(in srgb, var(--plan-accent) 82%, transparent);
+}
+
+.recharge-plan-card:focus-visible::before {
+  opacity: 1;
 }
 
 .plan-corner {
   position: absolute;
-  top: clamp(10px, 0.9vw, 14px);
-  right: clamp(10px, 0.9vw, 14px);
-  left: auto;
-  z-index: 6;
+  top: 14px;
+  right: 14px;
+  z-index: 4;
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
 }
 
-.plan-card-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex: 1;
-  width: 100%;
-  min-height: 100%;
-  flex-direction: column;
-  align-items: center;
-  padding: clamp(22px, 1.8vw, 30px);
-  pointer-events: none;
-}
-
-.plan-body {
-  display: flex;
-  width: 100%;
-  max-width: 280px;
-  flex: 1 1 auto;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.plan-action {
-  pointer-events: auto;
-}
-
-.recharge-plan-card:hover:not(.is-selected) {
-  --plan-lift: -4px;
-  border-color: #cfe0ff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.recharge-plan-card.is-gold:hover:not(.is-selected) {
-  border-color: color-mix(in srgb, #d4a017 35%, #e8edf5);
-}
-
-.recharge-plan-card.is-pressing {
-  --plan-lift: 0px;
-  transition-duration: 0.12s;
-}
-
-.recharge-plan-card.is-selected {
-  --plan-lift: -10px;
-  --plan-ring: transparent;
-  z-index: 2;
-  border: 1px solid var(--plan-border);
-  box-shadow:
-    0 16px 40px rgba(47, 107, 255, 0.2),
-    0 4px 12px rgba(47, 107, 255, 0.08);
-  animation: plan-card-select 0.48s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.recharge-plan-card.is-selected.is-featured {
-  --plan-lift: -12px;
-  min-height: clamp(448px, 41vh, 508px);
-  box-shadow:
-    0 20px 48px rgba(47, 107, 255, 0.24),
-    0 6px 16px rgba(47, 107, 255, 0.1);
-}
-
-.recharge-plan-card.is-selected.is-gold {
-  --plan-ring: transparent;
-  border: 1px solid var(--plan-border);
-  box-shadow:
-    0 16px 40px rgba(212, 160, 23, 0.2),
-    0 4px 12px rgba(212, 160, 23, 0.08);
-}
-
-.recharge-plan-card.is-selected.is-gold.is-featured {
-  box-shadow:
-    0 20px 48px rgba(212, 160, 23, 0.24),
-    0 6px 16px rgba(212, 160, 23, 0.1);
-}
-
-.recharge-plan-card.is-selected:hover {
-  --plan-lift: -10px;
-}
-
-.recharge-plan-card.is-selected.is-featured:hover {
-  --plan-lift: -12px;
-}
-
-@keyframes plan-card-select {
-  0% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 0 0 0 rgba(47, 107, 255, 0);
-  }
-
-  45% {
-    transform: translateY(-12px) scale(1.015);
-  }
-
-  100% {
-    transform: translateY(var(--plan-lift)) scale(1);
-  }
-}
-
-.recharge-plan-card.is-selected::after {
-  opacity: 0;
-  animation: none;
-}
-
-.recharge-plan-card:focus-visible {
-  --plan-ring: var(--plan-accent);
-}
-
-.recharge-plan-card:focus-visible::after {
-  opacity: 1;
-}
-
 .plan-check {
-  position: static;
   display: grid;
   place-items: center;
-  width: clamp(32px, 2.6vw, 38px);
-  height: clamp(32px, 2.6vw, 38px);
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  background: #2f6bff;
-  color: #fff;
-  box-shadow: 0 6px 16px rgba(47, 107, 255, 0.28);
-  animation: plan-check-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.recharge-plan-card.is-selected.is-gold .plan-check {
-  background: #d4a017;
-  box-shadow: 0 6px 16px rgba(212, 160, 23, 0.28);
+  background: var(--color-brand-primary);
+  color: #241700;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-brand-primary) 34%, transparent);
 }
 
 .plan-check-icon {
   font-size: 18px;
 }
 
-@keyframes plan-check-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.4) rotate(-20deg);
-  }
-
-  60% {
-    transform: scale(1.12) rotate(4deg);
-  }
-
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
 .plan-badge {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--plan-accent) 50%, transparent);
   border-radius: 999px;
-  background: #2f6bff;
-  color: #fff;
+  background: color-mix(in srgb, var(--color-bg-card-soft) 88%, transparent);
+  color: var(--plan-accent);
   font-size: 11px;
   font-weight: 800;
 }
 
-.recharge-plan-card.is-gold .plan-badge {
-  background: #d4a017;
+.plan-card-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+  padding: clamp(22px, 1.8vw, 30px);
+}
+
+.plan-body {
+  display: flex;
+  width: 100%;
+  max-width: 292px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0 auto;
 }
 
 .plan-head {
   display: flex;
-  width: 100%;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .plan-head-copy {
   min-width: 0;
-  width: 100%;
 }
 
 .plan-icon {
   display: grid;
-  flex-shrink: 0;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: #eef4ff;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--plan-accent) 11%, var(--color-bg-card-strong));
   color: var(--plan-accent);
   font-size: 22px;
 }
 
-.recharge-plan-card.is-gold .plan-icon {
-  background: #fff6e0;
-}
-
 .plan-name {
   margin: 0;
-  color: var(--plan-text);
-  font-size: clamp(16px, 1.35vw, 18px);
+  color: var(--color-text-primary);
+  font-size: clamp(18px, 1.45vw, 20px);
   font-weight: 900;
-  line-height: 1.3;
-  text-align: center;
+  line-height: 1.25;
 }
 
 .plan-price-row {
   display: flex;
-  width: 100%;
   align-items: baseline;
-  justify-content: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 20px;
 }
 
 .plan-price-row strong {
   color: var(--plan-accent);
-  font-size: clamp(32px, 3vw, 40px);
+  font-size: clamp(34px, 3.2vw, 44px);
   font-weight: 900;
   line-height: 1;
-  letter-spacing: -0.02em;
-  transition: color 0.25s ease, transform 0.25s ease;
+  letter-spacing: -0.03em;
 }
 
-.recharge-plan-card.is-selected .plan-price-row strong {
-  transform: scale(1.03);
-  transform-origin: center center;
-}
-
-.recharge-plan-card.is-selected:not(.is-gold) .plan-price-row strong {
-  color: #2f6bff;
-}
-
-.recharge-plan-card.is-selected.is-gold .plan-price-row strong {
-  color: #d4a017;
+.recharge-plan-card.is-gold .plan-price-row strong {
+  color: var(--plan-accent);
 }
 
 .plan-price-row span {
-  color: var(--plan-text-muted);
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 700;
 }
@@ -426,79 +345,62 @@ const cardClass = computed(() => [
 .plan-gift {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
+  width: fit-content;
   margin: 14px 0 0;
   padding: 8px 12px;
-  border-radius: 10px;
-  background: #eef4ff;
-  color: var(--plan-text);
-  font-size: 14px;
+  border: 1px solid color-mix(in srgb, var(--plan-accent) 26%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--plan-accent) 8%, var(--color-bg-card));
+  color: var(--color-text-primary);
+  font-size: 13px;
   font-weight: 800;
-  transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
 .recharge-plan-card.is-gold .plan-gift {
-  background: #fff6e0;
+  border-color: color-mix(in srgb, var(--recharge-gold, #d89a00) 28%, transparent);
+  background: color-mix(in srgb, var(--recharge-gold, #d89a00) 8%, var(--color-bg-card));
 }
 
 .plan-gift-icon {
   flex-shrink: 0;
   color: var(--plan-accent);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .plan-gift-points {
-  color: #2f6bff;
+  color: var(--plan-accent);
   font-style: normal;
-  font-size: clamp(18px, 1.6vw, 22px);
+  font-size: 18px;
   font-weight: 900;
-  letter-spacing: -0.01em;
-}
-
-.recharge-plan-card.is-gold .plan-gift-points {
-  color: #d4a017;
 }
 
 .plan-subtitle {
-  width: 100%;
   margin: 12px 0 0;
-  color: var(--plan-text-muted);
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.55;
-  text-align: left;
-  white-space: normal;
+  line-height: 1.58;
 }
 
 .plan-benefits {
   display: grid;
-  width: 100%;
-  flex: 1 1 auto;
   gap: 10px;
   min-height: 0;
   margin: 16px 0 0;
   padding: 16px 0 0;
-  border-top: 1px solid var(--plan-divider);
+  border-top: 1px solid var(--color-border-soft);
   list-style: none;
-  text-align: left;
 }
 
 .plan-benefits li {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
-  color: #334155;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
-  text-align: left;
-}
-
-:global(.recharge-page.theme-dark) .plan-benefits li {
-  color: var(--plan-text);
 }
 
 .benefit-icon {
@@ -509,58 +411,65 @@ const cardClass = computed(() => [
 }
 
 .plan-benefits li span {
-  flex: 0 1 auto;
   min-width: 0;
   white-space: normal;
 }
 
 .plan-action {
   display: inline-flex;
-  width: 100%;
-  max-width: 180px;
-  height: 40px;
-  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  width: 100%;
+  max-width: 180px;
+  height: 42px;
   margin: auto auto 0;
-  padding-top: 8px;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--plan-accent) 28%, transparent);
   border-radius: 999px;
-  background: var(--plan-accent);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--plan-accent) 28%, transparent);
-  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    var(--color-bg-card-strong);
+  color: var(--color-text-primary);
   font-family: inherit;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
-  transition: background 0.25s ease, box-shadow 0.25s ease;
+  pointer-events: auto;
+  transition:
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    color var(--motion-fast),
+    background var(--motion-fast);
 }
 
-.recharge-plan-card.is-blue .plan-action,
 .recharge-plan-card.is-featured .plan-action {
-  background: #2f6bff;
-}
-
-.recharge-plan-card.is-selected:not(.is-gold) .plan-action {
-  box-shadow: 0 8px 20px rgba(47, 107, 255, 0.36);
-}
-
-.recharge-plan-card.is-selected.is-gold .plan-action {
-  box-shadow: 0 8px 20px rgba(212, 160, 23, 0.34);
-}
-
-.recharge-plan-card.is-blue .plan-action:hover,
-.recharge-plan-card.is-featured .plan-action:hover {
-  background: #4f7fff;
+  box-shadow: var(--shadow-blue-glow);
 }
 
 .recharge-plan-card.is-gold .plan-action {
-  background: #d4a017;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--recharge-gold, #d89a00) 14%, transparent);
+}
+
+.plan-action:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--plan-accent) 48%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--plan-accent) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+  color: #ffffff;
+}
+
+.recharge-plan-card.is-featured .plan-action:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent-blue) 18%, transparent),
+    var(--shadow-blue-glow);
 }
 
 .recharge-plan-card.is-gold .plan-action:hover {
-  background: #e5b85c;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--recharge-gold, #d89a00) 18%, transparent),
+    0 0 28px color-mix(in srgb, var(--recharge-gold, #d89a00) 16%, transparent);
 }
 
 .plan-action-icon {
@@ -569,18 +478,15 @@ const cardClass = computed(() => [
 
 @media (max-width: 1180px) {
   .recharge-plan-card {
-    min-height: 400px;
-  }
-
-  .recharge-plan-card.is-selected.is-featured {
-    min-height: 420px;
+    flex-basis: calc((100% - var(--plan-gap)) / 2);
+    max-width: calc((100% - var(--plan-gap)) / 2);
   }
 }
 
 @media (max-width: 680px) {
-  .recharge-plan-card,
-  .recharge-plan-card.is-featured:not(.is-selected),
-  .recharge-plan-card.is-selected.is-featured {
+  .recharge-plan-card {
+    flex-basis: 100%;
+    max-width: 100%;
     min-height: 0;
   }
 
@@ -595,13 +501,9 @@ const cardClass = computed(() => [
 
 @media (prefers-reduced-motion: reduce) {
   .recharge-plan-card,
-  .recharge-plan-card::after,
-  .plan-check {
-    animation: none;
+  .recharge-plan-card::before,
+  .recharge-plan-card::after {
     transition: none;
-  }
-
-  .recharge-plan-card.is-selected::after {
     animation: none;
   }
 }

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -61,13 +61,22 @@ const creativeConversations = ref<CreativeImageConversation[]>([])
 const activeCreativeConversationId = ref<string | null>(null)
 const creativeReferenceAsset = ref<UploadedAsset | null>(null)
 const isUploadingCreativeReference = ref(false)
+const isCreatingCreativeConversation = ref(false)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
+const generatingCapabilityCode = ref<string | null>(null)
 const shortVideoPlayRequest = ref(0)
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(null)
 const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([])
 let batchPollTimer: number | null = null
+
+function resolveCapabilityCodeFromModule(moduleCode: string) {
+  const matched = workspaceCapabilities.find(
+    (capability) => capability.code === moduleCode || capability.apiCode === moduleCode,
+  )
+  return matched?.code ?? null
+}
 
 function readActiveGenerationTask() {
   const raw = window.localStorage.getItem(ACTIVE_GENERATION_TASK_KEY)
@@ -224,9 +233,35 @@ function handleSelectCapability(code: string) {
   }
 }
 
+const sidebarGeneratingCodes = computed(() => {
+  const codes: string[] = []
+
+  if (isGenerating.value && generatingCapabilityCode.value) {
+    codes.push(generatingCapabilityCode.value)
+  }
+
+  if (batchActiveJobs.value.some((job) => !isTerminalBatchStatus(job.status))) {
+    codes.push('batch-new')
+  }
+
+  return codes
+})
+
 const activeCapability = computed(
   () => workspaceCapabilities.find((capability) => capability.code === activeCode.value) ?? workspaceCapabilities[0],
 )
+
+const activeCreativeConversation = computed(
+  () =>
+    creativeConversations.value.find((item) => item.conversationId === activeCreativeConversationId.value) ??
+    null,
+)
+
+const hasActiveCreativeConversationDraft = computed(() => {
+  const conversation = activeCreativeConversation.value
+  if (!conversation) return false
+  return !conversation.lastMessage && !conversation.lastTaskId && !conversation.lastResultUrl && !conversation.lastReferenceAssetId
+})
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? '')
 
@@ -322,6 +357,8 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
 
   try {
     const initialTask = await getGenerationTask(taskId)
+    generatingCapabilityCode.value =
+      resolveCapabilityCodeFromModule(initialTask.moduleCode) ?? activeCode.value
     syncWorkspaceFromTask(initialTask)
 
     const task = isTerminalGenerationStatus(initialTask)
@@ -358,6 +395,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
   } finally {
     clearActiveGenerationTask(taskId)
     isGenerating.value = false
+    generatingCapabilityCode.value = null
   }
 }
 
@@ -384,6 +422,13 @@ async function ensureCreativeConversation(prompt?: string) {
 }
 
 async function handleNewCreativeConversation() {
+  if (isCreatingCreativeConversation.value) return
+  if (hasActiveCreativeConversationDraft.value) {
+    message.info('当前已经是新对话')
+    return
+  }
+
+  isCreatingCreativeConversation.value = true
   try {
     const conversation = await createCreativeImageConversation({ title: '创意生图对话' })
     activeCreativeConversationId.value = conversation.conversationId
@@ -395,6 +440,8 @@ async function handleNewCreativeConversation() {
   } catch (error) {
     const text = error instanceof Error ? error.message : '新建对话失败'
     message.error(text)
+  } finally {
+    isCreatingCreativeConversation.value = false
   }
 }
 
@@ -443,6 +490,7 @@ async function handleCreativeGenerate(payload: {
   isGenerating.value = true
   generationResult.value = null
   creativeImageCaption.value = null
+  generatingCapabilityCode.value = 'creative-image'
 
   try {
     const conversationId = await ensureCreativeConversation(payload.prompt)
@@ -470,6 +518,7 @@ async function handleCreativeGenerate(payload: {
     message.error(text)
   } finally {
     isGenerating.value = false
+    generatingCapabilityCode.value = null
   }
 }
 
@@ -481,6 +530,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
   isGenerating.value = true
   generationResult.value = null
+  generatingCapabilityCode.value = activeCapability.value.code
 
   try {
     const createPayload: CreateGenerationTaskPayload = {
@@ -507,6 +557,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     message.error(text)
   } finally {
     isGenerating.value = false
+    generatingCapabilityCode.value = null
   }
 }
 
@@ -592,7 +643,11 @@ onUnmounted(() => {
       :class="{ 'workspace-shell--studio': activeCode === 'creative-image' }"
     >
       <div class="workspace-col workspace-col--nav">
-        <WorkspaceSidebar :active-code="activeCode" @select="handleSelectCapability" />
+        <WorkspaceSidebar
+          :active-code="activeCode"
+          :generating-codes="sidebarGeneratingCodes"
+          @select="handleSelectCapability"
+        />
       </div>
 
       <section
@@ -613,6 +668,7 @@ onUnmounted(() => {
             :caption="creativeImageCaption"
             :conversations="creativeConversations"
             :active-conversation-id="activeCreativeConversationId"
+            :is-new-conversation-disabled="isCreatingCreativeConversation || hasActiveCreativeConversationDraft"
             :reference-asset="creativeReferenceAsset"
             @generate="handleCreativeGenerate"
             @new-conversation="handleNewCreativeConversation"
@@ -658,13 +714,13 @@ onUnmounted(() => {
 .workspace-page {
   --workspace-accent: #efc24c;
   --workspace-accent-strong: #ffd75a;
-  --workspace-panel: #101010;
-  --workspace-panel-soft: #151515;
-  --workspace-panel-deep: #080808;
-  --workspace-line: rgba(255, 255, 255, 0.12);
-  --workspace-line-strong: rgba(239, 194, 76, 0.42);
-  --workspace-muted: #969186;
-  --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+  --workspace-panel: #0b1220;
+  --workspace-panel-soft: #0e1628;
+  --workspace-panel-deep: #070b12;
+  --workspace-line: rgba(255, 255, 255, 0.06);
+  --workspace-line-strong: rgba(59, 130, 246, 0.25);
+  --workspace-muted: #64748b;
+  --workspace-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 
   display: flex;
   height: 100%;
@@ -675,7 +731,7 @@ onUnmounted(() => {
   overflow: hidden;
   color: var(--app-text);
   background:
-    radial-gradient(circle at 30% 0%, rgba(239, 194, 76, 0.08), transparent 28rem),
+    radial-gradient(circle at 30% 0%, rgba(59, 130, 246, 0.08), transparent 28rem),
     var(--app-bg);
 }
 
@@ -693,8 +749,8 @@ onUnmounted(() => {
   --workspace-accent-underline: #4f7fff;
   --workspace-hover-bg: #f3f7fc;
   --workspace-commercial: #d89a00;
-  --workspace-commercial-strong: #b98200;
-  --workspace-commercial-bg: #fff6e0;
+  --workspace-commercial-strong: #d4a017;
+  --workspace-commercial-bg: #fff8e8;
   --workspace-tag-available-bg: #eaf8f1;
   --workspace-tag-available-text: #00a870;
   --workspace-tag-demo-bg: #fff4e5;
@@ -718,9 +774,11 @@ onUnmounted(() => {
 }
 
 .workspace-page.theme-light .workspace-col--main {
+  border-color: var(--workspace-line);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 42%),
     var(--workspace-panel);
+  box-shadow: var(--workspace-shadow);
 }
 
 .workspace-shell {
@@ -767,10 +825,10 @@ onUnmounted(() => {
 .workspace-col--main {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--workspace-line);
-  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 20px;
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 36%),
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
     var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
 }

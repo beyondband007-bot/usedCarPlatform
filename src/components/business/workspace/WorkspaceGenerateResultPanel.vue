@@ -118,14 +118,12 @@ watch(videoUrl, async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--assist-border);
   background: var(--assist-card);
   color: var(--assist-text);
   font-family: inherit;
   font-weight: 900;
   cursor: pointer;
   transition:
-    border-color 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.2s ease;
 }
@@ -149,7 +147,6 @@ watch(videoUrl, async () => {
 
 .video-back-button:hover,
 .video-download-button:hover {
-  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
   box-shadow: 0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   transform: translateY(-1px);
 }
@@ -160,7 +157,6 @@ watch(videoUrl, async () => {
   flex: 1;
   place-items: center;
   overflow: hidden;
-  border: 1px solid var(--assist-border);
   border-radius: 14px;
   background: #050914;
   box-shadow: var(--assist-shadow);

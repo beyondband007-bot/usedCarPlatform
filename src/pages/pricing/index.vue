@@ -114,7 +114,7 @@ function handlePlanSelect(name: string) {
 }
 
 .pricing-page.theme-light {
-  --pricing-accent: #d6aa2f;
+  --pricing-accent: #d4a017;
   --pricing-accent-strong: #f4c84a;
   --pricing-hero-text: #f8fafc;
   --pricing-hero-sub: rgba(248, 250, 252, 0.76);

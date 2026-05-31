@@ -4,44 +4,44 @@ $theme-vars: (
   light: (
     app-bg: #f6f9fc,
     app-surface: #ffffff,
-    app-surface-soft: #f7fafd,
-    app-border: #e8edf5,
-    app-text: #172033,
+    app-surface-soft: #f8fafd,
+    app-border: #e6ecf5,
+    app-text: #0f172a,
     app-text-soft: #475569,
-    app-text-muted: #7c8a9e,
-    app-text-disabled: #c3cbd6,
-    app-header-bg: rgba(255, 255, 255, 0.96),
-    app-header-shadow: 0 10px 34px rgba(78, 111, 148, 0.08),
+    app-text-muted: #64748b,
+    app-text-disabled: #94a3b8,
+    app-header-bg: #f8fafd,
+    app-header-shadow: none,
     app-header-nav: #475569,
-    app-header-nav-active-bg: #fff6e0,
-    app-header-nav-active: #b98200,
-    app-header-brand-sub: #7c8a9e,
-    app-header-chip-bg: #fff6e0,
-    app-header-chip-text: #b98200,
-    app-header-credits-bg: #fff6e0,
-    app-header-credits-text: #b98200,
-    app-header-user: #172033,
+    app-header-nav-active-bg: transparent,
+    app-header-nav-active: #2f6bff,
+    app-header-brand-sub: #64748b,
+    app-header-chip-bg: #ffffff,
+    app-header-chip-text: #64748b,
+    app-header-credits-bg: #d4a017,
+    app-header-credits-text: #ffffff,
+    app-header-user: #0f172a,
   ),
   dark: (
-    app-bg: #050505,
-    app-surface: #101010,
-    app-surface-soft: #0b0b0b,
-    app-border: rgba(255, 255, 255, 0.1),
-    app-text: #f4f1e9,
-    app-text-soft: #959083,
-    app-text-muted: #7a7568,
-    app-text-disabled: rgba(244, 241, 233, 0.38),
-    app-header-bg: rgba(5, 5, 5, 0.9),
-    app-header-shadow: 0 4px 24px rgba(0, 0, 0, 0.42),
-    app-header-nav: #9c9788,
-    app-header-nav-active-bg: rgba(239, 194, 76, 0.12),
-    app-header-nav-active: #f0c44f,
-    app-header-brand-sub: #9c9788,
-    app-header-chip-bg: rgba(255, 255, 255, 0.06),
-    app-header-chip-text: #e8e1cf,
-    app-header-credits-bg: rgba(239, 194, 76, 0.14),
-    app-header-credits-text: #f4d36a,
-    app-header-user: #f8f3e7,
+    app-bg: #070b12,
+    app-surface: #0b1220,
+    app-surface-soft: #0e1628,
+    app-border: rgba(255, 255, 255, 0.06),
+    app-text: #f1f5f9,
+    app-text-soft: #94a3b8,
+    app-text-muted: #64748b,
+    app-text-disabled: rgba(148, 163, 184, 0.45),
+    app-header-bg: rgba(5, 7, 10, 0.88),
+    app-header-shadow: none,
+    app-header-nav: #94a3b8,
+    app-header-nav-active-bg: rgba(212, 160, 23, 0.1),
+    app-header-nav-active: #d4a017,
+    app-header-brand-sub: #64748b,
+    app-header-chip-bg: rgba(255, 255, 255, 0.05),
+    app-header-chip-text: #cbd5e1,
+    app-header-credits-bg: #d4a017,
+    app-header-credits-text: #ffffff,
+    app-header-user: #f1f5f9,
   ),
 );
 
@@ -85,16 +85,105 @@ $theme-vars: (
 :root {
   color-scheme: dark;
   @include apply-theme-vars(dark);
+  --color-bg-primary: #070b12;
+  --color-bg-secondary: #0b1220;
+  --color-bg-module: #0e1628;
+  --color-bg-card: #111827;
+  --color-bg-card-strong: #0e1628;
+  --color-bg-card-soft: #172033;
+  --color-bg-hover: #172033;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #64748b;
+  --color-border-primary: rgba(255, 255, 255, 0.06);
+  --color-border-soft: rgba(255, 255, 255, 0.06);
+  --color-border-strong: rgba(59, 130, 246, 0.25);
+  --color-border-gold: rgba(212, 160, 23, 0.25);
+  --color-brand-primary: #d4a017;
+  --color-brand-strong: #e5b85c;
+  --color-accent-blue: #2f6bff;
+  --color-accent-blue-strong: #4f7fff;
+  --color-success: #35c28a;
+  --color-warning: #f5b84c;
+  --color-error: #ef6a5b;
+  --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.25);
+  --shadow-panel-strong: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --shadow-brand-glow: 0 0 26px rgba(212, 160, 23, 0.14);
+  --shadow-blue-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --motion-fast: 160ms ease;
+  --motion-normal: 240ms ease;
 }
 
 [data-theme="light"] {
   color-scheme: light;
   @include apply-theme-vars(light);
+  --color-bg-primary: #f6f9fc;
+  --color-bg-secondary: #f8fafd;
+  --color-bg-card: #ffffff;
+  --color-bg-card-strong: #f8fafd;
+  --color-bg-card-soft: #f8fafd;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-text-assist: #94a3b8;
+  --color-border-primary: #e6ecf5;
+  --color-border-soft: #e6ecf5;
+  --color-border-strong: rgba(47, 107, 255, 0.28);
+  --color-brand-primary: #d4a017;
+  --color-brand-strong: #e5b85c;
+  --color-accent-blue: #2f6bff;
+  --color-accent-blue-strong: #4f7fff;
+  --color-accent-blue-active: #1d4ed8;
+  --color-action-primary: #2f6bff;
+  --color-action-primary-hover: #4f7fff;
+  --color-action-primary-active: #1d4ed8;
+  --color-action-secondary-border: #d8e2f0;
+  --color-success: #168a61;
+  --color-warning: #c68418;
+  --color-error: #d64f45;
+  --shadow-panel: 0 18px 52px rgba(78, 111, 148, 0.09);
+  --shadow-brand-glow: 0 0 26px rgba(212, 160, 23, 0.16);
+  --shadow-blue-glow: 0 0 28px rgba(47, 107, 255, 0.14);
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --motion-fast: 160ms ease;
+  --motion-normal: 240ms ease;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
   @include apply-theme-vars(dark);
+  --color-bg-primary: #070b12;
+  --color-bg-secondary: #0b1220;
+  --color-bg-module: #0e1628;
+  --color-bg-card: #111827;
+  --color-bg-card-strong: #0e1628;
+  --color-bg-card-soft: #172033;
+  --color-bg-hover: #172033;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #64748b;
+  --color-border-primary: rgba(255, 255, 255, 0.06);
+  --color-border-soft: rgba(255, 255, 255, 0.06);
+  --color-border-strong: rgba(59, 130, 246, 0.25);
+  --color-border-gold: rgba(212, 160, 23, 0.25);
+  --color-brand-primary: #d4a017;
+  --color-brand-strong: #e5b85c;
+  --color-accent-blue: #2f6bff;
+  --color-accent-blue-strong: #4f7fff;
+  --color-success: #35c28a;
+  --color-warning: #f5b84c;
+  --color-error: #ef6a5b;
+  --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.25);
+  --shadow-panel-strong: 0 10px 40px rgba(0, 0, 0, 0.35);
+  --shadow-brand-glow: 0 0 26px rgba(212, 160, 23, 0.14);
+  --shadow-blue-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --motion-fast: 160ms ease;
+  --motion-normal: 240ms ease;
 }
 
 html,

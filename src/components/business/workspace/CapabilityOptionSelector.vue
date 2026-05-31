@@ -92,11 +92,6 @@ const optionRows = computed(() => {
 .option-selector-card {
   --option-gap: 12px;
   --option-visible: 2.25;
-  --option-scroll-track: color-mix(in srgb, var(--workspace-muted, #969186) 16%, transparent);
-  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
-  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, transparent);
 
   padding: 18px 18px 14px;
   border: 1px solid var(--workspace-line, var(--app-border));
@@ -106,12 +101,6 @@ const optionRows = computed(() => {
 }
 
 :global([data-theme="dark"]) .option-selector-card {
-  --option-scroll-track: rgba(255, 255, 255, 0.08);
-  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
-  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 42%, transparent);
-
   box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
 }
 
@@ -160,60 +149,6 @@ const optionRows = computed(() => {
   padding: 2px 2px 20px;
   scroll-padding-inline: 2px;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  scrollbar-color: var(--option-scroll-thumb-end) var(--option-scroll-track);
-}
-
-.option-scroll::-webkit-scrollbar {
-  height: 9px;
-}
-
-.option-scroll::-webkit-scrollbar-track {
-  margin-inline: 4px;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--option-scroll-track-glow) 18%,
-      var(--option-scroll-track-glow) 82%,
-      transparent 100%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--app-border) 55%, transparent) 0 1px,
-      transparent 1px 7px
-    ),
-    var(--option-scroll-track);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--option-scroll-thumb-end) 18%, transparent);
-}
-
-.option-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid var(--option-scroll-track);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--option-scroll-thumb-start) 0%,
-    var(--option-scroll-thumb-end) 58%,
-    color-mix(in srgb, var(--option-scroll-thumb-end) 72%, #6b8cff) 100%
-  );
-  box-shadow:
-    0 0 10px var(--option-scroll-thumb-glow),
-    0 0 2px color-mix(in srgb, var(--option-scroll-thumb-start) 65%, transparent);
-}
-
-.option-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--option-scroll-thumb-start) 88%, #fff) 0%,
-    color-mix(in srgb, var(--option-scroll-thumb-end) 90%, #fff) 55%,
-    #6b8cff 100%
-  );
-  box-shadow:
-    0 0 14px var(--option-scroll-thumb-glow),
-    0 0 4px color-mix(in srgb, var(--option-scroll-thumb-start) 75%, transparent);
 }
 
 .option-rows {

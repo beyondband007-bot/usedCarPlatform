@@ -145,7 +145,6 @@ async function handleDownload() {
 .image-preview-back {
   flex-shrink: 0;
   height: 38px;
-  border: 1px solid var(--assist-border);
   border-radius: 10px;
   background: var(--assist-card-strong);
   color: var(--assist-text);
@@ -155,12 +154,10 @@ async function handleDownload() {
   font-weight: 900;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
+    background 0.2s ease;
 }
 
 .image-preview-back:hover {
-  border-color: color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border));
   background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
 }
 
@@ -200,7 +197,6 @@ async function handleDownload() {
   height: 52px;
   align-items: center;
   justify-content: center;
-  border: 0;
   border-radius: 12px;
   background: linear-gradient(180deg, #d6b36f, #c9a05e);
   color: #1a1208;

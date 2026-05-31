@@ -153,17 +153,21 @@ onUnmounted(() => {
   min-height: 259px;
   padding: 0;
   border: 0;
-  border-radius: 35px;
+  border-radius: var(--home-radius-card, 28px);
   overflow: hidden;
   background: var(--home-panel);
   opacity: 0;
   cursor: pointer;
-  transition: opacity 0.65s ease;
+  transform: scale(1.01);
+  transition:
+    opacity 500ms ease,
+    transform 500ms ease;
 }
 
 .promo-banner-slide.is-active {
   opacity: 1;
   z-index: 1;
+  transform: scale(1);
 }
 
 .promo-banner-image {
@@ -172,7 +176,12 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   opacity: 0.94;
-  border-radius: 35px;
+  border-radius: var(--home-radius-card, 28px);
+  transition: transform var(--home-motion-normal, 240ms ease);
+}
+
+.promo-banner:hover .promo-banner-image {
+  transform: scale(1.03);
 }
 
 .promo-banner-copy {
@@ -219,8 +228,18 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.28);
   cursor: pointer;
   transition:
-    width 0.25s ease,
-    background 0.25s ease;
+    width var(--home-motion-normal, 240ms ease),
+    background var(--home-motion-normal, 240ms ease),
+    opacity var(--home-motion-normal, 240ms ease);
+}
+
+.promo-banner-dot:hover {
+  opacity: 0.78;
+}
+
+.promo-banner-dot:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 70%, transparent);
+  outline-offset: 4px;
 }
 
 .promo-banner-dot.is-active {

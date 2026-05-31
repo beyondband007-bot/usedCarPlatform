@@ -70,7 +70,6 @@ function handleColorUpdate(value: string | null) {
 <style scoped lang="scss">
 .paint-color-card {
   padding: 16px 18px 18px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border));
   border-radius: 12px;
   background: var(--workspace-panel, var(--app-surface));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);

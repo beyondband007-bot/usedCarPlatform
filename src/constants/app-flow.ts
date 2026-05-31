@@ -2,7 +2,7 @@
  * 产品流程目录（访客首页 → 企业视觉工作台）
  *
  * 访客（顶栏：首页 / 企业套餐 / 视觉工作台）
- * ├─ 点击视觉工作台（顶栏或首页 CTA）→ 登录引导弹窗 → /auth 登录 / 稍后再说
+ * ├─ 点击视觉工作台（顶栏或首页 CTA）→ 登录引导弹窗 → /login 登录 / 稍后再说
  * ├─ 点击企业套餐 → /pricing
  * └─ 浏览案例与能力介绍
  *
@@ -12,7 +12,7 @@
  * └─ 成片交付
  */
 
-export const AUTH_ROUTE = '/auth'
+export const AUTH_ROUTE = '/login'
 
 export const WORKSPACE_ROUTE = '/workspace'
 
@@ -25,6 +25,8 @@ export const WORKBENCH_SECTION_ROUTES = [
   WORKSPACE_ROUTE,
   CREDITS_ROUTE,
   PACKAGE_POINTS_ROUTE,
+  '/points',
+  '/recharge',
 ] as const
 
 export function isWorkbenchSectionPath(path: string) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput } from 'naive-ui'
+import { NButton, NCheckbox, NInput, useMessage } from 'naive-ui'
 import { motion } from 'motion-v'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,25 +12,41 @@ defineProps<{
 
 const router = useRouter()
 const route = useRoute()
+const message = useMessage()
 const authStore = useAuthStore()
 
-const phone = ref('')
-const password = ref('')
+const username = ref('enterprise')
+const password = ref('123456')
+const remember = ref(true)
+const submitting = ref(false)
 
-function handleLogin() {
-  authStore.login()
+async function handleLogin() {
+  submitting.value = true
 
-  const redirect =
-    typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
-      ? route.query.redirect
-      : '/workspace'
+  try {
+    await authStore.login({
+      username: username.value.trim(),
+      password: password.value,
+      remember: remember.value,
+    })
 
-  if (redirect === '/auth' || redirect === '/enterprise') {
-    router.push('/workspace')
-    return
+    const redirect =
+      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+        ? route.query.redirect
+        : '/workspace'
+
+    if (redirect === '/auth' || redirect === '/enterprise' || redirect === '/login') {
+      await router.push('/workspace')
+      return
+    }
+
+    await router.push(redirect)
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '登录失败'
+    message.error(text)
+  } finally {
+    submitting.value = false
   }
-
-  router.push(redirect)
 }
 </script>
 
@@ -42,18 +58,18 @@ function handleLogin() {
     class="login-panel"
     :class="isDark ? 'login-panel--dark' : 'login-panel--light'"
   >
-    <div class="login-card">
+    <form class="login-card" @submit.prevent="handleLogin">
       <h1>企业账号登录</h1>
-      <p>进入脸谱AI汽车电商内容平台</p>
+      <p>进入 AI CAR STUDIO 汽车内容生产平台</p>
 
       <div class="login-fields">
         <label class="login-field">
-          <span class="login-field-label">手机号</span>
+          <span class="login-field-label">账号</span>
           <NInput
-            v-model:value="phone"
+            v-model:value="username"
             class="login-input"
             size="large"
-            placeholder="+86 · 11 位手机号"
+            placeholder="admin / enterprise"
           />
         </label>
         <label class="login-field">
@@ -64,21 +80,31 @@ function handleLogin() {
             size="large"
             type="password"
             show-password-on="click"
-            placeholder="请输入密码"
+            placeholder="123456"
           />
         </label>
       </div>
 
-      <NButton type="primary" size="large" block class="login-submit" @click="handleLogin">
+      <div class="login-options">
+        <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
+        <span>Mock账号：admin / enterprise</span>
+      </div>
+
+      <NButton
+        type="primary"
+        size="large"
+        block
+        class="login-submit"
+        attr-type="submit"
+        :loading="submitting"
+      >
         登录
       </NButton>
 
       <div class="login-links">
-        <a href="#">忘记密码？</a>
-        <span class="login-links-divider" aria-hidden="true">|</span>
-        <a href="#">申请开通企业账户</a>
+        <span>当前阶段使用前端 Mock 登录，后续替换 API 层即可。</span>
       </div>
-    </div>
+    </form>
   </motion.div>
 </template>
 
@@ -171,6 +197,17 @@ function handleLogin() {
   --n-caret-color: #2f7cff !important;
 }
 
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  color: var(--panel-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .login-submit {
   margin-top: 24px;
   height: 48px !important;
@@ -191,21 +228,17 @@ function handleLogin() {
   align-items: center;
   gap: 10px 12px;
   margin-top: 20px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.login-links a {
-  color: var(--link-color);
-  text-decoration: none;
-}
-
-.login-links a:hover {
-  color: #2f7cff;
-}
-
-.login-links-divider {
   color: var(--panel-muted);
-  opacity: 0.55;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .login-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

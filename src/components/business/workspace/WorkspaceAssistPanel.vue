@@ -26,6 +26,8 @@ import {
 } from '@/utils/workspace-recent'
 import watermarkBeforeOne from '@/assets/img/水印图1.png'
 import watermarkAfterOne from '@/assets/img/无水印图1.png'
+import tutorialCarImage from '@/assets/img/tutorial/upload-car.png'
+import tutorialResultImage from '@/assets/img/tutorial/generate-result.png'
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -212,6 +214,48 @@ const tutorialSteps = [
     icon: "mdi:car-select",
   },
 ] as const;
+
+const tutorialCards = computed(() => {
+  const templatePreview = templateCards[1]?.image ?? templateCards[0]?.image ?? "";
+
+  return tutorialSteps.map((step, index) => ({
+    ...step,
+    image:
+      index === 0
+        ? tutorialCarImage
+        : index === 1
+          ? templatePreview
+          : index === 3
+            ? tutorialResultImage
+            : "",
+  }));
+});
+
+const tutorialTemplatePreviewImages = computed(() =>
+  templateCards.slice(0, 4).map((item) => item.image),
+);
+
+const templateDescriptionMap: Record<string, string> = {
+  "经典白棚": "纯净背景·突出车身线条",
+  "玻璃展厅": "通透空间·自然光影",
+  "暗调奢华": "低调奢华·气质感",
+  "柔光灯顶": "柔光均匀·减少硬阴影",
+  "极简留白": "留白克制·主体更集中",
+  "广角空间": "空间更开阔·适合展示全景",
+};
+
+const requirementDescriptionMap: Record<string, string> = {
+  "车辆完整入镜": "建议四周留白，车辆完整不被切断。",
+  "画面清晰无遮挡": "主体清晰，无重度雾气或前景遮挡物。",
+  "光线均匀少反光": "避免强烈曝光、眩光、大面积镜面反射。",
+};
+
+const requirementCards = computed(() =>
+  (props.capability.requirements ?? []).map((item) => ({
+    title: item,
+    desc: requirementDescriptionMap[item] ?? "",
+  })),
+);
 
 const deliveryResultCount = deliveryResults.length;
 const message = useMessage();
@@ -671,6 +715,7 @@ defineExpose({
     <ShortVideoBetaPanel
       v-else-if="capability.code === 'short-video'"
       :play-request="shortVideoPlayRequest"
+      :is-generating="props.isGenerating"
       :generation-result="props.generationResult"
     />
 
@@ -866,30 +911,59 @@ defineExpose({
         :class="{ 'is-compact-guide': !showTemplateRecommendations }"
       >
         <section class="tutorial-section" aria-label="使用教程流程">
-          <h2>使用教程</h2>
+          <div class="section-head">
+            <h2>使用教程</h2>
+          </div>
           <div class="tutorial-flow">
-            <template
-              v-for="(step, index) in tutorialSteps"
+            <motion.article
+              v-for="(step, index) in tutorialCards"
               :key="`${capability.code}-${step.title}`"
+              :initial="{ opacity: 0, y: 14 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.32, delay: index * 0.04 }"
+              class="tutorial-step"
+              :class="`is-step-${index + 1}`"
             >
-              <motion.article
-                :initial="{ opacity: 0, y: 14 }"
-                :animate="{ opacity: 1, y: 0 }"
-                :transition="{ duration: 0.32, delay: index * 0.04 }"
-                class="tutorial-step"
-              >
-                <div class="tutorial-placeholder">
-                  <Icon :icon="step.icon" />
-                  <span>{{ String(index + 1).padStart(2, "0") }}</span>
-                </div>
-                <p>{{ step.title }}</p>
-              </motion.article>
-              <Icon
-                v-if="index < tutorialSteps.length - 1"
-                icon="mdi:arrow-right"
-                class="flow-arrow"
-              />
-            </template>
+              <div class="tutorial-placeholder">
+                <template v-if="index === 1">
+                  <div class="tutorial-mosaic" aria-hidden="true">
+                    <PreloadImage
+                      v-for="(image, mosaicIndex) in tutorialTemplatePreviewImages"
+                      :key="image"
+                      class="tutorial-mosaic-image"
+                      :class="`is-mosaic-${mosaicIndex + 1}`"
+                      :src="image"
+                      :alt="step.title"
+                      loading="lazy"
+                      :draggable="false"
+                    />
+                  </div>
+                </template>
+                <template v-else-if="index === 2">
+                  <div class="tutorial-logo-preview" aria-hidden="true">
+                    <span class="tutorial-logo-frame">
+                      <span>AI CAR STUDIO</span>
+                    </span>
+                  </div>
+                </template>
+                <PreloadImage
+                  v-else
+                  class="tutorial-image"
+                  :src="step.image"
+                  :alt="step.title"
+                  loading="lazy"
+                  :draggable="false"
+                />
+              </div>
+              <footer class="tutorial-step-foot">
+                <strong>{{ step.title }}</strong>
+              </footer>
+              <span class="tutorial-step-arrow" aria-hidden="true">
+                <Icon
+                  :icon="index < tutorialCards.length - 1 ? 'mdi:arrow-right' : 'mdi:check'"
+                />
+              </span>
+            </motion.article>
           </div>
         </section>
 
@@ -921,19 +995,29 @@ defineExpose({
                 :draggable="false"
               />
               <div class="template-title">
-                <span>{{ item.title }}</span>
+                <strong>{{ item.title }}</strong>
+                <span>{{ templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景" }}</span>
               </div>
             </article>
           </div>
         </section>
 
         <section class="requirement-section" aria-label="素材要求">
-          <strong>素材要求</strong>
-          <div class="requirement-list">
-            <span v-for="item in capability.requirements" :key="item">
-              <Icon icon="mdi:check" />
-              {{ item }}
-            </span>
+          <strong class="requirement-title">素材要求</strong>
+          <div class="requirement-grid">
+            <article
+              v-for="item in requirementCards"
+              :key="item.title"
+              class="requirement-card"
+            >
+              <span class="requirement-card-icon" aria-hidden="true">
+                <Icon icon="mdi:check" />
+              </span>
+              <div class="requirement-card-copy">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.desc }}</span>
+              </div>
+            </article>
           </div>
         </section>
       </section>
@@ -997,19 +1081,16 @@ defineExpose({
 
 <style scoped lang="scss">
 .assist-panel {
-  --assist-bg: var(--workspace-panel, rgba(10, 10, 10, 0.92));
-  --assist-card: rgba(255, 255, 255, 0.05);
-  --assist-card-strong: rgba(255, 255, 255, 0.075);
-  --assist-border: var(--workspace-line, rgba(255, 255, 255, 0.12));
-  --assist-border-soft: rgba(255, 255, 255, 0.08);
+  --assist-bg: var(--workspace-panel, #0b1220);
+  --assist-card: #111827;
+  --assist-card-strong: #0e1628;
+  --assist-border: rgba(255, 255, 255, 0.06);
+  --assist-border-soft: rgba(255, 255, 255, 0.06);
   --assist-text: var(--app-text);
   --assist-muted: var(--workspace-muted, var(--app-text-soft));
-  --assist-blue: var(--workspace-accent, #efc24c);
-  --assist-green: var(--workspace-accent-strong, #ffd75a);
-  --assist-scroll-track: rgba(255, 255, 255, 0.08);
-  --assist-scroll-thumb: rgba(239, 194, 76, 0.42);
-  --assist-scroll-thumb-hover: rgba(255, 215, 90, 0.72);
-  --assist-shadow: var(--workspace-shadow, 0 18px 52px rgba(0, 0, 0, 0.2));
+  --assist-blue: var(--color-accent-blue, #2f6bff);
+  --assist-green: var(--color-accent-blue-strong, #4f7fff);
+  --assist-shadow: var(--workspace-shadow, 0 10px 40px rgba(0, 0, 0, 0.35));
 
   display: flex;
   container-type: inline-size;
@@ -1022,13 +1103,13 @@ defineExpose({
   flex-direction: column;
   overflow: hidden;
   padding: 18px 20px 20px;
-  border: 1px solid var(--workspace-line, var(--assist-border));
-  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 20px;
   background:
     radial-gradient(
-      720px 180px at 48% 0%,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent),
-      transparent 72%
+      circle at center,
+      rgba(59, 130, 246, 0.08),
+      transparent 70%
     ),
     var(--assist-bg);
   color: var(--assist-text);
@@ -1044,9 +1125,6 @@ defineExpose({
   --assist-muted: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
   --assist-blue: var(--workspace-accent, #2f6bff);
   --assist-green: var(--workspace-accent-strong, #2f6bff);
-  --assist-scroll-track: #edf4ff;
-  --assist-scroll-thumb: rgba(47, 107, 255, 0.42);
-  --assist-scroll-thumb-hover: rgba(47, 107, 255, 0.68);
   --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 
   background:
@@ -1324,8 +1402,6 @@ defineExpose({
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 6px 24px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
 
 @container (min-width: 420px) {
@@ -1350,34 +1426,6 @@ defineExpose({
   .delivery-result-layout {
     grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   }
-}
-
-.delivery-result-layout::-webkit-scrollbar {
-  width: 10px;
-}
-
-.delivery-result-layout::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: var(--assist-scroll-track);
-  box-shadow: inset 0 0 0 1px rgba(127, 151, 179, 0.12);
-}
-
-.delivery-result-layout::-webkit-scrollbar-thumb {
-  border: 2px solid var(--assist-scroll-track);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--assist-blue),
-    var(--assist-scroll-thumb)
-  );
-}
-
-.delivery-result-layout::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    90deg,
-    var(--assist-blue),
-    var(--assist-scroll-thumb-hover)
-  );
 }
 
 .delivery-result-card {
@@ -1472,17 +1520,6 @@ defineExpose({
   overflow-x: hidden;
   overflow-y: auto;
   padding: 0 6px 24px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
-}
-
-.watermark-feature-layout::-webkit-scrollbar {
-  width: 8px;
-}
-
-.watermark-feature-layout::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--assist-blue), var(--assist-scroll-thumb));
 }
 
 .watermark-assist-hero {
@@ -1685,17 +1722,21 @@ defineExpose({
 .tab-group button {
   position: relative;
   padding: 0 0 10px;
-  color: var(--workspace-text-secondary, var(--assist-muted));
+  color: #999999;
   font-size: 15px;
   font-weight: 900;
 }
 
 .tab-group button:hover {
-  color: var(--workspace-text, var(--assist-text));
+  color: #ffffff;
+}
+
+.assist-panel.theme-light .tab-group button:hover {
+  color: #111827;
 }
 
 .tab-group button.active {
-  color: var(--workspace-accent, var(--assist-blue));
+  color: #d4a017;
 }
 
 .tab-group button.active::after {
@@ -1704,13 +1745,13 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
+  height: 2px;
   border-radius: 999px;
-  background: var(--workspace-accent-underline, var(--workspace-accent, var(--assist-blue)));
+  background: #d4a017;
 }
 
 .expand-button {
-  color: var(--assist-blue);
+  color: #d4a017;
   font-size: 14px;
   font-weight: 900;
 }
@@ -1719,36 +1760,18 @@ defineExpose({
   display: grid;
   flex: 1;
   min-height: 0;
-  grid-template-rows: auto auto auto;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 14px;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0 6px 18px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
 
 .guide-layout.is-compact-guide {
-  grid-template-rows: auto auto;
+  grid-auto-rows: max-content;
 }
 
-.guide-layout::-webkit-scrollbar {
-  width: 8px;
-}
-
-.guide-layout::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--assist-blue),
-    var(--assist-scroll-thumb)
-  );
-}
-
-.tutorial-section,
-.template-section,
-.requirement-section,
 .recent-card {
   border: 1px solid var(--assist-border);
   background: var(--assist-card);
@@ -1758,98 +1781,247 @@ defineExpose({
 .tutorial-section,
 .template-section {
   overflow: hidden;
-  border-radius: 10px;
-  padding: 14px 16px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  background: #111111;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.tutorial-section {
+  min-height: 266px;
+}
+
+.assist-panel.theme-light .tutorial-section,
+.assist-panel.theme-light .template-section,
+.assist-panel.theme-light .requirement-section {
+  border-color: rgba(203, 213, 225, 0.82);
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
 .tutorial-section h2,
 .template-section h2 {
   margin: 0;
-  color: var(--assist-text);
+  color: #fff;
   font-size: 16px;
   line-height: 1.3;
   font-weight: 900;
 }
 
+.assist-panel.theme-light .tutorial-section h2,
+.assist-panel.theme-light .template-section h2,
+.assist-panel.theme-light .requirement-title {
+  color: #111827;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .tutorial-flow {
   display: grid;
-  grid-template-columns:
-    minmax(120px, 1fr) 32px minmax(120px, 1fr) 32px minmax(120px, 1fr)
-    32px minmax(120px, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-height: 120px;
-  margin-top: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 0;
+  margin-top: 16px;
 }
 
 .tutorial-step {
-  display: grid;
-  align-content: center;
-  justify-items: center;
+  position: relative;
+  display: flex;
   min-width: 0;
-  height: 100%;
+  flex-direction: column;
+  height: 180px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #111111;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.tutorial-step:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.assist-panel.theme-light .tutorial-step {
+  border-color: rgba(203, 213, 225, 0.9);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.assist-panel.theme-light .tutorial-step:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.tutorial-step-arrow {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(212, 160, 23, 0.25);
+  border-radius: 999px;
+  background: rgba(212, 160, 23, 0.12);
+  color: #d4a017;
+  pointer-events: none;
+}
+
+.tutorial-step-arrow > .iconify {
+  font-size: 20px;
 }
 
 .tutorial-placeholder {
   position: relative;
+  flex: 0 0 110px;
+  height: 110px;
+  margin: 12px 12px 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #111111;
+}
+
+.tutorial-image {
+  width: 100%;
+  height: 100%;
+  background: #111111;
+}
+
+.tutorial-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.tutorial-step.is-step-1 .tutorial-image,
+.tutorial-step.is-step-4 .tutorial-image {
+  background: #f5f5f3;
+}
+
+.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
+.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
+  object-fit: cover;
+  padding: 0;
+}
+
+.tutorial-mosaic {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  background: #111111;
+}
+
+.assist-panel.theme-light .tutorial-mosaic {
+  background: #f8fafc;
+}
+
+.tutorial-mosaic-image {
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tutorial-mosaic-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tutorial-logo-preview {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 10px;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(212, 160, 23, 0.18), transparent 44%),
+    linear-gradient(180deg, #f6f9fc, #ffffff);
+}
+
+.tutorial-logo-frame {
+  position: relative;
   display: grid;
   place-items: center;
-  width: min(100%, 178px);
-  height: 86px;
-  min-height: 86px;
-  border: 1px dashed rgba(73, 130, 218, 0.34);
-  border-radius: 14px;
+  width: min(92%, 180px);
+  height: 44px;
+  border: 2px solid #5e4110;
+  border-radius: 8px;
   background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0.02)
-    ),
-    var(--assist-card-strong);
+    linear-gradient(180deg, rgba(244, 202, 79, 0.16), transparent 45%),
+    #171209;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 232, 139, 0.38),
+    0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
-.theme-light .tutorial-placeholder {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.85),
-      rgba(239, 246, 255, 0.8)
-    ),
-    var(--assist-card-strong);
-}
-
-.tutorial-placeholder > .iconify {
-  color: var(--assist-blue);
-  font-size: 38px;
-}
-
-.tutorial-placeholder span {
+.tutorial-logo-frame::before,
+.tutorial-logo-frame::after {
+  content: "";
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 22px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
-  color: var(--assist-blue);
-  font-size: 13px;
-  font-weight: 900;
+  background: #d4a017;
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
+  transform: translateY(-50%);
 }
 
-.tutorial-step p {
-  margin: 8px 0 0;
-  color: var(--assist-text);
-  text-align: center;
-  font-size: 13px;
-  font-weight: 900;
+.tutorial-logo-frame::before {
+  left: 10px;
 }
 
-.flow-arrow {
-  justify-self: center;
-  color: rgba(142, 162, 190, 0.68);
-  font-size: 24px;
+.tutorial-logo-frame::after {
+  right: 10px;
+}
+
+.tutorial-logo-frame span {
+  color: #d4a017;
+  font-size: clamp(12px, 1.1cqw, 16px);
+  font-weight: 950;
+  letter-spacing: 0.06em;
+}
+
+.tutorial-step-foot {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  padding: 10px 52px 12px 14px;
+}
+
+.assist-panel.theme-light .tutorial-step-foot {
+  background: transparent;
+}
+
+.tutorial-step-foot strong {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assist-panel.theme-light .tutorial-step-foot strong {
+  color: #111827;
 }
 
 .template-grid {
@@ -1859,37 +2031,61 @@ defineExpose({
   margin-top: 12px;
 }
 
+.template-section {
+  max-height: clamp(270px, 34vh, 390px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .template-card {
   position: relative;
   aspect-ratio: 16 / 10;
   min-width: 0;
   overflow: hidden;
-  border: 2px solid transparent;
-  border-radius: 12px;
-  background: var(--assist-card-strong);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #111111;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   outline: none;
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.assist-panel.theme-light .template-card {
+  border-color: rgba(203, 213, 225, 0.9);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
 .template-card:hover {
   transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--workspace-accent, #d4a017) 42%, rgba(255, 255, 255, 0.08));
 }
 
 .template-card.is-active {
-  border-color: var(--workspace-accent, var(--assist-blue));
-  background: transparent;
+  border-color: #d4a017;
   box-shadow:
-    0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
-    0 12px 28px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
+    0 0 0 1px rgba(212, 160, 23, 0.35),
+    0 0 24px rgba(212, 160, 23, 0.2),
+    0 12px 28px rgba(0, 0, 0, 0.3);
 }
 
 .template-card:focus-visible {
-  border-color: var(--workspace-accent, var(--assist-blue));
-  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
+  border-color: #d4a017;
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 23, 0.32),
+    0 0 24px rgba(212, 160, 23, 0.18);
+}
+
+.assist-panel.theme-light .template-card.is-active {
+  border-color: #d4a017;
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 23, 0.32),
+    0 0 22px rgba(212, 160, 23, 0.14),
+    0 12px 24px rgba(15, 23, 42, 0.1);
 }
 
 .template-image {
@@ -1901,61 +2097,126 @@ defineExpose({
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  display: flex;
-  align-items: end;
-  min-height: 52px;
-  padding: 12px;
-  background: linear-gradient(180deg, transparent, rgba(5, 14, 28, 0.74));
+  display: grid;
+  gap: 2px;
+  min-height: 64px;
+  padding: 14px 14px 12px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
+}
+
+.template-title strong {
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 900;
 }
 
 .template-title span {
-  color: #fff;
-  font-size: 13px;
-  font-weight: 900;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 600;
 }
 
 .requirement-section {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 16px;
-  border-radius: 12px;
-  padding: 14px 18px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--assist-card) 94%, white),
-      var(--assist-card)
-    );
+  display: grid;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #111111;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.requirement-section strong {
-  color: var(--assist-text);
-  font-size: 14px;
+.requirement-title {
+  color: #fff;
+  font-size: 16px;
   font-weight: 900;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
-.requirement-list {
+.requirement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.requirement-card {
   display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 10px;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 86px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
 }
 
-.requirement-list span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 0 13px;
+.assist-panel.theme-light .requirement-card {
+  border-color: rgba(203, 213, 225, 0.82);
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.requirement-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--workspace-accent, #d4a017) 34%, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.assist-panel.theme-light .requirement-card:hover {
+  border-color: rgba(212, 160, 23, 0.42);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.requirement-card-icon {
+  display: grid;
+  flex: 0 0 32px;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
-  background: rgba(39, 183, 125, 0.15);
-  color: var(--assist-green);
-  font-size: 12px;
+  background: rgba(212, 160, 23, 0.12);
+  color: var(--workspace-accent-strong, #d4a017);
+}
+
+.requirement-card-icon > .iconify {
+  font-size: 16px;
+}
+
+.requirement-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.requirement-card-copy strong {
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.35;
   font-weight: 900;
+}
+
+.assist-panel.theme-light .requirement-card-copy strong {
+  color: #111827;
+}
+
+.requirement-card-copy span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.assist-panel.theme-light .requirement-card-copy span {
+  color: rgba(71, 85, 105, 0.86);
 }
 
 .recent-layout {
@@ -1970,8 +2231,6 @@ defineExpose({
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 6px 20px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--assist-scroll-thumb) var(--assist-scroll-track);
 }
 
 @container assist (max-width: 480px) {
@@ -1990,25 +2249,6 @@ defineExpose({
   .recent-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-.recent-layout::-webkit-scrollbar {
-  width: 10px;
-}
-
-.recent-layout::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: var(--assist-scroll-track);
-}
-
-.recent-layout::-webkit-scrollbar-thumb {
-  border: 2px solid var(--assist-scroll-track);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--assist-blue),
-    var(--assist-scroll-thumb)
-  );
 }
 
 .recent-empty-state {
@@ -2279,23 +2519,16 @@ defineExpose({
   }
 
   .tutorial-flow {
-    gap: 10px;
-    grid-template-columns:
-      minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr)
-      28px minmax(0, 1fr);
-  }
-
-  .tutorial-placeholder {
-    height: 78px;
-    min-height: 78px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .template-grid {
     gap: 12px;
   }
 
-  .flow-arrow {
-    font-size: 22px;
+  .requirement-grid {
+    gap: 10px;
   }
 }
 
@@ -2315,6 +2548,11 @@ defineExpose({
   .watermark-recent-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .template-grid,
+  .requirement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -2328,6 +2566,11 @@ defineExpose({
 
   .watermark-compare-grid,
   .watermark-recent-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .template-grid,
+  .requirement-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

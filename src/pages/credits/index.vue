@@ -210,23 +210,18 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 <style scoped lang="scss">
 .credits-page {
   --credit-page-pad: clamp(16px, 2vw, 30px);
-  --credit-bg-a: rgba(20, 31, 50, 0.8);
-  --credit-bg-b: rgba(7, 13, 26, 0.98);
-  --credit-panel: rgba(16, 25, 40, 0.8);
-  --credit-panel-strong: rgba(14, 22, 37, 0.94);
-  --credit-border: rgba(103, 132, 167, 0.34);
-  --credit-border-soft: rgba(119, 145, 175, 0.18);
-  --credit-text: #edf5ff;
-  --credit-text-soft: #a4b5ca;
-  --credit-field: rgba(255, 255, 255, 0.055);
-  --credit-head: rgba(255, 255, 255, 0.065);
-  --credit-row-border: rgba(112, 136, 164, 0.22);
-  --credit-link: #438dff;
-  --credit-blue: #3282fa;
-  --panel-shadow:
-    0 0 0 1px rgba(53, 118, 174, 0.08),
-    0 24px 56px rgba(0, 0, 0, 0.24),
-    0 0 34px rgba(26, 123, 205, 0.14);
+  --credit-panel: #0b1220;
+  --credit-panel-strong: #0e1628;
+  --credit-border: rgba(59, 130, 246, 0.12);
+  --credit-border-soft: rgba(255, 255, 255, 0.06);
+  --credit-text: #f1f5f9;
+  --credit-text-soft: #94a3b8;
+  --credit-field: #111827;
+  --credit-head: #0e1628;
+  --credit-row-border: rgba(255, 255, 255, 0.06);
+  --credit-link: #4f7fff;
+  --credit-blue: #2f6bff;
+  --panel-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 
   min-width: 0;
   height: auto;
@@ -257,38 +252,34 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 }
 
 .credits-page.theme-light {
-  --credit-bg-a: #f7fbff;
-  --credit-bg-b: #edf5fc;
-  --credit-panel: rgba(255, 255, 255, 0.72);
-  --credit-panel-strong: rgba(255, 255, 255, 0.78);
-  --credit-border: rgba(184, 205, 226, 0.34);
-  --credit-border-soft: rgba(190, 207, 225, 0.26);
-  --credit-text: #182331;
-  --credit-text-soft: #5d6978;
-  --credit-field: rgba(236, 242, 248, 0.78);
-  --credit-head: rgba(229, 236, 243, 0.76);
-  --credit-row-border: rgba(139, 158, 178, 0.18);
-  --credit-link: #2e78df;
-  --panel-shadow:
-    0 16px 40px rgba(91, 126, 163, 0.08),
-    0 0 28px rgba(124, 190, 237, 0.11);
+  --credit-bg-a: #f6f9fc;
+  --credit-bg-b: #f6f9fc;
+  --credit-panel: #ffffff;
+  --credit-panel-strong: #ffffff;
+  --credit-border: #e6ecf5;
+  --credit-border-soft: #e6ecf5;
+  --credit-text: #0f172a;
+  --credit-text-soft: #64748b;
+  --credit-field: #ffffff;
+  --credit-head: #f8fafd;
+  --credit-row-border: #e6ecf5;
+  --credit-link: #2f6bff;
+  --panel-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
 
   background:
-    radial-gradient(820px 160px at 50% 4%, rgba(156, 211, 247, 0.18), transparent 66%),
-    linear-gradient(180deg, var(--credit-bg-a), var(--credit-bg-b));
+    radial-gradient(circle at 30% 0%, rgba(47, 107, 255, 0.06), transparent 28rem),
+    #f6f9fc;
 }
 
 .credits-page.theme-light .query-panel,
 .credits-page.theme-light .flow-panel {
-  border-color: rgba(180, 201, 223, 0.32);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64)),
-    var(--credit-panel);
+  border-color: #e6ecf5;
+  background: #ffffff;
 }
 
 .credits-page.theme-light .query-header,
 .credits-page.theme-light .filter-bar {
-  background: rgba(255, 255, 255, 0.68);
+  background: #f8fafd;
 }
 
 .credits-page.theme-light .flow-data-table {
@@ -301,10 +292,11 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   min-width: 0;
   overflow: visible;
   border: 1px solid var(--credit-border);
-  border-radius: 10px;
-  background: var(--credit-panel);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
+    var(--credit-panel);
   box-shadow: var(--panel-shadow);
-  backdrop-filter: blur(16px);
 }
 
 .query-panel {
@@ -322,7 +314,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   min-height: clamp(72px, 8vh, 88px);
   padding: 16px clamp(18px, 2vw, 26px);
   border: 1px solid var(--credit-border-soft);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--credit-head);
 }
 
@@ -362,10 +354,10 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .query-button {
   --n-height: clamp(46px, 5vh, 56px);
   --n-border-radius: 12px;
-  --n-color: #256ed7;
-  --n-color-hover: #256ed7;
-  --n-color-pressed: #1d61c8;
-  --n-color-focus: #256ed7;
+  --n-color: #2f6bff;
+  --n-color-hover: #4f7fff;
+  --n-color-pressed: #1d4ed8;
+  --n-color-focus: #2f6bff;
   --n-border: 0;
   --n-border-hover: 0;
   --n-border-pressed: 0;
@@ -382,14 +374,14 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   overflow: hidden;
   border: 0;
   border-radius: 12px;
-  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
-  box-shadow: 0 12px 26px rgba(33, 99, 202, 0.26);
+  background: #2f6bff !important;
+  box-shadow: 0 12px 26px rgba(47, 107, 255, 0.22);
   color: #fff;
   font-family: inherit;
   font-size: 17px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 160ms ease;
+  transition: background 160ms ease, box-shadow 160ms ease;
 }
 
 .query-button:hover,
@@ -399,29 +391,23 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .query-button:not(:disabled):focus,
 .query-button:active,
 .query-button:not(:disabled):active {
-  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
-  box-shadow: 0 12px 26px rgba(33, 99, 202, 0.26);
+  background: #4f7fff !important;
+  box-shadow: 0 12px 26px rgba(47, 107, 255, 0.28);
   color: #fff !important;
   filter: none;
   transform: none;
 }
 
-.query-button :deep(.n-button__content),
-.query-button:hover :deep(.n-button__content),
-.query-button:focus :deep(.n-button__content),
-.query-button:focus-visible :deep(.n-button__content),
-.query-button:active :deep(.n-button__content),
-.query-button:not(:disabled):hover :deep(.n-button__content),
-.query-button:not(:disabled):focus :deep(.n-button__content),
-.query-button:not(:disabled):active :deep(.n-button__content) {
-  color: #fff !important;
-}
-
 .query-button :deep(.n-button:not(:disabled):hover),
 .query-button :deep(.n-button:not(:disabled):focus),
 .query-button :deep(.n-button:not(:disabled):active) {
-  background: linear-gradient(140deg, #3685ef, #1d61c8) !important;
+  background: #4f7fff !important;
   color: #fff !important;
+}
+
+.query-button:active,
+.query-button:not(:disabled):active {
+  background: #1d4ed8 !important;
 }
 
 .query-button :deep(.n-button__border),
@@ -514,18 +500,18 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 }
 
 .credits-page.theme-light .export-button {
-  --n-color: #2f7ee8;
-  --n-color-hover: #3a8cf5;
-  --n-color-pressed: #266aca;
-  --n-color-focus: #2f7ee8;
-  --n-border: 0;
-  --n-border-hover: 0;
-  --n-border-pressed: 0;
-  --n-border-focus: 0;
-  --n-text-color: #fff;
-  --n-text-color-hover: #fff;
-  --n-text-color-pressed: #fff;
-  --n-text-color-focus: #fff;
+  --n-color: #ffffff;
+  --n-color-hover: #f8fafd;
+  --n-color-pressed: #f1f5f9;
+  --n-color-focus: #ffffff;
+  --n-border: 1px solid #d8e2f0;
+  --n-border-hover: 1px solid #d8e2f0;
+  --n-border-pressed: 1px solid #d8e2f0;
+  --n-border-focus: 1px solid #d8e2f0;
+  --n-text-color: #64748b;
+  --n-text-color-hover: #64748b;
+  --n-text-color-pressed: #64748b;
+  --n-text-color-focus: #64748b;
 }
 
 .stats-grid {
@@ -681,24 +667,6 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   border: 1px solid var(--credit-border-soft);
   border-radius: 8px;
   background: color-mix(in srgb, var(--credit-panel-strong) 74%, transparent);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(80, 137, 211, 0.58) transparent;
-}
-
-.flow-table-wrap::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.flow-table-wrap::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--credit-field) 82%, transparent);
-  border-radius: 999px;
-}
-
-.flow-table-wrap::-webkit-scrollbar-thumb {
-  border: 2px solid color-mix(in srgb, var(--credit-field) 82%, transparent);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #3c8cff, #1f6ed6);
 }
 
 .flow-data-table {

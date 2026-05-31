@@ -31,12 +31,12 @@ export const mainNavigation: NavigationItem[] = [
     description: '套餐与积分体系',
   },
   {
-    path: '/credits',
+    path: '/points',
     label: '积分系统',
     description: '积分消耗明细',
   },
   {
-    path: '/auth',
+    path: '/login',
     label: '企业账号',
     description: '成员与权限管理',
   },

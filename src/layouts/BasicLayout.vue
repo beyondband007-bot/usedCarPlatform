@@ -208,46 +208,48 @@ const {
   --studio-chrome-action-size: clamp(12px, 0.95vw, 15px);
   --studio-chrome-nav-gap: clamp(20px, 2.8vw, 56px);
 
-  --studio-chrome-bg: #060606;
+  --studio-chrome-bg: #05070a;
 
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(6, 6, 6, 0.78), transparent);
+  --studio-chrome-header-bg: #05070a;
 
-  --studio-chrome-logo: #f7f1e4;
+  --studio-chrome-logo: #f1f5f9;
 
-  --studio-chrome-nav: #c8c1b3;
+  --studio-chrome-nav: #94a3b8;
 
-  --studio-chrome-nav-hover: #efe3c3;
+  --studio-chrome-nav-hover: #cbd5e1;
 
-  --studio-chrome-nav-active: #efc24c;
+  --studio-chrome-nav-active: #d4a017;
 
-  --studio-chrome-nav-underline: #efc24c;
+  --studio-chrome-nav-underline: #d4a017;
 
-  --studio-chrome-credit-bg: #efc24c;
+  --studio-chrome-credit-bg: #d4a017;
 
-  --studio-chrome-credit-text: #221700;
+  --studio-chrome-credit-text: #ffffff;
+
+  --studio-chrome-credit-hover: #e5b85c;
 
   --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
-  --studio-chrome-theme-text: #f7f1e4;
+  --studio-chrome-theme-text: #cbd5e1;
 
-  --studio-chrome-theme-border: rgba(239, 194, 76, 0.18);
+  --studio-chrome-theme-border: rgba(255, 255, 255, 0.08);
 
-  --studio-chrome-user-border: rgba(239, 194, 76, 0.18);
+  --studio-chrome-user-border: rgba(255, 255, 255, 0.08);
 
-  --studio-chrome-user-bg: rgba(255, 255, 255, 0.05);
+  --studio-chrome-user-bg: rgba(255, 255, 255, 0.04);
 
-  --studio-chrome-user-text: #f7f1e4;
+  --studio-chrome-user-text: #f1f5f9;
 
-  --studio-chrome-user-hover-border: rgba(239, 194, 76, 0.42);
+  --studio-chrome-user-hover-border: rgba(59, 130, 246, 0.25);
 
-  --studio-chrome-user-hover-bg: rgba(239, 194, 76, 0.08);
+  --studio-chrome-user-hover-bg: rgba(255, 255, 255, 0.06);
 
-  --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
+  --studio-chrome-avatar-bg: rgba(47, 107, 255, 0.12);
 
-  --studio-chrome-avatar-text: #efc24c;
+  --studio-chrome-avatar-text: #4f7fff;
 
-  --studio-chrome-subnav-bg: #040404;
-  --studio-chrome-subnav-border: rgba(239, 194, 76, 0.08);
+  --studio-chrome-subnav-bg: #05070a;
+  --studio-chrome-subnav-border: rgba(255, 255, 255, 0.06);
 
 
 
@@ -262,54 +264,38 @@ const {
   z-index: 50;
 
   background: var(--studio-chrome-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
 
 }
 
 
 
 .home-chrome--light {
-
-  --studio-chrome-bg: #ffffff;
-
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(255, 255, 255, 0.96), transparent);
-
-  --studio-chrome-logo: #172033;
-
-  --studio-chrome-nav: #64748b;
-
-  --studio-chrome-nav-hover: #172033;
-
+  --studio-chrome-bg: #f8fafd;
+  --studio-chrome-header-bg: #f8fafd;
+  --studio-chrome-logo: #0f172a;
+  --studio-chrome-nav: #475569;
+  --studio-chrome-nav-hover: #2f6bff;
   --studio-chrome-nav-active: #2f6bff;
-
-  --studio-chrome-nav-underline: #4f7fff;
-
-  --studio-chrome-credit-bg: #d89a00;
-
-  --studio-chrome-credit-text: #172033;
-
-  --studio-chrome-theme-bg: #f2f7ff;
-
-  --studio-chrome-theme-text: #334155;
-
-  --studio-chrome-theme-border: #cfe0ff;
-
-  --studio-chrome-user-border: #e8edf5;
-
-  --studio-chrome-user-bg: #f3f7fc;
-
-  --studio-chrome-user-text: #172033;
-
+  --studio-chrome-nav-underline: #2f6bff;
+  --studio-chrome-credit-bg: #d4a017;
+  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-hover: #e5b85c;
+  --studio-chrome-theme-bg: #ffffff;
+  --studio-chrome-theme-text: #64748b;
+  --studio-chrome-theme-border: #e6ecf5;
+  --studio-chrome-user-border: #e6ecf5;
+  --studio-chrome-user-bg: #ffffff;
+  --studio-chrome-user-text: #0f172a;
   --studio-chrome-user-hover-border: #cfe0ff;
-
-  --studio-chrome-user-hover-bg: #f3f7fc;
-
-  --studio-chrome-avatar-bg: #eef4ff;
-
+  --studio-chrome-user-hover-bg: #f8fafd;
+  --studio-chrome-avatar-bg: #f2f7ff;
   --studio-chrome-avatar-text: #2f6bff;
+  --studio-chrome-subnav-bg: #f8fafd;
+  --studio-chrome-subnav-border: #e6ecf5;
 
-  --studio-chrome-subnav-bg: #edf4ff;
-  --studio-chrome-subnav-border: #e8edf5;
-
+  border-bottom: 1px solid #e6ecf5;
 }
 
 .home-chrome--pricing {

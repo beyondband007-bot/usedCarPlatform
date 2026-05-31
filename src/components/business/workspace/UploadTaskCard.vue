@@ -99,7 +99,7 @@ function openPreviewModal() {
       :class="
         compact
           ? 'upload-compact-shell'
-          : 'border border-[var(--workspace-line,var(--app-border))] bg-[var(--workspace-panel,var(--app-surface))] shadow-[var(--workspace-shadow,0_18px_60px_rgba(0,0,0,0.14))] backdrop-blur-xl'
+          : 'bg-[var(--workspace-panel,var(--app-surface))] shadow-[var(--workspace-shadow,0_18px_60px_rgba(0,0,0,0.14))] backdrop-blur-xl'
       "
       :content-class="compact ? undefined : '!p-0'"
     >
@@ -182,7 +182,7 @@ function openPreviewModal() {
             :class="
               compact
                 ? 'upload-compact-dragger'
-                : '!rounded-2xl !border-dashed !border-[var(--workspace-line,var(--app-border))] !bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10'
+                : '!rounded-2xl !!bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10'
             "
           >
             <div
@@ -265,7 +265,6 @@ function openPreviewModal() {
 .upload-compact-dragger {
   min-height: 178px !important;
   padding: 0 !important;
-  border: 1px dashed color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, var(--app-border)) !important;
   border-radius: 12px !important;
   background: color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%) !important;
 }
@@ -327,7 +326,6 @@ function openPreviewModal() {
 .upload-preview-media {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--app-border);
   border-radius: 16px;
   background: var(--workspace-panel-soft, var(--app-surface-soft));
 }
@@ -336,7 +334,6 @@ function openPreviewModal() {
   display: block;
   width: 100%;
   padding: 0;
-  border: 0;
   background: transparent;
   cursor: zoom-in;
 }
@@ -356,7 +353,6 @@ function openPreviewModal() {
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 72%, transparent);
   color: #fff;
@@ -385,7 +381,6 @@ function openPreviewModal() {
   place-items: center;
   gap: 12px;
   overflow: hidden;
-  border: 1px dashed var(--app-border);
   border-radius: 16px;
   background: var(--workspace-panel-soft, var(--app-surface-soft));
   padding: 28px;

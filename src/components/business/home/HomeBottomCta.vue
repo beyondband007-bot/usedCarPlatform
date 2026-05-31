@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-defineEmits<{
+import { useAuthStore } from '@/stores/auth'
+
+const emit = defineEmits<{
   enterWorkbench: []
 }>()
 
+const authStore = useAuthStore()
 const ctaRef = ref<HTMLElement | null>(null)
 
 onMounted(() => {
@@ -40,10 +43,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <section ref="ctaRef" class="final-cta" aria-label="预约演示">
+  <section
+    ref="ctaRef"
+    class="final-cta"
+    :class="{ 'final-cta--authenticated': authStore.isLoggedIn }"
+    aria-label="预约演示"
+  >
     <h2>企业视觉内容生产，从一套车图开始</h2>
     <p>企业套餐 ¥980 起，账号、积分、图组并发同步开通</p>
-    <button type="button" class="button gold" @click="$emit('enterWorkbench')">
+    <button
+      v-if="!authStore.isLoggedIn"
+      type="button"
+      class="button gold"
+      @click="emit('enterWorkbench')"
+    >
       预约演示
     </button>
   </section>
@@ -67,6 +80,10 @@ onMounted(() => {
   margin: 0 0 28px;
   color: var(--home-muted);
   font-size: 16px;
+}
+
+.final-cta--authenticated p {
+  margin-bottom: 0;
 }
 
 .button {
