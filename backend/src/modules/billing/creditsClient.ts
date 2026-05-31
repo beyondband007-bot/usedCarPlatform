@@ -86,6 +86,26 @@ export interface PaymentOrderResponse {
   idempotentReplay: boolean;
 }
 
+export interface CreditsApplicationResponse {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  status: string;
+}
+
+export interface CreditsFunctionResponse {
+  id: number;
+  applicationId: number;
+  applicationCode?: string;
+  code: string;
+  name: string;
+  description: string | null;
+  chargeMode: "fixed" | "dynamic" | "estimate_required";
+  defaultPoints: string;
+  status: string;
+}
+
 type EstimateBillingInput = BillingIdentity & {
   functionCode: string;
   bizType: string;
@@ -123,6 +143,16 @@ class CreditsClient {
 
   async listRechargeProducts() {
     return this.get<{ products: RechargeProductResponse[] }>("/recharge-products");
+  }
+
+  async listApplications() {
+    return this.get<{ applications: CreditsApplicationResponse[] }>("/integration/applications");
+  }
+
+  async listFunctions(applicationCode: string) {
+    return this.get<{ applicationCode: string; functions: CreditsFunctionResponse[] }>(
+      `/integration/applications/${encodeURIComponent(applicationCode)}/functions`,
+    );
   }
 
   async createPaymentOrder(input: {

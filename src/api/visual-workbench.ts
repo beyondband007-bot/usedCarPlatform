@@ -67,6 +67,39 @@ export interface PaymentOrder {
   idempotentReplay: boolean
 }
 
+export interface CreditsApplication {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  status: string
+}
+
+export interface CreditsFunction {
+  id: number
+  applicationId: number
+  applicationCode?: string
+  code: string
+  name: string
+  description: string | null
+  chargeMode: 'fixed' | 'dynamic' | 'estimate_required'
+  defaultPoints: string
+  status: string
+}
+
+export interface CreditsAdminOverview {
+  identity: {
+    userId: number
+    accountScope: 'personal' | 'tenant'
+    tenantId?: number
+  }
+  applications: CreditsApplication[]
+  functions: CreditsFunction[]
+  accounts: CreditAccount[]
+  transactions: CreditTransaction[]
+  rechargeProducts: RechargeProduct[]
+}
+
 export interface UploadedAsset {
   assetId: string
   purpose: string
@@ -121,6 +154,19 @@ export async function createPaymentOrder(payload: {
   creditsTenantId?: number | string
 }) {
   const response = await request.post<ApiResponse<PaymentOrder>>('/credits/payment-orders', payload)
+  return response.data
+}
+
+export async function getCreditsAdminOverview(params?: {
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.get<ApiResponse<CreditsAdminOverview>>('/credits/admin/overview', {
+    params,
+  })
   return response.data
 }
 

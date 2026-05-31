@@ -36,6 +36,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 6: Integrate batch creation | Done | `e47969b`, `phase-6-batch-creation-20260531` | Freezes credits for each batch item before KIE submission and reports batch estimated cost from frozen subtasks. |
 | Phase 7: UsedCar credit proxy APIs | Done | `phase-7-proxy-apis-20260531` | Adds `/api/v1/credits/*` proxy routes for accounts, transactions, recharge products, and payment orders. |
 | Phase 8: Frontend balance and recharge | Done | `phase-8-frontend-credit-data-20260531` | Replaces visible mock credit balance, credit ledger, recharge products, and payment order creation with proxy API data. |
+| Phase 9: Credits Admin Console | Done | `phase-9-admin-console-20260531` | Adds a read-only credits admin console backed by the usedCar credit proxy boundary. |
 
 Detailed phase notes:
 
@@ -47,6 +48,7 @@ Detailed phase notes:
 - [Phase 6 batch creation](./reusable-credits-phase-6-batch-billing.md)
 - [Phase 7 proxy APIs](./reusable-credits-phase-7-proxy-apis.md)
 - [Phase 8 frontend credit data](./reusable-credits-phase-8-frontend-credit-data.md)
+- [Phase 9 admin console](./reusable-credits-phase-9-admin-console.md)
 
 ## Important Implementation Notes
 
@@ -117,6 +119,8 @@ Expected deliverable:
 - task creation errors from billing are visible and understandable
 
 ### Phase 9: Credits Admin Console
+
+Status: done in this branch.
 
 Use the existing static admin console prototype as the starting point and turn it into a usable admin-facing view.
 
@@ -192,6 +196,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 9 next.
+Continue with Phase 10 next.
 
-The user-facing credit balance, credit ledger page, recharge product list, and payment-order creation now use the proxy APIs. The next step is to connect the Credits Admin Console prototype to live operational APIs.
+The Credits Admin Console now has a read-only live overview. The next step is to replace the temporary environment/header identity fallback with a clearer mock login/session convention.

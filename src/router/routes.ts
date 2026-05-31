@@ -97,6 +97,17 @@ export const routes: RouteRecordRaw[] = [
               hiddenNav: true,
             },
           },
+          {
+            path: 'credits-admin',
+            name: 'CreditsAdmin',
+            component: () => import('@/pages/credits-admin/index.vue'),
+            meta: {
+              title: '积分后台',
+              description: '积分后台只读运维视图',
+              requiresAuth: true,
+              hiddenNav: true,
+            },
+          },
         ],
       },
     ],

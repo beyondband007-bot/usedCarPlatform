@@ -4,6 +4,7 @@ import { asyncHandler } from "../../shared/asyncHandler";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
+import { getCreditsAdminOverview } from "./creditsAdminService";
 import { resolveBillingIdentity } from "./billingIdentity";
 import { creditsClient, type CreditAccountResponse } from "./creditsClient";
 
@@ -81,6 +82,14 @@ const selectTransactionAccount = (
 };
 
 export const creditsRoutes = Router();
+
+creditsRoutes.get(
+  "/admin/overview",
+  asyncHandler(async (req, res) => {
+    const identity = resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    ok(res, await getCreditsAdminOverview(identity));
+  }),
+);
 
 creditsRoutes.get(
   "/accounts",
