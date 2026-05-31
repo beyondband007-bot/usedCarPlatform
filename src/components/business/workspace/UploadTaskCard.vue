@@ -325,15 +325,17 @@ function openPreviewModal() {
 
 .upload-preview-media {
   position: relative;
-  overflow: hidden;
-  border-radius: 16px;
-  background: var(--workspace-panel-soft, var(--app-surface-soft));
+  overflow: visible;
+  background: transparent;
 }
 
 .upload-preview-image-btn {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   padding: 0;
+  border: 0;
   background: transparent;
   cursor: zoom-in;
 }
@@ -341,18 +343,36 @@ function openPreviewModal() {
 .upload-preview-image {
   display: block;
   width: 100%;
-  height: clamp(178px, 30vw, 320px);
-  background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
+  height: auto;
+}
+
+.upload-preview-image :deep(.preload-image) {
+  height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
+.upload-preview-image :deep(.preload-image:not(.is-loaded)) {
+  min-height: clamp(178px, 24vw, 280px);
+}
+
+.upload-preview-image :deep(.preload-image__img) {
+  width: 100%;
+  height: auto;
+  max-height: min(70vh, 480px);
+  border-radius: 12px;
 }
 
 .upload-preview-remove {
   position: absolute;
   top: 12px;
   right: 12px;
+  z-index: 5;
   display: grid;
   width: 36px;
   height: 36px;
   place-items: center;
+  border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 72%, transparent);
   color: #fff;
