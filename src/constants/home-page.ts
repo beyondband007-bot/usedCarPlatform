@@ -8,7 +8,6 @@ import featureShowroomImage from '@/img/home/feature-showroom.png'
 import featureSkyImage from '@/img/home/feature-sky.png'
 import featureVideoImage from '@/img/home/feature-video.png'
 import homeHeroImage from '@/img/home/hero-car.png'
-import homeHeroVideo from '@/assets/video/首页视频.mp4'
 import suiteEnterpriseImage from '@/img/home/suite-enterprise.png'
 import suiteWorkbenchImage from '@/img/home/suite-workbench.png'
 
@@ -39,7 +38,6 @@ export interface HomeCaseTab {
 }
 
 export const homeHeroImageSrc = homeHeroImage
-export const homeHeroVideoSrc = homeHeroVideo
 export const homeHeroPosterSrc = homeHeroImage
 
 export const homeQuickEntries: HomeQuickEntry[] = [

@@ -1,3 +1,5 @@
+import interiorCleanAfter from '@/assets/img/内饰清洁/清洁后.png'
+import interiorCleanBefore from '@/assets/img/内饰清洁/清洁前.png'
 import lightConsistencyAfter from '@/assets/img/光污一致化/修复后.png'
 import lightConsistencyBefore from '@/assets/img/光污一致化/修复前.png'
 import paintRefreshAfter from '@/assets/img/烤漆翻新/翻新后.png'
@@ -30,6 +32,7 @@ export const workspaceFeatureCompareCodes = [
   'watermark-remove',
   'paint-refresh',
   'light-consistency',
+  'interior-clean',
 ] as const
 
 export type WorkspaceFeatureCompareCode = (typeof workspaceFeatureCompareCodes)[number]
@@ -82,6 +85,21 @@ export const workspaceFeatureCompareMap: Record<
     generatingTitle: '正在光污一致化',
     generatingDesc: 'AI 正在优化眩光、反光与色偏，请稍候。',
     cards: [{ before: lightConsistencyBefore, after: lightConsistencyAfter }],
+  },
+  'interior-clean': {
+    tabListLabel: '内饰清洁视图切换',
+    featureSectionLabel: '内饰清洁功能描述',
+    heroBadge: 'AI 内饰清洁能力',
+    heroTitle: '智能增强座椅、仪表台与地毯洁净度',
+    heroDesc: '适用于内饰脏污、灰尘与陈旧感明显的车图，输出更整洁、更高级的内饰展示效果。',
+    compareTitle: '效果对比',
+    compareHint: '拖动滑杆查看内饰清洁前后效果对比',
+    beforeAlt: '内饰清洁处理前',
+    afterAlt: '内饰清洁处理后',
+    handleAriaLabel: '内饰清洁前后对比拖拽滑杆',
+    generatingTitle: '正在内饰清洁',
+    generatingDesc: 'AI 正在优化座椅、仪表台与地毯洁净度，请稍候。',
+    cards: [{ before: interiorCleanBefore, after: interiorCleanAfter }],
   },
 }
 

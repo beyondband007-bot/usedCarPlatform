@@ -945,7 +945,8 @@ onUnmounted(() => {
         'workspace-page--feature-compare':
           activeCode === 'watermark-remove'
           || activeCode === 'paint-refresh'
-          || activeCode === 'light-consistency',
+          || activeCode === 'light-consistency'
+          || activeCode === 'interior-clean',
         'workspace-page--creative-image': activeCode === 'creative-image',
       },
     ]"

@@ -1,81 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
-
 import PreloadImage from '@/components/common/PreloadImage.vue'
-import { homeHeroPosterSrc, homeHeroVideoSrc } from '@/constants/home-page'
+import { homeHeroImageSrc } from '@/constants/home-page'
 
 defineEmits<{
   enterWorkbench: []
 }>()
-
-const heroRef = useTemplateRef<HTMLElement>('heroRef')
-const videoRef = useTemplateRef<HTMLVideoElement>('videoRef')
-const shouldLoadVideo = ref(false)
-const isVideoReady = ref(false)
-const prefersReducedMotion = ref(false)
-
-let observer: IntersectionObserver | null = null
-
-async function playHeroVideo() {
-  const video = videoRef.value
-  if (!video || prefersReducedMotion.value) {
-    return
-  }
-
-  try {
-    await video.play()
-  } catch {
-    // Autoplay may be blocked; poster remains visible until user interaction.
-  }
-}
-
-function handleVideoReady() {
-  isVideoReady.value = true
-}
-
-onMounted(() => {
-  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  const root = heroRef.value
-  if (!root || prefersReducedMotion.value) {
-    return
-  }
-
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) {
-        return
-      }
-
-      shouldLoadVideo.value = true
-      observer?.disconnect()
-      observer = null
-    },
-    {
-      rootMargin: '120px 0px',
-      threshold: 0.01,
-    },
-  )
-
-  observer.observe(root)
-})
-
-watch(shouldLoadVideo, async (load) => {
-  if (!load) {
-    return
-  }
-
-  await nextTick()
-  await playHeroVideo()
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-})
 </script>
 
 <template>
-  <section id="top" ref="heroRef" class="hero">
+  <section id="top" class="hero">
     <div class="hero-copy">
       <p class="eyebrow">AI CAR STUDIO</p>
       <h1>每一辆车，都值得被精心呈现</h1>
@@ -84,30 +17,14 @@ onUnmounted(() => {
 
     <div class="hero-media" aria-hidden="true">
       <PreloadImage
-        class="hero-poster"
-        :class="{ 'is-hidden': isVideoReady }"
-        :src="homeHeroPosterSrc"
+        class="hero-image"
+        :src="homeHeroImageSrc"
         alt=""
         loading="eager"
         fetchpriority="high"
         decoding="async"
+        fit="contain"
       />
-      <video
-        v-if="shouldLoadVideo"
-        ref="videoRef"
-        class="hero-video"
-        :class="{ 'is-ready': isVideoReady }"
-        muted
-        loop
-        playsinline
-        autoplay
-        preload="auto"
-        :poster="homeHeroPosterSrc"
-        @loadeddata="handleVideoReady"
-        @canplay="handleVideoReady"
-      >
-        <source :src="homeHeroVideoSrc" type="video/mp4" />
-      </video>
     </div>
 
     <div class="hero-action">
@@ -210,34 +127,19 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.hero-poster,
-.hero-video {
+.hero-image {
   position: absolute;
   left: 50%;
   top: clamp(42px, 3.4vw, 66px);
   width: 100%;
   height: 100%;
   max-width: none;
-  object-fit: contain;
-  object-position: center center;
   transform: translateX(-50%);
 }
 
-.hero-poster {
-  transition: opacity 0.45s ease;
-}
-
-.hero-poster.is-hidden {
-  opacity: 0;
-}
-
-.hero-video {
-  opacity: 0;
-  transition: opacity 0.45s ease;
-}
-
-.hero-video.is-ready {
-  opacity: 1;
+.hero-image :deep(.preload-image__img) {
+  object-fit: contain;
+  object-position: center center;
 }
 
 .button {
@@ -317,21 +219,10 @@ onUnmounted(() => {
     font-size: 15px;
   }
 
-  .hero-poster,
-  .hero-video {
+  .hero-image {
     width: 980px;
     height: 100%;
     top: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-video {
-    display: none;
-  }
-
-  .hero-poster {
-    opacity: 1 !important;
   }
 }
 </style>
