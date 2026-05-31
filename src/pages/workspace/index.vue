@@ -9,11 +9,13 @@ import {
   createGenerationTask,
   getBatchTaskDetail,
   getCreativeImageConversations,
+  getCreativeImageMessages,
   getGenerationTask,
   uploadCreativeImageReference,
   type BatchTaskDetail,
   type CreateGenerationTaskPayload,
   type CreativeImageConversation,
+  type CreativeImageMessage,
   type GenerationTaskDetail,
   type GenerationTaskStatus,
   type UploadedAsset,
@@ -24,6 +26,7 @@ import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssis
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
 import type {
+  CreativeThreadTurn,
   WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
   WorkspaceDeliveryTaskPreview,
@@ -58,10 +61,12 @@ const activeCode = ref(resolveCapabilityCode(route.params.code))
 const generationResult = ref<WorkspaceGenerateResult | null>(null)
 const creativeImageCaption = ref<string | null>(null)
 const creativeConversations = ref<CreativeImageConversation[]>([])
+const creativeThreadTurns = ref<CreativeThreadTurn[]>([])
 const activeCreativeConversationId = ref<string | null>(null)
 const creativeReferenceAsset = ref<UploadedAsset | null>(null)
 const isUploadingCreativeReference = ref(false)
 const isCreatingCreativeConversation = ref(false)
+const isLoadingCreativeConversation = ref(false)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
@@ -93,6 +98,21 @@ function readActiveGenerationTask() {
 
 function saveActiveGenerationTask(task: ActiveGenerationTaskSnapshot) {
   window.localStorage.setItem(ACTIVE_GENERATION_TASK_KEY, JSON.stringify(task))
+}
+
+const ACTIVE_CREATIVE_CONVERSATION_KEY = 'workspace-active-creative-conversation'
+
+function readActiveCreativeConversationId() {
+  return window.localStorage.getItem(ACTIVE_CREATIVE_CONVERSATION_KEY)
+}
+
+function saveActiveCreativeConversationId(conversationId: string | null) {
+  if (!conversationId) {
+    window.localStorage.removeItem(ACTIVE_CREATIVE_CONVERSATION_KEY)
+    return
+  }
+
+  window.localStorage.setItem(ACTIVE_CREATIVE_CONVERSATION_KEY, conversationId)
 }
 
 function clearActiveGenerationTask(taskId?: string) {
@@ -140,6 +160,67 @@ function mapBatchDetailToJob(
       thumbnail: existing.previewUrl || undefined,
     })),
   }
+}
+
+function resolveCreativeMessageRatioLabel(message: CreativeImageMessage) {
+  const outputRatio = message.metadata?.outputRatio
+  const resolution = message.metadata?.resolution
+
+  if (outputRatio && resolution) return `${outputRatio} · ${resolution}`
+  if (outputRatio) return `${outputRatio} · 2K`
+  return undefined
+}
+
+function buildCreativeThreadTurns(
+  messages: CreativeImageMessage[],
+  conversation: CreativeImageConversation | null,
+): CreativeThreadTurn[] {
+  const turns: CreativeThreadTurn[] = []
+  let lastUserTurn: CreativeThreadTurn | null = null
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      if (lastUserTurn) {
+        lastUserTurn.taskId = message.taskId ?? lastUserTurn.taskId
+        lastUserTurn.ratioLabel = lastUserTurn.ratioLabel ?? resolveCreativeMessageRatioLabel(message)
+      }
+      continue
+    }
+
+    const turn = {
+      id: message.messageId,
+      prompt: message.content,
+      taskId: message.taskId ?? null,
+      createdAt: message.createdAt,
+      ratioLabel: resolveCreativeMessageRatioLabel(message),
+      resultUrl: null,
+      isGenerating: false,
+    }
+    turns.push(turn)
+    lastUserTurn = turn
+  }
+
+  if (!turns.length && conversation?.lastMessage) {
+    turns.push({
+      id: conversation.conversationId,
+      prompt: conversation.lastMessage,
+      taskId: conversation.lastTaskId,
+      createdAt: conversation.updatedAt,
+      resultUrl: conversation.lastResultUrl,
+      isGenerating: Boolean(conversation.lastTaskId && !conversation.lastResultUrl),
+    })
+    return turns
+  }
+
+  if (conversation?.lastTaskId) {
+    const lastTurn = [...turns].reverse().find((turn) => turn.taskId === conversation.lastTaskId)
+    if (lastTurn) {
+      lastTurn.resultUrl = conversation.lastResultUrl
+      lastTurn.isGenerating = Boolean(conversation.lastTaskId && !conversation.lastResultUrl)
+    }
+  }
+
+  return turns
 }
 
 async function refreshBatchJob(batchId: string) {
@@ -387,6 +468,9 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     if (!options.restored) {
       message.success('生成完成')
     }
+    if (task.moduleCode === 'creative-image' && activeCreativeConversationId.value) {
+      await refreshCreativeConversations()
+    }
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask(taskId)
@@ -403,11 +487,44 @@ async function refreshCreativeConversations() {
   try {
     const result = await getCreativeImageConversations({ page: 1, pageSize: 20 })
     creativeConversations.value = result.items
-    if (!activeCreativeConversationId.value && result.items[0]) {
-      activeCreativeConversationId.value = result.items[0].conversationId
+    const savedConversationId = readActiveCreativeConversationId()
+    const nextConversationId =
+      activeCreativeConversationId.value ??
+      (savedConversationId && result.items.some((item) => item.conversationId === savedConversationId)
+        ? savedConversationId
+        : result.items[0]?.conversationId)
+
+    if (nextConversationId && activeCreativeConversationId.value !== nextConversationId) {
+      activeCreativeConversationId.value = nextConversationId
+      saveActiveCreativeConversationId(nextConversationId)
+    }
+
+    if (nextConversationId) {
+      await loadCreativeConversationThread(nextConversationId)
     }
   } catch {
     // 创意生图历史不影响当前生成流程。
+  }
+}
+
+async function loadCreativeConversationThread(conversationId: string) {
+  const conversation =
+    creativeConversations.value.find((item) => item.conversationId === conversationId) ?? null
+
+  creativeImageCaption.value = conversation?.lastMessage ?? null
+  isLoadingCreativeConversation.value = true
+
+  try {
+    const result = await getCreativeImageMessages(conversationId)
+    if (activeCreativeConversationId.value !== conversationId) return
+    creativeThreadTurns.value = buildCreativeThreadTurns(result.items, conversation)
+  } catch {
+    if (activeCreativeConversationId.value !== conversationId) return
+    creativeThreadTurns.value = buildCreativeThreadTurns([], conversation)
+  } finally {
+    if (activeCreativeConversationId.value === conversationId) {
+      isLoadingCreativeConversation.value = false
+    }
   }
 }
 
@@ -417,6 +534,7 @@ async function ensureCreativeConversation(prompt?: string) {
   const title = prompt?.trim().slice(0, 24) || '创意生图对话'
   const conversation = await createCreativeImageConversation({ title })
   activeCreativeConversationId.value = conversation.conversationId
+  saveActiveCreativeConversationId(conversation.conversationId)
   creativeConversations.value = [conversation, ...creativeConversations.value]
   return conversation.conversationId
 }
@@ -432,9 +550,11 @@ async function handleNewCreativeConversation() {
   try {
     const conversation = await createCreativeImageConversation({ title: '创意生图对话' })
     activeCreativeConversationId.value = conversation.conversationId
+    saveActiveCreativeConversationId(conversation.conversationId)
     creativeReferenceAsset.value = null
     generationResult.value = null
     creativeImageCaption.value = null
+    creativeThreadTurns.value = []
     creativeConversations.value = [conversation, ...creativeConversations.value]
     message.success('已新建对话')
   } catch (error) {
@@ -447,13 +567,16 @@ async function handleNewCreativeConversation() {
 
 function handleSelectCreativeConversation(conversationId: string) {
   activeCreativeConversationId.value = conversationId
+  saveActiveCreativeConversationId(conversationId)
   const conversation = creativeConversations.value.find((item) => item.conversationId === conversationId)
   creativeImageCaption.value = conversation?.lastMessage ?? null
   generationResult.value = null
+  creativeThreadTurns.value = []
 
   if (conversation?.lastTaskId) {
     void resolveGenerationTask(conversation.lastTaskId, { restored: true })
   }
+  void loadCreativeConversationThread(conversationId)
 }
 
 async function handleUploadCreativeReference(file: File) {
@@ -465,6 +588,9 @@ async function handleUploadCreativeReference(file: File) {
     creativeReferenceAsset.value = asset
     message.success('参考图上传成功')
     await refreshCreativeConversations()
+    if (activeCreativeConversationId.value) {
+      await loadCreativeConversationThread(activeCreativeConversationId.value)
+    }
   } catch (error) {
     const text = error instanceof Error ? error.message : '参考图上传失败'
     message.error(text)
@@ -509,8 +635,10 @@ async function handleCreativeGenerate(payload: {
     })
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
     creativeImageCaption.value = payload.prompt
+    await loadCreativeConversationThread(conversationId)
     await resolveGenerationTask(created.taskId)
     await refreshCreativeConversations()
+    await loadCreativeConversationThread(conversationId)
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask()
@@ -667,6 +795,8 @@ onUnmounted(() => {
             :generation-result="generationResult"
             :caption="creativeImageCaption"
             :conversations="creativeConversations"
+            :thread-turns="creativeThreadTurns"
+            :is-loading-conversation="isLoadingCreativeConversation"
             :active-conversation-id="activeCreativeConversationId"
             :is-new-conversation-disabled="isCreatingCreativeConversation || hasActiveCreativeConversationDraft"
             :reference-asset="creativeReferenceAsset"
