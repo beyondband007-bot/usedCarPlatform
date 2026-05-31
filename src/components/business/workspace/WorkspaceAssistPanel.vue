@@ -24,8 +24,10 @@ import {
   recentStatusLabelMap,
   resolveWorkspaceOptionTitle,
 } from '@/utils/workspace-recent'
-import watermarkBeforeOne from '@/assets/img/水印图1.png'
-import watermarkAfterOne from '@/assets/img/无水印图1.png'
+import {
+  isWorkspaceFeatureCompareCode,
+  workspaceFeatureCompareMap,
+} from '@/constants/workspace-feature-compare'
 import tutorialCarImage from '@/assets/img/tutorial/upload-car.png'
 import tutorialResultImage from '@/assets/img/tutorial/generate-result.png'
 import type {
@@ -65,16 +67,27 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 const templateCards = workspaceTemplateRecommendations;
 
-const watermarkCompareCards = [
-  { before: watermarkBeforeOne, after: watermarkAfterOne },
-] as const;
-const watermarkCompareProgress = ref([50]);
-const watermarkCompareMediaRefs = ref<(HTMLElement | null)[]>([]);
-const activeWatermarkCompareDrag = ref<{
+const featureCompareActiveView = ref<"features" | "recent" | "generating">("features");
+
+const isFeatureCompareCapability = computed(() =>
+  isWorkspaceFeatureCompareCode(props.capability.code),
+);
+
+const featureCompareContent = computed(() => {
+  if (!isWorkspaceFeatureCompareCode(props.capability.code)) return null;
+  return workspaceFeatureCompareMap[props.capability.code];
+});
+
+const featureCompareCards = computed(
+  () => featureCompareContent.value?.cards ?? [],
+);
+
+const featureCompareProgress = ref([50]);
+const featureCompareMediaRefs = ref<(HTMLElement | null)[]>([]);
+const activeFeatureCompareDrag = ref<{
   index: number;
   pointerId: number;
 } | null>(null);
-const watermarkActiveView = ref<"features" | "recent" | "generating">("features");
 
 function isTemplateActive(item: (typeof templateCards)[number]) {
   return (
@@ -90,48 +103,48 @@ function handleTemplatePick(item: (typeof templateCards)[number]) {
   });
 }
 
-function clampWatermarkCompareProgress(value: number) {
+function clampFeatureCompareProgress(value: number) {
   return Math.min(88, Math.max(12, value));
 }
 
-function setWatermarkCompareMediaRef(index: number, element: unknown) {
-  watermarkCompareMediaRefs.value[index] = element instanceof HTMLElement ? element : null;
+function setFeatureCompareMediaRef(index: number, element: unknown) {
+  featureCompareMediaRefs.value[index] = element instanceof HTMLElement ? element : null;
 }
 
-function updateWatermarkCompareProgress(index: number, clientX: number) {
-  const element = watermarkCompareMediaRefs.value[index];
+function updateFeatureCompareProgress(index: number, clientX: number) {
+  const element = featureCompareMediaRefs.value[index];
   if (!element) return;
 
   const rect = element.getBoundingClientRect();
   if (!rect.width) return;
 
   const next = ((clientX - rect.left) / rect.width) * 100;
-  watermarkCompareProgress.value[index] = clampWatermarkCompareProgress(next);
+  featureCompareProgress.value[index] = clampFeatureCompareProgress(next);
 }
 
-function handleWatermarkComparePointerMove(event: PointerEvent) {
-  const drag = activeWatermarkCompareDrag.value;
+function handleFeatureComparePointerMove(event: PointerEvent) {
+  const drag = activeFeatureCompareDrag.value;
   if (!drag || event.pointerId !== drag.pointerId) return;
 
-  updateWatermarkCompareProgress(drag.index, event.clientX);
+  updateFeatureCompareProgress(drag.index, event.clientX);
 }
 
-function endWatermarkCompareDrag() {
-  activeWatermarkCompareDrag.value = null;
-  window.removeEventListener("pointermove", handleWatermarkComparePointerMove);
-  window.removeEventListener("pointerup", endWatermarkCompareDrag);
-  window.removeEventListener("pointercancel", endWatermarkCompareDrag);
+function endFeatureCompareDrag() {
+  activeFeatureCompareDrag.value = null;
+  window.removeEventListener("pointermove", handleFeatureComparePointerMove);
+  window.removeEventListener("pointerup", endFeatureCompareDrag);
+  window.removeEventListener("pointercancel", endFeatureCompareDrag);
 }
 
-function startWatermarkCompareDrag(index: number, event: PointerEvent) {
-  activeWatermarkCompareDrag.value = {
+function startFeatureCompareDrag(index: number, event: PointerEvent) {
+  activeFeatureCompareDrag.value = {
     index,
     pointerId: event.pointerId,
   };
-  updateWatermarkCompareProgress(index, event.clientX);
-  window.addEventListener("pointermove", handleWatermarkComparePointerMove);
-  window.addEventListener("pointerup", endWatermarkCompareDrag);
-  window.addEventListener("pointercancel", endWatermarkCompareDrag);
+  updateFeatureCompareProgress(index, event.clientX);
+  window.addEventListener("pointermove", handleFeatureComparePointerMove);
+  window.addEventListener("pointerup", endFeatureCompareDrag);
+  window.addEventListener("pointercancel", endFeatureCompareDrag);
 }
 
 const appStore = useAppStore();
@@ -356,8 +369,8 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
 function shouldPollRecent() {
   if (props.isGenerating) return true;
   if (
-    props.capability.code === "watermark-remove" &&
-    (watermarkActiveView.value === "recent" || watermarkActiveView.value === "generating")
+    isFeatureCompareCapability.value &&
+    (featureCompareActiveView.value === "recent" || featureCompareActiveView.value === "generating")
   ) {
     return canAutoRefreshRecent(recentItems.value);
   }
@@ -429,8 +442,8 @@ watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
     if (generating) {
-      if (props.capability.code === "watermark-remove") {
-        watermarkActiveView.value = "generating";
+      if (isFeatureCompareCapability.value) {
+        featureCompareActiveView.value = "generating";
       } else {
         activeTab.value = "generating";
       }
@@ -438,9 +451,9 @@ watch(
       return;
     }
 
-    if (props.capability.code === "watermark-remove") {
-      if (watermarkActiveView.value === "generating") {
-        watermarkActiveView.value = "features";
+    if (isFeatureCompareCapability.value) {
+      if (featureCompareActiveView.value === "generating") {
+        featureCompareActiveView.value = "features";
       }
     } else if (activeTab.value === "generating") {
       activeTab.value = "guide";
@@ -462,17 +475,22 @@ watch(
     if (
       props.isGenerating ||
       activeTab.value === "recent" ||
-      props.capability.code === "watermark-remove"
+      isFeatureCompareCapability.value
     ) {
       void loadRecentItems();
+    }
+
+    if (isFeatureCompareCapability.value) {
+      featureCompareActiveView.value = "features";
+      featureCompareProgress.value = featureCompareCards.value.map(() => 50);
     }
   },
 );
 
 watch(
-  () => watermarkActiveView.value,
+  () => featureCompareActiveView.value,
   (view) => {
-    if (props.capability.code !== "watermark-remove") return;
+    if (!isFeatureCompareCapability.value) return;
 
     if (view === "recent" || view === "generating") {
       if (!recentLoaded.value) {
@@ -510,7 +528,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopRecentAutoRefresh();
-  endWatermarkCompareDrag();
+  endFeatureCompareDrag();
 });
 
 defineExpose({
@@ -537,26 +555,26 @@ defineExpose({
       @back="closeDeliveryImagePreview"
     />
 
-    <template v-else-if="capability.code === 'watermark-remove'">
+    <template v-else-if="isFeatureCompareCapability && featureCompareContent">
       <div class="assist-shell">
         <header class="assist-tabs">
-          <div class="tab-group" role="tablist" aria-label="去水印视图切换">
+          <div class="tab-group" role="tablist" :aria-label="featureCompareContent.tabListLabel">
             <template v-if="isGenerating">
               <button
                 type="button"
                 role="tab"
-                :aria-selected="watermarkActiveView === 'generating'"
-                :class="{ active: watermarkActiveView === 'generating' }"
-                @click="watermarkActiveView = 'generating'"
+                :aria-selected="featureCompareActiveView === 'generating'"
+                :class="{ active: featureCompareActiveView === 'generating' }"
+                @click="featureCompareActiveView = 'generating'"
               >
                 正在生成
               </button>
               <button
                 type="button"
                 role="tab"
-                :aria-selected="watermarkActiveView === 'recent'"
-                :class="{ active: watermarkActiveView === 'recent' }"
-                @click="watermarkActiveView = 'recent'"
+                :aria-selected="featureCompareActiveView === 'recent'"
+                :class="{ active: featureCompareActiveView === 'recent' }"
+                @click="featureCompareActiveView = 'recent'"
               >
                 最近生成
               </button>
@@ -565,18 +583,18 @@ defineExpose({
               <button
                 type="button"
                 role="tab"
-                :aria-selected="watermarkActiveView === 'features'"
-                :class="{ active: watermarkActiveView === 'features' }"
-                @click="watermarkActiveView = 'features'"
+                :aria-selected="featureCompareActiveView === 'features'"
+                :class="{ active: featureCompareActiveView === 'features' }"
+                @click="featureCompareActiveView = 'features'"
               >
                 功能描述
               </button>
               <button
                 type="button"
                 role="tab"
-                :aria-selected="watermarkActiveView === 'recent'"
-                :class="{ active: watermarkActiveView === 'recent' }"
-                @click="watermarkActiveView = 'recent'"
+                :aria-selected="featureCompareActiveView === 'recent'"
+                :class="{ active: featureCompareActiveView === 'recent' }"
+                @click="featureCompareActiveView = 'recent'"
               >
                 最近生成
               </button>
@@ -586,7 +604,7 @@ defineExpose({
 
         <div class="assist-body">
           <section
-            v-if="isGenerating && watermarkActiveView === 'generating'"
+            v-if="isGenerating && featureCompareActiveView === 'generating'"
             class="generation-waiting"
             aria-live="polite"
           >
@@ -596,8 +614,8 @@ defineExpose({
             </div>
             <div class="waiting-copy">
               <p>图片待处理</p>
-              <h2>正在去除水印</h2>
-              <span>AI 正在识别并处理水印区域，请稍候。</span>
+              <h2>{{ featureCompareContent.generatingTitle }}</h2>
+              <span>{{ featureCompareContent.generatingDesc }}</span>
             </div>
             <div class="waiting-progress" aria-hidden="true">
               <span></span>
@@ -605,36 +623,52 @@ defineExpose({
           </section>
 
           <section
-            v-else-if="watermarkActiveView === 'features'"
+            v-else-if="featureCompareActiveView === 'features'"
             class="watermark-feature-layout"
-            aria-label="去水印功能描述"
+            :aria-label="featureCompareContent.featureSectionLabel"
           >
             <section class="watermark-assist-hero">
               <div class="watermark-assist-copy">
-                <p>AI 去水印能力</p>
-                <h2>智能识别水印并完整保留画面细节</h2>
-                <span>适用于平台角标、文字与遮挡痕迹处理，输出更干净的车图素材。</span>
+                <p>{{ featureCompareContent.heroBadge }}</p>
+                <h2>{{ featureCompareContent.heroTitle }}</h2>
+                <span>{{ featureCompareContent.heroDesc }}</span>
               </div>
             </section>
 
             <section class="watermark-compare-section" aria-label="效果对比">
               <header class="watermark-section-head">
                 <div>
-                  <h3>效果对比</h3>
-                  <p>拖动滑杆查看去水印前后效果对比</p>
+                  <h3>{{ featureCompareContent.compareTitle }}</h3>
+                  <p>{{ featureCompareContent.compareHint }}</p>
                 </div>
               </header>
 
               <div class="watermark-compare-grid">
-                <article v-for="(card, index) in watermarkCompareCards" :key="card.before" class="watermark-compare-card">
+                <article
+                  v-for="(card, index) in featureCompareCards"
+                  :key="card.before"
+                  class="watermark-compare-card"
+                >
                   <div
-                    :ref="(element) => setWatermarkCompareMediaRef(index, element)"
+                    :ref="(element) => setFeatureCompareMediaRef(index, element)"
                     class="watermark-compare-media"
-                    :style="{ '--compare-progress': `${watermarkCompareProgress[index]}%` }"
-                    @pointerdown.prevent="startWatermarkCompareDrag(index, $event)"
+                    :style="{ '--compare-progress': `${featureCompareProgress[index]}%` }"
+                    @pointerdown.prevent="startFeatureCompareDrag(index, $event)"
                   >
-                    <PreloadImage class="watermark-compare-image" :src="card.before" alt="去水印处理前" loading="lazy" decoding="async" />
-                    <PreloadImage class="watermark-compare-image watermark-compare-image--after" :src="card.after" alt="去水印处理后" loading="lazy" decoding="async" />
+                    <PreloadImage
+                      class="watermark-compare-image"
+                      :src="card.before"
+                      :alt="featureCompareContent.beforeAlt"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <PreloadImage
+                      class="watermark-compare-image watermark-compare-image--after"
+                      :src="card.after"
+                      :alt="featureCompareContent.afterAlt"
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <div class="watermark-compare-divider" aria-hidden="true">
                       <span></span>
                     </div>
@@ -643,8 +677,8 @@ defineExpose({
                     <button
                       type="button"
                       class="watermark-compare-handle"
-                      aria-label="去水印前后对比拖拽滑杆"
-                      @pointerdown.prevent.stop="startWatermarkCompareDrag(index, $event)"
+                      :aria-label="featureCompareContent.handleAriaLabel"
+                      @pointerdown.prevent.stop="startFeatureCompareDrag(index, $event)"
                     >
                       <Icon icon="mdi:unfold-more-horizontal" />
                     </button>

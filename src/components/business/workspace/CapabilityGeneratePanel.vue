@@ -33,7 +33,6 @@ import type {
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
-import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -89,7 +88,6 @@ const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const presetInput = ref(visualTemplates.value[0]?.name ?? "");
 const isApplyingTemplate = ref(false);
-const selectedPaintColor = ref("");
 const uploadedAsset = ref<UploadedAsset | null>(null);
 const batchExteriorUploads = ref<BatchExteriorUploadItem[]>([]);
 const uploadedInteriorAssets = ref<UploadedAsset[]>([]);
@@ -153,10 +151,6 @@ function resetBatchCreateSection() {
 function resetUploadedInterior() {
   uploadedInteriorAssets.value = [];
 }
-
-const showPaintColorPicker = computed(
-  () => props.capability.code === "paint-refresh",
-);
 
 const outputRatioOptions = [
   { label: "1:1 主图", value: "1:1" },
@@ -348,14 +342,19 @@ async function handleVehicleFileSelected(file: File) {
   isUploadingVehicle.value = true;
 
   try {
-    const asset = await uploadAsset(file, "car_exterior");
+    const purpose = props.capability.code === "interior-clean" ? "car_interior" : "car_exterior";
+    const asset = await uploadAsset(file, purpose);
     uploadedAsset.value = asset;
     revokePreviewObjectUrl();
     uploadedPreviewUrl.value = asset.url;
-    message.success("车辆图片上传成功");
+    message.success(props.capability.code === "interior-clean" ? "内饰图片上传成功" : "车辆图片上传成功");
   } catch (error) {
     resetUploadedVehicle();
-    const text = error instanceof Error ? error.message : "车辆图片上传失败";
+    const text = error instanceof Error
+      ? error.message
+      : props.capability.code === "interior-clean"
+        ? "内饰图片上传失败"
+        : "车辆图片上传失败";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
@@ -529,10 +528,6 @@ function handleGenerate() {
     optionId:
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
-    colorCode:
-      props.capability.code === "paint-refresh" && selectedPaintColor.value
-        ? selectedPaintColor.value
-        : undefined,
   });
 }
 
@@ -1457,11 +1452,6 @@ const activeCreateRatioLabel = computed(() => {
         :is-uploading="isUploadingVehicle"
         @select-file="handleVehicleFileSelected"
         @remove="handleVehicleImageRemove"
-      />
-
-      <PaintColorPicker
-        v-if="showPaintColorPicker"
-        v-model="selectedPaintColor"
       />
 
       <CapabilityOptionSelector

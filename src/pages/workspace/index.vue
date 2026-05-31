@@ -11,6 +11,7 @@ import {
   getCreativeImageConversations,
   getCreativeImageMessages,
   getGenerationTask,
+  getRecentGenerationTasks,
   uploadCreativeImageReference,
   type BatchTaskDetail,
   type CreateGenerationTaskPayload,
@@ -18,6 +19,7 @@ import {
   type CreativeImageMessage,
   type GenerationTaskDetail,
   type GenerationTaskStatus,
+  type RecentGenerationTask,
   type UploadedAsset,
 } from '@/api/visual-workbench'
 import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
@@ -25,6 +27,8 @@ import CreativeImageStudioPanel from '@/components/business/workspace/CreativeIm
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
+import { usePointsStore } from '@/stores/points'
+import { useSubscriptionStore } from '@/stores/subscription'
 import type {
   CreativeThreadTurn,
   WorkspaceBatchActiveJob,
@@ -43,8 +47,15 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const appStore = useAppStore()
+const pointsStore = usePointsStore()
+const subscriptionStore = useSubscriptionStore()
 const SHORT_VIDEO_CAPABILITY_CODE = 'short-video'
 const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
+const RECENT_GENERATION_SCAN_PAGE_SIZE = 50
+const runningGenerationStatuses = new Set(['waiting', 'queued', 'queue', 'generating'])
+const recentGenerationModuleCodes = workspaceCapabilities
+  .filter((capability) => capability.code !== 'batch-new' && capability.code !== 'delivery')
+  .map((capability) => capability.code)
 
 interface ActiveGenerationTaskSnapshot {
   taskId: string
@@ -74,7 +85,10 @@ const generatingCapabilityCode = ref<string | null>(null)
 const shortVideoPlayRequest = ref(0)
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(null)
 const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([])
+const trackedRunningTasks = ref<Record<string, string>>({})
 let batchPollTimer: number | null = null
+let globalGenerationPollTimer: number | null = null
+let isRefreshingRunningTasks = false
 
 function resolveCapabilityCodeFromModule(moduleCode: string) {
   const matched = workspaceCapabilities.find(
@@ -138,6 +152,48 @@ function isTerminalBatchStatus(status: GenerationTaskStatus | WorkspaceRecentIte
 function mapBatchStatus(status: GenerationTaskStatus): WorkspaceRecentItem['status'] {
   if (status === 'queued') return 'queued'
   return status
+}
+
+function normalizeRecentTaskStatus(task: RecentGenerationTask) {
+  const status = task.uiStatus ?? task.status
+  return status === 'queue' ? 'queued' : status
+}
+
+function isRunningGenerationStatus(status?: string | null) {
+  return Boolean(status && runningGenerationStatuses.has(status))
+}
+
+function setTrackedRunningTasks(next: Record<string, string>) {
+  trackedRunningTasks.value = next
+  pointsStore.setRunningTasks(Object.keys(next).length)
+
+  if (Object.keys(next).length) {
+    startGlobalGenerationPolling()
+  } else {
+    stopGlobalGenerationPolling()
+  }
+}
+
+function trackRunningTask(taskId: string, moduleCode: string) {
+  setTrackedRunningTasks({
+    ...trackedRunningTasks.value,
+    [taskId]: moduleCode,
+  })
+}
+
+function stopGlobalGenerationPolling() {
+  if (globalGenerationPollTimer !== null) {
+    window.clearInterval(globalGenerationPollTimer)
+    globalGenerationPollTimer = null
+  }
+}
+
+function startGlobalGenerationPolling() {
+  if (globalGenerationPollTimer !== null) return
+
+  globalGenerationPollTimer = window.setInterval(() => {
+    void pollTrackedRunningTasks()
+  }, 4000)
 }
 
 function mapBatchDetailToJob(
@@ -298,16 +354,119 @@ function syncWorkspaceFromTask(task: Pick<GenerationTaskDetail, 'moduleCode' | '
   }
 }
 
+async function refreshTrackedRunningTasks() {
+  if (isRefreshingRunningTasks) return Object.keys(trackedRunningTasks.value).length
+  isRefreshingRunningTasks = true
+
+  try {
+    const next: Record<string, string> = {}
+    const activeTask = readActiveGenerationTask()
+
+    if (activeTask?.taskId) {
+      next[activeTask.taskId] = activeTask.moduleCode
+    }
+
+    const results = await Promise.allSettled(
+      recentGenerationModuleCodes.map((moduleCode) =>
+        getRecentGenerationTasks({
+          moduleCode,
+          page: 1,
+          pageSize: RECENT_GENERATION_SCAN_PAGE_SIZE,
+        }).then((result) => ({ moduleCode, items: result.items })),
+      ),
+    )
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue
+
+      for (const task of result.value.items) {
+        const status = normalizeRecentTaskStatus(task)
+        const taskId = task.taskId ?? task.id
+        if (!taskId || !isRunningGenerationStatus(status)) continue
+
+        next[taskId] = task.moduleCode ?? result.value.moduleCode
+      }
+    }
+
+    setTrackedRunningTasks(next)
+    return Object.keys(next).length
+  } finally {
+    isRefreshingRunningTasks = false
+  }
+}
+
+async function pollTrackedRunningTasks() {
+  const entries = Object.entries(trackedRunningTasks.value)
+  if (!entries.length) {
+    stopGlobalGenerationPolling()
+    return
+  }
+
+  const next: Record<string, string> = { ...trackedRunningTasks.value }
+  let hasTerminalTask = false
+
+  const results = await Promise.allSettled(
+    entries.map(([taskId]) => getGenerationTask(taskId)),
+  )
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+
+    const task = result.value
+    if (isTerminalGenerationStatus(task)) {
+      delete next[task.taskId]
+      clearActiveGenerationTask(task.taskId)
+      hasTerminalTask = true
+      continue
+    }
+
+    next[task.taskId] = task.moduleCode
+  }
+
+  setTrackedRunningTasks(next)
+
+  if (hasTerminalTask) {
+    if (activeCode.value === 'creative-image') {
+      void refreshCreativeConversations()
+    }
+    void assistPanelRef.value?.refreshRecentItems()
+  }
+}
+
+async function refreshRunningTaskSummary() {
+  await subscriptionStore.hydrate()
+
+  if (!pointsStore.initialized) {
+    await pointsStore.hydrate()
+  }
+
+  return refreshTrackedRunningTasks()
+}
+
+async function canStartGeneration() {
+  const runningTasks = await refreshRunningTaskSummary()
+  const limit = subscriptionStore.concurrentTaskLimit
+
+  if (runningTasks >= limit) {
+    message.warning(`当前已有 ${runningTasks} 个任务正在生成，已达到套餐并发上限 ${limit} 个，请等待任务完成后再提交`)
+    return false
+  }
+
+  return true
+}
+
 watch(
   () => route.params.code,
   (code) => {
     const resolved = resolveCapabilityCode(code)
     activeCode.value = resolved
+    void refreshRunningTaskSummary()
   },
 )
 
 function handleSelectCapability(code: string) {
   activeCode.value = code
+  void refreshRunningTaskSummary()
 
   if (route.params.code !== code) {
     router.replace({ name: 'Workspace', params: { code } })
@@ -315,17 +474,24 @@ function handleSelectCapability(code: string) {
 }
 
 const sidebarGeneratingCodes = computed(() => {
-  const codes: string[] = []
+  const codes = new Set<string>()
 
   if (isGenerating.value && generatingCapabilityCode.value) {
-    codes.push(generatingCapabilityCode.value)
+    codes.add(generatingCapabilityCode.value)
   }
 
   if (batchActiveJobs.value.some((job) => !isTerminalBatchStatus(job.status))) {
-    codes.push('batch-new')
+    codes.add('batch-new')
   }
 
-  return codes
+  for (const moduleCode of Object.values(trackedRunningTasks.value)) {
+    const code = resolveCapabilityCodeFromModule(moduleCode)
+    if (code) {
+      codes.add(code)
+    }
+  }
+
+  return [...codes]
 })
 
 const activeCapability = computed(
@@ -480,6 +646,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     clearActiveGenerationTask(taskId)
     isGenerating.value = false
     generatingCapabilityCode.value = null
+    void refreshRunningTaskSummary()
   }
 }
 
@@ -613,6 +780,10 @@ async function handleCreativeGenerate(payload: {
     return
   }
 
+  if (!(await canStartGeneration())) {
+    return
+  }
+
   isGenerating.value = true
   generationResult.value = null
   creativeImageCaption.value = null
@@ -633,7 +804,9 @@ async function handleCreativeGenerate(payload: {
       taskId: created.taskId,
       moduleCode: created.moduleCode,
     })
+    trackRunningTask(created.taskId, created.moduleCode)
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
+    await refreshRunningTaskSummary()
     creativeImageCaption.value = payload.prompt
     await loadCreativeConversationThread(conversationId)
     await resolveGenerationTask(created.taskId)
@@ -653,6 +826,10 @@ async function handleCreativeGenerate(payload: {
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
   if (!payload.inputAssetId) {
     message.warning('请先上传车辆图片')
+    return
+  }
+
+  if (!(await canStartGeneration())) {
     return
   }
 
@@ -676,7 +853,9 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       moduleCode: created.moduleCode || activeCapability.value.code,
       optionId: created.optionId ?? payload.optionId,
     })
+    trackRunningTask(created.taskId, created.moduleCode || activeCapability.value.code)
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
+    await refreshRunningTaskSummary()
 
     await resolveGenerationTask(created.taskId)
   } catch (error) {
@@ -736,6 +915,7 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
 }
 
 onMounted(() => {
+  void refreshRunningTaskSummary()
   void refreshCreativeConversations()
 
   const activeTask = readActiveGenerationTask()
@@ -750,6 +930,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopGlobalGenerationPolling()
   stopBatchPolling()
 })
 
@@ -761,7 +942,10 @@ onUnmounted(() => {
     :class="[
       appStore.isDarkMode ? 'theme-dark' : 'theme-light',
       {
-        'workspace-page--watermark': activeCode === 'watermark-remove',
+        'workspace-page--feature-compare':
+          activeCode === 'watermark-remove'
+          || activeCode === 'paint-refresh'
+          || activeCode === 'light-consistency',
         'workspace-page--creative-image': activeCode === 'creative-image',
       },
     ]"
@@ -1011,7 +1195,7 @@ onUnmounted(() => {
   }
 }
 
-.workspace-page--watermark .workspace-shell {
+.workspace-page--feature-compare .workspace-shell {
   @media (width >= 1024px) {
     grid-template-columns: 240px minmax(340px, 430px) minmax(0, 1fr);
   }
