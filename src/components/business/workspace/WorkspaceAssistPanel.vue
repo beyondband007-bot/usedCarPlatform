@@ -472,17 +472,21 @@ watch(
     recentItems.value = [];
     recentLoaded.value = false;
 
+    if (isFeatureCompareCapability.value) {
+      featureCompareActiveView.value = props.isGenerating ? "generating" : "features";
+      featureCompareProgress.value = featureCompareCards.value.map(() => 50);
+    } else if (isBatchProcessingView.value) {
+      activeTab.value = "batchProcessing";
+    } else {
+      activeTab.value = props.isGenerating ? "generating" : "guide";
+    }
+
     if (
       props.isGenerating ||
       activeTab.value === "recent" ||
       isFeatureCompareCapability.value
     ) {
       void loadRecentItems();
-    }
-
-    if (isFeatureCompareCapability.value) {
-      featureCompareActiveView.value = "features";
-      featureCompareProgress.value = featureCompareCards.value.map(() => 50);
     }
   },
 );

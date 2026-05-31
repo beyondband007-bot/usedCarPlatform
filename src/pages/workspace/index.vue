@@ -498,6 +498,17 @@ const activeCapability = computed(
   () => workspaceCapabilities.find((capability) => capability.code === activeCode.value) ?? workspaceCapabilities[0],
 )
 
+const activeModuleGenerating = computed(() => {
+  if (isGenerating.value && generatingCapabilityCode.value === activeCode.value) {
+    return true
+  }
+
+  return Object.values(trackedRunningTasks.value).some((moduleCode) => {
+    const resolvedCode = resolveCapabilityCodeFromModule(moduleCode)
+    return resolvedCode === activeCode.value
+  })
+})
+
 const activeCreativeConversation = computed(
   () =>
     creativeConversations.value.find((item) => item.conversationId === activeCreativeConversationId.value) ??
@@ -975,7 +986,7 @@ onUnmounted(() => {
           <CreativeImageStudioPanel
             v-if="activeCode === 'creative-image'"
             :capability="activeCapability"
-            :is-generating="isGenerating"
+            :is-generating="activeModuleGenerating"
             :is-uploading-reference="isUploadingCreativeReference"
             :generation-result="generationResult"
             :caption="creativeImageCaption"
@@ -994,7 +1005,7 @@ onUnmounted(() => {
             v-else
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
-            :is-generating="isGenerating"
+            :is-generating="activeModuleGenerating"
             :previewed-delivery-task-id="previewedDeliveryTaskId"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
@@ -1009,7 +1020,7 @@ onUnmounted(() => {
           ref="assistPanelRef"
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
-          :is-generating="isGenerating"
+          :is-generating="activeModuleGenerating"
           :generation-result="generationResult"
           :delivery-image-preview="deliveryImagePreview"
           :short-video-play-request="shortVideoPlayRequest"
