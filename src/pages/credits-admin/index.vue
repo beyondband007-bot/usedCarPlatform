@@ -10,10 +10,21 @@ import {
   type CreditsFunction,
   type RechargeProduct,
 } from "@/api/visual-workbench";
+import {
+  canAgentCreateClientAccount,
+  canCreatePlatformAccount,
+  type AccountProvisioningRole,
+} from "@/policies/accountProvisioning";
 import { useAuthStore } from "@/stores/auth";
 
-type ConsoleRole = "developer" | "admin" | "agent";
+type ConsoleRole = AccountProvisioningRole;
 type TagTone = "blue" | "green" | "orange" | "red" | "cyan" | "default";
+
+interface ConsoleActionItem {
+  label: string;
+  disabled?: boolean;
+  reason?: string;
+}
 
 interface MetricItem {
   label: string;
@@ -39,7 +50,7 @@ interface ConsolePage {
   badge: string;
   title: string;
   subtitle: string;
-  actions: string[];
+  actions: Array<string | ConsoleActionItem>;
   metrics: MetricItem[];
   tableTitle: string;
   columns: string[];
@@ -264,7 +275,7 @@ const sideItems = {
   agent: [
     { title: "客户跟进", desc: "3 个报备商机 7 天未更新。", tag: "待办", tone: "orange" },
     { title: "结算确认", desc: "5 月返佣账单待确认。", tag: "财务", tone: "cyan" },
-    { title: "资料完善", desc: "结算账户资质将在 30 天后过期。", tag: "提醒", tone: "blue" },
+    { title: "账号创建", desc: "首发版本代理商不能创建客户账号，只能提交报备。", tag: "未开放", tone: "orange" },
   ] satisfies SideItem[],
 };
 
@@ -280,13 +291,21 @@ const agentPages = computed<Record<string, ConsolePage>>(() => ({
       { label: "待结算返佣", value: "¥ 4,628", hint: "预计 2026-06-05", icon: "mdi:cash-clock" },
       { label: "本月客户消费", value: "76,900", hint: "积分", icon: "mdi:chart-line" },
     ],
-    actions: ["报备商机", "新增客户", "复制邀请链接"],
+    actions: [
+      "报备商机",
+      {
+        label: "创建客户账号",
+        disabled: !canAgentCreateClientAccount("agent"),
+        reason: "首发版本仅平台开发者和管理员可创建账号；代理商客户账号创建将在后续开放。",
+      },
+      "复制邀请链接",
+    ],
     tableTitle: "近期客户动态",
     columns: ["客户", "联系人", "阶段", "累计充值", "累计消费", "最近动作", "操作"],
     rows: staticRows.customerDynamics,
     sideTitle: "代理待办",
     side: sideItems.agent,
-    note: "代理商只能看自己名下客户和返佣，不能看平台全局流水。",
+    note: "代理商只能看自己名下客户和返佣，首发版本不能创建客户账号；客户账号由平台开发者或管理员创建。",
   },
   leads: {
     menu: "线索/报备",
@@ -322,7 +341,15 @@ const agentPages = computed<Record<string, ConsolePage>>(() => ({
       { label: "沉默客户", value: "3", hint: "14 天无消费", icon: "mdi:sleep" },
       { label: "本月新增", value: "4", hint: "客户", icon: "mdi:account-plus" },
     ],
-    actions: ["新增客户", "批量导入", "导出客户"],
+    actions: [
+      {
+        label: "创建客户账号",
+        disabled: !canAgentCreateClientAccount("agent"),
+        reason: "首发版本代理商不能创建客户账号；可先提交客户资料，由平台管理员开通。",
+      },
+      "批量导入资料",
+      "导出客户",
+    ],
     tableTitle: "客户列表",
     columns: ["客户名称", "联系人", "状态", "绑定方式", "累计充值", "累计消费", "操作"],
     rows: staticRows.customerDynamics.map((row) => ({
@@ -335,7 +362,7 @@ const agentPages = computed<Record<string, ConsolePage>>(() => ({
       { title: "需唤醒", desc: "3 个客户 14 天无调用。", tag: "提醒", tone: "orange" },
       { title: "资料缺失", desc: "4 个客户未补营业信息。", tag: "补齐", tone: "blue" },
     ],
-    note: "代理商可新增和编辑客户基础资料，但客户归属和积分账户变更需要管理员审核。",
+    note: "首发版本代理商只能维护客户资料和跟进状态，不能创建登录账号；后续可开放代理商为客户创建账号的受控流程。",
   },
   consumption: {
     menu: "客户消费",
@@ -479,7 +506,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "启用能力", value: String(activeFunctionCount.value), hint: "usedCarPlatform functions", icon: "mdi:function-variant" },
           { label: "充值产品", value: String(enabledProductCount.value), hint: "enabled products", icon: "mdi:cart-outline" },
         ],
-        actions: ["新建租户", "新建应用", "手动对账", "导出审计"],
+        actions: ["新建租户/客户账号", "新建应用", "手动对账", "导出审计"],
         tableTitle: "系统核心对象",
         columns: ["对象", "数量", "可新增", "可编辑", "可删除", "风险等级", "入口"],
         rows: [
@@ -490,7 +517,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
         ],
         sideTitle: "开发待办",
         side: sideItems.dev,
-        note: "开发者是最高权限账号，但资金类删除应采用软删除/禁用/冲正，不做物理删除。",
+        note: "首发版本账号必须由平台开发者或管理员创建。开发者是最高权限账号，但资金类删除应采用软删除/禁用/冲正，不做物理删除。",
       },
       apps: {
         menu: "应用/API 管理",
@@ -526,12 +553,12 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "高危操作", value: "5", hint: "需二次确认", icon: "mdi:alert-outline" },
           { label: "审计覆盖", value: "100%", hint: "operatorId", icon: "mdi:file-search-outline" },
         ],
-        actions: ["新增记录", "批量编辑", "软删除", "查看变更日志"],
+        actions: ["新增客户账号", "批量编辑", "软删除", "查看变更日志"],
         tableTitle: "数据表权限",
         columns: ["数据对象", "新增", "读取", "编辑", "删除/禁用", "审计字段", "说明"],
         rows: [
           { cells: ["tenants", "允许", "允许", "允许", "软删除", "operatorId/reason", "客户组织"], tone: "blue" },
-          { cells: ["users", "允许", "允许", "允许", "禁用", "before/after", "登录身份"], tone: "blue" },
+          { cells: ["users", "平台所有者", "允许", "允许", "禁用", "createdBy/role", "首发仅开发者/管理员创建"], tone: "blue" },
           { cells: ["credit_accounts", "受控", "允许", "调账", "禁止", "reason/balance", "积分账户"], tone: "red" },
           { cells: ["credit_transactions", "禁止", "允许", "禁止", "禁止", "immutable", "不可变流水"], tone: "red" },
           { cells: ["recharge_products", "允许", "允许", "允许", "下架", "version", "充值档位"], tone: "orange" },
@@ -542,7 +569,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { title: "产品下架", desc: "不影响历史订单。", tag: "规则", tone: "orange" },
           { title: "用户禁用", desc: "保留历史流水和审计。", tag: "合规", tone: "cyan" },
         ],
-        note: "这里是后台字段权限蓝图；资金写操作后续需要真实审批接口。",
+        note: "这里是后台字段权限蓝图；首发版本 user/tenant/account 创建仅限平台开发者和管理员，资金写操作后续需要真实审批接口。",
       },
       tenants: {
         menu: "租户/客户",
@@ -555,7 +582,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "代理归属", value: "42", hint: "客户", icon: "mdi:account-tie" },
           { label: "异常客户", value: "6", hint: "需处理", icon: "mdi:alert-circle-outline" },
         ],
-        actions: ["新建客户", "编辑归属", "禁用客户", "导入客户"],
+        actions: ["新建客户账号", "编辑归属", "禁用客户", "导入客户"],
         tableTitle: "客户列表",
         columns: ["客户", "tenantId", "状态", "代理商", "成员数", "可用积分", "累计充值", "操作"],
         rows: staticRows.tenants,
@@ -563,9 +590,9 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
         side: [
           { title: "归属变更", desc: "会影响未来返佣，不重算历史。", tag: "规则", tone: "cyan" },
           { title: "禁用客户", desc: "禁止新任务，保留查询。", tag: "安全", tone: "orange" },
-          { title: "充值档位", desc: "可绑定企业专属档位。", tag: "配置", tone: "blue" },
+          { title: "账号开通", desc: "首发版本仅平台开发者/管理员可创建客户账号。", tag: "Owner", tone: "green" },
         ],
-        note: "公司管理员也能看此模块，但不能删除或改核心账户策略。",
+        note: "客户账号首发版本由平台开发者或管理员创建；公司管理员也能看此模块，但不能删除或改核心账户策略。",
       },
       accounts: {
         menu: "用户/账户",
@@ -578,7 +605,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "冻结积分", value: formatNumber(lockedBalance.value), hint: "任务中", icon: "mdi:lock-clock" },
           { label: "锁定账户", value: "0", hint: "demo", icon: "mdi:account-lock-outline" },
         ],
-        actions: ["新建用户", "禁用用户", "手动调账", "解锁账户"],
+        actions: ["新建用户账号", "禁用用户", "手动调账", "解锁账户"],
         tableTitle: "账户列表",
         columns: ["主体", "账户类型", "状态", "可用积分", "冻结积分", "租户ID", "用户ID", "操作"],
         rows: accountRows.value,
@@ -586,9 +613,9 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
         side: [
           { title: "调账", desc: "必须生成 adjustment 流水。", tag: "强审计", tone: "red" },
           { title: "冻结", desc: "任务冻结 30 分钟超时退款。", tag: "规则", tone: "orange" },
-          { title: "锁定", desc: "登录失败 5 次锁定 15 分钟。", tag: "安全", tone: "cyan" },
+          { title: "账号创建", desc: "首发版本由平台开发者/管理员开通。", tag: "Owner", tone: "green" },
         ],
-        note: "资金相关只能追加流水或冲正，不能直接改历史流水。",
+        note: "用户账号和积分账户首发版本只能由平台开发者或管理员创建；资金相关只能追加流水或冲正，不能直接改历史流水。",
       },
       payments: {
         menu: "充值/支付",
@@ -680,7 +707,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "代理待办", value: "7", hint: "审核/争议/结算", icon: "mdi:clipboard-alert-outline" },
           { label: "最近流水", value: String(transactions.value.length), hint: "live transactions", icon: "mdi:format-list-bulleted" },
         ],
-        actions: ["审核代理", "导出客户", "发起补偿申请"],
+        actions: ["新建客户账号", "审核代理", "导出客户", "发起补偿申请"],
         tableTitle: "运营待办",
         columns: ["事项", "对象", "优先级", "状态", "负责人", "更新时间", "操作"],
         rows: [
@@ -690,7 +717,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
         ],
         sideTitle: "管理员边界",
         side: sideItems.ops,
-        note: "公司管理员可以处理运营动作，但不能删除不可变流水或绕过资金审计。",
+        note: "公司管理员属于首发版本账号创建责任人，可开通客户账号；但不能删除不可变流水或绕过资金审计。",
       },
       agentsView: {
         menu: "代理商管理",
@@ -726,7 +753,7 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "归属代理", value: "42", hint: "客户", icon: "mdi:account-tie" },
           { label: "账户余额", value: formatNumber(availableBalance.value), hint: "live total", icon: "mdi:wallet-outline" },
         ],
-        actions: ["编辑资料", "调整跟进人", "导出客户"],
+        actions: ["新建客户账号", "编辑资料", "调整跟进人", "导出客户"],
         tableTitle: "客户列表",
         columns: ["客户", "tenantId", "状态", "代理商", "成员数", "可用积分", "累计充值", "操作"],
         rows: staticRows.tenants,
@@ -734,9 +761,9 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
         side: [
           { title: "归属变更", desc: "会影响未来返佣，不重算历史。", tag: "规则", tone: "cyan" },
           { title: "资料维护", desc: "允许改联系人和业务标签。", tag: "允许", tone: "green" },
-          { title: "积分调账", desc: "只能发起申请，不能直接执行。", tag: "受控", tone: "red" },
+          { title: "账号开通", desc: "首发版本由平台开发者/管理员创建。", tag: "Owner", tone: "green" },
         ],
-        note: "管理员客户页是受限版本，不展示开发者的高危 CRUD。",
+        note: "管理员可以创建客户账号；此页是受限版本，不展示开发者的高危 CRUD。",
       },
       paymentsView: {
         menu: "充值订单",
@@ -808,6 +835,9 @@ const roleOptions = computed(() =>
 const activeRole = computed(() => roleProfiles.value[selectedRole.value]);
 const pageEntries = computed(() => Object.entries(activeRole.value.pages));
 const activePage = computed(() => activeRole.value.pages[activePageKey.value] ?? pageEntries.value[0]?.[1]);
+const canActiveRoleCreatePlatformAccount = computed(() =>
+  canCreatePlatformAccount(selectedRole.value),
+);
 
 const statusOptions = [
   { label: "全部状态", value: "all" },
@@ -839,6 +869,37 @@ function isNumericCell(cell: string | number | null | undefined) {
   return typeof cell === "number" || /^[+¥\d,. -]+$/.test(String(cell));
 }
 
+function normalizeAction(action: string | ConsoleActionItem): ConsoleActionItem {
+  return typeof action === "string" ? { label: action } : action;
+}
+
+function actionLabel(action: string | ConsoleActionItem) {
+  return normalizeAction(action).label;
+}
+
+function actionKey(action: string | ConsoleActionItem) {
+  const item = normalizeAction(action);
+  return `${item.label}-${item.disabled ? "disabled" : "enabled"}`;
+}
+
+function isActionDisabled(action: string | ConsoleActionItem) {
+  const item = normalizeAction(action);
+  if (item.disabled) return true;
+  if (item.label.includes("账号") && item.label.includes("新") && !canActiveRoleCreatePlatformAccount.value) {
+    return true;
+  }
+  return false;
+}
+
+function actionReason(action: string | ConsoleActionItem) {
+  const item = normalizeAction(action);
+  if (item.reason) return item.reason;
+  if (isActionDisabled(action)) {
+    return "首发版本仅平台开发者和管理员可以创建用户/客户账号。";
+  }
+  return "";
+}
+
 function selectRole(role: ConsoleRole) {
   selectedRole.value = role;
   activePageKey.value = Object.keys(roleProfiles.value[role].pages)[0];
@@ -852,8 +913,13 @@ function selectPage(key: string) {
   statusFilter.value = "all";
 }
 
-function triggerAction(action: string) {
-  lastAction.value = `${activeRole.value.label} · ${activePage.value.title} · ${action}`;
+function triggerAction(action: string | ConsoleActionItem) {
+  const item = normalizeAction(action);
+  if (isActionDisabled(action)) {
+    lastAction.value = `${activeRole.value.label} · ${activePage.value.title} · ${item.label}：${actionReason(action)}`;
+    return;
+  }
+  lastAction.value = `${activeRole.value.label} · ${activePage.value.title} · ${item.label}`;
 }
 
 function tagType(tone?: TagTone) {
@@ -952,11 +1018,13 @@ onMounted(() => {
         </NButton>
         <NButton
           v-for="action in activePage.actions"
-          :key="action"
+          :key="actionKey(action)"
           secondary
+          :disabled="isActionDisabled(action)"
+          :title="actionReason(action)"
           @click="triggerAction(action)"
         >
-          {{ action }}
+          {{ actionLabel(action) }}
         </NButton>
       </div>
 

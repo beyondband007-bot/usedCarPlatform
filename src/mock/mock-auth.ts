@@ -10,6 +10,7 @@ const permissions = {
     'menu:points',
     'menu:recharge',
     'menu:admin',
+    'account:create:platform',
   ],
   enterprise: [
     'menu:home',

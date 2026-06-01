@@ -215,6 +215,13 @@ Use `admin` to test:
 
 The role switcher inside `/credits-admin` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
 
+First release account creation policy:
+
+- user/customer accounts must be created by platform owner roles: developer or company admin
+- agents cannot create client login accounts yet
+- the agent view shows client account creation as a disabled future action
+- later agent-created client accounts should go through an approval/audit flow
+
 ## 6. Automated Verification
 
 The main integration proof is the Phase 11 smoke test.

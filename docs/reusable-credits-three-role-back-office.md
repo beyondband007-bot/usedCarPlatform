@@ -142,3 +142,14 @@ password: 123456
 This implementation finishes the three-role back-office UI and reviewable workflow surface. It does not yet implement production writes for agent, settlement, ticket, material, or admin CRUD operations.
 
 High-risk financial operations remain intentionally non-mutating from this console. Future backend work should use append-only ledger events, idempotency keys, operator identity, and audit reasons rather than direct balance or transaction edits.
+
+## First Release Account Creation Policy
+
+For the first release, all user/customer accounts must be created by platform owner roles:
+
+- developer
+- company admin
+
+Agents cannot create client login accounts in the first release. In the three-role console, agent-side customer account creation is shown as a disabled future action so reviewers can see the intended later workflow without assuming it is already available.
+
+Later, agents may be allowed to create client accounts through a controlled approval flow. That future flow should still record creator role, creator id, tenant/customer ownership, agent relation, approval status, and audit history.
