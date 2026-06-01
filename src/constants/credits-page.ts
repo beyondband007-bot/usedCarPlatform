@@ -43,8 +43,8 @@ export const creditsFlowData: CreditFlowRow[] = [
   {
     flowNo: "20260520093202",
     flowType: "\u5355\u56fe\u751f\u6210",
-    delta: "-15",
-    balance: "700",
+    delta: "-30",
+    balance: "685",
     account: "\u7ecf\u5178\u767d\u68da",
     createdAt: "2026-05-20 09:32:18",
     remark: "\u751f\u6210\u5355\u56fe\u6d88\u8017",
@@ -61,8 +61,8 @@ export const creditsFlowData: CreditFlowRow[] = [
   {
     flowNo: "20260519200504",
     flowType: "\u5931\u8d25\u9000\u6b3e",
-    delta: "+15",
-    balance: "835",
+    delta: "+30",
+    balance: "820",
     account: "\u2014",
     createdAt: "2026-05-19 20:05:12",
     remark: "\u4efb\u52a1\u5931\u8d25\u81ea\u52a8\u9000\u56de",

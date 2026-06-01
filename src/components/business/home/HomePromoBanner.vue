@@ -273,7 +273,7 @@ onUnmounted(() => {
 .promo-banner-copy h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -281,7 +281,7 @@ onUnmounted(() => {
 .promo-banner-copy p {
   margin: 0 0 8px;
   color: var(--home-media-desc);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -392,11 +392,11 @@ onUnmounted(() => {
   }
 
   .promo-banner-copy h2 {
-    font-size: 18px;
+    font-size: 22px;
   }
 
   .promo-banner-copy p {
-    font-size: 12px;
+    font-size: 14px;
   }
 }
 

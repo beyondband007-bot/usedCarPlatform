@@ -128,7 +128,7 @@ export const pointTransactions: PointTransaction[] = [
   },
   {
     title: '单图生成',
-    amount: '-15 积分',
+    amount: '-30 积分',
     description: '2026-05-20 09:32 · 经典白棚',
   },
   {
@@ -138,7 +138,7 @@ export const pointTransactions: PointTransaction[] = [
   },
   {
     title: '失败退款',
-    amount: '+15 积分',
+    amount: '+30 积分',
     positive: true,
     description: '2026-05-19 20:05 · 任务失败自动退回',
   },

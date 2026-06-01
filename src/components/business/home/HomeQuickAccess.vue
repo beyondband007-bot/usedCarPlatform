@@ -175,7 +175,7 @@ onMounted(() => {
 .suite-card h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -183,7 +183,7 @@ onMounted(() => {
 .suite-card p {
   margin: 0 0 8px;
   color: var(--home-media-desc);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -241,6 +241,14 @@ onMounted(() => {
   .suite-card-copy {
     max-width: 72%;
     padding: 34px 20px 20px;
+  }
+
+  .suite-card h2 {
+    font-size: 22px;
+  }
+
+  .suite-card p {
+    font-size: 14px;
   }
 }
 </style>

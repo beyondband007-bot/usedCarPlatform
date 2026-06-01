@@ -15,10 +15,20 @@ import outdoorTutorial1 from '@/assets/img/户外场景/教程/教程1.png'
 import outdoorTutorial2 from '@/assets/img/户外场景/教程/教程2.png'
 import outdoorTutorial3 from '@/assets/img/户外场景/教程/教程3.png'
 import outdoorTutorial4 from '@/assets/img/户外场景/教程/教程4.png'
-import roadMotionScene1 from '@/assets/img/道路动态/场景选择/傍晚高架.png'
-import roadMotionScene2 from '@/assets/img/道路动态/场景选择/商务园区.png'
-import roadMotionScene3 from '@/assets/img/道路动态/场景选择/城市主干道.png'
-import roadMotionScene4 from '@/assets/img/道路动态/场景选择/夕阳高速.png'
+import roadSceneBusinessPark from '@/assets/img/道路动态/场景选择/商务园区.png'
+import roadSceneCityDay from '@/assets/img/道路动态/场景选择/城市主干道.png'
+import roadSceneCoastal from '@/assets/img/道路动态/场景选择/海岸公路.png'
+import roadSceneForest from '@/assets/img/道路动态/场景选择/林荫大道.png'
+import roadSceneHighwaySunset from '@/assets/img/道路动态/场景选择/夕阳高速.png'
+import roadSceneMountainCurve from '@/assets/img/道路动态/场景选择/山路弯道.png'
+import roadSceneOverpassDusk from '@/assets/img/道路动态/场景选择/傍晚高架.png'
+import roadSceneRainyNight from '@/assets/img/道路动态/场景选择/雨夜城市.png'
+import roadSceneSnow from '@/assets/img/道路动态/场景选择/雪后公路.png'
+import roadSceneTunnelExit from '@/assets/img/道路动态/场景选择/隧道出口.png'
+import roadTutorialBusinessPark from '@/assets/img/道路动态/教程背景图/商务园区.png'
+import roadTutorialCityDay from '@/assets/img/道路动态/教程背景图/城市主干道.png'
+import roadTutorialHighwaySunset from '@/assets/img/道路动态/教程背景图/夕阳高速.png'
+import roadTutorialOverpassDusk from '@/assets/img/道路动态/教程背景图/傍晚高架.png'
 import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
 import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
 import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
@@ -79,16 +89,16 @@ const outdoorOptions = createOptions([
 ])
 
 const roadOptions = createOptions([
-  ['city_day_road', '城市主干道', roadMotionScene1],
-  ['highway_sunset', '夕阳高速', roadMotionScene2],
-  ['rainy_night_city', '雨夜城市', roadMotionScene3],
-  ['mountain_curve', '山路弯道', roadMotionScene4],
-  ['coastal_road', '海岸公路', roadMotionScene1],
-  ['forest_avenue', '林荫大道', roadMotionScene2],
-  ['business_park', '商务园区', roadMotionScene3],
-  ['snow_road', '雪后公路', roadMotionScene4],
-  ['overpass_dusk', '傍晚高架', roadMotionScene2],
-  ['tunnel_exit', '隧道出口', roadMotionScene3],
+  ['city_day_road', '城市主干道', roadSceneCityDay],
+  ['highway_sunset', '夕阳高速', roadSceneHighwaySunset],
+  ['rainy_night_city', '雨夜城市', roadSceneRainyNight],
+  ['mountain_curve', '山路弯道', roadSceneMountainCurve],
+  ['coastal_road', '海岸公路', roadSceneCoastal],
+  ['forest_avenue', '林荫大道', roadSceneForest],
+  ['business_park', '商务园区', roadSceneBusinessPark],
+  ['snow_road', '雪后公路', roadSceneSnow],
+  ['overpass_dusk', '傍晚高架', roadSceneOverpassDusk],
+  ['tunnel_exit', '隧道出口', roadSceneTunnelExit],
 ])
 
 const skyOptions = createOptions([
@@ -264,7 +274,7 @@ const createCapability = (capability: CapabilityInput): WorkspaceCapability => (
   accept: 'image/jpeg,image/png,image/webp',
   requiredLabel: '必填',
   balance: 1250,
-  cost: 15,
+  cost: 30,
   tutorial,
   requirements: commonRequirements,
 })
@@ -522,18 +532,6 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
 
-function toTemplateRecommendations(
-  capabilityCode: string,
-  options: WorkspaceOption[],
-): WorkspaceTemplateRecommendation[] {
-  return options.map((option) => ({
-    title: option.title,
-    capabilityCode,
-    optionId: option.id,
-    image: option.image,
-  }))
-}
-
 const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   {
     title: '经典白棚',
@@ -615,10 +613,26 @@ const skyTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   },
 ]
 
+const roadTutorialImageByTitle: Record<string, string> = {
+  城市主干道: roadTutorialCityDay,
+  夕阳高速: roadTutorialHighwaySunset,
+  傍晚高架: roadTutorialOverpassDusk,
+  商务园区: roadTutorialBusinessPark,
+}
+
+const roadTemplateRecommendations: WorkspaceTemplateRecommendation[] = roadOptions
+  .slice(0, 4)
+  .map((option) => ({
+    title: option.title,
+    capabilityCode: 'road-motion',
+    optionId: option.id,
+    image: roadTutorialImageByTitle[option.title] ?? option.image,
+  }))
+
 export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   ...showroomTemplateRecommendations,
   ...outdoorTemplateRecommendations,
-  ...toTemplateRecommendations('road-motion', roadOptions),
+  ...roadTemplateRecommendations,
   ...skyTemplateRecommendations,
 ]
 
