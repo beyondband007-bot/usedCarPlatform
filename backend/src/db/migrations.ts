@@ -75,6 +75,7 @@ export const migrations = [
     group_title VARCHAR(255) NOT NULL,
     item_kind VARCHAR(24) NOT NULL,
     input_asset_id VARCHAR(64) NOT NULL,
+    source_asset_ids_json JSON NULL,
     generation_task_id VARCHAR(64) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
     status VARCHAR(24) NOT NULL DEFAULT 'waiting',

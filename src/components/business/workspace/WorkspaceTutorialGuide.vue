@@ -51,9 +51,6 @@ const tutorialTemplatePreviewImages = [
     :class="theme === 'light' ? 'theme-light' : 'theme-dark'"
     aria-label="使用教程流程"
   >
-    <div class="section-head">
-      <h2>使用教程</h2>
-    </div>
     <div class="tutorial-flow">
       <motion.article
         v-for="(step, index) in tutorialSteps"
@@ -119,51 +116,23 @@ const tutorialTemplatePreviewImages = [
   overflow: hidden;
   min-height: 0;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 18px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.tutorial-section.theme-light {
-  border-color: rgba(203, 213, 225, 0.82);
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-}
-
-.tutorial-section h2 {
-  margin: 0;
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.3;
-  font-weight: 900;
-}
-
-.tutorial-section.theme-light h2 {
-  color: #111827;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .tutorial-flow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .tutorial-step {
-  --tutorial-placeholder-margin: 10px;
-  --tutorial-step-image-ratio: 3 / 2;
-  --tutorial-mosaic-cell-ratio: 3 / 2;
+  --tutorial-car-display-ratio: 1672 / 941;
+  --tutorial-step-image-ratio: var(--tutorial-car-display-ratio);
 
   position: relative;
   display: flex;
@@ -172,27 +141,29 @@ const tutorialTemplatePreviewImages = [
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 0;
-  border-radius: 16px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(17, 17, 17, 0.72);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
   transition:
     transform 0.25s ease,
-    box-shadow 0.25s ease;
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
 }
 
 .tutorial-step:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .tutorial-section.theme-light .tutorial-step {
+  border: 1px solid #e5e7eb;
   background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 .tutorial-section.theme-light .tutorial-step:hover {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+  border-color: #dbeafe;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .tutorial-step-arrow {
@@ -215,13 +186,14 @@ const tutorialTemplatePreviewImages = [
 .tutorial-placeholder {
   position: relative;
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: var(--tutorial-step-image-ratio);
   min-height: 0;
-  margin: var(--tutorial-placeholder-margin) var(--tutorial-placeholder-margin)
-    0;
+  margin: 0;
   overflow: hidden;
-  border-radius: 12px;
-  background: #111111;
+  border-radius: 12px 12px 0 0;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tutorial-section.theme-light .tutorial-placeholder {
@@ -229,101 +201,107 @@ const tutorialTemplatePreviewImages = [
 }
 
 .tutorial-step.is-step-1 .tutorial-placeholder,
+.tutorial-step.is-step-2 .tutorial-placeholder,
 .tutorial-step.is-step-4 .tutorial-placeholder {
-  flex: 0 0 auto;
-  width: 100%;
-  aspect-ratio: var(--tutorial-step-image-ratio);
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: transparent;
 }
 
-.tutorial-step.is-step-2 .tutorial-placeholder {
-  align-items: flex-start;
-  justify-content: flex-start;
+.tutorial-section.theme-light .tutorial-step.is-step-1 .tutorial-placeholder,
+.tutorial-section.theme-light .tutorial-step.is-step-2 .tutorial-placeholder,
+.tutorial-section.theme-light .tutorial-step.is-step-4 .tutorial-placeholder {
+  background: #f8fafc;
 }
 
 .tutorial-step.is-step-3 .tutorial-placeholder {
   align-items: center;
   justify-content: center;
-}
-
-.tutorial-step.is-step-3 .tutorial-logo-preview {
-  flex: 1;
-  width: 100%;
-  height: 100%;
+  background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
 }
 
 .tutorial-step.is-step-1 .tutorial-image,
 .tutorial-step.is-step-4 .tutorial-image {
+  display: flex;
   width: 100%;
   height: 100%;
+  align-items: flex-start;
+  justify-content: center;
   background: transparent;
 }
 
 .tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
 .tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
+  display: flex;
   width: 100%;
   height: 100%;
-  background: transparent;
+  align-items: flex-start;
+  justify-content: center;
+  background: transparent !important;
 }
 
 .tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
 .tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
+  object-position: top center;
   padding: 0;
 }
 
 .tutorial-image :deep(.preload-image) {
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: transparent !important;
 }
 
 .tutorial-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 12px;
+  object-position: top center;
 }
 
 .tutorial-mosaic {
   display: grid;
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;
+  align-self: flex-start;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, auto);
-  gap: 6px;
-  padding: 8px;
-  background: #111111;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 0;
+  box-sizing: border-box;
+  background: transparent;
 }
 
 .tutorial-section.theme-light .tutorial-mosaic {
-  background: #f8fafc;
+  background: transparent;
 }
 
 .tutorial-mosaic-image {
   overflow: hidden;
   width: 100%;
-  aspect-ratio: var(--tutorial-mosaic-cell-ratio);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  height: 100%;
   min-height: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .tutorial-mosaic-image :deep(.preload-image) {
   width: 100%;
-  height: auto;
-  aspect-ratio: var(--tutorial-mosaic-cell-ratio);
-  background: transparent;
+  height: 100%;
+  background: transparent !important;
 }
 
 .tutorial-mosaic-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: top center;
 }
 
 .tutorial-logo-preview {
@@ -332,14 +310,7 @@ const tutorialTemplatePreviewImages = [
   height: 100%;
   min-height: 0;
   place-items: center;
-  border-radius: 12px;
-  background:
-    radial-gradient(
-      circle at 50% 30%,
-      rgba(212, 160, 23, 0.18),
-      transparent 44%
-    ),
-    linear-gradient(180deg, #f6f9fc, #ffffff);
+  background: transparent;
 }
 
 .tutorial-logo-frame {
@@ -391,9 +362,14 @@ const tutorialTemplatePreviewImages = [
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: auto;
-  padding: 8px 12px 10px;
+  min-height: 52px;
+  padding: 0 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
+}
+
+.tutorial-section.theme-light .tutorial-step-foot {
+  border-top-color: #e5e7eb;
 }
 
 .tutorial-step-foot strong {
@@ -402,14 +378,15 @@ const tutorialTemplatePreviewImages = [
   color: #ffffff;
   font-size: 14px;
   line-height: 1.35;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tutorial-section.theme-light .tutorial-step-foot strong {
-  color: #111827;
+  color: #1e293b;
+  font-weight: 600;
 }
 
 @media (max-width: 1500px) {

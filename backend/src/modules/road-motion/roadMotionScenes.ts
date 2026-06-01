@@ -1,29 +1,137 @@
-import type { SceneOption } from "../scene-common/sceneModuleFactory";
+export interface RoadMotionScene {
+  optionId: string;
+  title: string;
+  prompt: string;
+  logoPrompt: string;
+  legacyOptionIds?: string[];
+}
 
-export const roadMotionScenes: SceneOption[] = [
+const baseVehicleRule =
+  "第一张图片是用户上传的车辆主体。必须严格保持上传图片中的车辆拍摄角度、车辆朝向、可见车身面、机位高度、镜头透视、主体构图和车身占画面比例，不要把正面改成侧面，不要把侧面改成正面，不要旋转车辆，不要改变车辆姿态。保持原车真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构、车身线条和外观身份一致，车身完整，轮胎和车顶不要裁切。";
+
+const baseNegativeRule =
+  "不要人物、不要杂物、不要额外文字、不要车牌号，不要生成多辆车，不要重复车辆，不要悬浮车辆，不要车体扭曲，不要轮胎畸形，不要明显改色，不要改变车型。横版16:9汽车电商主图，真实汽车广告摄影。";
+
+const logoNegativeRule =
+  "不要人物、不要杂物、不要原车牌号，不要生成多辆车，不要重复车辆，不要悬浮车辆，不要车体扭曲，不要轮胎畸形，不要明显改色，不要改变车型。横版16:9汽车电商主图，真实汽车广告摄影。";
+
+const logoRule =
+  "第二张图片是需要放置在车牌位置的 Logo / 标识参考图。如果上传车辆图片中原本能看到车牌或车牌框，请将第二张图中的 Logo / 标识清晰、端正、自然地贴合到可见车牌区域，符合原车牌区域的透视、尺寸、弯曲、遮挡、阴影、反射和光照关系；不要变形，不要漂浮，不要额外生成其它文字。如果上传车辆角度看不到车牌、只有车身侧面看不到车牌区域，或车牌区域被遮挡，请不要强行新增车牌、不要新增 Logo、不要把 Logo 贴到车身、车窗、地面或背景上。";
+
+const buildPrompt = (scenePrompt: string) =>
+  `${baseVehicleRule}${scenePrompt}${baseNegativeRule}`;
+
+const buildLogoPrompt = (scenePrompt: string) =>
+  `第一张图片是用户上传的车辆主体。${logoRule}${baseVehicleRule.replace("第一张图片是用户上传的车辆主体。", "")}${scenePrompt}${logoNegativeRule}`;
+
+export const roadMotionScenes: RoadMotionScene[] = [
   {
-    optionId: "urban-road",
-    title: "城市公路",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=1600&q=90",
+    optionId: "city_day_road",
+    title: "城市主干道",
+    legacyOptionIds: ["urban-road"],
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实汽车广告风格的城市道路动态图片。将车辆自然放入白天现代城市主干道中，柏油路面干净，车道线清晰，背景有写字楼、绿化带和道路纵深。车辆需要有真实行驶氛围，车身保持清晰，轮胎和背景可有轻微运动模糊，轮胎必须真实接触地面，阴影、反射和光线方向自然统一。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实汽车广告风格的城市道路动态图片。将车辆自然放入白天现代城市主干道中，柏油路面干净，车道线清晰，背景有写字楼、绿化带和道路纵深。车辆需要有真实行驶氛围，车身保持清晰，轮胎和背景可有轻微运动模糊，轮胎真实接触地面，阴影、反射和光线自然统一。",
+    ),
   },
   {
-    optionId: "bridge-motion",
-    title: "高架动态",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1600&q=90",
+    optionId: "highway_sunset",
+    title: "夕阳高速",
+    legacyOptionIds: ["highway"],
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实高速公路动态行驶图。将车辆置于开阔高速公路上，夕阳金色逆光，远处护栏、路牌和天空形成纵深，路面透视自然。车辆需要表现高速行驶感，车身主体保持清晰，轮胎、路面和远处背景带有适度速度模糊，车底阴影准确，轮胎真实压在车道上。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实高速公路动态行驶图。将车辆置于开阔高速公路上，夕阳金色逆光，远处护栏、路牌和天空形成纵深，路面透视自然。车辆需要表现高速行驶感，车身主体保持清晰，轮胎、路面和远处背景带有适度速度模糊，车底阴影准确，轮胎真实压在车道上。",
+    ),
   },
   {
-    optionId: "night-road",
-    title: "夜景车流",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=90",
+    optionId: "rainy_night_city",
+    title: "雨夜城市",
+    legacyOptionIds: ["night-road"],
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实雨夜城市道路动态图片。场景为雨夜城市街道，湿润柏油路反射霓虹灯、路灯和建筑灯光，有轻微雨雾和高级夜景氛围。车辆正在道路上行驶，车灯可以自然点亮，车身清晰，背景和轮胎有轻微运动模糊，湿地反射符合车辆位置，轮胎接地真实，车底阴影和倒影合理。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实雨夜城市道路动态图片。场景为雨夜城市街道，湿润柏油路反射霓虹灯、路灯和建筑灯光，有轻微雨雾和高级夜景氛围。车辆正在道路上行驶，车灯可以自然点亮，车身清晰，背景和轮胎有轻微运动模糊，湿地反射符合车辆位置，轮胎接地真实，车底阴影和倒影合理。",
+    ),
   },
   {
-    optionId: "highway",
-    title: "高速驰行",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1533106418989-88406c7cc8ca?auto=format&fit=crop&w=1600&q=90",
+    optionId: "mountain_curve",
+    title: "山路弯道",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实山路驾驶场景图。将车辆放置在清晨山路弯道上，背景有山体、树林和自然光，道路线条形成弯道透视。车辆看起来正在顺着弯道行驶，车身保持清晰，轮胎和路边背景带轻微动态模糊，轮胎真实接触路面，车辆姿态稳定自然，阴影方向与清晨光线一致。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实山路驾驶场景图。将车辆放置在清晨山路弯道上，背景有山体、树林和自然光，道路线条形成弯道透视。车辆看起来正在顺着弯道行驶，车身保持清晰，轮胎和路边背景带轻微动态模糊，轮胎真实接触路面，车辆姿态稳定自然，阴影方向与清晨光线一致。",
+    ),
+  },
+  {
+    optionId: "coastal_road",
+    title: "海岸公路",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实海岸公路行驶图片。场景为晴朗海岸公路，一侧有海面、护栏和蓝天，柏油道路向远方延伸，光线明亮通透。车辆自然行驶在车道中，车身清晰锐利，轮胎和背景有轻微运动模糊，车底阴影真实，轮胎与路面接触准确，整体构图有广告大片感。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实海岸公路行驶图片。场景为晴朗海岸公路，一侧有海面、护栏和蓝天，柏油道路向远方延伸，光线明亮通透。车辆自然行驶在车道中，车身清晰锐利，轮胎和背景有轻微运动模糊，车底阴影真实，轮胎与路面接触准确，整体构图有广告大片感。",
+    ),
+  },
+  {
+    optionId: "forest_avenue",
+    title: "林荫大道",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实林荫道路动态图片。场景为上午林荫大道，阳光穿过树叶形成自然树影，路面干净，背景为绿色植被和道路纵深。车辆正在道路上平稳行驶，车身保持清晰，轮胎和背景有轻微动态模糊，轮胎接触地面真实，车底阴影与树影自然融合。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实林荫道路动态图片。场景为上午林荫大道，阳光穿过树叶形成自然树影，路面干净，背景为绿色植被和道路纵深。车辆正在道路上平稳行驶，车身保持清晰，轮胎和背景有轻微动态模糊，轮胎接触地面真实，车底阴影与树影自然融合。",
+    ),
+  },
+  {
+    optionId: "business_park",
+    title: "商务园区",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实商务园区道路动态图片。场景为现代商务园区道路，建筑立面简洁，绿化整齐，路面干净，光线柔和。车辆自然行驶在园区道路上，车身清晰，轮胎和背景有轻微运动模糊，车辆与道路透视一致，轮胎接地准确，阴影自然。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实商务园区道路动态图片。场景为现代商务园区道路，建筑立面简洁，绿化整齐，路面干净，光线柔和。车辆自然行驶在园区道路上，车身清晰，轮胎和背景有轻微运动模糊，车辆与道路透视一致，轮胎接地准确，阴影自然。",
+    ),
+  },
+  {
+    optionId: "snow_road",
+    title: "雪后公路",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实冬季雪后公路行驶图片。场景为雪后公路，路边有积雪，路面已清理但略带湿痕，天空冷色，远处有树林和护栏。车辆自然行驶在道路上，车身保持清晰，轮胎附近可以有轻微湿痕和动态感，背景略有运动模糊，车底阴影和轮胎接地真实。不要让雪覆盖车身导致外观不可识别。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实冬季雪后公路行驶图片。场景为雪后公路，路边有积雪，路面已清理但略带湿痕，天空冷色，远处有树林和护栏。车辆自然行驶在道路上，车身保持清晰，轮胎附近可以有轻微湿痕和动态感，背景略有运动模糊，车底阴影和轮胎接地真实。不要让雪覆盖车身导致外观不可识别。",
+    ),
+  },
+  {
+    optionId: "overpass_dusk",
+    title: "傍晚高架",
+    legacyOptionIds: ["bridge-motion"],
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实城市高架道路动态图片。场景为傍晚蓝调时刻的城市高架桥，远处有城市天际线和灯光，路面车道线清晰，空间纵深强。车辆正在高架道路上行驶，车身清晰锐利，轮胎、路面和背景有适度速度模糊，轮胎真实压在路面上，阴影和反射符合傍晚环境光。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实城市高架道路动态图片。场景为傍晚蓝调时刻的城市高架桥，远处有城市天际线和灯光，路面车道线清晰，空间纵深强。车辆正在高架道路上行驶，车身清晰锐利，轮胎、路面和背景有适度速度模糊，轮胎真实压在路面上，阴影和反射符合傍晚环境光。",
+    ),
+  },
+  {
+    optionId: "tunnel_exit",
+    title: "隧道出口",
+    prompt: buildPrompt(
+      "请基于该车辆生成一张真实隧道出口道路动态图片。场景为车辆从隧道出口驶向明亮自然光，隧道内壁线条形成强透视，路面干净，有明显速度感和空间纵深。车辆主体保持清晰，背景、隧道线条和轮胎有适度运动模糊，轮胎接地准确，车底阴影自然，光线从前方或侧前方进入并照亮车辆边缘。",
+    ),
+    logoPrompt: buildLogoPrompt(
+      "请基于该车辆生成一张真实隧道出口道路动态图片。场景为车辆从隧道出口驶向明亮自然光，隧道内壁线条形成强透视，路面干净，有明显速度感和空间纵深。车辆主体保持清晰，背景、隧道线条和轮胎有适度运动模糊，轮胎接地准确，车底阴影自然，光线从前方或侧前方进入并照亮车辆边缘。",
+    ),
   },
 ];
 
+export const resolveRoadMotionScene = (optionId?: string | null) =>
+  roadMotionScenes.find(
+    (scene) => scene.optionId === optionId || scene.legacyOptionIds?.includes(String(optionId)),
+  ) ?? roadMotionScenes[0];

@@ -1,5 +1,8 @@
 import type { BatchVisualConfig } from "./batchTypes";
 
+const logoVisibilityGuard =
+  "如果原车图片完全看不到车牌区域，例如只有车身侧面、车牌被遮挡或车牌不在画面内，不要强行新增车牌，不要新增 Logo，也不要把 Logo 贴到车身、车窗、地面或背景上。";
+
 const scene = "第一张图片是车辆主体，第二张图片是目标上新场景参考图。请将第一张车自然放入第二张场景中，保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。让车辆与目标场景的地面接触、透视关系、阴影、环境反射和整体光照自然融合，严格参考第二张场景图的空间结构、地面材质、光线方向、景深和环境氛围。不要人物、不要杂物、不要额外文字、不要车牌号，不要生成多辆车。输出适合二手车电商批量上新的真实汽车广告主图，画面干净、高级、统一。";
 const sceneLogo = "第一张图片是车辆主体，第二张图片是目标上新场景参考图，第三张图片是需要放置在车牌位置的 Logo / 标识参考图。请将第一张车自然放入第二张场景中，并将第三张图中的 Logo / 标识贴合到车辆车牌区域。保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。Logo 需要清晰、端正、自然贴合车牌位置，不要变形，不要漂浮，不要额外生成其它文字。让车辆与目标场景的地面接触、透视关系、阴影、环境反射和整体光照自然融合。不要人物、不要杂物、不要原车牌号，不要生成多辆车。输出适合二手车电商批量上新的真实汽车广告主图。";
 const sceneLight = "第一张图片是车辆主体，第二张图片是目标上新场景参考图。请将第一张车自然放入第二张场景中，同时对车辆外观进行光污一致化处理。保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。重点修复车身表面因环境光、反光、炫光、色偏和曝光不均造成的视觉不一致问题，弱化强烈反光、杂乱倒影、过曝光斑和异常色彩干扰，使车身光线更加均匀自然、漆面质感稳定统一。让车辆与目标场景的光线方向、地面阴影、环境反射、透视关系和整体氛围自然融合。不要人物、不要杂物、不要额外文字、不要车牌号，不要生成多辆车。";
@@ -19,6 +22,12 @@ const logoLightPaint = "第一张图片是车辆外观图，第二张图片是�
 export const batchInteriorPrompt =
   "请对上传的车辆内饰图进行清洁增强处理，重点提升方向盘、座椅、仪表台、中控区域、门板、扶手、地毯和脚垫区域的整洁度、清爽感与材质质感。保留原车内饰结构、布局、材质、颜色、屏幕内容和拍摄角度不变。清除灰尘、污渍、使用痕迹、油光、杂乱感和局部脏污，让皮革、塑料、金属、织物、木纹或碳纤维等材质呈现更加干净、细腻、自然的质感。整体画面需要真实、明亮、舒适，呈现车辆内饰焕然一新但不过度修饰的展示效果。不要改变内饰颜色，不要改变座椅和方向盘形状，不要新增文字，不要生成外观场景。";
 
+export const batchInteriorCollagePrompt =
+  "请基于本组上传的车辆内饰图片，生成一张汽车电商内饰拼图。每张拼图必须至少包含 2 张输入图片，不允许只包含 1 张图片或空白拼图。请完整展示本组图片内容，尽量避免重复和遗漏。所有图片均为同一辆车的内饰素材。请保留每张图片中的真实内饰结构、座椅布局、方向盘、中控、仪表台、门板、地毯、天窗、后排等细节，不要改变车型、材质、颜色和空间关系，不要生成不存在的部件，不要把多张图片内容错误融合成一个空间。拼图采用简洁规整的网格布局，图片之间间距均匀，边缘整齐，视觉平衡。统一亮度、色温、对比度和清晰度，轻微提升内饰洁净度和质感，但不要过度美化。每张小图保持原始视角和主体完整，避免裁切方向盘、座椅、中控屏、仪表盘、座椅靠背、门板等关键区域。不要添加文字、Logo、水印、边框装饰、价格标签、人物或额外物体。输出高清、真实、专业的二手车详情页内饰拼图。";
+
+export const batchInteriorCleanCollagePrompt =
+  "请基于本组上传的车辆内饰图片，生成一张汽车电商内饰拼图，并同时对每张内饰图进行清洁增强处理。每张拼图必须至少包含 2 张输入图片，不允许只包含 1 张图片或空白拼图。请完整展示本组图片内容，尽量避免重复和遗漏。所有图片均为同一辆车的内饰素材。请保留每张图片中的真实内饰结构、座椅布局、方向盘、中控、仪表台、门板、地毯、天窗、后排等细节，不要改变车型、材质、颜色和空间关系，不要生成不存在的部件，不要把多张图片内容错误融合成一个空间。请对车内空间进行清洁增强处理，重点提升方向盘、座椅、仪表台、中控区域、门板及地毯区域的整洁度与清爽感。清除灰尘、污渍、使用痕迹和杂乱感，使内饰表面看起来更加干净、细致、清爽自然；同时增强皮革、塑料、金属与织物等材质的质感表现，让整车内饰呈现焕然一新、整洁舒适的视觉效果。拼图采用简洁规整的网格布局，图片之间间距均匀，边缘整齐，视觉平衡。统一亮度、色温、对比度和清晰度，每张小图保持原始视角和主体完整，避免裁切方向盘、座椅、中控屏、仪表盘、座椅靠背、门板等关键区域。不要添加文字、Logo、水印、边框装饰、价格标签、人物或额外物体。输出高清、真实、专业的二手车详情页内饰拼图。";
+
 export const buildBatchPromptKey = (config: BatchVisualConfig) =>
   [
     config.enableSceneChange ? "scene" : "",
@@ -31,20 +40,20 @@ export const buildBatchPromptKey = (config: BatchVisualConfig) =>
 
 export const batchPromptMap: Record<string, string> = {
   scene,
-  "scene+logo": sceneLogo,
+  "scene+logo": `${sceneLogo}${logoVisibilityGuard}`,
   "scene+light": sceneLight,
   "scene+paint": scenePaint,
-  "scene+logo+light": sceneLogoLight,
-  "scene+logo+paint": sceneLogoPaint,
+  "scene+logo+light": `${sceneLogoLight}${logoVisibilityGuard}`,
+  "scene+logo+paint": `${sceneLogoPaint}${logoVisibilityGuard}`,
   "scene+light+paint": sceneLightPaint,
-  "scene+logo+light+paint": sceneLogoLightPaint,
-  logo,
-  "logo+light": logoLight,
-  "logo+paint": logoPaint,
+  "scene+logo+light+paint": `${sceneLogoLightPaint}${logoVisibilityGuard}`,
+  logo: `${logo}${logoVisibilityGuard}`,
+  "logo+light": `${logoLight}${logoVisibilityGuard}`,
+  "logo+paint": `${logoPaint}${logoVisibilityGuard}`,
   light,
   paint,
   "light+paint": lightPaint,
-  "logo+light+paint": logoLightPaint,
+  "logo+light+paint": `${logoLightPaint}${logoVisibilityGuard}`,
 };
 
 export const resolveBatchExteriorPrompt = (config: BatchVisualConfig) =>

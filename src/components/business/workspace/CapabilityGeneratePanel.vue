@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NButton, NSelect, NSwitch, NTag, useMessage } from "naive-ui";
+import { NButton, NSelect, NSwitch, useMessage } from "naive-ui";
 
 import {
   createBatchTask,
@@ -35,6 +35,7 @@ import type {
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
+import GenerateActionFooter from "@/components/business/workspace/GenerateActionFooter.vue";
 import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
@@ -1556,29 +1557,18 @@ const activeCreateRatioLabel = computed(() => {
         />
       </div>
 
-      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
-        <div class="generate-panel-actions">
-          <NTag type="warning" round :bordered="false">
-            预计消耗 {{ props.capability.cost }} 积分
-          </NTag>
-          <NTag type="success" round :bordered="false">
-            余额 {{ props.capability.balance }} 积分
-          </NTag>
-          <NButton
-            type="warning"
-            size="large"
-            class="min-w-48 !rounded-xl"
-            :loading="props.isGenerating"
-            :disabled="
-              isUploadingInterior || props.isGenerating ||
-              uploadedInteriorCollageAssets.length < MIN_INTERIOR_COLLAGE_IMAGES
-            "
-            @click="handleGenerate"
-          >
-            {{ props.capability.actionLabel }} {{ props.capability.cost }}
-          </NButton>
-        </div>
-      </footer>
+      <GenerateActionFooter
+        v-if="hasBlock('actions')"
+        :action-label="props.capability.actionLabel"
+        :cost="props.capability.cost"
+        :loading="props.isGenerating"
+        :disabled="
+          isUploadingInterior ||
+          props.isGenerating ||
+          uploadedInteriorCollageAssets.length < MIN_INTERIOR_COLLAGE_IMAGES
+        "
+        @generate="handleGenerate"
+      />
     </template>
 
     <template v-else-if="props.capability.code === 'short-video'">
@@ -1603,28 +1593,15 @@ const activeCreateRatioLabel = computed(() => {
         />
       </div>
 
-      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
-        <div class="generate-panel-actions">
-          <NTag type="warning" round :bordered="false">
-            预计消耗 {{ props.capability.cost }} 积分
-          </NTag>
-          <NTag type="success" round :bordered="false">
-            余额 {{ props.capability.balance }} 积分
-          </NTag>
-          <NButton
-            type="warning"
-            size="large"
-            class="min-w-48 !rounded-xl"
-            :loading="props.isGenerating"
-            :disabled="
-              isUploadingVehicle || props.isGenerating || !uploadedAsset
-            "
-            @click="handleGenerate"
-          >
-            {{ props.capability.actionLabel }} {{ props.capability.cost }}
-          </NButton>
-        </div>
-      </footer>
+      <GenerateActionFooter
+        v-if="hasBlock('actions')"
+        :action-label="props.capability.actionLabel"
+        :cost="props.capability.cost"
+        cost-unit="条"
+        :loading="props.isGenerating"
+        :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
+        @generate="handleGenerate"
+      />
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">
@@ -1805,28 +1782,14 @@ const activeCreateRatioLabel = computed(() => {
         </template>
       </div>
 
-      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
-        <div class="generate-panel-actions">
-          <NTag type="warning" round :bordered="false">
-            预计消耗 {{ props.capability.cost }} 积分
-          </NTag>
-          <NTag type="success" round :bordered="false">
-            余额 {{ props.capability.balance }} 积分
-          </NTag>
-          <NButton
-            type="warning"
-            size="large"
-            class="min-w-48 !rounded-xl"
-            :loading="props.isGenerating"
-            :disabled="
-              isUploadingVehicle || props.isGenerating || !uploadedAsset
-            "
-            @click="handleGenerate"
-          >
-            {{ props.capability.actionLabel }} {{ props.capability.cost }}
-          </NButton>
-        </div>
-      </footer>
+      <GenerateActionFooter
+        v-if="hasBlock('actions')"
+        :action-label="props.capability.actionLabel"
+        :cost="props.capability.cost"
+        :loading="props.isGenerating"
+        :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
+        @generate="handleGenerate"
+      />
     </template>
   </div>
 </template>
@@ -1905,29 +1868,6 @@ const activeCreateRatioLabel = computed(() => {
     var(--app-surface-soft) 24%,
     var(--app-surface-soft) 100%
   );
-}
-
-.generate-panel-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  flex-shrink: 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--app-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
-    var(--app-surface-soft) 24%,
-    var(--app-surface-soft) 100%
-  );
-}
-
-.generate-panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
 }
 
 .delivery-panel {

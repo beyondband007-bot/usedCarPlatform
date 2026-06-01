@@ -2,7 +2,7 @@ import type { RowDataPacket } from "mysql2";
 
 import { Repository } from "../../db/repository";
 import type { TaskStatus } from "../../shared/types";
-import type { BatchItemSummary, BatchVisualConfig } from "./batchTypes";
+import type { BatchItemKind, BatchItemSummary, BatchVisualConfig } from "./batchTypes";
 
 export interface BatchTaskRecord {
   id: string;
@@ -46,8 +46,9 @@ interface BatchItemRow extends RowDataPacket {
   id: string;
   batch_id: string;
   group_title: string;
-  item_kind: "exterior" | "interior";
+  item_kind: BatchItemKind;
   input_asset_id: string;
+  source_asset_ids_json: string[] | string | null;
   generation_task_id: string;
   sort_order: number;
   status: TaskStatus;
@@ -101,6 +102,7 @@ const mapItem = (row: BatchItemRow): BatchItemSummary => ({
   groupTitle: row.group_title,
   itemKind: row.item_kind,
   inputAssetId: row.input_asset_id,
+  sourceAssetIds: parseJson(row.source_asset_ids_json, [row.input_asset_id]),
   generationTaskId: row.generation_task_id,
   status: row.status,
   progress: row.progress,
@@ -167,17 +169,21 @@ export class BatchRepository extends Repository {
     id: string;
     batchId: string;
     groupTitle: string;
-    itemKind: "exterior" | "interior";
+    itemKind: BatchItemKind;
     inputAssetId: string;
+    sourceAssetIds?: string[];
     generationTaskId: string;
     sortOrder: number;
   }) {
     await this.execute(
       `INSERT INTO batch_task_items
-        (id, batch_id, group_title, item_kind, input_asset_id, generation_task_id, sort_order)
+        (id, batch_id, group_title, item_kind, input_asset_id, source_asset_ids_json, generation_task_id, sort_order)
        VALUES
-        (:id, :batchId, :groupTitle, :itemKind, :inputAssetId, :generationTaskId, :sortOrder)`,
-      input,
+        (:id, :batchId, :groupTitle, :itemKind, :inputAssetId, :sourceAssetIds, :generationTaskId, :sortOrder)`,
+      {
+        ...input,
+        sourceAssetIds: JSON.stringify(input.sourceAssetIds?.length ? input.sourceAssetIds : [input.inputAssetId]),
+      },
     );
   }
 

@@ -14,6 +14,8 @@ export interface BatchVisualConfig {
   paintRefresh?: boolean;
   enableInteriorClean?: boolean;
   interiorEnhance?: boolean;
+  enableInteriorCollage?: boolean;
+  interiorCollage?: boolean;
 }
 
 export interface BatchCarGroupInput {
@@ -38,11 +40,19 @@ export interface CreateBatchTaskRequest {
 export interface BatchItemSummary {
   itemId: string;
   groupTitle: string;
-  itemKind: "exterior" | "interior";
+  itemKind: BatchItemKind;
   inputAssetId: string;
+  sourceAssetIds: string[];
   generationTaskId: string;
   status: TaskStatus;
   progress: number;
   resultCount: number;
   error: { message?: string | null } | null;
 }
+
+export type BatchItemKind =
+  | "exterior"
+  | "interior"
+  | "interior_clean"
+  | "interior_collage"
+  | "interior_clean_collage";
