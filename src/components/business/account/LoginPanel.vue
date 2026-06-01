@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { NButton, NInput } from 'naive-ui'
+import { NButton, NInput, NSelect } from 'naive-ui'
 import { motion } from 'motion-v'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultMockCreditsIdentity, getMockCreditsIdentityOptions } from '@/utils/credits-identity'
 
 defineProps<{
   isDark: boolean
@@ -16,9 +17,24 @@ const authStore = useAuthStore()
 
 const phone = ref('')
 const password = ref('')
+const mockIdentityOptions = getMockCreditsIdentityOptions()
+const selectedIdentityKey = ref(
+  mockIdentityOptions.find(
+    (option) => option.identity.accountScope === getDefaultMockCreditsIdentity().accountScope,
+  )?.key ?? mockIdentityOptions[0].key,
+)
+const identitySelectOptions = mockIdentityOptions.map((option) => ({
+  label: option.label,
+  value: option.key,
+}))
+const selectedIdentity = computed(
+  () =>
+    mockIdentityOptions.find((option) => option.key === selectedIdentityKey.value)?.identity ??
+    getDefaultMockCreditsIdentity(),
+)
 
 function handleLogin() {
-  authStore.login()
+  authStore.login(selectedIdentity.value)
 
   const redirect =
     typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
@@ -65,6 +81,15 @@ function handleLogin() {
             type="password"
             show-password-on="click"
             placeholder="请输入密码"
+          />
+        </label>
+        <label class="login-field">
+          <span class="login-field-label">积分身份</span>
+          <NSelect
+            v-model:value="selectedIdentityKey"
+            class="login-select"
+            size="large"
+            :options="identitySelectOptions"
           />
         </label>
       </div>
@@ -158,6 +183,20 @@ function handleLogin() {
 }
 
 .login-input {
+  --n-height: 48px !important;
+  --n-border-radius: 8px !important;
+  --n-color: var(--field-bg) !important;
+  --n-color-focus: var(--field-bg) !important;
+  --n-border: 1px solid var(--field-border) !important;
+  --n-border-hover: 1px solid var(--field-border-focus) !important;
+  --n-border-focus: 1px solid var(--field-border-focus) !important;
+  --n-box-shadow-focus: 0 0 0 3px var(--field-focus-ring) !important;
+  --n-text-color: var(--panel-text) !important;
+  --n-placeholder-color: var(--panel-muted) !important;
+  --n-caret-color: #2f7cff !important;
+}
+
+.login-select {
   --n-height: 48px !important;
   --n-border-radius: 8px !important;
   --n-color: var(--field-bg) !important;

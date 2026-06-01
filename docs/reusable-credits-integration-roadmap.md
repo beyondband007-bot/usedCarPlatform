@@ -1,7 +1,7 @@
 # Reusable Credits Integration Roadmap
 
 Status: active integration plan
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 Branch: `feat/reusable-credits-integration`
 
 ## Current Architecture Decision
@@ -37,6 +37,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 7: UsedCar credit proxy APIs | Done | `phase-7-proxy-apis-20260531` | Adds `/api/v1/credits/*` proxy routes for accounts, transactions, recharge products, and payment orders. |
 | Phase 8: Frontend balance and recharge | Done | `phase-8-frontend-credit-data-20260531` | Replaces visible mock credit balance, credit ledger, recharge products, and payment order creation with proxy API data. |
 | Phase 9: Credits Admin Console | Done | `phase-9-admin-console-20260531` | Adds a read-only credits admin console backed by the usedCar credit proxy boundary. |
+| Phase 10: Identity and mock login | Done | `phase-10-mock-identity-20260601` | Adds an explicit frontend mock credits identity selector and sends that identity through request headers. |
 
 Detailed phase notes:
 
@@ -49,10 +50,13 @@ Detailed phase notes:
 - [Phase 7 proxy APIs](./reusable-credits-phase-7-proxy-apis.md)
 - [Phase 8 frontend credit data](./reusable-credits-phase-8-frontend-credit-data.md)
 - [Phase 9 admin console](./reusable-credits-phase-9-admin-console.md)
+- [Phase 10 mock identity](./reusable-credits-phase-10-mock-identity.md)
 
 ## Important Implementation Notes
 
 Billing identity is temporary until real login/session data exists.
+
+For normal frontend testing, usedCarPlatform now stores the selected mock identity in `localStorage` under `prototype-credits-identity` and sends it to the backend through request headers.
 
 During development, usedCarPlatform resolves credits identity in this order:
 
@@ -70,7 +74,7 @@ During development, usedCarPlatform resolves credits identity in this order:
    - `CREDITS_DEFAULT_ACCOUNT_SCOPE`
    - `CREDITS_DEFAULT_TENANT_ID`
 
-The environment fallback is for local development only. It should not become the production identity model.
+The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
 
 ## Revised Next Plan
 
@@ -141,13 +145,15 @@ Expected deliverable:
 
 ### Phase 10: Identity And Mock Login
 
-Introduce a clearer development login/session convention for usedCarPlatform.
+Status: done in this branch.
+
+Introduced a clearer development login/session convention for usedCarPlatform.
 
 Short-term target:
 
-- one predictable mock identity source for local testing
-- remove reliance on hidden environment fallback during normal frontend testing
-- keep support for request headers for backend/API smoke tests
+- one predictable mock identity source for local testing: done
+- remove reliance on hidden environment fallback during normal frontend testing: done
+- keep support for request headers for backend/API smoke tests: done
 
 Longer-term target:
 
@@ -196,6 +202,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 10 next.
+Continue with Phase 11 next.
 
-The Credits Admin Console now has a read-only live overview. The next step is to replace the temporary environment/header identity fallback with a clearer mock login/session convention.
+The browser now sends a stored mock credits identity through request headers. The next step is to run and document full end-to-end billing scenarios before team handoff.

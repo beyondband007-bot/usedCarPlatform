@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 
 import { getCreditAccounts, type CreditAccount } from '@/api/visual-workbench'
+import {
+  clearCreditsIdentity,
+  getDefaultMockCreditsIdentity,
+  normalizeCreditsIdentity,
+  readCreditsIdentity,
+  writeCreditsIdentity,
+  type CreditsIdentity,
+} from '@/utils/credits-identity'
 
 const SESSION_KEY = 'prototype-enterprise-session'
 
@@ -28,12 +36,21 @@ export const useAuthStore = defineStore('auth', {
     isLoggedIn: readSession(),
     userName: '企业用户',
     credits: '1,250',
+    creditsIdentity: (readSession() ? readCreditsIdentity() : null) as CreditsIdentity | null,
     creditAccounts: [] as CreditAccount[],
     creditBalanceLoading: false,
   }),
   actions: {
-    login() {
+    ensureCreditsIdentity() {
+      const identity = normalizeCreditsIdentity(this.creditsIdentity) ?? getDefaultMockCreditsIdentity()
+      this.creditsIdentity = identity
+      writeCreditsIdentity(identity)
+      return identity
+    },
+    login(identity?: CreditsIdentity) {
+      this.creditsIdentity = normalizeCreditsIdentity(identity) ?? getDefaultMockCreditsIdentity()
       this.isLoggedIn = true
+      writeCreditsIdentity(this.creditsIdentity)
       window.localStorage.setItem(SESSION_KEY, '1')
       void this.refreshCredits()
     },
@@ -41,11 +58,14 @@ export const useAuthStore = defineStore('auth', {
       this.isLoggedIn = false
       this.creditAccounts = []
       this.credits = '0'
+      this.creditsIdentity = null
       window.localStorage.removeItem(SESSION_KEY)
+      clearCreditsIdentity()
     },
     async refreshCredits() {
       if (!this.isLoggedIn || this.creditBalanceLoading) return
 
+      this.ensureCreditsIdentity()
       this.creditBalanceLoading = true
       try {
         const { accounts } = await getCreditAccounts()
