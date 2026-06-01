@@ -7,6 +7,99 @@ export interface ApiResponse<T> {
   requestId: string
 }
 
+export interface CreditAccount {
+  id: number
+  tenantId: number | null
+  userId: number | null
+  accountScope: 'personal' | 'tenant'
+  totalBalance: string
+  lockedBalance: string
+  availableBalance: string
+  currency: string
+  status: string
+}
+
+export interface CreditTransaction {
+  id: number
+  tenantId: number | null
+  userId: number
+  accountId: number
+  billingTaskId: number | null
+  paymentOrderId: number | null
+  applicationId: number | null
+  functionId: number | null
+  txnType: string
+  points: string
+  balanceBefore: string
+  balanceAfter: string
+  bizType: string | null
+  bizId: string | null
+  refTxnId: number | null
+  remark: string | null
+  createdAt: string
+}
+
+export interface RechargeProduct {
+  id: number
+  name: string
+  amount: string
+  points: string
+  bonusPoints: string
+  currency: string
+  sort: number
+  enabled: boolean
+}
+
+export interface PaymentOrder {
+  paymentOrderId: number
+  tenantId: number | null
+  userId: number
+  accountId: number
+  productId: number
+  orderNo: string
+  amount: string
+  points: string
+  bonusPoints: string
+  payChannel: 'alipay' | 'wechat' | 'card'
+  status: 'pending' | 'paid' | 'failed' | 'refunded'
+  paidAt: string | null
+  notifyId: string | null
+  idempotentReplay: boolean
+}
+
+export interface CreditsApplication {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  status: string
+}
+
+export interface CreditsFunction {
+  id: number
+  applicationId: number
+  applicationCode?: string
+  code: string
+  name: string
+  description: string | null
+  chargeMode: 'fixed' | 'dynamic' | 'estimate_required'
+  defaultPoints: string
+  status: string
+}
+
+export interface CreditsAdminOverview {
+  identity: {
+    userId: number
+    accountScope: 'personal' | 'tenant'
+    tenantId?: number
+  }
+  applications: CreditsApplication[]
+  functions: CreditsFunction[]
+  accounts: CreditAccount[]
+  transactions: CreditTransaction[]
+  rechargeProducts: RechargeProduct[]
+}
+
 export interface UploadedAsset {
   assetId: string
   purpose: string
@@ -14,6 +107,67 @@ export interface UploadedAsset {
   fileName: string
   mimeType: string
   size: number
+}
+
+export async function getCreditAccounts(params?: {
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.get<ApiResponse<{ accounts: CreditAccount[] }>>('/credits/accounts', {
+    params,
+  })
+  return response.data
+}
+
+export async function getCreditTransactions(params?: {
+  accountId?: number | string
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  limit?: number | string
+}) {
+  const response = await request.get<ApiResponse<{ account: CreditAccount; transactions: CreditTransaction[] }>>(
+    '/credits/transactions',
+    { params },
+  )
+  return response.data
+}
+
+export async function getRechargeProducts() {
+  const response = await request.get<ApiResponse<{ products: RechargeProduct[] }>>('/credits/recharge-products')
+  return response.data
+}
+
+export async function createPaymentOrder(payload: {
+  productId: number
+  payChannel: 'alipay' | 'wechat' | 'card'
+  idempotencyKey?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.post<ApiResponse<PaymentOrder>>('/credits/payment-orders', payload)
+  return response.data
+}
+
+export async function getCreditsAdminOverview(params?: {
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.get<ApiResponse<CreditsAdminOverview>>('/credits/admin/overview', {
+    params,
+  })
+  return response.data
 }
 
 export type AssetPurpose = 'car_exterior' | 'car_interior' | 'logo'
@@ -40,6 +194,11 @@ export interface CreateGenerationTaskPayload {
   colorCode?: string
   outputRatio?: string
   resolution?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
   extra?: Record<string, unknown>
 }
 
@@ -55,6 +214,10 @@ export interface CreatedGenerationTask {
   logoAssetId?: string | null
   colorCode?: string | null
   inputImageCount: number
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
   pollingUrl: string
   createdAt: string
 }
@@ -78,6 +241,10 @@ export interface GenerationTaskDetail {
   outputRatio: string
   resolution: string
   resultImages: GenerationResultImage[]
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   resultVideos?: GenerationResultImage[]
   videoUrl?: string
   previewVideo?: string
@@ -172,6 +339,11 @@ export interface CreateBatchTaskPayload {
     interiorAssetIds?: string[]
   }>
   visualConfig: BatchVisualConfig
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
 }
 
 export interface CreatedBatchTask {
@@ -184,6 +356,8 @@ export interface CreatedBatchTask {
   progress: number
   pollingUrl: string
   estimatedCost: number
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   balance: number
   createdAt: string
 }
@@ -210,6 +384,11 @@ export interface BatchTaskDetail {
   failed: number
   progress: number
   assetCount: number
+  creditsUserId?: number | null
+  creditsTenantId?: number | null
+  accountScope?: 'personal' | 'tenant' | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   items: BatchTaskDetailItem[]
   createdAt: string
   updatedAt: string
@@ -285,6 +464,10 @@ export interface RecentGenerationTask {
   inputAssetId?: string | null
   inputAssetUrl?: string | null
   resultCount?: number | null
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   error?: string | { code?: string; message?: string } | null
 }
 

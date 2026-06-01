@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { h, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import {
   NButton,
   NDataTable,
@@ -10,13 +10,23 @@ import {
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
+import {
+  createPaymentOrder,
+  getCreditAccounts,
+  getCreditTransactions,
+  getRechargeProducts,
+  type CreditTransaction,
+  type RechargeProduct,
+} from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
 import {
   rechargePlanToneMap,
   rechargePlans,
+  type RechargePlan,
   type RechargePlanTone,
 } from "@/constants/recharge-plans";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
 
 type RechargeRecord = {
   orderNo: string;
@@ -39,32 +49,38 @@ function getPlanTone(plan: string): RechargePlanTone {
   return tone === "purple" ? "blue" : tone;
 }
 
-const recordSummary: RecordSummary[] = [
-  {
-    label: "今日充值金额 (元)",
-    value: "12,680",
-    tone: "blue",
-    icon: "mdi:cash-multiple",
-  },
-  {
-    label: "今日获得积分",
-    value: "126,800",
-    tone: "gold",
-    icon: "mdi:diamond-stone",
-  },
-  {
-    label: "累计充值金额 (元)",
-    value: "236,580",
-    tone: "gold",
-    icon: "mdi:chart-line",
-  },
-  {
-    label: "累计获得积分",
-    value: "2,365,800",
-    tone: "navy",
-    icon: "mdi:star-four-points",
-  },
-];
+const formatNumber = (value: string | number | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return "0";
+  return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(parsed);
+};
+
+const formatCurrency = (value: string | number | null | undefined) => `¥${formatNumber(value)}`;
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date).replace(/\//g, "-");
+};
+
+const productDisplayName = (product: RechargeProduct, index: number) => {
+  if (product.name.includes("Team")) return "企业团队版";
+  if (product.name.includes("Flagship")) return "企业旗舰版";
+  if (product.name.includes("Basic")) return "企业基础版";
+  return rechargePlans[index]?.name ?? product.name;
+};
+
+const productTone = (index: number): RechargePlanTone =>
+  index === 1 ? "blue" : index === 2 ? "gold" : "blue";
 
 const planTypeMeta: Record<
   string,
@@ -77,8 +93,14 @@ const planTypeMeta: Record<
 
 const selectedPlanName = ref("企业团队版");
 const pressingPlanName = ref<string | null>(null);
+const plans = ref<RechargePlan[]>(rechargePlans);
+const productsByPlan = ref<Record<string, RechargeProduct>>({});
+const records = ref<RechargeRecord[]>([]);
+const isLoadingRecharge = ref(false);
+const isCreatingOrder = ref(false);
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 
 const recordTypeOptions = [
   { label: "全部类型", value: "all" },
@@ -97,58 +119,126 @@ function clearPlanPress() {
 
 function handlePlanSelect(name: string) {
   selectedPlanName.value = name;
+  void createOrderForPlan(name);
 }
 
-const records: RechargeRecord[] = [
-  {
-    orderNo: "202605200001",
-    plan: "企业团队版",
-    amount: "¥3,980",
-    points: "550",
+const recordSummary = computed<RecordSummary[]>(() => {
+  const successfulRecords = records.value.filter((record) => record.status === "支付成功");
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRecords = successfulRecords.filter((record) => record.paidAt.startsWith(today));
+  const sumAmount = (items: RechargeRecord[]) =>
+    items.reduce((sum, record) => sum + Number(record.amount.replace(/[¥,]/g, "")), 0);
+  const sumPoints = (items: RechargeRecord[]) =>
+    items.reduce((sum, record) => sum + Number(record.points.replace(/,/g, "")), 0);
+
+  return [
+    {
+      label: "今日充值金额 (元)",
+      value: formatNumber(sumAmount(todayRecords)),
+      tone: "blue",
+      icon: "mdi:cash-multiple",
+    },
+    {
+      label: "今日获得积分",
+      value: formatNumber(sumPoints(todayRecords)),
+      tone: "blue",
+      icon: "mdi:diamond-stone",
+    },
+    {
+      label: "累计充值金额 (元)",
+      value: formatNumber(sumAmount(successfulRecords)),
+      tone: "gold",
+      icon: "mdi:chart-line",
+    },
+    {
+      label: "累计获得积分",
+      value: formatNumber(sumPoints(successfulRecords)),
+      tone: "navy",
+      icon: "mdi:star-four-points",
+    },
+  ];
+});
+
+function mapProductToPlan(product: RechargeProduct, index: number): RechargePlan {
+  const fallback = rechargePlans[index] ?? rechargePlans[0];
+  const name = productDisplayName(product, index);
+  return {
+    ...fallback,
+    name,
+    price: formatCurrency(product.amount),
+    giftPoints: formatNumber(Number(product.points) + Number(product.bonusPoints)),
+    tone: productTone(index),
+    badge: fallback.badge,
+  };
+}
+
+function mapTransactionToRechargeRecord(transaction: CreditTransaction): RechargeRecord | null {
+  if (!transaction.paymentOrderId || Number(transaction.points) <= 0) return null;
+  return {
+    orderNo: String(transaction.paymentOrderId),
+    plan: "积分充值",
+    amount: "—",
+    points: formatNumber(transaction.points),
     status: "支付成功",
-    paidAt: "2026-05-20 10:30:45",
-  },
-  {
-    orderNo: "202605190002",
-    plan: "企业基础版",
-    amount: "¥980",
-    points: "200",
-    status: "支付成功",
-    paidAt: "2026-05-19 15:20:18",
-  },
-  {
-    orderNo: "202605180003",
-    plan: "企业旗舰版",
-    amount: "¥9,800",
-    points: "9800",
-    status: "支付成功",
-    paidAt: "2026-05-18 09:15:33",
-  },
-  {
-    orderNo: "202605160006",
-    plan: "企业旗舰版",
-    amount: "¥9,800",
-    points: "9800",
-    status: "支付中",
-    paidAt: "2026-05-16 14:22:09",
-  },
-  {
-    orderNo: "202605150004",
-    plan: "企业团队版",
-    amount: "¥3,980",
-    points: "550",
-    status: "支付失败",
-    paidAt: "2026-05-15 11:05:22",
-  },
-  {
-    orderNo: "202605100005",
-    plan: "企业基础版",
-    amount: "¥980",
-    points: "200",
-    status: "支付成功",
-    paidAt: "2026-05-10 16:40:11",
-  },
-];
+    paidAt: formatDateTime(transaction.createdAt),
+  };
+}
+
+async function loadRechargeData() {
+  isLoadingRecharge.value = true;
+  try {
+    const [{ products }, { accounts }] = await Promise.all([
+      getRechargeProducts(),
+      getCreditAccounts(),
+    ]);
+    const enabledProducts = products.filter((product) => product.enabled);
+    plans.value = enabledProducts.map(mapProductToPlan);
+    productsByPlan.value = Object.fromEntries(
+      enabledProducts.map((product, index) => [productDisplayName(product, index), product]),
+    );
+    selectedPlanName.value = plans.value[1]?.name ?? plans.value[0]?.name ?? selectedPlanName.value;
+    const account = accounts.find((item) => item.accountScope === "personal") ?? accounts[0];
+    if (account) {
+      authStore.credits = formatNumber(account.availableBalance);
+      const transactionResult = await getCreditTransactions({ accountId: account.id, limit: 50 });
+      records.value = transactionResult.transactions
+        .map(mapTransactionToRechargeRecord)
+        .filter((record): record is RechargeRecord => Boolean(record));
+    }
+  } catch (error) {
+    console.warn("failed to load recharge data", error);
+    plans.value = rechargePlans;
+  } finally {
+    isLoadingRecharge.value = false;
+  }
+}
+
+async function createOrderForPlan(name: string) {
+  const product = productsByPlan.value[name];
+  if (!product || isCreatingOrder.value) return;
+
+  isCreatingOrder.value = true;
+  try {
+    const order = await createPaymentOrder({
+      productId: product.id,
+      payChannel: "wechat",
+      idempotencyKey: `recharge:${product.id}:${Date.now()}`,
+    });
+    records.value = [
+      {
+        orderNo: order.orderNo,
+        plan: name,
+        amount: formatCurrency(order.amount),
+        points: formatNumber(Number(order.points) + Number(order.bonusPoints)),
+        status: order.status === "failed" ? "支付失败" : order.status === "paid" ? "支付成功" : "支付中",
+        paidAt: formatDateTime(order.paidAt) === "—" ? formatDateTime(new Date().toISOString()) : formatDateTime(order.paidAt),
+      },
+      ...records.value,
+    ];
+  } finally {
+    isCreatingOrder.value = false;
+  }
+}
 
 const recordsColumns: DataTableColumns<RechargeRecord> = [
   {
@@ -237,6 +327,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     },
   },
 ];
+
+onMounted(() => {
+  void loadRechargeData();
+});
 </script>
 
 <template>
@@ -250,7 +344,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
           <section class="plan-module" aria-label="选择充值套餐">
             <div class="plan-grid">
               <RechargePlanCard
-                v-for="plan in rechargePlans"
+                v-for="plan in plans"
                 :key="plan.name"
                 :plan="plan"
                 :selected="selectedPlanName === plan.name"
@@ -320,6 +414,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
                   class="records-data-table"
                   :columns="recordsColumns"
                   :data="records"
+                  :loading="isLoadingRecharge || isCreatingOrder"
                   :bordered="false"
                   :single-line="false"
                   :pagination="false"
@@ -328,12 +423,12 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
               </div>
 
               <footer class="records-footer">
-                <p class="records-total">共 128 条</p>
+                <p class="records-total">共 {{ records.length }} 条</p>
                 <NPagination
                   class="records-pager"
                   :page="1"
                   :page-size="10"
-                  :item-count="128"
+                  :item-count="records.length"
                   :page-sizes="[10, 20, 50]"
                   show-size-picker
                   show-quick-jumper

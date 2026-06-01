@@ -9,7 +9,7 @@ export const interiorCollageRoutes = Router();
 interiorCollageRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await interiorCollageService.createTasks(req.body);
+    const result = await interiorCollageService.createTasks(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );

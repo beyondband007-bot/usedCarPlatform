@@ -4,6 +4,14 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { OutputRatio, Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { interiorCollagePrompt } from "./interiorCollagePrompts";
 
@@ -11,6 +19,11 @@ interface CreateInteriorCollageRequest {
   assetIds?: string[];
   outputRatio?: OutputRatio;
   resolution?: Resolution;
+  userId?: number | string;
+  creditsUserId?: number | string;
+  tenantId?: number | string;
+  creditsTenantId?: number | string;
+  accountScope?: "personal" | "tenant";
 }
 
 const groupSizes = (count: number) => {
@@ -36,7 +49,7 @@ const splitAssets = (assets: AssetRecord[]) => {
 };
 
 class InteriorCollageService {
-  async createTasks(body: CreateInteriorCollageRequest) {
+  async createTasks(body: CreateInteriorCollageRequest, context?: BillingRequestContext) {
     const assetIds = Array.isArray(body.assetIds) ? body.assetIds.filter(Boolean) : [];
     if (assetIds.length < 2 || assetIds.length > 10) {
       throw errors.invalidParameter("assetIds must contain 2-10 items", { count: assetIds.length });
@@ -63,6 +76,7 @@ class InteriorCollageService {
     const outputRatio = body.outputRatio ?? "16:9";
     const resolution = body.resolution ?? "2K";
     const groups = splitAssets(interiorAssets);
+    const taskEntries = [];
     const tasks = [];
 
     for (let index = 0; index < groups.length; index += 1) {
@@ -80,6 +94,46 @@ class InteriorCollageService {
         logoAssetId: null,
         prompt: interiorCollagePrompt,
       });
+
+      taskEntries.push({
+        taskId,
+        optionId,
+        group,
+        groupIndex: index + 1,
+        groupCount: groups.length,
+        billing: null as FrozenGenerationBilling | null,
+      });
+    }
+
+    try {
+      for (const entry of taskEntries) {
+        entry.billing = await freezeGenerationBilling({
+          taskId: entry.taskId,
+          functionCode: "interior-collage",
+          body,
+          context,
+        });
+      }
+    } catch (error) {
+      await Promise.all(
+        taskEntries.map(async (entry) => {
+          try {
+            await refundFrozenGenerationBilling(entry.taskId, entry.billing);
+          } catch {
+            await markGenerationBillingRefundFailed(entry.taskId, entry.billing);
+          }
+          await tasksRepository.markFailed(
+            entry.taskId,
+            "BILLING_FREEZE_FAILED",
+            error instanceof Error ? error.message : "billing freeze failed",
+          );
+        }),
+      );
+      throw error;
+    }
+
+    for (const entry of taskEntries) {
+      const { taskId, group, groupIndex, groupCount, billing } = entry;
 
       const lease = await kieKeyPool.acquire();
       try {
@@ -111,8 +165,8 @@ class InteriorCollageService {
             prompt: interiorCollagePrompt,
             inputAssetIds: group.map((asset) => asset.id),
             inputUrls,
-            groupIndex: index + 1,
-            groupCount: groups.length,
+            groupIndex,
+            groupCount,
             aspectRatio: outputRatio,
             resolution,
           },
@@ -125,13 +179,19 @@ class InteriorCollageService {
           status: "queued",
           progress: 5,
           kieTaskId: kieTask.kieTaskId,
-          groupIndex: index + 1,
-          groupCount: groups.length,
+          groupIndex,
+          groupCount,
           inputAssetIds: group.map((asset) => asset.id),
           inputImageCount: group.length,
+          ...toBillingResponseFields(billing),
           pollingUrl: `/api/v1/tasks/${taskId}`,
         });
       } catch (error) {
+        try {
+          await refundFrozenGenerationBilling(taskId, billing);
+        } catch {
+          await markGenerationBillingRefundFailed(taskId, billing);
+        }
         await tasksRepository.markFailed(
           taskId,
           "INTERIOR_COLLAGE_CREATE_FAILED",
@@ -142,10 +202,11 @@ class InteriorCollageService {
           moduleCode: "interior-collage",
           status: "fail",
           progress: 100,
-          groupIndex: index + 1,
-          groupCount: groups.length,
+          groupIndex,
+          groupCount,
           inputAssetIds: group.map((asset) => asset.id),
           inputImageCount: group.length,
+          ...toBillingResponseFields(billing),
           pollingUrl: `/api/v1/tasks/${taskId}`,
           error: {
             code: "INTERIOR_COLLAGE_CREATE_FAILED",

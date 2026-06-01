@@ -9,6 +9,10 @@ import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
 import { creativeImageRepository } from "../creative-image/creativeImageRepository";
 import {
+  finalizeGenerationBilling,
+  shouldFinalizeGenerationBilling,
+} from "../billing/billingLifecycle";
+import {
   normalizeTaskResults,
   tasksRepository,
   type GenerationTaskRecord,
@@ -57,7 +61,8 @@ class TasksService {
     };
   }
 
-  async getTaskDetail(taskId: string) {
+  async getTaskDetail(taskId: string, options: { finalizeBilling?: boolean } = {}) {
+    const finalizeBilling = options.finalizeBilling ?? true;
     const task = await tasksRepository.findById(taskId);
     if (!task) throw errors.taskNotFound();
 
@@ -71,10 +76,25 @@ class TasksService {
       const refreshed = await tasksRepository.findById(taskId);
       if (!refreshed) throw errors.taskNotFound();
       await this.syncCreativeConversationResult(refreshed);
+      if (finalizeBilling && shouldFinalizeGenerationBilling(refreshed)) {
+        await finalizeGenerationBilling(refreshed);
+        const finalized = await tasksRepository.findById(taskId);
+        if (!finalized) throw errors.taskNotFound();
+        await this.syncCreativeConversationResult(finalized);
+        return this.toResponse(finalized);
+      }
       return this.toResponse(refreshed);
     }
 
     await this.syncCreativeConversationResult(task);
+    if (finalizeBilling && shouldFinalizeGenerationBilling(task)) {
+      await finalizeGenerationBilling(task);
+      const finalized = await tasksRepository.findById(taskId);
+      if (!finalized) throw errors.taskNotFound();
+      await this.syncCreativeConversationResult(finalized);
+      return this.toResponse(finalized);
+    }
+
     return this.toResponse(task);
   }
 
@@ -108,7 +128,7 @@ class TasksService {
       await creativeImageRepository.syncConversationResultByTaskId(task.id, resultImages[0].url);
     }
 
-    if (status === "success" || status === "fail") {
+    if (terminalStatuses.includes(status)) {
       await kieKeyPool.release(task.kieAccountHash ?? "");
     }
   }
@@ -145,6 +165,10 @@ class TasksService {
       outputRatio: task.outputRatio,
       resolution: task.resolution,
       resultImages: results,
+      billingTaskId: task.billingTaskId ?? null,
+      billingStatus: task.billingStatus ?? null,
+      estimatedPoints: task.estimatedPoints ?? null,
+      settledPoints: task.settledPoints ?? null,
       error:
         task.errorCode || task.errorMessage
           ? {
@@ -179,6 +203,10 @@ class TasksService {
       inputAssetId: task.inputAssetId,
       inputAssetUrl: task.inputAssetUrl,
       resultCount: results.length,
+      billingTaskId: task.billingTaskId ?? null,
+      billingStatus: task.billingStatus ?? null,
+      estimatedPoints: task.estimatedPoints ?? null,
+      settledPoints: task.settledPoints ?? null,
       error:
         task.errorCode || task.errorMessage
           ? {

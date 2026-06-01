@@ -9,7 +9,7 @@ export const watermarkRemoveRoutes = Router();
 watermarkRemoveRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await watermarkRemoveService.createTask(req.body);
+    const result = await watermarkRemoveService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );

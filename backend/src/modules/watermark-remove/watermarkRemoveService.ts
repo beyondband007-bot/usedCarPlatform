@@ -4,11 +4,19 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { watermarkRemovePrompt } from "./watermarkRemovePrompts";
 
 class WatermarkRemoveService {
-  async createTask(body: CreateModuleTaskRequest) {
+  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -39,6 +47,23 @@ class WatermarkRemoveService {
       logoAssetId: null,
       prompt: watermarkRemovePrompt,
     });
+
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: "watermark-remove",
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
 
     const lease = await kieKeyPool.acquire();
     try {
@@ -77,10 +102,16 @@ class WatermarkRemoveService {
         progress: 5,
         kieTaskId: kieTask.kieTaskId,
         inputImageCount: inputUrls.length,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "WATERMARK_REMOVE_CREATE_FAILED",

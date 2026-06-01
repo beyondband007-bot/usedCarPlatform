@@ -12,11 +12,10 @@ export const createSceneModuleRoutes = (
   router.post(
     "/tasks",
     asyncHandler(async (req, res) => {
-      const result = await service.createTask(req.body);
+      const result = await service.createTask(req.body, { headers: req.headers });
       ok(res, result);
     }),
   );
 
   return router;
 };
-

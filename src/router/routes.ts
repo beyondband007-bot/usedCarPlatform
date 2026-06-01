@@ -82,7 +82,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'credits',
             name: 'Credits',
-            component: () => import('@/pages/points/index.vue'),
+            component: () => import('@/pages/credits/index.vue'),
             meta: {
               title: '积分查询',
               requiresAuth: true,
@@ -101,6 +101,18 @@ export const routes: RouteRecordRaw[] = [
               title: '套餐/积分',
               requiresAuth: true,
               permission: 'menu:recharge',
+            },
+          },
+          {
+            path: 'credits-admin',
+            name: 'CreditsAdmin',
+            component: () => import('@/pages/credits-admin/index.vue'),
+            meta: {
+              title: '积分后台',
+              description: '积分后台只读运维视图',
+              requiresAuth: true,
+              hiddenNav: true,
+              permission: 'menu:admin',
             },
           },
           {

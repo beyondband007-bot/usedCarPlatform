@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
@@ -23,6 +23,7 @@ const permissionMap: Record<string, string> = {
   '/credits': 'menu:points',
   '/recharge': 'menu:recharge',
   '/package-points': 'menu:recharge',
+  '/credits-admin': 'menu:admin',
 }
 
 const visibleNavigation = computed(() =>
@@ -48,6 +49,10 @@ function navigate(item: NavItem) {
 
   router.push(item.path)
 }
+
+onMounted(() => {
+  void authStore.refreshCredits()
+})
 </script>
 
 <template>

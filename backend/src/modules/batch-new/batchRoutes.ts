@@ -23,7 +23,7 @@ batchRoutes.post(
 batchRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    ok(res, await batchService.createBatchTask(req.body));
+    ok(res, await batchService.createBatchTask(req.body, { headers: req.headers }));
   }),
 );
 

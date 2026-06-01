@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { NButton, NCheckbox, NInput, useMessage } from 'naive-ui'
+import { NButton, NCheckbox, NInput, NSelect, useMessage } from 'naive-ui'
 import { motion } from 'motion-v'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultMockCreditsIdentity, getMockCreditsIdentityOptions } from '@/utils/credits-identity'
 
 defineProps<{
   isDark: boolean
@@ -19,24 +20,80 @@ const username = ref('enterprise')
 const password = ref('123456')
 const remember = ref(true)
 const submitting = ref(false)
+const mockIdentityOptions = getMockCreditsIdentityOptions()
+const selectedIdentityKey = ref(
+  mockIdentityOptions.find(
+    (option) => option.identity.accountScope === getDefaultMockCreditsIdentity().accountScope,
+  )?.key ?? mockIdentityOptions[0].key,
+)
+const identitySelectOptions = mockIdentityOptions.map((option) => ({
+  label: option.label,
+  value: option.key,
+}))
+const mockAccountOptions = [
+  {
+    label: '普通企业用户',
+    username: 'enterprise',
+    helper: '普通用户，访问工作台、积分和充值。',
+  },
+  {
+    label: '平台开发者',
+    username: 'developer',
+    helper: '平台最高权限，可查看开发者后台。',
+  },
+  {
+    label: '公司管理员',
+    username: 'admin',
+    helper: '平台运营管理员，可创建客户账号。',
+  },
+  {
+    label: '代理商',
+    username: 'agent',
+    helper: '代理商后台，只能查看和维护自己客户相关信息。',
+  },
+]
+const selectedIdentity = computed(
+  () =>
+    mockIdentityOptions.find((option) => option.key === selectedIdentityKey.value)?.identity ??
+    getDefaultMockCreditsIdentity(),
+)
+const selectedMockAccount = computed(
+  () => mockAccountOptions.find((item) => item.username === username.value.trim()),
+)
+
+function selectMockAccount(accountUsername: string) {
+  username.value = accountUsername
+  password.value = '123456'
+}
+
+function defaultRedirectForUsername(accountUsername: string) {
+  if (accountUsername === 'developer' || accountUsername === 'admin' || accountUsername === 'agent') {
+    return '/credits-admin'
+  }
+  return '/workspace'
+}
 
 async function handleLogin() {
   submitting.value = true
 
   try {
-    await authStore.login({
-      username: username.value.trim(),
-      password: password.value,
-      remember: remember.value,
-    })
+    await authStore.login(
+      {
+        username: username.value.trim(),
+        password: password.value,
+        remember: remember.value,
+      },
+      selectedIdentity.value,
+    )
 
+    const defaultRedirect = defaultRedirectForUsername(username.value.trim())
     const redirect =
       typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
         ? route.query.redirect
-        : '/workspace'
+        : defaultRedirect
 
     if (redirect === '/auth' || redirect === '/enterprise' || redirect === '/login') {
-      await router.push('/workspace')
+      await router.push(defaultRedirect)
       return
     }
 
@@ -69,7 +126,7 @@ async function handleLogin() {
             v-model:value="username"
             class="login-input"
             size="large"
-            placeholder="admin / enterprise"
+            placeholder="developer / admin / agent / enterprise"
           />
         </label>
         <label class="login-field">
@@ -83,11 +140,38 @@ async function handleLogin() {
             placeholder="123456"
           />
         </label>
+        <label class="login-field">
+          <span class="login-field-label">积分身份</span>
+          <NSelect
+            v-model:value="selectedIdentityKey"
+            class="login-select"
+            size="large"
+            :options="identitySelectOptions"
+          />
+        </label>
       </div>
+
+      <div class="mock-accounts" aria-label="Mock账号">
+        <button
+          v-for="account in mockAccountOptions"
+          :key="account.username"
+          type="button"
+          class="mock-account"
+          :class="{ active: username.trim() === account.username }"
+          @click="selectMockAccount(account.username)"
+        >
+          <strong>{{ account.label }}</strong>
+          <span>{{ account.username }} / 123456</span>
+        </button>
+      </div>
+
+      <p v-if="selectedMockAccount" class="login-helper">
+        {{ selectedMockAccount.helper }}
+      </p>
 
       <div class="login-options">
         <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
-        <span>Mock账号：admin / enterprise</span>
+        <span>Mock账号：developer / admin / agent / enterprise</span>
       </div>
 
       <NButton
@@ -183,7 +267,8 @@ async function handleLogin() {
   font-weight: 800;
 }
 
-.login-input {
+.login-input,
+.login-select {
   --n-height: 48px !important;
   --n-border-radius: 8px !important;
   --n-color: var(--field-bg) !important;
@@ -195,6 +280,51 @@ async function handleLogin() {
   --n-text-color: var(--panel-text) !important;
   --n-placeholder-color: var(--panel-muted) !important;
   --n-caret-color: #2f7cff !important;
+}
+
+.mock-accounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mock-account {
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  color: var(--panel-text);
+  padding: 10px 12px;
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mock-account.active {
+  border-color: var(--field-border-focus);
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+}
+
+.mock-account strong,
+.mock-account span,
+.login-helper {
+  display: block;
+}
+
+.mock-account strong {
+  font-size: 13px;
+}
+
+.mock-account span {
+  margin-top: 3px;
+  color: var(--panel-muted);
+  font-size: 12px;
+}
+
+.login-helper {
+  margin: 10px 0 0;
+  color: var(--panel-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .login-options {
@@ -239,6 +369,10 @@ async function handleLogin() {
   .login-options {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .mock-accounts {
+    grid-template-columns: 1fr;
   }
 }
 </style>

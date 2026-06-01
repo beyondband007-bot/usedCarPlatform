@@ -9,7 +9,7 @@ export const paintRefreshRoutes = Router();
 paintRefreshRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await paintRefreshService.createTask(req.body);
+    const result = await paintRefreshService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );
