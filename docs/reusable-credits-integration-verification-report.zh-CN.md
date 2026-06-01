@@ -21,7 +21,7 @@ Reusable Credits Platform 已经作为当前 MVP 的积分与计费模块集成�
 
 当前积分/计费集成所需的数据库工作已经完成。
 
-Reusable Credits Platform 的 PostgreSQL 是计费数据的事实来源，包含以下核心表：
+Reusable Credits Platform 的 MySQL 是计费数据的事实来源，包含以下核心表：
 
 - `users`
 - `tenants`
@@ -123,7 +123,7 @@ GET /api/v1/credits/admin/overview
 
 ```bash
 cd "/Users/shenghangwang/Documents/Reusable Credits Platform"
-docker compose up -d postgres
+docker compose up -d mysql
 npm install
 npm run db:migrate
 npm run seed:used-car:demo
@@ -348,14 +348,14 @@ LIMIT 10;
 - 能看到带积分身份和积分汇总的批量任务行。
 - 批量任务积分汇总来自子 generation task 的计费记录。
 
-### 7.2 验证 Reusable Credits Platform PostgreSQL Schema
+### 7.2 验证 Reusable Credits Platform MySQL Schema
 
-连接 Reusable Credits Platform 的 PostgreSQL 数据库，执行：
+连接 Reusable Credits Platform 的 MySQL 数据库，执行：
 
 ```sql
 SELECT table_name
 FROM information_schema.tables
-WHERE table_schema = 'public'
+WHERE table_schema = DATABASE()
   AND table_name IN (
     'users',
     'tenants',

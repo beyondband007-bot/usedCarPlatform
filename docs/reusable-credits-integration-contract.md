@@ -153,7 +153,7 @@ The frontend should not need to know the internal credits platform base URL.
 
 ## Out Of Scope For Phase 1
 
-- Merging MySQL and PostgreSQL databases.
+- Merging the two service databases into one schema.
 - Porting Reusable Credits Platform logic into usedCarPlatform.
 - Replacing the usedCarPlatform task and asset schema.
 - Dynamic batch pricing.

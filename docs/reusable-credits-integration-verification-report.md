@@ -21,7 +21,7 @@ This is intentional. usedCarPlatform does not duplicate the full credits databas
 
 The database work required for the current credits/billing integration is finished.
 
-Reusable Credits Platform PostgreSQL contains the source-of-truth billing schema:
+Reusable Credits Platform MySQL contains the source-of-truth billing schema:
 
 - `users`
 - `tenants`
@@ -123,7 +123,7 @@ These are separate from the current credits/billing integration. The billing MVP
 
 ```bash
 cd "/Users/shenghangwang/Documents/Reusable Credits Platform"
-docker compose up -d postgres
+docker compose up -d mysql
 npm install
 npm run db:migrate
 npm run seed:used-car:demo
@@ -348,14 +348,14 @@ Expected result:
 - Batch rows with credits identity and point totals.
 - Batch totals are derived from child generation task billing records.
 
-### 7.2 Verify Reusable Credits Platform PostgreSQL Schema
+### 7.2 Verify Reusable Credits Platform MySQL Schema
 
-Connect to the Reusable Credits Platform PostgreSQL database and run:
+Connect to the Reusable Credits Platform MySQL database and run:
 
 ```sql
 SELECT table_name
 FROM information_schema.tables
-WHERE table_schema = 'public'
+WHERE table_schema = DATABASE()
   AND table_name IN (
     'users',
     'tenants',

@@ -43,7 +43,7 @@ For the insufficient-balance check, it temporarily raises the `showroom-light` f
 From the Reusable Credits Platform repo:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d mysql
 npm run db:migrate
 npm run seed:used-car:demo
 npm run dev

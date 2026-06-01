@@ -123,7 +123,7 @@ Start the two APIs and the frontend:
 
 ```bash
 cd "/Users/shenghangwang/Documents/Reusable Credits Platform"
-docker compose up -d postgres
+docker compose up -d mysql
 npm install
 npm run db:migrate
 npm run seed:used-car:demo

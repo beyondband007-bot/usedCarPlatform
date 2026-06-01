@@ -22,7 +22,7 @@ usedCarPlatform remains the source of truth for:
 - batch tasks and batch items
 - delivery assets and packages
 
-We should not merge the MySQL and PostgreSQL databases for the first integration. Keeping the services separate is still the smaller-workload and lower-risk path.
+Both services now use MySQL, but they should remain separate service databases for the first integration. Keeping the service boundaries separate is still the smaller-workload and lower-risk path.
 
 ## Completed Work
 

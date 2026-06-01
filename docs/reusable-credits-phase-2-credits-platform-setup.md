@@ -107,7 +107,7 @@ In Reusable Credits Platform:
 - lint
 - unit tests
 - integration tests
-- PostgreSQL migrations
+- MySQL migrations
 - `npm run seed:used-car:demo`
 - billing API smoke checks for estimate, freeze, settle, and refund
 
