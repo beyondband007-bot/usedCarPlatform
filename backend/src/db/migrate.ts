@@ -76,7 +76,6 @@ const run = async () => {
     await addColumnIfMissing("batch_tasks", "estimated_points", "DECIMAL(18, 4) NULL");
     await addColumnIfMissing("batch_tasks", "settled_points", "DECIMAL(18, 4) NULL");
     await addIndexIfMissing("batch_tasks", "idx_batch_tasks_credits_user_created", "(credits_user_id, created_at)");
-
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();

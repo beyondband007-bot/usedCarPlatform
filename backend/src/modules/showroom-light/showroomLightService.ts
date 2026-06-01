@@ -4,8 +4,6 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
-import { tasksRepository } from "../tasks/tasksRepository";
-import { userLogoService } from "../user-logo/userLogoService";
 import {
   freezeGenerationBilling,
   markGenerationBillingRefundFailed,
@@ -14,6 +12,8 @@ import {
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
+import { tasksRepository } from "../tasks/tasksRepository";
+import { userLogoService } from "../user-logo/userLogoService";
 import { showroomLightPrompt, showroomLightWithLogoPrompt } from "./showroomLightPrompts";
 import { getShowroomLightScene } from "./showroomLightScenes";
 
