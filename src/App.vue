@@ -51,10 +51,10 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
         // 通用效果，谨慎设置，影响全局
         common: {
           borderRadiusSmall: "10px",
-          primaryColor: "#d6b36f",
-          primaryColorHover: "#e4c782",
-          primaryColorPressed: "#b68a3e",
-          bodyColor: "#f3f5f8",
+          primaryColor: "#2f6bff",
+          primaryColorHover: "#4f7fff",
+          primaryColorPressed: "#1d4ed8",
+          bodyColor: "#f6f9fc",
           cardColor: "#ffffff",
           modalColor: "#ffffff",
           popoverColor: "#ffffff",

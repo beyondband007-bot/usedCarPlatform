@@ -202,7 +202,7 @@ function close() {
 .visitor-modal-login {
   border: 0;
   color: #171100;
-  background: linear-gradient(180deg, #ffd94d, #e9b82c);
+  background: linear-gradient(180deg, var(--color-brand-strong, #ffd94d), var(--color-brand-primary, #efc24c));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     0 12px 28px rgba(244, 200, 64, 0.22);

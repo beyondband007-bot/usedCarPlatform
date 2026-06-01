@@ -71,7 +71,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .section-block {
-  width: min(1520px, calc(100% - 40px));
+  width: min(1660px, calc(100% - 40px));
   margin: 0 auto;
   padding-bottom: 130px;
 }
@@ -99,8 +99,8 @@ onMounted(() => {
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 36px;
-  width: min(1575px, 100%);
+  gap: 24px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -110,12 +110,12 @@ onMounted(() => {
   padding: 10px 10px 24px;
   background: var(--home-card-bg);
   border: 1px solid var(--home-line);
-  border-radius: 35px;
+  border-radius: var(--home-radius-card, 28px);
   box-shadow: var(--home-card-shadow);
   transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
+    transform var(--home-motion-normal, 240ms ease),
+    border-color var(--home-motion-normal, 240ms ease),
+    box-shadow var(--home-motion-normal, 240ms ease);
 }
 
 .feature-card::after {
@@ -125,12 +125,16 @@ onMounted(() => {
   pointer-events: none;
   background: var(--home-card-shine);
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity var(--home-motion-normal, 240ms ease);
 }
 
 .feature-card:hover {
   border-color: var(--home-card-hover-border);
-  transform: translateY(-6px);
+  transform: translateY(-4px);
+  box-shadow:
+    var(--home-card-shadow),
+    0 0 0 1px color-mix(in srgb, var(--home-gold) 14%, transparent),
+    0 18px 42px color-mix(in srgb, var(--home-gold) 8%, transparent);
 }
 
 .feature-card:hover::after {
@@ -142,20 +146,32 @@ onMounted(() => {
   width: 100%;
   height: auto;
   aspect-ratio: 341 / 183;
-  border-radius: 30px;
+  border-radius: var(--home-radius-media, 22px);
+  transition: transform var(--home-motion-normal, 240ms ease), filter var(--home-motion-normal, 240ms ease);
+}
+
+.feature-card:hover .feature-card-image {
+  transform: scale(1.025);
 }
 
 .feature-card h3 {
-  margin: 24px 18px 6px;
+  margin: 24px 14px 6px;
+  overflow: hidden;
   color: var(--home-card-title);
-  font-size: 22px;
+  font-size: 21px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feature-card p {
-  margin: 0 18px;
+  margin: 0 14px;
+  overflow: hidden;
   color: var(--home-card-muted);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.65;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge-row {
@@ -179,6 +195,16 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 18px;
   font-weight: 800;
+  transition:
+    transform var(--home-motion-fast, 160ms ease),
+    border-color var(--home-motion-fast, 160ms ease),
+    color var(--home-motion-fast, 160ms ease);
+}
+
+.badge-row span:hover {
+  transform: translateY(-1px);
+  border-color: var(--home-card-hover-border);
+  color: var(--home-gold-strong);
 }
 
 .badge-row span::before {
@@ -194,6 +220,7 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .feature-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
   }
 }
 
@@ -210,6 +237,11 @@ onMounted(() => {
   .feature-grid {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+
+  .feature-card h3,
+  .feature-card p {
+    white-space: normal;
   }
 
   .badge-row {

@@ -1,118 +1,35 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
-
 import PreloadImage from '@/components/common/PreloadImage.vue'
-import { homeHeroPosterSrc, homeHeroVideoSrc } from '@/constants/home-page'
+import { homeHeroImageSrc } from '@/constants/home-page'
 
 defineEmits<{
   enterWorkbench: []
 }>()
-
-const heroRef = useTemplateRef<HTMLElement>('heroRef')
-const videoRef = useTemplateRef<HTMLVideoElement>('videoRef')
-const shouldLoadVideo = ref(false)
-const isVideoReady = ref(false)
-const prefersReducedMotion = ref(false)
-
-let observer: IntersectionObserver | null = null
-
-async function playHeroVideo() {
-  const video = videoRef.value
-  if (!video || prefersReducedMotion.value) {
-    return
-  }
-
-  try {
-    await video.play()
-  } catch {
-    // Autoplay may be blocked; poster remains visible until user interaction.
-  }
-}
-
-function handleVideoReady() {
-  isVideoReady.value = true
-}
-
-onMounted(() => {
-  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  const root = heroRef.value
-  if (!root || prefersReducedMotion.value) {
-    return
-  }
-
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) {
-        return
-      }
-
-      shouldLoadVideo.value = true
-      observer?.disconnect()
-      observer = null
-    },
-    {
-      rootMargin: '120px 0px',
-      threshold: 0.01,
-    },
-  )
-
-  observer.observe(root)
-})
-
-watch(shouldLoadVideo, async (load) => {
-  if (!load) {
-    return
-  }
-
-  await nextTick()
-  await playHeroVideo()
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-})
 </script>
 
 <template>
-  <section id="top" ref="heroRef" class="hero">
+  <section id="top" class="hero">
     <div class="hero-copy">
       <p class="eyebrow">AI CAR STUDIO</p>
-      <h1>让每一辆车，都值得被精心呈现</h1>
-      <p>针对汽车电商、出海商朝打造专业级的内容生成平台</p>
+      <h1>每一辆车，都值得被精心呈现</h1>
+      <p>针对汽车电商、出海车商打造的专业内容生产平台</p>
     </div>
 
     <div class="hero-media" aria-hidden="true">
       <PreloadImage
-        class="hero-poster"
-        :class="{ 'is-hidden': isVideoReady }"
-        :src="homeHeroPosterSrc"
+        class="hero-image"
+        :src="homeHeroImageSrc"
         alt=""
         loading="eager"
         fetchpriority="high"
         decoding="async"
+        fit="contain"
       />
-      <video
-        v-if="shouldLoadVideo"
-        ref="videoRef"
-        class="hero-video"
-        :class="{ 'is-ready': isVideoReady }"
-        muted
-        loop
-        playsinline
-        autoplay
-        preload="none"
-        :poster="homeHeroPosterSrc"
-        @loadeddata="handleVideoReady"
-        @canplay="handleVideoReady"
-      >
-        <source :src="homeHeroVideoSrc" type="video/mp4" />
-      </video>
     </div>
 
     <div class="hero-action">
       <button type="button" class="button gold" @click="$emit('enterWorkbench')">
-        进入视觉工作台
+        立即体验
       </button>
     </div>
   </section>
@@ -126,8 +43,9 @@ onUnmounted(() => {
   padding-top: clamp(148px, 11.3vw, 222px);
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 26%, rgba(121, 115, 105, 0.3), transparent 31rem),
-    radial-gradient(circle at 70% 36%, rgba(244, 200, 64, 0.08), transparent 28rem),
+    radial-gradient(circle at 50% 24%, rgba(121, 115, 105, 0.26), transparent 31rem),
+    radial-gradient(circle at 70% 36%, color-mix(in srgb, var(--home-gold) 10%, transparent), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 34%),
     var(--home-hero-bg);
 }
 
@@ -149,6 +67,19 @@ onUnmounted(() => {
   width: min(900px, calc(100% - 40px));
   margin: 0 auto;
   text-align: center;
+  animation: hero-copy-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes hero-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .eyebrow {
@@ -157,6 +88,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 900;
   letter-spacing: 0.08em;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--home-gold) 22%, transparent);
 }
 
 .hero h1 {
@@ -165,6 +97,7 @@ onUnmounted(() => {
   font-size: clamp(34px, 2.8vw, 55px);
   line-height: 1.08;
   letter-spacing: 0;
+  text-shadow: 0 4px 28px rgba(0, 0, 0, 0.42);
 }
 
 .hero p:not(.eyebrow) {
@@ -194,34 +127,19 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.hero-poster,
-.hero-video {
+.hero-image {
   position: absolute;
   left: 50%;
   top: clamp(42px, 3.4vw, 66px);
   width: 100%;
   height: 100%;
   max-width: none;
-  object-fit: cover;
-  object-position: center center;
   transform: translateX(-50%);
 }
 
-.hero-poster {
-  transition: opacity 0.45s ease;
-}
-
-.hero-poster.is-hidden {
-  opacity: 0;
-}
-
-.hero-video {
-  opacity: 0;
-  transition: opacity 0.45s ease;
-}
-
-.hero-video.is-ready {
-  opacity: 1;
+.hero-image :deep(.preload-image__img) {
+  object-fit: contain;
+  object-position: center center;
 }
 
 .button {
@@ -237,23 +155,32 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 900;
   transition:
-    transform 0.22s ease,
-    filter 0.22s ease,
-    box-shadow 0.22s ease;
+    transform var(--home-motion-normal),
+    filter var(--home-motion-normal),
+    box-shadow var(--home-motion-normal),
+    background var(--home-motion-normal);
 }
 
 .button:hover {
   transform: translateY(-2px);
   filter: saturate(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 16px 42px color-mix(in srgb, var(--home-gold) 26%, transparent);
 }
 
 .button:active {
   transform: translateY(0);
 }
 
+.button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 72%, transparent);
+  outline-offset: 4px;
+}
+
 .button.gold {
   color: #171100;
-  background: linear-gradient(180deg, var(--home-gold-strong), #e9b82c);
+  background: linear-gradient(180deg, var(--home-gold-strong), var(--home-gold));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     0 12px 34px rgba(244, 200, 64, 0.18);
@@ -292,21 +219,10 @@ onUnmounted(() => {
     font-size: 15px;
   }
 
-  .hero-poster,
-  .hero-video {
+  .hero-image {
     width: 980px;
     height: 100%;
     top: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-video {
-    display: none;
-  }
-
-  .hero-poster {
-    opacity: 1 !important;
   }
 }
 </style>

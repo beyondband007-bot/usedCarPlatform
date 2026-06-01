@@ -26,21 +26,18 @@ function finishIntro() {
       autoplay
       playsinline
       muted
+      preload="auto"
       @ended="finishIntro"
     />
 
-    <aside class="intro-video-panel" aria-label="进入引导">
-      <p class="intro-video-panel__title">进入视觉工作台</p>
-      <p class="intro-video-panel__hint">开启您的汽车内容创作之旅</p>
-      <div class="intro-video-panel__divider" aria-hidden="true" />
-      <button
-        type="button"
-        class="intro-video-panel__enter"
-        @click="finishIntro"
-      >
-        立即进入 →
-      </button>
-    </aside>
+    <button
+      type="button"
+      class="intro-video-skip"
+      aria-label="跳过视频"
+      @click="finishIntro"
+    >
+      跳过
+    </button>
   </main>
 </template>
 
@@ -57,82 +54,50 @@ function finishIntro() {
   display: block;
   width: 100vw;
   height: 100vh;
-  object-fit: cover;
+  object-fit: contain;
   background: #000;
 }
 
-.intro-video-panel {
+.intro-video-skip {
   position: fixed;
-  right: clamp(18px, 2.4vw, 36px);
-  bottom: clamp(18px, 2.4vw, 36px);
+  top: clamp(18px, 2.4vw, 32px);
+  right: clamp(18px, 2.4vw, 32px);
   z-index: 1;
-  display: grid;
-  gap: 10px;
-  width: min(100% - 36px, 320px);
-  padding: 22px 24px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  background: rgba(18, 18, 18, 0.58);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
-}
-
-.intro-video-panel__title {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.5;
-}
-
-.intro-video-panel__hint {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.55;
-}
-
-.intro-video-panel__divider {
-  height: 1px;
-  margin: 2px 0 4px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.intro-video-panel__enter {
-  justify-self: start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #efc24c;
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(18, 18, 18, 0.48);
+  backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
   font-family: inherit;
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.4;
-  transition: color 0.2s ease, opacity 0.2s ease;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.intro-video-panel__enter:hover {
-  color: #ffd75a;
+.intro-video-skip:hover {
+  background: rgba(28, 28, 28, 0.62);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
 }
 
-.intro-video-panel__enter:focus-visible {
+.intro-video-skip:focus-visible {
   outline: 2px solid rgba(239, 194, 76, 0.72);
   outline-offset: 3px;
-  border-radius: 4px;
 }
 
 @media (max-width: 640px) {
-  .intro-video-panel {
+  .intro-video-skip {
+    top: 16px;
     right: 16px;
-    bottom: 16px;
-    width: min(100% - 32px, 300px);
-    padding: 18px 18px 16px;
-  }
-
-  .intro-video-panel__title {
-    font-size: 14px;
+    padding: 9px 18px;
+    font-size: 13px;
   }
 }
 </style>

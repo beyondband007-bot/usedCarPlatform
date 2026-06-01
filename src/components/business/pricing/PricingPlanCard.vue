@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 const cardClass = computed(() => [
   "pricing-plan-card",
+  `is-${props.plan.tone}`,
   {
     "is-featured": props.plan.featured,
     "is-selected": props.selected,
@@ -29,7 +30,7 @@ const cardClass = computed(() => [
   },
 ]);
 
-const showBadge = computed(() => props.plan.badge && !props.selected);
+const showBadge = computed(() => Boolean(props.plan.badge));
 </script>
 
 <template>
@@ -56,10 +57,6 @@ const showBadge = computed(() => props.plan.badge && !props.selected);
     >
       <span v-if="showBadge" class="plan-badge">{{ plan.badge }}</span>
 
-      <span v-if="selected" class="plan-check" aria-hidden="true">
-        <Icon icon="mdi:check" />
-      </span>
-
       <div class="plan-card-content">
         <h3 class="plan-name">{{ plan.name }}</h3>
 
@@ -68,9 +65,11 @@ const showBadge = computed(() => props.plan.badge && !props.selected);
           <span>/ 套餐</span>
         </div>
 
+        <span class="plan-divider" aria-hidden="true" />
+
         <ul class="plan-benefits">
           <li v-for="benefit in plan.benefits" :key="benefit">
-            <Icon icon="mdi:check" class="benefit-icon" />
+            <Icon icon="mdi:check-circle-outline" class="benefit-icon" />
             <span>{{ benefit }}</span>
           </li>
         </ul>
@@ -90,8 +89,8 @@ const showBadge = computed(() => props.plan.badge && !props.selected);
 
 <style scoped lang="scss">
 .pricing-plan-motion {
+  container-type: inline-size;
   width: 100%;
-  height: 100%;
   min-width: 0;
   transition: z-index 0s;
 }
@@ -103,237 +102,420 @@ const showBadge = computed(() => props.plan.badge && !props.selected);
 
 .pricing-plan-card {
   --plan-accent: var(--pricing-accent-strong, #efc24c);
-  --plan-card-bg: rgba(255, 255, 255, 0.04);
-  --plan-card-border: rgba(255, 255, 255, 0.1);
+  --plan-card-bg: rgba(255, 255, 255, 0.03);
+  --plan-card-border: rgba(255, 255, 255, 0.08);
   --plan-card-text: #f8fafc;
-  --plan-card-muted: rgba(248, 250, 252, 0.58);
-  --plan-card-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  --plan-lift: 0px;
-  --plan-scale: 1;
+  --plan-card-muted: rgba(248, 250, 252, 0.72);
+  --plan-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --plan-selected-ring: transparent;
+  --plan-divider: rgba(255, 255, 255, 0.18);
+  --plan-action-border: rgba(255, 255, 255, 0.38);
+  --plan-action-text: var(--plan-card-text);
+  --plan-action-hover-border: rgba(255, 255, 255, 0.54);
+  --plan-action-hover-text: #ffffff;
+  --plan-action-solid-bg: linear-gradient(180deg, #f5cf65, #f1c646);
+  --plan-action-solid-text: #241700;
+  --plan-action-solid-shadow: 0 12px 28px color-mix(in srgb, var(--plan-accent) 28%, transparent);
 
   box-sizing: border-box;
   position: relative;
   display: flex;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 406 / 505;
   min-width: 0;
-  min-height: 0;
   flex-direction: column;
-  padding: clamp(20px, 2vw, 32px);
+  padding: clamp(22px, 7.8cqw, 54px);
   border: 1px solid var(--plan-card-border);
-  border-radius: 16px;
+  border-radius: clamp(22px, 7.2cqw, 44px);
   background: var(--plan-card-bg);
   box-shadow: var(--plan-card-shadow);
-  backdrop-filter: blur(18px);
-  transform: translateY(var(--plan-lift)) scale(var(--plan-scale));
-  transform-origin: center center;
+  backdrop-filter: blur(22px);
   cursor: pointer;
   outline: none;
   transition:
-    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.26s ease,
-    border-color 0.26s ease,
-    background 0.26s ease;
+    transform 0.22s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
 }
 
+.pricing-plan-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--plan-selected-ring);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.pricing-plan-card::after {
+  position: absolute;
+  inset: -22%;
+  z-index: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--plan-accent) 18%, transparent), transparent 28%),
+    radial-gradient(circle at 50% 104%, color-mix(in srgb, var(--plan-accent) 16%, transparent), transparent 34%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
 :global(.theme-light) .pricing-plan-card {
-  --plan-card-bg: rgba(255, 255, 255, 0.88);
-  --plan-card-border: rgba(15, 23, 42, 0.08);
+  --plan-card-bg: rgba(255, 255, 255, 0.94);
+  --plan-card-border: #e2e8f0;
   --plan-card-text: #0f172a;
   --plan-card-muted: #64748b;
-  --plan-card-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --plan-card-shadow: 0 14px 40px rgba(78, 111, 148, 0.12);
+  --plan-divider: #e2e8f0;
+  --plan-action-border: #cbd5e1;
+  --plan-action-text: #0f172a;
+  --plan-action-hover-border: #94a3b8;
+  --plan-action-hover-text: #0f172a;
+}
+
+:global(.theme-light) .pricing-plan-card.is-blue {
+  --plan-accent: #2f6bff;
+  --plan-card-bg: rgba(255, 255, 255, 0.96);
+  --plan-card-border: #dbeafe;
+  --plan-card-shadow: 0 12px 36px rgba(47, 107, 255, 0.1);
+}
+
+:global(.theme-light) .pricing-plan-card.is-orange {
+  --plan-accent: #2f6bff;
+  --plan-card-bg: linear-gradient(
+    180deg,
+    rgba(237, 244, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+  --plan-card-border: rgba(47, 107, 255, 0.28);
+  --plan-card-shadow: 0 18px 48px rgba(47, 107, 255, 0.14);
+  --plan-action-solid-bg: linear-gradient(180deg, #4f7fff, #2f6bff);
+  --plan-action-solid-text: #ffffff;
+  --plan-action-solid-shadow: 0 12px 28px rgba(47, 107, 255, 0.28);
+}
+
+:global(.theme-light) .pricing-plan-card.is-green {
+  --plan-accent: #d4a017;
+  --plan-card-bg: linear-gradient(
+    180deg,
+    rgba(255, 251, 235, 0.96) 0%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+  --plan-card-border: rgba(212, 160, 23, 0.28);
+  --plan-card-shadow: 0 14px 42px rgba(212, 160, 23, 0.12);
+  --plan-action-border: rgba(212, 160, 23, 0.42);
+  --plan-action-hover-border: rgba(212, 160, 23, 0.62);
+  --plan-action-hover-text: #92400e;
 }
 
 .pricing-plan-card.is-featured {
-  border-color: color-mix(in srgb, var(--plan-accent) 58%, transparent);
+  aspect-ratio: 406 / 505;
+  border-color: rgba(255, 255, 255, 0.12);
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--plan-accent) 8%, var(--plan-card-bg)),
-      var(--plan-card-bg)
+      color-mix(in srgb, var(--plan-accent) 4%, rgba(255, 255, 255, 0.03)),
+      rgba(255, 255, 255, 0.03)
     );
   box-shadow:
-    var(--plan-card-shadow),
-    0 0 0 1px color-mix(in srgb, var(--plan-accent) 22%, transparent),
-    0 0 48px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+    0 18px 48px rgba(0, 0, 0, 0.22),
+    0 0 22px color-mix(in srgb, var(--plan-accent) 8%, transparent);
 }
 
-.pricing-plan-card:hover {
-  --plan-lift: -4px;
-}
-
-.pricing-plan-card.is-pressing {
-  --plan-lift: 2px;
-  transition-duration: 0.12s;
+:global(.theme-light) .pricing-plan-card.is-featured {
+  border-color: rgba(47, 107, 255, 0.32);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(237, 244, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.96) 100%
+    );
+  box-shadow:
+    0 18px 48px rgba(47, 107, 255, 0.14),
+    0 0 0 1px rgba(47, 107, 255, 0.08);
 }
 
 .pricing-plan-card.is-selected {
-  --plan-lift: -4px;
-  --plan-scale: 1;
-  border-color: color-mix(in srgb, var(--plan-accent) 72%, transparent);
+  --plan-selected-ring: color-mix(in srgb, var(--plan-accent) 86%, transparent);
+
+  transform: translateY(-8px);
+  border-color: color-mix(in srgb, var(--plan-accent) 84%, transparent);
   box-shadow:
-    0 24px 56px rgba(0, 0, 0, 0.32),
-    0 0 0 1px color-mix(in srgb, var(--plan-accent) 34%, transparent),
-    0 0 64px color-mix(in srgb, var(--plan-accent) 24%, transparent);
+    0 28px 80px rgba(0, 0, 0, 0.42),
+    0 0 0 2px color-mix(in srgb, var(--plan-accent) 74%, transparent),
+    0 0 76px color-mix(in srgb, var(--plan-accent) 32%, transparent);
+  animation: selected-card-pop 0.38s cubic-bezier(0.2, 0.9, 0.22, 1.22);
 }
 
 :global(.theme-light) .pricing-plan-card.is-selected {
   box-shadow:
-    0 20px 48px rgba(15, 23, 42, 0.12),
-    0 0 0 1px color-mix(in srgb, var(--plan-accent) 34%, transparent),
-    0 0 48px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+    0 24px 56px rgba(78, 111, 148, 0.16),
+    0 0 0 2px color-mix(in srgb, var(--plan-accent) 52%, transparent),
+    0 0 32px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+}
+
+.pricing-plan-card.is-featured.is-selected {
+  --plan-selected-ring: color-mix(in srgb, var(--plan-accent) 92%, transparent);
+
+  border-color: color-mix(in srgb, var(--plan-accent) 84%, transparent);
+  box-shadow:
+    0 32px 86px rgba(0, 0, 0, 0.44),
+    0 0 0 2px color-mix(in srgb, var(--plan-accent) 78%, transparent),
+    0 0 84px color-mix(in srgb, var(--plan-accent) 34%, transparent);
+}
+
+:global(.theme-light) .pricing-plan-card.is-featured.is-selected {
+  box-shadow:
+    0 28px 64px rgba(47, 107, 255, 0.18),
+    0 0 0 2px rgba(47, 107, 255, 0.42),
+    0 0 36px rgba(47, 107, 255, 0.14);
+}
+
+.pricing-plan-card.is-selected::before,
+.pricing-plan-card.is-selected::after {
+  opacity: 1;
+}
+
+.pricing-plan-card.is-pressing {
+  transform: translateY(-3px);
+}
+
+.pricing-plan-card.is-selected.is-pressing {
+  transform: translateY(-5px);
+}
+
+@keyframes selected-card-pop {
+  0% {
+    transform: translateY(0);
+    box-shadow:
+      0 16px 44px rgba(0, 0, 0, 0.3),
+      0 0 0 1px color-mix(in srgb, var(--plan-accent) 38%, transparent),
+      0 0 24px color-mix(in srgb, var(--plan-accent) 14%, transparent);
+  }
+
+  72% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(-8px);
+  }
 }
 
 .plan-badge {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: clamp(18px, 6.2cqw, 36px);
+  right: clamp(18px, 6.2cqw, 36px);
   z-index: 3;
-  padding: 5px 12px;
+  padding: clamp(6px, 1.9cqw, 11px) clamp(12px, 3.4cqw, 20px);
   border-radius: 999px;
   background: var(--plan-accent);
-  color: #1a1204;
-  font-size: 12px;
+  color: #241700;
+  font-size: clamp(12px, 2.9cqw, 17px);
   font-weight: 800;
 }
 
-.plan-check {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: var(--plan-accent);
-  color: #1a1204;
-  font-size: 18px;
-}
-
 .plan-card-content {
-  display: flex;
-  height: 100%;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   flex: 1;
-  flex-direction: column;
   min-width: 0;
-  min-height: 0;
 }
 
 .plan-name {
   margin: 0;
-  padding-right: clamp(48px, 12%, 72px);
+  padding-right: clamp(58px, 18cqw, 96px);
   color: var(--plan-card-text);
-  font-size: clamp(16px, 1rem + 0.4vw, 22px);
+  font-size: clamp(20px, 5.2cqw, 34px);
   font-weight: 900;
-  line-height: 1.35;
+  line-height: 1.18;
 }
 
 .plan-price-row {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-top: clamp(18px, 2vw, 24px);
+  gap: clamp(8px, 2.3cqw, 14px);
+  margin-top: clamp(18px, 6.4cqw, 38px);
 }
 
 .plan-price-row strong {
   color: var(--plan-accent);
-  font-size: clamp(28px, 1.6rem + 1.2vw, 44px);
+  font-size: clamp(30px, 10cqw, 62px);
   font-weight: 900;
   line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .plan-price-row span {
   color: var(--plan-card-muted);
-  font-size: clamp(12px, 0.75rem + 0.15vw, 14px);
-  font-weight: 700;
+  font-size: clamp(15px, 4.1cqw, 26px);
+  font-weight: 800;
+}
+
+.plan-divider {
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin: clamp(18px, 6.2cqw, 38px) 0 clamp(14px, 4.8cqw, 30px);
+  background: var(--plan-divider);
 }
 
 .plan-benefits {
-  display: grid;
-  gap: clamp(10px, 1vw, 14px);
-  margin: clamp(18px, 2vw, 28px) 0 clamp(18px, 2vw, 28px);
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: clamp(8px, 2.2cqw, 16px);
+  min-height: 0;
+  margin: 0;
   padding: 0;
+  overflow: hidden;
   list-style: none;
 }
 
 .plan-benefits li {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: clamp(8px, 2.4cqw, 14px);
   color: var(--plan-card-text);
-  font-size: clamp(12px, 0.78rem + 0.2vw, 14px);
+  font-size: clamp(13px, 4.1cqw, 24px);
   font-weight: 600;
-  line-height: 1.65;
+  line-height: 1.4;
 }
 
 .benefit-icon {
   flex: 0 0 auto;
-  margin-top: 3px;
   color: var(--plan-accent);
-  font-size: 16px;
+  font-size: clamp(14px, 4.2cqw, 24px);
+  margin-top: 0.12em;
 }
 
 .plan-action {
   display: inline-flex;
   width: 100%;
-  min-height: 48px;
-  height: auto;
+  flex: 0 0 auto;
+  min-height: clamp(42px, 13.6cqw, 76px);
   align-items: center;
   justify-content: center;
-  margin-top: auto;
-  padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--plan-card-text) 24%, transparent);
-  border-radius: 999px;
+  margin-top: clamp(16px, 4.5cqw, 28px);
+  padding: clamp(10px, 3.5cqw, 19px) clamp(14px, 4.8cqw, 28px);
+  border: 1px solid var(--plan-action-border);
+  border-radius: clamp(12px, 3.3cqw, 18px);
   background: transparent;
-  color: var(--plan-card-text);
+  color: var(--plan-action-text);
   font-family: inherit;
-  font-size: clamp(13px, 0.82rem + 0.2vw, 15px);
-  font-weight: 800;
+  font-size: clamp(14px, 4cqw, 24px);
+  font-weight: 900;
   cursor: pointer;
   transition:
-    transform 160ms ease,
     background 160ms ease,
     border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    color 160ms ease;
 }
 
 .plan-action.is-solid {
   border-color: transparent;
-  background: linear-gradient(180deg, #f0cc62, var(--plan-accent));
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--plan-accent) 34%, transparent);
-  color: #1a1204;
+  background: var(--plan-action-solid-bg);
+  box-shadow: var(--plan-action-solid-shadow);
+  color: var(--plan-action-solid-text);
+}
+
+.pricing-plan-card.is-selected .plan-action.is-solid,
+.pricing-plan-card.is-featured.is-selected .plan-action.is-solid {
+  filter: brightness(1.04);
 }
 
 .pricing-plan-card:hover .plan-action.is-solid {
   filter: brightness(1.04);
 }
 
+:global(.theme-light) .pricing-plan-card:hover .plan-action.is-solid {
+  filter: brightness(1.06);
+}
+
 .pricing-plan-card:hover .plan-action:not(.is-solid) {
-  border-color: color-mix(in srgb, var(--plan-accent) 42%, transparent);
-  color: var(--plan-accent);
+  border-color: var(--plan-action-hover-border);
+  color: var(--plan-action-hover-text);
+}
+
+:global(.theme-light) .pricing-plan-card:hover .plan-action:not(.is-solid) {
+  background: color-mix(in srgb, var(--plan-accent) 6%, #ffffff);
 }
 
 .plan-action:active {
-  transform: translateY(1px);
-}
-
-@media (max-width: 720px) {
-  .pricing-plan-card:hover,
-  .pricing-plan-card.is-selected {
-    --plan-lift: 0;
-  }
+  opacity: 0.92;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pricing-plan-card {
+    animation: none;
     transition: none;
+  }
+}
+
+@media (max-height: 820px) {
+  .pricing-plan-card {
+    padding: clamp(17px, 5.4cqw, 30px);
+  }
+
+  .plan-name {
+    font-size: clamp(17px, 4.7cqw, 26px);
+  }
+
+  .plan-price-row {
+    gap: clamp(7px, 2cqw, 12px);
+    margin-top: clamp(12px, 4cqw, 22px);
+  }
+
+  .plan-price-row strong {
+    font-size: clamp(27px, 8.7cqw, 46px);
+  }
+
+  .plan-price-row span {
+    font-size: clamp(13px, 3.5cqw, 18px);
+  }
+
+  .plan-divider {
+    margin: clamp(12px, 3.8cqw, 20px) 0 clamp(9px, 3cqw, 16px);
+  }
+
+  .plan-benefits {
+    justify-content: flex-start;
+    gap: clamp(4px, 1.8cqw, 10px);
+    overflow: visible;
+  }
+
+  .plan-benefits li {
+    gap: clamp(7px, 2cqw, 11px);
+    font-size: clamp(11px, 3.35cqw, 16px);
+    line-height: 1.22;
+  }
+
+  .benefit-icon {
+    font-size: clamp(13px, 3.5cqw, 17px);
+    margin-top: 0;
+  }
+
+  .plan-action {
+    min-height: clamp(42px, 10.5cqw, 58px);
+    padding: clamp(10px, 2.8cqw, 15px) clamp(14px, 4cqw, 22px);
+    border-radius: clamp(12px, 3cqw, 16px);
+    font-size: clamp(14px, 3.35cqw, 18px);
+  }
+
+  .plan-badge {
+    top: clamp(16px, 5cqw, 28px);
+    right: clamp(16px, 5cqw, 28px);
+    padding: clamp(6px, 1.7cqw, 9px) clamp(12px, 3cqw, 16px);
+    font-size: clamp(12px, 2.7cqw, 14px);
   }
 }
 </style>

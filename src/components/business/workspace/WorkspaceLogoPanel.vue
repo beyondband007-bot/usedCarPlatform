@@ -116,7 +116,7 @@ function handleSelectRecent() {
     />
 
     <section
-      class="logo-setting-card border border-[var(--app-border)] bg-[var(--app-surface)]"
+      class="logo-setting-card bg-[var(--app-surface)]"
       aria-label="Logo 设置"
     >
       <div class="logo-setting-head px-6 py-5">
@@ -213,7 +213,6 @@ function handleSelectRecent() {
 }
 
 .workspace-logo-panel--batch .logo-setting-card {
-  border: 0;
   background: transparent;
   box-shadow: none;
 }
@@ -234,7 +233,6 @@ function handleSelectRecent() {
 
 .workspace-logo-panel--batch .logo-recent-block {
   margin-top: 4px;
-  border-top: 0;
   padding: 0;
   background: transparent;
 }
@@ -256,7 +254,6 @@ function handleSelectRecent() {
 .logo-recent-block {
   display: grid;
   gap: 12px;
-  border-top: 1px solid var(--workspace-line, var(--app-border));
   background: var(--workspace-panel, var(--app-surface));
   padding: 0 20px 20px;
 }
@@ -267,7 +264,6 @@ function handleSelectRecent() {
   border-radius: 10px;
   font-family: inherit;
   transition:
-    border-color 0.2s ease,
     box-shadow 0.2s ease,
     opacity 0.2s ease;
 }
@@ -279,14 +275,12 @@ function handleSelectRecent() {
   min-height: 68px;
   margin-top: 16px;
   padding: 12px 16px;
-  border: 1px solid var(--workspace-line, var(--app-border));
   background: var(--workspace-panel, var(--app-surface));
   text-align: left;
   cursor: pointer;
 }
 
 .recent-logo-row.is-active {
-  border-color: var(--logo-accent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--logo-accent) 18%, transparent);
 }
 
@@ -303,7 +297,6 @@ function handleSelectRecent() {
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 5px;
-  border: 1px solid var(--logo-preview-border);
   background:
     linear-gradient(90deg, rgba(255, 214, 114, 0.14), transparent 55%),
     var(--logo-preview-bg);
@@ -350,7 +343,6 @@ function handleSelectRecent() {
 
 .reupload-button {
   height: 48px;
-  border: 1px solid var(--workspace-line, var(--app-border));
   background: var(--workspace-panel, var(--app-surface));
   color: var(--app-text);
   text-align: left;
@@ -361,7 +353,6 @@ function handleSelectRecent() {
 }
 
 .reupload-button:hover:not(:disabled) {
-  border-color: var(--logo-accent-border);
 }
 
 .reupload-button:disabled,
@@ -375,7 +366,6 @@ function handleSelectRecent() {
   width: 100%;
   place-items: center;
   min-height: 190px;
-  border: 1px dashed var(--logo-drop-border);
   border-radius: 12px;
   background: var(--logo-drop-bg);
   color: var(--app-text);

@@ -245,6 +245,10 @@ export interface GenerationTaskDetail {
   billingStatus?: string | null
   estimatedPoints?: string | null
   settledPoints?: string | null
+  resultVideos?: GenerationResultImage[]
+  videoUrl?: string
+  previewVideo?: string
+  downloadUrl?: string
   error: {
     code?: string
     message?: string
@@ -269,12 +273,17 @@ export interface CreativeImageMessage {
   messageId: string
   conversationId: string
   role: string
-  prompt: string
-  taskId: string
-  referenceAssetId: string | null
-  sourceTaskId: string | null
-  sourceImageUrl: string | null
-  generationMode: 'text_to_image' | 'image_to_image' | 'revise'
+  content: string
+  taskId?: string | null
+  referenceAssetId?: string | null
+  sourceTaskId?: string | null
+  sourceImageUrl?: string | null
+  generationMode?: 'text_to_image' | 'image_to_image' | 'revise' | null
+  metadata?: {
+    outputRatio?: string
+    resolution?: string
+    [key: string]: unknown
+  } | null
   createdAt: string
 }
 
@@ -470,6 +479,10 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
   return response.data
 }
 
+const generationRequestConfig = {
+  timeout: 0,
+}
+
 export async function uploadCarExterior(file: File) {
   return uploadAsset(file, 'car_exterior')
 }
@@ -513,6 +526,7 @@ export async function createGenerationTask(
   const response = await request.post<ApiResponse<CreatedGenerationTask>>(
     `/modules/${moduleCode}/tasks`,
     payload,
+    generationRequestConfig,
   )
 
   return unwrapApiResponse(response)
@@ -571,6 +585,7 @@ export async function createCreativeImageGeneration(
   const response = await request.post<ApiResponse<CreatedCreativeGeneration>>(
     `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/generations`,
     payload,
+    generationRequestConfig,
   )
   return unwrapApiResponse(response)
 }
@@ -617,7 +632,11 @@ export async function saveBatchPreset(payload: {
 }
 
 export async function createBatchTask(payload: CreateBatchTaskPayload) {
-  const response = await request.post<ApiResponse<CreatedBatchTask>>('/modules/batch-new/tasks', payload)
+  const response = await request.post<ApiResponse<CreatedBatchTask>>(
+    '/modules/batch-new/tasks',
+    payload,
+    generationRequestConfig,
+  )
   return unwrapApiResponse(response)
 }
 

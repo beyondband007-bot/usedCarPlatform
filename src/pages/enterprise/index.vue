@@ -89,20 +89,20 @@ const isDark = computed(() => appStore.isDarkMode)
 
 .enterprise-login-page.theme-dark {
   --login-bg: var(--app-bg);
-  --login-text: #f8fbff;
-  --login-muted: rgba(198, 214, 236, 0.72);
-  --login-kicker: rgba(198, 214, 236, 0.82);
-  --login-feature-bg: rgba(255, 255, 255, 0.04);
+  --login-text: #f4f1e9;
+  --login-muted: #959083;
+  --login-kicker: #959083;
+  --login-feature-bg: #101010;
   --login-feature-border: rgba(255, 255, 255, 0.1);
-  --login-feature-icon-bg: rgba(47, 124, 255, 0.18);
-  --login-feature-icon: #7eb0ff;
+  --login-feature-icon-bg: rgba(239, 194, 76, 0.14);
+  --login-feature-icon: #efc24c;
   --login-overlay:
     linear-gradient(
       90deg,
-      rgba(4, 9, 18, 0.96) 0%,
-      rgba(5, 12, 24, 0.88) 44%,
-      rgba(5, 12, 24, 0.62) 70%,
-      rgba(4, 9, 18, 0.42) 100%
+      rgba(5, 5, 5, 0.96) 0%,
+      rgba(8, 8, 8, 0.88) 44%,
+      rgba(8, 8, 8, 0.62) 70%,
+      rgba(5, 5, 5, 0.42) 100%
     );
   --login-image-filter: saturate(1.05) brightness(0.55);
 }

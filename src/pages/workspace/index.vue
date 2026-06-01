@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -9,13 +9,17 @@ import {
   createGenerationTask,
   getBatchTaskDetail,
   getCreativeImageConversations,
+  getCreativeImageMessages,
   getGenerationTask,
+  getRecentGenerationTasks,
   uploadCreativeImageReference,
   type BatchTaskDetail,
   type CreateGenerationTaskPayload,
   type CreativeImageConversation,
+  type CreativeImageMessage,
   type GenerationTaskDetail,
   type GenerationTaskStatus,
+  type RecentGenerationTask,
   type UploadedAsset,
 } from '@/api/visual-workbench'
 import CapabilityGeneratePanel from '@/components/business/workspace/CapabilityGeneratePanel.vue'
@@ -23,8 +27,10 @@ import CreativeImageStudioPanel from '@/components/business/workspace/CreativeIm
 import WorkspaceAssistPanel from '@/components/business/workspace/WorkspaceAssistPanel.vue'
 import WorkspaceSidebar from '@/components/business/workspace/WorkspaceSidebar.vue'
 import { defaultWorkspaceCapabilityCode, workspaceCapabilities } from '@/constants/workspace'
-import { SHORT_VIDEO_BETA_MESSAGE } from '@/constants/short-video-beta'
+import { usePointsStore } from '@/stores/points'
+import { useSubscriptionStore } from '@/stores/subscription'
 import type {
+  CreativeThreadTurn,
   WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
   WorkspaceDeliveryTaskPreview,
@@ -41,8 +47,15 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const appStore = useAppStore()
+const pointsStore = usePointsStore()
+const subscriptionStore = useSubscriptionStore()
 const SHORT_VIDEO_CAPABILITY_CODE = 'short-video'
 const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
+const RECENT_GENERATION_SCAN_PAGE_SIZE = 50
+const runningGenerationStatuses = new Set(['waiting', 'queued', 'queue', 'generating'])
+const recentGenerationModuleCodes = workspaceCapabilities
+  .filter((capability) => capability.code !== 'batch-new' && capability.code !== 'delivery')
+  .map((capability) => capability.code)
 
 interface ActiveGenerationTaskSnapshot {
   taskId: string
@@ -59,16 +72,30 @@ const activeCode = ref(resolveCapabilityCode(route.params.code))
 const generationResult = ref<WorkspaceGenerateResult | null>(null)
 const creativeImageCaption = ref<string | null>(null)
 const creativeConversations = ref<CreativeImageConversation[]>([])
+const creativeThreadTurns = ref<CreativeThreadTurn[]>([])
 const activeCreativeConversationId = ref<string | null>(null)
 const creativeReferenceAsset = ref<UploadedAsset | null>(null)
 const isUploadingCreativeReference = ref(false)
+const isCreatingCreativeConversation = ref(false)
+const isLoadingCreativeConversation = ref(false)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
+const generatingCapabilityCode = ref<string | null>(null)
 const shortVideoPlayRequest = ref(0)
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(null)
 const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([])
+const trackedRunningTasks = ref<Record<string, string>>({})
 let batchPollTimer: number | null = null
+let globalGenerationPollTimer: number | null = null
+let isRefreshingRunningTasks = false
+
+function resolveCapabilityCodeFromModule(moduleCode: string) {
+  const matched = workspaceCapabilities.find(
+    (capability) => capability.code === moduleCode || capability.apiCode === moduleCode,
+  )
+  return matched?.code ?? null
+}
 
 function readActiveGenerationTask() {
   const raw = window.localStorage.getItem(ACTIVE_GENERATION_TASK_KEY)
@@ -85,6 +112,21 @@ function readActiveGenerationTask() {
 
 function saveActiveGenerationTask(task: ActiveGenerationTaskSnapshot) {
   window.localStorage.setItem(ACTIVE_GENERATION_TASK_KEY, JSON.stringify(task))
+}
+
+const ACTIVE_CREATIVE_CONVERSATION_KEY = 'workspace-active-creative-conversation'
+
+function readActiveCreativeConversationId() {
+  return window.localStorage.getItem(ACTIVE_CREATIVE_CONVERSATION_KEY)
+}
+
+function saveActiveCreativeConversationId(conversationId: string | null) {
+  if (!conversationId) {
+    window.localStorage.removeItem(ACTIVE_CREATIVE_CONVERSATION_KEY)
+    return
+  }
+
+  window.localStorage.setItem(ACTIVE_CREATIVE_CONVERSATION_KEY, conversationId)
 }
 
 function clearActiveGenerationTask(taskId?: string) {
@@ -112,6 +154,48 @@ function mapBatchStatus(status: GenerationTaskStatus): WorkspaceRecentItem['stat
   return status
 }
 
+function normalizeRecentTaskStatus(task: RecentGenerationTask) {
+  const status = task.uiStatus ?? task.status
+  return status === 'queue' ? 'queued' : status
+}
+
+function isRunningGenerationStatus(status?: string | null) {
+  return Boolean(status && runningGenerationStatuses.has(status))
+}
+
+function setTrackedRunningTasks(next: Record<string, string>) {
+  trackedRunningTasks.value = next
+  pointsStore.setRunningTasks(Object.keys(next).length)
+
+  if (Object.keys(next).length) {
+    startGlobalGenerationPolling()
+  } else {
+    stopGlobalGenerationPolling()
+  }
+}
+
+function trackRunningTask(taskId: string, moduleCode: string) {
+  setTrackedRunningTasks({
+    ...trackedRunningTasks.value,
+    [taskId]: moduleCode,
+  })
+}
+
+function stopGlobalGenerationPolling() {
+  if (globalGenerationPollTimer !== null) {
+    window.clearInterval(globalGenerationPollTimer)
+    globalGenerationPollTimer = null
+  }
+}
+
+function startGlobalGenerationPolling() {
+  if (globalGenerationPollTimer !== null) return
+
+  globalGenerationPollTimer = window.setInterval(() => {
+    void pollTrackedRunningTasks()
+  }, 4000)
+}
+
 function mapBatchDetailToJob(
   detail: BatchTaskDetail,
   existing: WorkspaceBatchActiveJob,
@@ -132,6 +216,67 @@ function mapBatchDetailToJob(
       thumbnail: existing.previewUrl || undefined,
     })),
   }
+}
+
+function resolveCreativeMessageRatioLabel(message: CreativeImageMessage) {
+  const outputRatio = message.metadata?.outputRatio
+  const resolution = message.metadata?.resolution
+
+  if (outputRatio && resolution) return `${outputRatio} · ${resolution}`
+  if (outputRatio) return `${outputRatio} · 2K`
+  return undefined
+}
+
+function buildCreativeThreadTurns(
+  messages: CreativeImageMessage[],
+  conversation: CreativeImageConversation | null,
+): CreativeThreadTurn[] {
+  const turns: CreativeThreadTurn[] = []
+  let lastUserTurn: CreativeThreadTurn | null = null
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      if (lastUserTurn) {
+        lastUserTurn.taskId = message.taskId ?? lastUserTurn.taskId
+        lastUserTurn.ratioLabel = lastUserTurn.ratioLabel ?? resolveCreativeMessageRatioLabel(message)
+      }
+      continue
+    }
+
+    const turn = {
+      id: message.messageId,
+      prompt: message.content,
+      taskId: message.taskId ?? null,
+      createdAt: message.createdAt,
+      ratioLabel: resolveCreativeMessageRatioLabel(message),
+      resultUrl: null,
+      isGenerating: false,
+    }
+    turns.push(turn)
+    lastUserTurn = turn
+  }
+
+  if (!turns.length && conversation?.lastMessage) {
+    turns.push({
+      id: conversation.conversationId,
+      prompt: conversation.lastMessage,
+      taskId: conversation.lastTaskId,
+      createdAt: conversation.updatedAt,
+      resultUrl: conversation.lastResultUrl,
+      isGenerating: Boolean(conversation.lastTaskId && !conversation.lastResultUrl),
+    })
+    return turns
+  }
+
+  if (conversation?.lastTaskId) {
+    const lastTurn = [...turns].reverse().find((turn) => turn.taskId === conversation.lastTaskId)
+    if (lastTurn) {
+      lastTurn.resultUrl = conversation.lastResultUrl
+      lastTurn.isGenerating = Boolean(conversation.lastTaskId && !conversation.lastResultUrl)
+    }
+  }
+
+  return turns
 }
 
 async function refreshBatchJob(batchId: string) {
@@ -209,38 +354,172 @@ function syncWorkspaceFromTask(task: Pick<GenerationTaskDetail, 'moduleCode' | '
   }
 }
 
-watch(
-  () => route.params.code,
-  (code, previousCode) => {
-    const resolved = resolveCapabilityCode(code)
-    activeCode.value = resolved
+async function refreshTrackedRunningTasks() {
+  if (isRefreshingRunningTasks) return Object.keys(trackedRunningTasks.value).length
+  isRefreshingRunningTasks = true
 
-    if (resolved === SHORT_VIDEO_CAPABILITY_CODE && previousCode !== code) {
-      notifyShortVideoBeta()
+  try {
+    const next: Record<string, string> = {}
+    const activeTask = readActiveGenerationTask()
+
+    if (activeTask?.taskId) {
+      next[activeTask.taskId] = activeTask.moduleCode
     }
-  },
-)
 
-function notifyShortVideoBeta() {
-  message.info(SHORT_VIDEO_BETA_MESSAGE, { duration: 4500 })
+    const results = await Promise.allSettled(
+      recentGenerationModuleCodes.map((moduleCode) =>
+        getRecentGenerationTasks({
+          moduleCode,
+          page: 1,
+          pageSize: RECENT_GENERATION_SCAN_PAGE_SIZE,
+        }).then((result) => ({ moduleCode, items: result.items })),
+      ),
+    )
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue
+
+      for (const task of result.value.items) {
+        const status = normalizeRecentTaskStatus(task)
+        const taskId = task.taskId ?? task.id
+        if (!taskId || !isRunningGenerationStatus(status)) continue
+
+        next[taskId] = task.moduleCode ?? result.value.moduleCode
+      }
+    }
+
+    setTrackedRunningTasks(next)
+    return Object.keys(next).length
+  } finally {
+    isRefreshingRunningTasks = false
+  }
 }
 
-function handleSelectCapability(code: string) {
-  activeCode.value = code
-
-  if (route.params.code !== code) {
-    router.replace({ name: 'Workspace', params: { code } })
+async function pollTrackedRunningTasks() {
+  const entries = Object.entries(trackedRunningTasks.value)
+  if (!entries.length) {
+    stopGlobalGenerationPolling()
     return
   }
 
-  if (code === SHORT_VIDEO_CAPABILITY_CODE) {
-    notifyShortVideoBeta()
+  const next: Record<string, string> = { ...trackedRunningTasks.value }
+  let hasTerminalTask = false
+
+  const results = await Promise.allSettled(
+    entries.map(([taskId]) => getGenerationTask(taskId)),
+  )
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+
+    const task = result.value
+    if (isTerminalGenerationStatus(task)) {
+      delete next[task.taskId]
+      clearActiveGenerationTask(task.taskId)
+      hasTerminalTask = true
+      continue
+    }
+
+    next[task.taskId] = task.moduleCode
+  }
+
+  setTrackedRunningTasks(next)
+
+  if (hasTerminalTask) {
+    if (activeCode.value === 'creative-image') {
+      void refreshCreativeConversations()
+    }
+    void assistPanelRef.value?.refreshRecentItems()
   }
 }
+
+async function refreshRunningTaskSummary() {
+  await subscriptionStore.hydrate()
+
+  if (!pointsStore.initialized) {
+    await pointsStore.hydrate()
+  }
+
+  return refreshTrackedRunningTasks()
+}
+
+async function canStartGeneration() {
+  const runningTasks = await refreshRunningTaskSummary()
+  const limit = subscriptionStore.concurrentTaskLimit
+
+  if (runningTasks >= limit) {
+    message.warning(`当前已有 ${runningTasks} 个任务正在生成，已达到套餐并发上限 ${limit} 个，请等待任务完成后再提交`)
+    return false
+  }
+
+  return true
+}
+
+watch(
+  () => route.params.code,
+  (code) => {
+    const resolved = resolveCapabilityCode(code)
+    activeCode.value = resolved
+    void refreshRunningTaskSummary()
+  },
+)
+
+function handleSelectCapability(code: string) {
+  activeCode.value = code
+  void refreshRunningTaskSummary()
+
+  if (route.params.code !== code) {
+    router.replace({ name: 'Workspace', params: { code } })
+  }
+}
+
+const sidebarGeneratingCodes = computed(() => {
+  const codes = new Set<string>()
+
+  if (isGenerating.value && generatingCapabilityCode.value) {
+    codes.add(generatingCapabilityCode.value)
+  }
+
+  if (batchActiveJobs.value.some((job) => !isTerminalBatchStatus(job.status))) {
+    codes.add('batch-new')
+  }
+
+  for (const moduleCode of Object.values(trackedRunningTasks.value)) {
+    const code = resolveCapabilityCodeFromModule(moduleCode)
+    if (code) {
+      codes.add(code)
+    }
+  }
+
+  return [...codes]
+})
 
 const activeCapability = computed(
   () => workspaceCapabilities.find((capability) => capability.code === activeCode.value) ?? workspaceCapabilities[0],
 )
+
+const activeModuleGenerating = computed(() => {
+  if (isGenerating.value && generatingCapabilityCode.value === activeCode.value) {
+    return true
+  }
+
+  return Object.values(trackedRunningTasks.value).some((moduleCode) => {
+    const resolvedCode = resolveCapabilityCodeFromModule(moduleCode)
+    return resolvedCode === activeCode.value
+  })
+})
+
+const activeCreativeConversation = computed(
+  () =>
+    creativeConversations.value.find((item) => item.conversationId === activeCreativeConversationId.value) ??
+    null,
+)
+
+const hasActiveCreativeConversationDraft = computed(() => {
+  const conversation = activeCreativeConversation.value
+  if (!conversation) return false
+  return !conversation.lastMessage && !conversation.lastTaskId && !conversation.lastResultUrl && !conversation.lastReferenceAssetId
+})
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? '')
 
@@ -295,19 +574,34 @@ async function pollGenerationTask(taskId: string) {
 }
 
 function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResult | null {
+  const isShortVideo = task.moduleCode === SHORT_VIDEO_CAPABILITY_CODE
   const image = task.resultImages[0]
-  if (!image?.url) return null
+  const videoUrl =
+    task.resultVideos?.[0]?.url ??
+    task.videoUrl ??
+    task.previewVideo ??
+    task.downloadUrl ??
+    image?.url
+  const resultUrl = isShortVideo ? videoUrl : image?.url
+  if (!resultUrl) return null
 
   const option = activeCapability.value.options.find((item) => item.id === task.optionId)
-  const sceneTitle = option?.title ?? activeCapability.value.label
+  const sceneTitle = isShortVideo ? '短视频生成' : option?.title ?? activeCapability.value.label
+  const ratioLabel = isShortVideo
+    ? `${task.outputRatio || '16:9'} · 720p · 10秒`
+    : `${task.outputRatio} · ${task.resolution}`
 
   return {
     createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
-    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: `${task.outputRatio} · ${task.resolution}`,
-    previewImage: image.url,
+    statusText: isShortVideo
+      ? `已完成 · ${sceneTitle} · 营销视频`
+      : `已完成 · ${sceneTitle} · 单图生成结果`,
+    ratioLabel,
+    mediaType: isShortVideo ? 'video' : 'image',
+    previewImage: isShortVideo ? '' : resultUrl,
+    previewVideo: isShortVideo ? resultUrl : undefined,
     previewAlt: `${sceneTitle}生成结果`,
-    downloadUrl: image.url,
+    downloadUrl: resultUrl,
     resultImages: task.resultImages,
     taskId: task.taskId,
     imageWidth: 1600,
@@ -321,6 +615,8 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
 
   try {
     const initialTask = await getGenerationTask(taskId)
+    generatingCapabilityCode.value =
+      resolveCapabilityCodeFromModule(initialTask.moduleCode) ?? activeCode.value
     syncWorkspaceFromTask(initialTask)
 
     const task = isTerminalGenerationStatus(initialTask)
@@ -349,6 +645,9 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     if (!options.restored) {
       message.success('生成完成')
     }
+    if (task.moduleCode === 'creative-image' && activeCreativeConversationId.value) {
+      await refreshCreativeConversations()
+    }
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask(taskId)
@@ -357,6 +656,8 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
   } finally {
     clearActiveGenerationTask(taskId)
     isGenerating.value = false
+    generatingCapabilityCode.value = null
+    void refreshRunningTaskSummary()
   }
 }
 
@@ -364,11 +665,44 @@ async function refreshCreativeConversations() {
   try {
     const result = await getCreativeImageConversations({ page: 1, pageSize: 20 })
     creativeConversations.value = result.items
-    if (!activeCreativeConversationId.value && result.items[0]) {
-      activeCreativeConversationId.value = result.items[0].conversationId
+    const savedConversationId = readActiveCreativeConversationId()
+    const nextConversationId =
+      activeCreativeConversationId.value ??
+      (savedConversationId && result.items.some((item) => item.conversationId === savedConversationId)
+        ? savedConversationId
+        : result.items[0]?.conversationId)
+
+    if (nextConversationId && activeCreativeConversationId.value !== nextConversationId) {
+      activeCreativeConversationId.value = nextConversationId
+      saveActiveCreativeConversationId(nextConversationId)
+    }
+
+    if (nextConversationId) {
+      await loadCreativeConversationThread(nextConversationId)
     }
   } catch {
     // 创意生图历史不影响当前生成流程。
+  }
+}
+
+async function loadCreativeConversationThread(conversationId: string) {
+  const conversation =
+    creativeConversations.value.find((item) => item.conversationId === conversationId) ?? null
+
+  creativeImageCaption.value = conversation?.lastMessage ?? null
+  isLoadingCreativeConversation.value = true
+
+  try {
+    const result = await getCreativeImageMessages(conversationId)
+    if (activeCreativeConversationId.value !== conversationId) return
+    creativeThreadTurns.value = buildCreativeThreadTurns(result.items, conversation)
+  } catch {
+    if (activeCreativeConversationId.value !== conversationId) return
+    creativeThreadTurns.value = buildCreativeThreadTurns([], conversation)
+  } finally {
+    if (activeCreativeConversationId.value === conversationId) {
+      isLoadingCreativeConversation.value = false
+    }
   }
 }
 
@@ -378,34 +712,49 @@ async function ensureCreativeConversation(prompt?: string) {
   const title = prompt?.trim().slice(0, 24) || '创意生图对话'
   const conversation = await createCreativeImageConversation({ title })
   activeCreativeConversationId.value = conversation.conversationId
+  saveActiveCreativeConversationId(conversation.conversationId)
   creativeConversations.value = [conversation, ...creativeConversations.value]
   return conversation.conversationId
 }
 
 async function handleNewCreativeConversation() {
+  if (isCreatingCreativeConversation.value) return
+  if (hasActiveCreativeConversationDraft.value) {
+    message.info('当前已经是新对话')
+    return
+  }
+
+  isCreatingCreativeConversation.value = true
   try {
     const conversation = await createCreativeImageConversation({ title: '创意生图对话' })
     activeCreativeConversationId.value = conversation.conversationId
+    saveActiveCreativeConversationId(conversation.conversationId)
     creativeReferenceAsset.value = null
     generationResult.value = null
     creativeImageCaption.value = null
+    creativeThreadTurns.value = []
     creativeConversations.value = [conversation, ...creativeConversations.value]
     message.success('已新建对话')
   } catch (error) {
     const text = error instanceof Error ? error.message : '新建对话失败'
     message.error(text)
+  } finally {
+    isCreatingCreativeConversation.value = false
   }
 }
 
 function handleSelectCreativeConversation(conversationId: string) {
   activeCreativeConversationId.value = conversationId
+  saveActiveCreativeConversationId(conversationId)
   const conversation = creativeConversations.value.find((item) => item.conversationId === conversationId)
   creativeImageCaption.value = conversation?.lastMessage ?? null
   generationResult.value = null
+  creativeThreadTurns.value = []
 
   if (conversation?.lastTaskId) {
     void resolveGenerationTask(conversation.lastTaskId, { restored: true })
   }
+  void loadCreativeConversationThread(conversationId)
 }
 
 async function handleUploadCreativeReference(file: File) {
@@ -417,6 +766,9 @@ async function handleUploadCreativeReference(file: File) {
     creativeReferenceAsset.value = asset
     message.success('参考图上传成功')
     await refreshCreativeConversations()
+    if (activeCreativeConversationId.value) {
+      await loadCreativeConversationThread(activeCreativeConversationId.value)
+    }
   } catch (error) {
     const text = error instanceof Error ? error.message : '参考图上传失败'
     message.error(text)
@@ -439,9 +791,14 @@ async function handleCreativeGenerate(payload: {
     return
   }
 
+  if (!(await canStartGeneration())) {
+    return
+  }
+
   isGenerating.value = true
   generationResult.value = null
   creativeImageCaption.value = null
+  generatingCapabilityCode.value = 'creative-image'
 
   try {
     const conversationId = await ensureCreativeConversation(payload.prompt)
@@ -458,10 +815,14 @@ async function handleCreativeGenerate(payload: {
       taskId: created.taskId,
       moduleCode: created.moduleCode,
     })
+    trackRunningTask(created.taskId, created.moduleCode)
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
+    await refreshRunningTaskSummary()
     creativeImageCaption.value = payload.prompt
+    await loadCreativeConversationThread(conversationId)
     await resolveGenerationTask(created.taskId)
     await refreshCreativeConversations()
+    await loadCreativeConversationThread(conversationId)
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask()
@@ -469,6 +830,7 @@ async function handleCreativeGenerate(payload: {
     message.error(text)
   } finally {
     isGenerating.value = false
+    generatingCapabilityCode.value = null
   }
 }
 
@@ -478,8 +840,13 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     return
   }
 
+  if (!(await canStartGeneration())) {
+    return
+  }
+
   isGenerating.value = true
   generationResult.value = null
+  generatingCapabilityCode.value = activeCapability.value.code
 
   try {
     const createPayload: CreateGenerationTaskPayload = {
@@ -488,7 +855,6 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       useLogo: payload.useLogo,
       colorCode: payload.colorCode,
       outputRatio: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '16:9' : undefined,
-      resolution: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '720p' : undefined,
       extra: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? { videoResolution: '720p' } : undefined,
     }
 
@@ -498,7 +864,9 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       moduleCode: created.moduleCode || activeCapability.value.code,
       optionId: created.optionId ?? payload.optionId,
     })
+    trackRunningTask(created.taskId, created.moduleCode || activeCapability.value.code)
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
+    await refreshRunningTaskSummary()
 
     await resolveGenerationTask(created.taskId)
   } catch (error) {
@@ -507,21 +875,28 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     message.error(text)
   } finally {
     isGenerating.value = false
+    generatingCapabilityCode.value = null
   }
 }
 
 function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResult | null {
   if (item.status !== 'success' || !item.previewImage) return null
 
-  const sceneTitle = item.sceneLabel ?? item.title
+  const isShortVideo = item.moduleCode === SHORT_VIDEO_CAPABILITY_CODE
+  const sceneTitle = isShortVideo ? '短视频生成' : item.sceneLabel ?? item.title
+  const mediaUrl = item.downloadUrl ?? item.previewImage
 
   return {
     createdAt: formatDate(item.createdAt),
-    statusText: `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: item.ratioLabel ?? '主图',
-    previewImage: item.previewImage,
+    statusText: isShortVideo
+      ? `已完成 · ${sceneTitle} · 营销视频`
+      : `已完成 · ${sceneTitle} · 单图生成结果`,
+    ratioLabel: isShortVideo ? `${item.outputRatio ?? '16:9'} · 720p · 10秒` : item.ratioLabel ?? '主图',
+    mediaType: isShortVideo ? 'video' : 'image',
+    previewImage: isShortVideo ? '' : item.previewImage,
+    previewVideo: isShortVideo ? mediaUrl : undefined,
     previewAlt: item.title,
-    downloadUrl: item.downloadUrl ?? item.previewImage,
+    downloadUrl: mediaUrl,
     taskId: item.taskId,
     imageWidth: item.imageWidth,
     imageHeight: item.imageHeight,
@@ -551,6 +926,7 @@ function handlePickTemplate(payload: { capabilityCode: string; optionId: string 
 }
 
 onMounted(() => {
+  void refreshRunningTaskSummary()
   void refreshCreativeConversations()
 
   const activeTask = readActiveGenerationTask()
@@ -565,6 +941,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopGlobalGenerationPolling()
   stopBatchPolling()
 })
 
@@ -576,7 +953,11 @@ onUnmounted(() => {
     :class="[
       appStore.isDarkMode ? 'theme-dark' : 'theme-light',
       {
-        'workspace-page--watermark': activeCode === 'watermark-remove',
+        'workspace-page--feature-compare':
+          activeCode === 'watermark-remove'
+          || activeCode === 'paint-refresh'
+          || activeCode === 'light-consistency'
+          || activeCode === 'interior-clean',
         'workspace-page--creative-image': activeCode === 'creative-image',
       },
     ]"
@@ -586,7 +967,11 @@ onUnmounted(() => {
       :class="{ 'workspace-shell--studio': activeCode === 'creative-image' }"
     >
       <div class="workspace-col workspace-col--nav">
-        <WorkspaceSidebar :active-code="activeCode" @select="handleSelectCapability" />
+        <WorkspaceSidebar
+          :active-code="activeCode"
+          :generating-codes="sidebarGeneratingCodes"
+          @select="handleSelectCapability"
+        />
       </div>
 
       <section
@@ -601,12 +986,15 @@ onUnmounted(() => {
           <CreativeImageStudioPanel
             v-if="activeCode === 'creative-image'"
             :capability="activeCapability"
-            :is-generating="isGenerating"
+            :is-generating="activeModuleGenerating"
             :is-uploading-reference="isUploadingCreativeReference"
             :generation-result="generationResult"
             :caption="creativeImageCaption"
             :conversations="creativeConversations"
+            :thread-turns="creativeThreadTurns"
+            :is-loading-conversation="isLoadingCreativeConversation"
             :active-conversation-id="activeCreativeConversationId"
+            :is-new-conversation-disabled="isCreatingCreativeConversation || hasActiveCreativeConversationDraft"
             :reference-asset="creativeReferenceAsset"
             @generate="handleCreativeGenerate"
             @new-conversation="handleNewCreativeConversation"
@@ -617,7 +1005,7 @@ onUnmounted(() => {
             v-else
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
-            :is-generating="isGenerating"
+            :is-generating="activeModuleGenerating"
             :previewed-delivery-task-id="previewedDeliveryTaskId"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
@@ -632,7 +1020,7 @@ onUnmounted(() => {
           ref="assistPanelRef"
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
-          :is-generating="isGenerating"
+          :is-generating="activeModuleGenerating"
           :generation-result="generationResult"
           :delivery-image-preview="deliveryImagePreview"
           :short-video-play-request="shortVideoPlayRequest"
@@ -668,31 +1056,49 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   color: var(--app-text);
-  background:
-    radial-gradient(circle at 30% 0%, rgba(239, 194, 76, 0.08), transparent 28rem),
-    var(--app-bg);
+  background: var(--app-bg);
 }
 
 .workspace-page.theme-light {
-  --workspace-accent: #c98600;
-  --workspace-accent-strong: #a86d00;
-  --workspace-panel: #fcfaf5;
-  --workspace-panel-soft: #f5efe4;
-  --workspace-panel-deep: #eee6da;
-  --workspace-line: rgba(47, 35, 12, 0.12);
-  --workspace-line-strong: rgba(201, 134, 0, 0.34);
-  --workspace-muted: #6b6252;
-  --workspace-shadow: 0 20px 46px rgba(67, 47, 16, 0.1);
+  --workspace-text: #172033;
+  --workspace-text-secondary: #334155;
+  --workspace-muted: #64748b;
+  --workspace-text-placeholder: #94a3b8;
+  --workspace-text-disabled: #cbd5e1;
+  --workspace-accent: #2f6bff;
+  --workspace-accent-strong: #2f6bff;
+  --workspace-accent-border: #cfe0ff;
+  --workspace-accent-bg: #f2f7ff;
+  --workspace-accent-glow: rgba(47, 107, 255, 0.16);
+  --workspace-accent-underline: #4f7fff;
+  --workspace-hover-bg: #f3f7fc;
+  --workspace-commercial: #d89a00;
+  --workspace-commercial-strong: #d4a017;
+  --workspace-commercial-bg: #fff8e8;
+  --workspace-tag-available-bg: #eaf8f1;
+  --workspace-tag-available-text: #00a870;
+  --workspace-tag-demo-bg: #fff4e5;
+  --workspace-tag-demo-text: #f59e0b;
+  --workspace-tag-beta-bg: #eef4ff;
+  --workspace-tag-beta-text: #2f6bff;
+  --workspace-tag-planned-bg: #f1f5f9;
+  --workspace-tag-planned-text: #94a3b8;
+  --workspace-panel: #ffffff;
+  --workspace-panel-soft: #f7fafd;
+  --workspace-panel-deep: #f7fafd;
+  --workspace-line: #e8edf5;
+  --workspace-line-strong: #cfe0ff;
+  --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
 
-  background:
-    radial-gradient(circle at 30% 0%, rgba(201, 134, 0, 0.06), transparent 28rem),
-    var(--app-bg);
+  color: var(--workspace-text);
+
+  background: var(--app-bg);
 }
 
 .workspace-page.theme-light .workspace-col--main {
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 42%),
-    var(--workspace-panel);
+  border-color: var(--workspace-line);
+  background: var(--workspace-panel);
+  box-shadow: var(--workspace-shadow);
 }
 
 .workspace-shell {
@@ -740,10 +1146,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--workspace-line);
-  border-radius: 18px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 36%),
-    var(--workspace-panel);
+  border-radius: 20px;
+  background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
 }
 
@@ -803,7 +1207,7 @@ onUnmounted(() => {
   }
 }
 
-.workspace-page--watermark .workspace-shell {
+.workspace-page--feature-compare .workspace-shell {
   @media (width >= 1024px) {
     grid-template-columns: 240px minmax(340px, 430px) minmax(0, 1fr);
   }
@@ -811,12 +1215,6 @@ onUnmounted(() => {
   @media (width >= 1536px) {
     grid-template-columns: 260px minmax(360px, 440px) minmax(0, 1fr);
   }
-}
-
-.workspace-page--watermark .workspace-col--main {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42)),
-    var(--workspace-panel);
 }
 
 .workspace-page--creative-image .workspace-shell {

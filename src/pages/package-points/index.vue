@@ -40,12 +40,13 @@ type RechargeRecord = {
 type RecordSummary = {
   label: string;
   value: string;
-  tone: "blue" | "purple" | "gold" | "navy";
+  tone: "blue" | "gold" | "navy";
   icon: string;
 };
 
 function getPlanTone(plan: string): RechargePlanTone {
-  return rechargePlanToneMap[plan] ?? "blue";
+  const tone = rechargePlanToneMap[plan] ?? "blue";
+  return tone === "purple" ? "blue" : tone;
 }
 
 const formatNumber = (value: string | number | null | undefined) => {
@@ -79,14 +80,14 @@ const productDisplayName = (product: RechargeProduct, index: number) => {
 };
 
 const productTone = (index: number): RechargePlanTone =>
-  index === 1 ? "purple" : index === 2 ? "gold" : "blue";
+  index === 1 ? "blue" : index === 2 ? "gold" : "blue";
 
 const planTypeMeta: Record<
   string,
   { icon: string; tone: RechargePlanTone }
 > = {
   企业基础版: { icon: "mdi:layers-triple-outline", tone: "blue" },
-  企业团队版: { icon: "mdi:chart-bar", tone: "purple" },
+  企业团队版: { icon: "mdi:chart-bar", tone: "blue" },
   企业旗舰版: { icon: "mdi:crown-outline", tone: "gold" },
 };
 
@@ -140,7 +141,7 @@ const recordSummary = computed<RecordSummary[]>(() => {
     {
       label: "今日获得积分",
       value: formatNumber(sumPoints(todayRecords)),
-      tone: "purple",
+      tone: "blue",
       icon: "mdi:diamond-stone",
     },
     {
@@ -339,25 +340,8 @@ onMounted(() => {
   >
     <section class="recharge-shell">
       <section class="recharge-panel" aria-label="充值套餐选择">
-        <header class="recharge-hero">
-          <div>
-            <h1>充值中心</h1>
-            <p>选择充值套餐，快速获取积分</p>
-          </div>
-          <div class="hero-visual" aria-hidden="true">
-            <span class="orbit orbit-one"></span>
-            <span class="orbit orbit-two"></span>
-            <span class="shield">
-              <Icon icon="mdi:check-decagram" />
-            </span>
-            <span class="chip chip-one"><Icon icon="mdi:diamond-stone" /></span>
-            <span class="chip chip-two"><Icon icon="mdi:plus-circle" /></span>
-          </div>
-        </header>
-
         <div class="recharge-body">
           <section class="plan-module" aria-label="选择充值套餐">
-            <h2 class="section-title">选择充值套餐</h2>
             <div class="plan-grid">
               <RechargePlanCard
                 v-for="plan in plans"
@@ -461,22 +445,19 @@ onMounted(() => {
 <style scoped lang="scss">
 .recharge-page {
   --recharge-page-pad: clamp(16px, 2vw, 30px);
-  --recharge-bg: #071226;
-  --recharge-panel: rgba(7, 15, 32, 0.78);
-  --recharge-panel-strong: rgba(8, 16, 35, 0.92);
-  --recharge-border: rgba(73, 106, 148, 0.42);
-  --recharge-border-soft: rgba(91, 117, 151, 0.22);
-  --recharge-text: #eef6ff;
-  --recharge-muted: #9fb0c7;
-  --recharge-head: rgba(255, 255, 255, 0.06);
-  --recharge-row: rgba(125, 150, 181, 0.18);
-  --recharge-field: rgba(255, 255, 255, 0.055);
-  --recharge-blue: #347cff;
-  --recharge-purple: #8f57ff;
-  --recharge-gold: #f49a23;
-  --shell-shadow:
-    0 0 0 1px rgba(79, 139, 220, 0.08), 0 28px 72px rgba(0, 0, 0, 0.28),
-    0 0 42px rgba(39, 124, 235, 0.12);
+  --recharge-bg: #050505;
+  --recharge-panel: #101010;
+  --recharge-panel-strong: #151515;
+  --recharge-border: rgba(255, 255, 255, 0.1);
+  --recharge-border-soft: rgba(255, 255, 255, 0.08);
+  --recharge-text: #f4f1e9;
+  --recharge-muted: #969186;
+  --recharge-head: #151515;
+  --recharge-row: rgba(255, 255, 255, 0.08);
+  --recharge-field: #0b0b0b;
+  --recharge-blue: #efc24c;
+  --recharge-gold: #efc24c;
+  --shell-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 
   min-width: 0;
   height: auto;
@@ -496,26 +477,27 @@ onMounted(() => {
 }
 
 .recharge-page.theme-light {
-  --recharge-bg: #edf3fa;
-  --recharge-panel: rgba(255, 255, 255, 0.86);
-  --recharge-panel-strong: rgba(255, 255, 255, 0.92);
-  --recharge-border: rgba(175, 194, 215, 0.42);
-  --recharge-border-soft: rgba(188, 205, 223, 0.42);
-  --recharge-text: #071a34;
-  --recharge-muted: #52647a;
-  --recharge-head: rgba(231, 238, 247, 0.72);
+  --recharge-bg: #f6f9fc;
+  --recharge-panel: #ffffff;
+  --recharge-panel-strong: #ffffff;
+  --recharge-border: #e6ecf5;
+  --recharge-border-soft: #e6ecf5;
+  --recharge-text: #172033;
+  --recharge-muted: #64748b;
+  --recharge-head: #ffffff;
   --recharge-row: rgba(148, 163, 184, 0.18);
-  --recharge-field: rgba(247, 250, 253, 0.94);
-  --shell-shadow:
-    0 18px 52px rgba(71, 99, 132, 0.12), 0 0 30px rgba(125, 184, 238, 0.14);
+  --recharge-field: #ffffff;
+  --recharge-blue: #2f6bff;
+  --recharge-gold: #d4a017;
+  --shell-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
 
   background:
     radial-gradient(
       860px 220px at 63% 0%,
-      rgba(166, 210, 255, 0.32),
+      rgba(47, 107, 255, 0.06),
       transparent 72%
     ),
-    linear-gradient(180deg, #f6fbff, var(--recharge-bg));
+    #f6f9fc;
 }
 
 .recharge-shell {
@@ -532,10 +514,15 @@ onMounted(() => {
   flex-direction: column;
   overflow: visible;
   border: 1px solid var(--recharge-border);
-  border-radius: 10px;
+  border-radius: 20px;
   background: var(--recharge-panel);
   box-shadow: var(--shell-shadow);
-  backdrop-filter: blur(18px);
+}
+
+.recharge-page.theme-light .recharge-panel {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
+    var(--recharge-panel);
 }
 
 .recharge-hero {
@@ -544,17 +531,16 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  min-height: clamp(104px, 12vh, 128px);
-  padding: 18px clamp(22px, 2.4vw, 34px);
+  min-height: 100px;
+  padding: 14px clamp(22px, 2.4vw, 34px);
   overflow: hidden;
   border-bottom: 1px solid var(--recharge-border-soft);
+  background: var(--recharge-head);
+}
+
+.recharge-page.theme-light .recharge-hero {
   background:
-    linear-gradient(
-      90deg,
-      rgba(47, 118, 225, 0.13),
-      rgba(47, 118, 225, 0.02) 48%,
-      rgba(54, 132, 245, 0.18)
-    ),
+    radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.08), transparent 55%),
     var(--recharge-head);
 }
 
@@ -562,9 +548,9 @@ onMounted(() => {
   background:
     linear-gradient(
       90deg,
-      rgba(242, 247, 253, 0.94),
-      rgba(238, 246, 255, 0.86) 52%,
-      rgba(214, 231, 252, 0.9)
+      rgba(238, 244, 255, 0.96),
+      rgba(242, 247, 255, 0.88) 52%,
+      rgba(207, 224, 255, 0.72)
     ),
     var(--recharge-head);
 }
@@ -595,21 +581,23 @@ onMounted(() => {
 }
 
 .recharge-hero h1 {
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1.25;
 }
 
 .recharge-hero p {
-  margin: 9px 0 0;
+  margin: 6px 0 0;
   color: var(--recharge-muted);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .hero-visual {
   position: relative;
-  width: clamp(260px, 25vw, 360px);
-  height: 116px;
+  width: clamp(200px, 20vw, 280px);
+  height: 80px;
+  transform: scale(0.88);
+  transform-origin: right center;
 }
 
 .orbit {
@@ -638,16 +626,16 @@ onMounted(() => {
 .shield {
   position: absolute;
   right: 130px;
-  top: 26px;
+  top: 18px;
   display: grid;
   place-items: center;
-  width: 70px;
-  height: 70px;
-  border-radius: 20px;
-  background: linear-gradient(140deg, #5fb4ff, #2d6bff);
-  box-shadow: 0 10px 24px rgba(44, 105, 255, 0.34);
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(140deg, #5b8fff, #2f6bff);
+  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.28);
   color: #fff;
-  font-size: 42px;
+  font-size: 34px;
 }
 
 .chip {
@@ -676,6 +664,7 @@ onMounted(() => {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  align-items: center;
   gap: clamp(22px, 2.2vw, 32px);
   padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px) clamp(24px, 2vw, 32px);
 }
@@ -684,11 +673,15 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   flex-shrink: 0;
+  width: 100%;
+  max-width: 1280px;
   min-width: 0;
+  margin-inline: auto;
 }
 
 .plan-module > .section-title {
-  margin-left: -6px;
+  margin-left: 0;
+  justify-content: center;
 }
 
 .plan-grid {
@@ -697,38 +690,33 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
+  justify-content: center;
   gap: var(--plan-gap);
-  margin-top: 18px;
-  margin-left: clamp(10px, 1.4vw, 22px);
+  margin-top: 0;
+  margin-inline: auto;
 }
 
 .records-module {
   position: relative;
   z-index: 0;
   display: flex;
+  width: 100%;
+  max-width: 1280px;
   min-width: 0;
   flex: 1;
   flex-direction: column;
+  margin-inline: auto;
   padding: clamp(20px, 1.8vw, 28px);
-  border: 1px solid rgba(188, 205, 223, 0.62);
+  border: 1px solid #e8edf5;
   border-radius: 16px;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(166, 210, 255, 0.2), transparent 34%),
-    radial-gradient(circle at 88% 8%, rgba(255, 214, 153, 0.14), transparent 28%),
-    linear-gradient(180deg, #fbfdff 0%, #ffffff 38%, #f7faff 100%);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
-    0 16px 42px rgba(71, 99, 132, 0.1);
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .theme-dark .records-module {
-  border-color: rgba(73, 106, 148, 0.5);
-  background:
-    radial-gradient(circle at 12% 0%, rgba(48, 128, 255, 0.14), transparent 34%),
-    linear-gradient(180deg, rgba(10, 20, 40, 0.96) 0%, rgba(8, 16, 35, 0.98) 100%);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-    0 18px 44px rgba(0, 0, 0, 0.28);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #101010;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
 .records-header {
@@ -755,10 +743,8 @@ onMounted(() => {
 }
 
 .theme-dark .records-summary {
-  border-color: rgba(73, 106, 148, 0.38);
-  background:
-    radial-gradient(circle, rgba(125, 150, 181, 0.16) 1px, transparent 1.5px) 0 0 / 18px 18px,
-    linear-gradient(135deg, rgba(12, 24, 48, 0.92), rgba(8, 16, 35, 0.88));
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #151515;
 }
 
 .summary-card {
@@ -773,8 +759,9 @@ onMounted(() => {
 }
 
 .theme-dark .summary-card {
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #101010;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
 .summary-card-icon {
@@ -790,23 +777,18 @@ onMounted(() => {
 }
 
 .summary-card.is-blue .summary-card-icon {
-  background: linear-gradient(145deg, #5eb0ff, #2f7dff);
-  box-shadow: 0 8px 18px rgba(47, 125, 255, 0.34);
-}
-
-.summary-card.is-purple .summary-card-icon {
-  background: linear-gradient(145deg, #b58cff, #7b4dff);
-  box-shadow: 0 8px 18px rgba(123, 77, 255, 0.34);
+  background: linear-gradient(145deg, #5b8fff, #2f6bff);
+  box-shadow: 0 8px 18px rgba(47, 107, 255, 0.28);
 }
 
 .summary-card.is-gold .summary-card-icon {
-  background: linear-gradient(145deg, #ffc857, #f49a23);
-  box-shadow: 0 8px 18px rgba(244, 154, 35, 0.34);
+  background: linear-gradient(145deg, #e5b85c, #d4a017);
+  box-shadow: 0 8px 18px rgba(212, 160, 23, 0.28);
 }
 
 .summary-card.is-navy .summary-card-icon {
-  background: linear-gradient(145deg, #4f7fd6, #1f4f9c);
-  box-shadow: 0 8px 18px rgba(31, 79, 156, 0.34);
+  background: linear-gradient(145deg, #4f7fff, #2f6bff);
+  box-shadow: 0 8px 18px rgba(47, 107, 255, 0.24);
 }
 
 .summary-card-copy {
@@ -833,19 +815,15 @@ onMounted(() => {
 }
 
 .summary-card.is-blue .summary-card-copy strong {
-  color: #2f7dff;
-}
-
-.summary-card.is-purple .summary-card-copy strong {
-  color: #8f57ff;
+  color: #2f6bff;
 }
 
 .summary-card.is-gold .summary-card-copy strong {
-  color: #f49a23;
+  color: #d4a017;
 }
 
 .summary-card.is-navy .summary-card-copy strong {
-  color: #1f4f9c;
+  color: #2f6bff;
 }
 
 .theme-dark .summary-card.is-navy .summary-card-copy strong {
@@ -865,8 +843,8 @@ onMounted(() => {
 }
 
 .theme-dark .records-table-panel {
-  border-color: rgba(73, 106, 148, 0.38);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #101010;
 }
 
 .records-filter {
@@ -913,18 +891,18 @@ onMounted(() => {
 .export-button {
   --n-height: 38px;
   --n-border-radius: 8px;
-  --n-color: rgba(255, 248, 238, 0.92);
-  --n-color-hover: rgba(255, 241, 224, 0.98);
-  --n-color-pressed: rgba(255, 232, 204, 0.98);
-  --n-color-focus: rgba(255, 244, 232, 0.96);
-  --n-border: 1px solid rgba(244, 154, 35, 0.52);
-  --n-border-hover: 1px solid rgba(244, 154, 35, 0.72);
-  --n-border-pressed: 1px solid rgba(216, 132, 19, 0.82);
-  --n-border-focus: 1px solid rgba(244, 154, 35, 0.72);
-  --n-text-color: #d88413;
-  --n-text-color-hover: #c87915;
-  --n-text-color-pressed: #a96510;
-  --n-text-color-focus: #d88413;
+  --n-color: #ffffff;
+  --n-color-hover: #f8fafd;
+  --n-color-pressed: #f1f5f9;
+  --n-color-focus: #ffffff;
+  --n-border: 1px solid #d8e2f0;
+  --n-border-hover: 1px solid #d8e2f0;
+  --n-border-pressed: 1px solid #d8e2f0;
+  --n-border-focus: 1px solid #d8e2f0;
+  --n-text-color: #64748b;
+  --n-text-color-hover: #64748b;
+  --n-text-color-pressed: #64748b;
+  --n-text-color-focus: #64748b;
   width: 100%;
   font-size: 14px;
   font-weight: 800;
@@ -933,24 +911,6 @@ onMounted(() => {
 .records-table-wrap {
   min-width: 0;
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(80, 137, 211, 0.58) transparent;
-}
-
-.records-table-wrap::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.records-table-wrap::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--recharge-field) 82%, transparent);
-}
-
-.records-table-wrap::-webkit-scrollbar-thumb {
-  border: 2px solid color-mix(in srgb, var(--recharge-field) 82%, transparent);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #3c8cff, #1f6ed6);
 }
 
 .records-data-table {
@@ -967,10 +927,11 @@ onMounted(() => {
 }
 
 .theme-dark .records-data-table {
-  --n-th-color: rgba(255, 255, 255, 0.05);
-  --n-th-color-hover: rgba(255, 255, 255, 0.05);
-  --n-th-text-color: #9fb0c7;
-  --n-border-color: rgba(125, 150, 181, 0.22);
+  --n-th-color: #151515;
+  --n-th-color-hover: #151515;
+  --n-th-text-color: #959083;
+  --n-td-color-hover: rgba(239, 194, 76, 0.08);
+  --n-border-color: rgba(255, 255, 255, 0.08);
 }
 
 .records-data-table :deep(.n-data-table-th) {
@@ -1006,36 +967,34 @@ onMounted(() => {
   font-size: 16px;
 }
 
-.records-data-table :deep(.plan-type-pill.is-blue) {
-  background: rgba(47, 125, 255, 0.1);
-  color: #2f7dff;
-}
-
-.records-data-table :deep(.plan-type-pill.is-purple) {
-  background: rgba(143, 87, 255, 0.1);
-  color: #8f57ff;
-}
-
-.records-data-table :deep(.plan-type-pill.is-gold) {
-  background: rgba(244, 154, 35, 0.12);
-  color: #f49a23;
-}
-
 .records-data-table :deep(.amount-cell) {
   font-size: 15px;
   font-weight: 900;
 }
 
-.records-data-table :deep(.amount-cell.is-blue) {
-  color: #2f7dff;
+.records-data-table :deep(.plan-type-pill.is-blue) {
+  background: #eef4ff;
+  color: #2f6bff;
 }
 
-.records-data-table :deep(.amount-cell.is-purple) {
-  color: #8f57ff;
+.records-data-table :deep(.plan-type-pill.is-gold) {
+  background: #fff6e0;
+  color: #d4a017;
+}
+
+.records-data-table :deep(.amount-cell.is-blue) {
+  color: #2f6bff;
 }
 
 .records-data-table :deep(.amount-cell.is-gold) {
-  color: #f49a23;
+  color: #d4a017;
+}
+
+.records-data-table :deep(.points-cell-icon) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: #d4a017;
+  font-size: 18px;
 }
 
 .records-data-table :deep(.points-cell) {
@@ -1044,13 +1003,6 @@ onMounted(() => {
   gap: 6px;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.records-data-table :deep(.points-cell-icon) {
-  display: inline-flex;
-  flex: 0 0 auto;
-  color: #f49a23;
-  font-size: 18px;
 }
 
 .records-data-table :deep(.points-cell > span) {
@@ -1168,16 +1120,16 @@ onMounted(() => {
 
   .recharge-hero {
     min-height: 88px;
-    padding-block: 12px;
+    padding-block: 10px;
   }
 
   .recharge-hero h1 {
-    font-size: 26px;
+    font-size: 24px;
   }
 
   .hero-visual {
-    height: 86px;
-    transform: scale(0.86);
+    height: 72px;
+    transform: scale(0.8);
     transform-origin: right center;
   }
 
@@ -1254,7 +1206,7 @@ onMounted(() => {
   }
 
   .plan-grid {
-    margin-left: 6px;
+    margin-inline: auto;
   }
 
   .records-summary {

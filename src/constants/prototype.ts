@@ -10,7 +10,7 @@ import type {
 export const studioGuestNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/pricing', label: '企业套餐' },
-  { path: '/auth', label: '企业账号登录' },
+  { path: '/login', label: '企业账号登录' },
 ]
 
 /** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */
@@ -23,7 +23,7 @@ export const topNavigation: NavItem[] = [
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
-  { path: '/auth', label: '企业账号登录', icon: 'mdi:account-key-outline' },
+  { path: '/login', label: '企业账号登录', icon: 'mdi:account-key-outline' },
 ]
 
 /** 登录后二级导航 */

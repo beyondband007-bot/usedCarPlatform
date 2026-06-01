@@ -23,13 +23,17 @@ import { homeFooterLinks } from '@/constants/home-page'
   padding: 112px 20px 62px;
   text-align: center;
   color: var(--home-text);
-  background: var(--home-footer-bg);
+  border-top: 1px solid var(--home-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--home-gold) 4%, transparent), transparent 42%),
+    var(--home-footer-bg);
 }
 
 .footer h2 {
   margin: 0 0 38px;
   color: var(--home-text);
   font-size: clamp(34px, 4vw, 50px);
+  letter-spacing: 0;
 }
 
 .footer nav {
@@ -44,13 +48,19 @@ import { homeFooterLinks } from '@/constants/home-page'
 }
 
 .footer nav a {
+  position: relative;
   color: inherit;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--home-motion-fast, 160ms ease);
 }
 
 .footer nav a:hover {
   color: var(--home-gold);
+}
+
+.footer nav a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 70%, transparent);
+  outline-offset: 5px;
 }
 
 .footer p {

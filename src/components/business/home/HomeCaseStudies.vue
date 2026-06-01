@@ -130,6 +130,7 @@ onMounted(() => {
   background: var(--home-tabs-bg);
   border: 1px solid var(--home-line);
   border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .tab {
@@ -142,11 +143,25 @@ onMounted(() => {
   font-family: inherit;
   font-size: 13px;
   font-weight: 900;
+  transition:
+    color var(--home-motion-fast, 160ms ease),
+    background var(--home-motion-fast, 160ms ease),
+    transform var(--home-motion-fast, 160ms ease);
+}
+
+.tab:hover {
+  color: var(--home-text);
+}
+
+.tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 70%, transparent);
+  outline-offset: 3px;
 }
 
 .tab.active {
   color: var(--home-tab-active-text);
   background: var(--home-tab-active-bg);
+  transform: translateY(-1px);
 }
 
 .case-layout {
@@ -162,12 +177,20 @@ onMounted(() => {
 .case-panel {
   min-height: 480px;
   border: 1px solid var(--home-line);
-  border-radius: 24px;
+  border-radius: var(--home-radius-card, 28px);
 }
 
 .case-image {
   width: 100%;
   height: 100%;
+  transition:
+    transform var(--home-motion-normal, 240ms ease),
+    border-color var(--home-motion-normal, 240ms ease);
+}
+
+.case-image:hover {
+  transform: translateY(-2px);
+  border-color: var(--home-card-hover-border);
 }
 
 .case-panel {
@@ -177,6 +200,16 @@ onMounted(() => {
   padding: clamp(34px, 5vw, 64px);
   background: var(--home-case-panel-bg);
   box-shadow: var(--home-card-shadow);
+  transition:
+    border-color var(--home-motion-normal, 240ms ease),
+    box-shadow var(--home-motion-normal, 240ms ease);
+}
+
+.case-panel:hover {
+  border-color: var(--home-card-hover-border);
+  box-shadow:
+    var(--home-card-shadow),
+    0 0 0 1px color-mix(in srgb, var(--home-gold) 14%, transparent);
 }
 
 .case-panel h3 {
@@ -205,7 +238,7 @@ onMounted(() => {
   padding: 42px 24px;
   background: var(--home-metric-bg);
   border: 1px solid var(--home-line);
-  border-radius: 24px;
+  border-radius: var(--home-radius-media, 22px);
 }
 
 .metric-card div + div {

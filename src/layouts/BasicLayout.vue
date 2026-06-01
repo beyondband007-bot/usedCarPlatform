@@ -47,6 +47,7 @@ const showSubNav = computed(
 )
 
 const isHomePage = computed(() => route.path === '/home')
+const isPricingPage = computed(() => route.path === '/pricing')
 
 
 
@@ -76,6 +77,8 @@ const {
 
       'app-layout--home': isHomePage,
 
+      'app-layout--pricing': isPricingPage,
+
       'app-layout--studio-chrome': usesStudioChrome,
 
     }"
@@ -94,7 +97,9 @@ const {
 
           'home-chrome--with-subnav': showSubNav,
 
-          'home-chrome--light': !appStore.isDarkMode,
+          'home-chrome--light': !appStore.isDarkMode && !isPricingPage,
+          'home-chrome--pricing': isPricingPage,
+          'home-chrome--pricing-light': !appStore.isDarkMode && isPricingPage,
 
         }"
 
@@ -222,6 +227,8 @@ const {
 
   --studio-chrome-credit-text: #221700;
 
+  --studio-chrome-credit-hover: #f4d36a;
+
   --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
   --studio-chrome-theme-text: #f7f1e4;
@@ -258,54 +265,96 @@ const {
   z-index: 50;
 
   background: var(--studio-chrome-bg);
+  border-bottom: 1px solid rgba(239, 194, 76, 0.08);
+  backdrop-filter: blur(12px);
 
 }
 
 
 
 .home-chrome--light {
+  --studio-chrome-bg: #f8fafd;
+  --studio-chrome-header-bg: #f8fafd;
+  --studio-chrome-logo: #0f172a;
+  --studio-chrome-nav: #475569;
+  --studio-chrome-nav-hover: #2f6bff;
+  --studio-chrome-nav-active: #2f6bff;
+  --studio-chrome-nav-underline: #2f6bff;
+  --studio-chrome-credit-bg: #d4a017;
+  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-hover: #e5b85c;
+  --studio-chrome-theme-bg: #ffffff;
+  --studio-chrome-theme-text: #64748b;
+  --studio-chrome-theme-border: #e6ecf5;
+  --studio-chrome-user-border: #e6ecf5;
+  --studio-chrome-user-bg: #ffffff;
+  --studio-chrome-user-text: #0f172a;
+  --studio-chrome-user-hover-border: #cfe0ff;
+  --studio-chrome-user-hover-bg: #f8fafd;
+  --studio-chrome-avatar-bg: #f2f7ff;
+  --studio-chrome-avatar-text: #2f6bff;
+  --studio-chrome-subnav-bg: #f8fafd;
+  --studio-chrome-subnav-border: #e6ecf5;
 
-  --studio-chrome-bg: #fcfaf5;
+  border-bottom: 1px solid #e6ecf5;
+}
 
-  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(252, 250, 245, 0.96), transparent);
-
-  --studio-chrome-logo: #1e160b;
-
-  --studio-chrome-nav: #6d6456;
-
-  --studio-chrome-nav-hover: #2f271a;
-
-  --studio-chrome-nav-active: #a26b00;
-
-  --studio-chrome-nav-underline: #c98600;
-
+.home-chrome--pricing {
+  --studio-chrome-pad-x: clamp(28px, 2vw, 44px);
+  --studio-chrome-logo-size: clamp(26px, 1.55vw, 42px);
+  --studio-chrome-nav-size: clamp(18px, 0.92vw, 24px);
+  --studio-chrome-action-size: clamp(14px, 0.78vw, 19px);
+  --studio-chrome-nav-gap: clamp(32px, 2.7vw, 72px);
+  --studio-chrome-bg: #060606;
+  --studio-chrome-header-bg: linear-gradient(to bottom, rgba(6, 6, 6, 0.88), rgba(6, 6, 6, 0.88));
+  --studio-chrome-logo: #f7f1e4;
+  --studio-chrome-nav: #c8c1b3;
+  --studio-chrome-nav-hover: #efe3c3;
+  --studio-chrome-nav-active: #efc24c;
+  --studio-chrome-nav-underline: #efc24c;
   --studio-chrome-credit-bg: #efc24c;
+  --studio-chrome-credit-text: #221700;
+  --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
+  --studio-chrome-theme-text: #f7f1e4;
+  --studio-chrome-theme-border: rgba(239, 194, 76, 0.18);
+  --studio-chrome-user-border: rgba(239, 194, 76, 0.18);
+  --studio-chrome-user-bg: rgba(255, 255, 255, 0.05);
+  --studio-chrome-user-text: #f7f1e4;
+  --studio-chrome-user-hover-border: rgba(239, 194, 76, 0.42);
+  --studio-chrome-user-hover-bg: rgba(239, 194, 76, 0.08);
+  --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
+  --studio-chrome-avatar-text: #efc24c;
+}
 
-  --studio-chrome-credit-text: #241700;
+.home-chrome--pricing :deep(.site-header) {
+  min-height: clamp(92px, 5.8vw, 132px);
+  padding-block: clamp(26px, 1.8vw, 40px);
+}
 
-  --studio-chrome-theme-bg: rgba(201, 134, 0, 0.08);
+.home-chrome--pricing.home-chrome--pricing-light {
+  --studio-chrome-bg: rgba(248, 250, 253, 0.92);
+  --studio-chrome-header-bg: rgba(248, 250, 253, 0.92);
+  --studio-chrome-logo: #0f172a;
+  --studio-chrome-nav: #475569;
+  --studio-chrome-nav-hover: #2f6bff;
+  --studio-chrome-nav-active: #2f6bff;
+  --studio-chrome-nav-underline: #2f6bff;
+  --studio-chrome-credit-bg: #d4a017;
+  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-hover: #e5b85c;
+  --studio-chrome-theme-bg: #ffffff;
+  --studio-chrome-theme-text: #64748b;
+  --studio-chrome-theme-border: #e6ecf5;
+  --studio-chrome-user-border: #e6ecf5;
+  --studio-chrome-user-bg: #ffffff;
+  --studio-chrome-user-text: #0f172a;
+  --studio-chrome-user-hover-border: #cfe0ff;
+  --studio-chrome-user-hover-bg: #f8fafd;
+  --studio-chrome-avatar-bg: #f2f7ff;
+  --studio-chrome-avatar-text: #2f6bff;
 
-  --studio-chrome-theme-text: #382508;
-
-  --studio-chrome-theme-border: rgba(201, 134, 0, 0.16);
-
-  --studio-chrome-user-border: rgba(201, 134, 0, 0.16);
-
-  --studio-chrome-user-bg: rgba(201, 134, 0, 0.05);
-
-  --studio-chrome-user-text: #241700;
-
-  --studio-chrome-user-hover-border: rgba(201, 134, 0, 0.45);
-
-  --studio-chrome-user-hover-bg: rgba(201, 134, 0, 0.08);
-
-  --studio-chrome-avatar-bg: rgba(201, 134, 0, 0.14);
-
-  --studio-chrome-avatar-text: #a26b00;
-
-  --studio-chrome-subnav-bg: #f0e8dc;
-  --studio-chrome-subnav-border: rgba(201, 134, 0, 0.12);
-
+  border-bottom: 1px solid rgba(230, 236, 245, 0.95);
+  backdrop-filter: blur(16px);
 }
 
 
@@ -326,6 +375,37 @@ const {
 
   padding-top: 96px;
 
+}
+
+
+
+.app-layout--studio-chrome.app-layout--pricing {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.app-layout--studio-chrome.app-layout--pricing .app-layout-main {
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: 96px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-layout--pricing:not(.app-layout--studio-chrome) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-layout--pricing:not(.app-layout--studio-chrome) .app-layout-main {
+  box-sizing: border-box;
+  height: calc(100dvh - var(--app-header-offset));
+  max-height: calc(100dvh - var(--app-header-offset));
+  overflow: hidden;
 }
 
 
@@ -357,4 +437,3 @@ const {
 }
 
 </style>
-

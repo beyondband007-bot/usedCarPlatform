@@ -4,8 +4,11 @@ import { Icon } from '@iconify/vue'
 import { workspaceMenuGroups } from '@/constants/workspace'
 import type { WorkspaceMenuItem } from '@/types/workspace'
 
+const STATIC_TAG_GROUP_TITLE = '营销工具'
+
 defineProps<{
   activeCode: string
+  generatingCodes?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +21,16 @@ function handleSelect(item: WorkspaceMenuItem) {
   }
 
   emit('select', item.code)
+}
+
+function isGenerating(item: WorkspaceMenuItem, generatingCodes?: string[]) {
+  return Boolean(generatingCodes?.includes(item.code))
+}
+
+function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, generatingCodes?: string[]) {
+  if (groupTitle !== STATIC_TAG_GROUP_TITLE) return false
+  if (isGenerating(item, generatingCodes)) return false
+  return Boolean(item.tag)
 }
 </script>
 
@@ -39,17 +52,36 @@ function handleSelect(item: WorkspaceMenuItem) {
               :class="{
                 'is-active': item.code === activeCode,
                 'is-disabled': item.disabled,
-                [`tag-${item.tagVariant ?? 'planned'}`]: true,
+                'has-generating-tag': isGenerating(item, generatingCodes),
+                [`tag-${item.tagVariant ?? 'planned'}`]:
+                  shouldShowStaticTag(group.title, item, generatingCodes),
               }"
               :disabled="item.disabled"
-              :aria-label="`${item.label}，${item.tag}`"
+              :aria-label="
+                isGenerating(item, generatingCodes)
+                  ? `${item.label}，正在生成中`
+                  : shouldShowStaticTag(group.title, item, generatingCodes)
+                    ? `${item.label}，${item.tag}`
+                    : item.label
+              "
               @click="handleSelect(item)"
             >
               <span class="sidebar-menu-icon" aria-hidden="true">
                 <Icon :icon="item.icon" />
               </span>
               <span class="sidebar-menu-label">{{ item.label }}</span>
-              <span class="sidebar-menu-tag">{{ item.tag }}</span>
+              <span
+                v-if="isGenerating(item, generatingCodes)"
+                class="sidebar-menu-tag is-generating"
+              >
+                正在生成中
+              </span>
+              <span
+                v-else-if="shouldShowStaticTag(group.title, item, generatingCodes)"
+                class="sidebar-menu-tag"
+              >
+                {{ item.tag }}
+              </span>
             </button>
           </li>
         </ul>
@@ -78,7 +110,7 @@ function handleSelect(item: WorkspaceMenuItem) {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 32%),
     var(--workspace-panel, var(--app-surface));
-  box-shadow: var(--workspace-shadow, 0 14px 34px rgba(67, 47, 16, 0.08));
+  box-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
 }
 
 .workspace-sidebar-body {
@@ -96,7 +128,7 @@ function handleSelect(item: WorkspaceMenuItem) {
 .sidebar-group-title {
   margin: 0 0 10px;
   padding: 0 8px;
-  color: var(--workspace-muted, var(--app-text-soft));
+  color: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -120,35 +152,46 @@ function handleSelect(item: WorkspaceMenuItem) {
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  color: var(--app-text);
+  color: var(--workspace-text-secondary, var(--app-text-soft));
   cursor: pointer;
   font-family: inherit;
   text-align: left;
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .sidebar-menu-item:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--workspace-panel-soft, var(--app-surface-soft)));
+  background: var(--workspace-hover-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-text, var(--app-text));
 }
 
 .sidebar-menu-item.is-active {
-  border-color: var(--workspace-line-strong, color-mix(in srgb, #efc24c 24%, transparent));
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  border-color: var(--workspace-accent-border, var(--workspace-line-strong, color-mix(in srgb, #efc24c 24%, transparent)));
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
+  box-shadow: none;
+}
+
+.sidebar-menu-item.is-active:hover:not(:disabled) {
+  border-color: var(--workspace-accent-border, var(--workspace-line-strong, color-mix(in srgb, #efc24c 24%, transparent)));
+  background: var(--workspace-accent-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.is-active {
   border-color: var(--workspace-line-strong, rgba(239, 194, 76, 0.42));
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
   color: var(--workspace-accent-strong, #ffd75a);
+  box-shadow: none;
 }
 
 .sidebar-menu-item.is-disabled {
   cursor: not-allowed;
-  opacity: 0.52;
+  color: var(--workspace-text-disabled, var(--app-text-disabled, var(--app-text-soft)));
+  opacity: 1;
 }
 
 .sidebar-menu-icon {
@@ -159,7 +202,7 @@ function handleSelect(item: WorkspaceMenuItem) {
 }
 
 .sidebar-menu-item.is-active .sidebar-menu-icon {
-  color: var(--workspace-accent-strong, #ffd75a);
+  color: var(--workspace-accent, var(--workspace-accent-strong, #ffd75a));
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.is-active .sidebar-menu-icon {
@@ -186,34 +229,37 @@ function handleSelect(item: WorkspaceMenuItem) {
   white-space: nowrap;
 }
 
+.sidebar-menu-tag.is-generating {
+  background: rgba(255, 255, 255, 0.96);
+  color: #171100;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+:global(.workspace-page.theme-light) .sidebar-menu-tag.is-generating {
+  border: 1px solid #e8edf5;
+  background: #fff;
+  color: #334155;
+  box-shadow: 0 1px 4px rgba(78, 111, 148, 0.08);
+}
+
 .sidebar-menu-item.tag-available .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-tag-available-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-tag-available-text, var(--workspace-accent, var(--workspace-accent-strong, #ffd75a)));
 }
 
 .sidebar-menu-item.tag-demo .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
-}
-
-.sidebar-menu-item.tag-package .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-tag-demo-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-tag-demo-text, var(--workspace-accent, var(--workspace-accent-strong, #ffd75a)));
 }
 
 .sidebar-menu-item.tag-beta .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-tag-beta-bg, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-tag-beta-text, var(--workspace-accent, var(--workspace-accent-strong, #ffd75a)));
 }
 
 .sidebar-menu-item.tag-planned .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-muted, var(--app-text-soft)) 14%, var(--workspace-panel-soft, var(--app-surface-soft)));
-  color: var(--workspace-muted, var(--app-text-soft));
-}
-
-:global([data-theme='dark']) .sidebar-menu-item.tag-available .sidebar-menu-tag {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
-  color: var(--workspace-accent-strong, #ffd75a);
+  background: var(--workspace-tag-planned-bg, color-mix(in srgb, var(--workspace-muted, var(--app-text-soft)) 10%, var(--workspace-panel-soft, var(--app-surface-soft))));
+  color: var(--workspace-tag-planned-text, var(--workspace-muted, var(--app-text-muted, var(--app-text-soft))));
 }
 
 :global([data-theme='dark']) .sidebar-menu-item.tag-demo .sidebar-menu-tag {
@@ -221,7 +267,6 @@ function handleSelect(item: WorkspaceMenuItem) {
   color: var(--workspace-accent-strong, #ffd75a);
 }
 
-:global([data-theme='dark']) .sidebar-menu-item.tag-package .sidebar-menu-tag,
 :global([data-theme='dark']) .sidebar-menu-item.tag-beta .sidebar-menu-tag {
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   color: var(--workspace-accent-strong, #ffd75a);

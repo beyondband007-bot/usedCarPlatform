@@ -44,13 +44,26 @@ export interface WorkspaceGenerateResult {
   createdAt: string
   statusText: string
   ratioLabel: string
+  mediaType?: 'image' | 'video'
   previewImage: string
+  previewVideo?: string
   previewAlt: string
   downloadUrl: string
   resultImages?: Array<{ url: string; sourceUrl?: string }>
   imageWidth?: number
   imageHeight?: number
   caption?: string
+}
+
+export interface CreativeThreadTurn {
+  id: string
+  prompt: string
+  taskId?: string | null
+  resultUrl?: string | null
+  ratioLabel?: string
+  createdAt?: string
+  isGenerating?: boolean
+  isLoadingImage?: boolean
 }
 
 /** 通用大图预览面板数据，可用于生成结果、成片交付等场景 */

@@ -33,7 +33,6 @@ import type {
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
-import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -77,7 +76,9 @@ const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
 const batchSceneIndex = ref(0);
 const batchSceneCategory = ref("展厅灯光");
-const batchScenes = computed(() => getBatchScenesByCategory(batchSceneCategory.value));
+const batchScenes = computed(() =>
+  getBatchScenesByCategory(batchSceneCategory.value),
+);
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
@@ -87,7 +88,6 @@ const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const presetInput = ref(visualTemplates.value[0]?.name ?? "");
 const isApplyingTemplate = ref(false);
-const selectedPaintColor = ref("");
 const uploadedAsset = ref<UploadedAsset | null>(null);
 const batchExteriorUploads = ref<BatchExteriorUploadItem[]>([]);
 const uploadedInteriorAssets = ref<UploadedAsset[]>([]);
@@ -144,16 +144,13 @@ function resetBatchCreateSection() {
   resetBatchExteriorUploads();
   resetUploadedInterior();
   uploadInterior.value = false;
-  projectName.value = getTemplateById(createTaskPresetId.value)?.name ?? "批量上新任务";
+  projectName.value =
+    getTemplateById(createTaskPresetId.value)?.name ?? "批量上新任务";
 }
 
 function resetUploadedInterior() {
   uploadedInteriorAssets.value = [];
 }
-
-const showPaintColorPicker = computed(
-  () => props.capability.code === "paint-refresh",
-);
 
 const outputRatioOptions = [
   { label: "1:1 主图", value: "1:1" },
@@ -205,18 +202,21 @@ const createPresetOptions = computed(() =>
 
 const uploadedExteriorAssets = computed(() =>
   batchExteriorUploads.value
-    .filter((item): item is BatchExteriorUploadItem & { asset: UploadedAsset } =>
-      item.status === "success" && Boolean(item.asset),
+    .filter(
+      (item): item is BatchExteriorUploadItem & { asset: UploadedAsset } =>
+        item.status === "success" && Boolean(item.asset),
     )
     .map((item) => item.asset),
 );
 
 const batchExteriorFirstPreviewUrl = computed(
-  () => batchExteriorUploads.value.find((item) => item.status !== "fail")?.previewUrl ?? "",
+  () =>
+    batchExteriorUploads.value.find((item) => item.status !== "fail")
+      ?.previewUrl ?? "",
 );
 
-const batchExteriorRemainingCount = computed(
-  () => Math.max(0, MAX_BATCH_EXTERIOR_IMAGES - batchExteriorUploads.value.length),
+const batchExteriorRemainingCount = computed(() =>
+  Math.max(0, MAX_BATCH_EXTERIOR_IMAGES - batchExteriorUploads.value.length),
 );
 
 const canAddBatchExteriorImages = computed(
@@ -316,7 +316,8 @@ async function handleSaveVisualPreset() {
     message.success("视觉配置保存成功");
     resetVisualConfigSelection();
   } catch (error) {
-    const text = error instanceof Error ? error.message : "预设保存失败，请重试";
+    const text =
+      error instanceof Error ? error.message : "预设保存失败，请重试";
     message.error(text);
   }
 }
@@ -341,14 +342,19 @@ async function handleVehicleFileSelected(file: File) {
   isUploadingVehicle.value = true;
 
   try {
-    const asset = await uploadAsset(file, "car_exterior");
+    const purpose = props.capability.code === "interior-clean" ? "car_interior" : "car_exterior";
+    const asset = await uploadAsset(file, purpose);
     uploadedAsset.value = asset;
     revokePreviewObjectUrl();
     uploadedPreviewUrl.value = asset.url;
-    message.success("车辆图片上传成功");
+    message.success(props.capability.code === "interior-clean" ? "内饰图片上传成功" : "车辆图片上传成功");
   } catch (error) {
     resetUploadedVehicle();
-    const text = error instanceof Error ? error.message : "车辆图片上传失败";
+    const text = error instanceof Error
+      ? error.message
+      : props.capability.code === "interior-clean"
+        ? "内饰图片上传失败"
+        : "车辆图片上传失败";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
@@ -392,8 +398,9 @@ function openBatchExteriorPicker() {
 }
 
 function normalizeImageFiles(files: File[]) {
-  return files.filter((file) =>
-    file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name),
+  return files.filter(
+    (file) =>
+      file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(file.name),
   );
 }
 
@@ -413,7 +420,9 @@ async function handleBatchExteriorFilesSelected(files: File[]) {
 
   const selectedFiles = imageFiles.slice(0, remaining);
   if (imageFiles.length > remaining) {
-    message.warning(`最多支持 ${MAX_BATCH_EXTERIOR_IMAGES} 张，已自动保留前 ${remaining} 张`);
+    message.warning(
+      `最多支持 ${MAX_BATCH_EXTERIOR_IMAGES} 张，已自动保留前 ${remaining} 张`,
+    );
   }
 
   const pendingItems = selectedFiles.map(createBatchExteriorUploadItem);
@@ -433,14 +442,17 @@ async function handleBatchExteriorFilesSelected(files: File[]) {
     }),
   );
 
-  const successCount = results.filter((result) => result.status === "fulfilled").length;
+  const successCount = results.filter(
+    (result) => result.status === "fulfilled",
+  ).length;
 
   results.forEach((result, index) => {
     if (result.status === "fulfilled") return;
 
     updateBatchExteriorUpload(pendingItems[index].id, {
       status: "fail",
-      error: result.reason instanceof Error ? result.reason.message : "上传失败",
+      error:
+        result.reason instanceof Error ? result.reason.message : "上传失败",
     });
   });
 
@@ -476,7 +488,9 @@ function handleBatchExteriorRemove(id: string) {
     revokeBatchExteriorObjectUrl(target);
   }
 
-  batchExteriorUploads.value = batchExteriorUploads.value.filter((item) => item.id !== id);
+  batchExteriorUploads.value = batchExteriorUploads.value.filter(
+    (item) => item.id !== id,
+  );
 }
 
 function handleInteriorFileSelected(file: File) {
@@ -509,13 +523,11 @@ function handleGenerate() {
 
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
-    outputRatio: outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
-    optionId: props.capability.kind === "scene" ? props.selectedOptionId : undefined,
+    outputRatio:
+      outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+    optionId:
+      props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
-    colorCode:
-      props.capability.code === "paint-refresh" && selectedPaintColor.value
-        ? selectedPaintColor.value
-        : undefined,
   });
 }
 
@@ -523,7 +535,8 @@ function mapBatchVisualConfig() {
   const scenes = batchScenes.value;
   return {
     enableSceneChange: enableSceneChange.value,
-    sceneOptionId: scenes[batchSceneIndex.value]?.optionId ?? scenes[0]?.optionId,
+    sceneOptionId:
+      scenes[batchSceneIndex.value]?.optionId ?? scenes[0]?.optionId,
     sceneIndex: batchSceneIndex.value,
     sceneCategory: batchSceneCategory.value,
     outputRatio: outputRatio.value,
@@ -559,7 +572,9 @@ async function handleCreateBatchTask() {
       carGroups: [
         {
           groupTitle: projectName.value.trim() || "车辆图组",
-          exteriorAssetIds: uploadedExteriorAssets.value.map((item) => item.assetId),
+          exteriorAssetIds: uploadedExteriorAssets.value.map(
+            (item) => item.assetId,
+          ),
           interiorAssetIds: uploadInterior.value
             ? uploadedInteriorAssets.value.map((item) => item.assetId)
             : [],
@@ -607,7 +622,8 @@ async function refreshDeliveryTasks() {
     );
     brokenDeliveryThumbs.value = new Set();
   } catch (error) {
-    const text = error instanceof Error ? error.message : "成片交付列表加载失败";
+    const text =
+      error instanceof Error ? error.message : "成片交付列表加载失败";
     message.error(text);
   } finally {
     isLoadingDeliveryTasks.value = false;
@@ -618,7 +634,10 @@ async function loadDeliveryAssets(taskId: string) {
   isLoadingDeliveryAssets.value = true;
 
   try {
-    const result = await getDeliveryTaskAssets(taskId, { page: 1, pageSize: 200 });
+    const result = await getDeliveryTaskAssets(taskId, {
+      page: 1,
+      pageSize: 200,
+    });
     deliveryTaskAssets.value = {
       ...deliveryTaskAssets.value,
       [taskId]: result.items,
@@ -727,7 +746,10 @@ async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
   if (task.progress < 100 || task.assetCount <= 0) return "";
 
   try {
-    const result = await getDeliveryTaskAssets(task.taskId, { page: 1, pageSize: 1 });
+    const result = await getDeliveryTaskAssets(task.taskId, {
+      page: 1,
+      pageSize: 1,
+    });
     if (!result.items.length) return "";
 
     deliveryTaskAssets.value = {
@@ -825,33 +847,34 @@ async function handleDeliveryBatchDownload() {
 async function handleDeleteDeliveryAssets() {
   const selectedTaskIds = deliveryTasks.value
     .filter((task) => task.selected)
-    .map((task) => task.taskId)
+    .map((task) => task.taskId);
 
   if (!selectedTaskIds.length) {
-    message.warning('请先选择任务')
-    return
+    message.warning("请先选择任务");
+    return;
   }
 
-  const selectedAssets = selectedTaskIds.flatMap((taskId) =>
-    deliveryTaskAssets.value[taskId]?.map((asset) => asset.assetId) ?? [],
-  )
+  const selectedAssets = selectedTaskIds.flatMap(
+    (taskId) =>
+      deliveryTaskAssets.value[taskId]?.map((asset) => asset.assetId) ?? [],
+  );
 
   if (!selectedAssets.length) {
-    message.warning('当前没有可删除素材')
-    return
+    message.warning("当前没有可删除素材");
+    return;
   }
 
-  isDeletingDeliveryAssets.value = true
+  isDeletingDeliveryAssets.value = true;
 
   try {
-    const result = await deleteDeliveryAssets(selectedAssets)
-    message.success(`已删除 ${result.deleted.length} 个素材`)
-    await refreshDeliveryTasks()
+    const result = await deleteDeliveryAssets(selectedAssets);
+    message.success(`已删除 ${result.deleted.length} 个素材`);
+    await refreshDeliveryTasks();
   } catch (error) {
-    const text = error instanceof Error ? error.message : '删除素材失败'
-    message.error(text)
+    const text = error instanceof Error ? error.message : "删除素材失败";
+    message.error(text);
   } finally {
-    isDeletingDeliveryAssets.value = false
+    isDeletingDeliveryAssets.value = false;
   }
 }
 
@@ -862,11 +885,13 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
   }
 
   activeDeliveryTaskId.value = task.taskId;
-  const assets = deliveryTaskAssets.value[task.taskId] ?? (await loadDeliveryAssets(task.taskId));
+  const assets =
+    deliveryTaskAssets.value[task.taskId] ??
+    (await loadDeliveryAssets(task.taskId));
   const firstAsset = assets?.[0];
 
   if (!firstAsset) {
-    message.warning('暂无可预览素材')
+    message.warning("暂无可预览素材");
     return;
   }
 
@@ -885,12 +910,16 @@ const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
 const activeCreateTemplate = computed(() =>
-  createTaskPresetId.value ? getTemplateById(createTaskPresetId.value) : undefined,
+  createTaskPresetId.value
+    ? getTemplateById(createTaskPresetId.value)
+    : undefined,
 );
 
 const activeCreateRatioLabel = computed(() => {
   const ratio = activeCreateTemplate.value?.outputRatio;
-  return outputRatioOptions.find((item) => item.value === ratio)?.label ?? ratio;
+  return (
+    outputRatioOptions.find((item) => item.value === ratio)?.label ?? ratio
+  );
 });
 </script>
 
@@ -922,249 +951,298 @@ const activeCreateRatioLabel = computed(() => {
         </div>
 
         <section class="batch-card batch-notice">
-          当前套餐：企业团队版 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传 3 套。单张生成仍可正常使用。
+          当前套餐：企业团队版 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传
+          3 套。单张生成仍可正常使用。
         </section>
 
         <div class="batch-panel-scroll">
           <template v-if="batchTab === 'create'">
-        <section class="batch-card inline-field">
-          <span>使用预设</span>
-          <NSelect
-            v-model:value="createTaskPresetId"
-            :options="createPresetOptions"
-            placeholder="请选择已保存的预设"
-            size="large"
-          />
-        </section>
-
-        <section v-if="createTaskPresetId && activeCreateTemplate" class="preset-summary">
-          <header class="preset-summary-head">
-            <span class="preset-summary-icon" aria-hidden="true">
-              <Icon icon="mdi:check-decagram" />
-            </span>
-            <div class="preset-summary-copy">
-              <p>已套用视觉配置</p>
-              <strong>{{ activeCreateTemplate.name }}</strong>
-            </div>
-          </header>
-
-          <div class="preset-summary-tags">
-            <span
-              v-if="activeCreateTemplate.enableSceneChange"
-              class="preset-tag is-scene"
-            >
-              <Icon icon="mdi:image-filter-hdr" />
-              {{ activeCreateTemplate.sceneCategory }} ·
-              {{ getBatchSceneTitle(activeCreateTemplate.sceneCategory, activeCreateTemplate.sceneIndex) }}
-            </span>
-            <span class="preset-tag is-ratio">
-              <Icon icon="mdi:aspect-ratio" />
-              {{ activeCreateRatioLabel }}
-            </span>
-            <span v-if="activeCreateTemplate.lightConsistency" class="preset-tag is-on">
-              <Icon icon="mdi:weather-sunny" />
-              光污一致化
-            </span>
-            <span v-if="activeCreateTemplate.useRecentLogo" class="preset-tag is-on">
-              <Icon icon="mdi:badge-account-horizontal-outline" />
-              最近 Logo
-            </span>
-            <span v-if="activeCreateTemplate.paintRefresh" class="preset-tag is-on">
-              <Icon icon="mdi:spray" />
-              漆面翻新
-            </span>
-            <span v-if="activeCreateTemplate.interiorEnhance" class="preset-tag is-on">
-              <Icon icon="mdi:seat-passenger" />
-              内饰清洁
-            </span>
-          </div>
-        </section>
-
-        <section class="batch-card">
-          <h3>项目名</h3>
-          <input v-model="projectName" class="plain-input" type="text" />
-        </section>
-
-        <section class="batch-card batch-upload-card">
-          <input
-            ref="batchExteriorInputRef"
-            type="file"
-            class="batch-upload-input"
-            :accept="props.capability.accept"
-            multiple
-            @change="handleBatchExteriorInputChange"
-          />
-
-          <header class="batch-upload-head">
-            <div>
-              <h3>上传外观图组</h3>
-              <p>支持一次多选，最多上传 {{ MAX_BATCH_EXTERIOR_IMAGES }} 张。</p>
-            </div>
-            <span class="batch-upload-count">
-              {{ batchExteriorUploads.length }}/{{ MAX_BATCH_EXTERIOR_IMAGES }}
-            </span>
-          </header>
-
-          <button
-            type="button"
-            class="batch-upload-drop"
-            :class="{ 'is-disabled': !canAddBatchExteriorImages }"
-            :disabled="!canAddBatchExteriorImages"
-            @click="openBatchExteriorPicker"
-            @dragover.prevent
-            @drop.prevent="handleBatchExteriorDrop"
-          >
-            <Icon icon="mdi:camera-plus" />
-            <strong>{{ batchExteriorUploads.length ? "继续添加外观图" : "上传外观图组" }}</strong>
-            <span>JPG / PNG / WebP · 剩余 {{ batchExteriorRemainingCount }} 张</span>
-          </button>
-
-          <div v-if="batchExteriorUploads.length" class="batch-upload-grid">
-            <article
-              v-for="item in batchExteriorUploads"
-              :key="item.id"
-              class="batch-upload-item"
-              :class="`is-${item.status}`"
-            >
-              <PreloadImage
-                class="batch-upload-image"
-                :src="item.previewUrl"
-                :alt="item.name"
-                loading="lazy"
-                decoding="async"
+            <section class="batch-card inline-field">
+              <span>使用预设</span>
+              <NSelect
+                v-model:value="createTaskPresetId"
+                :options="createPresetOptions"
+                placeholder="请选择已保存的预设"
+                size="large"
               />
-              <span v-if="item.status === 'uploading'" class="batch-upload-status">
-                <Icon icon="mdi:loading" />
-              </span>
-              <span v-else-if="item.status === 'fail'" class="batch-upload-status is-error">
-                <Icon icon="mdi:alert-circle-outline" />
-              </span>
+            </section>
+
+            <section
+              v-if="createTaskPresetId && activeCreateTemplate"
+              class="preset-summary"
+            >
+              <header class="preset-summary-head">
+                <span class="preset-summary-icon" aria-hidden="true">
+                  <Icon icon="mdi:check-decagram" />
+                </span>
+                <div class="preset-summary-copy">
+                  <p>已套用视觉配置</p>
+                  <strong>{{ activeCreateTemplate.name }}</strong>
+                </div>
+              </header>
+
+              <div class="preset-summary-tags">
+                <span
+                  v-if="activeCreateTemplate.enableSceneChange"
+                  class="preset-tag is-scene"
+                >
+                  <Icon icon="mdi:image-filter-hdr" />
+                  {{ activeCreateTemplate.sceneCategory }} ·
+                  {{
+                    getBatchSceneTitle(
+                      activeCreateTemplate.sceneCategory,
+                      activeCreateTemplate.sceneIndex,
+                    )
+                  }}
+                </span>
+                <span class="preset-tag is-ratio">
+                  <Icon icon="mdi:aspect-ratio" />
+                  {{ activeCreateRatioLabel }}
+                </span>
+                <span
+                  v-if="activeCreateTemplate.lightConsistency"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:weather-sunny" />
+                  光污一致化
+                </span>
+                <span
+                  v-if="activeCreateTemplate.useRecentLogo"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:badge-account-horizontal-outline" />
+                  最近 Logo
+                </span>
+                <span
+                  v-if="activeCreateTemplate.paintRefresh"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:spray" />
+                  漆面翻新
+                </span>
+                <span
+                  v-if="activeCreateTemplate.interiorEnhance"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:seat-passenger" />
+                  内饰清洁
+                </span>
+              </div>
+            </section>
+
+            <section class="batch-card">
+              <h3>项目名</h3>
+              <input v-model="projectName" class="plain-input" type="text" />
+            </section>
+
+            <section class="batch-card batch-upload-card">
+              <input
+                ref="batchExteriorInputRef"
+                type="file"
+                class="batch-upload-input"
+                :accept="props.capability.accept"
+                multiple
+                @change="handleBatchExteriorInputChange"
+              />
+
+              <header class="batch-upload-head">
+                <div>
+                  <h3>上传外观图组</h3>
+                  <p>
+                    支持一次多选，最多上传 {{ MAX_BATCH_EXTERIOR_IMAGES }} 张。
+                  </p>
+                </div>
+                <span class="batch-upload-count">
+                  {{ batchExteriorUploads.length }}/{{
+                    MAX_BATCH_EXTERIOR_IMAGES
+                  }}
+                </span>
+              </header>
+
               <button
                 type="button"
-                class="batch-upload-remove"
-                :aria-label="`删除${item.name}`"
-                @click="handleBatchExteriorRemove(item.id)"
+                class="batch-upload-drop"
+                :class="{ 'is-disabled': !canAddBatchExteriorImages }"
+                :disabled="!canAddBatchExteriorImages"
+                @click="openBatchExteriorPicker"
+                @dragover.prevent
+                @drop.prevent="handleBatchExteriorDrop"
               >
-                <Icon icon="mdi:close" />
+                <Icon icon="mdi:camera-plus" />
+                <strong>{{
+                  batchExteriorUploads.length
+                    ? "继续添加外观图"
+                    : "上传外观图组"
+                }}</strong>
+                <span
+                  >JPG / PNG / WebP · 剩余
+                  {{ batchExteriorRemainingCount }} 张</span
+                >
               </button>
-            </article>
-          </div>
-        </section>
 
-        <section class="batch-card switch-card">
-          <div>
-            <h3>同时上传内饰图</h3>
-            <p>开启后，每套外观图组可补充内饰图，用于成片交付包。</p>
-          </div>
-          <NSwitch v-model:value="uploadInterior" size="large" />
-        </section>
+              <div v-if="batchExteriorUploads.length" class="batch-upload-grid">
+                <article
+                  v-for="item in batchExteriorUploads"
+                  :key="item.id"
+                  class="batch-upload-item"
+                  :class="`is-${item.status}`"
+                >
+                  <PreloadImage
+                    class="batch-upload-image"
+                    :src="item.previewUrl"
+                    :alt="item.name"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span
+                    v-if="item.status === 'uploading'"
+                    class="batch-upload-status"
+                  >
+                    <Icon icon="mdi:loading" />
+                  </span>
+                  <span
+                    v-else-if="item.status === 'fail'"
+                    class="batch-upload-status is-error"
+                  >
+                    <Icon icon="mdi:alert-circle-outline" />
+                  </span>
+                  <button
+                    type="button"
+                    class="batch-upload-remove"
+                    :aria-label="`删除${item.name}`"
+                    @click="handleBatchExteriorRemove(item.id)"
+                  >
+                    <Icon icon="mdi:close" />
+                  </button>
+                </article>
+              </div>
+            </section>
 
-        <UploadTaskCard
-          v-if="uploadInterior"
-          compact
-          :capability="props.capability"
-          upload-title="上传内饰图组"
-          upload-hint="用于成片交付中的内饰展示图，可选上传"
-          required-label="选填"
-          upload-icon="mdi:seat-passenger"
-          :upload-preview-url="uploadedInteriorAssets[0]?.url ?? null"
-          :is-uploading="isUploadingInterior"
-          @select-file="handleInteriorFileSelected"
-          @remove="handleInteriorImageRemove"
-        />
+            <section class="batch-card switch-card">
+              <div>
+                <h3>同时上传内饰图</h3>
+                <p>开启后，每套外观图组可补充内饰图，用于成片交付包。</p>
+              </div>
+              <NSwitch v-model:value="uploadInterior" size="large" />
+            </section>
+
+            <UploadTaskCard
+              v-if="uploadInterior"
+              compact
+              :capability="props.capability"
+              upload-title="上传内饰图组"
+              upload-hint="用于成片交付中的内饰展示图，可选上传"
+              required-label="选填"
+              upload-icon="mdi:seat-passenger"
+              :upload-preview-url="uploadedInteriorAssets[0]?.url ?? null"
+              :is-uploading="isUploadingInterior"
+              @select-file="handleInteriorFileSelected"
+              @remove="handleInteriorImageRemove"
+            />
           </template>
 
           <template v-else>
-        <section class="batch-card preset-save-card">
-          <div class="preset-save-row">
-            <span>预设</span>
-            <NSelect
-              v-model:value="selectedPresetKey"
-              class="preset-combobox"
-              :options="visualPresetOptions"
-              :loading="isLoadingVisualPresets"
-              size="large"
-              filterable
-              tag
-              clearable
-              placeholder="输入或选择预设名称"
-            />
-            <NButton type="primary" size="large" @click="handleSaveVisualPreset">
-              保存
-            </NButton>
-          </div>
-        </section>
+            <section class="batch-card preset-save-card">
+              <div class="preset-save-row">
+                <span>预设</span>
+                <NSelect
+                  v-model:value="selectedPresetKey"
+                  class="preset-combobox"
+                  :options="visualPresetOptions"
+                  :loading="isLoadingVisualPresets"
+                  size="large"
+                  filterable
+                  tag
+                  clearable
+                  placeholder="输入或选择预设名称"
+                />
+                <NButton
+                  type="primary"
+                  size="large"
+                  @click="handleSaveVisualPreset"
+                >
+                  保存
+                </NButton>
+              </div>
+            </section>
 
-        <section class="batch-card switch-card">
-          <div>
-            <h3>开启场景更换</h3>
-            <p>为所有图组统一套用选定场景，保持上新视觉一致。</p>
-          </div>
-          <NSwitch v-model:value="enableSceneChange" size="large" />
-        </section>
+            <section class="batch-card switch-card">
+              <div>
+                <h3>开启场景更换</h3>
+                <p>为所有图组统一套用选定场景，保持上新视觉一致。</p>
+              </div>
+              <NSwitch v-model:value="enableSceneChange" size="large" />
+            </section>
 
-        <section v-if="enableSceneChange" class="batch-scene-card">
-          <div class="scene-head">
-            <h3>批量场景选择</h3>
-            <NSelect
-              v-model:value="batchSceneCategory"
-              :options="batchSceneCategoryOptions"
-              size="medium"
-              class="scene-category-select"
-            />
-          </div>
-          <div class="scene-grid">
-            <article
-              v-for="(scene, index) in batchScenes"
-              :key="scene.optionId"
-              :class="{ active: index === batchSceneIndex }"
-              @click="batchSceneIndex = index"
-            >
-              <PreloadImage
-                class="scene-image"
-                :src="scene.image"
-                :alt="scene.title"
-                loading="lazy"
-                decoding="async"
-                :draggable="false"
+            <section v-if="enableSceneChange" class="batch-scene-card">
+              <div class="scene-head">
+                <h3>批量场景选择</h3>
+                <NSelect
+                  v-model:value="batchSceneCategory"
+                  :options="batchSceneCategoryOptions"
+                  size="medium"
+                  class="scene-category-select"
+                />
+              </div>
+              <div class="scene-grid">
+                <article
+                  v-for="(scene, index) in batchScenes"
+                  :key="scene.optionId"
+                  :class="{ active: index === batchSceneIndex }"
+                  @click="batchSceneIndex = index"
+                >
+                  <PreloadImage
+                    class="scene-image"
+                    :src="scene.image"
+                    :alt="scene.title"
+                    loading="lazy"
+                    decoding="async"
+                    :draggable="false"
+                  />
+                  <strong>{{ scene.title }}</strong>
+                </article>
+              </div>
+            </section>
+
+            <section class="batch-card inline-field">
+              <span>输出比例</span>
+              <NSelect
+                v-model:value="outputRatio"
+                :options="outputRatioOptions"
+                size="large"
               />
-              <strong>{{ scene.title }}</strong>
-            </article>
-          </div>
-        </section>
+            </section>
 
-        <section class="batch-card inline-field">
-          <span>输出比例</span>
-          <NSelect v-model:value="outputRatio" :options="outputRatioOptions" size="large" />
-        </section>
+            <section class="batch-card batch-logo-card">
+              <WorkspaceLogoPanel
+                v-model:enabled="useRecentLogo"
+                variant="batch"
+              />
+            </section>
 
-        <section class="batch-card batch-logo-card">
-          <WorkspaceLogoPanel v-model:enabled="useRecentLogo" variant="batch" />
-        </section>
+            <section class="batch-card switch-card">
+              <div>
+                <h3>光污一致化</h3>
+                <p>批量弱化眩光、反光和色偏，让车辆与新场景更融合。</p>
+              </div>
+              <NSwitch v-model:value="lightConsistency" size="large" />
+            </section>
 
-        <section class="batch-card switch-card">
-          <div>
-            <h3>光污一致化</h3>
-            <p>批量弱化眩光、反光和色偏，让车辆与新场景更融合。</p>
-          </div>
-          <NSwitch v-model:value="lightConsistency" size="large" />
-        </section>
+            <section class="batch-card switch-card">
+              <div>
+                <h3>漆面翻新预览</h3>
+                <p>增强漆面亮度和轮毂金属质感，作为演示型美容开关。</p>
+              </div>
+              <NSwitch v-model:value="paintRefresh" size="large" />
+            </section>
 
-        <section class="batch-card switch-card">
-          <div>
-            <h3>漆面翻新预览</h3>
-            <p>增强漆面亮度和轮毂金属质感，作为演示型美容开关。</p>
-          </div>
-          <NSwitch v-model:value="paintRefresh" size="large" />
-        </section>
-
-        <section class="batch-card switch-card">
-          <div>
-            <h3>内饰清洁增强</h3>
-            <p>对已上传内饰图做清洁与质感增强。</p>
-          </div>
-          <NSwitch v-model:value="interiorEnhance" size="large" />
-        </section>
+            <section class="batch-card switch-card">
+              <div>
+                <h3>内饰清洁增强</h3>
+                <p>对已上传内饰图做清洁与质感增强。</p>
+              </div>
+              <NSwitch v-model:value="interiorEnhance" size="large" />
+            </section>
           </template>
         </div>
 
@@ -1176,12 +1254,18 @@ const activeCreateRatioLabel = computed(() => {
             :loading="batchTab === 'create' && isCreatingBatchTask"
             :disabled="
               batchTab === 'create' &&
-              (!createTaskPresetId || !uploadedExteriorAssets.length || isUploadingVehicle)
+              (!createTaskPresetId ||
+                !uploadedExteriorAssets.length ||
+                isUploadingVehicle)
             "
             @click="handleStickyAction"
           >
-            {{ batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置" }}
-            <span v-if="batchTab === 'create'" class="ml-2">预计 {{ batchEstimatedCost }}</span>
+            {{
+              batchTab === "create" ? "创建批量上新任务" : "保存视觉处理配置"
+            }}
+            <span v-if="batchTab === 'create'" class="ml-2"
+              >预计 {{ batchEstimatedCost }}</span
+            >
           </NButton>
         </footer>
       </div>
@@ -1300,7 +1384,10 @@ const activeCreateRatioLabel = computed(() => {
 
                 <div class="delivery-status">
                   <template v-if="task.progress >= 100">
-                    <span class="delivery-status-ring" aria-hidden="true"></span>
+                    <span
+                      class="delivery-status-ring"
+                      aria-hidden="true"
+                    ></span>
                     <strong>已完成</strong>
                   </template>
                   <template v-else>
@@ -1311,7 +1398,9 @@ const activeCreateRatioLabel = computed(() => {
                     >
                       <b>{{ task.progress }}%</b>
                     </span>
-                    <strong class="delivery-status-meta">{{ task.progress }}%</strong>
+                    <strong class="delivery-status-meta"
+                      >{{ task.progress }}%</strong
+                    >
                   </template>
                 </div>
               </button>
@@ -1324,7 +1413,11 @@ const activeCreateRatioLabel = computed(() => {
               <strong>{{ deliverySelectedImages }}</strong> 张图
             </p>
             <div class="delivery-actions-buttons">
-              <button type="button" class="delivery-link-btn" @click="toggleSelectAllDelivery">
+              <button
+                type="button"
+                class="delivery-link-btn"
+                @click="toggleSelectAllDelivery"
+              >
                 {{ isAllDeliverySelected ? "取消全选" : "全选" }}
               </button>
               <NButton
@@ -1359,11 +1452,6 @@ const activeCreateRatioLabel = computed(() => {
         :is-uploading="isUploadingVehicle"
         @select-file="handleVehicleFileSelected"
         @remove="handleVehicleImageRemove"
-      />
-
-      <PaintColorPicker
-        v-if="showPaintColorPicker"
-        v-model="selectedPaintColor"
       />
 
       <CapabilityOptionSelector
@@ -1425,22 +1513,8 @@ const activeCreateRatioLabel = computed(() => {
 <style scoped lang="scss">
 .generate-panel {
   padding-bottom: 8px;
-  --scene-scroll-track: color-mix(in srgb, var(--workspace-muted, #969186) 18%, transparent);
-  --scene-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
-  --scene-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --scene-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --scene-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, transparent);
-
   display: grid;
   gap: 18px;
-}
-
-:global([data-theme="dark"]) .generate-panel {
-  --scene-scroll-track: rgba(255, 255, 255, 0.08);
-  --scene-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
-  --scene-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --scene-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --scene-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 44%, transparent);
 }
 
 .generate-panel.is-batch,
@@ -1472,25 +1546,10 @@ const activeCreateRatioLabel = computed(() => {
   overscroll-behavior: contain;
   padding-right: 8px;
   padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
 }
 
 .batch-panel-scroll > * {
   flex-shrink: 0;
-}
-
-.batch-panel-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.batch-panel-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--scene-scroll-thumb-start),
-    var(--scene-scroll-thumb-end)
-  );
 }
 
 .batch-panel-footer {
@@ -1554,9 +1613,14 @@ const activeCreateRatioLabel = computed(() => {
 .batch-card,
 .batch-notice {
   padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, var(--app-border));
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, var(--app-border));
   border-radius: 12px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 9%, var(--app-surface));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 9%,
+    var(--app-surface)
+  );
   color: var(--workspace-accent-strong, #a86d00);
   font-size: 14px;
   font-weight: 800;
@@ -1595,10 +1659,20 @@ const activeCreateRatioLabel = computed(() => {
 
 .preset-summary {
   padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border));
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border));
   border-radius: 12px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 9%, var(--app-surface)) 0%, var(--app-surface) 58%),
+    linear-gradient(
+      135deg,
+      color-mix(
+          in srgb,
+          var(--workspace-accent, #efc24c) 9%,
+          var(--app-surface)
+        )
+        0%,
+      var(--app-surface) 58%
+    ),
     var(--app-surface);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
@@ -1621,7 +1695,11 @@ const activeCreateRatioLabel = computed(() => {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, var(--app-surface-soft));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 14%,
+    var(--app-surface-soft)
+  );
   color: var(--workspace-accent-strong, #ffd75a);
   font-size: 20px;
 }
@@ -1678,20 +1756,44 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .preset-tag.is-scene {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, var(--app-border));
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 10%, var(--app-surface-soft));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 28%,
+    var(--app-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 10%,
+    var(--app-surface-soft)
+  );
   color: var(--workspace-accent-strong, #a86d00);
 }
 
 .preset-tag.is-ratio {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 9%, var(--app-surface-soft));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 24%,
+    var(--app-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 9%,
+    var(--app-surface-soft)
+  );
   color: var(--workspace-accent-strong, #a86d00);
 }
 
 .preset-tag.is-on {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 30%, var(--app-border));
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, var(--app-surface-soft));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 30%,
+    var(--app-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 12%,
+    var(--app-surface-soft)
+  );
   color: var(--workspace-accent-strong, #a86d00);
 }
 
@@ -1727,7 +1829,8 @@ const activeCreateRatioLabel = computed(() => {
 .plain-input {
   width: 100%;
   height: 48px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
   border-radius: 8px;
   background: var(--app-surface);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 80%, transparent);
@@ -1778,7 +1881,11 @@ const activeCreateRatioLabel = computed(() => {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, var(--app-surface));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 16%,
+    var(--app-surface)
+  );
   color: var(--workspace-accent-strong, #a86d00);
   font-size: 13px;
   font-weight: 900;
@@ -1790,9 +1897,14 @@ const activeCreateRatioLabel = computed(() => {
   place-items: center;
   align-content: center;
   gap: 8px;
-  border: 1px dashed color-mix(in srgb, var(--workspace-accent, #efc24c) 48%, var(--app-border));
+  border: 1px dashed
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 48%, var(--app-border));
   border-radius: 12px;
-  background: color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%);
+  background: color-mix(
+    in srgb,
+    var(--app-surface) 92%,
+    var(--workspace-accent, #efc24c) 8%
+  );
   color: var(--app-text);
   padding: 22px 16px;
   font-family: inherit;
@@ -1805,8 +1917,16 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .batch-upload-drop:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 72%, var(--app-border));
-  background: color-mix(in srgb, var(--app-surface) 88%, var(--workspace-accent, #efc24c) 12%);
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 72%,
+    var(--app-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--app-surface) 88%,
+    var(--workspace-accent, #efc24c) 12%
+  );
   transform: translateY(-1px);
 }
 
@@ -1843,7 +1963,8 @@ const activeCreateRatioLabel = computed(() => {
   position: relative;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
   border-radius: 10px;
   background: var(--app-surface-soft);
 }
@@ -1870,7 +1991,11 @@ const activeCreateRatioLabel = computed(() => {
   top: 8px;
   width: 28px;
   height: 28px;
-  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 74%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--workspace-panel-deep, #101010) 74%,
+    transparent
+  );
   color: #fff;
   font-size: 18px;
 }
@@ -1893,7 +2018,11 @@ const activeCreateRatioLabel = computed(() => {
   width: 28px;
   height: 28px;
   border: 0;
-  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 74%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--workspace-panel-deep, #101010) 74%,
+    transparent
+  );
   color: #fff;
   font-size: 16px;
   cursor: pointer;
@@ -1914,14 +2043,23 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .plain-input:hover {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, var(--app-border));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 38%,
+    var(--app-border)
+  );
 }
 
 .plain-input:focus {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 58%, var(--app-border));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 58%,
+    var(--app-border)
+  );
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 80%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
+    0 0 0 3px
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
 }
 
 .plain-input:focus-visible {
@@ -1936,7 +2074,8 @@ const activeCreateRatioLabel = computed(() => {
 :global([data-theme="dark"]) .plain-input:focus {
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
+    0 0 0 3px
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
 }
 
 .switch-card {
@@ -1958,7 +2097,8 @@ const activeCreateRatioLabel = computed(() => {
   container-type: inline-size;
   min-width: 0;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 24%, var(--app-border));
   border-radius: 12px;
   background: var(--app-surface);
   color: var(--app-text);
@@ -2029,60 +2169,6 @@ const activeCreateRatioLabel = computed(() => {
   padding: 2px 10px 14px 2px;
   scroll-padding-inline: 8px;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
-}
-
-.scene-grid::-webkit-scrollbar {
-  height: 9px;
-}
-
-.scene-grid::-webkit-scrollbar-track {
-  margin-inline: 4px;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--scene-scroll-track-glow) 18%,
-      var(--scene-scroll-track-glow) 82%,
-      transparent 100%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--app-border) 55%, transparent) 0 1px,
-      transparent 1px 7px
-    ),
-    var(--scene-scroll-track);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--scene-scroll-thumb-end) 18%, transparent);
-}
-
-.scene-grid::-webkit-scrollbar-thumb {
-  border: 2px solid var(--scene-scroll-track);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--scene-scroll-thumb-start) 0%,
-    var(--scene-scroll-thumb-end) 58%,
-    color-mix(in srgb, var(--scene-scroll-thumb-end) 72%, #6b8cff) 100%
-  );
-  box-shadow:
-    0 0 10px var(--scene-scroll-thumb-glow),
-    0 0 2px color-mix(in srgb, var(--scene-scroll-thumb-start) 65%, transparent);
-}
-
-.scene-grid::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--scene-scroll-thumb-start) 88%, #fff) 0%,
-    color-mix(in srgb, var(--scene-scroll-thumb-end) 90%, #fff) 55%,
-    #6b8cff 100%
-  );
-  box-shadow:
-    0 0 14px var(--scene-scroll-thumb-glow),
-    0 0 4px color-mix(in srgb, var(--scene-scroll-thumb-start) 75%, transparent);
 }
 
 .scene-grid article {
@@ -2100,7 +2186,8 @@ const activeCreateRatioLabel = computed(() => {
 
 .scene-grid article.active {
   border-color: var(--workspace-accent, #efc24c);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
 }
 
 .scene-image {
@@ -2145,25 +2232,6 @@ const activeCreateRatioLabel = computed(() => {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scene-scroll-thumb-end) var(--scene-scroll-track);
-}
-
-.delivery-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.delivery-list::-webkit-scrollbar-track {
-  background: var(--scene-scroll-track);
-}
-
-.delivery-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--scene-scroll-thumb-start),
-    var(--scene-scroll-thumb-end)
-  );
 }
 
 .delivery-item {
@@ -2175,7 +2243,8 @@ const activeCreateRatioLabel = computed(() => {
   align-items: stretch;
   gap: 14px;
   padding: 14px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--app-border) 88%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--app-border) 88%, transparent);
   background: var(--app-surface);
   transition:
     background 0.2s ease,
@@ -2206,15 +2275,27 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .delivery-item:hover {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 4%, var(--app-surface));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 4%,
+    var(--app-surface)
+  );
 }
 
 .delivery-item.is-checked {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 6%, var(--app-surface-soft));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 6%,
+    var(--app-surface-soft)
+  );
 }
 
 .delivery-item.is-previewing {
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 9%, var(--app-surface-soft));
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 9%,
+    var(--app-surface-soft)
+  );
   box-shadow: inset 3px 0 0 var(--workspace-accent, #efc24c);
 }
 
@@ -2239,7 +2320,8 @@ const activeCreateRatioLabel = computed(() => {
 .delivery-item-body:focus-visible {
   outline: none;
   border-radius: 10px;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
 }
 
 .delivery-item:last-child {
@@ -2266,12 +2348,15 @@ const activeCreateRatioLabel = computed(() => {
   align-content: center;
   gap: 4px;
   border-style: dashed;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, var(--app-surface-soft)),
+  background: linear-gradient(
+    145deg,
+    color-mix(
+      in srgb,
+      var(--workspace-accent, #efc24c) 8%,
       var(--app-surface-soft)
-    );
+    ),
+    var(--app-surface-soft)
+  );
   color: var(--app-text-soft);
 }
 
@@ -2354,7 +2439,11 @@ const activeCreateRatioLabel = computed(() => {
   height: 26px;
   border: 3px solid var(--workspace-accent-strong, #a86d00);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 8%,
+    transparent
+  );
 }
 
 .delivery-status-progress {
@@ -2386,7 +2475,11 @@ const activeCreateRatioLabel = computed(() => {
   gap: 14px 16px;
   padding: 16px 18px;
   border-top: 1px solid var(--app-border);
-  background: color-mix(in srgb, var(--app-surface-soft) 72%, var(--app-surface));
+  background: color-mix(
+    in srgb,
+    var(--app-surface-soft) 72%,
+    var(--app-surface)
+  );
 }
 
 .delivery-actions-summary {
@@ -2450,7 +2543,63 @@ const activeCreateRatioLabel = computed(() => {
 :global([data-theme="dark"]) .delivery-status-progress {
   background:
     radial-gradient(closest-side, var(--app-surface) 72%, transparent 73% 100%),
-    conic-gradient(var(--workspace-accent-strong, #ffd75a) var(--progress), rgba(255, 255, 255, 0.12) 0);
+    conic-gradient(
+      var(--workspace-accent-strong, #ffd75a) var(--progress),
+      rgba(255, 255, 255, 0.12) 0
+    );
 }
 
+:global(.workspace-page.theme-light) .batch-card,
+:global(.workspace-page.theme-light) .batch-notice {
+  border-color: var(--workspace-line, #e8edf5);
+  background: var(--workspace-panel-soft, #f7fafd);
+  color: var(--workspace-text-secondary, #334155);
+}
+
+:global(.workspace-page.theme-light) .batch-tabs button.active,
+:global(.workspace-page.theme-light) .delivery-tabs button.active {
+  color: var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .batch-tabs button.active::after,
+:global(.workspace-page.theme-light) .delivery-tabs button.active::after {
+  background: var(--workspace-accent-underline, #4f7fff);
+}
+
+:global(.workspace-page.theme-light) .preset-summary {
+  border-color: var(--workspace-line, #e8edf5);
+  background:
+    linear-gradient(
+      135deg,
+      var(--workspace-accent-bg, #f2f7ff) 0%,
+      var(--app-surface) 58%
+    ),
+    var(--app-surface);
+}
+
+:global(.workspace-page.theme-light) .preset-tag.is-scene,
+:global(.workspace-page.theme-light) .preset-tag.is-ratio,
+:global(.workspace-page.theme-light) .preset-tag.is-on {
+  border-color: var(--workspace-accent-border, #cfe0ff);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .scene-grid article.active {
+  border-color: var(--workspace-accent, #2f6bff);
+  box-shadow: 0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16));
+}
+
+:global(.workspace-page.theme-light) .delivery-item.is-checked {
+  background: var(--workspace-accent-bg, #f2f7ff);
+}
+
+:global(.workspace-page.theme-light) .delivery-item.is-previewing {
+  background: var(--workspace-accent-bg, #f2f7ff);
+  box-shadow: inset 3px 0 0 var(--workspace-accent, #2f6bff);
+}
+
+:global(.workspace-page.theme-light) .delivery-item:hover {
+  background: var(--workspace-hover-bg, #f3f7fc);
+}
 </style>

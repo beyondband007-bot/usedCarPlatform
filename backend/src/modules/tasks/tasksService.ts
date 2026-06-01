@@ -7,6 +7,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { downloadFile } from "../../shared/downloadFile";
 import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
+import { creativeImageRepository } from "../creative-image/creativeImageRepository";
 import {
   finalizeGenerationBilling,
   shouldFinalizeGenerationBilling,
@@ -74,23 +75,34 @@ class TasksService {
       await this.refreshFromKie(task);
       const refreshed = await tasksRepository.findById(taskId);
       if (!refreshed) throw errors.taskNotFound();
+      await this.syncCreativeConversationResult(refreshed);
       if (finalizeBilling && shouldFinalizeGenerationBilling(refreshed)) {
         await finalizeGenerationBilling(refreshed);
         const finalized = await tasksRepository.findById(taskId);
         if (!finalized) throw errors.taskNotFound();
+        await this.syncCreativeConversationResult(finalized);
         return this.toResponse(finalized);
       }
       return this.toResponse(refreshed);
     }
 
+    await this.syncCreativeConversationResult(task);
     if (finalizeBilling && shouldFinalizeGenerationBilling(task)) {
       await finalizeGenerationBilling(task);
       const finalized = await tasksRepository.findById(taskId);
       if (!finalized) throw errors.taskNotFound();
+      await this.syncCreativeConversationResult(finalized);
       return this.toResponse(finalized);
     }
 
     return this.toResponse(task);
+  }
+
+  private async syncCreativeConversationResult(task: GenerationTaskRecord) {
+    if (task.moduleCode !== "creative-image" || task.status !== "success") return;
+    const results = normalizeTaskResults(task.resultJson);
+    if (!results[0]?.url) return;
+    await creativeImageRepository.syncConversationResultByTaskId(task.id, results[0].url);
   }
 
   private async refreshFromKie(task: GenerationTaskRecord) {
@@ -111,6 +123,10 @@ class TasksService {
       errorCode: status === "fail" ? "KIE_TASK_FAILED" : null,
       errorMessage: status === "fail" ? detail.errorMessage ?? "Kie task failed" : null,
     });
+
+    if (status === "success" && task.moduleCode === "creative-image" && resultImages[0]?.url) {
+      await creativeImageRepository.syncConversationResultByTaskId(task.id, resultImages[0].url);
+    }
 
     if (terminalStatuses.includes(status)) {
       await kieKeyPool.release(task.kieAccountHash ?? "");

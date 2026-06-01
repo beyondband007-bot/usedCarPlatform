@@ -92,11 +92,6 @@ const optionRows = computed(() => {
 .option-selector-card {
   --option-gap: 12px;
   --option-visible: 2.25;
-  --option-scroll-track: color-mix(in srgb, var(--workspace-muted, #969186) 16%, transparent);
-  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
-  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 38%, transparent);
 
   padding: 18px 18px 14px;
   border: 1px solid var(--workspace-line, var(--app-border));
@@ -106,12 +101,6 @@ const optionRows = computed(() => {
 }
 
 :global([data-theme="dark"]) .option-selector-card {
-  --option-scroll-track: rgba(255, 255, 255, 0.08);
-  --option-scroll-track-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
-  --option-scroll-thumb-start: var(--workspace-accent, #efc24c);
-  --option-scroll-thumb-end: var(--workspace-accent-strong, #ffd75a);
-  --option-scroll-thumb-glow: color-mix(in srgb, var(--workspace-accent, #efc24c) 42%, transparent);
-
   box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
 }
 
@@ -137,83 +126,12 @@ const optionRows = computed(() => {
   container-type: inline-size;
 }
 
-.option-scroll-shell::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 22px;
-  z-index: 2;
-  width: clamp(18px, 4vw, 32px);
-  pointer-events: none;
-  background: linear-gradient(
-    270deg,
-    var(--app-surface) 0%,
-    color-mix(in srgb, var(--app-surface) 72%, transparent) 55%,
-    transparent 100%
-  );
-}
-
 .option-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 2px 2px 20px;
   scroll-padding-inline: 2px;
   scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  scrollbar-color: var(--option-scroll-thumb-end) var(--option-scroll-track);
-}
-
-.option-scroll::-webkit-scrollbar {
-  height: 9px;
-}
-
-.option-scroll::-webkit-scrollbar-track {
-  margin-inline: 4px;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--option-scroll-track-glow) 18%,
-      var(--option-scroll-track-glow) 82%,
-      transparent 100%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--app-border) 55%, transparent) 0 1px,
-      transparent 1px 7px
-    ),
-    var(--option-scroll-track);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 70%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--option-scroll-thumb-end) 18%, transparent);
-}
-
-.option-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid var(--option-scroll-track);
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--option-scroll-thumb-start) 0%,
-    var(--option-scroll-thumb-end) 58%,
-    color-mix(in srgb, var(--option-scroll-thumb-end) 72%, #6b8cff) 100%
-  );
-  box-shadow:
-    0 0 10px var(--option-scroll-thumb-glow),
-    0 0 2px color-mix(in srgb, var(--option-scroll-thumb-start) 65%, transparent);
-}
-
-.option-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--option-scroll-thumb-start) 88%, #fff) 0%,
-    color-mix(in srgb, var(--option-scroll-thumb-end) 90%, #fff) 55%,
-    #6b8cff 100%
-  );
-  box-shadow:
-    0 0 14px var(--option-scroll-thumb-glow),
-    0 0 4px color-mix(in srgb, var(--option-scroll-thumb-start) 75%, transparent);
 }
 
 .option-rows {
@@ -247,18 +165,20 @@ const optionRows = computed(() => {
 
 .option-item:hover {
   transform: translateY(-2px);
+  background: var(--workspace-hover-bg, var(--app-surface-soft));
 }
 
 .option-item.is-active {
-  border-color: var(--workspace-accent, #efc24c);
+  border-color: var(--workspace-accent, #2f6bff);
+  background: var(--workspace-accent-bg, var(--app-surface-soft));
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent),
-    0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
+    0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
+    0 10px 24px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
 }
 
 .option-item:focus-visible {
-  border-color: var(--workspace-accent, #efc24c);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 22%, transparent);
+  border-color: var(--workspace-accent, #2f6bff);
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
 }
 
 .option-item-cover {
@@ -271,11 +191,15 @@ const optionRows = computed(() => {
 .option-item-title {
   display: block;
   padding: 8px 6px;
-  color: var(--app-text);
+  color: var(--workspace-text-secondary, var(--app-text-soft));
   text-align: center;
   font-size: 13px;
   font-weight: 900;
   line-height: 1.35;
+}
+
+.option-item.is-active .option-item-title {
+  color: var(--workspace-accent, var(--app-text));
 }
 
 @media (prefers-reduced-motion: reduce) {

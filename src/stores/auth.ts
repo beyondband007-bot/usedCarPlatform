@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 
 import { getCreditAccounts, type CreditAccount } from '@/api/visual-workbench'
+import { getUserInfo, login as mockLogin, logout as mockLogout } from '@/mock/mock-auth'
+import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
+import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
 import {
   clearCreditsIdentity,
   getDefaultMockCreditsIdentity,
@@ -10,7 +13,21 @@ import {
   type CreditsIdentity,
 } from '@/utils/credits-identity'
 
-const SESSION_KEY = 'prototype-enterprise-session'
+const TOKEN_KEY = 'ai-car-studio:auth-token'
+const USER_KEY = 'ai-car-studio:user-info'
+
+interface AuthState {
+  token: string
+  userInfo: UserInfo | null
+  role: UserRole | null
+  permissions: string[]
+  remember: boolean
+  initialized: boolean
+  credits: string
+  creditsIdentity: CreditsIdentity | null
+  creditAccounts: CreditAccount[]
+  creditBalanceLoading: boolean
+}
 
 const formatPoints = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0)
@@ -23,44 +40,111 @@ const formatPoints = (value: string | number | null | undefined) => {
 const selectDisplayAccount = (accounts: CreditAccount[]) =>
   accounts.find((account) => account.accountScope === 'personal') ?? accounts[0] ?? null
 
-function readSession(): boolean {
-  if (typeof window === 'undefined') {
-    return false
-  }
+function readInitialCreditsText() {
+  if (typeof window === 'undefined') return '55,000'
 
-  return window.localStorage.getItem(SESSION_KEY) === '1'
+  const raw = window.localStorage.getItem('ai-car-studio:points-summary')
+  if (!raw) return '55,000'
+
+  try {
+    const parsed = JSON.parse(raw) as { currentPoints?: number }
+    return Number(parsed.currentPoints ?? 0).toLocaleString('zh-CN')
+  } catch {
+    return '55,000'
+  }
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    isLoggedIn: readSession(),
-    userName: '企业用户',
-    credits: '1,250',
-    creditsIdentity: (readSession() ? readCreditsIdentity() : null) as CreditsIdentity | null,
-    creditAccounts: [] as CreditAccount[],
-    creditBalanceLoading: false,
-  }),
+  state: (): AuthState => {
+    const userInfo = readMockStorage<UserInfo | null>(USER_KEY, null)
+
+    return {
+      token: readMockStorage(TOKEN_KEY, ''),
+      userInfo,
+      role: userInfo?.role ?? null,
+      permissions: userInfo?.permissions ?? [],
+      remember: true,
+      initialized: false,
+      credits: readInitialCreditsText(),
+      creditsIdentity: userInfo ? readCreditsIdentity() : null,
+      creditAccounts: [],
+      creditBalanceLoading: false,
+    }
+  },
+  getters: {
+    isLoggedIn: (state) => Boolean(state.token && state.userInfo),
+    userName: (state) => state.userInfo?.displayName ?? state.userInfo?.username ?? '未登录',
+  },
   actions: {
+    hydrate() {
+      if (this.initialized) return
+      this.initialized = true
+      if (this.token && !this.userInfo) {
+        void this.logout(false)
+        return
+      }
+      if (this.isLoggedIn) {
+        this.ensureCreditsIdentity()
+        void this.refreshCredits()
+      }
+    },
     ensureCreditsIdentity() {
       const identity = normalizeCreditsIdentity(this.creditsIdentity) ?? getDefaultMockCreditsIdentity()
       this.creditsIdentity = identity
       writeCreditsIdentity(identity)
       return identity
     },
-    login(identity?: CreditsIdentity) {
+    setCreditsIdentity(identity?: CreditsIdentity | null) {
       this.creditsIdentity = normalizeCreditsIdentity(identity) ?? getDefaultMockCreditsIdentity()
-      this.isLoggedIn = true
       writeCreditsIdentity(this.creditsIdentity)
-      window.localStorage.setItem(SESSION_KEY, '1')
-      void this.refreshCredits()
+      return this.creditsIdentity
     },
-    logout() {
-      this.isLoggedIn = false
+    async login(payload: LoginRequest, creditsIdentity?: CreditsIdentity) {
+      const response = await mockLogin(payload)
+      const userInfo = await getUserInfo(response.token)
+
+      this.token = response.token
+      this.userInfo = userInfo
+      this.role = userInfo.role
+      this.permissions = [...userInfo.permissions]
+      this.remember = Boolean(payload.remember)
+      this.setCreditsIdentity(creditsIdentity)
+
+      if (this.remember) {
+        writeMockStorage(TOKEN_KEY, response.token)
+        writeMockStorage(USER_KEY, userInfo)
+      } else {
+        removeMockStorage(TOKEN_KEY)
+        removeMockStorage(USER_KEY)
+      }
+
+      void this.refreshCredits()
+      return userInfo
+    },
+    async logout(persist = true) {
+      await mockLogout()
+      this.token = ''
+      this.userInfo = null
+      this.role = null
+      this.permissions = []
       this.creditAccounts = []
       this.credits = '0'
       this.creditsIdentity = null
-      window.localStorage.removeItem(SESSION_KEY)
       clearCreditsIdentity()
+
+      if (persist) {
+        removeMockStorage(TOKEN_KEY)
+        removeMockStorage(USER_KEY)
+      }
+    },
+    async refreshUserInfo() {
+      if (!this.token) return null
+      const userInfo = await getUserInfo(this.token)
+      this.userInfo = userInfo
+      this.role = userInfo.role
+      this.permissions = [...userInfo.permissions]
+      writeMockStorage(USER_KEY, userInfo)
+      return userInfo
     },
     async refreshCredits() {
       if (!this.isLoggedIn || this.creditBalanceLoading) return
@@ -82,3 +166,5 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 })
+
+export const useUserStore = useAuthStore

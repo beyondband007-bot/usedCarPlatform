@@ -33,8 +33,13 @@ function resolveAuthenticatedRedirectPath(redirect: unknown, fallback: string) {
 
 router.beforeEach((to) => {
   const authStore = useAuthStore()
+  authStore.hydrate()
+
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const guestOnly = to.matched.some((record) => record.meta.guestOnly)
+  const requiredPermission = to.matched
+    .map((record) => record.meta.permission)
+    .find((permission): permission is string => typeof permission === 'string')
 
   if (authStore.isLoggedIn) {
     if (to.path === '/intro-video') {
@@ -45,10 +50,23 @@ router.beforeEach((to) => {
       return resolveAuthenticatedRedirectPath(to.query.redirect, '/workspace')
     }
 
+    if (requiredPermission && !authStore.permissions.includes(requiredPermission)) {
+      return '/home'
+    }
+
     return true
   }
 
   resetIntroVideoOnHardReload()
+
+  if (requiresAuth) {
+    return {
+      path: AUTH_ROUTE,
+      query: {
+        redirect: to.fullPath,
+      },
+    }
+  }
 
   const hasPlayedIntroVideo = hasPlayedIntroVideoThisSession()
   const hideIntroVideo = to.matched.some((record) => record.meta.hideIntroVideo)
@@ -61,12 +79,7 @@ router.beforeEach((to) => {
     return true
   }
 
-  return {
-    path: AUTH_ROUTE,
-    query: {
-      redirect: to.fullPath,
-    },
-  }
+  return true
 })
 
 export default router
