@@ -189,12 +189,14 @@ http://127.0.0.1:5173
 http://127.0.0.1:5173/login
 ```
 
-普通企业用户：
+Enterprise 兼容登录名：
 
 ```text
 username: enterprise
 password: 123456
 ```
+
+该用户名保留用于兼容现有前端，但底层归类为 `agent` 角色。
 
 管理员用户：
 
@@ -217,17 +219,18 @@ username: agent
 password: 123456
 ```
 
-使用 `enterprise` 测试普通用户页面：
+使用 `enterprise` 或 `agent` 测试代理商类别登录：
 
 - `/workspace`
 - `/credits`
 - `/package-points`
+- `/credits-admin` 代理商视图
 
 使用 `admin` 测试：
 
 - `/credits-admin`
 
-使用 `developer` 可以评审所有后台角色视图。使用 `agent` 可以验证代理商只能看到代理商后台视图。
+使用 `developer` 可以评审所有后台角色视图。使用 `agent` 或 `enterprise` 可以验证该登录只能看到代理商后台视图。
 
 `/credits-admin` 内部的角色切换器目前用于原型/演示评审。真实的开发者/管理员/代理商登录与权限隔离属于后续生产认证与权限阶段。
 

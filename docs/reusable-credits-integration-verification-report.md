@@ -189,12 +189,14 @@ Open:
 http://127.0.0.1:5173/login
 ```
 
-Regular enterprise user:
+Enterprise compatibility login:
 
 ```text
 username: enterprise
 password: 123456
 ```
+
+This username is kept for compatibility with the existing frontend, but it is categorized internally as the `agent` role.
 
 Admin user:
 
@@ -217,17 +219,18 @@ username: agent
 password: 123456
 ```
 
-Use `enterprise` to test normal user pages:
+Use `enterprise` or `agent` to test the agent-category login:
 
 - `/workspace`
 - `/credits`
 - `/package-points`
+- `/credits-admin` agent view
 
 Use `admin` to test:
 
 - `/credits-admin`
 
-Use `developer` to review all back-office role views. Use `agent` to verify that the agent can only see the agent back-office view.
+Use `developer` to review all back-office role views. Use `agent` or `enterprise` to verify that the login can only see the agent back-office view.
 
 The role switcher inside `/credits-admin` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
 

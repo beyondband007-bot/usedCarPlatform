@@ -130,12 +130,15 @@ The Reusable Credits Platform demo seed creates:
 
 The usedCar login page currently uses frontend mock auth:
 
-- username: `enterprise`
-- password: `123456`
-- username: `admin`
-- password: `123456`
+Exactly three platform roles are used in the lower-level auth and back-office logic:
 
-Use `admin` to see admin-only navigation such as the credits admin console.
+- `developer` / `123456`
+- `admin` / `123456`
+- `agent` / `123456`
+
+The username `enterprise` / `123456` is kept as a compatibility login name from the existing colleague frontend, but it is normalized internally to the `agent` role. It is not a fourth platform role.
+
+Use `developer` to review all three back-office views. Use `admin` to review admin and agent views. Use `agent` or `enterprise` to verify the agent-only view.
 
 ## Three-Role Back Office
 
@@ -181,12 +184,12 @@ npm run build
 
 ## Manual Review Checklist
 
-1. Log in as `enterprise` and choose the personal mock credits identity.
+1. Log in as `enterprise` or `agent` and choose the personal mock credits identity.
 2. Confirm the header and subnav show a real credits balance.
 3. Open `/credits` and confirm the transaction list is populated from Reusable Credits Platform data.
 4. Open `/package-points` and confirm recharge products are loaded from the credits platform.
 5. Select a recharge product and confirm a pending payment order is created.
-6. Log in as `admin`.
+6. Log in as `developer`.
 7. Open `/credits-admin` and switch through the developer, company admin, and agent views.
 8. Confirm live applications, functions, accounts, products, and transactions load in the developer/admin credit sections.
 9. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.

@@ -87,7 +87,7 @@ The environment fallback is for direct local backend smoke tests only. It should
 
 For the first release, every user/customer account must be created by platform owner roles: developer or company admin. Agent-created client accounts are intentionally disabled in the back-office UI and documented as a future approval/audit workflow.
 
-The current frontend mock login now supports four demo identities: `developer`, `admin`, `agent`, and `enterprise`, all with password `123456`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
+The current frontend mock login uses exactly three platform roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as a compatibility alias from the existing frontend, but it is categorized internally as `agent`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
 ## Revised Next Plan
 

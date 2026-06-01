@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 
 import { getCreditAccounts, type CreditAccount } from '@/api/visual-workbench'
-import { getUserInfo, login as mockLogin, logout as mockLogout } from '@/mock/mock-auth'
+import {
+  getUserInfo,
+  login as mockLogin,
+  logout as mockLogout,
+  normalizeMockUserInfo,
+} from '@/mock/mock-auth'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
 import {
@@ -56,7 +61,7 @@ function readInitialCreditsText() {
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => {
-    const userInfo = readMockStorage<UserInfo | null>(USER_KEY, null)
+    const userInfo = normalizeMockUserInfo(readMockStorage<UserInfo | null>(USER_KEY, null))
 
     return {
       token: readMockStorage(TOKEN_KEY, ''),

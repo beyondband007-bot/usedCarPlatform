@@ -32,13 +32,6 @@ const permissions = {
     'menu:admin',
     'backoffice:agent',
   ],
-  enterprise: [
-    'menu:home',
-    'menu:workspace',
-    'menu:pricing',
-    'menu:points',
-    'menu:recharge',
-  ],
 } as const
 
 const mockUsers: Record<
@@ -84,9 +77,9 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_enterprise',
       username: 'enterprise',
-      displayName: '企业用户',
-      role: 'enterprise',
-      permissions: [...permissions.enterprise],
+      displayName: '企业用户（代理商）',
+      role: 'agent',
+      permissions: [...permissions.agent],
     },
   },
 }
@@ -107,6 +100,27 @@ export async function getUserInfo(token: string): Promise<UserInfo> {
   }
 
   return mockDelay(matched.userInfo)
+}
+
+export function normalizeMockUserInfo(userInfo: UserInfo | null): UserInfo | null {
+  if (!userInfo) return null
+
+  const role = (userInfo as unknown as { role?: string }).role
+
+  if (role === 'enterprise') {
+    return {
+      ...userInfo,
+      displayName: userInfo.displayName === '企业用户' ? '企业用户（代理商）' : userInfo.displayName,
+      role: 'agent',
+      permissions: [...permissions.agent],
+    }
+  }
+
+  if (role === 'developer' || role === 'admin' || role === 'agent') {
+    return userInfo
+  }
+
+  return null
 }
 
 export async function logout() {

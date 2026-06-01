@@ -32,9 +32,9 @@ const identitySelectOptions = mockIdentityOptions.map((option) => ({
 }))
 const mockAccountOptions = [
   {
-    label: '普通企业用户',
+    label: '企业账号（代理）',
     username: 'enterprise',
-    helper: '普通用户，访问工作台、积分和充值。',
+    helper: '兼容同事前端的 enterprise 登录名，底层按 agent 角色处理。',
   },
   {
     label: '平台开发者',
@@ -66,18 +66,15 @@ function selectMockAccount(accountUsername: string) {
   password.value = '123456'
 }
 
-function defaultRedirectForUsername(accountUsername: string) {
-  if (accountUsername === 'developer' || accountUsername === 'admin' || accountUsername === 'agent') {
-    return '/credits-admin'
-  }
-  return '/workspace'
+function defaultRedirectForRole(role: string) {
+  return role === 'developer' || role === 'admin' || role === 'agent' ? '/credits-admin' : '/workspace'
 }
 
 async function handleLogin() {
   submitting.value = true
 
   try {
-    await authStore.login(
+    const userInfo = await authStore.login(
       {
         username: username.value.trim(),
         password: password.value,
@@ -86,7 +83,7 @@ async function handleLogin() {
       selectedIdentity.value,
     )
 
-    const defaultRedirect = defaultRedirectForUsername(username.value.trim())
+    const defaultRedirect = defaultRedirectForRole(userInfo.role)
     const redirect =
       typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
         ? route.query.redirect
@@ -171,7 +168,7 @@ async function handleLogin() {
 
       <div class="login-options">
         <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
-        <span>Mock账号：developer / admin / agent / enterprise</span>
+        <span>Mock账号：developer / admin / agent / enterprise，其中 enterprise 归入 agent</span>
       </div>
 
       <NButton
