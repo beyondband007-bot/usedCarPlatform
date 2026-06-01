@@ -62,6 +62,11 @@ const normalizeKieStatus = (status: unknown): KieTaskDetail["status"] => {
   return "queued";
 };
 
+const mapKlingVideoMode = (resolution: CreateKieImageToVideoTaskInput["resolution"]) => {
+  if (resolution === "1080p") return "pro";
+  return "std";
+};
+
 class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
     const lease = await kieKeyPool.acquire();
@@ -215,12 +220,14 @@ class KieClient {
     input: CreateKieImageToVideoTaskInput,
   ): Promise<CreateKieImageTaskResult> {
     const requestBody = {
-      model: "bytedance/seedance-2",
+      model: "kling-3.0/video",
       input: {
         prompt: input.prompt,
-        reference_image_urls: [input.imageUrl],
+        multi_shots: false,
+        sound: false,
+        image_urls: [input.imageUrl],
         aspect_ratio: input.aspectRatio,
-        resolution: input.resolution,
+        mode: mapKlingVideoMode(input.resolution),
         duration: input.duration,
       },
     };

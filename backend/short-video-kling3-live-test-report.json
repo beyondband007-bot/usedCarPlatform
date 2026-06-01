@@ -1,0 +1,128 @@
+{
+  "runId": "short-video-kling3-live-test-jetour-x70",
+  "startedAt": "2026-06-01T11:40:44.869Z",
+  "finishedAt": "2026-06-01T11:40:48.133Z",
+  "imagePath": "C:/Users/Administrator/Desktop/jetour-x70-source.jpg",
+  "imageBytes": 248492,
+  "upload": {
+    "ok": true,
+    "status": 200,
+    "fileUrl": "https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg",
+    "raw": {
+      "success": true,
+      "code": 200,
+      "msg": "File uploaded successfully",
+      "data": {
+        "success": true,
+        "fileName": "jetour-x70-source.jpg",
+        "filePath": "kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg",
+        "downloadUrl": "https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg",
+        "fileSize": 248492,
+        "mimeType": "image/jpeg",
+        "uploadedAt": "2026-06-01T11:40:46.568Z"
+      }
+    }
+  },
+  "createTask": {
+    "ok": true,
+    "httpOk": true,
+    "status": 200,
+    "taskId": "1de69a734f95a2b72b5ad90c72e10e2a",
+    "requestBody": {
+      "model": "kling-3.0/video",
+      "input": {
+        "prompt": "主体锁定：严格保持原图车辆的车型、颜色、车身结构、轮毂样式、车灯造型、车窗比例及车牌区域不变，不允许修改任何外观特征。\n\n运镜编排：电影级稳定器环绕运镜为主——从车头45度角低机位缓缓切入，平滑过渡至正侧展示车身腰线，继续环绕至车尾强调尾灯设计与溜背轮廓，再收束至另一侧形成完整闭环。在环绕过程中可插入2-3处极短的同轴跳切（例如从低位仰角瞬间切至齐腰平视），节奏利落但不破坏空间连续性。\n\n画面质感：8K商业广告片影调，色彩科学偏向低饱和高对比（teal & orange微倾向），画面通透无雾感，车身漆面如液态金属般深邃，玻璃车窗呈现真实的折射与反光层次，地面反射清晰但不抢主体。整体风格参考保时捷、奥迪或蔚来品牌官方宣传片的视觉标准——冷静、精密、带有克制的豪华感。\n输出要求：画面绝对稳定无抖动，运动模糊自然，拒绝任何廉价特效、滤镜感或AI失真痕迹，不要出现中文乱码。",
+        "multi_shots": false,
+        "sound": false,
+        "image_urls": [
+          "https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg"
+        ],
+        "aspect_ratio": "16:9",
+        "mode": "std",
+        "duration": 10
+      }
+    },
+    "raw": {
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "taskId": "1de69a734f95a2b72b5ad90c72e10e2a",
+        "recordId": "1de69a734f95a2b72b5ad90c72e10e2a"
+      }
+    }
+  },
+  "polls": [
+    {
+      "checkedAt": "2026-06-01T11:41:14.419Z",
+      "httpOk": true,
+      "status": 200,
+      "raw": {
+        "code": 200,
+        "msg": "success",
+        "data": {
+          "taskId": "1de69a734f95a2b72b5ad90c72e10e2a",
+          "model": "kling-3.0/video",
+          "state": "generating",
+          "param": "{\"input\":\"{\\\"mode\\\":\\\"std\\\",\\\"duration\\\":10,\\\"aspect_ratio\\\":\\\"16:9\\\",\\\"sound\\\":false,\\\"image_urls\\\":[\\\"https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg\\\"],\\\"multi_shots\\\":false,\\\"prompt\\\":\\\"主体锁定：严格保持原图车辆的车型、颜色、车身结构、轮毂样式、车灯造型、车窗比例及车牌区域不变，不允许修改任何外观特征。\\\\n\\\\n运镜编排：电影级稳定器环绕运镜为主——从车头45度角低机位缓缓切入，平滑过渡至正侧展示车身腰线，继续环绕至车尾强调尾灯设计与溜背轮廓，再收束至另一侧形成完整闭环。在环绕过程中可插入2-3处极短的同轴跳切（例如从低位仰角瞬间切至齐腰平视），节奏利落但不破坏空间连续性。\\\\n\\\\n画面质感：8K商业广告片影调，色彩科学偏向低饱和高对比（teal & orange微倾向），画面通透无雾感，车身漆面如液态金属般深邃，玻璃车窗呈现真实的折射与反光层次，地面反射清晰但不抢主体。整体风格参考保时捷、奥迪或蔚来品牌官方宣传片的视觉标准——冷静、精密、带有克制的豪华感。\\\\n输出要求：画面绝对稳定无抖动，运动模糊自然，拒绝任何廉价特效、滤镜感或AI失真痕迹，不要出现中文乱码。\\\"}\",\"model\":\"kling-3.0/video\"}",
+          "resultJson": "",
+          "failCode": null,
+          "failMsg": null,
+          "costTime": null,
+          "completeTime": null,
+          "createTime": 1780314048005,
+          "creditsConsumed": 140
+        }
+      }
+    },
+    {
+      "checkedAt": "2026-06-01T11:42:03.747Z",
+      "httpOk": true,
+      "status": 200,
+      "raw": {
+        "code": 200,
+        "msg": "success",
+        "data": {
+          "taskId": "1de69a734f95a2b72b5ad90c72e10e2a",
+          "model": "kling-3.0/video",
+          "state": "generating",
+          "param": "{\"input\":\"{\\\"mode\\\":\\\"std\\\",\\\"duration\\\":10,\\\"aspect_ratio\\\":\\\"16:9\\\",\\\"sound\\\":false,\\\"image_urls\\\":[\\\"https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg\\\"],\\\"multi_shots\\\":false,\\\"prompt\\\":\\\"主体锁定：严格保持原图车辆的车型、颜色、车身结构、轮毂样式、车灯造型、车窗比例及车牌区域不变，不允许修改任何外观特征。\\\\n\\\\n运镜编排：电影级稳定器环绕运镜为主——从车头45度角低机位缓缓切入，平滑过渡至正侧展示车身腰线，继续环绕至车尾强调尾灯设计与溜背轮廓，再收束至另一侧形成完整闭环。在环绕过程中可插入2-3处极短的同轴跳切（例如从低位仰角瞬间切至齐腰平视），节奏利落但不破坏空间连续性。\\\\n\\\\n画面质感：8K商业广告片影调，色彩科学偏向低饱和高对比（teal & orange微倾向），画面通透无雾感，车身漆面如液态金属般深邃，玻璃车窗呈现真实的折射与反光层次，地面反射清晰但不抢主体。整体风格参考保时捷、奥迪或蔚来品牌官方宣传片的视觉标准——冷静、精密、带有克制的豪华感。\\\\n输出要求：画面绝对稳定无抖动，运动模糊自然，拒绝任何廉价特效、滤镜感或AI失真痕迹，不要出现中文乱码。\\\"}\",\"model\":\"kling-3.0/video\"}",
+          "resultJson": "",
+          "failCode": null,
+          "failMsg": null,
+          "costTime": null,
+          "completeTime": null,
+          "createTime": 1780314048005,
+          "creditsConsumed": 140
+        }
+      }
+    },
+    {
+      "checkedAt": "2026-06-01T11:42:51.871Z",
+      "httpOk": true,
+      "status": 200,
+      "raw": {
+        "code": 200,
+        "msg": "success",
+        "data": {
+          "taskId": "1de69a734f95a2b72b5ad90c72e10e2a",
+          "model": "kling-3.0/video",
+          "state": "success",
+          "param": "{\"input\":\"{\\\"mode\\\":\\\"std\\\",\\\"duration\\\":10,\\\"aspect_ratio\\\":\\\"16:9\\\",\\\"sound\\\":false,\\\"image_urls\\\":[\\\"https://tempfile.redpandaai.co/kieai/725953/used-car-platform/short-video-live-test/jetour-x70-source.jpg\\\"],\\\"multi_shots\\\":false,\\\"prompt\\\":\\\"主体锁定：严格保持原图车辆的车型、颜色、车身结构、轮毂样式、车灯造型、车窗比例及车牌区域不变，不允许修改任何外观特征。\\\\n\\\\n运镜编排：电影级稳定器环绕运镜为主——从车头45度角低机位缓缓切入，平滑过渡至正侧展示车身腰线，继续环绕至车尾强调尾灯设计与溜背轮廓，再收束至另一侧形成完整闭环。在环绕过程中可插入2-3处极短的同轴跳切（例如从低位仰角瞬间切至齐腰平视），节奏利落但不破坏空间连续性。\\\\n\\\\n画面质感：8K商业广告片影调，色彩科学偏向低饱和高对比（teal & orange微倾向），画面通透无雾感，车身漆面如液态金属般深邃，玻璃车窗呈现真实的折射与反光层次，地面反射清晰但不抢主体。整体风格参考保时捷、奥迪或蔚来品牌官方宣传片的视觉标准——冷静、精密、带有克制的豪华感。\\\\n输出要求：画面绝对稳定无抖动，运动模糊自然，拒绝任何廉价特效、滤镜感或AI失真痕迹，不要出现中文乱码。\\\"}\",\"model\":\"kling-3.0/video\"}",
+          "resultJson": "{\"resultUrls\":[\"https://tempfile.aiquickdraw.com/k/1de69a734f95a2b72b5ad90c72e10e2a_1_1780314151_5799.mp4\"]}",
+          "failCode": null,
+          "failMsg": null,
+          "costTime": 103,
+          "completeTime": 1780314153226,
+          "createTime": 1780314048005,
+          "creditsConsumed": 140
+        }
+      }
+    }
+  ],
+  "download": {
+    "downloadedAt": "2026-06-01T11:44:03.289Z",
+    "url": "https://tempfile.aiquickdraw.com/k/1de69a734f95a2b72b5ad90c72e10e2a_1_1780314151_5799.mp4",
+    "localPath": "D:\\usedCarPlatform\\backend\\storage\\results\\short-video-live-test\\jetour-x70-kling3-live-test.mp4",
+    "bytes": 14191249
+  }
+}
