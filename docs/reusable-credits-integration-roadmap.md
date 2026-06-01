@@ -41,6 +41,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 | Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
 | Three-role back office | Done | Current branch | Expands `/credits-admin` into the developer, company-admin, and agent back-office surface from the shared prototype. |
+| First-release account creation policy | Done | `5aa2c73` | Restricts user/customer account creation to platform owner roles and marks agent-created client accounts as a future workflow. |
 
 Detailed phase notes:
 
@@ -57,6 +58,7 @@ Detailed phase notes:
 - [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
 - [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
 - [Three-role credits back office](./reusable-credits-three-role-back-office.md)
+- [First release account creation policy](./first-release-account-creation-policy.md)
 
 ## Important Implementation Notes
 
@@ -81,6 +83,8 @@ During development, usedCarPlatform resolves credits identity in this order:
    - `CREDITS_DEFAULT_TENANT_ID`
 
 The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
+
+For the first release, every user/customer account must be created by platform owner roles: developer or company admin. Agent-created client accounts are intentionally disabled in the back-office UI and documented as a future approval/audit workflow.
 
 ## Revised Next Plan
 
