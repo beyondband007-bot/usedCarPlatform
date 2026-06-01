@@ -158,6 +158,13 @@ It contains:
 
 Detailed notes are in [Three-Role Credits Back Office](./reusable-credits-three-role-back-office.md).
 
+Current progress status:
+
+- complete for this release as a UI/prototype and review surface
+- not production-complete as a writable operations system
+- remaining production work is deferred: real backend RBAC, audited regular-user-to-agent promotion, agent APIs, settlement/ticket/material/commission CRUD, approval workflows, and audit logs
+- current branch should be left as-is unless the team decides to pull those later-release workflows into the first release
+
 ## Verification
 
 Run the deterministic integration smoke:
@@ -211,7 +218,7 @@ The Phase 11 smoke runner does not call real KIE and does not spend KIE quota. I
 
 Payment provider callback and paid recharge settlement are covered inside the Reusable Credits Platform tests, but usedCar currently only creates pending payment orders.
 
-The credits admin console now has the full three-role UI surface, but write actions are intentionally non-mutating in this branch.
+The credits admin console now has the full three-role UI surface, but write actions are intentionally non-mutating in this branch. This is the intended stopping point for the current release.
 
 Agent, settlement, material, ticket, and commission pages currently use local UI data because those backend APIs do not exist yet in usedCarPlatform.
 

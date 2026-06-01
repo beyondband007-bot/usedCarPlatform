@@ -1,6 +1,6 @@
 # Three-Role Credits Back Office
 
-Status: implemented
+Status: UI/prototype complete; production workflows pending
 Date: 2026-06-01
 Route: `/credits-admin`
 
@@ -9,6 +9,32 @@ Route: `/credits-admin`
 The shared static prototype `积分后台-三角色静态原型.html` has been ported into the usedCarPlatform Vue frontend as a full three-role credits back office.
 
 This page is intended for team review and local integration testing while the production auth/session and agent APIs are still being designed.
+
+## Progress Snapshot
+
+The Three-Role Credits Back Office should be treated as complete for the current integration release only at the UI/prototype level.
+
+Completed in this branch:
+
+- Vue route `/credits-admin`
+- three reviewable back-office views: developer, company admin, and agent
+- role-limited local mock access for `developer`, `admin`, and `agent`
+- regular user exclusion from back-office access
+- regular-user-to-agent onboarding shown as a developer/admin back-office action
+- live read-only credit data through the usedCar backend proxy
+- non-mutating action buttons that show intended workflows
+- documentation for account creation and agent onboarding policy
+
+Not production-complete yet:
+
+- real backend login/session and server-side RBAC
+- audited regular-user-to-agent promotion API
+- agent onboarding database/API
+- production CRUD for tenants, users, agents, tickets, settlement, materials, and commissions
+- approval workflow and audit logs for role changes and account creation
+- real write actions from the console
+
+Decision for now: leave the current back-office implementation as-is for the first release. The remaining production workflow work should be planned as a later release after the team agrees on auth, role audit, and agent-management APIs.
 
 ## Roles
 
