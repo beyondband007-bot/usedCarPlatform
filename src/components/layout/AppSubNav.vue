@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
 import { secondaryNavigation } from '@/constants/prototype'
 import { useAuthStore } from '@/stores/auth'
+import { useCreditsStore } from '@/stores/credits'
 import type { NavItem } from '@/types/prototype'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const creditsStore = useCreditsStore()
 
 const permissionMap: Record<string, string> = {
   '/home': 'menu:home',
@@ -23,7 +25,15 @@ const permissionMap: Record<string, string> = {
   '/credits': 'menu:points',
   '/recharge': 'menu:recharge',
   '/package-points': 'menu:recharge',
+  '/credits-admin': 'menu:admin',
 }
+
+const creditsBalanceText = computed(() => {
+  if (creditsStore.accountsLoaded) {
+    return Number(creditsStore.availableBalance ?? 0).toLocaleString('zh-CN')
+  }
+  return authStore.credits
+})
 
 const visibleNavigation = computed(() =>
   secondaryNavigation.filter((item) => {
@@ -92,7 +102,7 @@ function navigate(item: NavItem) {
     >
       <Icon icon="mdi:diamond-stone" class="subnav-credits-icon" />
       <span class="subnav-credits-label">积分余额</span>
-      <strong class="subnav-credits-value">{{ authStore.credits }}</strong>
+      <strong class="subnav-credits-value">{{ creditsBalanceText }}</strong>
     </RouterLink>
   </nav>
 </template>

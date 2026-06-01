@@ -10,8 +10,6 @@ import VisitorWorkbenchModal from '@/components/business/home/VisitorWorkbenchMo
 
 import AppHeader from '@/components/layout/AppHeader.vue'
 
-import AppSubNav from '@/components/layout/AppSubNav.vue'
-
 import { isWorkbenchSectionPath } from '@/constants/app-flow'
 
 import { useStudioChrome } from '@/composables/useStudioChrome'
@@ -42,7 +40,7 @@ provide(WORKBENCH_ENTRY_KEY, workbenchEntry)
 
 
 
-const showSubNav = computed(
+const useFixedAppFrame = computed(
   () => authStore.isLoggedIn && isWorkbenchSectionPath(route.path),
 )
 
@@ -73,7 +71,7 @@ const {
 
     :class="{
 
-      'app-layout--auth': showSubNav,
+      'app-layout--auth': useFixedAppFrame,
 
       'app-layout--home': isHomePage,
 
@@ -82,8 +80,6 @@ const {
       'app-layout--studio-chrome': usesStudioChrome,
 
     }"
-
-    :data-subnav="showSubNav ? 'true' : undefined"
 
   >
 
@@ -95,8 +91,6 @@ const {
 
         :class="{
 
-          'home-chrome--with-subnav': showSubNav,
-
           'home-chrome--light': !appStore.isDarkMode && !isPricingPage,
           'home-chrome--pricing': isPricingPage,
           'home-chrome--pricing-light': !appStore.isDarkMode && isPricingPage,
@@ -107,8 +101,6 @@ const {
 
         <AppHeader />
 
-        <AppSubNav v-if="showSubNav" embedded />
-
       </div>
 
     </template>
@@ -116,8 +108,6 @@ const {
     <template v-else>
 
       <AppHeader />
-
-      <AppSubNav v-if="showSubNav" />
 
     </template>
 
@@ -204,6 +194,7 @@ const {
 .home-chrome {
 
   --studio-chrome-pad-x: 24px;
+  --studio-chrome-header-height: 72px;
   --studio-chrome-logo-size: clamp(20px, 1.75vw, 30px);
   --studio-chrome-nav-size: clamp(15px, 1.15vw, 19px);
   --studio-chrome-action-size: clamp(12px, 0.95vw, 15px);
@@ -300,11 +291,6 @@ const {
 }
 
 .home-chrome--pricing {
-  --studio-chrome-pad-x: clamp(28px, 2vw, 44px);
-  --studio-chrome-logo-size: clamp(26px, 1.55vw, 42px);
-  --studio-chrome-nav-size: clamp(18px, 0.92vw, 24px);
-  --studio-chrome-action-size: clamp(14px, 0.78vw, 19px);
-  --studio-chrome-nav-gap: clamp(32px, 2.7vw, 72px);
   --studio-chrome-bg: #060606;
   --studio-chrome-header-bg: linear-gradient(to bottom, rgba(6, 6, 6, 0.88), rgba(6, 6, 6, 0.88));
   --studio-chrome-logo: #f7f1e4;
@@ -324,11 +310,6 @@ const {
   --studio-chrome-user-hover-bg: rgba(239, 194, 76, 0.08);
   --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
   --studio-chrome-avatar-text: #efc24c;
-}
-
-.home-chrome--pricing :deep(.site-header) {
-  min-height: 72px;
-  padding-block: clamp(12px, 0.9vw, 14px);
 }
 
 .home-chrome--pricing.home-chrome--pricing-light {
@@ -409,31 +390,5 @@ const {
 }
 
 
-
-.app-layout--studio-chrome[data-subnav='true']:not(.app-layout--home) .app-layout-main {
-
-  padding-top: 118px;
-
-}
-
-
-
-.home-chrome--with-subnav :deep(.site-header) {
-
-  padding-bottom: 8px;
-
-  background: var(--studio-chrome-bg);
-
-}
-
-
-
-.home-chrome--with-subnav :deep(.subnav--embedded) {
-
-  padding-top: 0;
-
-  margin-top: 0;
-
-}
 
 </style>

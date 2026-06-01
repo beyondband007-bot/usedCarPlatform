@@ -1,51 +1,56 @@
 <script setup lang="ts">
-import { NButton, NCheckbox, NInput, useMessage } from 'naive-ui'
-import { motion } from 'motion-v'
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { NButton, NCheckbox, NInput, useMessage } from "naive-ui";
+import { motion } from "motion-v";
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from "@/stores/auth";
 
 defineProps<{
-  isDark: boolean
-}>()
+  isDark: boolean;
+}>();
 
-const router = useRouter()
-const route = useRoute()
-const message = useMessage()
-const authStore = useAuthStore()
+const router = useRouter();
+const route = useRoute();
+const message = useMessage();
+const authStore = useAuthStore();
 
-const username = ref('enterprise')
-const password = ref('123456')
-const remember = ref(true)
-const submitting = ref(false)
+const username = ref("enterprise");
+const password = ref("123456");
+const remember = ref(true);
+const submitting = ref(false);
 
 async function handleLogin() {
-  submitting.value = true
+  submitting.value = true;
 
   try {
     await authStore.login({
       username: username.value.trim(),
       password: password.value,
       remember: remember.value,
-    })
+    });
 
     const redirect =
-      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      typeof route.query.redirect === "string" &&
+      route.query.redirect.startsWith("/")
         ? route.query.redirect
-        : '/workspace'
+        : "/workspace";
 
-    if (redirect === '/auth' || redirect === '/enterprise' || redirect === '/login') {
-      await router.push('/workspace')
-      return
+    if (
+      redirect === "/auth" ||
+      redirect === "/enterprise" ||
+      redirect === "/login"
+    ) {
+      await router.push("/workspace");
+      return;
     }
 
-    await router.push(redirect)
+    await router.push(redirect);
   } catch (error) {
-    const text = error instanceof Error ? error.message : '登录失败'
-    message.error(text)
+    const text = error instanceof Error ? error.message : "登录失败";
+    message.error(text);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 </script>
@@ -87,7 +92,6 @@ async function handleLogin() {
 
       <div class="login-options">
         <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
-        <span>Mock账号：admin / enterprise</span>
       </div>
 
       <NButton
@@ -100,10 +104,6 @@ async function handleLogin() {
       >
         登录
       </NButton>
-
-      <div class="login-links">
-        <span>当前阶段使用前端 Mock 登录，后续替换 API 层即可。</span>
-      </div>
     </form>
   </motion.div>
 </template>

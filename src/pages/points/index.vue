@@ -1,39 +1,48 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NButton, NDataTable, NSelect } from 'naive-ui'
+import { NButton, NDataTable, NPagination, NSelect } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
-import pricingHeroBg from '@/assets/img/pricing-hero-bg.png'
+import pointsNightBg from '@/assets/img/积分查询/夜间背景图.jpg'
 import { useAppStore } from '@/stores/app'
-import { usePointsStore } from '@/stores/points'
+import { useCreditsStore } from '@/stores/credits'
 import { useSubscriptionStore } from '@/stores/subscription'
-import type { PointRecord, PointRecordType } from '@/types/points'
+import type { CreditsTransaction, CreditsTransactionType } from '@/api/visual-workbench'
 
 type TimeFilter = 'recent-3-months' | 'recent-30-days' | 'this-month' | 'all'
-type StatusFilter = 'all' | 'active' | 'pending' | 'expired'
+type StatusFilter = 'all' | 'in' | 'out'
 
-interface PointDisplayRecord extends PointRecord {
+interface CreditsDisplayRow {
+  id: string | number
+  createdAt: string
+  txnType: CreditsTransactionType
+  txnTypeLabel: string
+  points: number
+  pointsText: string
   status: StatusFilter
   source: string
-  validUntil: string
+  balanceAfter?: number
 }
 
 const appStore = useAppStore()
-const pointsStore = usePointsStore()
+const creditsStore = useCreditsStore()
 const subscriptionStore = useSubscriptionStore()
 
 const timeFilter = ref<TimeFilter>('recent-3-months')
-const selectedFlowType = ref<'all' | PointRecordType>('all')
+const selectedFlowType = ref<'all' | CreditsTransactionType>('all')
 const selectedStatus = ref<StatusFilter>('all')
+const currentPage = ref(1)
+const pageSize = 10
 
 onMounted(async () => {
   await subscriptionStore.hydrate()
-  await pointsStore.hydrate()
+  await creditsStore.hydrateAccounts()
+  await creditsStore.loadTransactions({ page: 1, pageSize: 50 })
 })
 
 const pageStyle = {
-  '--points-hero-image': `url(${pricingHeroBg})`,
+  '--points-night-image': `url(${pointsNightBg})`,
 }
 
 const timeOptions: Array<{ label: string; value: TimeFilter }> = [
@@ -43,101 +52,106 @@ const timeOptions: Array<{ label: string; value: TimeFilter }> = [
   { label: '全部时间', value: 'all' },
 ]
 
-const flowTypeOptions: Array<{ label: string; value: 'all' | PointRecordType }> = [
+const flowTypeOptions: Array<{ label: string; value: 'all' | CreditsTransactionType }> = [
   { label: '全部积分类型', value: 'all' },
-  { label: '充值积分', value: 'recharge' },
-  { label: '消费积分', value: 'consume' },
-  { label: '活动积分', value: 'gift' },
-  { label: '失败退回', value: 'refund' },
+  { label: '充值', value: 'recharge' },
+  { label: '预估', value: 'estimate' },
+  { label: '冻结', value: 'freeze' },
+  { label: '结算', value: 'settle' },
+  { label: '退款', value: 'refund' },
+  { label: '调整', value: 'adjust' },
 ]
 
 const statusOptions: Array<{ label: string; value: StatusFilter }> = [
   { label: '全部状态', value: 'all' },
-  { label: '已生效', value: 'active' },
-  { label: '待生效', value: 'pending' },
-  { label: '已过期', value: 'expired' },
+  { label: '收入', value: 'in' },
+  { label: '支出', value: 'out' },
 ]
 
-const flowTypeLabelMap: Record<PointRecordType, string> = {
+const txnTypeLabelMap: Record<string, string> = {
   recharge: '充值积分',
-  consume: '消费积分',
-  gift: '活动积分',
+  estimate: '预估冻结',
+  freeze: '冻结积分',
+  settle: '结算扣减',
   refund: '失败退回',
+  adjust: '人工调整',
 }
 
-const sourceMap: Record<PointRecordType, string> = {
-  recharge: '积分充值',
-  consume: '车辆保养服务',
-  gift: '五一积分加倍活动',
+const txnSourceMap: Record<string, string> = {
+  recharge: '充值产品到账',
+  estimate: '生成任务预估',
+  freeze: '生成任务冻结',
+  settle: '生成任务结算',
   refund: '失败任务退回',
+  adjust: '账户调整',
 }
 
-function parseRecordTime(value: string) {
-  const time = new Date(value.replace(/-/g, '/')).getTime()
+function parseTime(value: string) {
+  const normalized = value.includes('T') ? value : value.replace(/-/g, '/')
+  const time = new Date(normalized).getTime()
   return Number.isFinite(time) ? time : 0
 }
 
-function getStatus(record: PointRecord): StatusFilter {
-  if (record.type === 'gift' && record.amount <= 200) return 'pending'
-  if (record.type === 'consume' && Math.abs(record.amount) >= 300) return 'expired'
-  return 'active'
+function deriveStatus(points: number): StatusFilter {
+  return points >= 0 ? 'in' : 'out'
 }
 
-function getValidUntil(record: PointRecord) {
-  if (record.type === 'consume') return '-'
-
-  const createdAt = parseRecordTime(record.createdAt)
-  if (!createdAt) return '-'
-
-  const validDate = new Date(createdAt)
-  validDate.setFullYear(validDate.getFullYear() + 1)
-  return validDate.toISOString().slice(0, 10)
+function buildDisplayRow(txn: CreditsTransaction): CreditsDisplayRow {
+  return {
+    id: txn.id,
+    createdAt: txn.createdAt,
+    txnType: txn.txnType,
+    txnTypeLabel: txnTypeLabelMap[txn.txnType] ?? txn.txnType,
+    points: txn.points,
+    pointsText: formatSignedAmount(txn.points),
+    status: deriveStatus(txn.points),
+    source: txn.remark || txnSourceMap[txn.txnType] || txn.bizType || '-',
+    balanceAfter: txn.balanceAfter,
+  }
 }
 
-const displayRecords = computed<PointDisplayRecord[]>(() =>
-  pointsStore.records.map((record) => ({
-    ...record,
-    status: getStatus(record),
-    source: record.remark || sourceMap[record.type],
-    validUntil: getValidUntil(record),
-  })),
+const displayRecords = computed<CreditsDisplayRow[]>(() =>
+  creditsStore.transactions.map(buildDisplayRow),
 )
 
 const filteredRecords = computed(() => {
-  const now = new Date('2026-06-01T00:00:00').getTime()
+  const now = Date.now()
   const thirtyDays = 30 * 24 * 60 * 60 * 1000
   const threeMonths = 92 * 24 * 60 * 60 * 1000
 
   return displayRecords.value.filter((record) => {
-    const matchType = selectedFlowType.value === 'all' || record.type === selectedFlowType.value
+    const matchType = selectedFlowType.value === 'all' || record.txnType === selectedFlowType.value
     const matchStatus = selectedStatus.value === 'all' || record.status === selectedStatus.value
-    const recordTime = parseRecordTime(record.createdAt)
+    const recordTime = parseTime(record.createdAt)
     const matchTime =
       timeFilter.value === 'all' ||
       (timeFilter.value === 'recent-30-days' && now - recordTime <= thirtyDays) ||
       (timeFilter.value === 'recent-3-months' && now - recordTime <= threeMonths) ||
-      (timeFilter.value === 'this-month' && record.createdAt.startsWith('2026-06'))
+      (timeFilter.value === 'this-month' && record.createdAt.startsWith(new Date().toISOString().slice(0, 7)))
 
     return matchType && matchStatus && matchTime
   })
 })
 
-const availablePoints = computed(() => pointsStore.summary.currentPoints)
-const pendingPoints = computed(() =>
+const pagedRecords = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredRecords.value.slice(start, start + pageSize)
+})
+
+const availablePoints = computed(() => creditsStore.availableBalance)
+const lockedPoints = computed(() => creditsStore.lockedBalance)
+
+const monthDelta = computed(() => {
+  const month = new Date().toISOString().slice(0, 7)
+  return displayRecords.value
+    .filter((record) => record.createdAt.startsWith(month))
+    .reduce((total, record) => total + record.points, 0)
+})
+
+const refundPoints = computed(() =>
   displayRecords.value
-    .filter((record) => record.status === 'pending' && record.amount > 0)
-    .reduce((total, record) => total + record.amount, 0),
-)
-const monthDelta = computed(() =>
-  displayRecords.value
-    .filter((record) => record.createdAt.startsWith('2026-05'))
-    .reduce((total, record) => total + record.amount, 0),
-)
-const expiringPoints = computed(() =>
-  displayRecords.value
-    .filter((record) => record.status !== 'expired' && record.amount > 0)
-    .slice(0, 2)
-    .reduce((total, record) => total + Math.min(record.amount, 150), 0),
+    .filter((record) => record.txnType === 'refund' && record.points > 0)
+    .reduce((total, record) => total + record.points, 0),
 )
 
 const statCards = computed(() => [
@@ -145,80 +159,92 @@ const statCards = computed(() => [
     label: '可用积分',
     value: availablePoints.value.toLocaleString('zh-CN'),
     suffix: '积分',
-    desc: '可用于兑换各类商品和服务',
+    desc: '可用于单图生成、批量任务等',
     icon: 'mdi:database',
   },
   {
-    label: '待生效积分',
-    value: pendingPoints.value.toLocaleString('zh-CN'),
+    label: '冻结中积分',
+    value: lockedPoints.value.toLocaleString('zh-CN'),
     suffix: '积分',
-    desc: '将在次月1日生效',
+    desc: '生成任务预估冻结额度',
     icon: 'mdi:credit-card-clock-outline',
   },
   {
     label: '本月积分变动',
     value: formatSignedAmount(monthDelta.value),
     suffix: '积分',
-    desc: '较上月同期 ↑ 12.5%',
+    desc: '收入与支出净额',
     icon: 'mdi:calendar-month-outline',
   },
   {
-    label: '积分将于30天内过期',
-    value: expiringPoints.value.toLocaleString('zh-CN'),
+    label: '本期失败退回积分',
+    value: refundPoints.value.toLocaleString('zh-CN'),
     suffix: '积分',
-    desc: '过期时间：2025-06-15',
-    icon: 'mdi:timer-sand',
+    desc: '生成任务失败自动退回',
+    icon: 'mdi:cash-refund',
   },
 ])
 
 function formatSignedAmount(amount: number) {
+  if (!Number.isFinite(amount)) return '0'
   return `${amount > 0 ? '+' : ''}${amount.toLocaleString('zh-CN')}`
 }
 
 function formatStatus(status: StatusFilter) {
-  if (status === 'pending') return '待生效'
-  if (status === 'expired') return '已过期'
-  return '已生效'
+  if (status === 'in') return '收入'
+  if (status === 'out') return '支出'
+  return '全部'
+}
+
+function formatCreatedAt(value: string) {
+  const time = parseTime(value)
+  if (!time) return value
+  const d = new Date(time)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 watch([timeFilter, selectedFlowType, selectedStatus], () => {
-  // Data is filtered reactively. This watcher keeps future server-side query wiring explicit.
+  currentPage.value = 1
 })
 
-const flowColumns: DataTableColumns<PointDisplayRecord> = [
+const flowColumns: DataTableColumns<CreditsDisplayRow> = [
   {
     title: '时间',
     key: 'createdAt',
-    width: 220,
+    width: 200,
+    render(row) {
+      return formatCreatedAt(row.createdAt)
+    },
   },
   {
     title: '积分类型',
-    key: 'type',
-    width: 160,
+    key: 'txnType',
+    width: 150,
     render(row) {
-      return flowTypeLabelMap[row.type]
+      return row.txnTypeLabel
     },
   },
   {
     title: '积分变动',
-    key: 'amount',
-    width: 150,
+    key: 'points',
+    width: 140,
     render(row) {
       return h(
         'span',
-        { class: ['points-delta', row.amount > 0 ? 'is-up' : 'is-down'] },
-        formatSignedAmount(row.amount),
+        { class: ['points-delta', row.points > 0 ? 'is-up' : 'is-down'] },
+        row.pointsText,
       )
     },
   },
   {
-    title: '状态',
+    title: '方向',
     key: 'status',
-    width: 150,
+    width: 120,
     render(row) {
       return h(
         'span',
-        { class: ['points-status', `is-${row.status}`] },
+        { class: ['points-status', `is-${row.status === 'in' ? 'active' : 'expired'}`] },
         [
           h('i', { class: 'points-status-dot', 'aria-hidden': 'true' }),
           h('span', formatStatus(row.status)),
@@ -233,9 +259,12 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
     ellipsis: { tooltip: true },
   },
   {
-    title: '有效期',
-    key: 'validUntil',
-    width: 180,
+    title: '当前余额',
+    key: 'balanceAfter',
+    width: 150,
+    render(row) {
+      return row.balanceAfter == null ? '-' : Number(row.balanceAfter).toLocaleString('zh-CN')
+    },
   },
 ]
 </script>
@@ -304,7 +333,7 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
           <NDataTable
             class="points-data-table"
             :columns="flowColumns"
-            :data="filteredRecords"
+            :data="pagedRecords"
             :bordered="false"
             :single-line="false"
             :pagination="false"
@@ -312,6 +341,16 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
             :scroll-x="1080"
           />
         </div>
+
+        <footer class="points-table-footer">
+          <p>共 {{ filteredRecords.length }} 条记录</p>
+          <NPagination
+            v-model:page="currentPage"
+            class="points-pagination"
+            :page-size="pageSize"
+            :item-count="filteredRecords.length"
+          />
+        </footer>
       </section>
     </section>
   </main>
@@ -322,6 +361,9 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   --points-gold: #d7ad32;
   --points-gold-strong: #f2cf56;
   --points-bg: #050505;
+  --points-bg-image: var(--points-night-image);
+  --points-bg-position: right top;
+  --points-bg-size: cover;
   --points-panel: rgba(27, 28, 28, 0.9);
   --points-panel-strong: rgba(16, 17, 17, 0.9);
   --points-border: rgba(255, 255, 255, 0.1);
@@ -335,7 +377,8 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
 
   position: relative;
   min-height: calc(100dvh - var(--app-header-offset));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--points-bg);
   color: var(--points-text);
 }
@@ -349,6 +392,14 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
 
 .points-page.theme-light {
   --points-bg: #f6f9fc;
+  --points-bg-image:
+    linear-gradient(rgba(47, 107, 255, 0.075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 107, 255, 0.075) 1px, transparent 1px),
+    radial-gradient(circle at 72% 18%, rgba(47, 107, 255, 0.18), transparent 34%),
+    radial-gradient(circle at 28% 42%, rgba(125, 181, 255, 0.16), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 46%, #eaf2ff 100%);
+  --points-bg-position: center top, center top, center top, center top, center top;
+  --points-bg-size: 44px 44px, 44px 44px, cover, cover, cover;
   --points-panel: rgba(255, 255, 255, 0.9);
   --points-panel-strong: rgba(248, 250, 252, 0.94);
   --points-border: rgba(15, 23, 42, 0.1);
@@ -366,12 +417,12 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   bottom: 0;
   left: 50%;
   z-index: 0;
-  width: min(100%, 2400px);
+  width: min(100%, 2200px);
   background-color: var(--points-bg);
-  background-image: var(--points-hero-image);
-  background-position: center top;
+  background-image: var(--points-bg-image);
+  background-position: var(--points-bg-position);
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: var(--points-bg-size);
   transform: translateX(-50%);
 }
 
@@ -380,20 +431,20 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   inset: 0;
   content: "";
   background:
-    linear-gradient(90deg, rgba(5, 5, 5, 0.94) 0%, rgba(5, 5, 5, 0.72) 38%, rgba(5, 5, 5, 0.45) 72%, rgba(5, 5, 5, 0.82) 100%),
-    linear-gradient(180deg, rgba(5, 5, 5, 0.16) 0%, rgba(5, 5, 5, 0.72) 55%, #050505 100%);
+    linear-gradient(90deg, rgba(5, 5, 5, 0.82) 0%, rgba(5, 5, 5, 0.52) 38%, rgba(5, 5, 5, 0.16) 72%, rgba(5, 5, 5, 0.46) 100%),
+    linear-gradient(180deg, rgba(5, 5, 5, 0.02) 0%, rgba(5, 5, 5, 0.46) 58%, #050505 100%);
 }
 
 .theme-light .points-bg::after {
   background:
-    linear-gradient(90deg, rgba(246, 249, 252, 0.94) 0%, rgba(246, 249, 252, 0.72) 46%, rgba(246, 249, 252, 0.44) 78%, rgba(246, 249, 252, 0.78) 100%),
-    linear-gradient(180deg, rgba(246, 249, 252, 0.2) 0%, rgba(246, 249, 252, 0.82) 62%, #f6f9fc 100%);
+    linear-gradient(90deg, rgba(246, 249, 252, 0.88) 0%, rgba(246, 249, 252, 0.58) 44%, rgba(246, 249, 252, 0.32) 78%, rgba(246, 249, 252, 0.7) 100%),
+    linear-gradient(180deg, rgba(246, 249, 252, 0.06) 0%, rgba(246, 249, 252, 0.74) 62%, #f6f9fc 100%);
 }
 
 .points-shell {
   position: relative;
   z-index: 1;
-  width: min(2400px, 100%);
+  width: min(2200px, 100%);
   min-height: calc(100dvh - var(--app-header-offset));
   margin: 0 auto;
   padding: clamp(84px, 10vh, 116px) clamp(80px, 10vw, 320px) clamp(70px, 8vh, 104px);
@@ -598,7 +649,8 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
 }
 
 .points-table-wrap {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--points-border);
   border-radius: 8px;
   background: rgba(15, 16, 16, 0.86);
@@ -643,6 +695,51 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   height: 72px;
   padding: 0 34px;
   font-weight: 800;
+}
+
+.points-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.points-table-footer p {
+  margin: 0;
+  color: var(--points-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.points-pagination {
+  --n-item-size: 32px;
+  --n-item-border-radius: 6px;
+  --n-item-color: rgba(15, 16, 16, 0.76);
+  --n-item-color-hover: rgba(215, 173, 50, 0.1);
+  --n-item-color-active: rgba(215, 173, 50, 0.16);
+  --n-item-color-active-hover: rgba(215, 173, 50, 0.22);
+  --n-item-border: 1px solid var(--points-border);
+  --n-item-border-hover: 1px solid rgba(215, 173, 50, 0.34);
+  --n-item-border-active: 1px solid rgba(215, 173, 50, 0.54);
+  --n-item-text-color: var(--points-text-muted);
+  --n-item-text-color-hover: var(--points-text);
+  --n-item-text-color-active: var(--points-gold-strong);
+  --n-button-color: rgba(15, 16, 16, 0.76);
+  --n-button-color-hover: rgba(215, 173, 50, 0.1);
+  --n-button-border: 1px solid var(--points-border);
+  --n-button-border-hover: 1px solid rgba(215, 173, 50, 0.34);
+  --n-button-icon-color: var(--points-text-muted);
+  --n-button-icon-color-hover: var(--points-text);
+}
+
+.theme-light .points-pagination {
+  --n-item-color: rgba(255, 255, 255, 0.9);
+  --n-item-color-hover: rgba(47, 107, 255, 0.08);
+  --n-item-color-active: rgba(47, 107, 255, 0.12);
+  --n-item-color-active-hover: rgba(47, 107, 255, 0.16);
+  --n-button-color: rgba(255, 255, 255, 0.9);
+  --n-button-color-hover: rgba(47, 107, 255, 0.08);
 }
 
 .points-data-table :deep(.points-delta) {
@@ -707,6 +804,7 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   .points-shell {
     width: min(100% - 24px, 720px);
     padding-top: 54px;
+    padding-bottom: 56px;
   }
 
   .points-filter {
@@ -726,6 +824,11 @@ const flowColumns: DataTableColumns<PointDisplayRecord> = [
   .points-data-table :deep(.n-data-table-th),
   .points-data-table :deep(.n-data-table-td) {
     padding: 0 18px;
+  }
+
+  .points-table-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

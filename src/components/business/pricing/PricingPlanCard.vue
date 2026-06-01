@@ -106,6 +106,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-card-border: rgba(255, 255, 255, 0.08);
   --plan-card-text: #f8fafc;
   --plan-card-muted: rgba(248, 250, 252, 0.72);
+  --plan-benefit-text: var(--plan-card-text);
   --plan-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   --plan-selected-ring: transparent;
   --plan-divider: rgba(255, 255, 255, 0.18);
@@ -116,12 +117,14 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-action-solid-bg: linear-gradient(180deg, #f5cf65, #f1c646);
   --plan-action-solid-text: #241700;
   --plan-action-solid-shadow: 0 12px 28px color-mix(in srgb, var(--plan-accent) 28%, transparent);
+  --plan-badge-bg: var(--plan-accent);
+  --plan-badge-text: #241700;
 
   box-sizing: border-box;
   position: relative;
   display: flex;
   width: 100%;
-  aspect-ratio: 406 / 505;
+  min-height: calc(100cqw * 505 / 406);
   min-width: 0;
   flex-direction: column;
   padding: clamp(22px, 7.8cqw, 54px);
@@ -168,55 +171,55 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 }
 
 :global(.theme-light) .pricing-plan-card {
-  --plan-card-bg: rgba(255, 255, 255, 0.94);
+  --plan-card-bg: #ffffff;
   --plan-card-border: #e2e8f0;
-  --plan-card-text: #0f172a;
+  --plan-card-text: #172033;
   --plan-card-muted: #64748b;
-  --plan-card-shadow: 0 14px 40px rgba(78, 111, 148, 0.12);
+  --plan-benefit-text: #334155;
+  --plan-card-shadow: 0 12px 28px rgba(78, 111, 148, 0.1);
   --plan-divider: #e2e8f0;
-  --plan-action-border: #cbd5e1;
-  --plan-action-text: #0f172a;
-  --plan-action-hover-border: #94a3b8;
-  --plan-action-hover-text: #0f172a;
+  --plan-action-border: #d8e2f0;
+  --plan-action-text: #172033;
+  --plan-action-hover-border: color-mix(in srgb, var(--plan-accent) 42%, #d8e2f0);
+  --plan-action-hover-text: var(--plan-accent);
+  --plan-badge-bg: color-mix(in srgb, var(--plan-accent) 12%, #ffffff);
+  --plan-badge-text: var(--plan-accent);
+
+  backdrop-filter: none;
 }
 
 :global(.theme-light) .pricing-plan-card.is-blue {
   --plan-accent: #2f6bff;
-  --plan-card-bg: rgba(255, 255, 255, 0.96);
+  --plan-card-bg: #ffffff;
   --plan-card-border: #dbeafe;
-  --plan-card-shadow: 0 12px 36px rgba(47, 107, 255, 0.1);
+  --plan-card-shadow: 0 12px 28px rgba(47, 107, 255, 0.08);
 }
 
 :global(.theme-light) .pricing-plan-card.is-orange {
   --plan-accent: #2f6bff;
-  --plan-card-bg: linear-gradient(
-    180deg,
-    rgba(237, 244, 255, 0.98) 0%,
-    rgba(255, 255, 255, 0.96) 100%
-  );
+  --plan-card-bg: #ffffff;
   --plan-card-border: rgba(47, 107, 255, 0.28);
-  --plan-card-shadow: 0 18px 48px rgba(47, 107, 255, 0.14);
-  --plan-action-solid-bg: linear-gradient(180deg, #4f7fff, #2f6bff);
+  --plan-card-shadow: 0 14px 34px rgba(47, 107, 255, 0.1);
+  --plan-action-solid-bg: #2f6bff;
   --plan-action-solid-text: #ffffff;
-  --plan-action-solid-shadow: 0 12px 28px rgba(47, 107, 255, 0.28);
+  --plan-action-solid-shadow: 0 10px 22px rgba(47, 107, 255, 0.22);
+  --plan-badge-bg: #edf4ff;
+  --plan-badge-text: #1d4ed8;
 }
 
 :global(.theme-light) .pricing-plan-card.is-green {
   --plan-accent: #d4a017;
-  --plan-card-bg: linear-gradient(
-    180deg,
-    rgba(255, 251, 235, 0.96) 0%,
-    rgba(255, 255, 255, 0.96) 100%
-  );
+  --plan-card-bg: #ffffff;
   --plan-card-border: rgba(212, 160, 23, 0.28);
-  --plan-card-shadow: 0 14px 42px rgba(212, 160, 23, 0.12);
+  --plan-card-shadow: 0 12px 30px rgba(212, 160, 23, 0.1);
   --plan-action-border: rgba(212, 160, 23, 0.42);
   --plan-action-hover-border: rgba(212, 160, 23, 0.62);
   --plan-action-hover-text: #92400e;
+  --plan-badge-bg: #fff7e6;
+  --plan-badge-text: #9a6a00;
 }
 
 .pricing-plan-card.is-featured {
-  aspect-ratio: 406 / 505;
   border-color: rgba(255, 255, 255, 0.12);
   background:
     linear-gradient(
@@ -231,20 +234,16 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
 :global(.theme-light) .pricing-plan-card.is-featured {
   border-color: rgba(47, 107, 255, 0.32);
-  background:
-    linear-gradient(
-      180deg,
-      rgba(237, 244, 255, 0.98) 0%,
-      rgba(255, 255, 255, 0.96) 100%
-    );
+  background: #ffffff;
   box-shadow:
-    0 18px 48px rgba(47, 107, 255, 0.14),
+    0 16px 38px rgba(47, 107, 255, 0.12),
     0 0 0 1px rgba(47, 107, 255, 0.08);
 }
 
 .pricing-plan-card.is-selected {
   --plan-selected-ring: color-mix(in srgb, var(--plan-accent) 86%, transparent);
 
+  min-height: calc((100cqw * 505 / 406) + 20px);
   transform: translateY(-8px);
   border-color: color-mix(in srgb, var(--plan-accent) 84%, transparent);
   box-shadow:
@@ -255,10 +254,10 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 }
 
 :global(.theme-light) .pricing-plan-card.is-selected {
+  background: #ffffff;
   box-shadow:
-    0 24px 56px rgba(78, 111, 148, 0.16),
-    0 0 0 2px color-mix(in srgb, var(--plan-accent) 52%, transparent),
-    0 0 32px color-mix(in srgb, var(--plan-accent) 16%, transparent);
+    0 18px 44px rgba(78, 111, 148, 0.14),
+    0 0 0 2px color-mix(in srgb, var(--plan-accent) 46%, transparent);
 }
 
 .pricing-plan-card.is-featured.is-selected {
@@ -273,13 +272,25 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
 :global(.theme-light) .pricing-plan-card.is-featured.is-selected {
   box-shadow:
-    0 28px 64px rgba(47, 107, 255, 0.18),
-    0 0 0 2px rgba(47, 107, 255, 0.42),
-    0 0 36px rgba(47, 107, 255, 0.14);
+    0 20px 48px rgba(47, 107, 255, 0.16),
+    0 0 0 2px rgba(47, 107, 255, 0.42);
 }
 
 .pricing-plan-card.is-selected::before,
 .pricing-plan-card.is-selected::after {
+  opacity: 1;
+}
+
+:global(.theme-light) .pricing-plan-card::after {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--plan-accent) 5%, transparent),
+      transparent 42%
+    );
+}
+
+:global(.theme-light) .pricing-plan-card.is-selected::after {
   opacity: 1;
 }
 
@@ -316,8 +327,8 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   z-index: 3;
   padding: clamp(6px, 1.9cqw, 11px) clamp(12px, 3.4cqw, 20px);
   border-radius: 999px;
-  background: var(--plan-accent);
-  color: #241700;
+  background: var(--plan-badge-bg);
+  color: var(--plan-badge-text);
   font-size: clamp(12px, 2.9cqw, 17px);
   font-weight: 800;
 }
@@ -385,7 +396,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   display: flex;
   align-items: flex-start;
   gap: clamp(8px, 2.4cqw, 14px);
-  color: var(--plan-card-text);
+  color: var(--plan-benefit-text);
   font-size: clamp(13px, 4.1cqw, 24px);
   font-weight: 600;
   line-height: 1.4;

@@ -7,6 +7,18 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
+import outdoorScene1 from '@/assets/img/户外场景/场景/图1.png'
+import outdoorScene2 from '@/assets/img/户外场景/场景/图2.png'
+import outdoorScene3 from '@/assets/img/户外场景/场景/图3.png'
+import outdoorScene4 from '@/assets/img/户外场景/场景/图4.png'
+import outdoorTutorial1 from '@/assets/img/户外场景/教程/教程1.png'
+import outdoorTutorial2 from '@/assets/img/户外场景/教程/教程2.png'
+import outdoorTutorial3 from '@/assets/img/户外场景/教程/教程3.png'
+import outdoorTutorial4 from '@/assets/img/户外场景/教程/教程4.png'
+import roadMotionScene1 from '@/assets/img/道路动态/场景选择/道路动态1.png'
+import roadMotionScene2 from '@/assets/img/道路动态/场景选择/道路动态2.png'
+import roadMotionScene3 from '@/assets/img/道路动态/场景选择/道路动态3.png'
+import roadMotionScene4 from '@/assets/img/道路动态/场景选择/道路动态4.png'
 import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
 import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
 import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
@@ -58,49 +70,17 @@ const showroomOptions = createOptions([
 ])
 
 const outdoorOptions = createOptions([
-  [
-    'tree-park',
-    '林荫公园',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'mountain-lake',
-    '山野湖畔',
-    'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'city-block',
-    '城市街区',
-    'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'coast-daylight',
-    '海边日光',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['tree-park', '林荫公园', outdoorScene1],
+  ['mountain-lake', '山野湖畔', outdoorScene2],
+  ['city-block', '城市街区', outdoorScene3],
+  ['coast-daylight', '海边日光', outdoorScene4],
 ])
 
 const roadOptions = createOptions([
-  [
-    'urban-road',
-    '城市公路',
-    'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'bridge-motion',
-    '高架动态',
-    'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'night-road',
-    '夜景车流',
-    'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'highway',
-    '高速行驶',
-    'https://images.unsplash.com/photo-1533106418989-88406c7cc8ca?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['urban-road', '道路动态1', roadMotionScene1],
+  ['bridge-motion', '道路动态2', roadMotionScene2],
+  ['night-road', '道路动态3', roadMotionScene3],
+  ['highway', '道路动态4', roadMotionScene4],
 ])
 
 const skyOptions = createOptions([
@@ -575,8 +555,37 @@ const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   },
 ]
 
+const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  {
+    title: '林荫公园',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'tree-park',
+    image: outdoorTutorial1,
+  },
+  {
+    title: '山野湖畔',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'mountain-lake',
+    image: outdoorTutorial2,
+  },
+  {
+    title: '城市街区',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'city-block',
+    image: outdoorTutorial3,
+  },
+  {
+    title: '海边日光',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'coast-daylight',
+    image: outdoorTutorial4,
+  },
+]
+
 export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   ...showroomTemplateRecommendations,
+  ...outdoorTemplateRecommendations,
+  ...toTemplateRecommendations('road-motion', roadOptions),
   ...toTemplateRecommendations('sky-studio', skyOptions),
 ]
 

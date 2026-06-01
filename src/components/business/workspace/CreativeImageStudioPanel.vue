@@ -56,6 +56,11 @@ const threadScrollRef = ref<HTMLElement | null>(null)
 const sidebarCollapsed = ref(false)
 const previewModalVisible = ref(false)
 const previewImageUrl = ref('')
+const editingReference = ref<{
+  prompt: string
+  taskId?: string | null
+  resultUrl: string
+} | null>(null)
 
 const activeRatio = computed(
   () =>
@@ -164,7 +169,7 @@ function clearPendingReferencePreview() {
 }
 
 const referencePreview = computed(
-  () => props.referenceAsset?.url ?? pendingReferencePreview.value,
+  () => editingReference.value?.resultUrl ?? props.referenceAsset?.url ?? pendingReferencePreview.value,
 )
 
 const isReferenceUploading = computed(
@@ -202,6 +207,7 @@ watch(
     prompt.value = ''
     lastSubmittedPrompt.value = ''
     pendingTurns.value = []
+    editingReference.value = null
     threadScrollRef.value?.scrollTo({ top: 0 })
   },
 )
@@ -256,16 +262,18 @@ function handleSubmit() {
 
   lastSubmittedPrompt.value = text
   prompt.value = ''
-  const chain = findChainSource()
+  const editSource = editingReference.value
+  const chain = editSource ? null : findChainSource()
+  editingReference.value = null
   pushPendingTurn(text)
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
     resolution: '2K',
-    referenceAssetId: chain ? undefined : props.referenceAsset?.assetId,
-    useLastReference: chain ? false : Boolean(props.referenceAsset?.assetId),
-    sourceTaskId: chain?.taskId ?? undefined,
-    sourceImageUrl: chain?.resultUrl ?? undefined,
+    referenceAssetId: chain || editSource ? undefined : props.referenceAsset?.assetId,
+    useLastReference: chain || editSource ? false : Boolean(props.referenceAsset?.assetId),
+    sourceTaskId: editSource?.taskId ?? chain?.taskId ?? undefined,
+    sourceImageUrl: editSource?.resultUrl ?? chain?.resultUrl ?? undefined,
   })
 }
 
@@ -286,6 +294,19 @@ function handleRegenerateTurn(turn: CreativeThreadTurn) {
     sourceTaskId: chain?.taskId ?? undefined,
     sourceImageUrl: chain?.resultUrl ?? undefined,
   })
+}
+
+function handleEditTurn(turn: CreativeThreadTurn) {
+  const text = turn.prompt.trim()
+  if (!text || !turn.resultUrl || props.isGenerating || pendingTurns.value.length > 0) return
+
+  clearPendingReferencePreview()
+  editingReference.value = {
+    prompt: text,
+    taskId: turn.taskId,
+    resultUrl: turn.resultUrl,
+  }
+  prompt.value = text
 }
 
 function resolveTurnRatioLabel(turn: CreativeThreadTurn) {
@@ -318,6 +339,7 @@ function handleReferenceSelected(event: Event) {
   input.value = ''
   if (!file) return
 
+  editingReference.value = null
   clearPendingReferencePreview()
   const objectUrl = URL.createObjectURL(file)
   pendingReferenceObjectUrl.value = objectUrl
@@ -327,6 +349,11 @@ function handleReferenceSelected(event: Event) {
 }
 
 function handleRemoveReference() {
+  if (editingReference.value) {
+    editingReference.value = null
+    return
+  }
+
   clearPendingReferencePreview()
   emit('removeReference')
 }
@@ -520,6 +547,14 @@ function toggleSidebar() {
                 </button>
                 <button
                   type="button"
+                  :disabled="!turn.resultUrl || props.isGenerating || pendingTurns.length > 0"
+                  @click="handleEditTurn(turn)"
+                >
+                  <Icon icon="mdi:image-edit-outline" />
+                  重新编辑
+                </button>
+                <button
+                  type="button"
                   :disabled="!turn.resultUrl"
                   @click="handleDownloadResult(turn.resultUrl)"
                 >
@@ -581,6 +616,9 @@ function toggleSidebar() {
               aria-hidden="true"
             >
               <span class="creative-attachment-spinner"></span>
+            </span>
+            <span v-else-if="editingReference" class="creative-attachment-badge">
+              待编辑
             </span>
             <button
               type="button"
@@ -1213,6 +1251,7 @@ function toggleSidebar() {
 }
 
 .creative-result-actions {
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 24px;
 }
@@ -1228,6 +1267,11 @@ function toggleSidebar() {
   padding: 0 16px;
   font-size: 14px;
   font-weight: 800;
+}
+
+.creative-result-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .creative-composer {
@@ -1400,6 +1444,20 @@ function toggleSidebar() {
   border-top-color: #fff;
   border-radius: 999px;
   animation: creative-spin 0.9s linear infinite;
+}
+
+.creative-attachment-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--creative-composer-bg) 82%, var(--creative-accent));
+  color: var(--creative-text);
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  box-shadow: 0 0 0 1px var(--creative-line);
 }
 
 .creative-attachment-remove {

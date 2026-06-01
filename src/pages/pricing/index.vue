@@ -138,6 +138,14 @@ function handlePlanSelect(name: string) {
   color: var(--pricing-hero-text);
 }
 
+.pricing-page.theme-light .pricing-bg {
+  background-image: none;
+}
+
+.pricing-page.theme-light .pricing-bg::after {
+  background: none;
+}
+
 .pricing-bg {
   position: fixed;
   inset: 0;

@@ -74,7 +74,9 @@ const optionRows = computed(() => {
                   decoding="async"
                   :draggable="false"
                 />
-                <strong class="option-item-title">{{ option.title }}</strong>
+                <div class="option-item-caption">
+                  <strong class="option-item-title">{{ option.title }}</strong>
+                </div>
               </article>
             </div>
           </div>
@@ -148,8 +150,10 @@ const optionRows = computed(() => {
 }
 
 .option-item {
+  position: relative;
   flex: 0 0 auto;
   width: calc((100cqw - var(--option-gap) * 2) / var(--option-visible));
+  aspect-ratio: 4 / 3;
   scroll-snap-align: start;
   overflow: hidden;
   border: 2px solid color-mix(in srgb, var(--workspace-line, var(--app-border)) 88%, transparent);
@@ -165,12 +169,10 @@ const optionRows = computed(() => {
 
 .option-item:hover {
   transform: translateY(-2px);
-  background: var(--workspace-hover-bg, var(--app-surface-soft));
 }
 
 .option-item.is-active {
   border-color: var(--workspace-accent, #2f6bff);
-  background: var(--workspace-accent-bg, var(--app-surface-soft));
   box-shadow:
     0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
     0 10px 24px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
@@ -182,24 +184,46 @@ const optionRows = computed(() => {
 }
 
 .option-item-cover {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  height: clamp(96px, 10vw, 124px);
+  height: 100%;
+  pointer-events: none;
+}
+
+.option-item-cover :deep(.preload-image),
+.option-item-cover :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.option-item-caption {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: grid;
+  min-height: 42%;
+  align-items: end;
+  padding: 28px 8px 10px;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.44) 54%, rgba(0, 0, 0, 0.7) 100%);
   pointer-events: none;
 }
 
 .option-item-title {
   display: block;
-  padding: 8px 6px;
-  color: var(--workspace-text-secondary, var(--app-text-soft));
+  color: #ffffff;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
-  line-height: 1.35;
+  line-height: 1.2;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
 }
 
 .option-item.is-active .option-item-title {
-  color: var(--workspace-accent, var(--app-text));
+  color: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {

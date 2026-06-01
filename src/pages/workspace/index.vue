@@ -1224,10 +1224,10 @@ onUnmounted(() => {
   --workspace-panel: #ffffff;
   --workspace-panel-soft: #f7fafd;
   --workspace-panel-deep: #f7fafd;
-  --workspace-line: #e8edf5;
-  --workspace-line-strong: #cfe0ff;
+  --workspace-line: #d6e0ed;
+  --workspace-line-strong: #aebfd5;
   --workspace-muted: #64748b;
-  --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
+  --workspace-shadow: 0 18px 42px rgba(78, 111, 148, 0.11);
 
   display: flex;
   height: 100%;
@@ -1253,6 +1253,7 @@ onUnmounted(() => {
 }
 
 .workspace-page.theme-light {
+  --app-border: #d6e0ed;
   --workspace-text: #172033;
   --workspace-text-secondary: #334155;
   --workspace-muted: #64748b;
@@ -1260,7 +1261,7 @@ onUnmounted(() => {
   --workspace-text-disabled: #cbd5e1;
   --workspace-accent: #2f6bff;
   --workspace-accent-strong: #2f6bff;
-  --workspace-accent-border: #cfe0ff;
+  --workspace-accent-border: #b8cdf4;
   --workspace-accent-bg: #f2f7ff;
   --workspace-accent-glow: rgba(47, 107, 255, 0.16);
   --workspace-accent-underline: #4f7fff;
@@ -1279,9 +1280,11 @@ onUnmounted(() => {
   --workspace-panel: #ffffff;
   --workspace-panel-soft: #f7fafd;
   --workspace-panel-deep: #f7fafd;
-  --workspace-line: #e8edf5;
-  --workspace-line-strong: #cfe0ff;
-  --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
+  --workspace-line: #d6e0ed;
+  --workspace-line-strong: #aebfd5;
+  --workspace-shadow:
+    0 0 0 1px rgba(174, 191, 213, 0.2),
+    0 18px 42px rgba(78, 111, 148, 0.11);
 
   color: var(--workspace-text);
 
@@ -1292,6 +1295,10 @@ onUnmounted(() => {
   border-color: var(--workspace-line);
   background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
+}
+
+.workspace-page.theme-light .workspace-shell {
+  background: #eef4fb;
 }
 
 .workspace-shell {

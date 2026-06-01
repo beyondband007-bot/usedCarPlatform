@@ -32,6 +32,7 @@ const cardClass = computed(() => [
 <template>
   <article
     :class="cardClass"
+    :style="{ '--plan-bg-image': `url('${plan.backgroundImage}')` }"
     role="button"
     tabindex="0"
     :aria-pressed="selected"
@@ -44,6 +45,8 @@ const cardClass = computed(() => [
     @pointerleave="emit('pointerleave')"
     @pointercancel="emit('pointercancel')"
   >
+    <span class="plan-bg-image" aria-hidden="true" />
+
     <div class="plan-corner">
       <span v-if="selected" class="plan-check" aria-hidden="true">
         <Icon icon="mdi:check-bold" class="plan-check-icon" />
@@ -101,13 +104,14 @@ const cardClass = computed(() => [
   --plan-ring: transparent;
   --plan-lift: 0px;
   --plan-shadow: var(--shadow-panel);
+  --plan-selected-height-extra: 0px;
 
   position: relative;
   display: flex;
   flex: 0 1 calc((100% - var(--plan-gap) * 2) / 3);
   width: 100%;
   min-width: 0;
-  min-height: clamp(430px, 39vh, 496px);
+  min-height: calc(clamp(430px, 39vh, 496px) + var(--plan-selected-height-extra));
   max-width: calc((100% - var(--plan-gap) * 2) / 3);
   overflow: hidden;
   border: 1px solid var(--plan-border);
@@ -192,6 +196,7 @@ const cardClass = computed(() => [
 .recharge-plan-card.is-selected {
   --plan-lift: -10px;
   --plan-ring: color-mix(in srgb, var(--plan-accent) 62%, transparent);
+  --plan-selected-height-extra: 20px;
   border-color: color-mix(in srgb, var(--plan-accent) 54%, var(--plan-border));
   box-shadow:
     0 22px 60px rgba(0, 0, 0, 0.36),
@@ -235,6 +240,26 @@ const cardClass = computed(() => [
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
+}
+
+.plan-bg-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(5, 5, 5, 0.34), rgba(5, 5, 5, 0.86)),
+    var(--plan-bg-image) center / cover no-repeat;
+  opacity: 0.2;
+  mix-blend-mode: screen;
+}
+
+:global([data-theme='light']) .plan-bg-image {
+  display: none;
+}
+
+:global([data-theme='dark']) .recharge-plan-card.is-selected .plan-bg-image {
+  opacity: 0.28;
 }
 
 .plan-check {
@@ -492,6 +517,7 @@ const cardClass = computed(() => [
 
   .recharge-plan-card.is-selected {
     --plan-lift: -6px;
+    --plan-selected-height-extra: 0px;
   }
 
   .recharge-plan-card.is-selected.is-featured {

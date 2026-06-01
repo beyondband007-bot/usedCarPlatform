@@ -9,6 +9,11 @@ import type {
 /** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
 export const studioGuestNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
+  {
+    path: '/workspace',
+    label: '视觉工作台',
+    workbenchEntry: true,
+  },
   { path: '/pricing', label: '企业套餐' },
   { path: '/login', label: '企业账号登录' },
 ]
@@ -16,21 +21,23 @@ export const studioGuestNavigation: NavItem[] = [
 /** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
-  { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   {
     path: '/workspace',
     label: '视觉工作台',
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
+  { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
+  { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   { path: '/login', label: '企业账号登录', icon: 'mdi:account-key-outline' },
 ]
 
-/** 登录后二级导航 */
+/** 旧版登录后二级导航配置，仅保留给历史组件引用 */
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/workspace', label: '视觉工作台' },
   { path: '/credits', label: '积分查询' },
+  { path: '/credits-admin', label: '积分后台' },
 ]
 
 export const homeFeatures: FeatureEntry[] = [

@@ -1,14 +1,17 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { motion } from "motion-v";
 import { useMessage } from "naive-ui";
 
 import {
   getRecentGenerationTasks,
   type RecentGenerationTask,
 } from "@/api/visual-workbench";
+import SceneTemplateRecommendations, {
+  type SceneTemplateRecommendationItem,
+} from "@/components/business/workspace/SceneTemplateRecommendations.vue";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
+import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTutorialGuide.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
@@ -32,11 +35,6 @@ import {
   isWorkspaceFeatureCompareCode,
   workspaceFeatureCompareMap,
 } from "@/constants/workspace-feature-compare";
-import tutorialUploadCarImage from "@/assets/img/展厅灯光/展厅模板/上传车图.png";
-import tutorialShowroomTemplate1 from "@/assets/img/展厅灯光/展厅模板/选择模板1.png";
-import tutorialShowroomTemplate2 from "@/assets/img/展厅灯光/展厅模板/选择模板2.png";
-import tutorialShowroomTemplate3 from "@/assets/img/展厅灯光/展厅模板/选择模板3.png";
-import tutorialResultImage from "@/assets/img/展厅灯光/展厅模板/生成效果.png";
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -44,7 +42,6 @@ import type {
   WorkspaceGenerateResult,
   WorkspaceImagePreview,
   WorkspaceRecentItem,
-  WorkspaceTemplateRecommendation,
 } from "@/types/workspace";
 
 const props = defineProps<{
@@ -79,10 +76,40 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   emit("pickRecent", item);
 }
 
-const templateCards = computed(() =>
+const templateDescriptionMap: Record<string, string> = {
+  经典白棚: "纯净背景·突出车身线条",
+  玻璃展厅: "通透空间·自然光影",
+  暗调奢华: "低调奢华·气质感",
+  柔光灯顶: "柔光均匀·减少硬阴影",
+  极简留白: "留白克制·主体更集中",
+  广角空间: "空间更开阔·适合展示全景",
+  林荫公园: "自然绿意·日常外景",
+  山野湖畔: "山野开阔·环境更自然",
+  城市街区: "城市质感·适合门店传播",
+  海边日光: "明亮通透·度假氛围",
+  道路动态1: "高速跟拍·突出速度感",
+  道路动态2: "城市动感·增强行驶氛围",
+  道路动态3: "夜景道路·强化光轨质感",
+  道路动态4: "山路弯道·突出操控感",
+  天空镜场: "镜面天空·反射质感更强",
+  夕阳车境: "暖色夕照·氛围更柔和",
+  天境无垠: "开阔天境·视野更通透",
+  云海展台: "云海展台·层次更丰富",
+  云境车场: "云境车场·场景更完整",
+  天空之境: "纯净天境·主体更突出",
+};
+
+const templateCards = computed<SceneTemplateRecommendationItem[]>(() =>
   workspaceTemplateRecommendations
     .filter((item) => item.capabilityCode === props.capability.code)
-    .slice(0, 4),
+    .slice(0, 4)
+    .map((item) => ({
+      id: item.optionId,
+      title: item.title,
+      image: item.image,
+      description:
+        templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景",
+    })),
 );
 
 const featureCompareActiveView = ref<"features" | "recent" | "generating">(
@@ -109,17 +136,10 @@ const activeFeatureCompareDrag = ref<{
   pointerId: number;
 } | null>(null);
 
-function isTemplateActive(item: WorkspaceTemplateRecommendation) {
-  return (
-    props.capability.code === item.capabilityCode &&
-    props.selectedOptionId === item.optionId
-  );
-}
-
-function handleTemplatePick(item: WorkspaceTemplateRecommendation) {
+function handleTemplatePick(item: SceneTemplateRecommendationItem) {
   emit("pickTemplate", {
-    capabilityCode: item.capabilityCode,
-    optionId: item.optionId,
+    capabilityCode: props.capability.code,
+    optionId: item.id,
   });
 }
 
@@ -235,63 +255,6 @@ const showTemplateRecommendations = computed(
     props.capability.kind !== "interior" &&
     props.capability.kind !== "batch",
 );
-
-const tutorialSteps = [
-  {
-    title: "上传车图",
-    icon: "mdi:cloud-upload-outline",
-  },
-  {
-    title: "选择展厅模板",
-    icon: "mdi:view-gallery-outline",
-  },
-  {
-    title: "选择 Logo",
-    icon: "mdi:badge-account-horizontal-outline",
-  },
-  {
-    title: "生成效果",
-    icon: "mdi:car-select",
-  },
-] as const;
-
-const tutorialShowroomMosaicImages = [
-  tutorialShowroomTemplate1,
-  tutorialShowroomTemplate2,
-  tutorialShowroomTemplate3,
-  tutorialUploadCarImage,
-] as const;
-
-const tutorialCards = computed(() => {
-  return tutorialSteps.map((step, index) => ({
-    ...step,
-    image:
-      index === 0
-        ? tutorialUploadCarImage
-        : index === 3
-          ? tutorialResultImage
-          : "",
-  }));
-});
-
-const tutorialTemplatePreviewImages = computed(() => [
-  ...tutorialShowroomMosaicImages,
-]);
-
-const templateDescriptionMap: Record<string, string> = {
-  经典白棚: "纯净背景·突出车身线条",
-  玻璃展厅: "通透空间·自然光影",
-  暗调奢华: "低调奢华·气质感",
-  柔光灯顶: "柔光均匀·减少硬阴影",
-  极简留白: "留白克制·主体更集中",
-  广角空间: "空间更开阔·适合展示全景",
-  天空镜场: "镜面天空·反射质感更强",
-  夕阳车境: "暖色夕照·氛围更柔和",
-  天境无垠: "开阔天境·视野更通透",
-  云海展台: "云海展台·层次更丰富",
-  云境车场: "云境车场·场景更完整",
-  天空之境: "纯净天境·主体更突出",
-};
 
 const requirementDescriptionMap: Record<string, string> = {
   车辆完整入镜: "建议四周留白，车辆完整不被切断。",
@@ -1210,110 +1173,18 @@ defineExpose({
             class="guide-layout"
             :class="{ 'is-compact-guide': !showTemplateRecommendations }"
           >
-            <section class="tutorial-section" aria-label="使用教程流程">
-              <div class="section-head">
-                <h2>使用教程</h2>
-              </div>
-              <div class="tutorial-flow">
-                <motion.article
-                  v-for="(step, index) in tutorialCards"
-                  :key="`${capability.code}-${step.title}`"
-                  :initial="{ opacity: 0, y: 14 }"
-                  :animate="{ opacity: 1, y: 0 }"
-                  :transition="{ duration: 0.32, delay: index * 0.04 }"
-                  class="tutorial-step"
-                  :class="`is-step-${index + 1}`"
-                >
-                  <div class="tutorial-placeholder">
-                    <template v-if="index === 1">
-                      <div class="tutorial-mosaic" aria-hidden="true">
-                        <PreloadImage
-                          v-for="(
-                            image, mosaicIndex
-                          ) in tutorialTemplatePreviewImages"
-                          :key="image"
-                          class="tutorial-mosaic-image"
-                          :class="`is-mosaic-${mosaicIndex + 1}`"
-                          :src="image"
-                          :alt="step.title"
-                          loading="lazy"
-                          :draggable="false"
-                          fit="contain"
-                        />
-                      </div>
-                    </template>
-                    <template v-else-if="index === 2">
-                      <div class="tutorial-logo-preview" aria-hidden="true">
-                        <span class="tutorial-logo-frame">
-                          <span>AI CAR STUDIO</span>
-                        </span>
-                      </div>
-                    </template>
-                    <PreloadImage
-                      v-else
-                      class="tutorial-image"
-                      :src="step.image"
-                      :alt="step.title"
-                      loading="lazy"
-                      :draggable="false"
-                      fit="contain"
-                    />
-                  </div>
-                  <footer class="tutorial-step-foot">
-                    <strong>{{ step.title }}</strong>
-                    <span class="tutorial-step-arrow" aria-hidden="true">
-                      <Icon
-                        :icon="
-                          index < tutorialCards.length - 1
-                            ? 'mdi:arrow-right'
-                            : 'mdi:check'
-                        "
-                      />
-                    </span>
-                  </footer>
-                </motion.article>
-              </div>
-            </section>
+            <WorkspaceTutorialGuide
+              :animation-key="capability.code"
+              :theme="appStore.isDarkMode ? 'dark' : 'light'"
+            />
 
-            <section
+            <SceneTemplateRecommendations
               v-if="showTemplateRecommendations"
-              class="template-section"
-              aria-label="模板推荐"
-            >
-              <h2>初次使用？试试这些</h2>
-              <div class="template-grid">
-                <article
-                  v-for="item in templateCards"
-                  :key="item.title"
-                  role="button"
-                  tabindex="0"
-                  class="template-card"
-                  :class="{ 'is-active': isTemplateActive(item) }"
-                  :aria-pressed="isTemplateActive(item)"
-                  :aria-label="`选择${item.title}场景`"
-                  @click="handleTemplatePick(item)"
-                  @keydown.enter.prevent="handleTemplatePick(item)"
-                  @keydown.space.prevent="handleTemplatePick(item)"
-                >
-                  <PreloadImage
-                    class="template-image"
-                    :src="item.image"
-                    :alt="item.title"
-                    loading="lazy"
-                    :draggable="false"
-                    fit="cover"
-                    object-position="center"
-                  />
-                  <div class="template-title">
-                    <strong>{{ item.title }}</strong>
-                    <span>{{
-                      templateDescriptionMap[item.title] ??
-                      "推荐的视觉工作台场景"
-                    }}</span>
-                  </div>
-                </article>
-              </div>
-            </section>
+              :items="templateCards"
+              :active-id="selectedOptionId"
+              :theme="appStore.isDarkMode ? 'dark' : 'light'"
+              @select="handleTemplatePick"
+            />
 
             <section class="requirement-section" aria-label="素材要求">
               <strong class="requirement-title">素材要求</strong>
@@ -2399,49 +2270,12 @@ defineExpose({
   box-shadow: var(--assist-shadow);
 }
 
-.tutorial-section,
-.template-section {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 18px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.tutorial-section {
-  overflow: hidden;
-  min-height: 0;
-  flex-shrink: 0;
-}
-
-.template-section {
-  --template-card-ratio: 1086 / 1448;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.assist-panel.theme-light .tutorial-section,
-.assist-panel.theme-light .template-section,
 .assist-panel.theme-light .requirement-section {
   border-color: rgba(203, 213, 225, 0.82);
   background: #ffffff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
-.tutorial-section h2,
-.template-section h2 {
-  margin: 0;
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.3;
-  font-weight: 900;
-}
-
-.assist-panel.theme-light .tutorial-section h2,
-.assist-panel.theme-light .template-section h2,
 .assist-panel.theme-light .requirement-title {
   color: #111827;
 }
@@ -2451,379 +2285,6 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.tutorial-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 16px;
-  min-height: 0;
-  margin-top: 16px;
-}
-
-.tutorial-step {
-  --tutorial-placeholder-margin: 10px;
-  --tutorial-image-ratio: 1672 / 941;
-
-  position: relative;
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  flex-direction: column;
-  overflow: hidden;
-  border: 0;
-  border-radius: 16px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.tutorial-step:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.assist-panel.theme-light .tutorial-step {
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-}
-
-.assist-panel.theme-light .tutorial-step:hover {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
-}
-
-.tutorial-step-arrow {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(212, 160, 23, 0.25);
-  border-radius: 999px;
-  background: rgba(212, 160, 23, 0.12);
-  color: #d4a017;
-  pointer-events: none;
-}
-
-.tutorial-step-arrow > .iconify {
-  font-size: 20px;
-}
-
-.tutorial-placeholder {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  margin: var(--tutorial-placeholder-margin) var(--tutorial-placeholder-margin)
-    0;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #111111;
-}
-
-.tutorial-step.is-step-1 .tutorial-placeholder,
-.tutorial-step.is-step-4 .tutorial-placeholder {
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-}
-
-.tutorial-step.is-step-2 .tutorial-placeholder {
-  align-items: flex-start;
-  justify-content: flex-start;
-}
-
-.tutorial-step.is-step-3 .tutorial-placeholder {
-  align-items: center;
-  justify-content: center;
-}
-
-.tutorial-step.is-step-3 .tutorial-logo-preview {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-}
-
-.tutorial-step.is-step-1 .tutorial-image,
-.tutorial-step.is-step-4 .tutorial-image {
-  width: 100%;
-  height: auto;
-  max-height: 100%;
-  aspect-ratio: var(--tutorial-image-ratio);
-  background: transparent;
-}
-
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: var(--tutorial-image-ratio);
-  background: transparent;
-}
-
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  padding: 0;
-}
-
-.tutorial-image :deep(.preload-image) {
-  width: 100%;
-  height: 100%;
-  background: transparent;
-}
-
-.tutorial-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 12px;
-}
-
-.tutorial-mosaic {
-  display: grid;
-  width: 100%;
-  height: auto;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, auto);
-  gap: 6px;
-  padding: 8px;
-  background: #111111;
-}
-
-.assist-panel.theme-light .tutorial-mosaic {
-  background: #f8fafc;
-}
-
-.tutorial-mosaic-image {
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: var(--tutorial-image-ratio);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  min-height: 0;
-}
-
-.tutorial-mosaic-image :deep(.preload-image) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: var(--tutorial-image-ratio);
-  background: transparent;
-}
-
-.tutorial-mosaic-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.tutorial-logo-preview {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  place-items: center;
-  padding: 10px;
-  background:
-    radial-gradient(
-      circle at 50% 48%,
-      rgba(212, 160, 23, 0.18),
-      transparent 44%
-    ),
-    linear-gradient(180deg, #f6f9fc, #ffffff);
-}
-
-.tutorial-logo-frame {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(92%, 180px);
-  height: 44px;
-  margin: 0 auto;
-  border: 2px solid #5e4110;
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(244, 202, 79, 0.16), transparent 45%), #171209;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 232, 139, 0.38),
-    0 10px 24px rgba(0, 0, 0, 0.24);
-}
-
-.tutorial-logo-frame::before,
-.tutorial-logo-frame::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #d4a017;
-  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
-  transform: translateY(-50%);
-}
-
-.tutorial-logo-frame::before {
-  left: 10px;
-}
-
-.tutorial-logo-frame::after {
-  right: 10px;
-}
-
-.tutorial-logo-frame span {
-  color: #d4a017;
-  font-size: 13px;
-  font-weight: 950;
-  letter-spacing: 0.06em;
-}
-
-.tutorial-step-foot {
-  display: flex;
-  min-width: 0;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 54px;
-  margin-top: auto;
-  padding: 8px 12px 10px;
-  box-sizing: border-box;
-}
-
-.tutorial-step-foot strong {
-  min-width: 0;
-  flex: 1 1 auto;
-  color: #ffffff;
-  font-size: 14px;
-  line-height: 1.35;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.assist-panel.theme-light .tutorial-step-foot strong {
-  color: #111827;
-}
-
-.template-grid {
-  display: grid;
-  flex: 1;
-  min-height: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  align-items: stretch;
-  margin-top: 12px;
-}
-
-.template-card {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  width: 100%;
-  height: clamp(320px, 27vw, 430px);
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  outline: none;
-  transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.assist-panel.theme-light .template-card {
-  border-color: rgba(203, 213, 225, 0.9);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-}
-
-.template-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(
-    in srgb,
-    var(--workspace-accent, #d4a017) 42%,
-    rgba(255, 255, 255, 0.08)
-  );
-}
-
-.template-card.is-active {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.35),
-    0 0 24px rgba(212, 160, 23, 0.2),
-    0 12px 28px rgba(0, 0, 0, 0.3);
-}
-
-.template-card:focus-visible {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.32),
-    0 0 24px rgba(212, 160, 23, 0.18);
-}
-
-.assist-panel.theme-light .template-card.is-active {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.32),
-    0 0 22px rgba(212, 160, 23, 0.14),
-    0 12px 24px rgba(15, 23, 42, 0.1);
-}
-
-.template-image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.template-image :deep(.preload-image),
-.template-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.template-title {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  align-content: end;
-  justify-items: center;
-  gap: 4px;
-  z-index: 1;
-  min-height: 86px;
-  padding: 28px 18px 14px;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.88));
-  text-align: center;
-}
-
-.template-title strong {
-  max-width: 80%;
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.3;
-  font-weight: 900;
-}
-
-.template-title span {
-  max-width: 80%;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 700;
 }
 
 .requirement-section {
@@ -3242,15 +2703,6 @@ defineExpose({
     padding-right: 4px;
   }
 
-  .tutorial-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .requirement-grid {
     gap: 10px;
   }
@@ -3273,10 +2725,6 @@ defineExpose({
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .requirement-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3294,15 +2742,6 @@ defineExpose({
   .watermark-compare-grid,
   .watermark-recent-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .template-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .template-card {
-    height: 220px;
-    max-height: none;
   }
 
   .requirement-grid {
