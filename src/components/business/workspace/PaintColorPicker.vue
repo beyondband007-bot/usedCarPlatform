@@ -1,18 +1,10 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
 import { NColorPicker } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 
-const props = withDefaults(
-  defineProps<{
-    modelValue?: string
-    compact?: boolean
-  }>(),
-  {
-    modelValue: '',
-    compact: false,
-  },
-)
+const props = defineProps<{
+  modelValue?: string
+}>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -44,19 +36,11 @@ function handleColorUpdate(value: string | null) {
   colorValue.value = value ? normalizeHex(value) : null
   emit('update:modelValue', value ? normalizeHex(value) : '')
 }
-
-function handleClear() {
-  handleColorUpdate(null)
-}
 </script>
 
 <template>
-  <section
-    class="paint-color-card"
-    :class="{ 'is-compact': compact }"
-    aria-label="目标色号选择"
-  >
-    <header v-if="!compact" class="paint-color-head">
+  <section class="paint-color-card" aria-label="目标色号选择">
+    <header class="paint-color-head">
       <div>
         <h3 class="paint-color-title">选择目标色号</h3>
         <p class="paint-color-subtitle">
@@ -66,7 +50,7 @@ function handleClear() {
     </header>
 
     <div class="paint-color-field">
-      <div class="paint-color-field-head">
+      <div class="paint-color-field-row">
         <p class="paint-color-field-label">
           <template v-if="displayHex">颜色 ({{ displayHex }})</template>
           <template v-else>未选择色号</template>
@@ -74,12 +58,11 @@ function handleClear() {
         <button
           v-if="displayHex"
           type="button"
-          class="paint-color-delete"
-          aria-label="删除色号"
-          @click="handleClear"
+          class="paint-color-clear"
+          aria-label="清除已选色号"
+          @click="handleColorUpdate(null)"
         >
-          <Icon icon="mdi:close" />
-          删除
+          清除
         </button>
       </div>
 
@@ -88,6 +71,7 @@ function handleClear() {
         :show-alpha="false"
         :modes="['hex']"
         :swatches="[]"
+        :actions="['clear']"
         class="paint-color-picker"
         @update:value="handleColorUpdate"
       />
@@ -103,13 +87,7 @@ function handleClear() {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
 
-.paint-color-card.is-compact {
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-:global([data-theme='dark']) .paint-color-card:not(.is-compact) {
+:global([data-theme='dark']) .paint-color-card {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
 }
 
@@ -139,7 +117,7 @@ function handleClear() {
   gap: 6px;
 }
 
-.paint-color-field-head {
+.paint-color-field-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -148,30 +126,28 @@ function handleClear() {
 
 .paint-color-field-label {
   margin: 0;
-  min-width: 0;
   color: var(--app-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
 }
 
-.paint-color-delete {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
+.paint-color-clear {
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--app-text-soft);
-  font-family: inherit;
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.4;
   cursor: pointer;
-  transition: color 0.16s ease;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.paint-color-delete:hover {
-  color: #e25555;
+.paint-color-clear:hover {
+  color: var(--app-text);
 }
 
 .paint-color-picker {

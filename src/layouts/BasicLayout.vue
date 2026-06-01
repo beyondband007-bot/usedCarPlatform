@@ -327,8 +327,8 @@ const {
 }
 
 .home-chrome--pricing :deep(.site-header) {
-  min-height: clamp(92px, 5.8vw, 132px);
-  padding-block: clamp(26px, 1.8vw, 40px);
+  min-height: 72px;
+  padding-block: clamp(12px, 0.9vw, 14px);
 }
 
 .home-chrome--pricing.home-chrome--pricing-light {
@@ -373,7 +373,7 @@ const {
 
 .app-layout--studio-chrome:not(.app-layout--home) .app-layout-main {
 
-  padding-top: 96px;
+  padding-top: 72px;
 
 }
 
@@ -390,7 +390,7 @@ const {
   box-sizing: border-box;
   height: 100dvh;
   max-height: 100dvh;
-  padding-top: 96px;
+  padding-top: 72px;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -412,7 +412,7 @@ const {
 
 .app-layout--studio-chrome[data-subnav='true']:not(.app-layout--home) .app-layout-main {
 
-  padding-top: 148px;
+  padding-top: 118px;
 
 }
 

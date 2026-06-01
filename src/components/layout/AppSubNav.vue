@@ -56,7 +56,7 @@ function navigate(item: NavItem) {
     :class="
       props.embedded
         ? 'subnav--embedded subnav--workbench'
-        : 'sticky top-[72px] z-40 gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 shadow-sm xl:px-6'
+        : 'sticky top-[60px] z-40 gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 shadow-sm xl:px-6'
     "
     aria-label="企业业务导航"
   >
@@ -102,7 +102,7 @@ function navigate(item: NavItem) {
   position: static;
   top: auto;
   z-index: auto;
-  min-height: clamp(52px, 4.2vw, 64px);
+  min-height: clamp(40px, 3vw, 48px);
   border: 0;
   padding-inline: var(--studio-chrome-pad-x, 24px);
   background: var(--studio-chrome-subnav-bg, #040404);
@@ -159,9 +159,9 @@ function navigate(item: NavItem) {
   font-weight: 600;
   line-height: 1.2;
   padding:
-    clamp(12px, 1vw, 16px)
+    clamp(8px, 0.7vw, 10px)
     clamp(12px, 1.1vw, 18px)
-    clamp(14px, 1.1vw, 18px);
+    clamp(10px, 0.8vw, 12px);
 }
 
 .subnav-link--embedded::after {

@@ -33,8 +33,8 @@ import type {
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
-import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
+import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
 const props = defineProps<{
@@ -63,6 +63,7 @@ const {
 } = useBatchVisualTemplates();
 
 const useLogo = ref(false);
+const paintColorCode = ref("");
 const outputRatio = ref("1:1");
 const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
@@ -75,7 +76,6 @@ const batchScenes = computed(() =>
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
-const paintTargetColor = ref("");
 const interiorEnhance = ref(false);
 const projectName = ref("5月展厅批量上新");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
@@ -96,7 +96,10 @@ const isCreatingBatchTask = ref(false);
 const isDeletingDeliveryAssets = ref(false);
 const lastCreatedBatchId = ref<string | null>(null);
 const batchExteriorInputRef = ref<HTMLInputElement | null>(null);
+const interiorCollageInputRef = ref<HTMLInputElement | null>(null);
 const MAX_BATCH_EXTERIOR_IMAGES = 5;
+const MIN_INTERIOR_COLLAGE_IMAGES = 2;
+const MAX_INTERIOR_COLLAGE_IMAGES = 10;
 
 let previewObjectUrl: string | null = null;
 
@@ -110,6 +113,10 @@ type BatchExteriorUploadItem = {
   objectUrl?: string;
   error?: string;
 };
+
+type InteriorCollageUploadItem = BatchExteriorUploadItem;
+
+const interiorCollageUploads = ref<InteriorCollageUploadItem[]>([]);
 
 function revokePreviewObjectUrl() {
   if (!previewObjectUrl) return;
@@ -132,6 +139,11 @@ function revokeBatchExteriorObjectUrl(item: BatchExteriorUploadItem) {
 function resetBatchExteriorUploads() {
   batchExteriorUploads.value.forEach(revokeBatchExteriorObjectUrl);
   batchExteriorUploads.value = [];
+}
+
+function resetInteriorCollageUploads() {
+  interiorCollageUploads.value.forEach(revokeBatchExteriorObjectUrl);
+  interiorCollageUploads.value = [];
 }
 
 function resetBatchCreateSection() {
@@ -215,6 +227,26 @@ const batchExteriorRemainingCount = computed(() =>
 
 const canAddBatchExteriorImages = computed(
   () => batchExteriorRemainingCount.value > 0 && !isUploadingVehicle.value,
+);
+
+const uploadedInteriorCollageAssets = computed(() =>
+  interiorCollageUploads.value
+    .filter(
+      (item): item is InteriorCollageUploadItem & { asset: UploadedAsset } =>
+        item.status === "success" && Boolean(item.asset),
+    )
+    .map((item) => item.asset),
+);
+
+const interiorCollageRemainingCount = computed(() =>
+  Math.max(
+    0,
+    MAX_INTERIOR_COLLAGE_IMAGES - interiorCollageUploads.value.length,
+  ),
+);
+
+const canAddInteriorCollageImages = computed(
+  () => interiorCollageRemainingCount.value > 0 && !isUploadingInterior.value,
 );
 
 const batchEstimatedCost = computed(() => {
@@ -349,11 +381,12 @@ async function handleVehicleFileSelected(file: File) {
     );
   } catch (error) {
     resetUploadedVehicle();
-    const text = error instanceof Error
-      ? error.message
-      : props.capability.kind === "interior"
-        ? "内饰图片上传失败"
-        : "车辆图片上传失败";
+    const text =
+      error instanceof Error
+        ? error.message
+        : props.capability.kind === "interior"
+          ? "内饰图片上传失败"
+          : "车辆图片上传失败";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
@@ -362,7 +395,6 @@ async function handleVehicleFileSelected(file: File) {
 
 function handleVehicleImageRemove() {
   resetUploadedVehicle();
-  paintTargetColor.value = "";
   message.info("已删除车辆图片");
 }
 
@@ -493,6 +525,116 @@ function handleBatchExteriorRemove(id: string) {
   );
 }
 
+function updateInteriorCollageUpload(
+  id: string,
+  patch: Partial<InteriorCollageUploadItem>,
+) {
+  const index = interiorCollageUploads.value.findIndex((item) => item.id === id);
+  if (index < 0) return;
+
+  interiorCollageUploads.value[index] = {
+    ...interiorCollageUploads.value[index],
+    ...patch,
+  };
+}
+
+function openInteriorCollagePicker() {
+  if (!canAddInteriorCollageImages.value) return;
+  interiorCollageInputRef.value?.click();
+}
+
+async function handleInteriorCollageFilesSelected(files: File[]) {
+  const imageFiles = normalizeImageFiles(files);
+
+  if (!imageFiles.length) {
+    message.warning("请选择 JPG、PNG 或 WebP 图片");
+    return;
+  }
+
+  const remaining = interiorCollageRemainingCount.value;
+  if (remaining <= 0) {
+    message.warning(`内饰图最多上传 ${MAX_INTERIOR_COLLAGE_IMAGES} 张`);
+    return;
+  }
+
+  const selectedFiles = imageFiles.slice(0, remaining);
+  if (imageFiles.length > remaining) {
+    message.warning(
+      `最多支持 ${MAX_INTERIOR_COLLAGE_IMAGES} 张，已自动保留前 ${remaining} 张`,
+    );
+  }
+
+  const pendingItems = selectedFiles.map(createBatchExteriorUploadItem);
+  interiorCollageUploads.value = [
+    ...interiorCollageUploads.value,
+    ...pendingItems,
+  ];
+  isUploadingInterior.value = true;
+
+  const results = await Promise.allSettled(
+    pendingItems.map(async (item, index) => {
+      const asset = await uploadAsset(selectedFiles[index], "car_interior");
+      revokeBatchExteriorObjectUrl(item);
+      updateInteriorCollageUpload(item.id, {
+        asset,
+        previewUrl: asset.url,
+        objectUrl: undefined,
+        status: "success",
+      });
+    }),
+  );
+
+  const successCount = results.filter(
+    (result) => result.status === "fulfilled",
+  ).length;
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+
+    updateInteriorCollageUpload(pendingItems[index].id, {
+      status: "fail",
+      error:
+        result.reason instanceof Error ? result.reason.message : "上传失败",
+    });
+  });
+
+  if (successCount > 0) {
+    message.success(`已上传 ${successCount} 张内饰图`);
+  }
+
+  const failedCount = results.length - successCount;
+  if (failedCount > 0) {
+    message.error(`${failedCount} 张内饰图上传失败，请删除后重试`);
+  }
+
+  isUploadingInterior.value = false;
+}
+
+function handleInteriorCollageInputChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+
+  void handleInteriorCollageFilesSelected(files);
+}
+
+function handleInteriorCollageDrop(event: DragEvent) {
+  if (!canAddInteriorCollageImages.value) return;
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  void handleInteriorCollageFilesSelected(files);
+}
+
+function handleInteriorCollageRemove(id: string) {
+  const target = interiorCollageUploads.value.find((item) => item.id === id);
+  if (target) {
+    revokeBatchExteriorObjectUrl(target);
+  }
+
+  interiorCollageUploads.value = interiorCollageUploads.value.filter(
+    (item) => item.id !== id,
+  );
+}
+
 function handleInteriorFileSelected(file: File) {
   isUploadingInterior.value = true;
 
@@ -516,6 +658,24 @@ function handleInteriorImageRemove() {
 }
 
 function handleGenerate() {
+  if (props.capability.code === "interior-stitch") {
+    const assetIds = uploadedInteriorCollageAssets.value.map(
+      (asset) => asset.assetId,
+    );
+
+    if (assetIds.length < MIN_INTERIOR_COLLAGE_IMAGES) {
+      message.warning(`请至少上传 ${MIN_INTERIOR_COLLAGE_IMAGES} 张内饰图`);
+      return;
+    }
+
+    emit("generate", {
+      assetIds,
+      outputRatio: "16:9",
+      resolution: "2K",
+    });
+    return;
+  }
+
   if (!uploadedAsset.value) {
     message.warning("Please select completed tasks first");
     return;
@@ -529,7 +689,7 @@ function handleGenerate() {
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
     colorCode:
       props.capability.code === "paint-refresh"
-        ? paintTargetColor.value || undefined
+        ? paintColorCode.value || undefined
         : undefined,
   });
 }
@@ -677,12 +837,15 @@ watch(
   () => {
     resetUploadedVehicle();
     resetBatchExteriorUploads();
+    resetInteriorCollageUploads();
+    paintColorCode.value = "";
   },
 );
 
 onUnmounted(() => {
   revokePreviewObjectUrl();
   resetBatchExteriorUploads();
+  resetInteriorCollageUploads();
 });
 
 watch(
@@ -906,6 +1069,16 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
     previewImage: firstAsset.url,
     progress: task.progress,
     imageCount: task.assetCount,
+    assets: assets.map((asset) => ({
+      id: asset.assetId,
+      title: asset.title,
+      imageUrl: asset.url,
+      thumbnailUrl: asset.thumbnailUrl ?? undefined,
+      ratio: asset.ratio,
+      createdAt: formatDate(asset.createdAt),
+      width: asset.width ?? undefined,
+      height: asset.height ?? undefined,
+    })),
   });
 }
 
@@ -1274,6 +1447,132 @@ const activeCreateRatioLabel = computed(() => {
       </div>
     </template>
 
+    <template v-else-if="props.capability.code === 'interior-stitch'">
+      <div class="generate-panel-body">
+        <section class="batch-card batch-notice short-video-notice">
+          前端只负责收集 2-10 张内饰图并提交 `assetIds`，后端会自动分组生成 1-3 张拼图结果。
+        </section>
+
+        <section class="batch-card batch-upload-card">
+          <input
+            ref="interiorCollageInputRef"
+            type="file"
+            class="batch-upload-input"
+            :accept="props.capability.accept"
+            multiple
+            @change="handleInteriorCollageInputChange"
+          />
+
+          <header class="batch-upload-head">
+            <div>
+              <h3>上传内饰图组</h3>
+              <p>
+                支持一次多选，最少上传 {{ MIN_INTERIOR_COLLAGE_IMAGES }} 张，
+                最多上传 {{ MAX_INTERIOR_COLLAGE_IMAGES }} 张。
+              </p>
+            </div>
+            <span class="batch-upload-count">
+              {{ interiorCollageUploads.length }}/{{
+                MAX_INTERIOR_COLLAGE_IMAGES
+              }}
+            </span>
+          </header>
+
+          <button
+            type="button"
+            class="batch-upload-drop"
+            :class="{ 'is-disabled': !canAddInteriorCollageImages }"
+            :disabled="!canAddInteriorCollageImages"
+            @click="openInteriorCollagePicker"
+            @dragover.prevent
+            @drop.prevent="handleInteriorCollageDrop"
+          >
+            <Icon icon="mdi:image-multiple-outline" />
+            <strong>{{
+              interiorCollageUploads.length
+                ? "继续添加内饰图"
+                : "上传内饰图组"
+            }}</strong>
+            <span
+              >JPG / PNG / WebP · 剩余
+              {{ interiorCollageRemainingCount }} 张</span
+            >
+          </button>
+
+          <div
+            v-if="interiorCollageUploads.length"
+            class="batch-upload-grid"
+          >
+            <article
+              v-for="item in interiorCollageUploads"
+              :key="item.id"
+              class="batch-upload-item"
+              :class="`is-${item.status}`"
+            >
+              <PreloadImage
+                class="batch-upload-image"
+                :src="item.previewUrl"
+                :alt="item.name"
+                loading="lazy"
+                decoding="async"
+              />
+              <span
+                v-if="item.status === 'uploading'"
+                class="batch-upload-status"
+              >
+                <Icon icon="mdi:loading" />
+              </span>
+              <span
+                v-else-if="item.status === 'fail'"
+                class="batch-upload-status is-error"
+              >
+                <Icon icon="mdi:alert-circle-outline" />
+              </span>
+              <button
+                type="button"
+                class="batch-upload-remove"
+                :aria-label="`删除${item.name}`"
+                @click="handleInteriorCollageRemove(item.id)"
+              >
+                <Icon icon="mdi:close" />
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
+      </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingInterior || props.isGenerating ||
+              uploadedInteriorCollageAssets.length < MIN_INTERIOR_COLLAGE_IMAGES
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
+    </template>
+
     <template v-else-if="props.capability.code === 'short-video'">
       <div class="generate-panel-body">
         <section class="batch-card batch-notice short-video-notice">
@@ -1459,6 +1758,11 @@ const activeCreateRatioLabel = computed(() => {
           :is-uploading="isUploadingVehicle"
           @select-file="handleVehicleFileSelected"
           @remove="handleVehicleImageRemove"
+        />
+
+        <PaintColorPicker
+          v-if="props.capability.code === 'paint-refresh'"
+          v-model="paintColorCode"
         />
 
         <CapabilityOptionSelector

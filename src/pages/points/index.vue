@@ -1,57 +1,75 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NButton, NDataTable, NDatePicker, NInput, NPagination, NSelect, NTag } from 'naive-ui'
+import { NButton, NDataTable, NSelect } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
+import pricingHeroBg from '@/assets/img/pricing-hero-bg.png'
 import { useAppStore } from '@/stores/app'
 import { usePointsStore } from '@/stores/points'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { PointRecord, PointRecordType } from '@/types/points'
 
+type TimeFilter = 'recent-3-months' | 'recent-30-days' | 'this-month' | 'all'
+type StatusFilter = 'all' | 'active' | 'pending' | 'expired'
+
+interface PointDisplayRecord extends PointRecord {
+  status: StatusFilter
+  source: string
+  validUntil: string
+}
+
 const appStore = useAppStore()
 const pointsStore = usePointsStore()
 const subscriptionStore = useSubscriptionStore()
+
+const timeFilter = ref<TimeFilter>('recent-3-months')
+const selectedFlowType = ref<'all' | PointRecordType>('all')
+const selectedStatus = ref<StatusFilter>('all')
 
 onMounted(async () => {
   await subscriptionStore.hydrate()
   await pointsStore.hydrate()
 })
 
-const planName = computed(() =>
-  subscriptionStore.currentPlan === 'basic'
-    ? '企业基础版'
-    : subscriptionStore.currentPlan === 'flagship'
-      ? '企业旗舰版'
-      : '企业团队版',
-)
+const pageStyle = {
+  '--points-hero-image': `url(${pricingHeroBg})`,
+}
 
-const flowKeyword = ref('')
-const selectedFlowType = ref<'all' | PointRecordType>('all')
-const dateRange = ref<[number, number] | null>(null)
-const flowPage = ref(1)
-const flowPageSize = 10
+const timeOptions: Array<{ label: string; value: TimeFilter }> = [
+  { label: '近三个月', value: 'recent-3-months' },
+  { label: '近30天', value: 'recent-30-days' },
+  { label: '本月', value: 'this-month' },
+  { label: '全部时间', value: 'all' },
+]
 
 const flowTypeOptions: Array<{ label: string; value: 'all' | PointRecordType }> = [
-  { label: '全部类型', value: 'all' },
-  { label: '充值入账', value: 'recharge' },
-  { label: '任务消费', value: 'consume' },
-  { label: '套餐赠送', value: 'gift' },
+  { label: '全部积分类型', value: 'all' },
+  { label: '充值积分', value: 'recharge' },
+  { label: '消费积分', value: 'consume' },
+  { label: '活动积分', value: 'gift' },
   { label: '失败退回', value: 'refund' },
 ]
 
+const statusOptions: Array<{ label: string; value: StatusFilter }> = [
+  { label: '全部状态', value: 'all' },
+  { label: '已生效', value: 'active' },
+  { label: '待生效', value: 'pending' },
+  { label: '已过期', value: 'expired' },
+]
+
 const flowTypeLabelMap: Record<PointRecordType, string> = {
-  recharge: '充值入账',
-  consume: '任务消费',
-  gift: '套餐赠送',
+  recharge: '充值积分',
+  consume: '消费积分',
+  gift: '活动积分',
   refund: '失败退回',
 }
 
-const flowTypeToneMap: Record<PointRecordType, string> = {
-  recharge: 'is-positive',
-  consume: 'is-cost',
-  gift: 'is-positive',
-  refund: 'is-refund',
+const sourceMap: Record<PointRecordType, string> = {
+  recharge: '积分充值',
+  consume: '车辆保养服务',
+  gift: '五一积分加倍活动',
+  refund: '失败任务退回',
 }
 
 function parseRecordTime(value: string) {
@@ -59,255 +77,241 @@ function parseRecordTime(value: string) {
   return Number.isFinite(time) ? time : 0
 }
 
+function getStatus(record: PointRecord): StatusFilter {
+  if (record.type === 'gift' && record.amount <= 200) return 'pending'
+  if (record.type === 'consume' && Math.abs(record.amount) >= 300) return 'expired'
+  return 'active'
+}
+
+function getValidUntil(record: PointRecord) {
+  if (record.type === 'consume') return '-'
+
+  const createdAt = parseRecordTime(record.createdAt)
+  if (!createdAt) return '-'
+
+  const validDate = new Date(createdAt)
+  validDate.setFullYear(validDate.getFullYear() + 1)
+  return validDate.toISOString().slice(0, 10)
+}
+
+const displayRecords = computed<PointDisplayRecord[]>(() =>
+  pointsStore.records.map((record) => ({
+    ...record,
+    status: getStatus(record),
+    source: record.remark || sourceMap[record.type],
+    validUntil: getValidUntil(record),
+  })),
+)
+
 const filteredRecords = computed(() => {
-  const keyword = flowKeyword.value.trim().toLowerCase()
-  const [start, end] = dateRange.value ?? []
+  const now = new Date('2026-06-01T00:00:00').getTime()
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000
+  const threeMonths = 92 * 24 * 60 * 60 * 1000
 
-  return pointsStore.records.filter((item) => {
-    const matchType = selectedFlowType.value === 'all' || item.type === selectedFlowType.value
-    const matchKeyword =
-      !keyword ||
-      item.id.toLowerCase().includes(keyword) ||
-      item.title.toLowerCase().includes(keyword) ||
-      item.remark.toLowerCase().includes(keyword)
-    const recordTime = parseRecordTime(item.createdAt)
-    const matchDate = !start || !end || (recordTime >= start && recordTime <= end)
+  return displayRecords.value.filter((record) => {
+    const matchType = selectedFlowType.value === 'all' || record.type === selectedFlowType.value
+    const matchStatus = selectedStatus.value === 'all' || record.status === selectedStatus.value
+    const recordTime = parseRecordTime(record.createdAt)
+    const matchTime =
+      timeFilter.value === 'all' ||
+      (timeFilter.value === 'recent-30-days' && now - recordTime <= thirtyDays) ||
+      (timeFilter.value === 'recent-3-months' && now - recordTime <= threeMonths) ||
+      (timeFilter.value === 'this-month' && record.createdAt.startsWith('2026-06'))
 
-    return matchType && matchKeyword && matchDate
+    return matchType && matchStatus && matchTime
   })
 })
 
-const pagedRecords = computed(() => {
-  const start = (flowPage.value - 1) * flowPageSize
-  return filteredRecords.value.slice(start, start + flowPageSize)
-})
+const availablePoints = computed(() => pointsStore.summary.currentPoints)
+const pendingPoints = computed(() =>
+  displayRecords.value
+    .filter((record) => record.status === 'pending' && record.amount > 0)
+    .reduce((total, record) => total + record.amount, 0),
+)
+const monthDelta = computed(() =>
+  displayRecords.value
+    .filter((record) => record.createdAt.startsWith('2026-05'))
+    .reduce((total, record) => total + record.amount, 0),
+)
+const expiringPoints = computed(() =>
+  displayRecords.value
+    .filter((record) => record.status !== 'expired' && record.amount > 0)
+    .slice(0, 2)
+    .reduce((total, record) => total + Math.min(record.amount, 150), 0),
+)
 
-function formatAmount(amount: number) {
+const statCards = computed(() => [
+  {
+    label: '可用积分',
+    value: availablePoints.value.toLocaleString('zh-CN'),
+    suffix: '积分',
+    desc: '可用于兑换各类商品和服务',
+    icon: 'mdi:database',
+  },
+  {
+    label: '待生效积分',
+    value: pendingPoints.value.toLocaleString('zh-CN'),
+    suffix: '积分',
+    desc: '将在次月1日生效',
+    icon: 'mdi:credit-card-clock-outline',
+  },
+  {
+    label: '本月积分变动',
+    value: formatSignedAmount(monthDelta.value),
+    suffix: '积分',
+    desc: '较上月同期 ↑ 12.5%',
+    icon: 'mdi:calendar-month-outline',
+  },
+  {
+    label: '积分将于30天内过期',
+    value: expiringPoints.value.toLocaleString('zh-CN'),
+    suffix: '积分',
+    desc: '过期时间：2025-06-15',
+    icon: 'mdi:timer-sand',
+  },
+])
+
+function formatSignedAmount(amount: number) {
   return `${amount > 0 ? '+' : ''}${amount.toLocaleString('zh-CN')}`
 }
 
-function resetFlowFilters() {
-  flowKeyword.value = ''
-  selectedFlowType.value = 'all'
-  dateRange.value = null
-  flowPage.value = 1
+function formatStatus(status: StatusFilter) {
+  if (status === 'pending') return '待生效'
+  if (status === 'expired') return '已过期'
+  return '已生效'
 }
 
-watch([flowKeyword, selectedFlowType, dateRange], () => {
-  flowPage.value = 1
+watch([timeFilter, selectedFlowType, selectedStatus], () => {
+  // Data is filtered reactively. This watcher keeps future server-side query wiring explicit.
 })
 
-const flowColumns: DataTableColumns<PointRecord> = [
+const flowColumns: DataTableColumns<PointDisplayRecord> = [
   {
-    title: '流水编号',
-    key: 'id',
-    width: 190,
-    ellipsis: { tooltip: true },
+    title: '时间',
+    key: 'createdAt',
+    width: 220,
   },
   {
-    title: '流水类型',
+    title: '积分类型',
     key: 'type',
-    width: 130,
+    width: 160,
     render(row) {
-      return h(
-        NTag,
-        {
-          round: true,
-          bordered: false,
-          class: ['flow-type-tag', flowTypeToneMap[row.type]],
-        },
-        { default: () => flowTypeLabelMap[row.type] },
-      )
+      return flowTypeLabelMap[row.type]
     },
-  },
-  {
-    title: '业务名称',
-    key: 'title',
-    width: 190,
-    ellipsis: { tooltip: true },
   },
   {
     title: '积分变动',
     key: 'amount',
-    width: 130,
+    width: 150,
     render(row) {
       return h(
         'span',
-        { class: ['flow-amount', row.amount > 0 ? 'is-up' : 'is-down'] },
-        formatAmount(row.amount),
+        { class: ['points-delta', row.amount > 0 ? 'is-up' : 'is-down'] },
+        formatSignedAmount(row.amount),
       )
     },
   },
   {
-    title: '变动后余额',
-    key: 'balance',
-    width: 140,
+    title: '状态',
+    key: 'status',
+    width: 150,
     render(row) {
-      return row.balance.toLocaleString('zh-CN')
+      return h(
+        'span',
+        { class: ['points-status', `is-${row.status}`] },
+        [
+          h('i', { class: 'points-status-dot', 'aria-hidden': 'true' }),
+          h('span', formatStatus(row.status)),
+        ],
+      )
     },
   },
   {
-    title: '发生时间',
-    key: 'createdAt',
-    width: 190,
-  },
-  {
-    title: '备注',
-    key: 'remark',
+    title: '来源/用途',
+    key: 'source',
     minWidth: 220,
     ellipsis: { tooltip: true },
   },
+  {
+    title: '有效期',
+    key: 'validUntil',
+    width: 180,
+  },
 ]
-
-const summary = computed(() => [
-  {
-    label: '积分余额',
-    value: pointsStore.summary.currentPoints.toLocaleString('zh-CN'),
-    icon: 'mdi:diamond-stone',
-  },
-  {
-    label: '累计充值',
-    value: pointsStore.summary.totalRecharge.toLocaleString('zh-CN'),
-    icon: 'mdi:cash-plus',
-  },
-  {
-    label: '累计消费',
-    value: pointsStore.summary.totalConsume.toLocaleString('zh-CN'),
-    icon: 'mdi:cash-minus',
-  },
-  {
-    label: '并行任务额度',
-    value: `${subscriptionStore.concurrentTaskLimit}`,
-    icon: 'mdi:counter',
-  },
-  {
-    label: '当前运行任务数',
-    value: `${pointsStore.summary.currentRunningTasks}`,
-    icon: 'mdi:play-circle-outline',
-  },
-  {
-    label: '剩余可用任务数',
-    value: `${pointsStore.remainingTasks}`,
-    icon: 'mdi:timer-outline',
-  },
-])
 </script>
 
 <template>
-  <main class="points-page" :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'">
-    <section class="points-shell">
-      <header class="points-head">
-        <div>
-          <p class="eyebrow">积分中心</p>
-          <h1>当前套餐与积分额度</h1>
-          <span>Mock API + Pinia + LocalStorage 驱动，后续只替换 API 层即可接入真实后端。</span>
-        </div>
+  <main
+    class="points-page"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    :style="pageStyle"
+  >
+    <div class="points-bg" aria-hidden="true" />
+
+    <section class="points-shell" aria-label="积分查询">
+      <header class="points-hero">
+        <h1>积分查询</h1>
+        <p>三档套餐覆盖试运行、团队批量上新与集团化交付场景</p>
       </header>
 
-      <section class="overview-layout">
-        <article class="overview-card plan-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:briefcase-check-outline" /></span>
-          <div>
-            <p>套餐信息卡片</p>
-            <h2>{{ planName }}</h2>
-            <span>账号额度 {{ subscriptionStore.accountLimit }} 个 · 并行任务额度 {{ subscriptionStore.concurrentTaskLimit }} 个 · 赠送积分 {{ subscriptionStore.giftPoints.toLocaleString('zh-CN') }}</span>
-          </div>
-        </article>
-        <article class="overview-card balance-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:diamond-stone" /></span>
-          <div>
-            <p>积分余额卡片</p>
-            <h2>{{ pointsStore.summary.currentPoints.toLocaleString('zh-CN') }}</h2>
-            <span>冻结 {{ pointsStore.summary.freezePoints.toLocaleString('zh-CN') }} · 累计充值 {{ pointsStore.summary.totalRecharge.toLocaleString('zh-CN') }} · 累计消费 {{ pointsStore.summary.totalConsume.toLocaleString('zh-CN') }}</span>
-          </div>
-        </article>
-        <article class="overview-card task-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:progress-clock" /></span>
-          <div>
-            <p>任务额度卡片</p>
-            <h2>{{ pointsStore.remainingTasks }}</h2>
-            <span>额度 {{ subscriptionStore.concurrentTaskLimit }} · 运行中 {{ pointsStore.summary.currentRunningTasks }} · 剩余可用 {{ pointsStore.remainingTasks }}</span>
-          </div>
-        </article>
-      </section>
+      <form class="points-filter" aria-label="积分筛选条件" @submit.prevent>
+        <NSelect
+          v-model:value="timeFilter"
+          class="points-select"
+          :options="timeOptions"
+          size="large"
+        />
+        <NSelect
+          v-model:value="selectedFlowType"
+          class="points-select"
+          :options="flowTypeOptions"
+          size="large"
+        />
+        <NSelect
+          v-model:value="selectedStatus"
+          class="points-select"
+          :options="statusOptions"
+          size="large"
+        />
+        <NButton class="points-query-button" size="large" attr-type="submit">
+          <template #icon>
+            <Icon icon="mdi:magnify" />
+          </template>
+          查询
+        </NButton>
+      </form>
 
-      <section class="points-grid">
-        <article v-for="item in summary" :key="item.label" class="points-card">
-          <span class="points-icon" aria-hidden="true"><Icon :icon="item.icon" /></span>
-          <div>
+      <section class="points-stats" aria-label="积分统计">
+        <article v-for="item in statCards" :key="item.label" class="points-stat-card">
+          <span class="points-stat-icon" aria-hidden="true">
+            <Icon :icon="item.icon" />
+          </span>
+          <div class="points-stat-copy">
             <p>{{ item.label }}</p>
-            <strong>{{ item.value }}</strong>
+            <strong>{{ item.value }} <span>{{ item.suffix }}</span></strong>
+            <small>{{ item.desc }}</small>
           </div>
         </article>
       </section>
 
-      <section class="points-table">
-        <header class="points-table-head">
-          <div>
-            <h2>积分流水</h2>
-            <p>按发生时间、流水类型、业务名称或备注快速核对积分变化。</p>
-          </div>
-          <span>{{ filteredRecords.length }} / {{ pointsStore.records.length }} 条记录</span>
+      <section class="points-detail">
+        <header class="points-detail-head">
+          <span aria-hidden="true" />
+          <h2>积分明细</h2>
         </header>
 
-        <form class="flow-filter" aria-label="积分流水查询条件" @submit.prevent>
-          <NDatePicker
-            v-model:value="dateRange"
-            class="flow-date-picker"
-            type="daterange"
-            clearable
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          />
-
-          <NSelect
-            v-model:value="selectedFlowType"
-            class="flow-type-select"
-            :options="flowTypeOptions"
-          />
-
-          <NInput
-            v-model:value="flowKeyword"
-            class="flow-keyword"
-            clearable
-            placeholder="搜索流水编号 / 业务名称 / 备注"
-          >
-            <template #prefix>
-              <Icon icon="mdi:magnify" />
-            </template>
-          </NInput>
-
-          <NButton class="flow-query-button" type="primary" attr-type="submit">
-            查询
-          </NButton>
-
-          <NButton class="flow-reset-button" attr-type="button" @click="resetFlowFilters">
-            重置
-          </NButton>
-        </form>
-
-        <div class="flow-table-wrap">
+        <div class="points-table-wrap">
           <NDataTable
-            class="flow-data-table"
+            class="points-data-table"
             :columns="flowColumns"
-            :data="pagedRecords"
+            :data="filteredRecords"
             :bordered="false"
             :single-line="false"
             :pagination="false"
             :row-key="(row) => row.id"
-            :scroll-x="1190"
+            :scroll-x="1080"
           />
         </div>
-
-        <footer class="flow-table-footer">
-          <p>共 {{ filteredRecords.length }} 条流水</p>
-          <NPagination
-            v-model:page="flowPage"
-            class="flow-pagination"
-            :page-size="flowPageSize"
-            :item-count="filteredRecords.length"
-          />
-        </footer>
       </section>
     </section>
   </main>
@@ -315,136 +319,413 @@ const summary = computed(() => [
 
 <style scoped lang="scss">
 .points-page {
+  --points-gold: #d7ad32;
+  --points-gold-strong: #f2cf56;
+  --points-bg: #050505;
+  --points-panel: rgba(27, 28, 28, 0.9);
+  --points-panel-strong: rgba(16, 17, 17, 0.9);
+  --points-border: rgba(255, 255, 255, 0.1);
+  --points-border-strong: rgba(215, 173, 50, 0.34);
+  --points-text: #f7f7f4;
+  --points-text-soft: rgba(247, 247, 244, 0.7);
+  --points-text-muted: rgba(247, 247, 244, 0.54);
+  --points-success: #27d184;
+  --points-warning: #f2c74a;
+  --points-danger: #ff4f4f;
+
+  position: relative;
   min-height: calc(100dvh - var(--app-header-offset));
-  padding: clamp(16px, 2vw, 24px);
-  background: var(--app-bg);
-  color: var(--app-text);
-}
-.points-shell {
-  max-width: 1400px;
-  margin: 0 auto;
-  display: grid;
-  gap: 18px;
-}
-.points-head h1 { margin: 0; font-size: 32px; font-weight: 900; }
-.points-head .eyebrow { margin: 0 0 8px; color: var(--color-brand-primary); font-weight: 900; }
-.points-head span { color: var(--app-text-soft); }
-.overview-layout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
-.overview-card {
-  display: flex;
-  min-width: 0;
-  min-height: 138px;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-card);
-  background: var(--app-surface);
-  box-shadow: var(--shadow-panel);
-}
-.overview-icon {
-  flex: 0 0 42px;
-  width: 42px;
-  height: 42px;
+  overflow: hidden;
+  background: var(--points-bg);
+  color: var(--points-text);
 }
 
-.overview-card div span {
-  display: block;
-  margin-top: 8px;
-  color: var(--app-text-soft);
-  font-size: 13px;
-  line-height: 1.6;
+.points-page,
+.points-page *,
+.points-page *::before,
+.points-page *::after {
+  box-sizing: border-box;
+}
+
+.points-page.theme-light {
+  --points-bg: #f6f9fc;
+  --points-panel: rgba(255, 255, 255, 0.9);
+  --points-panel-strong: rgba(248, 250, 252, 0.94);
+  --points-border: rgba(15, 23, 42, 0.1);
+  --points-border-strong: rgba(47, 107, 255, 0.24);
+  --points-text: #0f172a;
+  --points-text-soft: #475569;
+  --points-text-muted: #64748b;
+  --points-gold: #2f6bff;
+  --points-gold-strong: #4f7fff;
+}
+
+.points-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 0;
+  width: min(100%, 2400px);
+  background-color: var(--points-bg);
+  background-image: var(--points-hero-image);
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transform: translateX(-50%);
+}
+
+.points-bg::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(90deg, rgba(5, 5, 5, 0.94) 0%, rgba(5, 5, 5, 0.72) 38%, rgba(5, 5, 5, 0.45) 72%, rgba(5, 5, 5, 0.82) 100%),
+    linear-gradient(180deg, rgba(5, 5, 5, 0.16) 0%, rgba(5, 5, 5, 0.72) 55%, #050505 100%);
+}
+
+.theme-light .points-bg::after {
+  background:
+    linear-gradient(90deg, rgba(246, 249, 252, 0.94) 0%, rgba(246, 249, 252, 0.72) 46%, rgba(246, 249, 252, 0.44) 78%, rgba(246, 249, 252, 0.78) 100%),
+    linear-gradient(180deg, rgba(246, 249, 252, 0.2) 0%, rgba(246, 249, 252, 0.82) 62%, #f6f9fc 100%);
+}
+
+.points-shell {
+  position: relative;
+  z-index: 1;
+  width: min(2400px, 100%);
+  min-height: calc(100dvh - var(--app-header-offset));
+  margin: 0 auto;
+  padding: clamp(84px, 10vh, 116px) clamp(80px, 10vw, 320px) clamp(70px, 8vh, 104px);
+}
+
+.points-hero {
+  width: min(720px, 100%);
+}
+
+.points-hero h1 {
+  margin: 0;
+  color: var(--points-text);
+  font-size: clamp(38px, 3.3vw, 52px);
+  font-weight: 950;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.points-hero p {
+  margin: 16px 0 0;
+  color: var(--points-text-soft);
+  font-size: clamp(18px, 1.35vw, 24px);
   font-weight: 700;
+  line-height: 1.45;
 }
-.points-grid {
+
+.points-filter {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  align-items: stretch;
+  width: min(1040px, 100%);
+  grid-template-columns: repeat(3, minmax(210px, 1fr)) 180px;
+  gap: 16px;
+  margin-top: 34px;
 }
-.overview-card p,
-.overview-card h2 {
+
+.points-select,
+.points-query-button {
+  --n-height: 48px;
+  --n-border-radius: 8px;
+  --n-color: rgba(17, 18, 18, 0.76);
+  --n-color-active: rgba(17, 18, 18, 0.88);
+  --n-color-focus: rgba(17, 18, 18, 0.88);
+  --n-color-hover: rgba(22, 23, 23, 0.92);
+  --n-border: 1px solid rgba(255, 255, 255, 0.12);
+  --n-border-active: 1px solid var(--points-border-strong);
+  --n-border-focus: 1px solid var(--points-border-strong);
+  --n-border-hover: 1px solid rgba(215, 173, 50, 0.26);
+  --n-box-shadow-focus: 0 0 0 2px rgba(215, 173, 50, 0.1);
+  --n-text-color: var(--points-text);
+  --n-placeholder-color: var(--points-text-soft);
+  --n-icon-color: var(--points-text-soft);
+  width: 100%;
+  min-width: 0;
+}
+
+.theme-light .points-select,
+.theme-light .points-query-button {
+  --n-color: rgba(255, 255, 255, 0.86);
+  --n-color-active: #ffffff;
+  --n-color-focus: #ffffff;
+  --n-color-hover: #ffffff;
+  --n-border: 1px solid rgba(15, 23, 42, 0.1);
+  --n-border-hover: 1px solid rgba(47, 107, 255, 0.28);
+  --n-text-color: var(--points-text);
+  --n-placeholder-color: var(--points-text-soft);
+  --n-icon-color: var(--points-text-soft);
+}
+
+.points-query-button {
+  --n-color: rgba(215, 173, 50, 0.08);
+  --n-color-hover: rgba(215, 173, 50, 0.14);
+  --n-color-pressed: rgba(215, 173, 50, 0.2);
+  --n-color-focus: rgba(215, 173, 50, 0.12);
+  --n-border: 1px solid rgba(215, 173, 50, 0.72);
+  --n-border-hover: 1px solid rgba(242, 207, 86, 0.88);
+  --n-border-pressed: 1px solid rgba(242, 207, 86, 0.78);
+  --n-border-focus: 1px solid rgba(242, 207, 86, 0.88);
+  --n-text-color: var(--points-gold-strong);
+  --n-text-color-hover: var(--points-gold-strong);
+  --n-text-color-pressed: var(--points-gold);
+  --n-text-color-focus: var(--points-gold-strong);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.points-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(300px, 1fr));
+  gap: 24px;
+  margin-top: 34px;
+  overflow: visible;
+}
+
+.points-stat-card {
+  display: flex;
+  min-width: 0;
+  min-height: 144px;
+  align-items: center;
+  gap: clamp(14px, 1.1vw, 22px);
+  padding: clamp(20px, 1.4vw, 28px);
+  border: 1px solid var(--points-border);
+  border-radius: 8px;
+  background: var(--points-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 46px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(10px);
+}
+
+.points-stat-icon {
+  display: grid;
+  flex: 0 0 clamp(52px, 3.2vw, 68px);
+  width: clamp(52px, 3.2vw, 68px);
+  height: clamp(52px, 3.2vw, 68px);
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(215, 173, 50, 0.12);
+  color: var(--points-gold-strong);
+  font-size: 30px;
+}
+
+.points-stat-copy {
+  min-width: 0;
+}
+
+.points-stat-copy p,
+.points-stat-copy strong,
+.points-stat-copy small {
   margin: 0;
 }
 
-.overview-card p {
-  color: var(--app-text-soft);
-  font-size: 13px;
+.points-stat-copy p {
+  overflow: hidden;
+  color: var(--points-text-soft);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points-stat-copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+  overflow: visible;
+  color: var(--points-gold-strong);
+  font-size: clamp(27px, 2vw, 42px);
+  font-weight: 950;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.points-stat-copy strong span {
+  flex: 0 0 auto;
+  color: var(--points-text-soft);
+  font-size: 14px;
   font-weight: 800;
 }
 
-.overview-card h2 {
-  margin-top: 6px;
-  color: var(--app-text);
-  font-size: clamp(24px, 2vw, 34px);
-  font-weight: 900;
-  line-height: 1.1;
+.points-stat-copy small {
+  display: block;
+  margin-top: 10px;
+  overflow: hidden;
+  color: var(--points-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.points-card, .points-table { border: 1px solid var(--app-border); border-radius: var(--radius-card); background: var(--app-surface); box-shadow: var(--shadow-panel); }
-.points-card {
+.points-stat-card:nth-child(3) .points-stat-copy small {
+  color: var(--points-gold-strong);
+}
+
+.points-detail {
+  margin-top: 48px;
+}
+
+.points-detail-head {
   display: flex;
-  min-height: 110px;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-}
-.points-card > div {
-  min-width: 0;
-}
-.points-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-accent-blue) 12%, transparent);
-  color: var(--color-brand-primary);
-  font-size: 22px;
+  margin-bottom: 22px;
 }
 
-.points-icon :deep(svg) {
-  color: currentColor;
+.points-detail-head span {
+  width: 5px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--points-gold-strong);
 }
-.points-card p, .points-card strong { margin: 0; }
-.points-card p { color: var(--app-text-soft); font-size: 13px; font-weight: 700; }
-.points-card strong { display: block; margin-top: 4px; font-size: 24px; font-weight: 900; }
-.points-table { padding: 16px; }
-.points-table-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.points-table-head h2 { margin: 0; font-size: 20px; }
-.points-table-head p { margin: 6px 0 0; color: var(--app-text-soft); font-size: 13px; font-weight: 700; line-height: 1.5; }
-.points-table-head span { flex: 0 0 auto; color: var(--app-text-soft); font-weight: 700; }
-.flow-filter { display: grid; grid-template-columns: minmax(260px, 1.2fr) minmax(150px, 0.62fr) minmax(260px, 1fr) 86px 86px; gap: 12px; align-items: center; margin-bottom: 14px; padding: 14px; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface-soft); }
-.flow-date-picker, .flow-type-select, .flow-keyword { width: 100%; min-width: 0; }
-.flow-date-picker, .flow-type-select, .flow-keyword, .flow-query-button, .flow-reset-button { --n-height: 40px; --n-border-radius: 8px; --n-color: var(--app-surface); --n-color-active: var(--app-surface); --n-color-focus: var(--app-surface); --n-color-hover: #f8fafd; --n-border: 1px solid var(--app-border); --n-border-active: 1px solid color-mix(in srgb, var(--color-accent-blue) 72%, var(--app-border)); --n-border-focus: 1px solid color-mix(in srgb, var(--color-accent-blue) 72%, var(--app-border)); --n-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 56%, var(--app-border)); --n-box-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--color-accent-blue) 14%, transparent); --n-text-color: var(--app-text); --n-placeholder-color: var(--app-text-soft); --n-icon-color: var(--app-text-soft); }
-.flow-keyword :deep(.n-input__prefix) { color: var(--app-text-soft); font-size: 18px; }
-.flow-query-button { --n-color: #2f6bff; --n-color-hover: #4f7fff; --n-color-pressed: #1d4ed8; --n-color-focus: #2f6bff; --n-border: 0; --n-border-hover: 0; --n-border-pressed: 0; --n-border-focus: 0; --n-text-color: #fff; --n-text-color-hover: #fff; --n-text-color-pressed: #fff; --n-text-color-focus: #fff; font-weight: 800; }
-.flow-reset-button { --n-color: #ffffff; --n-color-hover: #f8fafd; --n-color-pressed: #f1f5f9; --n-color-focus: #ffffff; --n-border: 1px solid #d8e2f0; --n-border-hover: 1px solid #d8e2f0; --n-border-pressed: 1px solid #d8e2f0; --n-border-focus: 1px solid #d8e2f0; --n-text-color: #64748b; --n-text-color-hover: #64748b; --n-text-color-pressed: #64748b; --n-text-color-focus: #64748b; font-weight: 800; }
-.flow-table-wrap { min-width: 0; overflow: auto; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface); }
-.flow-data-table { --n-font-size: 14px; --n-th-color: var(--app-surface-soft); --n-th-color-hover: var(--app-surface-soft); --n-th-text-color: var(--app-text-soft); --n-td-color: transparent; --n-td-color-hover: color-mix(in srgb, var(--color-accent-blue) 7%, transparent); --n-td-text-color: var(--app-text); --n-border-color: var(--app-border); color: var(--app-text); }
-.flow-data-table :deep(.n-data-table-th) { height: 48px; padding: 0 16px; font-size: 13px; font-weight: 900; white-space: nowrap; }
-.flow-data-table :deep(.n-data-table-td) { height: 58px; padding: 0 16px; font-weight: 700; }
-.flow-data-table :deep(.flow-type-tag) { --n-height: 26px; --n-border-radius: 999px; --n-font-size: 13px; --n-font-weight: 800; padding: 0 12px; }
-.flow-data-table :deep(.flow-type-tag.is-positive) { --n-color: color-mix(in srgb, var(--color-success) 14%, transparent); --n-text-color: var(--color-success); color: var(--color-success); background: color-mix(in srgb, var(--color-success) 14%, transparent); }
-.flow-data-table :deep(.flow-type-tag.is-cost) { --n-color: color-mix(in srgb, var(--color-error) 12%, transparent); --n-text-color: var(--color-error); color: var(--color-error); background: color-mix(in srgb, var(--color-error) 12%, transparent); }
-.flow-data-table :deep(.flow-type-tag.is-refund) { --n-color: color-mix(in srgb, var(--color-brand-primary) 12%, transparent); --n-text-color: var(--color-brand-primary); color: var(--color-brand-primary); background: color-mix(in srgb, var(--color-brand-primary) 12%, transparent); }
-.flow-data-table :deep(.flow-amount) { font-weight: 900; }
-.flow-data-table :deep(.flow-amount.is-up) { color: var(--color-success); }
-.flow-data-table :deep(.flow-amount.is-down) { color: var(--color-error); }
-.flow-table-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.flow-table-footer p { margin: 0; color: var(--app-text-soft); font-size: 13px; font-weight: 700; }
-.flow-pagination { --n-item-size: 30px; --n-item-border-radius: 6px; --n-item-color: var(--app-surface-soft); --n-item-color-hover: #f8fafd; --n-item-color-active: #2f6bff; --n-item-color-active-hover: #4f7fff; --n-item-border: 1px solid var(--app-border); --n-item-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 44%, var(--app-border)); --n-item-border-active: 1px solid #2f6bff; --n-item-text-color: var(--app-text-soft); --n-item-text-color-hover: var(--app-text); --n-item-text-color-active: #fff; --n-button-color: var(--app-surface-soft); --n-button-color-hover: #f8fafd; --n-button-border: 1px solid var(--app-border); --n-button-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 44%, var(--app-border)); --n-button-icon-color: var(--app-text-soft); --n-button-icon-color-hover: var(--app-text); }
-.points-table-body { display: grid; gap: 10px; }
-.points-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--app-border); border-radius: 12px; background: var(--app-surface-soft); }
-.points-row strong, .points-row p, .points-row time { margin: 0; }
-.points-row strong { display: block; font-weight: 800; }
-.points-row p, .points-row time { color: var(--app-text-soft); font-size: 13px; }
-.record-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.compact-table { min-width: 0; }
-.points-row.three-col { grid-template-columns: minmax(0, 1fr) auto minmax(128px, auto); }
-.empty-text { margin: 0; padding: 18px; border: 1px dashed var(--app-border); border-radius: 12px; color: var(--app-text-soft); text-align: center; font-weight: 700; }
-.up { color: var(--color-success); font-weight: 900; }
-.down { color: var(--color-error); font-weight: 900; }
-@media (max-width: 1100px) { .overview-layout, .record-columns { grid-template-columns: minmax(0, 1fr); } .points-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .flow-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); } .points-row, .points-row.three-col { grid-template-columns: minmax(0, 1fr) auto; } .points-row time { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .points-grid, .flow-filter { grid-template-columns: minmax(0, 1fr); } .points-table-head, .flow-table-footer { align-items: flex-start; flex-direction: column; } .points-row, .points-row.three-col { grid-template-columns: minmax(0, 1fr); } }
+
+.points-detail-head h2 {
+  margin: 0;
+  color: var(--points-text);
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.points-table-wrap {
+  overflow: hidden;
+  border: 1px solid var(--points-border);
+  border-radius: 8px;
+  background: rgba(15, 16, 16, 0.86);
+  backdrop-filter: blur(10px);
+}
+
+.theme-light .points-table-wrap {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.points-data-table {
+  --n-font-size: 16px;
+  --n-th-color: rgba(36, 37, 37, 0.94);
+  --n-th-color-hover: rgba(36, 37, 37, 0.94);
+  --n-th-text-color: rgba(247, 247, 244, 0.62);
+  --n-td-color: rgba(15, 16, 16, 0.5);
+  --n-td-color-hover: rgba(215, 173, 50, 0.08);
+  --n-td-text-color: rgba(247, 247, 244, 0.68);
+  --n-border-color: rgba(255, 255, 255, 0.07);
+  color: var(--points-text-soft);
+}
+
+.theme-light .points-data-table {
+  --n-th-color: rgba(248, 250, 252, 0.94);
+  --n-th-color-hover: rgba(248, 250, 252, 0.94);
+  --n-th-text-color: #64748b;
+  --n-td-color: rgba(255, 255, 255, 0.54);
+  --n-td-color-hover: rgba(47, 107, 255, 0.06);
+  --n-td-text-color: #475569;
+  --n-border-color: rgba(15, 23, 42, 0.08);
+}
+
+.points-data-table :deep(.n-data-table-th) {
+  height: 64px;
+  padding: 0 34px;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.points-data-table :deep(.n-data-table-td) {
+  height: 72px;
+  padding: 0 34px;
+  font-weight: 800;
+}
+
+.points-data-table :deep(.points-delta) {
+  font-weight: 950;
+}
+
+.points-data-table :deep(.points-delta.is-up) {
+  color: var(--points-gold-strong);
+}
+
+.points-data-table :deep(.points-delta.is-down) {
+  color: var(--points-danger);
+}
+
+.points-data-table :deep(.points-status) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--points-text-soft);
+}
+
+.points-data-table :deep(.points-status-dot) {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--points-success);
+}
+
+.points-data-table :deep(.points-status.is-pending .points-status-dot) {
+  background: var(--points-warning);
+}
+
+.points-data-table :deep(.points-status.is-expired .points-status-dot) {
+  background: var(--points-danger);
+}
+
+@media (max-width: 1180px) {
+  .points-shell {
+    width: min(100% - 32px, 1040px);
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .points-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1500px) {
+  .points-shell {
+    padding-right: clamp(120px, 12vw, 360px);
+    padding-left: clamp(120px, 12vw, 360px);
+  }
+
+  .points-stat-card {
+    min-height: 148px;
+  }
+}
+
+@media (max-width: 820px) {
+  .points-shell {
+    width: min(100% - 24px, 720px);
+    padding-top: 54px;
+  }
+
+  .points-filter {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .points-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .points-stat-card {
+    min-height: 112px;
+    padding: 18px;
+  }
+
+  .points-data-table :deep(.n-data-table-th),
+  .points-data-table :deep(.n-data-table-td) {
+    padding: 0 18px;
+  }
+}
 </style>

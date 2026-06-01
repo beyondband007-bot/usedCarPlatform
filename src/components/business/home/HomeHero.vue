@@ -40,7 +40,7 @@ defineEmits<{
   position: relative;
   height: clamp(680px, 56.28vw, 1107px);
   min-height: 0;
-  padding-top: clamp(148px, 11.3vw, 222px);
+  padding-top: clamp(104px, 8.4vw, 152px);
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 24%, rgba(121, 115, 105, 0.26), transparent 31rem),
@@ -189,14 +189,14 @@ defineEmits<{
 @media (max-width: 1100px) {
   .hero {
     height: 720px;
-    padding-top: 144px;
+    padding-top: 108px;
   }
 }
 
 @media (max-width: 700px) {
   .hero {
     height: 620px;
-    padding-top: 120px;
+    padding-top: 92px;
   }
 
   .hero-copy {

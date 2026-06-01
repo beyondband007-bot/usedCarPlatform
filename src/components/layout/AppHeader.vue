@@ -172,7 +172,7 @@ const navItems = computed(() => {
 
     <header
       v-else
-      class="flex min-h-[72px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
+      class="flex min-h-[60px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
     >
       <RouterLink
         to="/home"
@@ -316,7 +316,7 @@ const navItems = computed(() => {
   gap: clamp(16px, 2.5vw, 32px);
   width: 100%;
   max-width: none;
-  padding: clamp(24px, 2.5vw, 34px) var(--studio-chrome-pad-x, 24px);
+  padding: clamp(14px, 1.55vw, 20px) var(--studio-chrome-pad-x, 24px);
   margin: 0;
   background: var(--studio-chrome-header-bg, linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent));
   color: var(--studio-chrome-logo, #f3f3f3);
@@ -473,7 +473,7 @@ const navItems = computed(() => {
 
 @media (max-width: 700px) {
   .site-header {
-    padding: 20px var(--studio-chrome-pad-x, 18px);
+    padding: 14px var(--studio-chrome-pad-x, 18px);
   }
 
   .credit-pill {

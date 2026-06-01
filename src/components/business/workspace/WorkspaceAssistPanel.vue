@@ -20,6 +20,7 @@ import {
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadAllDeliveryResults } from "@/utils/delivery-download";
+import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
 import { formatDate } from "@/utils/dayjs";
 import {
@@ -39,6 +40,7 @@ import tutorialResultImage from "@/assets/img/展厅灯光/展厅模板/生成�
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
+  WorkspaceDeliveryTaskPreview,
   WorkspaceGenerateResult,
   WorkspaceImagePreview,
   WorkspaceRecentItem,
@@ -50,6 +52,7 @@ const props = defineProps<{
   selectedOptionId: string;
   isGenerating?: boolean;
   generationResult?: WorkspaceGenerateResult | null;
+  deliveryTaskPreview?: WorkspaceDeliveryTaskPreview | null;
   deliveryImagePreview?: WorkspaceImagePreview | null;
   shortVideoPlayRequest?: number;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
@@ -59,6 +62,7 @@ const emit = defineEmits<{
   backFromResult: [];
   closeDeliveryImagePreview: [];
   openDeliveryImagePreview: [preview: WorkspaceImagePreview];
+  openDeliveryAssetResult: [result: WorkspaceGenerateResult];
   pickTemplate: [payload: { capabilityCode: string; optionId: string }];
   pickRecent: [item: WorkspaceRecentItem];
 }>();
@@ -76,9 +80,9 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 const templateCards = computed(() =>
-  workspaceTemplateRecommendations.filter(
-    (item) => item.capabilityCode === props.capability.code,
-  ),
+  workspaceTemplateRecommendations
+    .filter((item) => item.capabilityCode === props.capability.code)
+    .slice(0, 4),
 );
 
 const featureCompareActiveView = ref<"features" | "recent" | "generating">(
@@ -305,6 +309,7 @@ const requirementCards = computed(() =>
 const deliveryResultCount = deliveryResults.length;
 const message = useMessage();
 const isDownloadingAllDelivery = ref(false);
+const isDownloadingDeliveryGroup = ref(false);
 
 watch(
   () => props.capability.kind,
@@ -320,8 +325,50 @@ function openDeliveryResultPreview(item: DeliveryResultItem) {
   );
 }
 
+function openDeliveryGroupAssetPreview(
+  asset: WorkspaceDeliveryTaskPreview["assets"][number],
+) {
+  emit("openDeliveryAssetResult", {
+    createdAt: asset.createdAt,
+    statusText: `已完成 · ${asset.title} · 成片交付结果`,
+    ratioLabel: asset.ratio,
+    mediaType: "image",
+    previewImage: asset.imageUrl,
+    previewAlt: asset.title,
+    downloadUrl: asset.imageUrl,
+    imageWidth: asset.width,
+    imageHeight: asset.height,
+  });
+}
+
 function closeDeliveryImagePreview() {
   emit("closeDeliveryImagePreview");
+}
+
+async function handleDownloadDeliveryGroup() {
+  const task = props.deliveryTaskPreview;
+  if (!task?.assets.length) {
+    message.warning("当前任务组没有可下载成片");
+    return;
+  }
+
+  isDownloadingDeliveryGroup.value = true;
+
+  try {
+    const files = task.assets.map((asset, index) => ({
+      url: asset.imageUrl,
+      filename: `${sanitizeFilename(task.title)}-${String(index + 1).padStart(2, "0")}-${sanitizeFilename(asset.title)}.jpg`,
+    }));
+    const count = await downloadFilesAsZip(
+      files,
+      `${sanitizeFilename(task.title)}-成片交付.zip`,
+    );
+    message.success(`已开始下载 ${count} 张成片`);
+  } catch {
+    message.error("批量下载失败，请稍后重试");
+  } finally {
+    isDownloadingDeliveryGroup.value = false;
+  }
 }
 
 async function handleDownloadAllDelivery() {
@@ -345,6 +392,7 @@ const recentTaskModuleCodes = new Set([
   "paint-refresh",
   "light-consistency",
   "interior-clean",
+  "interior-stitch",
   "watermark-remove",
   "short-video",
   "batch-new",
@@ -439,7 +487,10 @@ async function loadRecentItems() {
 
   try {
     const result = await getRecentGenerationTasks({
-      moduleCode: props.capability.code,
+      moduleCode:
+        props.capability.code === "interior-stitch"
+          ? "interior-collage"
+          : props.capability.code,
       page: 1,
       pageSize: 20,
     });
@@ -620,6 +671,84 @@ defineExpose({
       :preview="deliveryImagePreview"
       @back="closeDeliveryImagePreview"
     />
+
+    <section
+      v-else-if="deliveryTaskPreview"
+      class="delivery-group-preview"
+      aria-label="成片图组预览"
+    >
+      <header class="delivery-group-head">
+        <div class="delivery-group-copy">
+          <p>成片交付</p>
+          <h2>{{ deliveryTaskPreview.title }}</h2>
+          <span>
+            {{ deliveryTaskPreview.meta }} · {{ deliveryTaskPreview.assets.length }} 张成片
+          </span>
+        </div>
+        <div class="delivery-group-actions">
+          <button
+            type="button"
+            class="delivery-group-download-all"
+            :disabled="isDownloadingDeliveryGroup"
+            @click="handleDownloadDeliveryGroup"
+          >
+            <Icon icon="mdi:download-multiple" />
+            {{ isDownloadingDeliveryGroup ? "下载中..." : "全部下载" }}
+          </button>
+          <button
+            type="button"
+            class="delivery-group-back"
+            @click="closeDeliveryImagePreview"
+          >
+            返回
+          </button>
+        </div>
+      </header>
+
+      <div class="delivery-group-grid">
+        <article
+          v-for="asset in deliveryTaskPreview.assets"
+          :key="asset.id"
+          class="delivery-group-card is-clickable"
+          role="button"
+          tabindex="0"
+          :aria-label="`查看大图：${asset.title}`"
+          @click="openDeliveryGroupAssetPreview(asset)"
+          @keydown.enter.prevent="openDeliveryGroupAssetPreview(asset)"
+          @keydown.space.prevent="openDeliveryGroupAssetPreview(asset)"
+        >
+          <div class="delivery-group-media">
+            <PreloadImage
+              class="delivery-group-image"
+              :src="asset.thumbnailUrl || asset.imageUrl"
+              :alt="asset.title"
+              loading="lazy"
+              decoding="async"
+              :draggable="false"
+              fit="cover"
+              object-position="center"
+            />
+          </div>
+          <footer class="delivery-group-foot">
+            <div>
+              <strong>{{ asset.title }}</strong>
+              <span>{{ asset.ratio }}</span>
+            </div>
+            <a
+              class="delivery-group-download"
+              :href="asset.imageUrl"
+              download
+              target="_blank"
+              rel="noreferrer"
+              aria-label="下载成片"
+              @click.stop
+            >
+              <Icon icon="mdi:download" />
+            </a>
+          </footer>
+        </article>
+      </div>
+    </section>
 
     <template v-else-if="isFeatureCompareCapability && featureCompareContent">
       <div class="assist-shell">
@@ -1304,10 +1433,10 @@ defineExpose({
 }
 
 .assist-panel.theme-light {
-  --assist-bg: var(--workspace-panel, #ffffff);
-  --assist-card: rgba(255, 255, 255, 0.92);
-  --assist-card-strong: #f7fafd;
-  --assist-border: var(--workspace-line, #e8edf5);
+  --assist-bg: #f6faff;
+  --assist-card: #ffffff;
+  --assist-card-strong: #f8fbff;
+  --assist-border: #e1eaf5;
   --assist-border-soft: #edf4ff;
   --assist-text: var(--workspace-text, var(--app-text));
   --assist-muted: var(
@@ -1321,7 +1450,223 @@ defineExpose({
     0 14px 34px rgba(78, 111, 148, 0.09)
   );
 
-  background: var(--assist-bg);
+  border-color: #dce6f3;
+  background:
+    radial-gradient(
+      circle at 62% 32%,
+      rgba(207, 224, 255, 0.46),
+      rgba(246, 250, 255, 0) 34%
+    ),
+    linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 18px 42px rgba(78, 111, 148, 0.1);
+}
+
+.delivery-group-preview {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.delivery-group-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.delivery-group-copy {
+  min-width: 0;
+}
+
+.delivery-group-copy p,
+.delivery-group-copy h2,
+.delivery-group-copy span {
+  margin: 0;
+}
+
+.delivery-group-copy p {
+  color: var(--assist-blue);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.delivery-group-copy h2 {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--assist-text);
+  font-size: clamp(18px, 1.35vw, 24px);
+  font-weight: 950;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-group-copy span {
+  display: block;
+  margin-top: 8px;
+  color: var(--assist-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.delivery-group-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.delivery-group-back,
+.delivery-group-download-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--assist-card-strong);
+  color: var(--assist-text);
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.delivery-group-download-all {
+  color: var(--assist-blue);
+}
+
+.delivery-group-download-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.delivery-group-back:hover,
+.delivery-group-download-all:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+}
+
+.delivery-group-grid {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 20px 0;
+}
+
+.delivery-group-card {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid var(--assist-border);
+  border-radius: 12px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.delivery-group-card.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.delivery-group-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--assist-blue) 12%, transparent),
+    var(--assist-shadow);
+  transform: translateY(-1px);
+}
+
+.delivery-group-card.is-clickable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--assist-blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.delivery-group-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--assist-card-strong);
+}
+
+.delivery-group-image,
+.delivery-group-image :deep(.preload-image),
+.delivery-group-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+}
+
+.delivery-group-foot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.delivery-group-foot div {
+  min-width: 0;
+}
+
+.delivery-group-foot strong {
+  display: block;
+  overflow: hidden;
+  color: var(--assist-text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-group-foot span {
+  display: block;
+  margin-top: 4px;
+  color: var(--assist-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.delivery-group-download {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+  color: var(--assist-blue);
+  font-size: 18px;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.delivery-group-download:hover {
+  background: color-mix(in srgb, var(--assist-blue) 16%, var(--assist-card-strong));
+  transform: translateY(-1px);
 }
 
 .assist-tabs {
@@ -1740,6 +2085,17 @@ defineExpose({
   box-shadow: var(--assist-shadow);
 }
 
+.assist-panel.theme-light .watermark-assist-hero,
+.assist-panel.theme-light .watermark-compare-section,
+.assist-panel.theme-light .watermark-result-section,
+.assist-panel.theme-light .generation-waiting {
+  border-color: #e1eaf5;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 16px 36px rgba(78, 111, 148, 0.08);
+}
+
 .watermark-assist-copy {
   display: grid;
   gap: 6px;
@@ -1841,7 +2197,13 @@ defineExpose({
   overflow: hidden;
   border: 1px solid var(--assist-border);
   border-radius: 14px;
-  background: var(--assist-card-strong);
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(207, 224, 255, 0.52),
+      rgba(248, 251, 255, 0) 44%
+    ),
+    var(--assist-card-strong);
 }
 
 .watermark-result-image {
@@ -1849,6 +2211,20 @@ defineExpose({
   width: 100%;
   height: 100%;
   background: var(--assist-card-strong);
+}
+
+.assist-panel.theme-light .watermark-result-media {
+  border-color: #dce6f3;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(207, 224, 255, 0.5),
+      rgba(248, 251, 255, 0) 44%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.78),
+    0 14px 32px rgba(78, 111, 148, 0.1);
 }
 
 .watermark-compare-card {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NInput, NSelect } from 'naive-ui'
 
@@ -45,6 +45,7 @@ const emit = defineEmits<{
   newConversation: []
   selectConversation: [conversationId: string]
   uploadReference: [file: File]
+  removeReference: []
 }>()
 
 const prompt = ref('')
@@ -87,8 +88,13 @@ const hasHistoryContext = computed(
           activeConversation.value?.lastTaskId),
     ),
 )
+const pendingTurns = ref<CreativeThreadTurn[]>([])
 const hasConversation = computed(
-  () => props.isGenerating || hasResult.value || hasHistoryContext.value,
+  () =>
+    props.isGenerating ||
+    hasResult.value ||
+    hasHistoryContext.value ||
+    pendingTurns.value.length > 0,
 )
 
 const displayPrompt = computed(
@@ -112,24 +118,69 @@ const ratioMetaLabel = computed(() => {
 })
 
 const threadItems = computed<CreativeThreadTurn[]>(() => {
-  if (props.threadTurns?.length) return props.threadTurns
-
-  if (!hasHistoryContext.value && !hasResult.value) return []
-
-  return [
-    {
-      id: 'current',
-      prompt: displayPrompt.value,
-      resultUrl: primaryResultImage.value || null,
-      ratioLabel: ratioMetaLabel.value,
-      taskId: props.generationResult?.taskId ?? null,
-      isGenerating: props.isGenerating,
-    },
-  ]
+  let base: CreativeThreadTurn[] = []
+  if (props.threadTurns?.length) {
+    base = props.threadTurns
+  } else if (hasHistoryContext.value || hasResult.value) {
+    base = [
+      {
+        id: 'current',
+        prompt: displayPrompt.value,
+        resultUrl: primaryResultImage.value || null,
+        ratioLabel: ratioMetaLabel.value,
+        taskId: props.generationResult?.taskId ?? null,
+        isGenerating: props.isGenerating,
+      },
+    ]
+  }
+  return [...base, ...pendingTurns.value]
 })
 
+function findChainSource(beforeTurnId?: string): CreativeThreadTurn | null {
+  const items = threadItems.value
+  const endIdx =
+    beforeTurnId !== undefined
+      ? items.findIndex((t) => t.id === beforeTurnId)
+      : items.length
+  const limit = endIdx >= 0 ? endIdx : items.length
+  for (let i = limit - 1; i >= 0; i--) {
+    const turn = items[i]
+    if (turn.taskId && turn.resultUrl) return turn
+  }
+  return null
+}
+
 const recentConversations = computed(() => props.conversations ?? [])
-const referencePreview = computed(() => props.referenceAsset?.url ?? null)
+
+const pendingReferenceObjectUrl = ref<string | null>(null)
+const pendingReferencePreview = ref<string | null>(null)
+
+function clearPendingReferencePreview() {
+  if (pendingReferenceObjectUrl.value) {
+    URL.revokeObjectURL(pendingReferenceObjectUrl.value)
+    pendingReferenceObjectUrl.value = null
+  }
+  pendingReferencePreview.value = null
+}
+
+const referencePreview = computed(
+  () => props.referenceAsset?.url ?? pendingReferencePreview.value,
+)
+
+const isReferenceUploading = computed(
+  () => Boolean(props.isUploadingReference) && !props.referenceAsset?.url,
+)
+
+watch(
+  () => props.referenceAsset?.url,
+  (url) => {
+    if (url) clearPendingReferencePreview()
+  },
+)
+
+onUnmounted(() => {
+  clearPendingReferencePreview()
+})
 
 function resolveConversationTitle(conversation: CreativeImageConversation) {
   return conversation.title?.trim() || '创意生图对话'
@@ -150,9 +201,43 @@ watch(
   () => {
     prompt.value = ''
     lastSubmittedPrompt.value = ''
+    pendingTurns.value = []
     threadScrollRef.value?.scrollTo({ top: 0 })
   },
 )
+
+watch(
+  () => props.threadTurns?.length ?? 0,
+  (newCount, oldCount) => {
+    if (newCount > (oldCount ?? 0)) {
+      pendingTurns.value = []
+      scrollThreadToBottom()
+    }
+  },
+)
+
+function scrollThreadToBottom() {
+  void nextTick().then(() => {
+    const el = threadScrollRef.value
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  })
+}
+
+function pushPendingTurn(text: string) {
+  pendingTurns.value = [
+    ...pendingTurns.value,
+    {
+      id: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      prompt: text,
+      taskId: null,
+      resultUrl: null,
+      ratioLabel: `${activeRatio.value.value} · 2K`,
+      isGenerating: true,
+    },
+  ]
+  scrollThreadToBottom()
+}
 
 watch(
   () => props.generationResult,
@@ -167,31 +252,39 @@ watch(
 
 function handleSubmit() {
   const text = prompt.value.trim()
-  if (!text || props.isGenerating) return
+  if (!text || props.isGenerating || pendingTurns.value.length > 0) return
 
   lastSubmittedPrompt.value = text
   prompt.value = ''
+  const chain = findChainSource()
+  pushPendingTurn(text)
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
     resolution: '2K',
-    referenceAssetId: props.referenceAsset?.assetId,
-    useLastReference: Boolean(props.referenceAsset?.assetId),
+    referenceAssetId: chain ? undefined : props.referenceAsset?.assetId,
+    useLastReference: chain ? false : Boolean(props.referenceAsset?.assetId),
+    sourceTaskId: chain?.taskId ?? undefined,
+    sourceImageUrl: chain?.resultUrl ?? undefined,
   })
 }
 
 function handleRegenerateTurn(turn: CreativeThreadTurn) {
   const text = turn.prompt.trim()
-  if (!text || props.isGenerating) return
+  if (!text || props.isGenerating || pendingTurns.value.length > 0) return
 
   lastSubmittedPrompt.value = text
   prompt.value = ''
+  const chain = findChainSource(turn.id)
+  pushPendingTurn(text)
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
     resolution: '2K',
-    referenceAssetId: props.referenceAsset?.assetId,
-    useLastReference: Boolean(props.referenceAsset?.assetId),
+    referenceAssetId: chain ? undefined : props.referenceAsset?.assetId,
+    useLastReference: chain ? false : Boolean(props.referenceAsset?.assetId),
+    sourceTaskId: chain?.taskId ?? undefined,
+    sourceImageUrl: chain?.resultUrl ?? undefined,
   })
 }
 
@@ -224,7 +317,18 @@ function handleReferenceSelected(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+
+  clearPendingReferencePreview()
+  const objectUrl = URL.createObjectURL(file)
+  pendingReferenceObjectUrl.value = objectUrl
+  pendingReferencePreview.value = objectUrl
+
   emit('uploadReference', file)
+}
+
+function handleRemoveReference() {
+  clearPendingReferencePreview()
+  emit('removeReference')
 }
 
 function openImagePreview(imageUrl?: string | null) {
@@ -461,6 +565,34 @@ function toggleSidebar() {
         :class="{ 'is-inline': !hasConversation, 'is-docked': hasConversation }"
         aria-label="创意输入"
       >
+        <div v-if="referencePreview" class="creative-attachments">
+          <div
+            class="creative-attachment"
+            :class="{ 'is-loading': isReferenceUploading }"
+          >
+            <img
+              :src="referencePreview"
+              alt="参考图"
+              class="creative-attachment-img"
+            />
+            <span
+              v-if="isReferenceUploading"
+              class="creative-attachment-overlay"
+              aria-hidden="true"
+            >
+              <span class="creative-attachment-spinner"></span>
+            </span>
+            <button
+              type="button"
+              class="creative-attachment-remove"
+              aria-label="移除参考图"
+              @click="handleRemoveReference"
+            >
+              <Icon icon="mdi:close" />
+            </button>
+          </div>
+        </div>
+
         <div class="creative-composer-row">
           <button
             type="button"
@@ -513,9 +645,6 @@ function toggleSidebar() {
                 class="creative-ratio-select"
               />
             </div>
-            <span v-if="referencePreview" class="creative-reference-pill">
-              已选参考图
-            </span>
             <span class="creative-prompt-count">
               {{ promptLength }}/{{ creativeImagePromptMaxLength }}
             </span>
@@ -800,6 +929,9 @@ function toggleSidebar() {
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   overflow: hidden;
+  border: 1px solid var(--creative-line);
+  border-radius: 14px;
+  margin: 12px;
   background: var(--creative-main-glow), var(--creative-main-bg);
 }
 
@@ -1229,14 +1361,67 @@ function toggleSidebar() {
   min-width: 0;
 }
 
-.creative-reference-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  border: 1px solid var(--creative-accent-border);
+.creative-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.creative-attachment {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.creative-attachment-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--creative-surface-soft);
+}
+
+.creative-attachment-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.creative-attachment-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
   border-radius: 999px;
-  color: var(--creative-accent) !important;
-  padding: 0 10px;
+  animation: creative-spin 0.9s linear infinite;
+}
+
+.creative-attachment-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--creative-composer-bg);
+  border-radius: 999px;
+  background: var(--creative-text);
+  color: var(--creative-composer-bg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.16s ease;
+}
+
+.creative-attachment-remove:hover {
+  transform: scale(1.08);
 }
 
 @keyframes creative-spin {

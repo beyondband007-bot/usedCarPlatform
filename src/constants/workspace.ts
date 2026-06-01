@@ -422,7 +422,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
   }),
   createCapability({
     code: 'interior-stitch',
-    apiCode: 'interior_stitch',
+    apiCode: 'interior-collage',
     kind: 'interior',
     groupTitle: '内饰',
     icon: 'mdi:image-multiple-outline',

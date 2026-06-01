@@ -107,7 +107,7 @@ function handlePlanSelect(name: string) {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: clamp(58px, 8.6vh, 100px) clamp(14px, 4.9vw, 102px) clamp(20px, 3.4vh, 44px);
+  padding: clamp(34px, 5.2vh, 64px) clamp(14px, 4.9vw, 102px) clamp(20px, 3.4vh, 44px);
   overflow: visible;
   background: var(--pricing-bg-fallback);
   color: #f8fafc;
@@ -161,7 +161,7 @@ function handlePlanSelect(name: string) {
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(calc(100vw - 56px), calc((100dvh - 96px) * 1.65));
+  width: min(calc(100vw - 56px), calc((100dvh - 72px) * 1.65));
   height: auto;
   min-width: 0;
   min-height: 0;
@@ -329,7 +329,7 @@ function handlePlanSelect(name: string) {
   }
 
   .pricing-shell {
-    width: min(980px, calc(100vw - 28px), calc((100dvh - 96px) * 1.65));
+    width: min(980px, calc(100vw - 28px), calc((100dvh - 72px) * 1.65));
     gap: 18px;
   }
 

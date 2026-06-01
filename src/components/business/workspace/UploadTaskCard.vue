@@ -141,8 +141,6 @@ function openPreviewModal() {
           >
             重新生成
           </NButton>
-
-          <slot name="after-reupload" />
         </div>
 
         <div v-else-if="isPreviewLoading" class="upload-loading">
