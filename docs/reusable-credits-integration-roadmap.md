@@ -40,6 +40,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 10: Identity and mock login | Done | `phase-10-mock-identity-20260601` | Adds an explicit frontend mock credits identity selector and sends that identity through request headers. |
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 | Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
+| Three-role back office | Done | Current branch | Expands `/credits-admin` into the developer, company-admin, and agent back-office surface from the shared prototype. |
 
 Detailed phase notes:
 
@@ -55,6 +56,7 @@ Detailed phase notes:
 - [Phase 10 mock identity](./reusable-credits-phase-10-mock-identity.md)
 - [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
 - [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
+- [Three-role credits back office](./reusable-credits-three-role-back-office.md)
 
 ## Important Implementation Notes
 
@@ -128,11 +130,11 @@ Expected deliverable:
 
 ### Phase 9: Credits Admin Console
 
-Status: done in this branch.
+Status: done in this branch, then expanded into the three-role back office.
 
 Use the existing static admin console prototype as the starting point and turn it into a usable admin-facing view.
 
-Initial scope should be read-only operational visibility:
+Initial scope was read-only operational visibility:
 
 - applications and functions
 - users and accounts
@@ -140,12 +142,13 @@ Initial scope should be read-only operational visibility:
 - transactions
 - payment orders
 
-Management actions can come later after the read-only view is stable.
+The current route now includes the complete developer, company-admin, and agent menu surface from the shared prototype. Management buttons are present for review, but remain non-mutating until backend role, audit, and workflow APIs are added.
 
 Expected deliverable:
 
 - admin console is connected to live APIs
 - team members can inspect credit and billing state while testing usedCar flows
+- team members can review the full three-role back-office scope before backend CRUD/workflow implementation
 
 ### Phase 10: Identity And Mock Login
 
@@ -219,4 +222,4 @@ Expected deliverable:
 
 Ready for team review.
 
-The integration branch is synced with upstream `master`, documented, and ready for PR review.
+The integration branch is synced with upstream `master`, documented, and ready for PR review. The three-role back-office UI is ready for product and backend API review.

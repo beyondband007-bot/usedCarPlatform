@@ -1,13 +1,16 @@
 # Phase 9: Credits Admin Console
 
-Status: implemented
+Status: implemented, expanded to three-role back office
 Date: 2026-05-31
+Expanded: 2026-06-01
 
 ## Purpose
 
-Turn the static Credits Admin Console prototype into a usable read-only operational console inside usedCarPlatform.
+Turn the static Credits Admin Console prototype into a usable operational console inside usedCarPlatform.
 
 The console helps teammates inspect the credits integration while testing usedCar flows.
+
+On 2026-06-01, the page was expanded from the initial read-only overview into the full three-role back office described in [Three-Role Credits Back Office](./reusable-credits-three-role-back-office.md).
 
 ## Added Frontend Page
 
@@ -17,16 +20,13 @@ Route:
 /credits-admin
 ```
 
-The page follows the structure of the shared static prototype:
+The page follows the structure of the shared static prototype and now includes role-specific navigation for:
 
-- left admin sidebar
-- top summary metrics
-- account table
-- recharge product list
-- usedCarPlatform function pricing table
-- recent credit transaction table
+- developer
+- company admin
+- agent
 
-This phase keeps the console read-only. Management actions are intentionally left for a later phase.
+The first version kept the console read-only. The current page adds the complete three-role workflow surface, while high-risk management actions remain non-mutating until backend permissions, audit APIs, and production identity are implemented.
 
 ## Added Backend Proxy
 
@@ -73,7 +73,7 @@ Real admin roles and permissions are not implemented yet.
 - Backend typecheck
 - Frontend typecheck
 - Frontend production build
+- Three-role console route smoke served by Vite
 - Local smoke test against running credits platform, usedCar backend, and Vite frontend:
   - `GET /api/v1/credits/admin/overview`
   - `/credits-admin` served by Vite
-

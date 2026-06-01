@@ -34,7 +34,9 @@ Frontend integration:
 - Credits page loads real account and transaction data.
 - Recharge page loads real recharge products and creates payment orders through the usedCar backend.
 - Login exposes a temporary mock credits identity selector.
-- Credits admin console provides a read-only live overview for applications, functions, accounts, products, and transactions.
+- Credits admin console provides a three-role back office for developer, company admin, and agent views.
+- Developer/admin credit sections load live applications, functions, accounts, products, and transactions through the usedCar backend proxy.
+- Agent and operational workflow sections define the intended leads, customers, commission, settlement, materials, and ticket surfaces until their backend APIs are implemented.
 
 Testing and handoff:
 
@@ -135,6 +137,22 @@ The usedCar login page currently uses frontend mock auth:
 
 Use `admin` to see admin-only navigation such as the credits admin console.
 
+## Three-Role Back Office
+
+The shared static prototype `积分后台-三角色静态原型.html` has been ported into the Vue route:
+
+```text
+/credits-admin
+```
+
+It contains:
+
+- developer back office: system overview, app/API management, core data CRUD blueprint, tenant/customer management, user/account management, recharge/payment management, transaction audit, and agent management
+- company admin back office: operations overview, agent management, customer management, recharge order/product view, transaction audit, and tickets
+- agent back office: dashboard, leads/opportunity reporting, own customers, customer consumption, commission records, settlement bills, materials/training, and tickets
+
+Detailed notes are in [Three-Role Credits Back Office](./reusable-credits-three-role-back-office.md).
+
 ## Verification
 
 Run the deterministic integration smoke:
@@ -169,9 +187,11 @@ npm run build
 4. Open `/package-points` and confirm recharge products are loaded from the credits platform.
 5. Select a recharge product and confirm a pending payment order is created.
 6. Log in as `admin`.
-7. Open `/credits-admin` and confirm applications, functions, accounts, products, and transactions load.
-8. Run `npm run phase11:smoke`.
-9. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
+7. Open `/credits-admin` and switch through the developer, company admin, and agent views.
+8. Confirm live applications, functions, accounts, products, and transactions load in the developer/admin credit sections.
+9. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.
+10. Run `npm run phase11:smoke`.
+11. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
 
 ## Known Limitations
 
@@ -183,7 +203,9 @@ The Phase 11 smoke runner does not call real KIE and does not spend KIE quota. I
 
 Payment provider callback and paid recharge settlement are covered inside the Reusable Credits Platform tests, but usedCar currently only creates pending payment orders.
 
-The credits admin console is intentionally read-only in this branch.
+The credits admin console now has the full three-role UI surface, but write actions are intentionally non-mutating in this branch.
+
+Agent, settlement, material, ticket, and commission pages currently use local UI data because those backend APIs do not exist yet in usedCarPlatform.
 
 ## Phase Links
 
@@ -199,3 +221,4 @@ The credits admin console is intentionally read-only in this branch.
 - [Phase 9 admin console](./reusable-credits-phase-9-admin-console.md)
 - [Phase 10 mock identity](./reusable-credits-phase-10-mock-identity.md)
 - [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
+- [Three-role credits back office](./reusable-credits-three-role-back-office.md)
