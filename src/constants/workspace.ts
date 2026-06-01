@@ -15,10 +15,10 @@ import outdoorTutorial1 from '@/assets/img/户外场景/教程/教程1.png'
 import outdoorTutorial2 from '@/assets/img/户外场景/教程/教程2.png'
 import outdoorTutorial3 from '@/assets/img/户外场景/教程/教程3.png'
 import outdoorTutorial4 from '@/assets/img/户外场景/教程/教程4.png'
-import roadMotionScene1 from '@/assets/img/道路动态/场景选择/道路动态1.png'
-import roadMotionScene2 from '@/assets/img/道路动态/场景选择/道路动态2.png'
-import roadMotionScene3 from '@/assets/img/道路动态/场景选择/道路动态3.png'
-import roadMotionScene4 from '@/assets/img/道路动态/场景选择/道路动态4.png'
+import roadMotionScene1 from '@/assets/img/道路动态/场景选择/傍晚高架.png'
+import roadMotionScene2 from '@/assets/img/道路动态/场景选择/商务园区.png'
+import roadMotionScene3 from '@/assets/img/道路动态/场景选择/城市主干道.png'
+import roadMotionScene4 from '@/assets/img/道路动态/场景选择/夕阳高速.png'
 import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
 import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
 import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
@@ -277,9 +277,9 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'showroom-light',
     apiCode: 'scene_showroom_light',
     kind: 'scene',
-    groupTitle: '场景影棚',
+    groupTitle: '场景更换',
     icon: 'mdi:domain',
-    label: '展厅灯光',
+    label: '展厅棚拍',
     tag: '可用',
     tagType: 'success',
     title: '单张生成',
@@ -287,7 +287,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     uploadTitle: '车辆外观图',
     uploadHint: '点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB',
     selectorTitle: '场景选择',
-    selectorTag: '展厅灯光',
+    selectorTag: '展厅棚拍',
     middleBlocks: sceneBlocks,
     options: showroomOptions,
     actionLabel: '生成',
@@ -296,9 +296,9 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'outdoor-scene',
     apiCode: 'scene_outdoor',
     kind: 'scene',
-    groupTitle: '场景影棚',
+    groupTitle: '场景更换',
     icon: 'mdi:pine-tree',
-    label: '户外场景',
+    label: '户外实景',
     tag: '可用',
     tagType: 'success',
     title: '单张生成',
@@ -306,7 +306,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     uploadTitle: '车辆外观图',
     uploadHint: '点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB',
     selectorTitle: '场景选择',
-    selectorTag: '户外场景',
+    selectorTag: '户外实景',
     middleBlocks: sceneBlocks,
     options: outdoorOptions,
     actionLabel: '生成',
@@ -315,9 +315,9 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'road-motion',
     apiCode: 'scene_road_motion',
     kind: 'scene',
-    groupTitle: '场景影棚',
+    groupTitle: '场景更换',
     icon: 'mdi:road-variant',
-    label: '道路动态',
+    label: '行驶动效',
     tag: '可用',
     tagType: 'success',
     title: '单张生成',
@@ -325,7 +325,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     uploadTitle: '车辆外观图',
     uploadHint: '车身完整入镜 · JPG / PNG / WebP',
     selectorTitle: '场景选择',
-    selectorTag: '道路动态',
+    selectorTag: '行驶动效',
     middleBlocks: sceneBlocks,
     options: roadOptions,
     actionLabel: '生成',
@@ -334,7 +334,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'sky-studio',
     apiCode: 'scene_sky_studio',
     kind: 'scene',
-    groupTitle: '场景影棚',
+    groupTitle: '场景更换',
     icon: 'mdi:weather-cloudy',
     label: '天空影棚',
     tag: '可用',
@@ -374,10 +374,10 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     kind: 'beauty',
     groupTitle: '车辆美容',
     icon: 'mdi:white-balance-sunny',
-    label: '光污一致化',
+    label: '光污美化',
     tag: '演示',
     tagType: 'warning',
-    title: '光污一致化',
+    title: '光污美化',
     description: '上传车辆外观图，演示弱化眩光、反光、色偏，让车辆光线更统一。',
     uploadTitle: '上传外观图',
     uploadHint: '建议选择反光明显或光线不均的车图',
@@ -391,7 +391,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'interior-clean',
     apiCode: 'interior_clean',
     kind: 'interior',
-    groupTitle: '内饰',
+    groupTitle: '车辆美容',
     icon: 'mdi:car-seat',
     label: '内饰清洁',
     tag: '演示',
@@ -467,7 +467,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'batch-new',
     apiCode: 'batch_listing',
     kind: 'batch',
-    groupTitle: '批量 & 交付',
+    groupTitle: '智能交付',
     icon: 'mdi:package-variant-closed',
     label: '批量上新',
     tag: '套餐高阶',
@@ -486,7 +486,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     code: 'delivery',
     apiCode: 'asset_delivery',
     kind: 'delivery',
-    groupTitle: '批量 & 交付',
+    groupTitle: '智能交付',
     icon: 'mdi:folder-multiple-outline',
     label: '成片交付',
     tag: '可用',
@@ -671,7 +671,7 @@ const futureSidebarItems: WorkspaceMenuItem[] = [
   {
     code: 'future-detail-page',
     icon: 'mdi:file-document-outline',
-    label: '详情页素材',
+    label: '详情页物料',
     tag: '规划中',
     tagVariant: 'planned',
     disabled: true,
@@ -688,7 +688,7 @@ const futureSidebarItems: WorkspaceMenuItem[] = [
 
 export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   {
-    title: '场景影棚',
+    title: '场景更换',
     items: pickMenuItems([
       'showroom-light',
       'outdoor-scene',
@@ -698,14 +698,14 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   },
   {
     title: '车辆美容',
-    items: pickMenuItems(['paint-refresh', 'light-consistency']),
+    items: pickMenuItems([
+      'paint-refresh',
+      'light-consistency',
+      'interior-clean',
+    ]),
   },
   {
-    title: '内饰',
-    items: pickMenuItems(['interior-clean', 'interior-stitch']),
-  },
-  {
-    title: '批量 & 交付',
+    title: '智能交付',
     items: pickMenuItems(['batch-new', 'delivery']),
   },
   {

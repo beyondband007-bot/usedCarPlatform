@@ -146,7 +146,15 @@ onUnmounted(() => {
           loading="lazy"
           decoding="async"
         />
-        <div v-if="!slide.hideCopy" class="promo-banner-copy">
+        <div
+          v-if="!slide.hideCopy"
+          class="promo-banner-copy"
+          :class="{
+            'is-overlay-hidden': slide.copyOverlay === false,
+            'is-elevated': slide.copyLayout === 'elevated',
+            'is-dark-copy': slide.copyTone === 'dark',
+          }"
+        >
           <h2 v-if="slide.title">{{ slide.title }}</h2>
           <p v-for="line in slide.lines" :key="line">{{ line }}</p>
           <span
@@ -310,6 +318,29 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
+.promo-banner-copy.is-overlay-hidden {
+  background: transparent;
+}
+
+.promo-banner-copy.is-elevated {
+  justify-content: flex-start;
+  padding: 48px 35px 28px;
+}
+
+.promo-banner-copy.is-elevated .promo-banner-action {
+  margin-top: 16px;
+}
+
+.promo-banner-copy.is-dark-copy h2 {
+  color: #241a10;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.promo-banner-copy.is-dark-copy p {
+  color: #5a4c3c;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
 .promo-banner-dots {
   position: absolute;
   right: 24px;
@@ -354,6 +385,10 @@ onUnmounted(() => {
   .promo-banner-copy {
     max-width: 72%;
     padding: 95px 20px 24px;
+  }
+
+  .promo-banner-copy.is-elevated {
+    padding: 34px 20px 20px;
   }
 
   .promo-banner-copy h2 {

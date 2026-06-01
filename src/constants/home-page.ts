@@ -8,14 +8,17 @@ import featureShowroomImage from '@/img/home/feature-showroom.png'
 import featureSkyImage from '@/img/home/feature-sky.png'
 import featureVideoImage from '@/img/home/feature-video.png'
 import homeHeroImage from '@/assets/img/首页背景图/ae5148a4c2e2ae857a6f889b55bf0b8.png'
-import suiteEnterpriseImage from '@/img/home/suite-enterprise.png'
-import suiteWorkbenchImage from '@/img/home/suite-workbench.png'
+import suiteEnterpriseImageDark from '@/img/home/suite-enterprise.png'
+import suiteEnterpriseImageLight from '@/img/home/suite-enterprise-light.png'
+import suiteWorkbenchImageDark from '@/img/home/suite-workbench.png'
+import suiteWorkbenchImageLight from '@/img/home/suite-workbench-light.png'
 
 export interface HomeQuickEntry {
   title: string
   description: string
   action: string
-  image: string
+  imageDark: string
+  imageLight: string
   to?: string
   workbenchEntry?: boolean
   disabled?: boolean
@@ -49,14 +52,16 @@ export const homeQuickEntries: HomeQuickEntry[] = [
     description: '场景照、精修图、成片交付',
     action: '开始探索',
     workbenchEntry: true,
-    image: suiteWorkbenchImage,
+    imageDark: suiteWorkbenchImageDark,
+    imageLight: suiteWorkbenchImageLight,
   },
   {
     title: '企业套餐',
     description: '三档套餐，权限灵活、功能多元',
     action: '查看套餐',
     to: '/pricing',
-    image: suiteEnterpriseImage,
+    imageDark: suiteEnterpriseImageDark,
+    imageLight: suiteEnterpriseImageLight,
   },
 ]
 

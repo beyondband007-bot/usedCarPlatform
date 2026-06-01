@@ -3,9 +3,15 @@ import { onMounted, ref } from 'vue'
 
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import HomePromoBanner from '@/components/business/home/HomePromoBanner.vue'
-import { homeQuickEntries } from '@/constants/home-page'
+import { homeQuickEntries, type HomeQuickEntry } from '@/constants/home-page'
+import { useAppStore } from '@/stores/app'
 
+const appStore = useAppStore()
 const gridRef = ref<HTMLElement | null>(null)
+
+function entryImage(entry: HomeQuickEntry) {
+  return appStore.isDarkMode ? entry.imageDark : entry.imageLight
+}
 
 onMounted(() => {
   const root = gridRef.value
@@ -40,7 +46,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <section id="suite" class="suite-shell" aria-label="快捷入口">
+  <section
+    id="suite"
+    class="suite-shell"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    aria-label="快捷入口"
+  >
     <div ref="gridRef" class="suite-grid">
       <article
         v-for="entry in homeQuickEntries"
@@ -49,12 +60,12 @@ onMounted(() => {
       >
         <PreloadImage
           class="suite-card-image"
-          :src="entry.image"
+          :src="entryImage(entry)"
           :alt="entry.title"
           loading="lazy"
           decoding="async"
         />
-        <div>
+        <div class="suite-card-copy">
           <h2>{{ entry.title }}</h2>
           <p>{{ entry.description }}</p>
         </div>
@@ -98,7 +109,8 @@ onMounted(() => {
     box-shadow var(--home-motion-normal, 240ms ease);
 }
 
-.suite-card div {
+.suite-card div,
+.suite-card-copy {
   position: relative;
   z-index: 1;
   display: flex;
@@ -108,11 +120,12 @@ onMounted(() => {
   justify-content: flex-start;
   min-height: 259px;
   max-width: 58%;
-  padding: 117px 35px 35px;
+  padding: 48px 35px 28px;
   background: var(--home-media-overlay);
 }
 
-.suite-card div::after {
+.suite-card div::after,
+.suite-card-copy::after {
   position: absolute;
   inset: 0;
   content: '';
@@ -122,7 +135,8 @@ onMounted(() => {
   transition: opacity var(--home-motion-normal, 240ms ease);
 }
 
-.suite-card:hover:not(.promo-banner) div::after {
+.suite-card:hover:not(.promo-banner) div::after,
+.suite-card:hover:not(.promo-banner) .suite-card-copy::after {
   opacity: 0.55;
 }
 
@@ -177,6 +191,24 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
+.suite-shell.theme-light .suite-card div,
+.suite-shell.theme-light .suite-card-copy {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(255, 255, 255, 0.72) 58%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+}
+
+.suite-shell.theme-light .suite-card h2 {
+  color: #0f172a;
+}
+
+.suite-shell.theme-light .suite-card p {
+  color: #475569;
+}
+
 @media (max-width: 1100px) {
   .suite-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -200,13 +232,15 @@ onMounted(() => {
   }
 
   .suite-card,
-  .suite-card div {
+  .suite-card div,
+  .suite-card-copy {
     min-height: 210px;
   }
 
-  .suite-card div {
+  .suite-card div,
+  .suite-card-copy {
     max-width: 72%;
-    padding: 95px 20px 24px;
+    padding: 34px 20px 20px;
   }
 }
 </style>

@@ -8,6 +8,7 @@ import tutorialShowroomTemplate1 from "@/assets/img/展厅灯光/展厅模板/�
 import tutorialShowroomTemplate2 from "@/assets/img/展厅灯光/展厅模板/选择模板2.png";
 import tutorialShowroomTemplate3 from "@/assets/img/展厅灯光/展厅模板/选择模板3.png";
 import tutorialResultImage from "@/assets/img/展厅灯光/展厅模板/生成效果.png";
+import tutorialLogoImage from "@/assets/img/展厅灯光/展厅模板/ai-car-studio-logo.png";
 
 defineProps<{
   animationKey?: string;
@@ -28,7 +29,7 @@ const tutorialSteps = [
   {
     title: "选择 Logo",
     icon: "mdi:badge-account-horizontal-outline",
-    image: "",
+    image: tutorialLogoImage,
   },
   {
     title: "生成效果",
@@ -78,11 +79,14 @@ const tutorialTemplatePreviewImages = [
             </div>
           </template>
           <template v-else-if="index === 2">
-            <div class="tutorial-logo-preview" aria-hidden="true">
-              <span class="tutorial-logo-frame">
-                <span>AI CARXEN</span>
-              </span>
-            </div>
+            <PreloadImage
+              class="tutorial-image tutorial-logo-image"
+              :src="step.image"
+              alt="AI CAR STUDIO Logo"
+              loading="lazy"
+              :draggable="false"
+              fit="contain"
+            />
           </template>
           <PreloadImage
             v-else
@@ -200,6 +204,7 @@ const tutorialTemplatePreviewImages = [
 
 .tutorial-step.is-step-1 .tutorial-placeholder,
 .tutorial-step.is-step-2 .tutorial-placeholder,
+.tutorial-step.is-step-3 .tutorial-placeholder,
 .tutorial-step.is-step-4 .tutorial-placeholder {
   align-items: flex-start;
   justify-content: center;
@@ -210,6 +215,7 @@ const tutorialTemplatePreviewImages = [
 
 .tutorial-section.theme-light .tutorial-step.is-step-1 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-2 .tutorial-placeholder,
+.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-4 .tutorial-placeholder {
   background: #f8fafc;
 }
@@ -217,10 +223,10 @@ const tutorialTemplatePreviewImages = [
 .tutorial-step.is-step-3 .tutorial-placeholder {
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #fffdf8 0%, #f8fafc 100%);
 }
 
 .tutorial-step.is-step-1 .tutorial-image,
+.tutorial-step.is-step-3 .tutorial-image,
 .tutorial-step.is-step-4 .tutorial-image {
   display: flex;
   width: 100%;
@@ -231,6 +237,7 @@ const tutorialTemplatePreviewImages = [
 }
 
 .tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
+.tutorial-step.is-step-3 .tutorial-image :deep(.preload-image),
 .tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
   display: flex;
   width: 100%;
@@ -248,6 +255,33 @@ const tutorialTemplatePreviewImages = [
   max-height: 100%;
   object-fit: contain;
   object-position: top center;
+}
+
+.tutorial-step.is-step-3 .tutorial-logo-image {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image) {
+  display: flex;
+  width: min(88%, 220px);
+  height: auto;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+}
+
+.tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image__img) {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .tutorial-mosaic {
@@ -288,57 +322,6 @@ const tutorialTemplatePreviewImages = [
   height: 100%;
   object-fit: contain;
   object-position: top center;
-}
-
-.tutorial-logo-preview {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  place-items: center;
-  background: transparent;
-}
-
-.tutorial-logo-frame {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(92%, 180px);
-  height: 44px;
-  border: 1px solid rgba(212, 160, 23, 0.48);
-  border-radius: 999px;
-  background: #111111;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 232, 139, 0.38),
-    0 10px 24px rgba(0, 0, 0, 0.24);
-}
-
-.tutorial-logo-frame::before,
-.tutorial-logo-frame::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #d4a017;
-  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
-  transform: translateY(-50%);
-}
-
-.tutorial-logo-frame::before {
-  left: 10px;
-}
-
-.tutorial-logo-frame::after {
-  right: 10px;
-}
-
-.tutorial-logo-frame span {
-  color: #d4a017;
-  font-size: 13px;
-  font-weight: 950;
-  letter-spacing: 0.06em;
 }
 
 .tutorial-step-foot {
