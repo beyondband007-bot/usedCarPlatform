@@ -1,0 +1,168 @@
+import { Router } from "express";
+
+import { asyncHandler } from "../../shared/asyncHandler";
+import { errors } from "../../shared/errors";
+import { createId } from "../../shared/ids";
+import { ok } from "../../shared/response";
+import { getCreditsAdminOverview } from "./creditsAdminService";
+import { resolveBillingIdentity } from "./billingIdentity";
+import { creditsClient, type CreditAccountResponse } from "./creditsClient";
+
+type ProxyIdentityBody = {
+  userId?: unknown;
+  creditsUserId?: unknown;
+  tenantId?: unknown;
+  creditsTenantId?: unknown;
+  accountScope?: unknown;
+};
+
+const parsePositiveInteger = (value: unknown, name: string, required = false) => {
+  if (value === undefined || value === null || value === "") {
+    if (required) throw errors.invalidParameter(`${name} is required`);
+    return null;
+  }
+  const parsed = Number(Array.isArray(value) ? value[0] : value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw errors.invalidParameter(`${name} must be a positive integer`);
+  }
+  return parsed;
+};
+
+const parseRequiredPositiveInteger = (value: unknown, name: string) =>
+  parsePositiveInteger(value, name, true) as number;
+
+const parseLimit = (value: unknown) => {
+  const limit = parsePositiveInteger(value, "limit");
+  if (limit === null) return undefined;
+  if (limit > 100) throw errors.invalidParameter("limit must be between 1 and 100");
+  return limit;
+};
+
+const parsePayChannel = (value: unknown) => {
+  if (value === "alipay" || value === "wechat" || value === "card") return value;
+  throw errors.invalidParameter("payChannel must be alipay, wechat, or card");
+};
+
+const parseAccountScope = (value: unknown) =>
+  value === "personal" || value === "tenant" ? value : null;
+
+const resolveProxyIdentity = (body: ProxyIdentityBody, headers: Record<string, string | string[] | undefined>) => {
+  const identity = resolveBillingIdentity(body, { headers }, { requireEnabled: false });
+  if (!identity) {
+    throw errors.invalidParameter("credits user id is required", {
+      headers: ["x-credits-user-id", "x-user-id"],
+      queryOrBody: ["creditsUserId", "userId"],
+      env: "CREDITS_DEFAULT_USER_ID",
+    });
+  }
+  return identity;
+};
+
+const selectTransactionAccount = (
+  accounts: CreditAccountResponse[],
+  input: {
+    accountId: number | null;
+    accountScope: "personal" | "tenant";
+    tenantId?: number;
+  },
+) => {
+  if (input.accountId) {
+    return accounts.find((account) => account.id === input.accountId) ?? null;
+  }
+  if (input.accountScope === "tenant") {
+    return (
+      accounts.find(
+        (account) =>
+          account.accountScope === "tenant" &&
+          (input.tenantId === undefined || account.tenantId === input.tenantId),
+      ) ?? null
+    );
+  }
+  return accounts.find((account) => account.accountScope === "personal") ?? accounts[0] ?? null;
+};
+
+export const creditsRoutes = Router();
+
+creditsRoutes.get(
+  "/admin/overview",
+  asyncHandler(async (req, res) => {
+    const identity = resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    ok(res, await getCreditsAdminOverview(identity));
+  }),
+);
+
+creditsRoutes.get(
+  "/accounts",
+  asyncHandler(async (req, res) => {
+    const identity = resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    ok(res, await creditsClient.listAccounts({ userId: identity.userId }));
+  }),
+);
+
+creditsRoutes.get(
+  "/transactions",
+  asyncHandler(async (req, res) => {
+    const query = req.query as Record<string, unknown>;
+    const identity = resolveProxyIdentity(query, req.headers);
+    const accountId = parsePositiveInteger(query.accountId, "accountId");
+    const limit = parseLimit(query.limit);
+    const accountsResult = await creditsClient.listAccounts({ userId: identity.userId });
+    const account = selectTransactionAccount(accountsResult.accounts, {
+      accountId,
+      accountScope: parseAccountScope(query.accountScope) ?? identity.accountScope,
+      tenantId: parsePositiveInteger(query.tenantId ?? query.creditsTenantId, "tenantId") ?? identity.tenantId,
+    });
+
+    if (!account) {
+      throw errors.invalidParameter("credit account not found for transaction query", {
+        accountId,
+        accountScope: identity.accountScope,
+        tenantId: identity.tenantId ?? null,
+      });
+    }
+
+    const transactions = await creditsClient.listAccountTransactions({
+      accountId: account.id,
+      userId: identity.userId,
+      limit,
+    });
+
+    ok(res, {
+      account,
+      ...transactions,
+    });
+  }),
+);
+
+creditsRoutes.get(
+  "/recharge-products",
+  asyncHandler(async (_req, res) => {
+    ok(res, await creditsClient.listRechargeProducts());
+  }),
+);
+
+creditsRoutes.post(
+  "/payment-orders",
+  asyncHandler(async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const identity = resolveProxyIdentity(body, req.headers);
+    const productId = parseRequiredPositiveInteger(body.productId, "productId");
+    const payChannel = parsePayChannel(body.payChannel);
+    const idempotencyKey =
+      typeof body.idempotencyKey === "string" && body.idempotencyKey.trim()
+        ? body.idempotencyKey.trim()
+        : `payment_order:${createId("request")}`;
+
+    ok(
+      res,
+      await creditsClient.createPaymentOrder({
+        userId: identity.userId,
+        accountScope: identity.accountScope,
+        tenantId: identity.tenantId,
+        productId,
+        payChannel,
+        idempotencyKey,
+      }),
+    );
+  }),
+);

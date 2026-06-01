@@ -16,6 +16,17 @@ const toList = (value: string | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const toBoolean = (value: string | undefined, fallback: boolean) => {
+  if (value === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+};
+
+const toOptionalNumber = (value: string | undefined) => {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const rootDir = path.resolve(__dirname, "../..");
 
 export const env = {
@@ -47,5 +58,16 @@ export const env = {
       process.env.KIE_TASK_DETAIL_URL ?? "https://api.kie.ai/api/v1/jobs/recordInfo",
     fileUploadBaseUrl: process.env.KIE_FILE_UPLOAD_BASE_URL ?? "https://kieai.redpandaai.co",
     model: "gpt-image-2-image-to-image",
+  },
+
+  credits: {
+    enabled: toBoolean(process.env.CREDITS_PLATFORM_ENABLED, false),
+    baseUrl: (process.env.CREDITS_PLATFORM_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, ""),
+    applicationCode: process.env.CREDITS_APPLICATION_CODE ?? "used-car-platform",
+    defaultUserId: toOptionalNumber(process.env.CREDITS_DEFAULT_USER_ID),
+    defaultTenantId: toOptionalNumber(process.env.CREDITS_DEFAULT_TENANT_ID),
+    defaultAccountScope:
+      process.env.CREDITS_DEFAULT_ACCOUNT_SCOPE === "tenant" ? "tenant" : "personal",
+    requestTimeoutMs: toNumber(process.env.CREDITS_REQUEST_TIMEOUT_MS, 8000),
   },
 };

@@ -4,13 +4,21 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
 import { showroomLightPrompt, showroomLightWithLogoPrompt } from "./showroomLightPrompts";
 import { getShowroomLightScene } from "./showroomLightScenes";
 
 class ShowroomLightService {
-  async createTask(body: CreateModuleTaskRequest) {
+  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -60,6 +68,23 @@ class ShowroomLightService {
       logoAssetId: logoAsset?.id ?? null,
       prompt,
     });
+
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: "showroom-light",
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
 
     const lease = await kieKeyPool.acquire();
     try {
@@ -115,10 +140,16 @@ class ShowroomLightService {
         sceneReferenceImageUrl: scene.referenceImageUrl,
         logoAssetId: logoAsset?.id ?? null,
         inputImageCount: inputUrls.length,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "SHOWROOM_LIGHT_CREATE_FAILED",

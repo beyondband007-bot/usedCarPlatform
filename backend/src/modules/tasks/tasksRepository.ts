@@ -21,6 +21,13 @@ export interface GenerationTaskRecord {
   resultJson?: unknown;
   errorCode?: string | null;
   errorMessage?: string | null;
+  creditsUserId?: number | null;
+  creditsTenantId?: number | null;
+  accountScope?: "personal" | "tenant" | null;
+  billingTaskId?: number | null;
+  billingStatus?: string | null;
+  estimatedPoints?: string | null;
+  settledPoints?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +53,13 @@ interface GenerationTaskRow extends RowDataPacket {
   result_json: unknown;
   error_code: string | null;
   error_message: string | null;
+  credits_user_id: number | null;
+  credits_tenant_id: number | null;
+  account_scope: "personal" | "tenant" | null;
+  billing_task_id: number | null;
+  billing_status: string | null;
+  estimated_points: string | null;
+  settled_points: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -71,6 +85,13 @@ const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   resultJson: row.result_json,
   errorCode: row.error_code,
   errorMessage: row.error_message,
+  creditsUserId: row.credits_user_id,
+  creditsTenantId: row.credits_tenant_id,
+  accountScope: row.account_scope,
+  billingTaskId: row.billing_task_id,
+  billingStatus: row.billing_status,
+  estimatedPoints: row.estimated_points,
+  settledPoints: row.settled_points,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -169,6 +190,35 @@ export class TasksRepository extends Repository {
        VALUES
         (:id, :moduleCode, 'waiting', 0, :inputAssetId, :optionId, :outputRatio, :resolution, :logoAssetId, :prompt)`,
       input as unknown as Record<string, unknown>,
+    );
+  }
+
+  async updateBilling(input: {
+    id: string;
+    creditsUserId: number;
+    creditsTenantId?: number | null;
+    accountScope: "personal" | "tenant";
+    billingTaskId: number;
+    billingStatus: string;
+    estimatedPoints?: string | null;
+    settledPoints?: string | null;
+  }) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET credits_user_id = :creditsUserId,
+           credits_tenant_id = :creditsTenantId,
+           account_scope = :accountScope,
+           billing_task_id = :billingTaskId,
+           billing_status = :billingStatus,
+           estimated_points = :estimatedPoints,
+           settled_points = :settledPoints
+       WHERE id = :id`,
+      {
+        ...input,
+        creditsTenantId: input.creditsTenantId ?? null,
+        estimatedPoints: input.estimatedPoints ?? null,
+        settledPoints: input.settledPoints ?? null,
+      },
     );
   }
 

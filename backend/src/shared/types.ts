@@ -19,5 +19,10 @@ export interface CreateModuleTaskRequest {
   outputRatio?: OutputRatio;
   resolution?: Resolution;
   logoAssetId?: string;
+  userId?: number | string;
+  creditsUserId?: number | string;
+  tenantId?: number | string;
+  creditsTenantId?: number | string;
+  accountScope?: "personal" | "tenant";
   extra?: Record<string, unknown>;
 }
