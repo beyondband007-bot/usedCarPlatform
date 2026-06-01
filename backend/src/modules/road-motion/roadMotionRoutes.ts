@@ -1,15 +1,16 @@
-import { createSceneModuleService } from "../scene-common/sceneModuleFactory";
-import { createSceneModuleRoutes } from "../scene-common/sceneModuleRoutes";
-import { roadMotionPrompt, roadMotionWithLogoPrompt } from "./roadMotionPrompts";
-import { roadMotionScenes } from "./roadMotionScenes";
+import { Router } from "express";
 
-export const roadMotionService = createSceneModuleService({
-  moduleCode: "road-motion",
-  uploadPath: "used-car-platform/road-motion",
-  defaultPrompt: roadMotionPrompt,
-  logoPrompt: roadMotionWithLogoPrompt,
-  scenes: roadMotionScenes,
-});
+import { asyncHandler } from "../../shared/asyncHandler";
+import { ok } from "../../shared/response";
+import { roadMotionService } from "./roadMotionService";
 
-export const roadMotionRoutes = createSceneModuleRoutes(roadMotionService);
+export const roadMotionRoutes = Router();
+
+roadMotionRoutes.post(
+  "/tasks",
+  asyncHandler(async (req, res) => {
+    const result = await roadMotionService.createTask(req.body);
+    ok(res, result);
+  }),
+);
 

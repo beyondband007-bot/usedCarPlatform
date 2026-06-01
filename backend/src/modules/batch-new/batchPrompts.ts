@@ -1,5 +1,8 @@
 import type { BatchVisualConfig } from "./batchTypes";
 
+const logoVisibilityGuard =
+  "如果原车图片完全看不到车牌区域，例如只有车身侧面、车牌被遮挡或车牌不在画面内，不要强行新增车牌，不要新增 Logo，也不要把 Logo 贴到车身、车窗、地面或背景上。";
+
 const scene = "第一张图片是车辆主体，第二张图片是目标上新场景参考图。请将第一张车自然放入第二张场景中，保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。让车辆与目标场景的地面接触、透视关系、阴影、环境反射和整体光照自然融合，严格参考第二张场景图的空间结构、地面材质、光线方向、景深和环境氛围。不要人物、不要杂物、不要额外文字、不要车牌号，不要生成多辆车。输出适合二手车电商批量上新的真实汽车广告主图，画面干净、高级、统一。";
 const sceneLogo = "第一张图片是车辆主体，第二张图片是目标上新场景参考图，第三张图片是需要放置在车牌位置的 Logo / 标识参考图。请将第一张车自然放入第二张场景中，并将第三张图中的 Logo / 标识贴合到车辆车牌区域。保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。Logo 需要清晰、端正、自然贴合车牌位置，不要变形，不要漂浮，不要额外生成其它文字。让车辆与目标场景的地面接触、透视关系、阴影、环境反射和整体光照自然融合。不要人物、不要杂物、不要原车牌号，不要生成多辆车。输出适合二手车电商批量上新的真实汽车广告主图。";
 const sceneLight = "第一张图片是车辆主体，第二张图片是目标上新场景参考图。请将第一张车自然放入第二张场景中，同时对车辆外观进行光污一致化处理。保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。重点修复车身表面因环境光、反光、炫光、色偏和曝光不均造成的视觉不一致问题，弱化强烈反光、杂乱倒影、过曝光斑和异常色彩干扰，使车身光线更加均匀自然、漆面质感稳定统一。让车辆与目标场景的光线方向、地面阴影、环境反射、透视关系和整体氛围自然融合。不要人物、不要杂物、不要额外文字、不要车牌号，不要生成多辆车。";
@@ -37,20 +40,20 @@ export const buildBatchPromptKey = (config: BatchVisualConfig) =>
 
 export const batchPromptMap: Record<string, string> = {
   scene,
-  "scene+logo": sceneLogo,
+  "scene+logo": `${sceneLogo}${logoVisibilityGuard}`,
   "scene+light": sceneLight,
   "scene+paint": scenePaint,
-  "scene+logo+light": sceneLogoLight,
-  "scene+logo+paint": sceneLogoPaint,
+  "scene+logo+light": `${sceneLogoLight}${logoVisibilityGuard}`,
+  "scene+logo+paint": `${sceneLogoPaint}${logoVisibilityGuard}`,
   "scene+light+paint": sceneLightPaint,
-  "scene+logo+light+paint": sceneLogoLightPaint,
-  logo,
-  "logo+light": logoLight,
-  "logo+paint": logoPaint,
+  "scene+logo+light+paint": `${sceneLogoLightPaint}${logoVisibilityGuard}`,
+  logo: `${logo}${logoVisibilityGuard}`,
+  "logo+light": `${logoLight}${logoVisibilityGuard}`,
+  "logo+paint": `${logoPaint}${logoVisibilityGuard}`,
   light,
   paint,
   "light+paint": lightPaint,
-  "logo+light+paint": logoLightPaint,
+  "logo+light+paint": `${logoLightPaint}${logoVisibilityGuard}`,
 };
 
 export const resolveBatchExteriorPrompt = (config: BatchVisualConfig) =>
