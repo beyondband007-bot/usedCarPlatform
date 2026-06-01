@@ -59,6 +59,34 @@ export interface CreatedGenerationTask {
   createdAt: string
 }
 
+export interface InteriorCollageTaskGroup {
+  groupIndex: number
+  inputAssetIds: string[]
+  inputImageCount: number
+}
+
+export interface CreatedInteriorCollageTask extends CreatedGenerationTask {
+  groupIndex: number
+  groupCount: number
+  inputAssetIds: string[]
+}
+
+export interface CreatedInteriorCollageBatch {
+  moduleCode: 'interior-collage'
+  status: GenerationTaskStatus
+  inputImageCount: number
+  outputCount: number
+  groups: InteriorCollageTaskGroup[]
+  tasks: CreatedInteriorCollageTask[]
+  createdAt: string
+}
+
+export interface CreateInteriorCollageTaskPayload {
+  assetIds: string[]
+  outputRatio?: string
+  resolution?: string
+}
+
 export interface GenerationResultImage {
   url: string
   sourceUrl?: string
@@ -117,6 +145,7 @@ export interface CreativeImageMessage {
     resolution?: string
     [key: string]: unknown
   } | null
+  resultUrl?: string | null
   createdAt: string
 }
 
@@ -349,6 +378,18 @@ export async function createGenerationTask(
   return unwrapApiResponse(response)
 }
 
+export async function createInteriorCollageTask(
+  payload: CreateInteriorCollageTaskPayload,
+) {
+  const response = await request.post<ApiResponse<CreatedInteriorCollageBatch>>(
+    '/modules/interior-collage/tasks',
+    payload,
+    generationRequestConfig,
+  )
+
+  return unwrapApiResponse(response)
+}
+
 export async function createCreativeImageConversation(payload?: { title?: string }) {
   const response = await request.post<ApiResponse<CreativeImageConversation>>(
     '/modules/creative-image/conversations',
@@ -499,6 +540,148 @@ export async function deleteDeliveryAssets(assetIds: string[]) {
   const response = await request.delete<ApiResponse<{ deleted: string[]; failed: string[] }>>(
     '/modules/delivery/assets',
     { data: { assetIds } },
+  )
+  return unwrapApiResponse(response)
+}
+
+// ===================== Reusable Credits Platform 代理接口 =====================
+// 详见 文档/积分文档.md 第 2/8 节。
+// 请求头 x-credits-user-id / x-credits-account-scope 由 http.ts 拦截器自动注入。
+
+export type CreditsAccountStatus = 'active' | 'frozen' | 'closed' | string
+
+export interface CreditsAccount {
+  id: number | string
+  userId: number | string
+  tenantId: number | string | null
+  accountScope: 'personal' | 'tenant' | string
+  totalBalance: number
+  lockedBalance: number
+  availableBalance: number
+  status: CreditsAccountStatus
+}
+
+export interface RechargeProduct {
+  id: number | string
+  code: string
+  name: string
+  description?: string | null
+  priceCents?: number
+  priceText?: string
+  giftPoints: number
+  totalPoints?: number
+  status?: string
+  badge?: string | null
+  highlights?: string[]
+}
+
+export type CreditsTransactionType =
+  | 'estimate'
+  | 'freeze'
+  | 'settle'
+  | 'refund'
+  | 'recharge'
+  | 'adjust'
+  | string
+
+export interface CreditsTransaction {
+  id: number | string
+  txnType: CreditsTransactionType
+  points: number
+  balanceBefore?: number
+  balanceAfter?: number
+  billingTaskId?: string | null
+  paymentOrderId?: string | null
+  bizType?: string | null
+  bizId?: string | null
+  remark?: string | null
+  createdAt: string
+}
+
+export interface PaymentOrderResult {
+  id: number | string
+  orderNo: string
+  productId: number | string
+  productName?: string
+  amountCents?: number
+  amountText?: string
+  giftPoints: number
+  totalPoints?: number
+  status: 'pending' | 'paid' | 'failed' | 'canceled' | string
+  payUrl?: string | null
+  qrCodeUrl?: string | null
+  createdAt: string
+}
+
+export interface CreditsAdminOverview {
+  application: {
+    id: number | string
+    code: string
+    name: string
+    status: string
+  } | null
+  applicationFunctions: Array<{
+    code: string
+    name: string
+    defaultPoints: number
+    status: string
+  }>
+  creditAccounts: CreditsAccount[]
+  rechargeProducts: RechargeProduct[]
+  recentTransactions: CreditsTransaction[]
+}
+
+export async function getCreditsAccounts() {
+  const response = await request.get<ApiResponse<{ items: CreditsAccount[] }> | ApiResponse<CreditsAccount[]>>(
+    '/credits/accounts',
+  )
+  const payload = unwrapApiResponse(response as ApiResponse<unknown>)
+  if (Array.isArray(payload)) return payload as CreditsAccount[]
+  return (payload as { items: CreditsAccount[] }).items ?? []
+}
+
+export async function getRechargeProducts() {
+  const response = await request.get<ApiResponse<{ items: RechargeProduct[] }> | ApiResponse<RechargeProduct[]>>(
+    '/credits/recharge-products',
+  )
+  const payload = unwrapApiResponse(response as ApiResponse<unknown>)
+  if (Array.isArray(payload)) return payload as RechargeProduct[]
+  return (payload as { items: RechargeProduct[] }).items ?? []
+}
+
+export async function getCreditsTransactions(params?: {
+  page?: number
+  pageSize?: number
+  txnType?: CreditsTransactionType
+  from?: string
+  to?: string
+}) {
+  const response = await request.get<
+    ApiResponse<{ items: CreditsTransaction[]; total?: number } | CreditsTransaction[]>
+  >('/credits/transactions', { params })
+  const payload = unwrapApiResponse(response)
+  if (Array.isArray(payload)) return { items: payload, total: payload.length }
+  return {
+    items: payload.items ?? [],
+    total: payload.total ?? payload.items?.length ?? 0,
+  }
+}
+
+export async function createRechargeOrder(payload: {
+  productId: number | string
+  quantity?: number
+  remark?: string
+}) {
+  const response = await request.post<ApiResponse<PaymentOrderResult>>(
+    '/credits/payment-orders',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getCreditsAdminOverview() {
+  const response = await request.get<ApiResponse<CreditsAdminOverview>>(
+    '/credits/admin/overview',
   )
   return unwrapApiResponse(response)
 }

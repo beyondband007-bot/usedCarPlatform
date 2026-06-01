@@ -1,14 +1,14 @@
 export interface CreativeImageAspectRatio {
   value: string
   label: string
-  resolution: string
 }
 
 export const creativeImageAspectRatios: CreativeImageAspectRatio[] = [
-  { value: '1:1', label: '1:1', resolution: '2048×2048' },
-  { value: '3:4', label: '3:4', resolution: '1536×2048' },
-  { value: '16:9', label: '16:9', resolution: '2048×1152' },
-  { value: '4:3', label: '4:3', resolution: '1600×1200' },
+  { value: '1:1', label: '1:1 主图' },
+  { value: '3:4', label: '3:4 竖图' },
+  { value: '4:3', label: '4:3 横图' },
+  { value: '9:16', label: '9:16 竖图' },
+  { value: '16:9', label: '16:9 横图' },
 ]
 
 export const creativeImagePromptMaxLength = 2000

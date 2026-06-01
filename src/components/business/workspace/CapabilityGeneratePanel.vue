@@ -33,6 +33,7 @@ import type {
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
+import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -50,14 +51,6 @@ const emit = defineEmits<{
   batchCreated: [payload: WorkspaceBatchCreatedPayload];
 }>();
 
-const outputRatioLabelMap: Record<string, string> = {
-  "1:1": "主图 1:1",
-  "3:4": "主图 3:4",
-  "4:3": "主图 4:3",
-  "9:16": "主图 9:16",
-  "16:9": "主图 16:9",
-};
-
 const message = useMessage();
 const {
   NEW_PRESET_VALUE,
@@ -70,6 +63,7 @@ const {
 } = useBatchVisualTemplates();
 
 const useLogo = ref(false);
+const paintColorCode = ref("");
 const outputRatio = ref("1:1");
 const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
@@ -102,7 +96,10 @@ const isCreatingBatchTask = ref(false);
 const isDeletingDeliveryAssets = ref(false);
 const lastCreatedBatchId = ref<string | null>(null);
 const batchExteriorInputRef = ref<HTMLInputElement | null>(null);
+const interiorCollageInputRef = ref<HTMLInputElement | null>(null);
 const MAX_BATCH_EXTERIOR_IMAGES = 5;
+const MIN_INTERIOR_COLLAGE_IMAGES = 2;
+const MAX_INTERIOR_COLLAGE_IMAGES = 10;
 
 let previewObjectUrl: string | null = null;
 
@@ -116,6 +113,10 @@ type BatchExteriorUploadItem = {
   objectUrl?: string;
   error?: string;
 };
+
+type InteriorCollageUploadItem = BatchExteriorUploadItem;
+
+const interiorCollageUploads = ref<InteriorCollageUploadItem[]>([]);
 
 function revokePreviewObjectUrl() {
   if (!previewObjectUrl) return;
@@ -138,6 +139,11 @@ function revokeBatchExteriorObjectUrl(item: BatchExteriorUploadItem) {
 function resetBatchExteriorUploads() {
   batchExteriorUploads.value.forEach(revokeBatchExteriorObjectUrl);
   batchExteriorUploads.value = [];
+}
+
+function resetInteriorCollageUploads() {
+  interiorCollageUploads.value.forEach(revokeBatchExteriorObjectUrl);
+  interiorCollageUploads.value = [];
 }
 
 function resetBatchCreateSection() {
@@ -221,6 +227,26 @@ const batchExteriorRemainingCount = computed(() =>
 
 const canAddBatchExteriorImages = computed(
   () => batchExteriorRemainingCount.value > 0 && !isUploadingVehicle.value,
+);
+
+const uploadedInteriorCollageAssets = computed(() =>
+  interiorCollageUploads.value
+    .filter(
+      (item): item is InteriorCollageUploadItem & { asset: UploadedAsset } =>
+        item.status === "success" && Boolean(item.asset),
+    )
+    .map((item) => item.asset),
+);
+
+const interiorCollageRemainingCount = computed(() =>
+  Math.max(
+    0,
+    MAX_INTERIOR_COLLAGE_IMAGES - interiorCollageUploads.value.length,
+  ),
+);
+
+const canAddInteriorCollageImages = computed(
+  () => interiorCollageRemainingCount.value > 0 && !isUploadingInterior.value,
 );
 
 const batchEstimatedCost = computed(() => {
@@ -342,19 +368,25 @@ async function handleVehicleFileSelected(file: File) {
   isUploadingVehicle.value = true;
 
   try {
-    const purpose = props.capability.code === "interior-clean" ? "car_interior" : "car_exterior";
+    const purpose =
+      props.capability.kind === "interior" ? "car_interior" : "car_exterior";
     const asset = await uploadAsset(file, purpose);
     uploadedAsset.value = asset;
     revokePreviewObjectUrl();
     uploadedPreviewUrl.value = asset.url;
-    message.success(props.capability.code === "interior-clean" ? "内饰图片上传成功" : "车辆图片上传成功");
+    message.success(
+      props.capability.kind === "interior"
+        ? "内饰图片上传成功"
+        : "车辆图片上传成功",
+    );
   } catch (error) {
     resetUploadedVehicle();
-    const text = error instanceof Error
-      ? error.message
-      : props.capability.code === "interior-clean"
-        ? "内饰图片上传失败"
-        : "车辆图片上传失败";
+    const text =
+      error instanceof Error
+        ? error.message
+        : props.capability.kind === "interior"
+          ? "内饰图片上传失败"
+          : "车辆图片上传失败";
     message.error(text);
   } finally {
     isUploadingVehicle.value = false;
@@ -493,6 +525,116 @@ function handleBatchExteriorRemove(id: string) {
   );
 }
 
+function updateInteriorCollageUpload(
+  id: string,
+  patch: Partial<InteriorCollageUploadItem>,
+) {
+  const index = interiorCollageUploads.value.findIndex((item) => item.id === id);
+  if (index < 0) return;
+
+  interiorCollageUploads.value[index] = {
+    ...interiorCollageUploads.value[index],
+    ...patch,
+  };
+}
+
+function openInteriorCollagePicker() {
+  if (!canAddInteriorCollageImages.value) return;
+  interiorCollageInputRef.value?.click();
+}
+
+async function handleInteriorCollageFilesSelected(files: File[]) {
+  const imageFiles = normalizeImageFiles(files);
+
+  if (!imageFiles.length) {
+    message.warning("请选择 JPG、PNG 或 WebP 图片");
+    return;
+  }
+
+  const remaining = interiorCollageRemainingCount.value;
+  if (remaining <= 0) {
+    message.warning(`内饰图最多上传 ${MAX_INTERIOR_COLLAGE_IMAGES} 张`);
+    return;
+  }
+
+  const selectedFiles = imageFiles.slice(0, remaining);
+  if (imageFiles.length > remaining) {
+    message.warning(
+      `最多支持 ${MAX_INTERIOR_COLLAGE_IMAGES} 张，已自动保留前 ${remaining} 张`,
+    );
+  }
+
+  const pendingItems = selectedFiles.map(createBatchExteriorUploadItem);
+  interiorCollageUploads.value = [
+    ...interiorCollageUploads.value,
+    ...pendingItems,
+  ];
+  isUploadingInterior.value = true;
+
+  const results = await Promise.allSettled(
+    pendingItems.map(async (item, index) => {
+      const asset = await uploadAsset(selectedFiles[index], "car_interior");
+      revokeBatchExteriorObjectUrl(item);
+      updateInteriorCollageUpload(item.id, {
+        asset,
+        previewUrl: asset.url,
+        objectUrl: undefined,
+        status: "success",
+      });
+    }),
+  );
+
+  const successCount = results.filter(
+    (result) => result.status === "fulfilled",
+  ).length;
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+
+    updateInteriorCollageUpload(pendingItems[index].id, {
+      status: "fail",
+      error:
+        result.reason instanceof Error ? result.reason.message : "上传失败",
+    });
+  });
+
+  if (successCount > 0) {
+    message.success(`已上传 ${successCount} 张内饰图`);
+  }
+
+  const failedCount = results.length - successCount;
+  if (failedCount > 0) {
+    message.error(`${failedCount} 张内饰图上传失败，请删除后重试`);
+  }
+
+  isUploadingInterior.value = false;
+}
+
+function handleInteriorCollageInputChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+
+  void handleInteriorCollageFilesSelected(files);
+}
+
+function handleInteriorCollageDrop(event: DragEvent) {
+  if (!canAddInteriorCollageImages.value) return;
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  void handleInteriorCollageFilesSelected(files);
+}
+
+function handleInteriorCollageRemove(id: string) {
+  const target = interiorCollageUploads.value.find((item) => item.id === id);
+  if (target) {
+    revokeBatchExteriorObjectUrl(target);
+  }
+
+  interiorCollageUploads.value = interiorCollageUploads.value.filter(
+    (item) => item.id !== id,
+  );
+}
+
 function handleInteriorFileSelected(file: File) {
   isUploadingInterior.value = true;
 
@@ -516,6 +658,24 @@ function handleInteriorImageRemove() {
 }
 
 function handleGenerate() {
+  if (props.capability.code === "interior-stitch") {
+    const assetIds = uploadedInteriorCollageAssets.value.map(
+      (asset) => asset.assetId,
+    );
+
+    if (assetIds.length < MIN_INTERIOR_COLLAGE_IMAGES) {
+      message.warning(`请至少上传 ${MIN_INTERIOR_COLLAGE_IMAGES} 张内饰图`);
+      return;
+    }
+
+    emit("generate", {
+      assetIds,
+      outputRatio: "16:9",
+      resolution: "2K",
+    });
+    return;
+  }
+
   if (!uploadedAsset.value) {
     message.warning("Please select completed tasks first");
     return;
@@ -523,11 +683,14 @@ function handleGenerate() {
 
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
-    outputRatio:
-      outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+    outputRatio: outputRatio.value,
     optionId:
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
+    colorCode:
+      props.capability.code === "paint-refresh"
+        ? paintColorCode.value || undefined
+        : undefined,
   });
 }
 
@@ -674,12 +837,15 @@ watch(
   () => {
     resetUploadedVehicle();
     resetBatchExteriorUploads();
+    resetInteriorCollageUploads();
+    paintColorCode.value = "";
   },
 );
 
 onUnmounted(() => {
   revokePreviewObjectUrl();
   resetBatchExteriorUploads();
+  resetInteriorCollageUploads();
 });
 
 watch(
@@ -903,6 +1069,16 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
     previewImage: firstAsset.url,
     progress: task.progress,
     imageCount: task.assetCount,
+    assets: assets.map((asset) => ({
+      id: asset.assetId,
+      title: asset.title,
+      imageUrl: asset.url,
+      thumbnailUrl: asset.thumbnailUrl ?? undefined,
+      ratio: asset.ratio,
+      createdAt: formatDate(asset.createdAt),
+      width: asset.width ?? undefined,
+      height: asset.height ?? undefined,
+    })),
   });
 }
 
@@ -1271,47 +1447,176 @@ const activeCreateRatioLabel = computed(() => {
       </div>
     </template>
 
-    <template v-else-if="props.capability.code === 'short-video'">
-      <section class="batch-card batch-notice short-video-notice">
-        上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
-      </section>
+    <template v-else-if="props.capability.code === 'interior-stitch'">
+      <div class="generate-panel-body">
+        <section class="batch-card batch-notice short-video-notice">
+          前端只负责收集 2-10 张内饰图并提交 `assetIds`，后端会自动分组生成 1-3 张拼图结果。
+        </section>
 
-      <UploadTaskCard
-        :capability="props.capability"
-        :upload-preview-url="uploadedPreviewUrl"
-        :is-uploading="isUploadingVehicle"
-        @select-file="handleVehicleFileSelected"
-        @remove="handleVehicleImageRemove"
-      />
+        <section class="batch-card batch-upload-card">
+          <input
+            ref="interiorCollageInputRef"
+            type="file"
+            class="batch-upload-input"
+            :accept="props.capability.accept"
+            multiple
+            @change="handleInteriorCollageInputChange"
+          />
 
-      <CapabilityOptionSelector
-        v-if="hasBlock('selector')"
-        :capability="props.capability"
-        :selected-option-id="props.selectedOptionId"
-        @select="emit('selectOption', $event)"
-      />
+          <header class="batch-upload-head">
+            <div>
+              <h3>上传内饰图组</h3>
+              <p>
+                支持一次多选，最少上传 {{ MIN_INTERIOR_COLLAGE_IMAGES }} 张，
+                最多上传 {{ MAX_INTERIOR_COLLAGE_IMAGES }} 张。
+              </p>
+            </div>
+            <span class="batch-upload-count">
+              {{ interiorCollageUploads.length }}/{{
+                MAX_INTERIOR_COLLAGE_IMAGES
+              }}
+            </span>
+          </header>
 
-      <div
-        v-if="hasBlock('actions')"
-        class="flex flex-wrap items-center justify-center gap-4 pt-3"
-      >
-        <NTag type="warning" round :bordered="false">
-          预计消耗 {{ props.capability.cost }} 积分
-        </NTag>
-        <NTag type="success" round :bordered="false">
-          余额 {{ props.capability.balance }} 积分
-        </NTag>
-        <NButton
-          type="warning"
-          size="large"
-          class="min-w-48 !rounded-xl"
-          :loading="props.isGenerating"
-          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-          @click="handleGenerate"
-        >
-          {{ props.capability.actionLabel }} {{ props.capability.cost }}
-        </NButton>
+          <button
+            type="button"
+            class="batch-upload-drop"
+            :class="{ 'is-disabled': !canAddInteriorCollageImages }"
+            :disabled="!canAddInteriorCollageImages"
+            @click="openInteriorCollagePicker"
+            @dragover.prevent
+            @drop.prevent="handleInteriorCollageDrop"
+          >
+            <Icon icon="mdi:image-multiple-outline" />
+            <strong>{{
+              interiorCollageUploads.length
+                ? "继续添加内饰图"
+                : "上传内饰图组"
+            }}</strong>
+            <span
+              >JPG / PNG / WebP · 剩余
+              {{ interiorCollageRemainingCount }} 张</span
+            >
+          </button>
+
+          <div
+            v-if="interiorCollageUploads.length"
+            class="batch-upload-grid"
+          >
+            <article
+              v-for="item in interiorCollageUploads"
+              :key="item.id"
+              class="batch-upload-item"
+              :class="`is-${item.status}`"
+            >
+              <PreloadImage
+                class="batch-upload-image"
+                :src="item.previewUrl"
+                :alt="item.name"
+                loading="lazy"
+                decoding="async"
+              />
+              <span
+                v-if="item.status === 'uploading'"
+                class="batch-upload-status"
+              >
+                <Icon icon="mdi:loading" />
+              </span>
+              <span
+                v-else-if="item.status === 'fail'"
+                class="batch-upload-status is-error"
+              >
+                <Icon icon="mdi:alert-circle-outline" />
+              </span>
+              <button
+                type="button"
+                class="batch-upload-remove"
+                :aria-label="`删除${item.name}`"
+                @click="handleInteriorCollageRemove(item.id)"
+              >
+                <Icon icon="mdi:close" />
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
       </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingInterior || props.isGenerating ||
+              uploadedInteriorCollageAssets.length < MIN_INTERIOR_COLLAGE_IMAGES
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
+    </template>
+
+    <template v-else-if="props.capability.code === 'short-video'">
+      <div class="generate-panel-body">
+        <section class="batch-card batch-notice short-video-notice">
+          上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
+        </section>
+
+        <UploadTaskCard
+          :capability="props.capability"
+          :upload-preview-url="uploadedPreviewUrl"
+          :is-uploading="isUploadingVehicle"
+          @select-file="handleVehicleFileSelected"
+          @remove="handleVehicleImageRemove"
+        />
+
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
+      </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingVehicle || props.isGenerating || !uploadedAsset
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">
@@ -1446,75 +1751,88 @@ const activeCreateRatioLabel = computed(() => {
     </template>
 
     <template v-else>
-      <UploadTaskCard
-        :capability="props.capability"
-        :upload-preview-url="uploadedPreviewUrl"
-        :is-uploading="isUploadingVehicle"
-        @select-file="handleVehicleFileSelected"
-        @remove="handleVehicleImageRemove"
-      />
+      <div class="generate-panel-body">
+        <UploadTaskCard
+          :capability="props.capability"
+          :upload-preview-url="uploadedPreviewUrl"
+          :is-uploading="isUploadingVehicle"
+          @select-file="handleVehicleFileSelected"
+          @remove="handleVehicleImageRemove"
+        />
 
-      <CapabilityOptionSelector
-        v-if="hasBlock('selector')"
-        :capability="props.capability"
-        :selected-option-id="props.selectedOptionId"
-        @select="emit('selectOption', $event)"
-      />
+        <PaintColorPicker
+          v-if="props.capability.code === 'paint-refresh'"
+          v-model="paintColorCode"
+        />
 
-      <template
-        v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
-      >
-        <WorkspaceLogoPanel v-model:enabled="useLogo" />
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
 
-        <div
-          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+        <template
+          v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
-          <div class="flex items-center gap-4">
-            <span
-              class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
-            >
-              输出比例
-            </span>
-            <NSelect
-              v-model:value="outputRatio"
-              :options="outputRatioOptions"
-              size="large"
-              class="min-w-0 flex-1"
-            />
+          <WorkspaceLogoPanel v-model:enabled="useLogo" />
+
+          <div
+            class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+          >
+            <div class="flex items-center gap-4">
+              <span
+                class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
+              >
+                输出比例
+              </span>
+              <NSelect
+                v-model:value="outputRatio"
+                :options="outputRatioOptions"
+                size="large"
+                class="min-w-0 flex-1"
+              />
+            </div>
           </div>
-        </div>
-      </template>
-
-      <div
-        v-if="hasBlock('actions')"
-        class="flex flex-wrap items-center justify-center gap-4 pt-3"
-      >
-        <NTag type="warning" round :bordered="false">
-          预计消耗 {{ props.capability.cost }} 积分
-        </NTag>
-        <NTag type="success" round :bordered="false">
-          余额 {{ props.capability.balance }} 积分
-        </NTag>
-        <NButton
-          type="warning"
-          size="large"
-          class="min-w-48 !rounded-xl"
-          :loading="props.isGenerating"
-          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-          @click="handleGenerate"
-        >
-          {{ props.capability.actionLabel }} {{ props.capability.cost }}
-        </NButton>
+        </template>
       </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingVehicle || props.isGenerating || !uploadedAsset
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
     </template>
   </div>
 </template>
 
 <style scoped lang="scss">
 .generate-panel {
-  padding-bottom: 8px;
-  display: grid;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
   gap: 18px;
+  overflow: hidden;
+  padding-bottom: 0;
 }
 
 .generate-panel.is-batch,
@@ -1525,6 +1843,23 @@ const activeCreateRatioLabel = computed(() => {
   flex-direction: column;
   gap: clamp(12px, 1.2vw, 16px);
   padding-bottom: 0;
+}
+
+.generate-panel-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  padding-bottom: 4px;
+}
+
+.generate-panel-body > * {
+  flex-shrink: 0;
 }
 
 .batch-panel {
@@ -1562,6 +1897,29 @@ const activeCreateRatioLabel = computed(() => {
     var(--app-surface-soft) 24%,
     var(--app-surface-soft) 100%
   );
+}
+
+.generate-panel-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
+    var(--app-surface-soft) 24%,
+    var(--app-surface-soft) 100%
+  );
+}
+
+.generate-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
 .delivery-panel {

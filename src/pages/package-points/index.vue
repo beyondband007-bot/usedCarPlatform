@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { h, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import {
   NButton,
   NDataTable,
   NDatePicker,
   NPagination,
   NSelect,
+  useMessage,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
+import { createRechargeOrder, type RechargeProduct } from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
+import planBasicBg from "@/img/充值积分/基础套餐.png";
+import planTeamBg from "@/img/充值积分/企业团队版.png";
+import planFlagshipBg from "@/img/充值积分/企业旗舰版.png";
 import {
   rechargePlanToneMap,
   rechargePlans,
+  type RechargePlan,
   type RechargePlanTone,
 } from "@/constants/recharge-plans";
 import { useAppStore } from "@/stores/app";
+import { useCreditsStore } from "@/stores/credits";
 
 type RechargeRecord = {
   orderNo: string;
@@ -77,8 +84,59 @@ const planTypeMeta: Record<
 
 const selectedPlanName = ref("企业团队版");
 const pressingPlanName = ref<string | null>(null);
+const isCreatingOrder = ref(false);
 
 const appStore = useAppStore();
+const creditsStore = useCreditsStore();
+const message = useMessage();
+
+onMounted(async () => {
+  await creditsStore.hydrateRechargeProducts();
+  // 默认选中第一项 API 产品
+  const first = creditsStore.rechargeProducts[0];
+  if (first) selectedPlanName.value = first.name;
+});
+
+function resolveBackgroundImage(tone: RechargePlanTone) {
+  if (tone === "purple") return planTeamBg;
+  if (tone === "gold") return planFlagshipBg;
+  return planBasicBg;
+}
+
+function resolveIcon(tone: RechargePlanTone) {
+  if (tone === "purple") return "mdi:chart-bar";
+  if (tone === "gold") return "mdi:crown-outline";
+  return "mdi:layers-triple-outline";
+}
+
+function formatPrice(product: RechargeProduct) {
+  if (product.priceText) return product.priceText;
+  if (typeof product.priceCents === "number") {
+    return `¥${(product.priceCents / 100).toLocaleString("zh-CN")}`;
+  }
+  return "-";
+}
+
+function mapProductToPlan(product: RechargeProduct): RechargePlan {
+  const tone: RechargePlanTone = rechargePlanToneMap[product.name] ?? "blue";
+  return {
+    name: product.name,
+    subtitle: product.description ?? "",
+    price: formatPrice(product),
+    giftPoints: Number(product.giftPoints ?? 0).toLocaleString("zh-CN"),
+    tone,
+    icon: resolveIcon(tone),
+    badge: product.badge ?? undefined,
+    backgroundImage: resolveBackgroundImage(tone),
+    benefits: product.highlights ?? [],
+  };
+}
+
+const displayPlans = computed<RechargePlan[]>(() =>
+  creditsStore.rechargeProducts.length > 0
+    ? creditsStore.rechargeProducts.map(mapProductToPlan)
+    : rechargePlans,
+);
 
 const recordTypeOptions = [
   { label: "全部类型", value: "all" },
@@ -95,8 +153,24 @@ function clearPlanPress() {
   pressingPlanName.value = null;
 }
 
-function handlePlanSelect(name: string) {
+async function handlePlanSelect(name: string) {
   selectedPlanName.value = name;
+  const product = creditsStore.rechargeProducts.find((item) => item.name === name);
+  if (!product) {
+    message.info("当前为原型套餐，未接入真实下单接口");
+    return;
+  }
+  if (isCreatingOrder.value) return;
+  isCreatingOrder.value = true;
+  try {
+    const order = await createRechargeOrder({ productId: product.id });
+    message.success(`充值订单已创建（${order.orderNo}），等待支付`);
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "创建充值订单失败";
+    message.error(text);
+  } finally {
+    isCreatingOrder.value = false;
+  }
 }
 
 const records: RechargeRecord[] = [
@@ -250,7 +324,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
           <section class="plan-module" aria-label="选择充值套餐">
             <div class="plan-grid">
               <RechargePlanCard
-                v-for="plan in rechargePlans"
+                v-for="plan in displayPlans"
                 :key="plan.name"
                 :plan="plan"
                 :selected="selectedPlanName === plan.name"
@@ -396,13 +470,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   --recharge-gold: #d4a017;
   --shell-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
 
-  background:
-    radial-gradient(
-      860px 220px at 63% 0%,
-      rgba(47, 107, 255, 0.06),
-      transparent 72%
-    ),
-    #f6f9fc;
+  background: #f6f9fc;
 }
 
 .recharge-shell {
@@ -425,9 +493,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 }
 
 .recharge-page.theme-light .recharge-panel {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
-    var(--recharge-panel);
+  background: var(--recharge-panel);
 }
 
 .recharge-hero {
@@ -594,7 +660,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   gap: var(--plan-gap);
   margin-top: 0;

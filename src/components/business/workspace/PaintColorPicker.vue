@@ -50,16 +50,28 @@ function handleColorUpdate(value: string | null) {
     </header>
 
     <div class="paint-color-field">
-      <p class="paint-color-field-label">
-        <template v-if="displayHex">颜色 ({{ displayHex }})</template>
-        <template v-else>未选择色号</template>
-      </p>
+      <div class="paint-color-field-row">
+        <p class="paint-color-field-label">
+          <template v-if="displayHex">颜色 ({{ displayHex }})</template>
+          <template v-else>未选择色号</template>
+        </p>
+        <button
+          v-if="displayHex"
+          type="button"
+          class="paint-color-clear"
+          aria-label="清除已选色号"
+          @click="handleColorUpdate(null)"
+        >
+          清除
+        </button>
+      </div>
 
       <NColorPicker
         :value="colorValue"
         :show-alpha="false"
         :modes="['hex']"
         :swatches="[]"
+        :actions="['clear']"
         class="paint-color-picker"
         @update:value="handleColorUpdate"
       />
@@ -105,12 +117,37 @@ function handleColorUpdate(value: string | null) {
   gap: 6px;
 }
 
+.paint-color-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .paint-color-field-label {
   margin: 0;
   color: var(--app-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.paint-color-clear {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-text-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.paint-color-clear:hover {
+  color: var(--app-text);
 }
 
 .paint-color-picker {

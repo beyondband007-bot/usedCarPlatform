@@ -67,8 +67,22 @@ class CreativeImageService {
   async listMessages(conversationId: string) {
     await this.requireConversation(conversationId);
     const messages = await creativeImageRepository.listMessages(conversationId);
+    const taskIds = Array.from(
+      new Set(messages.map((message) => message.taskId).filter((id): id is string => Boolean(id))),
+    );
+    const tasks = await tasksRepository.findByIds(taskIds);
+    const resultUrlByTaskId = new Map<string, string | null>();
+    for (const task of tasks) {
+      const results = normalizeTaskResults(task.resultJson);
+      resultUrlByTaskId.set(task.id, results[0]?.url ?? null);
+    }
     return {
-      items: messages.map((message) => this.toMessageResponse(message)),
+      items: messages.map((message) =>
+        this.toMessageResponse(
+          message,
+          message.taskId ? resultUrlByTaskId.get(message.taskId) ?? null : null,
+        ),
+      ),
     };
   }
 
@@ -354,7 +368,7 @@ class CreativeImageService {
     };
   }
 
-  private toMessageResponse(message: CreativeMessageRecord) {
+  private toMessageResponse(message: CreativeMessageRecord, resultUrl: string | null = null) {
     return {
       messageId: message.id,
       conversationId: message.conversationId,
@@ -366,6 +380,7 @@ class CreativeImageService {
       sourceImageUrl: message.sourceImageUrl,
       generationMode: message.generationMode,
       metadata: message.metadataJson,
+      resultUrl,
       createdAt: message.createdAt.toISOString(),
     };
   }

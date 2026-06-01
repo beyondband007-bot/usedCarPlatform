@@ -1,5 +1,7 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
+import { toCreditsHeaders } from '@/utils/credits-identity'
+
 // 创建 axios 实例
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101/api/v1',
@@ -17,6 +19,13 @@ http.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // 自动注入 credits 身份头（mock，对接 Reusable Credits Platform 代理）
+    const creditsHeaders = toCreditsHeaders()
+    for (const [key, value] of Object.entries(creditsHeaders)) {
+      config.headers[key] = value
+    }
+
     return config
   },
   (error) => {

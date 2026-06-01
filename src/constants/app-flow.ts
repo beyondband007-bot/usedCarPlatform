@@ -1,12 +1,12 @@
 /**
  * 产品流程目录（访客首页 → 企业视觉工作台）
  *
- * 访客（顶栏：首页 / 企业套餐 / 视觉工作台）
+ * 访客（顶栏：首页 / 视觉工作台 / 企业套餐 / 企业账号登录）
  * ├─ 点击视觉工作台（顶栏或首页 CTA）→ 登录引导弹窗 → /login 登录 / 稍后再说
  * ├─ 点击企业套餐 → /pricing
  * └─ 浏览案例与能力介绍
  *
- * 企业用户（二级导航：首页 / 视觉工作台 / 积分查询 / 套餐·积分）
+ * 企业用户（顶栏：首页 / 视觉工作台 / 积分查询 / 企业套餐）
  * ├─ 场景影棚能力（单图生成）
  * ├─ 批量上新
  * └─ 成片交付
@@ -61,9 +61,9 @@ export const workspaceFlowModules = [
   {
     id: 'interior',
     title: '内饰',
-    description: '内饰清洁增强',
+    description: '内饰清洁增强与拼接展示',
     defaultCapabilityCode: 'interior-clean',
-    capabilityCodes: ['interior-clean'],
+    capabilityCodes: ['interior-clean', 'interior-stitch'],
   },
   {
     id: 'batch-delivery',

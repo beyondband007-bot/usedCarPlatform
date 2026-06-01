@@ -107,6 +107,16 @@ export const routes: RouteRecordRaw[] = [
             path: 'recharge',
             redirect: '/package-points',
           },
+          {
+            path: 'credits-admin',
+            name: 'CreditsAdmin',
+            component: () => import('@/pages/credits-admin/index.vue'),
+            meta: {
+              title: '积分后台',
+              requiresAuth: true,
+              permission: 'menu:admin',
+            },
+          },
         ],
       },
     ],

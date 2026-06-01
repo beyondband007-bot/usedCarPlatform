@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
 import { secondaryNavigation } from '@/constants/prototype'
 import { useAuthStore } from '@/stores/auth'
+import { useCreditsStore } from '@/stores/credits'
 import type { NavItem } from '@/types/prototype'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const creditsStore = useCreditsStore()
 
 const permissionMap: Record<string, string> = {
   '/home': 'menu:home',
@@ -23,7 +25,15 @@ const permissionMap: Record<string, string> = {
   '/credits': 'menu:points',
   '/recharge': 'menu:recharge',
   '/package-points': 'menu:recharge',
+  '/credits-admin': 'menu:admin',
 }
+
+const creditsBalanceText = computed(() => {
+  if (creditsStore.accountsLoaded) {
+    return Number(creditsStore.availableBalance ?? 0).toLocaleString('zh-CN')
+  }
+  return authStore.credits
+})
 
 const visibleNavigation = computed(() =>
   secondaryNavigation.filter((item) => {
@@ -56,7 +66,7 @@ function navigate(item: NavItem) {
     :class="
       props.embedded
         ? 'subnav--embedded subnav--workbench'
-        : 'sticky top-[72px] z-40 gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 shadow-sm xl:px-6'
+        : 'sticky top-[60px] z-40 gap-4 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-4 shadow-sm xl:px-6'
     "
     aria-label="企业业务导航"
   >
@@ -92,7 +102,7 @@ function navigate(item: NavItem) {
     >
       <Icon icon="mdi:diamond-stone" class="subnav-credits-icon" />
       <span class="subnav-credits-label">积分余额</span>
-      <strong class="subnav-credits-value">{{ authStore.credits }}</strong>
+      <strong class="subnav-credits-value">{{ creditsBalanceText }}</strong>
     </RouterLink>
   </nav>
 </template>
@@ -102,7 +112,7 @@ function navigate(item: NavItem) {
   position: static;
   top: auto;
   z-index: auto;
-  min-height: clamp(52px, 4.2vw, 64px);
+  min-height: clamp(40px, 3vw, 48px);
   border: 0;
   padding-inline: var(--studio-chrome-pad-x, 24px);
   background: var(--studio-chrome-subnav-bg, #040404);
@@ -159,9 +169,9 @@ function navigate(item: NavItem) {
   font-weight: 600;
   line-height: 1.2;
   padding:
-    clamp(12px, 1vw, 16px)
+    clamp(8px, 0.7vw, 10px)
     clamp(12px, 1.1vw, 18px)
-    clamp(14px, 1.1vw, 18px);
+    clamp(10px, 0.8vw, 12px);
 }
 
 .subnav-link--embedded::after {

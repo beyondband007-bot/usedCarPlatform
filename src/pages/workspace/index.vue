@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -6,6 +6,7 @@ import { useMessage } from 'naive-ui'
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
+  createInteriorCollageTask,
   createGenerationTask,
   getBatchTaskDetail,
   getCreativeImageConversations,
@@ -40,7 +41,6 @@ import type {
   WorkspaceRecentItem,
 } from '@/types/workspace'
 import { formatDate } from '@/utils/dayjs'
-import { buildImagePreviewFromDeliveryTask } from '@/utils/workspace-image-preview'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
@@ -50,12 +50,13 @@ const appStore = useAppStore()
 const pointsStore = usePointsStore()
 const subscriptionStore = useSubscriptionStore()
 const SHORT_VIDEO_CAPABILITY_CODE = 'short-video'
+const INTERIOR_COLLAGE_CAPABILITY_CODE = 'interior-stitch'
 const ACTIVE_GENERATION_TASK_KEY = 'workspace-active-generation-task'
 const RECENT_GENERATION_SCAN_PAGE_SIZE = 50
 const runningGenerationStatuses = new Set(['waiting', 'queued', 'queue', 'generating'])
 const recentGenerationModuleCodes = workspaceCapabilities
   .filter((capability) => capability.code !== 'batch-new' && capability.code !== 'delivery')
-  .map((capability) => capability.code)
+  .map((capability) => resolveModuleCodeForCapability(capability.code))
 
 interface ActiveGenerationTaskSnapshot {
   taskId: string
@@ -79,6 +80,7 @@ const isUploadingCreativeReference = ref(false)
 const isCreatingCreativeConversation = ref(false)
 const isLoadingCreativeConversation = ref(false)
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null)
+const deliveryTaskPreview = ref<WorkspaceDeliveryTaskPreview | null>(null)
 const previewedDeliveryTaskId = ref<string | null>(null)
 const isGenerating = ref(false)
 const generatingCapabilityCode = ref<string | null>(null)
@@ -95,6 +97,11 @@ function resolveCapabilityCodeFromModule(moduleCode: string) {
     (capability) => capability.code === moduleCode || capability.apiCode === moduleCode,
   )
   return matched?.code ?? null
+}
+
+function resolveModuleCodeForCapability(code: string) {
+  if (code === INTERIOR_COLLAGE_CAPABILITY_CODE) return 'interior-collage'
+  return code
 }
 
 function readActiveGenerationTask() {
@@ -239,6 +246,9 @@ function buildCreativeThreadTurns(
       if (lastUserTurn) {
         lastUserTurn.taskId = message.taskId ?? lastUserTurn.taskId
         lastUserTurn.ratioLabel = lastUserTurn.ratioLabel ?? resolveCreativeMessageRatioLabel(message)
+        if (message.resultUrl) {
+          lastUserTurn.resultUrl = message.resultUrl
+        }
       }
       continue
     }
@@ -249,7 +259,7 @@ function buildCreativeThreadTurns(
       taskId: message.taskId ?? null,
       createdAt: message.createdAt,
       ratioLabel: resolveCreativeMessageRatioLabel(message),
-      resultUrl: null,
+      resultUrl: message.resultUrl ?? null,
       isGenerating: false,
     }
     turns.push(turn)
@@ -271,8 +281,10 @@ function buildCreativeThreadTurns(
   if (conversation?.lastTaskId) {
     const lastTurn = [...turns].reverse().find((turn) => turn.taskId === conversation.lastTaskId)
     if (lastTurn) {
-      lastTurn.resultUrl = conversation.lastResultUrl
-      lastTurn.isGenerating = Boolean(conversation.lastTaskId && !conversation.lastResultUrl)
+      if (!lastTurn.resultUrl) {
+        lastTurn.resultUrl = conversation.lastResultUrl
+      }
+      lastTurn.isGenerating = Boolean(conversation.lastTaskId && !lastTurn.resultUrl)
     }
   }
 
@@ -534,21 +546,35 @@ watch(activeCode, () => {
   generationResult.value = null
   creativeImageCaption.value = null
   deliveryImagePreview.value = null
+  deliveryTaskPreview.value = null
   previewedDeliveryTaskId.value = null
 })
 
 function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview) {
-  deliveryImagePreview.value = buildImagePreviewFromDeliveryTask(task)
+  deliveryTaskPreview.value = task
+  deliveryImagePreview.value = null
+  generationResult.value = null
   previewedDeliveryTaskId.value = task.id
+}
+
+function handleOpenDeliveryAssetResult(result: WorkspaceGenerateResult) {
+  generationResult.value = result
+  deliveryImagePreview.value = null
 }
 
 function handleOpenDeliveryImagePreview(preview: WorkspaceImagePreview) {
   deliveryImagePreview.value = preview
-  previewedDeliveryTaskId.value = null
+  generationResult.value = null
 }
 
 function clearDeliveryImagePreview() {
+  if (deliveryImagePreview.value && deliveryTaskPreview.value) {
+    deliveryImagePreview.value = null
+    return
+  }
+
   deliveryImagePreview.value = null
+  deliveryTaskPreview.value = null
   previewedDeliveryTaskId.value = null
 }
 
@@ -609,6 +635,65 @@ function buildResultFromTask(task: GenerationTaskDetail): WorkspaceGenerateResul
   }
 }
 
+function buildInteriorCollageResult(
+  tasks: GenerationTaskDetail[],
+  outputRatio: string,
+  resolution: string,
+): WorkspaceGenerateResult | null {
+  const resultImages = tasks.flatMap((task) => task.resultImages ?? [])
+  const firstImage = resultImages[0]
+
+  if (!firstImage?.url) return null
+
+  return {
+    createdAt: formatDate(tasks[0]?.updatedAt ?? tasks[0]?.createdAt ?? new Date()),
+    statusText: `已完成 · 内饰拼图 · ${resultImages.length} 张结果图`,
+    ratioLabel: `${outputRatio} · ${resolution}`,
+    mediaType: 'image',
+    previewImage: firstImage.url,
+    previewAlt: '内饰拼图生成结果',
+    downloadUrl: firstImage.url,
+    resultImages,
+    taskId: tasks[0]?.taskId,
+    imageWidth: 1600,
+    imageHeight: 900,
+  }
+}
+
+async function resolveInteriorCollageTasks(
+  taskIds: string[],
+  outputRatio: string,
+  resolution: string,
+) {
+  const results = await Promise.allSettled(
+    taskIds.map((taskId) => pollGenerationTask(taskId)),
+  )
+  const finishedTasks = results
+    .filter(
+      (result): result is PromiseFulfilledResult<GenerationTaskDetail | null> =>
+        result.status === 'fulfilled',
+    )
+    .map((result) => result.value)
+    .filter((task): task is GenerationTaskDetail => Boolean(task))
+
+  const successTasks = finishedTasks.filter((task) => task.status === 'success')
+  const failedCount = finishedTasks.filter((task) => task.status !== 'success').length
+
+  if (failedCount > 0) {
+    message.warning(`${failedCount} 个内饰拼图任务生成失败，其它任务不受影响`)
+  }
+
+  const result = buildInteriorCollageResult(successTasks, outputRatio, resolution)
+  if (!result) {
+    message.warning('任务完成，但没有返回内饰拼图结果')
+    return
+  }
+
+  generationResult.value = result
+  clearActiveGenerationTask(result.taskId)
+  await assistPanelRef.value?.refreshRecentItems()
+}
+
 async function resolveGenerationTask(taskId: string, options: { restored?: boolean } = {}) {
   isGenerating.value = true
   generationResult.value = null
@@ -631,7 +716,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     syncWorkspaceFromTask(task)
 
     if (task.status !== 'success') {
-      message.error(task.error?.message || '生成任务失败')
+      message.error('查看图片失败')
       return
     }
 
@@ -651,8 +736,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask(taskId)
-    const text = error instanceof Error ? error.message : '生成任务查询失败'
-    message.error(text)
+    message.error('查看图片失败')
   } finally {
     clearActiveGenerationTask(taskId)
     isGenerating.value = false
@@ -717,6 +801,17 @@ async function ensureCreativeConversation(prompt?: string) {
   return conversation.conversationId
 }
 
+function syncCreativeConversationTitle(conversationId: string, prompt: string) {
+  const title = prompt.trim().slice(0, 24)
+  if (!title) return
+
+  creativeConversations.value = creativeConversations.value.map((item) =>
+    item.conversationId === conversationId
+      ? { ...item, title, lastMessage: prompt.trim() }
+      : item,
+  )
+}
+
 async function handleNewCreativeConversation() {
   if (isCreatingCreativeConversation.value) return
   if (hasActiveCreativeConversationDraft.value) {
@@ -777,6 +872,10 @@ async function handleUploadCreativeReference(file: File) {
   }
 }
 
+function handleRemoveCreativeReference() {
+  creativeReferenceAsset.value = null
+}
+
 async function handleCreativeGenerate(payload: {
   prompt: string
   outputRatio: string
@@ -819,6 +918,8 @@ async function handleCreativeGenerate(payload: {
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
     await refreshRunningTaskSummary()
     creativeImageCaption.value = payload.prompt
+    syncCreativeConversationTitle(conversationId, payload.prompt)
+    await refreshCreativeConversations()
     await loadCreativeConversationThread(conversationId)
     await resolveGenerationTask(created.taskId)
     await refreshCreativeConversations()
@@ -835,8 +936,71 @@ async function handleCreativeGenerate(payload: {
 }
 
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
+  if (activeCode.value === INTERIOR_COLLAGE_CAPABILITY_CODE) {
+    const assetIds = [...new Set(payload.assetIds ?? [])]
+
+    if (assetIds.length < 2 || assetIds.length > 10) {
+      message.warning('请上传 2-10 张内饰图')
+      return
+    }
+
+    if (!(await canStartGeneration())) {
+      return
+    }
+
+    const outputRatio = payload.outputRatio || '16:9'
+    const resolution = payload.resolution || '2K'
+
+    isGenerating.value = true
+    generationResult.value = null
+    generatingCapabilityCode.value = INTERIOR_COLLAGE_CAPABILITY_CODE
+
+    try {
+      const created = await createInteriorCollageTask({
+        assetIds,
+        outputRatio,
+        resolution,
+      })
+      const taskIds = created.tasks.map((task) => task.taskId).filter(Boolean)
+
+      if (!taskIds.length) {
+        message.warning('内饰拼图任务创建失败，请稍后重试')
+        return
+      }
+
+      const firstTask = created.tasks[0]
+      saveActiveGenerationTask({
+        taskId: firstTask.taskId,
+        moduleCode: firstTask.moduleCode || created.moduleCode,
+        optionId: firstTask.optionId,
+      })
+
+      for (const task of created.tasks) {
+        trackRunningTask(task.taskId, task.moduleCode || created.moduleCode)
+      }
+
+      message.info(`任务已创建，正在生成 ${created.outputCount} 张内饰拼图`, { duration: 3000 })
+      await refreshRunningTaskSummary()
+      await resolveInteriorCollageTasks(taskIds, outputRatio, resolution)
+    } catch (error) {
+      clearActiveGenerationTask()
+      const text = error instanceof Error ? error.message : '内饰拼图任务创建失败'
+      message.error(text)
+    } finally {
+      isGenerating.value = false
+      generatingCapabilityCode.value = null
+    }
+
+    return
+  }
+
   if (!payload.inputAssetId) {
     message.warning('请先上传车辆图片')
+    return
+  }
+
+  if (activeCode.value === 'interior-stitch') {
+    message.info('内饰拼接功能暂未接入接口，当前仅展示效果图')
     return
   }
 
@@ -854,7 +1018,10 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       optionId: payload.optionId,
       useLogo: payload.useLogo,
       colorCode: payload.colorCode,
-      outputRatio: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '16:9' : undefined,
+      outputRatio:
+        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
+          ? '16:9'
+          : payload.outputRatio,
       extra: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? { videoResolution: '720p' } : undefined,
     }
 
@@ -904,9 +1071,19 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
 }
 
 function handlePickRecent(item: WorkspaceRecentItem) {
+  if (item.status === 'fail' || item.status === 'canceled') {
+    message.error('查看图片失败')
+    return
+  }
+
   if (item.status === 'success') {
     const result = buildResultFromRecent(item)
-    if (result) generationResult.value = result
+    if (result) {
+      generationResult.value = result
+      return
+    }
+
+    message.error('查看图片失败')
     return
   }
 
@@ -957,7 +1134,8 @@ onUnmounted(() => {
           activeCode === 'watermark-remove'
           || activeCode === 'paint-refresh'
           || activeCode === 'light-consistency'
-          || activeCode === 'interior-clean',
+          || activeCode === 'interior-clean'
+          || activeCode === 'interior-stitch',
         'workspace-page--creative-image': activeCode === 'creative-image',
       },
     ]"
@@ -1000,6 +1178,7 @@ onUnmounted(() => {
             @new-conversation="handleNewCreativeConversation"
             @select-conversation="handleSelectCreativeConversation"
             @upload-reference="handleUploadCreativeReference"
+            @remove-reference="handleRemoveCreativeReference"
           />
           <CapabilityGeneratePanel
             v-else
@@ -1022,12 +1201,14 @@ onUnmounted(() => {
           :selected-option-id="selectedOptionId"
           :is-generating="activeModuleGenerating"
           :generation-result="generationResult"
+          :delivery-task-preview="deliveryTaskPreview"
           :delivery-image-preview="deliveryImagePreview"
           :short-video-play-request="shortVideoPlayRequest"
           :batch-active-jobs="batchActiveJobs"
           @back-from-result="clearGenerationResult"
           @close-delivery-image-preview="clearDeliveryImagePreview"
           @open-delivery-image-preview="handleOpenDeliveryImagePreview"
+          @open-delivery-asset-result="handleOpenDeliveryAssetResult"
           @pick-template="handlePickTemplate"
           @pick-recent="handlePickRecent"
         />
@@ -1038,15 +1219,15 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .workspace-page {
-  --workspace-accent: #efc24c;
-  --workspace-accent-strong: #ffd75a;
-  --workspace-panel: #101010;
-  --workspace-panel-soft: #151515;
-  --workspace-panel-deep: #080808;
-  --workspace-line: rgba(255, 255, 255, 0.12);
-  --workspace-line-strong: rgba(239, 194, 76, 0.42);
-  --workspace-muted: #969186;
-  --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+  --workspace-accent: #2f6bff;
+  --workspace-accent-strong: #2f6bff;
+  --workspace-panel: #ffffff;
+  --workspace-panel-soft: #f7fafd;
+  --workspace-panel-deep: #f7fafd;
+  --workspace-line: #d6e0ed;
+  --workspace-line-strong: #aebfd5;
+  --workspace-muted: #64748b;
+  --workspace-shadow: 0 18px 42px rgba(78, 111, 148, 0.11);
 
   display: flex;
   height: 100%;
@@ -1059,7 +1240,20 @@ onUnmounted(() => {
   background: var(--app-bg);
 }
 
+.workspace-page.theme-dark {
+  --workspace-accent: #efc24c;
+  --workspace-accent-strong: #ffd75a;
+  --workspace-panel: #101010;
+  --workspace-panel-soft: #151515;
+  --workspace-panel-deep: #080808;
+  --workspace-line: rgba(255, 255, 255, 0.12);
+  --workspace-line-strong: rgba(239, 194, 76, 0.42);
+  --workspace-muted: #969186;
+  --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+}
+
 .workspace-page.theme-light {
+  --app-border: #d6e0ed;
   --workspace-text: #172033;
   --workspace-text-secondary: #334155;
   --workspace-muted: #64748b;
@@ -1067,7 +1261,7 @@ onUnmounted(() => {
   --workspace-text-disabled: #cbd5e1;
   --workspace-accent: #2f6bff;
   --workspace-accent-strong: #2f6bff;
-  --workspace-accent-border: #cfe0ff;
+  --workspace-accent-border: #b8cdf4;
   --workspace-accent-bg: #f2f7ff;
   --workspace-accent-glow: rgba(47, 107, 255, 0.16);
   --workspace-accent-underline: #4f7fff;
@@ -1086,9 +1280,11 @@ onUnmounted(() => {
   --workspace-panel: #ffffff;
   --workspace-panel-soft: #f7fafd;
   --workspace-panel-deep: #f7fafd;
-  --workspace-line: #e8edf5;
-  --workspace-line-strong: #cfe0ff;
-  --workspace-shadow: 0 20px 46px rgba(78, 111, 148, 0.09);
+  --workspace-line: #d6e0ed;
+  --workspace-line-strong: #aebfd5;
+  --workspace-shadow:
+    0 0 0 1px rgba(174, 191, 213, 0.2),
+    0 18px 42px rgba(78, 111, 148, 0.11);
 
   color: var(--workspace-text);
 
@@ -1099,6 +1295,10 @@ onUnmounted(() => {
   border-color: var(--workspace-line);
   background: var(--workspace-panel);
   box-shadow: var(--workspace-shadow);
+}
+
+.workspace-page.theme-light .workspace-shell {
+  background: #eef4fb;
 }
 
 .workspace-shell {
