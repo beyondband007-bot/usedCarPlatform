@@ -38,6 +38,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 8: Frontend balance and recharge | Done | `phase-8-frontend-credit-data-20260531` | Replaces visible mock credit balance, credit ledger, recharge products, and payment order creation with proxy API data. |
 | Phase 9: Credits Admin Console | Done | `phase-9-admin-console-20260531` | Adds a read-only credits admin console backed by the usedCar credit proxy boundary. |
 | Phase 10: Identity and mock login | Done | `phase-10-mock-identity-20260601` | Adds an explicit frontend mock credits identity selector and sends that identity through request headers. |
+| Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 
 Detailed phase notes:
 
@@ -51,6 +52,7 @@ Detailed phase notes:
 - [Phase 8 frontend credit data](./reusable-credits-phase-8-frontend-credit-data.md)
 - [Phase 9 admin console](./reusable-credits-phase-9-admin-console.md)
 - [Phase 10 mock identity](./reusable-credits-phase-10-mock-identity.md)
+- [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
 
 ## Important Implementation Notes
 
@@ -167,16 +169,25 @@ Expected deliverable:
 
 ### Phase 11: End-To-End Testing
 
+Status: done in this branch.
+
+Added and ran `backend/scripts/phase11-e2e-smoke.mjs`, exposed through:
+
+```bash
+cd backend
+npm run phase11:smoke
+```
+
 Run and document full integration scenarios:
 
-- single generation success settles credits
-- single generation fail refunds credits
-- batch with mixed success/failure settles/refunds per item
-- insufficient balance blocks KIE submission
-- recharge products load from credits platform
-- payment order can be created
-- transaction history reflects billing and recharge actions
-- admin console can inspect the resulting state
+- single generation success settles credits: done
+- single generation fail refunds credits: done
+- batch with mixed success/failure settles/refunds per item: done
+- insufficient balance blocks KIE submission: done
+- recharge products load from credits platform: done
+- payment order can be created: done
+- transaction history reflects billing and recharge actions: covered by smoke-created ledger rows and manual checklist
+- admin console can inspect the resulting state: covered by smoke-created ledger rows and manual checklist
 
 Expected deliverable:
 
@@ -202,6 +213,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 11 next.
+Continue with Phase 12 next.
 
-The browser now sends a stored mock credits identity through request headers. The next step is to run and document full end-to-end billing scenarios before team handoff.
+The integration now has a repeatable local smoke runner and documented manual checklist. The next step is the team handoff and PR preparation.
