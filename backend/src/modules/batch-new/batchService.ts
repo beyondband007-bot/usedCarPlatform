@@ -8,10 +8,15 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import type { OutputRatio } from "../../shared/types";
 import { deliveryRepository } from "../delivery/deliveryRepository";
-import { batchInteriorPrompt, resolveBatchExteriorPrompt } from "./batchPrompts";
+import {
+  batchInteriorCleanCollagePrompt,
+  batchInteriorCollagePrompt,
+  batchInteriorPrompt,
+  resolveBatchExteriorPrompt,
+} from "./batchPrompts";
 import { batchRepository } from "./batchRepository";
 import { resolveBatchScene } from "./batchScenes";
-import type { BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
+import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
 
 const DEFAULT_USER_ID = "default_user";
 const terminalStatuses = ["success", "fail", "canceled"];
@@ -23,6 +28,50 @@ const outputRatioOrDefault = (value?: string): OutputRatio =>
 
 const booleanFlag = (config: BatchVisualConfig, a: keyof BatchVisualConfig, b?: keyof BatchVisualConfig) =>
   config[a] === true || (b ? config[b] === true : false);
+
+const interiorGroupSizes = (count: number) => {
+  if (count < 2 || count > 10) {
+    throw errors.invalidParameter("interior collage requires 2-10 images", { count });
+  }
+  if (count <= 4) return [count];
+  if (count <= 8) {
+    const first = Math.ceil(count / 2);
+    return [first, count - first];
+  }
+  return count === 9 ? [3, 3, 3] : [4, 3, 3];
+};
+
+const splitInteriorAssetIds = (assetIds: string[]) => {
+  const sizes = interiorGroupSizes(assetIds.length);
+  let cursor = 0;
+  return sizes.map((size) => {
+    const group = assetIds.slice(cursor, cursor + size);
+    cursor += size;
+    return group;
+  });
+};
+
+const resolveInteriorItemKind = (config: BatchVisualConfig): BatchItemKind => {
+  const clean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
+  const collage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
+  if (clean && collage) return "interior_clean_collage";
+  if (collage) return "interior_collage";
+  return "interior_clean";
+};
+
+const resolveInteriorPrompt = (itemKind: BatchItemKind) => {
+  if (itemKind === "interior_clean_collage") return batchInteriorCleanCollagePrompt;
+  if (itemKind === "interior_collage") return batchInteriorCollagePrompt;
+  return batchInteriorPrompt;
+};
+
+const deliveryTitleByKind: Record<BatchItemKind, string> = {
+  exterior: "外观成片",
+  interior: "内饰清洁",
+  interior_clean: "内饰清洁",
+  interior_collage: "内饰拼图",
+  interior_clean_collage: "内饰清洁拼图",
+};
 
 class BatchService {
   async listPresets() {
@@ -39,6 +88,7 @@ class BatchService {
       enableLightConsistency: true,
       enablePaintRefresh: false,
       enableInteriorClean: false,
+      enableInteriorCollage: false,
     };
     return {
       items: [
@@ -78,6 +128,8 @@ class BatchService {
 
     const batchId = createId("batch");
     const config = body.visualConfig;
+    const interiorClean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
+    const interiorCollage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
     let total = 0;
 
     for (const group of body.carGroups) {
@@ -86,9 +138,10 @@ class BatchService {
       }
       await this.validateAssets(group.exteriorAssetIds, "car_exterior");
       total += group.exteriorAssetIds.length;
-      if (booleanFlag(config, "enableInteriorClean", "interiorEnhance")) {
-        await this.validateAssets(group.interiorAssetIds ?? [], "car_interior");
-        total += group.interiorAssetIds?.length ?? 0;
+      if (interiorClean || interiorCollage) {
+        const interiorAssetIds = group.interiorAssetIds ?? [];
+        await this.validateAssets(interiorAssetIds, "car_interior");
+        total += interiorCollage ? splitInteriorAssetIds(interiorAssetIds).length : interiorAssetIds.length;
       }
     }
 
@@ -107,21 +160,30 @@ class BatchService {
         await this.createSubTask({
           batchId,
           groupTitle,
-          assetId,
+          assetIds: [assetId],
           itemKind: "exterior",
           sortOrder: sortOrder++,
           config,
         });
       }
-      if (booleanFlag(config, "enableInteriorClean", "interiorEnhance")) {
-        for (const assetId of group.interiorAssetIds ?? []) {
+      if (interiorClean || interiorCollage) {
+        const interiorAssetIds = group.interiorAssetIds ?? [];
+        const itemKind = resolveInteriorItemKind(config);
+        const interiorGroups = interiorCollage
+          ? splitInteriorAssetIds(interiorAssetIds)
+          : interiorAssetIds.map((assetId) => [assetId]);
+        for (const [interiorGroupIndex, assetIds] of interiorGroups.entries()) {
           await this.createSubTask({
             batchId,
             groupTitle,
-            assetId,
-            itemKind: "interior",
+            assetIds,
+            itemKind,
             sortOrder: sortOrder++,
             config,
+            optionId:
+              interiorCollage && interiorGroups.length > 1
+                ? `${itemKind}-${interiorGroupIndex + 1}-of-${interiorGroups.length}`
+                : itemKind,
           });
         }
       }
@@ -224,12 +286,13 @@ class BatchService {
   private async createSubTask(input: {
     batchId: string;
     groupTitle: string;
-    assetId: string;
-    itemKind: "exterior" | "interior";
+    assetIds: string[];
+    itemKind: BatchItemKind;
     sortOrder: number;
     config: BatchVisualConfig;
+    optionId?: string;
   }) {
-    const asset = await assetsRepository.findById(input.assetId);
+    const asset = await assetsRepository.findById(input.assetIds[0]);
     if (!asset) throw errors.assetNotFound();
     const expectedPurpose = input.itemKind === "exterior" ? "car_exterior" : "car_interior";
     if (asset.purpose !== expectedPurpose) {
@@ -241,12 +304,12 @@ class BatchService {
 
     const taskId = createId("task");
     const prompt =
-      input.itemKind === "interior" ? batchInteriorPrompt : resolveBatchExteriorPrompt(input.config);
+      input.itemKind === "exterior" ? resolveBatchExteriorPrompt(input.config) : resolveInteriorPrompt(input.itemKind);
     await tasksRepository.createWaitingTask({
       id: taskId,
       moduleCode: "batch-new",
       inputAssetId: asset.id,
-      optionId: input.itemKind,
+      optionId: input.optionId ?? input.itemKind,
       outputRatio: outputRatioOrDefault(input.config.outputRatio),
       resolution: "2K",
       logoAssetId: null,
@@ -258,6 +321,7 @@ class BatchService {
       groupTitle: input.groupTitle,
       itemKind: input.itemKind,
       inputAssetId: asset.id,
+      sourceAssetIds: input.assetIds,
       generationTaskId: taskId,
       sortOrder: input.sortOrder,
     });
@@ -295,18 +359,25 @@ class BatchService {
     const task = await tasksRepository.findById(item.generationTaskId);
     if (!task) throw errors.taskNotFound();
     if (!task.inputAssetId) throw errors.assetNotFound();
-    const asset = await assetsRepository.findById(task.inputAssetId);
-    if (!asset) throw errors.assetNotFound();
+    const sourceAssetIds = item.sourceAssetIds?.length ? item.sourceAssetIds : [task.inputAssetId];
+    const sourceAssets = [];
+    for (const assetId of sourceAssetIds) {
+      const asset = await assetsRepository.findById(assetId);
+      if (!asset) throw errors.assetNotFound();
+      sourceAssets.push(asset);
+    }
 
     const inputUrls: string[] = [];
     const lease = await kieKeyPool.acquire();
     try {
-      const uploaded = await kieClient.uploadLocalFileWithLease(
-        lease,
-        asset.localPath,
-        `used-car-platform/batch-new/${item.itemKind}`,
-      );
-      inputUrls.push(uploaded.fileUrl);
+      for (const asset of sourceAssets) {
+        const uploaded = await kieClient.uploadLocalFileWithLease(
+          lease,
+          asset.localPath,
+          `used-car-platform/batch-new/${item.itemKind}`,
+        );
+        inputUrls.push(uploaded.fileUrl);
+      }
 
       if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
         const scene = resolveBatchScene(config.sceneOptionId, config.sceneIndex);
@@ -342,6 +413,7 @@ class BatchService {
           moduleCode: "batch-new",
           itemKind: item.itemKind,
           prompt: task.prompt,
+          inputAssetIds: sourceAssetIds,
           inputUrls,
           visualConfig: config,
           aspectRatio: task.outputRatio,
@@ -368,7 +440,7 @@ class BatchService {
       await deliveryRepository.upsertAsset({
         id: `delivery_${item.generationTaskId}_${index}`,
         sourceTaskId: batchId,
-        title: `${item.groupTitle} · ${item.itemKind === "interior" ? "内饰清洁" : "外观成片"}`,
+        title: `${item.groupTitle} ? ${deliveryTitleByKind[item.itemKind] ?? "??"}`,
         url: image.url,
         thumbnailUrl: image.url,
         ratio: task.outputRatio,

@@ -3,6 +3,7 @@ dist/
 .DS_Store
 *.local
 
+docs/
 .env
 .env.*
 !.env.example

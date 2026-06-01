@@ -34,6 +34,7 @@ const run = async () => {
     await addColumnIfMissing("delivery_packages", "task_id", "VARCHAR(64) NULL");
     await addColumnIfMissing("delivery_packages", "package_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_packages", "expires_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("batch_task_items", "source_asset_ids_json", "JSON NULL");
     await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
