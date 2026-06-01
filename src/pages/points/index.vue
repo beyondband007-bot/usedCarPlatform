@@ -205,7 +205,7 @@ const summary = computed(() => [
           <div>
             <p>套餐信息卡片</p>
             <h2>{{ planName }}</h2>
-            <span>账号额度 {{ subscriptionStore.accountLimit }} 个 · 并行任务额度 {{ subscriptionStore.concurrentTaskLimit }} 个 · 赠送积分 {{ subscriptionStore.giftPoints.toLocaleString('zh-CN') }}</span>
+            <span>账号额度 {{ subscriptionStore.accountLimit }} 个 · 后台生成并发 {{ subscriptionStore.concurrentTaskLimit }} 个请求 · 赠送积分 {{ subscriptionStore.giftPoints.toLocaleString('zh-CN') }}</span>
           </div>
         </article>
         <article class="overview-card balance-overview">
@@ -221,7 +221,7 @@ const summary = computed(() => [
           <div>
             <p>任务额度卡片</p>
             <h2>{{ pointsStore.remainingTasks }}</h2>
-            <span>额度 {{ subscriptionStore.concurrentTaskLimit }} · 运行中 {{ pointsStore.summary.currentRunningTasks }} · 剩余可用 {{ pointsStore.remainingTasks }}</span>
+            <span>后台并发额度 {{ subscriptionStore.concurrentTaskLimit }} · 运行中 {{ pointsStore.summary.currentRunningTasks }} · 剩余可用 {{ pointsStore.remainingTasks }}</span>
           </div>
         </article>
       </section>

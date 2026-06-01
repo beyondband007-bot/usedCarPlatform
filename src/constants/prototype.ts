@@ -134,7 +134,7 @@ export const packageOptions: PackageOption[] = enterprisePlanList.map((plan) => 
 
 export const pricingPageCopy = {
   title: '企业套餐',
-  subtitle: '面向汽车电商与出海车商，按账号、积分、外观图组并发和专属场景配置团队产能',
+  subtitle: '面向汽车电商与出海车商，按账号、积分和后台生成请求并发配置团队产能',
   tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
   plansTitle: '选择适合您的套餐方案',
   plansSubtitle: '三档套餐覆盖试运行、团队批量上新与集团化交付场景',

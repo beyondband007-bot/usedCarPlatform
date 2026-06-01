@@ -21,11 +21,13 @@ scripts/seed-used-car-platform.cjs
 
 ## First-Release Plans
 
-| Plan | Price | Accounts | Gift Points | Capacity Description |
+| Plan | Price | Accounts | Gift Points | Backstage Generation Concurrency |
 | --- | ---: | ---: | ---: | --- |
-| 企业基础档 | ¥980 | 1 个账号 | 20,000 | 可生成 500 张图，约 50-80 辆车；后台可执行 1 套图（10 张外观图） |
-| 企业团队档 | ¥3,980 | 1 个账号 | 100,000 | 可生成 2,500 张图，约 250-300 辆车；可同时执行 5 套图 |
-| 企业旗舰档 | ¥9,800 | 1 + 3 个账号 | 800,000 | 可生成 15,000 张图，约 1,500 辆车；每个账号可同时执行 20 套图 |
+| 企业基础档 | ¥980 | 1 个账号 | 20,000 | 当前账号最多同时执行 1 个生成请求 |
+| 企业团队档 | ¥3,980 | 1 个账号 | 100,000 | 当前账号最多同时执行 5 个生成请求 |
+| 企业旗舰档 | ¥9,800 | 1 + 3 个账号 | 800,000 | 每个账号最多同时执行 20 个生成请求；4 个账号同时工作时合计最多 80 个 |
+
+The image-count and vehicle-count descriptions are sales/estimation copy only. They are not business rules enforced by the code. The enforceable first-release rule is backstage generation-request concurrency.
 
 ## Flagship Mother/Child Account Rule
 
@@ -69,7 +71,7 @@ The Reusable Credits Platform seed was also updated so real local payment orders
 
 ## Later Modification Rule
 
-When business changes plan price, points, account count, image estimate, or concurrency, update `src/domain/enterprise-plans.ts` first.
+When business changes plan price, points, account count, or concurrency, update `src/domain/enterprise-plans.ts` first.
 
 If the change affects real recharge/payment behavior, also update the Reusable Credits Platform recharge product seed and rerun:
 

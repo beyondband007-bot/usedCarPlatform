@@ -3,9 +3,9 @@ import type { SubscriptionPlan, SubscriptionPlanCode } from '@/types/subscriptio
 export interface EnterprisePlan extends SubscriptionPlan {
   displayName: string
   accountLabel: string
+  perAccountConcurrentRequestLimit: number
+  totalConcurrentRequestLimit: number
   concurrencyLabel: string
-  generatedImagesLabel: string
-  vehicleCoverageLabel: string
   description: string
   featureDetails: string[]
 }
@@ -20,15 +20,14 @@ export const enterprisePlans: Record<SubscriptionPlanCode, EnterprisePlan> = {
     concurrentTaskLimit: 1,
     giftPoints: 20000,
     accountLabel: '1 个账号',
-    concurrencyLabel: '后台可执行 1 套图（10 张外观图）',
-    generatedImagesLabel: '可生成 500 张图',
-    vehicleCoverageLabel: '约 50-80 辆车',
+    perAccountConcurrentRequestLimit: 1,
+    totalConcurrentRequestLimit: 1,
+    concurrencyLabel: '后台最多同时执行 1 个生成请求',
     description: '适合小团队启动视觉生产流程，先验证素材标准与交付节奏。',
     featureDetails: [
       '赠送 20,000 积分',
       '1 个账号',
-      '可生成 500 张图，约 50-80 辆车',
-      '后台可执行 1 套图（10 张外观图）',
+      '后台最多同时执行 1 个生成请求',
     ],
   },
   team: {
@@ -40,15 +39,14 @@ export const enterprisePlans: Record<SubscriptionPlanCode, EnterprisePlan> = {
     concurrentTaskLimit: 5,
     giftPoints: 100000,
     accountLabel: '1 个账号',
-    concurrencyLabel: '可同时执行 5 套图',
-    generatedImagesLabel: '可生成 2,500 张图',
-    vehicleCoverageLabel: '约 250-300 辆车',
-    description: '适合门店或车商团队并行上新，兼顾积分额度与图组并发。',
+    perAccountConcurrentRequestLimit: 5,
+    totalConcurrentRequestLimit: 5,
+    concurrencyLabel: '后台最多同时执行 5 个生成请求',
+    description: '适合门店或车商团队并行上新，兼顾积分额度与后台并发。',
     featureDetails: [
       '赠送 100,000 积分',
       '1 个账号',
-      '可生成 2,500 张图，约 250-300 辆车',
-      '可同时执行 5 套图',
+      '后台最多同时执行 5 个生成请求',
     ],
   },
   flagship: {
@@ -60,15 +58,15 @@ export const enterprisePlans: Record<SubscriptionPlanCode, EnterprisePlan> = {
     concurrentTaskLimit: 20,
     giftPoints: 800000,
     accountLabel: '1 + 3 个账号',
-    concurrencyLabel: '每个账号可同时执行 20 套图',
-    generatedImagesLabel: '可生成 15,000 张图',
-    vehicleCoverageLabel: '约 1,500 辆车',
+    perAccountConcurrentRequestLimit: 20,
+    totalConcurrentRequestLimit: 80,
+    concurrencyLabel: '每个账号后台最多同时执行 20 个生成请求，4 个账号合计最多 80 个',
     description: '适合集团化业务、出海车源与多账号高并发交付。',
     featureDetails: [
       '赠送 800,000 积分',
       '1 + 3 个账号',
-      '可生成 15,000 张图，约 1,500 辆车',
-      '每个账号可同时执行 20 套图',
+      '每个账号后台最多同时执行 20 个生成请求',
+      '4 个账号同时工作时，后台合计最多执行 80 个生成请求',
     ],
   },
 }
@@ -89,6 +87,10 @@ export function formatPlanPoints(plan: Pick<EnterprisePlan, 'giftPoints'>) {
 
 export function resolveEnterprisePlanName(plan: SubscriptionPlanCode) {
   return enterprisePlans[plan].name
+}
+
+export function resolveTotalConcurrentRequestLimit(plan: SubscriptionPlanCode) {
+  return enterprisePlans[plan].totalConcurrentRequestLimit
 }
 
 export function resolveEnterprisePlanCodeFromName(name: string): SubscriptionPlanCode | null {

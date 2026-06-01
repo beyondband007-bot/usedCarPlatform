@@ -86,7 +86,7 @@ const batchNoticeText = computed(() => {
   const limit = subscriptionStore.concurrentTaskLimit;
   const running = 2;
   const remaining = Math.max(0, limit - running);
-  return `当前套餐：${resolveEnterprisePlanName(subscriptionStore.currentPlan)} · 每账号图组并发 ${limit} 套 · 进行中 ${running} 套 · 可继续上传 ${remaining} 套。单张生成仍可正常使用。`;
+  return `当前套餐：${resolveEnterprisePlanName(subscriptionStore.currentPlan)} · 当前账号后台并发上限 ${limit} 个生成请求 · 进行中 ${running} 个 · 可继续提交 ${remaining} 个。`;
 });
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
