@@ -152,6 +152,7 @@ const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">("gu
 const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
+const shortVideoInitialView = ref<"preview" | "recent">("preview");
 let recentRefreshTimer: number | null = null;
 
 const isBatchProcessingView = computed(
@@ -368,6 +369,9 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
 
 function shouldPollRecent() {
   if (props.isGenerating) return true;
+  if (props.capability.code === "short-video") {
+    return canAutoRefreshRecent(recentItems.value);
+  }
   if (
     isFeatureCompareCapability.value &&
     (featureCompareActiveView.value === "recent" || featureCompareActiveView.value === "generating")
@@ -405,6 +409,14 @@ async function loadRecentItems() {
   } finally {
     recentLoading.value = false;
   }
+}
+
+function handleResultBack() {
+  if (props.capability.code === "short-video" && props.generationResult?.mediaType === "video") {
+    shortVideoInitialView.value = "recent";
+  }
+
+  emit("backFromResult");
 }
 
 function stopRecentAutoRefresh() {
@@ -484,7 +496,8 @@ watch(
     if (
       props.isGenerating ||
       activeTab.value === "recent" ||
-      isFeatureCompareCapability.value
+      isFeatureCompareCapability.value ||
+      props.capability.code === "short-video"
     ) {
       void loadRecentItems();
     }
@@ -550,7 +563,7 @@ defineExpose({
     <WorkspaceGenerateResultPanel
       v-if="generationResult"
       :result="generationResult"
-      @back="emit('backFromResult')"
+      @back="handleResultBack"
     />
 
     <WorkspaceImagePreviewPanel
@@ -751,6 +764,10 @@ defineExpose({
       :play-request="shortVideoPlayRequest"
       :is-generating="props.isGenerating"
       :generation-result="props.generationResult"
+      :recent-items="recentItems"
+      :recent-loading="recentLoading"
+      :initial-view="shortVideoInitialView"
+      @pick-recent="handleRecentPick"
     />
 
     <template v-else-if="capability.kind === 'delivery'">
@@ -966,6 +983,7 @@ defineExpose({
                       :alt="step.title"
                       loading="lazy"
                       :draggable="false"
+                      fit="contain"
                     />
                   </div>
                 </template>
@@ -983,6 +1001,7 @@ defineExpose({
                   :alt="step.title"
                   loading="lazy"
                   :draggable="false"
+                  fit="contain"
                 />
               </div>
               <footer class="tutorial-step-foot">
@@ -1768,7 +1787,7 @@ defineExpose({
 }
 
 .tutorial-section {
-  min-height: 266px;
+  min-height: 0;
 }
 
 .assist-panel.theme-light .tutorial-section,
@@ -1814,7 +1833,8 @@ defineExpose({
   display: flex;
   min-width: 0;
   flex-direction: column;
-  height: 180px;
+  aspect-ratio: 1 / 1;
+  height: auto;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -1862,9 +1882,9 @@ defineExpose({
 
 .tutorial-placeholder {
   position: relative;
-  flex: 0 0 110px;
-  height: 110px;
-  margin: 12px 12px 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 10px 10px 0;
   overflow: hidden;
   border-radius: 12px;
   background: #111111;
@@ -1876,10 +1896,16 @@ defineExpose({
   background: #111111;
 }
 
+.tutorial-image :deep(.preload-image) {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
 .tutorial-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 12px;
 }
 
@@ -1888,9 +1914,14 @@ defineExpose({
   background: #f5f5f3;
 }
 
+.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
+.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
+  background: #f5f5f3;
+}
+
 .tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
 .tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
-  object-fit: cover;
+  object-fit: contain;
   padding: 0;
 }
 
@@ -1913,12 +1944,19 @@ defineExpose({
   overflow: hidden;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
+  min-height: 0;
+}
+
+.tutorial-mosaic-image :deep(.preload-image) {
+  width: 100%;
+  height: 100%;
+  background: transparent;
 }
 
 .tutorial-mosaic-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .tutorial-logo-preview {
@@ -1979,19 +2017,15 @@ defineExpose({
 .tutorial-step-foot {
   display: flex;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   align-items: flex-end;
-  padding: 10px 52px 12px 14px;
-}
-
-.assist-panel.theme-light .tutorial-step-foot {
-  background: transparent;
+  padding: 8px 48px 10px 12px;
 }
 
 .tutorial-step-foot strong {
   min-width: 0;
   color: #ffffff;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.35;
   font-weight: 600;
   white-space: nowrap;

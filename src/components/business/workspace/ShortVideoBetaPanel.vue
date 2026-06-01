@@ -1,16 +1,32 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 
-import type { WorkspaceGenerateResult } from "@/types/workspace";
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
+import {
+  recentStatusIconMap,
+  recentStatusLabelMap,
+} from "@/utils/workspace-recent";
 
 const props = defineProps<{
   playRequest?: number;
   isGenerating?: boolean;
   generationResult?: WorkspaceGenerateResult | null;
+  recentItems?: WorkspaceRecentItem[];
+  recentLoading?: boolean;
+  initialView?: "preview" | "recent";
+}>();
+
+const emit = defineEmits<{
+  pickRecent: [item: WorkspaceRecentItem];
 }>();
 
 const videoRef = ref<HTMLVideoElement | null>(null);
+const activeView = ref<"preview" | "recent">(props.initialView ?? "preview");
+const recentVideoItems = computed(() => props.recentItems ?? []);
+const statusLabelMap = recentStatusLabelMap;
+const statusIconMap = recentStatusIconMap;
 
 async function playGeneratedVideo() {
   await nextTick();
@@ -39,6 +55,31 @@ watch(
     void playGeneratedVideo();
   },
 );
+
+watch(
+  () => props.generationResult?.previewVideo,
+  (videoUrl) => {
+    if (!videoUrl) return;
+    activeView.value = "preview";
+    void playGeneratedVideo();
+  },
+);
+
+watch(
+  () => props.initialView,
+  (view) => {
+    if (view) activeView.value = view;
+  },
+);
+
+function canOpenRecentVideo(item: WorkspaceRecentItem) {
+  return Boolean(item.taskId) || (item.status === "success" && Boolean(item.downloadUrl));
+}
+
+function handleRecentPick(item: WorkspaceRecentItem) {
+  if (!canOpenRecentVideo(item)) return;
+  emit("pickRecent", item);
+}
 </script>
 
 <template>
@@ -55,7 +96,85 @@ watch(
       </div>
     </header>
 
-    <div v-if="props.generationResult?.previewVideo" class="short-video-stage">
+    <div class="short-video-tabs" role="tablist" aria-label="short video views">
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="activeView === 'preview'"
+        :class="{ active: activeView === 'preview' }"
+        @click="activeView = 'preview'"
+      >
+        结果预览
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="activeView === 'recent'"
+        :class="{ active: activeView === 'recent' }"
+        @click="activeView = 'recent'"
+      >
+        最近生成
+      </button>
+    </div>
+
+    <section v-if="activeView === 'recent'" class="short-video-recent" aria-label="recent videos">
+      <div v-if="props.recentLoading && !recentVideoItems.length" class="short-video-recent-empty">
+        <Icon icon="mdi:loading" class="short-video-loading-icon" />
+        <span>正在加载最近生成</span>
+      </div>
+      <div v-else-if="!recentVideoItems.length" class="short-video-recent-empty">
+        <Icon icon="mdi:video-off-outline" />
+        <span>暂无最近生成视频</span>
+      </div>
+      <template v-else>
+        <article
+          v-for="item in recentVideoItems"
+          :key="item.id"
+          class="short-video-recent-card"
+          :class="{ 'is-clickable': canOpenRecentVideo(item) }"
+          :role="canOpenRecentVideo(item) ? 'button' : undefined"
+          :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+          :aria-label="canOpenRecentVideo(item) ? `查看${item.title}` : item.title"
+          @click="handleRecentPick(item)"
+          @keydown.enter.prevent="handleRecentPick(item)"
+          @keydown.space.prevent="handleRecentPick(item)"
+        >
+          <div class="short-video-recent-media">
+            <PreloadImage
+              v-if="item.thumbnail || item.previewImage || item.inputAssetUrl"
+              class="short-video-recent-image"
+              :src="item.thumbnail || item.previewImage || item.inputAssetUrl"
+              :alt="item.title"
+              loading="lazy"
+              decoding="async"
+              :draggable="false"
+              fit="cover"
+              object-position="center"
+            />
+            <div v-else class="short-video-recent-placeholder">
+              <Icon icon="mdi:video-outline" />
+            </div>
+            <span class="short-video-recent-status" :class="`is-${item.status}`">
+              <Icon :icon="statusIconMap[item.status]" />
+              {{ statusLabelMap[item.status] }}
+            </span>
+            <span v-if="item.status === 'success'" class="short-video-play-badge">
+              <Icon icon="mdi:play" />
+            </span>
+          </div>
+          <footer class="short-video-recent-foot">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.ratioLabel || item.sceneLabel || '16:9 · 720p · 10秒' }}</span>
+            <small>
+              <Icon icon="mdi:clock-outline" />
+              {{ item.createdAt }}
+            </small>
+          </footer>
+        </article>
+      </template>
+    </section>
+
+    <div v-else-if="props.generationResult?.previewVideo" class="short-video-stage">
       <video
         ref="videoRef"
         class="short-video-player"
@@ -205,8 +324,39 @@ watch(
   color: var(--assist-blue);
 }
 
+.short-video-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  flex-shrink: 0;
+  gap: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assist-card) 82%, transparent);
+  padding: 4px;
+}
+
+.short-video-tabs button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--assist-muted);
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.short-video-tabs button.active {
+  background: color-mix(in srgb, var(--assist-blue) 13%, var(--assist-card));
+  color: var(--assist-blue);
+}
+
 .short-video-stage,
-.short-video-blank {
+.short-video-blank,
+.short-video-recent {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -219,6 +369,165 @@ watch(
   padding: 2px 0;
 }
 
+.short-video-recent {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 20px 0;
+}
+
+.short-video-recent-empty {
+  display: grid;
+  min-height: 280px;
+  grid-column: 1 / -1;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px dashed var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  color: var(--assist-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.short-video-recent-empty .iconify {
+  color: var(--assist-blue);
+  font-size: 34px;
+}
+
+.short-video-loading-icon {
+  animation: short-video-loading-spin 0.9s linear infinite;
+}
+
+.short-video-recent-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--assist-border);
+  border-radius: 12px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.short-video-recent-card.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.short-video-recent-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--assist-blue) 44%, var(--assist-border));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.short-video-recent-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--assist-card-strong);
+}
+
+.short-video-recent-image {
+  width: 100%;
+  height: 100%;
+}
+
+.short-video-recent-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--assist-blue);
+  font-size: 34px;
+}
+
+.short-video-recent-status {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: rgba(120, 120, 120, 0.88);
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.short-video-recent-status.is-success {
+  background: rgba(39, 183, 125, 0.92);
+}
+
+.short-video-recent-status.is-fail,
+.short-video-recent-status.is-canceled {
+  background: rgba(239, 99, 99, 0.92);
+}
+
+.short-video-recent-status.is-waiting,
+.short-video-recent-status.is-queued,
+.short-video-recent-status.is-queue,
+.short-video-recent-status.is-generating {
+  background: rgba(47, 107, 255, 0.9);
+}
+
+.short-video-play-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 18px;
+}
+
+.short-video-recent-foot {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px 12px;
+}
+
+.short-video-recent-foot strong,
+.short-video-recent-foot span,
+.short-video-recent-foot small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.short-video-recent-foot strong {
+  color: var(--assist-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.short-video-recent-foot span,
+.short-video-recent-foot small {
+  color: var(--assist-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.short-video-recent-foot small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .short-video-waiting {
   display: grid;
   min-height: 0;
@@ -226,6 +535,7 @@ watch(
   align-content: center;
   justify-items: center;
   gap: 18px;
+  border: 1px solid var(--assist-border);
   border-radius: 16px;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 40%),
@@ -240,6 +550,7 @@ watch(
   place-items: center;
   width: min(100%, 760px);
   aspect-ratio: 16 / 9;
+  border: 1px dashed color-mix(in srgb, var(--assist-blue) 30%, var(--assist-border));
   border-radius: 22px;
   background:
     radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent), transparent 36%),
@@ -284,29 +595,39 @@ watch(
   position: absolute;
   width: 30px;
   height: 30px;
+  border: 2px solid color-mix(in srgb, var(--assist-blue) 62%, transparent);
+  opacity: 0.86;
 }
 
 .short-video-waiting-corner--tl {
   left: 18px;
   top: 18px;
+  border-right: 0;
+  border-bottom: 0;
   border-top-left-radius: 12px;
 }
 
 .short-video-waiting-corner--tr {
   right: 18px;
   top: 18px;
+  border-left: 0;
+  border-bottom: 0;
   border-top-right-radius: 12px;
 }
 
 .short-video-waiting-corner--bl {
   left: 18px;
   bottom: 18px;
+  border-top: 0;
+  border-right: 0;
   border-bottom-left-radius: 12px;
 }
 
 .short-video-waiting-corner--br {
   right: 18px;
   bottom: 18px;
+  border-top: 0;
+  border-left: 0;
   border-bottom-right-radius: 12px;
 }
 
@@ -522,6 +843,12 @@ watch(
   100% {
     width: 22%;
     transform: translateX(220%);
+  }
+}
+
+@keyframes short-video-loading-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

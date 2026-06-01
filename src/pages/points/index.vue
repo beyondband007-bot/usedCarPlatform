@@ -206,7 +206,7 @@ const summary = computed(() => [
 
       <section class="overview-layout">
         <article class="overview-card plan-overview">
-          <span class="overview-icon" aria-hidden="true"><Icon icon="mdi:briefcase-check-outline" /></span>
+          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:briefcase-check-outline" /></span>
           <div>
             <p>套餐信息卡片</p>
             <h2>{{ planName }}</h2>
@@ -214,7 +214,7 @@ const summary = computed(() => [
           </div>
         </article>
         <article class="overview-card balance-overview">
-          <span class="overview-icon" aria-hidden="true"><Icon icon="mdi:diamond-stone" /></span>
+          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:diamond-stone" /></span>
           <div>
             <p>积分余额卡片</p>
             <h2>{{ pointsStore.summary.currentPoints.toLocaleString('zh-CN') }}</h2>
@@ -222,7 +222,7 @@ const summary = computed(() => [
           </div>
         </article>
         <article class="overview-card task-overview">
-          <span class="overview-icon" aria-hidden="true"><Icon icon="mdi:progress-clock" /></span>
+          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:progress-clock" /></span>
           <div>
             <p>任务额度卡片</p>
             <h2>{{ pointsStore.remainingTasks }}</h2>
@@ -341,17 +341,45 @@ const summary = computed(() => [
   background: var(--app-surface);
   box-shadow: var(--shadow-panel);
 }
-.overview-icon { display: grid; flex: 0 0 46px; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: color-mix(in srgb, var(--color-accent-blue) 12%, transparent); color: var(--color-brand-primary); font-size: 24px; }
-.overview-card p, .overview-card h2, .overview-card span { margin: 0; }
-.overview-card p { color: var(--app-text-soft); font-size: 13px; font-weight: 800; }
-.overview-card h2 { margin-top: 6px; color: var(--app-text); font-size: clamp(24px, 2vw, 34px); font-weight: 900; line-height: 1.1; }
-.overview-card span { display: block; margin-top: 8px; color: var(--app-text-soft); font-size: 13px; line-height: 1.6; font-weight: 700; }
+.overview-icon {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+}
+
+.overview-card div span {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 700;
+}
 .points-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
+.overview-card p,
+.overview-card h2 {
+  margin: 0;
+}
+
+.overview-card p {
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.overview-card h2 {
+  margin-top: 6px;
+  color: var(--app-text);
+  font-size: clamp(24px, 2vw, 34px);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
 .points-card, .points-table { border: 1px solid var(--app-border); border-radius: var(--radius-card); background: var(--app-surface); box-shadow: var(--shadow-panel); }
 .points-card {
   display: flex;
@@ -363,7 +391,21 @@ const summary = computed(() => [
 .points-card > div {
   min-width: 0;
 }
-.points-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: color-mix(in srgb, var(--color-accent-blue) 12%, transparent); color: var(--color-brand-primary); font-size: 22px; }
+.points-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent-blue) 12%, transparent);
+  color: var(--color-brand-primary);
+  font-size: 22px;
+}
+
+.points-icon :deep(svg) {
+  color: currentColor;
+}
 .points-card p, .points-card strong { margin: 0; }
 .points-card p { color: var(--app-text-soft); font-size: 13px; font-weight: 700; }
 .points-card strong { display: block; margin-top: 4px; font-size: 24px; font-weight: 900; }
