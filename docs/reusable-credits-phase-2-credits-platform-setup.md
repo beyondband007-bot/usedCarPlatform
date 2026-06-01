@@ -61,18 +61,19 @@ applicationCode: used-car-platform
 
 | Function code | Default points | Usage |
 | --- | ---: | --- |
-| `showroom-light` | `15.0000` | Single exterior image generation |
-| `outdoor-scene` | `15.0000` | Single exterior image generation |
-| `road-motion` | `15.0000` | Single exterior image generation |
-| `sky-studio` | `15.0000` | Single exterior image generation |
-| `paint-refresh` | `15.0000` | Single image enhancement |
-| `light-consistency` | `15.0000` | Single image enhancement |
-| `interior-clean` | `15.0000` | Single interior image generation |
-| `watermark-remove` | `15.0000` | Single image enhancement |
-| `batch-new-exterior` | `120.0000` | One exterior item in a batch task |
-| `batch-new-interior` | `120.0000` | One interior item in a batch task |
+| `showroom-light` | `30.0000` | Single exterior image generation |
+| `outdoor-scene` | `30.0000` | Single exterior image generation |
+| `road-motion` | `30.0000` | Single exterior image generation |
+| `sky-studio` | `30.0000` | Single exterior image generation |
+| `paint-refresh` | `30.0000` | Single image enhancement |
+| `light-consistency` | `30.0000` | Single image enhancement |
+| `interior-clean` | `30.0000` | Single interior image generation |
+| `interior-collage` | `30.0000` | One generated interior collage output |
+| `watermark-remove` | `30.0000` | Single image enhancement |
+| `batch-new-exterior` | `30.0000` | One exterior item in a batch task before dynamic option extras |
+| `batch-new-interior` | `30.0000` | One interior item in a batch task before dynamic option extras |
 
-Pricing is stored centrally in Reusable Credits Platform `application_functions.default_points`.
+Baseline pricing is stored centrally in Reusable Credits Platform `application_functions.default_points`. Dynamic batch visual-processing extras are calculated by usedCarPlatform and sent as `estimatedPoints`.
 
 ## Recharge Products
 

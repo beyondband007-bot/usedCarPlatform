@@ -58,6 +58,7 @@ const snapshotTaskBilling = async (
 export const freezeGenerationBilling = async (input: {
   taskId: string;
   functionCode: string;
+  estimatedPoints?: string;
   body: BillingBody;
   context?: BillingRequestContext;
   scope?: BillingOperationScope;
@@ -69,6 +70,7 @@ export const freezeGenerationBilling = async (input: {
   const estimate = await creditsClient.estimate({
     ...identity,
     functionCode: input.functionCode,
+    estimatedPoints: input.estimatedPoints,
     bizType: scope.bizType,
     bizId: scope.bizId,
     idempotencyKey: billingIdempotencyKey("estimate", scope),

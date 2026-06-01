@@ -19,6 +19,7 @@ import {
   resolveBillingIdentity,
   type BillingRequestContext,
 } from "../billing/billingIdentity";
+import { batchItemGenerationPoints } from "../billing/generationPointRules";
 import { deliveryRepository } from "../delivery/deliveryRepository";
 import { batchInteriorPrompt, resolveBatchExteriorPrompt } from "./batchPrompts";
 import { batchRepository, type BatchTaskRecord } from "./batchRepository";
@@ -355,6 +356,7 @@ class BatchService {
       billing = await freezeGenerationBilling({
         taskId: task.id,
         functionCode: batchItemFunctionCode(item.itemKind),
+        estimatedPoints: batchItemGenerationPoints(config),
         body: batchBillingBody(batch),
         scope: batchItemBillingScope(item.itemId),
       });

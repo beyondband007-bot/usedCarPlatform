@@ -108,6 +108,7 @@ export interface CreditsFunctionResponse {
 
 type EstimateBillingInput = BillingIdentity & {
   functionCode: string;
+  estimatedPoints?: string;
   bizType: string;
   bizId: string;
   idempotencyKey: string;
@@ -173,6 +174,7 @@ class CreditsClient {
       tenantId: input.tenantId,
       applicationCode: env.credits.applicationCode,
       functionCode: input.functionCode,
+      estimatedPoints: input.estimatedPoints,
       bizType: input.bizType,
       bizId: input.bizId,
       idempotencyKey: input.idempotencyKey,

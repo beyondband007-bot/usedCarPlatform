@@ -92,6 +92,8 @@ The current frontend mock login keeps exactly three Three-Role Credits Back Offi
 
 First-release enterprise plan business logic is centralized in `src/domain/enterprise-plans.ts`. Flagship mother/child account visibility is separated in `src/domain/enterprise-account-hierarchy.ts`: the flagship mother account can view its three child accounts' points and transactions, while lower plans do not get child-account visibility.
 
+First-release generation point deduction rules are documented in [Generation Points Deduction Rules](./generation-points-deduction-rules.md). Single generation functions use a 30-point baseline from the Reusable Credits Platform function catalog. Batch visual-processing extras are calculated in usedCarPlatform and passed to the credits platform as a dynamic `estimatedPoints` override.
+
 ## Revised Next Plan
 
 The original plan is still directionally correct, but the next phases should now focus on frontend/admin visibility and identity, because backend task billing is mostly in place.
