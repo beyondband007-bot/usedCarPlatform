@@ -38,6 +38,16 @@ export const buildBatchPromptKey = (config: BatchVisualConfig) =>
     .filter(Boolean)
     .join("+");
 
+const resolveBatchPaintColorCode = (config: BatchVisualConfig) => {
+  const colorCode = typeof config.colorCode === "string" ? config.colorCode.trim() : "";
+  return colorCode || null;
+};
+
+const appendBatchPaintColorPrompt = (prompt: string, colorCode: string | null) =>
+  colorCode
+    ? `${prompt} 本次烤漆翻新指定色号为 ${colorCode}，请以该色号对应的车漆颜色作为翻新后的车身颜色；如前文出现“保持原车颜色”或“不主动改色”，以本指定色号要求为准。不要自行扩展为其它颜色，不要改变车辆车型、结构、轮毂、灯组、车窗比例和拍摄角度。`
+    : prompt;
+
 export const batchPromptMap: Record<string, string> = {
   scene,
   "scene+logo": `${sceneLogo}${logoVisibilityGuard}`,
@@ -56,5 +66,10 @@ export const batchPromptMap: Record<string, string> = {
   "logo+light+paint": `${logoLightPaint}${logoVisibilityGuard}`,
 };
 
-export const resolveBatchExteriorPrompt = (config: BatchVisualConfig) =>
-  batchPromptMap[buildBatchPromptKey(config)] ?? light;
+export const resolveBatchExteriorPrompt = (config: BatchVisualConfig) => {
+  const promptKey = buildBatchPromptKey(config);
+  const prompt = batchPromptMap[promptKey] ?? light;
+  return promptKey.includes("paint")
+    ? appendBatchPaintColorPrompt(prompt, resolveBatchPaintColorCode(config))
+    : prompt;
+};

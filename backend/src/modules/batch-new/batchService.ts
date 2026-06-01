@@ -87,6 +87,7 @@ class BatchService {
       useRecentLogo: false,
       enableLightConsistency: true,
       enablePaintRefresh: false,
+      colorCode: null,
       enableInteriorClean: false,
       enableInteriorCollage: false,
     };
