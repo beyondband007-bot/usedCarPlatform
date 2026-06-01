@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue";
+
 import PreloadImage from "@/components/common/PreloadImage.vue";
 
 export interface SceneTemplateRecommendationItem {
@@ -57,6 +59,13 @@ const emit = defineEmits<{
           fit="cover"
           object-position="center"
         />
+        <span
+          v-if="theme === 'light' && item.id === activeId"
+          class="scene-template-check"
+          aria-hidden="true"
+        >
+          <Icon icon="mdi:check" />
+        </span>
         <div class="scene-template-title">
           <strong>{{ item.title }}</strong>
           <span>{{ item.description }}</span>
@@ -83,9 +92,9 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light {
-  border-color: rgba(203, 213, 225, 0.82);
+  border-color: #e5e7eb;
   background: #ffffff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
 .scene-template-section h2 {
@@ -97,7 +106,8 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light h2 {
-  color: #111827;
+  color: #1e293b;
+  font-weight: 600;
 }
 
 .scene-template-grid {
@@ -126,16 +136,14 @@ const emit = defineEmits<{
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   outline: none;
-  transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
+  transition: all 0.25s ease;
 }
 
 .scene-template-section.theme-light .scene-template-card {
-  border-color: rgba(203, 213, 225, 0.9);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
 .scene-template-card:hover {
@@ -147,12 +155,22 @@ const emit = defineEmits<{
   );
 }
 
+.scene-template-section.theme-light .scene-template-card:hover:not(.is-active) {
+  border-color: #60a5fa;
+  transform: translateY(-2px);
+}
+
 .scene-template-card.is-active {
   border-color: #d4a017;
   box-shadow:
     0 0 0 1px rgba(212, 160, 23, 0.35),
     0 0 24px rgba(212, 160, 23, 0.2),
     0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+.scene-template-section.theme-light .scene-template-card.is-active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 .scene-template-card:focus-visible {
@@ -162,12 +180,30 @@ const emit = defineEmits<{
     0 0 24px rgba(212, 160, 23, 0.18);
 }
 
-.scene-template-section.theme-light .scene-template-card.is-active {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.32),
-    0 0 22px rgba(212, 160, 23, 0.14),
-    0 12px 24px rgba(15, 23, 42, 0.1);
+.scene-template-section.theme-light .scene-template-card:focus-visible {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.scene-template-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
+  pointer-events: none;
+}
+
+.scene-template-check :deep(svg) {
+  width: 14px;
+  height: 14px;
 }
 
 .scene-template-image {
@@ -200,6 +236,16 @@ const emit = defineEmits<{
   text-align: center;
 }
 
+.scene-template-section.theme-light .scene-template-title {
+  min-height: 80px;
+  padding: 24px 14px 12px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.75) 100%
+  );
+}
+
 .scene-template-title strong {
   max-width: 80%;
   color: #ffffff;
@@ -208,12 +254,21 @@ const emit = defineEmits<{
   font-weight: 900;
 }
 
+.scene-template-section.theme-light .scene-template-title strong {
+  font-weight: 600;
+}
+
 .scene-template-title span {
   max-width: 80%;
   color: rgba(255, 255, 255, 0.75);
   font-size: 12px;
   line-height: 1.35;
   font-weight: 700;
+}
+
+.scene-template-section.theme-light .scene-template-title span {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
 
 @media (max-width: 1500px) {

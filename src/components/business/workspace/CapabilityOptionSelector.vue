@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
@@ -36,10 +37,17 @@ const optionRows = computed(() => {
     <section
       v-if="capability.options.length"
       class="option-selector-card"
+      :class="{ 'is-scene': capability.kind === 'scene' }"
       :aria-label="capability.selectorTitle"
     >
       <header class="option-selector-head">
         <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
+        <span
+          v-if="capability.kind === 'scene'"
+          class="option-selector-badge"
+        >
+          必选
+        </span>
       </header>
 
       <div class="option-scroll-shell">
@@ -74,6 +82,13 @@ const optionRows = computed(() => {
                   decoding="async"
                   :draggable="false"
                 />
+                <span
+                  v-if="capability.kind === 'scene' && option.id === selectedOptionId"
+                  class="option-item-check"
+                  aria-hidden="true"
+                >
+                  <Icon icon="mdi:check" />
+                </span>
                 <div class="option-item-caption">
                   <strong class="option-item-title">{{ option.title }}</strong>
                 </div>
@@ -122,6 +137,36 @@ const optionRows = computed(() => {
   line-height: 1.35;
 }
 
+.option-selector-card.is-scene .option-selector-title {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.option-selector-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--workspace-accent, #d4a017);
+  color: #111111;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.option-selector-card.is-scene .option-selector-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .option-scroll-shell {
   position: relative;
   min-width: 0;
@@ -167,7 +212,19 @@ const optionRows = computed(() => {
     transform 0.2s ease;
 }
 
+.option-selector-card.is-scene .option-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.25s ease;
+}
+
 .option-item:hover {
+  transform: translateY(-2px);
+}
+
+.option-selector-card.is-scene .option-item:hover:not(.is-active) {
+  border-color: #60a5fa;
   transform: translateY(-2px);
 }
 
@@ -178,14 +235,52 @@ const optionRows = computed(() => {
     0 10px 24px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
 }
 
+.option-selector-card.is-scene .option-item.is-active {
+  border-color: #3b82f6;
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.08) 0%,
+    rgba(255, 255, 255, 0.98) 100%
+  );
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  transform: none;
+}
+
 .option-item:focus-visible {
   border-color: var(--workspace-accent, #2f6bff);
   box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
 }
 
+.option-selector-card.is-scene .option-item:focus-visible {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.option-item-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
+  pointer-events: none;
+}
+
+.option-item-check :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+
 .option-item-cover {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
@@ -203,23 +298,46 @@ const optionRows = computed(() => {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  display: grid;
-  min-height: 42%;
-  align-items: end;
-  padding: 28px 8px 10px;
-  background:
-    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.44) 54%, rgba(0, 0, 0, 0.7) 100%);
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 22px 10px 10px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.38) 42%,
+    rgba(0, 0, 0, 0.78) 100%
+  );
   pointer-events: none;
+}
+
+.option-selector-card.is-scene .option-item-caption {
+  padding: 20px 10px 10px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.75) 100%
+  );
 }
 
 .option-item-title {
   display: block;
+  max-width: 100%;
   color: #ffffff;
   text-align: center;
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1.2;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.72);
+}
+
+.option-selector-card.is-scene .option-item-title {
+  font-weight: 600;
+  text-shadow: none;
 }
 
 .option-item.is-active .option-item-title {

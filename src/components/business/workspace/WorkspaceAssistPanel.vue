@@ -1547,7 +1547,7 @@ defineExpose({
   flex-shrink: 0;
   gap: 18px;
   min-height: 32px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .assist-shell {
