@@ -72,11 +72,29 @@ npm install
 npm run dev
 ```
 
-Default local URLs:
+Default local service URLs:
 
-- Reusable Credits Platform API: `http://127.0.0.1:3000`
-- usedCar backend API: `http://127.0.0.1:3101`
+- Reusable Credits Platform API base: `http://127.0.0.1:3000`
+- usedCar backend API base: `http://127.0.0.1:3101`
 - usedCar frontend: `http://127.0.0.1:5173`
+
+The two API services do not serve a root `/` page, so opening the bare API base URL in a browser returns `404`.
+
+Use these health and inspection URLs instead:
+
+- Reusable Credits Platform health: `http://127.0.0.1:3000/health`
+- Reusable Credits Platform database health: `http://127.0.0.1:3000/health/db`
+- Reusable Credits Platform Swagger UI: `http://127.0.0.1:3000/docs`
+- usedCar backend health: `http://127.0.0.1:3101/health`
+
+Example usedCar credits proxy smoke:
+
+```bash
+curl \
+  -H "x-credits-user-id: 4" \
+  -H "x-credits-account-scope: personal" \
+  http://127.0.0.1:3101/api/v1/credits/accounts
+```
 
 ## Required Environment Variables
 
