@@ -56,6 +56,7 @@ const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
 const ACTIVE_GENERATION_TASK_KEY = "workspace-active-generation-task";
 const RECENT_GENERATION_SCAN_PAGE_SIZE = 50;
+const MAX_RUNNING_TASK_TRACKING_AGE_MS = 2 * 60 * 60 * 1000;
 const runningGenerationStatuses = new Set([
   "waiting",
   "queued",
@@ -193,6 +194,27 @@ function normalizeRecentTaskStatus(task: RecentGenerationTask) {
 
 function isRunningGenerationStatus(status?: string | null) {
   return Boolean(status && runningGenerationStatuses.has(status));
+}
+
+function resolveTaskTimestamp(task: {
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}) {
+  const timestamp = Date.parse(task.updatedAt ?? task.createdAt ?? "");
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function isStaleRunningGenerationTask(task: {
+  status?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}) {
+  if (!isRunningGenerationStatus(task.status)) return false;
+
+  const timestamp = resolveTaskTimestamp(task);
+  if (timestamp === null) return false;
+
+  return Date.now() - timestamp > MAX_RUNNING_TASK_TRACKING_AGE_MS;
 }
 
 function setTrackedRunningTasks(next: Record<string, string>) {
@@ -445,6 +467,7 @@ async function refreshTrackedRunningTasks() {
         const status = normalizeRecentTaskStatus(task);
         const taskId = task.taskId ?? task.id;
         if (!taskId || !isRunningGenerationStatus(status)) continue;
+        if (isStaleRunningGenerationTask({ ...task, status })) continue;
 
         next[taskId] = task.moduleCode ?? result.value.moduleCode;
       }
@@ -479,6 +502,12 @@ async function pollTrackedRunningTasks() {
       delete next[task.taskId];
       clearActiveGenerationTask(task.taskId);
       hasTerminalTask = true;
+      continue;
+    }
+
+    if (isStaleRunningGenerationTask(task)) {
+      delete next[task.taskId];
+      clearActiveGenerationTask(task.taskId);
       continue;
     }
 
@@ -659,6 +688,10 @@ async function pollGenerationTask(taskId: string) {
       return task;
     }
 
+    if (isStaleRunningGenerationTask(task)) {
+      return task;
+    }
+
     await sleep(index === 0 ? 1500 : 4000);
   }
 
@@ -800,6 +833,13 @@ async function resolveGenerationTask(
     }
 
     syncWorkspaceFromTask(task);
+
+    if (isStaleRunningGenerationTask(task)) {
+      if (!options.restored) {
+        message.warning("生成任务已超时，请重新提交");
+      }
+      return;
+    }
 
     if (task.status !== "success") {
       message.error("查看图片失败");
