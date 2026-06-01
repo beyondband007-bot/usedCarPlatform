@@ -4,7 +4,13 @@ import type {
   PackageOption,
   PointTransaction,
   PricingPlan,
+  PricingPlanTone,
 } from '@/types/prototype'
+import {
+  enterprisePlanList,
+  formatPlanPrice,
+  type EnterprisePlan,
+} from '@/domain/enterprise-plans'
 
 /** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
 export const studioGuestNavigation: NavItem[] = [
@@ -63,60 +69,41 @@ export const homeFeatures: FeatureEntry[] = [
   },
 ]
 
-export const pricingPlans: PricingPlan[] = [
-  {
-    name: '企业基础档',
-    price: '¥980',
-    description: '适合新团队启动视觉生产流程，先验证素材标准与交付节奏。',
+const pricingPlanVisuals: Record<
+  EnterprisePlan['plan'],
+  { icon: string; tone: PricingPlanTone; badge?: string; featured?: boolean; action: string }
+> = {
+  basic: {
     icon: 'mdi:rocket-launch-outline',
     tone: 'blue',
-    benefits: [
-      '赠送 20,000 积分',
-      '1 个企业账号',
-      '每账号同时上传 1 套外观图组',
-      '单张生成正常使用',
-      '适合小团队试运行',
-    ],
     action: '订阅基础档',
   },
-  {
-    name: '企业团队档',
-    price: '¥3,980',
-    description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
+  team: {
     icon: 'mdi:account-group-outline',
     tone: 'orange',
     badge: '最划算',
-    benefits: [
-      '赠送 55,000 积分',
-      '5 个企业账号',
-      '每账号同时上传 5 套外观图组',
-      '单张生成正常使用',
-      '适合车商团队批量上新',
-    ],
-    action: '订阅团队档',
     featured: true,
+    action: '订阅团队档',
   },
-  {
-    name: '企业旗舰档',
-    price: '¥9,800',
-    description: '适合集团化业务、出海车源与专属场景长期配置。',
+  flagship: {
     icon: 'mdi:shield-crown-outline',
     tone: 'green',
-    benefits: [
-      '赠送 980,000 积分',
-      '20 个企业账号',
-      '每账号同时上传 20 套外观图组',
-      '可定制 20 个专属场景',
-      '适合集团化和出海团队',
-    ],
     action: '咨询旗舰档',
   },
-]
+}
+
+export const pricingPlans: PricingPlan[] = enterprisePlanList.map((plan) => ({
+  name: plan.name,
+  price: formatPlanPrice(plan),
+  description: plan.description,
+  benefits: plan.featureDetails,
+  ...pricingPlanVisuals[plan.plan],
+}))
 
 export const pointTransactions: PointTransaction[] = [
   {
     title: '套餐赠送',
-    amount: '+550 积分',
+    amount: '+100,000 积分',
     positive: true,
     description: '2026-05-20 09:00 · 企业团队档开通',
   },
@@ -138,24 +125,12 @@ export const pointTransactions: PointTransaction[] = [
   },
 ]
 
-export const packageOptions: PackageOption[] = [
-  {
-    price: '¥980',
-    description: '赠 200 积分 · 1账号 · 1套并发',
-    action: '选择',
-  },
-  {
-    price: '¥3,980',
-    description: '赠 55,000 积分 · 5账号 · 5套并发',
-    action: '选择',
-    active: true,
-  },
-  {
-    price: '¥9,800',
-    description: '980,000 积分 · 20账号 · 20专属场景',
-    action: '预约演示',
-  },
-]
+export const packageOptions: PackageOption[] = enterprisePlanList.map((plan) => ({
+  price: formatPlanPrice(plan),
+  description: `${plan.giftPoints.toLocaleString('zh-CN')} 积分 · ${plan.accountLabel} · ${plan.concurrencyLabel}`,
+  action: plan.plan === 'flagship' ? '预约演示' : '选择',
+  active: plan.plan === 'team',
+}))
 
 export const pricingPageCopy = {
   title: '企业套餐',

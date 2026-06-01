@@ -25,6 +25,13 @@ import {
   type RechargePlan,
   type RechargePlanTone,
 } from "@/constants/recharge-plans";
+import {
+  enterprisePlans,
+  formatPlanPoints,
+  formatPlanPrice,
+  resolveEnterprisePlanCodeFromName,
+  resolveEnterprisePlanName,
+} from "@/domain/enterprise-plans";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 
@@ -73,25 +80,28 @@ const formatDateTime = (value: string | null | undefined) => {
 };
 
 const productDisplayName = (product: RechargeProduct, index: number) => {
-  if (product.name.includes("Team")) return "企业团队版";
-  if (product.name.includes("Flagship")) return "企业旗舰版";
-  if (product.name.includes("Basic")) return "企业基础版";
+  const planCode = resolveEnterprisePlanCodeFromName(product.name);
+  if (planCode) return resolveEnterprisePlanName(planCode);
   return rechargePlans[index]?.name ?? product.name;
 };
 
-const productTone = (index: number): RechargePlanTone =>
-  index === 1 ? "blue" : index === 2 ? "gold" : "blue";
+const productTone = (name: string, index: number): RechargePlanTone => {
+  const planCode = resolveEnterprisePlanCodeFromName(name);
+  if (planCode === "flagship") return "gold";
+  if (planCode === "team") return "blue";
+  return index === 2 ? "gold" : "blue";
+};
 
 const planTypeMeta: Record<
   string,
   { icon: string; tone: RechargePlanTone }
 > = {
-  企业基础版: { icon: "mdi:layers-triple-outline", tone: "blue" },
-  企业团队版: { icon: "mdi:chart-bar", tone: "blue" },
-  企业旗舰版: { icon: "mdi:crown-outline", tone: "gold" },
+  企业基础档: { icon: "mdi:layers-triple-outline", tone: "blue" },
+  企业团队档: { icon: "mdi:chart-bar", tone: "blue" },
+  企业旗舰档: { icon: "mdi:crown-outline", tone: "gold" },
 };
 
-const selectedPlanName = ref("企业团队版");
+const selectedPlanName = ref(enterprisePlans.team.name);
 const pressingPlanName = ref<string | null>(null);
 const plans = ref<RechargePlan[]>(rechargePlans);
 const productsByPlan = ref<Record<string, RechargeProduct>>({});
@@ -104,9 +114,9 @@ const authStore = useAuthStore();
 
 const recordTypeOptions = [
   { label: "全部类型", value: "all" },
-  { label: "企业基础版", value: "basic" },
-  { label: "企业团队版", value: "advanced" },
-  { label: "企业旗舰版", value: "premium" },
+  { label: enterprisePlans.basic.name, value: "basic" },
+  { label: enterprisePlans.team.name, value: "advanced" },
+  { label: enterprisePlans.flagship.name, value: "premium" },
 ];
 
 function handlePlanPointerDown(name: string) {
@@ -162,12 +172,16 @@ const recordSummary = computed<RecordSummary[]>(() => {
 function mapProductToPlan(product: RechargeProduct, index: number): RechargePlan {
   const fallback = rechargePlans[index] ?? rechargePlans[0];
   const name = productDisplayName(product, index);
+  const planCode = resolveEnterprisePlanCodeFromName(name);
+  const enterprisePlan = planCode ? enterprisePlans[planCode] : null;
   return {
     ...fallback,
     name,
-    price: formatCurrency(product.amount),
-    giftPoints: formatNumber(Number(product.points) + Number(product.bonusPoints)),
-    tone: productTone(index),
+    price: enterprisePlan ? formatPlanPrice(enterprisePlan) : formatCurrency(product.amount),
+    giftPoints: enterprisePlan
+      ? formatPlanPoints(enterprisePlan)
+      : formatNumber(Number(product.points) + Number(product.bonusPoints)),
+    tone: productTone(name, index),
     badge: fallback.badge,
   };
 }
@@ -216,6 +230,7 @@ async function loadRechargeData() {
 async function createOrderForPlan(name: string) {
   const product = productsByPlan.value[name];
   if (!product || isCreatingOrder.value) return;
+  const enterprisePlan = enterprisePlans[resolveEnterprisePlanCodeFromName(name) ?? "team"];
 
   isCreatingOrder.value = true;
   try {
@@ -228,8 +243,8 @@ async function createOrderForPlan(name: string) {
       {
         orderNo: order.orderNo,
         plan: name,
-        amount: formatCurrency(order.amount),
-        points: formatNumber(Number(order.points) + Number(order.bonusPoints)),
+        amount: formatPlanPrice(enterprisePlan),
+        points: formatPlanPoints(enterprisePlan),
         status: order.status === "failed" ? "支付失败" : order.status === "paid" ? "支付成功" : "支付中",
         paidAt: formatDateTime(order.paidAt) === "—" ? formatDateTime(new Date().toISOString()) : formatDateTime(order.paidAt),
       },
@@ -252,7 +267,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     key: "plan",
     width: 168,
     render(row) {
-      const meta = planTypeMeta[row.plan] ?? planTypeMeta["企业基础版"];
+      const meta = planTypeMeta[row.plan] ?? planTypeMeta[enterprisePlans.basic.name];
       return h(
         "span",
         { class: ["plan-type-pill", `is-${meta.tone}`] },

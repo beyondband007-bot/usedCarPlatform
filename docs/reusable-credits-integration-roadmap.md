@@ -58,6 +58,7 @@ Detailed phase notes:
 - [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
 - [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
 - [Three-role credits back office](./reusable-credits-three-role-back-office.md)
+- [Enterprise plan business logic](./enterprise-plan-business-logic.md)
 - [First release account creation policy](./first-release-account-creation-policy.md)
 - [Auth login demo accounts](./auth-login-demo-accounts.md)
 

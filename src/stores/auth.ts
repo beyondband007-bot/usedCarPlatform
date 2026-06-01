@@ -46,16 +46,16 @@ const selectDisplayAccount = (accounts: CreditAccount[]) =>
   accounts.find((account) => account.accountScope === 'personal') ?? accounts[0] ?? null
 
 function readInitialCreditsText() {
-  if (typeof window === 'undefined') return '55,000'
+  if (typeof window === 'undefined') return '100,000'
 
   const raw = window.localStorage.getItem('ai-car-studio:points-summary')
-  if (!raw) return '55,000'
+  if (!raw) return '100,000'
 
   try {
     const parsed = JSON.parse(raw) as { currentPoints?: number }
     return Number(parsed.currentPoints ?? 0).toLocaleString('zh-CN')
   } catch {
-    return '55,000'
+    return '100,000'
   }
 }
 

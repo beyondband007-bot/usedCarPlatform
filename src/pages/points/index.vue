@@ -7,6 +7,7 @@ import type { DataTableColumns } from 'naive-ui'
 import { useAppStore } from '@/stores/app'
 import { usePointsStore } from '@/stores/points'
 import { useSubscriptionStore } from '@/stores/subscription'
+import { resolveEnterprisePlanName } from '@/domain/enterprise-plans'
 import type { PointRecord, PointRecordType } from '@/types/points'
 
 const appStore = useAppStore()
@@ -18,13 +19,7 @@ onMounted(async () => {
   await pointsStore.hydrate()
 })
 
-const planName = computed(() =>
-  subscriptionStore.currentPlan === 'basic'
-    ? '企业基础版'
-    : subscriptionStore.currentPlan === 'flagship'
-      ? '企业旗舰版'
-      : '企业团队版',
-)
+const planName = computed(() => resolveEnterprisePlanName(subscriptionStore.currentPlan))
 
 const flowKeyword = ref('')
 const selectedFlowType = ref<'all' | PointRecordType>('all')

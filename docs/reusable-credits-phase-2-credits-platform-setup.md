@@ -81,8 +81,8 @@ Phase 2 also seeds local recharge products for usedCarPlatform testing:
 | Product | Amount | Points |
 | --- | ---: | ---: |
 | Enterprise Basic | CNY 980.00 | `20000.0000` |
-| Enterprise Team | CNY 3980.00 | `55000.0000` |
-| Enterprise Flagship | CNY 9800.00 | `980000.0000` |
+| Enterprise Team | CNY 3980.00 | `100000.0000` |
+| Enterprise Flagship | CNY 9800.00 | `800000.0000` |
 
 These are setup values for integration testing and can be adjusted in the credits platform without changing usedCarPlatform billing workflow code.
 
@@ -113,4 +113,3 @@ In Reusable Credits Platform:
 ## Why This Note Exists In usedCarPlatform
 
 The code changes for Phase 2 belong in Reusable Credits Platform, but the usedCarPlatform integration branch should still show that Phase 2 is complete. This note gives reviewers a visible pointer from the usedCarPlatform branch to the credits-platform setup work.
-
