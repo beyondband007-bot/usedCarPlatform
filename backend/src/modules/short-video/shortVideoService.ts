@@ -7,7 +7,10 @@ import { assetsRepository } from "../assets/assetsRepository";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
 
-const allowedRatios = ["16:9", "9:16", "1:1", "4:3", "3:4"] as const;
+const KIE_KLING_VIDEO_MODEL = "kling-3.0/video";
+const KIE_KLING_VIDEO_OPTION_ID = "kling-3.0-video-10s";
+
+const allowedRatios = ["16:9", "9:16", "1:1"] as const;
 const allowedVideoResolutions = ["480p", "720p", "1080p"] as const;
 
 type VideoRatio = (typeof allowedRatios)[number];
@@ -48,7 +51,7 @@ class ShortVideoService {
       id: taskId,
       moduleCode: "short-video",
       inputAssetId: asset.id,
-      optionId: "seedance-2-10s",
+      optionId: KIE_KLING_VIDEO_OPTION_ID,
       outputRatio: aspectRatio,
       resolution: "2K",
       logoAssetId: null,
@@ -76,10 +79,10 @@ class ShortVideoService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: "bytedance/seedance-2",
+          model: KIE_KLING_VIDEO_MODEL,
           moduleCode: "short-video",
           prompt: shortVideoPrompt,
-          referenceImageUrls: [uploadedVehicle.fileUrl],
+          startFrameUrls: [uploadedVehicle.fileUrl],
           aspectRatio,
           videoResolution,
           duration,
@@ -93,7 +96,7 @@ class ShortVideoService {
         status: "queued",
         progress: 5,
         kieTaskId: kieTask.kieTaskId,
-        model: "bytedance/seedance-2",
+        model: KIE_KLING_VIDEO_MODEL,
         duration,
         aspectRatio,
         videoResolution,
