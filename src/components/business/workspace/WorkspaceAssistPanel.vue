@@ -4,7 +4,10 @@ import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
 
 import {
+  getDeliveryTaskAssets,
+  getDeliveryTasks,
   getRecentGenerationTasks,
+  type DeliveryAsset,
   type RecentGenerationTask,
 } from "@/api/visual-workbench";
 import SceneTemplateRecommendations, {
@@ -16,14 +19,14 @@ import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import {
-  deliveryResults,
   formatDeliveryRatio,
   type DeliveryResultItem,
 } from "@/constants/delivery-results";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
-import { downloadAllDeliveryResults } from "@/utils/delivery-download";
+import { downloadDeliveryGalleryAssets } from "@/utils/delivery-download";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
+import { getBatchItemKindLabel } from "@/utils/batch-task";
 import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
 import { formatDate } from "@/utils/dayjs";
 import {
@@ -78,6 +81,16 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 const templateDescriptionMap: Record<string, string> = {
   经典白棚: "纯净背景·突出车身线条",
+  城市主干道: "城市日间主干道动态场景",
+  夕阳高速: "高速公路夕阳行驶场景",
+  雨夜城市: "雨夜城市街道光影场景",
+  山路弯道: "山区弯道行驶场景",
+  海岸公路: "滨海公路动态场景",
+  林荫大道: "林荫大道自然光场景",
+  商务园区: "园区道路商务场景",
+  雪后公路: "雪后公路质感场景",
+  傍晚高架: "傍晚高架桥动态场景",
+  隧道出口: "隧道出口光线过渡场景",
   玻璃展厅: "通透空间·自然光影",
   暗调奢华: "低调奢华·气质感",
   柔光灯顶: "柔光均匀·减少硬阴影",
@@ -92,11 +105,9 @@ const templateDescriptionMap: Record<string, string> = {
   道路动态3: "夜景道路·强化光轨质感",
   道路动态4: "山路弯道·突出操控感",
   天空镜场: "镜面天空·反射质感更强",
-  夕阳车境: "暖色夕照·氛围更柔和",
-  天境无垠: "开阔天境·视野更通透",
+  夕阳车镜: "暖色夕照·氛围更柔和",
   云海展台: "云海展台·层次更丰富",
-  云境车场: "云境车场·场景更完整",
-  天空之境: "纯净天境·主体更突出",
+  云镜车场: "云镜车场·场景更完整",
 };
 
 const templateCards = computed<SceneTemplateRecommendationItem[]>(() =>
@@ -225,8 +236,7 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
         cards.push({
           id: `${job.batchId}-${item.itemId}`,
           title: item.groupTitle || job.projectName,
-          sceneLabel:
-            item.itemKind === "interior" ? "内饰增强" : job.projectName,
+          sceneLabel: getBatchItemKindLabel(item.itemKind),
           createdAt,
           status: item.status,
           thumbnail: item.thumbnail || job.previewUrl || undefined,
@@ -269,15 +279,68 @@ const requirementCards = computed(() =>
   })),
 );
 
-const deliveryResultCount = deliveryResults.length;
+const deliveryGalleryAssets = ref<DeliveryResultItem[]>([]);
+const deliveryGalleryTitle = ref("成片结果");
+const deliveryGalleryLoading = ref(false);
+const deliveryResultCount = computed(() => deliveryGalleryAssets.value.length);
 const message = useMessage();
 const isDownloadingAllDelivery = ref(false);
 const isDownloadingDeliveryGroup = ref(false);
 
+async function loadDeliveryGallery() {
+  if (props.capability.kind !== "delivery") {
+    deliveryGalleryAssets.value = [];
+    return;
+  }
+
+  deliveryGalleryLoading.value = true;
+
+  try {
+    const tasks = await getDeliveryTasks({ page: 1, pageSize: 20 });
+    const taskWithAssets =
+      tasks.items.find((item) => item.assetCount > 0) ?? tasks.items[0];
+
+    if (!taskWithAssets) {
+      deliveryGalleryAssets.value = [];
+      deliveryGalleryTitle.value = "成片结果";
+      return;
+    }
+
+    deliveryGalleryTitle.value = taskWithAssets.title.replace(
+      / · 成片交付$/,
+      "",
+    );
+
+    const assets = await getDeliveryTaskAssets(taskWithAssets.taskId, {
+      page: 1,
+      pageSize: 200,
+    });
+
+    deliveryGalleryAssets.value = assets.items.map((asset) =>
+      mapDeliveryAssetToResultItem(asset),
+    );
+  } catch {
+    deliveryGalleryAssets.value = [];
+  } finally {
+    deliveryGalleryLoading.value = false;
+  }
+}
+
+function mapDeliveryAssetToResultItem(asset: DeliveryAsset): DeliveryResultItem {
+  return {
+    title: asset.title,
+    image: asset.thumbnailUrl ?? asset.url,
+    ratio: asset.ratio,
+  };
+}
+
 watch(
   () => props.capability.kind,
-  () => {
+  (kind) => {
     emit("closeDeliveryImagePreview");
+    if (kind === "delivery") {
+      void loadDeliveryGallery();
+    }
   },
 );
 
@@ -335,11 +398,18 @@ async function handleDownloadDeliveryGroup() {
 }
 
 async function handleDownloadAllDelivery() {
+  if (!deliveryGalleryAssets.value.length) {
+    message.warning("暂无可下载成片");
+    return;
+  }
+
   isDownloadingAllDelivery.value = true;
 
   try {
-    const count = await downloadAllDeliveryResults();
-    message.success(`Batch download started for ${count} images`);
+    const count = await downloadDeliveryGalleryAssets(deliveryGalleryAssets.value);
+    message.success(`已开始下载 ${count} 张成片`);
+  } catch {
+    message.error("批量下载失败，请稍后重试");
   } finally {
     isDownloadingAllDelivery.value = false;
   }
@@ -606,6 +676,9 @@ watch(
 
 onMounted(() => {
   void loadRecentItems();
+  if (props.capability.kind === "delivery") {
+    void loadDeliveryGallery();
+  }
 });
 
 onUnmounted(() => {
@@ -982,13 +1055,16 @@ defineExpose({
         <header class="delivery-result-head">
           <div>
             <p>成片结果</p>
-            <h2>5月展厅批量上新</h2>
-            <span>已完成 {{ deliveryResultCount }} 张 · 1:1 预览展示</span>
+            <h2>{{ deliveryGalleryTitle }}</h2>
+            <span
+              >已完成 {{ deliveryResultCount }} 张 ·
+              {{ deliveryGalleryLoading ? "加载中..." : "实时交付素材" }}</span
+            >
           </div>
           <button
             type="button"
             class="delivery-download-all"
-            :disabled="isDownloadingAllDelivery"
+            :disabled="isDownloadingAllDelivery || !deliveryResultCount"
             @click="handleDownloadAllDelivery"
           >
             {{ isDownloadingAllDelivery ? "下载中..." : "下载全部" }}
@@ -996,9 +1072,23 @@ defineExpose({
         </header>
 
         <section class="delivery-result-layout" aria-label="成片交付结果">
+          <div
+            v-if="deliveryGalleryLoading && !deliveryGalleryAssets.length"
+            class="recent-empty-state"
+          >
+            <Icon icon="mdi:loading" class="recent-loading-icon" />
+            <span>正在加载成片素材</span>
+          </div>
+          <div
+            v-else-if="!deliveryGalleryAssets.length"
+            class="recent-empty-state"
+          >
+            <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
+            <span>暂无成片素材</span>
+          </div>
           <article
-            v-for="item in deliveryResults"
-            :key="item.title"
+            v-for="item in deliveryGalleryAssets"
+            :key="`${item.title}-${item.image}`"
             class="delivery-result-card is-clickable"
             role="button"
             tabindex="0"
@@ -1174,12 +1264,13 @@ defineExpose({
             :class="{ 'is-compact-guide': !showTemplateRecommendations }"
           >
             <WorkspaceTutorialGuide
-              :animation-key="capability.code"
+              :animation-key="`${capability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
             />
 
             <SceneTemplateRecommendations
               v-if="showTemplateRecommendations"
+              :key="`${capability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
               :items="templateCards"
               :active-id="selectedOptionId"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
@@ -1301,6 +1392,12 @@ defineExpose({
   border-radius: 20px;
   background: var(--assist-bg);
   color: var(--assist-text);
+}
+
+.assist-panel.theme-dark {
+  border-color: var(--workspace-line, var(--assist-border));
+  background: var(--assist-bg);
+  box-shadow: none;
 }
 
 .assist-panel.theme-light {
@@ -2215,7 +2312,7 @@ defineExpose({
 
 .tab-group button {
   position: relative;
-  padding: 0 0 10px;
+  padding: 0;
   color: #999999;
   font-size: 15px;
   font-weight: 900;
@@ -2231,17 +2328,6 @@ defineExpose({
 
 .tab-group button.active {
   color: #d4a017;
-}
-
-.tab-group button.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  border-radius: 999px;
-  background: #d4a017;
 }
 
 .expand-button {

@@ -10,7 +10,7 @@ import VisitorWorkbenchModal from '@/components/business/home/VisitorWorkbenchMo
 
 import AppHeader from '@/components/layout/AppHeader.vue'
 
-import { isWorkbenchSectionPath } from '@/constants/app-flow'
+import { WORKSPACE_ROUTE } from '@/constants/app-flow'
 
 import { useStudioChrome } from '@/composables/useStudioChrome'
 
@@ -41,11 +41,15 @@ provide(WORKBENCH_ENTRY_KEY, workbenchEntry)
 
 
 const useFixedAppFrame = computed(
-  () => authStore.isLoggedIn && isWorkbenchSectionPath(route.path),
+  () =>
+    authStore.isLoggedIn &&
+    (route.path === WORKSPACE_ROUTE ||
+      route.path.startsWith(`${WORKSPACE_ROUTE}/`)),
 )
 
 const isHomePage = computed(() => route.path === '/home')
 const isPricingPage = computed(() => route.path === '/pricing')
+const isLoginPage = computed(() => route.path === '/login')
 
 
 
@@ -77,6 +81,8 @@ const {
 
       'app-layout--pricing': isPricingPage,
 
+      'app-layout--login': isLoginPage,
+
       'app-layout--studio-chrome': usesStudioChrome,
 
     }"
@@ -92,7 +98,8 @@ const {
         :class="{
 
           'home-chrome--light': !appStore.isDarkMode && !isPricingPage,
-          'home-chrome--pricing': isPricingPage,
+          'home-chrome--pricing':
+            isPricingPage || (isLoginPage && appStore.isDarkMode),
           'home-chrome--pricing-light': !appStore.isDarkMode && isPricingPage,
 
         }"
@@ -144,39 +151,33 @@ const {
 
 
 .app-layout--auth {
-
   display: flex;
-
   height: 100dvh;
-
   max-height: 100dvh;
-
   min-height: 100dvh;
-
   flex-direction: column;
-
   overflow: hidden;
-
 }
 
-
-
 .app-layout-main {
-
   display: flex;
-
   min-height: 0;
-
   flex: 1;
-
   flex-direction: column;
-
   overflow-x: hidden;
-
   overflow-y: auto;
-
   overscroll-behavior: contain;
+}
 
+.app-layout--auth .app-layout-main {
+  overflow: hidden;
+}
+
+.app-layout--auth .app-layout-main > :deep(*) {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 
@@ -354,8 +355,23 @@ const {
 
 .app-layout--studio-chrome:not(.app-layout--home) .app-layout-main {
 
-  padding-top: 72px;
+  padding-top: var(--app-header-offset);
 
+}
+
+.app-layout--studio-chrome.app-layout--auth .app-layout-main {
+  box-sizing: border-box;
+  flex: 0 0 calc(100dvh - var(--app-header-offset));
+  height: calc(100dvh - var(--app-header-offset));
+  max-height: calc(100dvh - var(--app-header-offset));
+  margin-top: var(--app-header-offset);
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.app-layout--studio-chrome.app-layout--auth .app-layout-main > :deep(*) {
+  height: 100%;
+  max-height: 100%;
 }
 
 
@@ -371,7 +387,7 @@ const {
   box-sizing: border-box;
   height: 100dvh;
   max-height: 100dvh;
-  padding-top: 72px;
+  padding-top: var(--app-header-offset);
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -389,6 +405,19 @@ const {
   overflow: hidden;
 }
 
+.app-layout--studio-chrome.app-layout--login {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: var(--app-bg);
+}
 
+.app-layout--studio-chrome.app-layout--login .app-layout-main {
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: var(--app-header-offset);
+  overflow: hidden;
+}
 
 </style>

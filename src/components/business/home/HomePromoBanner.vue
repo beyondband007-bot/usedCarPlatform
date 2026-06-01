@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, inject } from 'vue'
 import { useRouter } from 'vue-router'
 
 import PreloadImage from '@/components/common/PreloadImage.vue'
@@ -8,8 +8,12 @@ import {
   homePromoBannerSlides,
   type HomePromoBannerSlide,
 } from '@/constants/home-promo-banners'
+import { WORKBENCH_ENTRY_KEY } from '@/composables/workbench-entry-key'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const workbenchEntry = inject(WORKBENCH_ENTRY_KEY)
+const authStore = useAuthStore()
 const activeIndex = ref(0)
 const isPaused = ref(false)
 const prefersReducedMotion = ref(false)
@@ -61,6 +65,19 @@ function handleSlideClick(slide: HomePromoBannerSlide) {
   router.push(slide.to)
 }
 
+function handleActionClick(slide: HomePromoBannerSlide) {
+  if (slide.opensConsultModal) {
+    workbenchEntry?.openVisitorModal()
+    return
+  }
+
+  if (!slide.actionTo) {
+    return
+  }
+
+  router.push(slide.actionTo)
+}
+
 function handleDotClick(index: number) {
   goToSlide(index)
 
@@ -68,6 +85,27 @@ function handleDotClick(index: number) {
     stopAutoplay()
     startAutoplay()
   }
+}
+
+function shouldShowAction(slide: HomePromoBannerSlide) {
+  if (!slide.actionLabel) {
+    return false
+  }
+
+  if (slide.opensConsultModal && authStore.isLoggedIn) {
+    return false
+  }
+
+  return true
+}
+
+function slideAriaLabel(slide: HomePromoBannerSlide) {
+  if (slide.hideCopy) {
+    return slide.alt
+  }
+
+  const parts = [slide.title, ...(slide.lines ?? [])].filter(Boolean)
+  return parts.join('，')
 }
 
 onMounted(() => {
@@ -96,8 +134,8 @@ onUnmounted(() => {
         :key="slide.id"
         type="button"
         class="promo-banner-slide"
-        :class="{ 'is-active': index === activeIndex }"
-        :aria-label="`${slide.title}：${slide.subtitle ?? ''}`"
+        :class="{ 'is-active': index === activeIndex, 'is-image-only': slide.hideCopy }"
+        :aria-label="slideAriaLabel(slide)"
         :aria-current="index === activeIndex ? 'true' : undefined"
         @click="handleSlideClick(slide)"
       >
@@ -108,9 +146,20 @@ onUnmounted(() => {
           loading="lazy"
           decoding="async"
         />
-        <div class="promo-banner-copy">
-          <h2>{{ slide.title }}</h2>
-          <p v-if="slide.subtitle">{{ slide.subtitle }}</p>
+        <div v-if="!slide.hideCopy" class="promo-banner-copy">
+          <h2 v-if="slide.title">{{ slide.title }}</h2>
+          <p v-for="line in slide.lines" :key="line">{{ line }}</p>
+          <span
+            v-if="shouldShowAction(slide)"
+            role="button"
+            tabindex="0"
+            class="promo-banner-action"
+            @click.stop="handleActionClick(slide)"
+            @keydown.enter.stop.prevent="handleActionClick(slide)"
+            @keydown.space.stop.prevent="handleActionClick(slide)"
+          >
+            {{ slide.actionLabel }}
+          </span>
         </div>
       </button>
     </div>
@@ -124,7 +173,7 @@ onUnmounted(() => {
         :class="{ 'is-active': index === activeIndex }"
         role="tab"
         :aria-selected="index === activeIndex"
-        :aria-label="`切换到${slide.title}`"
+        :aria-label="`切换到${slide.alt}`"
         @click="handleDotClick(index)"
       />
     </div>
@@ -148,7 +197,8 @@ onUnmounted(() => {
 .promo-banner-slide {
   position: absolute;
   inset: 0;
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 259px;
   padding: 0;
@@ -158,16 +208,16 @@ onUnmounted(() => {
   background: var(--home-panel);
   opacity: 0;
   cursor: pointer;
-  transform: scale(1.01);
-  transition:
-    opacity 500ms ease,
-    transform 500ms ease;
+  transition: opacity 500ms ease;
+}
+
+.promo-banner-slide.is-image-only {
+  cursor: default;
 }
 
 .promo-banner-slide.is-active {
   opacity: 1;
   z-index: 1;
-  transform: scale(1);
 }
 
 .promo-banner-image {
@@ -175,24 +225,39 @@ onUnmounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  isolation: isolate;
   opacity: 0.94;
   border-radius: var(--home-radius-card, 28px);
-  transition: transform var(--home-motion-normal, 240ms ease);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.promo-banner:hover .promo-banner-image {
-  transform: scale(1.03);
+.promo-banner-image :deep(.preload-image),
+.promo-banner-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.promo-banner-image :deep(.preload-image__img) {
+  image-rendering: auto;
+  object-fit: cover;
+  object-position: center;
 }
 
 .promo-banner-copy {
   position: relative;
   z-index: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-height: 259px;
-  padding: 35px;
+  max-width: 58%;
+  padding: 117px 35px 35px;
   text-align: left;
   background: var(--home-media-overlay);
 }
@@ -200,13 +265,49 @@ onUnmounted(() => {
 .promo-banner-copy h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 22px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .promo-banner-copy p {
-  margin: 0 0 40px;
+  margin: 0 0 8px;
   color: var(--home-media-desc);
   font-size: 13px;
+  line-height: 1.5;
+}
+
+.promo-banner-copy p:last-of-type {
+  margin-bottom: 0;
+}
+
+.promo-banner-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  margin-top: 14px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--home-gold-strong), var(--home-gold));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 12px 34px rgba(244, 200, 64, 0.18);
+  color: #171100;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.promo-banner-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--home-gold) 72%, transparent);
+  outline-offset: 4px;
+}
+
+.promo-banner-copy:not(:has(.promo-banner-action)) p:last-of-type {
+  margin-bottom: 0;
 }
 
 .promo-banner-dots {
@@ -229,12 +330,7 @@ onUnmounted(() => {
   cursor: pointer;
   transition:
     width var(--home-motion-normal, 240ms ease),
-    background var(--home-motion-normal, 240ms ease),
-    opacity var(--home-motion-normal, 240ms ease);
-}
-
-.promo-banner-dot:hover {
-  opacity: 0.78;
+    background var(--home-motion-normal, 240ms ease);
 }
 
 .promo-banner-dot:focus-visible {
@@ -253,6 +349,19 @@ onUnmounted(() => {
   .promo-banner-slide,
   .promo-banner-copy {
     min-height: 210px;
+  }
+
+  .promo-banner-copy {
+    max-width: 72%;
+    padding: 95px 20px 24px;
+  }
+
+  .promo-banner-copy h2 {
+    font-size: 18px;
+  }
+
+  .promo-banner-copy p {
+    font-size: 12px;
   }
 }
 

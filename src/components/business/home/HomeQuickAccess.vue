@@ -4,23 +4,8 @@ import { onMounted, ref } from 'vue'
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import HomePromoBanner from '@/components/business/home/HomePromoBanner.vue'
 import { homeQuickEntries } from '@/constants/home-page'
-import type { HomeQuickEntry } from '@/constants/home-page'
-
-const emit = defineEmits<{
-  enterWorkbench: []
-}>()
 
 const gridRef = ref<HTMLElement | null>(null)
-
-function handleClick(entry: HomeQuickEntry) {
-  if (entry.disabled) {
-    return
-  }
-
-  if (entry.workbenchEntry) {
-    emit('enterWorkbench')
-  }
-}
 
 onMounted(() => {
   const root = gridRef.value
@@ -72,29 +57,6 @@ onMounted(() => {
         <div>
           <h2>{{ entry.title }}</h2>
           <p>{{ entry.description }}</p>
-          <RouterLink
-            v-if="entry.to"
-            :to="entry.to"
-            class="button gold small"
-          >
-            {{ entry.action }}
-          </RouterLink>
-          <button
-            v-else-if="entry.workbenchEntry"
-            type="button"
-            class="button gold small"
-            @click="handleClick(entry)"
-          >
-            {{ entry.action }}
-          </button>
-          <button
-            v-else
-            type="button"
-            class="button gold small"
-            disabled
-          >
-            {{ entry.action }}
-          </button>
         </div>
       </article>
 
@@ -107,21 +69,23 @@ onMounted(() => {
 .suite-shell {
   position: relative;
   z-index: 3;
-  width: min(1520px, calc(100% - 40px));
-  margin: 70px auto 0;
+  width: min(1660px, calc(100% - 40px));
+  margin: 126px auto 0;
   padding-bottom: 126px;
 }
 
 .suite-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) minmax(0, 4fr);
   gap: 40px;
-  width: min(1575px, 100%);
+  width: 100%;
   margin: 0 auto;
 }
 
 .suite-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 259px;
   overflow: hidden;
   border: 1px solid var(--home-line);
@@ -134,7 +98,21 @@ onMounted(() => {
     box-shadow var(--home-motion-normal, 240ms ease);
 }
 
-.suite-card::after {
+.suite-card div {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 259px;
+  max-width: 58%;
+  padding: 117px 35px 35px;
+  background: var(--home-media-overlay);
+}
+
+.suite-card div::after {
   position: absolute;
   inset: 0;
   content: '';
@@ -144,11 +122,11 @@ onMounted(() => {
   transition: opacity var(--home-motion-normal, 240ms ease);
 }
 
-.suite-card:hover::after {
-  opacity: 1;
+.suite-card:hover:not(.promo-banner) div::after {
+  opacity: 0.55;
 }
 
-.suite-card:hover {
+.suite-card:hover:not(.promo-banner) {
   transform: translateY(-4px);
   border-color: var(--home-card-hover-border);
   box-shadow: 0 18px 48px color-mix(in srgb, var(--home-gold) 8%, transparent);
@@ -159,101 +137,60 @@ onMounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  isolation: isolate;
   opacity: 0.94;
   border-radius: var(--home-radius-card, 28px);
-  transition: transform var(--home-motion-normal, 240ms ease), opacity var(--home-motion-normal, 240ms ease);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.suite-card:hover .suite-card-image {
-  transform: scale(1.03);
+.suite-card-image :deep(.preload-image),
+.suite-card-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.suite-card div {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  min-height: 259px;
-  padding: 35px;
-  background: var(--home-media-overlay);
+.suite-card-image :deep(.preload-image__img) {
+  image-rendering: auto;
+  object-fit: cover;
 }
 
 .suite-card h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 22px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .suite-card p {
-  margin: 0 0 48px;
+  margin: 0 0 8px;
   color: var(--home-media-desc);
   font-size: 13px;
+  line-height: 1.5;
 }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 24px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  text-decoration: none;
-  transition:
-    transform var(--home-motion-normal, 240ms ease),
-    filter var(--home-motion-normal, 240ms ease),
-    box-shadow var(--home-motion-normal, 240ms ease),
-    background var(--home-motion-normal, 240ms ease);
-}
-
-.button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  filter: saturate(1.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.58),
-    0 14px 34px color-mix(in srgb, var(--home-gold) 24%, transparent);
-}
-
-.button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--home-gold) 72%, transparent);
-  outline-offset: 4px;
-}
-
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.button.gold {
-  color: #171100;
-  background: linear-gradient(180deg, var(--home-gold-strong), var(--home-gold));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 12px 34px rgba(244, 200, 64, 0.18);
-}
-
-.button.small {
-  min-height: 36px;
-  padding: 0 20px;
-  font-size: 12px;
+.suite-card p:last-of-type {
+  margin-bottom: 0;
 }
 
 @media (max-width: 1100px) {
   .suite-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .suite-grid :deep(.promo-banner) {
+    grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 700px) {
   .suite-shell {
-    width: min(100% - 28px, 1520px);
-    margin-top: 26px;
+    width: min(100% - 28px, 1660px);
+    margin-top: 80px;
     padding-bottom: 80px;
   }
 
@@ -265,6 +202,11 @@ onMounted(() => {
   .suite-card,
   .suite-card div {
     min-height: 210px;
+  }
+
+  .suite-card div {
+    max-width: 72%;
+    padding: 95px 20px 24px;
   }
 }
 </style>

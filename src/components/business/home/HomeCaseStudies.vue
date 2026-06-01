@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from "vue";
 
-import PreloadImage from '@/components/common/PreloadImage.vue'
-import { homeCaseTabs } from '@/constants/home-page'
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import { homeCaseTabs } from "@/constants/home-page";
 
-const activeTabId = ref(homeCaseTabs[0]?.id ?? '')
-const layoutRef = ref<HTMLElement | null>(null)
+const activeTabId = ref(homeCaseTabs[0]?.id ?? "");
+const layoutRef = ref<HTMLElement | null>(null);
 
 const activeCase = computed(
-  () => homeCaseTabs.find((tab) => tab.id === activeTabId.value) ?? homeCaseTabs[0],
-)
+  () =>
+    homeCaseTabs.find((tab) => tab.id === activeTabId.value) ?? homeCaseTabs[0],
+);
 
 onMounted(() => {
-  const root = layoutRef.value
+  const root = layoutRef.value;
   if (!root) {
-    return
+    return;
   }
 
   const observer = new IntersectionObserver(
@@ -23,24 +24,24 @@ onMounted(() => {
         if (entry.isIntersecting) {
           entry.target.animate(
             [
-              { opacity: 0, transform: 'translateY(22px)' },
-              { opacity: 1, transform: 'translateY(0)' },
+              { opacity: 0, transform: "translateY(22px)" },
+              { opacity: 1, transform: "translateY(0)" },
             ],
             {
               duration: 620,
-              easing: 'cubic-bezier(.16,1,.3,1)',
-              fill: 'both',
+              easing: "cubic-bezier(.16,1,.3,1)",
+              fill: "both",
             },
-          )
-          observer.unobserve(entry.target)
+          );
+          observer.unobserve(entry.target);
         }
-      })
+      });
     },
     { threshold: 0.12 },
-  )
+  );
 
-  observer.observe(root)
-})
+  observer.observe(root);
+});
 </script>
 
 <template>
@@ -80,15 +81,13 @@ onMounted(() => {
           <p>{{ activeCase.pain }}</p>
         </div>
         <div>
-          <strong>交付服务项</strong>
+          <strong>交付内容</strong>
           <p>{{ activeCase.service }}</p>
         </div>
-        <dl class="metric-card">
-          <div v-for="stat in activeCase.stats" :key="stat.label">
-            <dt>{{ stat.value }}</dt>
-            <dd>{{ stat.label }}</dd>
-          </div>
-        </dl>
+        <div>
+          <strong>{{ activeCase.efficiencyTip.title }}</strong>
+          <p>{{ activeCase.efficiencyTip.copy }}</p>
+        </div>
       </article>
     </div>
   </section>
@@ -96,7 +95,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .section-block {
-  width: min(1520px, calc(100% - 40px));
+  width: min(1660px, calc(100% - 40px));
   margin: 0 auto;
   padding-bottom: 130px;
 }
@@ -122,9 +121,11 @@ onMounted(() => {
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  width: min(430px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
   padding: 8px;
   margin: -28px auto 72px;
   background: var(--home-tabs-bg);
@@ -135,6 +136,8 @@ onMounted(() => {
 
 .tab {
   min-height: 42px;
+  padding: 0 22px;
+  white-space: nowrap;
   color: var(--home-tab-text);
   background: transparent;
   border: 0;
@@ -166,10 +169,10 @@ onMounted(() => {
 
 .case-layout {
   display: grid;
-  grid-template-columns: 0.96fr 1.04fr;
-  gap: 56px;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
   align-items: stretch;
-  width: min(1220px, 100%);
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -183,9 +186,26 @@ onMounted(() => {
 .case-image {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateZ(0);
+  backface-visibility: hidden;
   transition:
     transform var(--home-motion-normal, 240ms ease),
     border-color var(--home-motion-normal, 240ms ease);
+}
+
+.case-image :deep(.preload-image),
+.case-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.case-image :deep(.preload-image__img) {
+  image-rendering: auto;
+  object-fit: cover;
 }
 
 .case-image:hover {
@@ -197,7 +217,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: clamp(34px, 5vw, 64px);
+  padding: clamp(36px, 4.5vw, 56px);
   background: var(--home-case-panel-bg);
   box-shadow: var(--home-card-shadow);
   transition:
@@ -215,49 +235,35 @@ onMounted(() => {
 .case-panel h3 {
   margin: 0 0 40px;
   color: var(--home-card-title);
-  font-size: clamp(28px, 3vw, 42px);
+  font-size: clamp(32px, 3.2vw, 46px);
+  font-weight: 800;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+}
+
+.case-panel > div + div {
+  margin-top: 10px;
 }
 
 .case-panel strong {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   color: var(--home-card-title);
-  font-size: 17px;
+  font-size: clamp(20px, 1.55vw, 24px);
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .case-panel p {
-  margin: 0 0 32px;
-  color: var(--home-card-muted);
-  line-height: 1.8;
+  margin: 0 0 34px;
+  color: var(--home-card-desc);
+  font-size: clamp(18px, 1.4vw, 21px);
+  font-weight: 500;
+  line-height: 1.82;
 }
 
-.metric-card {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  margin: 14px 0 0;
-  padding: 42px 24px;
-  background: var(--home-metric-bg);
-  border: 1px solid var(--home-line);
-  border-radius: var(--home-radius-media, 22px);
-}
-
-.metric-card div + div {
-  border-left: 1px solid var(--home-line);
-}
-
-.metric-card dt {
-  color: var(--home-gold);
-  font-size: clamp(44px, 5vw, 62px);
-  font-weight: 900;
-  text-align: center;
-}
-
-.metric-card dd {
-  margin: 8px 0 0;
-  color: var(--home-card-muted);
-  font-size: 13px;
-  font-weight: 800;
-  text-align: center;
+.case-panel > div:last-of-type p {
+  margin-bottom: 0;
 }
 
 @media (max-width: 1100px) {
@@ -273,7 +279,7 @@ onMounted(() => {
 
 @media (max-width: 700px) {
   .section-block {
-    width: min(100% - 28px, 1520px);
+    width: min(100% - 28px, 1660px);
     padding-bottom: 86px;
   }
 
@@ -287,14 +293,6 @@ onMounted(() => {
 
   .case-panel {
     padding: 28px;
-  }
-
-  .metric-card {
-    padding: 28px 12px;
-  }
-
-  .metric-card dt {
-    font-size: 38px;
   }
 }
 </style>

@@ -4,6 +4,9 @@ import { motion } from "motion-v";
 import { computed } from "vue";
 
 import type { PricingPlan } from "@/types/prototype";
+import { useAppStore } from "@/stores/app";
+
+const appStore = useAppStore();
 
 const props = defineProps<{
   plan: PricingPlan;
@@ -22,6 +25,7 @@ const emit = defineEmits<{
 
 const cardClass = computed(() => [
   "pricing-plan-card",
+  appStore.isDarkMode ? "theme-dark" : "theme-light",
   `is-${props.plan.tone}`,
   {
     "is-featured": props.plan.featured,
@@ -170,7 +174,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   transition: opacity 0.2s ease;
 }
 
-:global(.theme-light) .pricing-plan-card {
+.pricing-plan-card.theme-light {
   --plan-card-bg: #ffffff;
   --plan-card-border: #e2e8f0;
   --plan-card-text: #172033;
@@ -188,14 +192,14 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   backdrop-filter: none;
 }
 
-:global(.theme-light) .pricing-plan-card.is-blue {
+.pricing-plan-card.theme-light.is-blue {
   --plan-accent: #2f6bff;
   --plan-card-bg: #ffffff;
   --plan-card-border: #dbeafe;
   --plan-card-shadow: 0 12px 28px rgba(47, 107, 255, 0.08);
 }
 
-:global(.theme-light) .pricing-plan-card.is-orange {
+.pricing-plan-card.theme-light.is-orange {
   --plan-accent: #2f6bff;
   --plan-card-bg: #ffffff;
   --plan-card-border: rgba(47, 107, 255, 0.28);
@@ -207,7 +211,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-badge-text: #1d4ed8;
 }
 
-:global(.theme-light) .pricing-plan-card.is-green {
+.pricing-plan-card.theme-light.is-green {
   --plan-accent: #d4a017;
   --plan-card-bg: #ffffff;
   --plan-card-border: rgba(212, 160, 23, 0.28);
@@ -232,7 +236,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     0 0 22px color-mix(in srgb, var(--plan-accent) 8%, transparent);
 }
 
-:global(.theme-light) .pricing-plan-card.is-featured {
+.pricing-plan-card.theme-light.is-featured {
   border-color: rgba(47, 107, 255, 0.32);
   background: #ffffff;
   box-shadow:
@@ -253,7 +257,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   animation: selected-card-pop 0.38s cubic-bezier(0.2, 0.9, 0.22, 1.22);
 }
 
-:global(.theme-light) .pricing-plan-card.is-selected {
+.pricing-plan-card.theme-light.is-selected {
   background: #ffffff;
   box-shadow:
     0 18px 44px rgba(78, 111, 148, 0.14),
@@ -270,7 +274,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     0 0 84px color-mix(in srgb, var(--plan-accent) 34%, transparent);
 }
 
-:global(.theme-light) .pricing-plan-card.is-featured.is-selected {
+.pricing-plan-card.theme-light.is-featured.is-selected {
   box-shadow:
     0 20px 48px rgba(47, 107, 255, 0.16),
     0 0 0 2px rgba(47, 107, 255, 0.42);
@@ -281,7 +285,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   opacity: 1;
 }
 
-:global(.theme-light) .pricing-plan-card::after {
+.pricing-plan-card.theme-light::after {
   background:
     linear-gradient(
       180deg,
@@ -290,7 +294,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     );
 }
 
-:global(.theme-light) .pricing-plan-card.is-selected::after {
+.pricing-plan-card.theme-light.is-selected::after {
   opacity: 1;
 }
 
@@ -448,7 +452,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   filter: brightness(1.04);
 }
 
-:global(.theme-light) .pricing-plan-card:hover .plan-action.is-solid {
+.pricing-plan-card.theme-light:hover .plan-action.is-solid {
   filter: brightness(1.06);
 }
 
@@ -457,7 +461,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   color: var(--plan-action-hover-text);
 }
 
-:global(.theme-light) .pricing-plan-card:hover .plan-action:not(.is-solid) {
+.pricing-plan-card.theme-light:hover .plan-action:not(.is-solid) {
   background: color-mix(in srgb, var(--plan-accent) 6%, #ffffff);
 }
 

@@ -45,7 +45,7 @@ export async function createOrder(payload: CreateOrderRequest) {
 }
 
 export async function getPayQRCode(orderId: string) {
-  const qrText = `AI CAR STUDIO ${orderId}`
+  const qrText = `AI CARXEN ${orderId}`
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
       <rect width="220" height="220" rx="18" fill="#ffffff"/>
@@ -56,7 +56,7 @@ export async function getPayQRCode(orderId: string) {
       <rect x="18" y="148" width="54" height="54" rx="8" fill="#111827"/>
       <rect x="30" y="160" width="30" height="30" rx="4" fill="#ffffff"/>
       <path d="M92 28h14v14H92zM120 28h14v14h-14zM92 58h42v14H92zM88 92h14v14H88zM116 88h14v14h-14zM144 92h14v14h-14zM172 88h14v14h-14zM88 120h28v14H88zM130 118h14v14h-14zM158 120h44v14h-44zM92 148h14v14H92zM120 148h14v14h-14zM144 146h14v14h-14zM176 148h14v14h-14zM88 176h42v14H88zM146 176h14v14h-14zM174 176h28v14h-28z" fill="#111827"/>
-      <text x="110" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#2563eb">AI CAR STUDIO</text>
+      <text x="110" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#2563eb">AI CARXEN</text>
       <text x="110" y="208" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">${qrText}</text>
     </svg>`
   const qrCodeUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`

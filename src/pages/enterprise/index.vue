@@ -1,23 +1,24 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { computed } from 'vue'
+import { Icon } from "@iconify/vue";
+import { computed } from "vue";
 
-import PreloadImage from '@/components/common/PreloadImage.vue'
-import LoginPanel from '@/components/business/account/LoginPanel.vue'
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import LoginPanel from "@/components/business/account/LoginPanel.vue";
 import {
   enterpriseLoginFeatures,
   enterpriseLoginHeroImage,
-} from '@/constants/enterprise-login'
-import { useAppStore } from '@/stores/app'
+} from "@/constants/enterprise-login";
+import { useAppStore } from "@/stores/app";
 
-const appStore = useAppStore()
-const isDark = computed(() => appStore.isDarkMode)
+const appStore = useAppStore();
+const isDark = computed(() => appStore.isDarkMode);
 </script>
 
 <template>
   <main
     class="enterprise-login-page"
     :class="isDark ? 'theme-dark' : 'theme-light'"
+    aria-label="企业账号登录"
   >
     <div class="enterprise-login-bg" aria-hidden="true">
       <PreloadImage
@@ -27,84 +28,103 @@ const isDark = computed(() => appStore.isDarkMode)
         loading="eager"
         fetchpriority="high"
         decoding="async"
-        object-position="center 40%"
+        object-position="left center"
       />
     </div>
     <div class="enterprise-login-overlay" aria-hidden="true"></div>
 
-    <section class="enterprise-login-copy" aria-label="企业登录介绍">
-      <p class="enterprise-login-kicker">企业二手车</p>
-      <h1>让每一辆车<br />都值得被精心呈现</h1>
-      <p class="enterprise-login-subtitle">AI 驱动的汽车视觉内容创作平台</p>
+    <div class="enterprise-login-shell">
+      <section class="enterprise-login-copy" aria-label="企业登录介绍">
+        <h1>每一辆车<br />都值得被精心呈现</h1>
+        <p class="enterprise-login-subtitle">AI驱动的汽车电商内容生产平台</p>
 
-      <ul class="enterprise-login-features">
-        <li v-for="item in enterpriseLoginFeatures" :key="item.title">
-          <span class="enterprise-login-feature-icon" aria-hidden="true">
-            <Icon :icon="item.icon" />
-          </span>
-          <span class="enterprise-login-feature-text">
-            <b>{{ item.title }}</b>
-            <small>{{ item.description }}</small>
-          </span>
-        </li>
-      </ul>
-    </section>
+        <ul class="enterprise-login-features">
+          <li v-for="item in enterpriseLoginFeatures" :key="item.title">
+            <span class="enterprise-login-feature-icon" aria-hidden="true">
+              <Icon :icon="item.icon" />
+            </span>
+            <span class="enterprise-login-feature-text">
+              <b>{{ item.title }}</b>
+              <small>{{ item.description }}</small>
+            </span>
+          </li>
+        </ul>
+      </section>
 
-    <section class="enterprise-login-panel" aria-label="企业账号登录">
-      <LoginPanel :is-dark="isDark" />
-    </section>
+      <section class="enterprise-login-panel" aria-label="企业账号登录表单">
+        <LoginPanel :is-dark="isDark" />
+      </section>
+    </div>
   </main>
 </template>
 
 <style scoped lang="scss">
 .enterprise-login-page {
-  --login-bg: #e8f0fa;
-  --login-text: #10233c;
-  --login-muted: #5c708c;
-  --login-kicker: #5c708c;
-  --login-feature-bg: rgba(255, 255, 255, 0.72);
-  --login-feature-border: rgba(15, 35, 60, 0.08);
-  --login-feature-icon-bg: rgba(47, 124, 255, 0.1);
-  --login-feature-icon: #2f7cff;
-  --login-overlay:
-    linear-gradient(
-      90deg,
-      rgba(248, 251, 255, 0.97) 0%,
-      rgba(248, 251, 255, 0.82) 42%,
-      rgba(232, 242, 255, 0.55) 68%,
-      rgba(220, 234, 250, 0.35) 100%
-    );
-  --login-image-filter: saturate(0.92) brightness(1.08);
-
-  position: relative;
-  display: grid;
-  min-height: calc(100vh - var(--app-header-offset));
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 440px);
-  align-items: center;
-  gap: clamp(28px, 5vw, 80px);
-  overflow: hidden;
-  padding: clamp(36px, 5vw, 72px) clamp(24px, 6vw, 96px);
-  background: var(--login-bg);
-}
-
-.enterprise-login-page.theme-dark {
-  --login-bg: var(--app-bg);
-  --login-text: #f4f1e9;
-  --login-muted: #959083;
-  --login-kicker: #959083;
-  --login-feature-bg: #101010;
+  --login-gold: #efc24c;
+  --login-gold-strong: #f4d36a;
+  --login-text: #ffffff;
+  --login-muted: rgba(255, 255, 255, 0.72);
+  --login-feature-bg: rgba(8, 8, 8, 0.42);
   --login-feature-border: rgba(255, 255, 255, 0.1);
   --login-feature-icon-bg: rgba(239, 194, 76, 0.14);
-  --login-feature-icon: #efc24c;
-  --login-overlay:
-    linear-gradient(
-      90deg,
-      rgba(5, 5, 5, 0.96) 0%,
-      rgba(8, 8, 8, 0.88) 44%,
-      rgba(8, 8, 8, 0.62) 70%,
-      rgba(5, 5, 5, 0.42) 100%
-    );
-  --login-image-filter: saturate(1.05) brightness(0.55);
+  --login-overlay: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.34) 34%,
+    rgba(0, 0, 0, 0.12) 58%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(100dvh - 72px);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(24px, 4vw, 48px) clamp(24px, 5.5vw, 88px);
+  background: #050505;
+  transition:
+    background 0.28s ease,
+    color 0.28s ease;
+}
+
+.enterprise-login-page.theme-light {
+  --login-gold: #d4a017;
+  --login-gold-strong: #e5b85c;
+  --login-text: #10233c;
+  --login-muted: #5c708c;
+  --login-feature-bg: rgba(255, 255, 255, 0.78);
+  --login-feature-border: rgba(15, 35, 60, 0.08);
+  --login-feature-icon-bg: rgba(212, 160, 23, 0.12);
+  --login-overlay: linear-gradient(
+    90deg,
+    rgba(248, 251, 255, 0.94) 0%,
+    rgba(248, 251, 255, 0.78) 38%,
+    rgba(236, 244, 255, 0.48) 62%,
+    rgba(230, 240, 252, 0.22) 100%
+  );
+
+  background: #e8f0fa;
+}
+
+.enterprise-login-page.theme-light .enterprise-login-bg-image {
+  filter: saturate(0.95) brightness(1.06);
+}
+
+.enterprise-login-page.theme-light .enterprise-login-copy h1 {
+  text-shadow: 0 4px 18px rgba(255, 255, 255, 0.45);
+}
+
+.enterprise-login-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100%, 1120px);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  align-items: start;
+  gap: clamp(32px, 5vw, 80px);
 }
 
 .enterprise-login-bg,
@@ -122,8 +142,7 @@ const isDark = computed(() => appStore.isDarkMode)
   display: block;
   width: 100%;
   height: 100%;
-  filter: var(--login-image-filter);
-  transform: scale(1.03);
+  filter: saturate(1.04) brightness(0.94);
   transition: filter 0.28s ease;
 }
 
@@ -132,48 +151,36 @@ const isDark = computed(() => appStore.isDarkMode)
   transition: background 0.28s ease;
 }
 
-.enterprise-login-copy,
-.enterprise-login-panel {
-  position: relative;
-  z-index: 1;
-}
-
 .enterprise-login-copy {
-  max-width: 640px;
+  max-width: 620px;
   color: var(--login-text);
-}
-
-.enterprise-login-kicker {
-  margin: 0 0 20px;
-  color: var(--login-kicker);
-  font-size: 16px;
-  font-weight: 800;
 }
 
 .enterprise-login-copy h1 {
   margin: 0;
   max-width: 560px;
   color: var(--login-text);
-  font-size: clamp(40px, 4.8vw, 68px);
-  line-height: 1.14;
+  font-size: clamp(38px, 4.4vw, 64px);
+  line-height: 1.16;
   font-weight: 950;
   letter-spacing: -0.02em;
+  text-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .enterprise-login-subtitle {
-  margin: 24px 0 0;
+  margin: 22px 0 0;
   max-width: 520px;
   color: var(--login-muted);
-  font-size: clamp(17px, 1.5vw, 22px);
-  line-height: 1.65;
-  font-weight: 700;
+  font-size: clamp(16px, 1.45vw, 21px);
+  line-height: 1.6;
+  font-weight: 600;
 }
 
 .enterprise-login-features {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(16px, 2.5vw, 28px);
-  margin: clamp(40px, 7vh, 88px) 0 0;
+  gap: clamp(14px, 2vw, 24px);
+  margin: clamp(36px, 6vh, 72px) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -182,12 +189,12 @@ const isDark = computed(() => appStore.isDarkMode)
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 148px;
+  min-width: 168px;
   padding: 12px 16px;
   border: 1px solid var(--login-feature-border);
   border-radius: 12px;
   background: var(--login-feature-bg);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
 }
 
 .enterprise-login-feature-icon {
@@ -199,7 +206,7 @@ const isDark = computed(() => appStore.isDarkMode)
   justify-content: center;
   border-radius: 10px;
   background: var(--login-feature-icon-bg);
-  color: var(--login-feature-icon);
+  color: var(--login-gold);
   font-size: 22px;
 }
 
@@ -210,41 +217,39 @@ const isDark = computed(() => appStore.isDarkMode)
 
 .enterprise-login-feature-text b {
   color: var(--login-text);
-  font-size: 16px;
-  font-weight: 900;
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .enterprise-login-feature-text small {
   color: var(--login-muted);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .enterprise-login-panel {
-  justify-self: end;
-  width: min(100%, 420px);
+  width: 100%;
 }
 
 @media (max-width: 1100px) {
   .enterprise-login-page {
+    overflow-y: auto;
+    padding-top: clamp(24px, 4vw, 40px);
+    padding-bottom: clamp(36px, 5vw, 56px);
+  }
+
+  .enterprise-login-shell {
+    width: 100%;
+    max-width: 420px;
     grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-    padding-top: clamp(28px, 4vw, 48px);
-    padding-bottom: clamp(40px, 6vw, 64px);
   }
 
   .enterprise-login-copy {
     max-width: 100%;
   }
 
-  .enterprise-login-panel {
-    justify-self: stretch;
-    width: 100%;
-    max-width: 440px;
-  }
-
   .enterprise-login-features {
-    margin-top: 32px;
+    margin-top: 28px;
   }
 }
 

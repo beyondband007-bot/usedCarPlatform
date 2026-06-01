@@ -16,7 +16,9 @@ const types = {
 };
 
 const server = http.createServer((req, res) => {
-  const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+  const rawPath = decodeURIComponent(
+    new URL(req.url, `http://${req.headers.host}`).pathname,
+  );
   const requested = rawPath === "/" ? "/index.html" : rawPath;
   const filePath = path.normalize(path.join(root, requested));
 
@@ -34,7 +36,9 @@ const server = http.createServer((req, res) => {
     }
 
     res.writeHead(200, {
-      "Content-Type": types[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+      "Content-Type":
+        types[path.extname(filePath).toLowerCase()] ||
+        "application/octet-stream",
       "Cache-Control": "no-store",
     });
     res.end(data);
@@ -42,5 +46,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`AI CAR STUDIO preview: http://127.0.0.1:${port}/index.html`);
+  console.log(`AI CARXEN preview: http://127.0.0.1:${port}/index.html`);
 });

@@ -18,6 +18,10 @@ export function useWorkbenchEntry() {
     visitorModalVisible.value = true
   }
 
+  function openVisitorModal() {
+    visitorModalVisible.value = true
+  }
+
   function closeVisitorModal() {
     visitorModalVisible.value = false
   }
@@ -33,6 +37,7 @@ export function useWorkbenchEntry() {
   return {
     visitorModalVisible,
     openWorkbench,
+    openVisitorModal,
     closeVisitorModal,
     goToAuth,
   }

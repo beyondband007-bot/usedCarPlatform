@@ -29,12 +29,14 @@ import showroomTutorialLuxuryDark from '@/assets/img/展厅灯光/教程图片/�
 import showroomTutorialSoftTop from '@/assets/img/展厅灯光/教程图片/柔光灯顶.png'
 import showroomMinimal from '@/assets/img/展厅灯光/极简留白.png'
 import showroomWideAngle from '@/assets/img/展厅灯光/广角空间.png'
-import skyCloudParking from '@/assets/img/天空影棚/云境车场.png'
-import skyCloudSeaStage from '@/assets/img/天空影棚/云海展台.png'
-import skyEndless from '@/assets/img/天空影棚/天境无垠.png'
-import skyMirrorField from '@/assets/img/天空影棚/天空镜场.png'
-import skyRealm from '@/assets/img/天空影棚/天空之境.png'
-import skySunsetDrive from '@/assets/img/天空影棚/夕阳车境.png'
+import skyCloudParkingScene from '@/assets/img/天空影棚/天空影棚场景/云镜车场场景.png'
+import skyCloudSeaStageScene from '@/assets/img/天空影棚/天空影棚场景/云海展台场景.png'
+import skyMirrorFieldScene from '@/assets/img/天空影棚/天空影棚场景/天空镜场场景.png'
+import skySunsetDriveScene from '@/assets/img/天空影棚/天空影棚场景/夕阳车镜场景.png'
+import skyCloudParkingTutorial from '@/assets/img/天空影棚/天空影棚教程/云镜车场.png'
+import skyCloudSeaStageTutorial from '@/assets/img/天空影棚/天空影棚教程/云海展台.png'
+import skyMirrorFieldTutorial from '@/assets/img/天空影棚/天空影棚教程/天空镜场.png'
+import skySunsetDriveTutorial from '@/assets/img/天空影棚/天空影棚教程/夕阳车镜.png'
 
 const tutorial = [
   {
@@ -77,19 +79,23 @@ const outdoorOptions = createOptions([
 ])
 
 const roadOptions = createOptions([
-  ['urban-road', '道路动态1', roadMotionScene1],
-  ['bridge-motion', '道路动态2', roadMotionScene2],
-  ['night-road', '道路动态3', roadMotionScene3],
-  ['highway', '道路动态4', roadMotionScene4],
+  ['city_day_road', '城市主干道', roadMotionScene1],
+  ['highway_sunset', '夕阳高速', roadMotionScene2],
+  ['rainy_night_city', '雨夜城市', roadMotionScene3],
+  ['mountain_curve', '山路弯道', roadMotionScene4],
+  ['coastal_road', '海岸公路', roadMotionScene1],
+  ['forest_avenue', '林荫大道', roadMotionScene2],
+  ['business_park', '商务园区', roadMotionScene3],
+  ['snow_road', '雪后公路', roadMotionScene4],
+  ['overpass_dusk', '傍晚高架', roadMotionScene2],
+  ['tunnel_exit', '隧道出口', roadMotionScene3],
 ])
 
 const skyOptions = createOptions([
-  ['sky-mirror-field', '天空镜场', skyMirrorField],
-  ['sunset-drive', '夕阳车境', skySunsetDrive],
-  ['endless-sky', '天境无垠', skyEndless],
-  ['cloud-sea-stage', '云海展台', skyCloudSeaStage],
-  ['cloud-parking', '云境车场', skyCloudParking],
-  ['sky-realm', '天空之境', skyRealm],
+  ['sky-mirror-field', '天空镜场', skyMirrorFieldScene],
+  ['sunset-drive', '夕阳车镜', skySunsetDriveScene],
+  ['cloud-sea-stage', '云海展台', skyCloudSeaStageScene],
+  ['cloud-parking', '云镜车场', skyCloudParkingScene],
 ])
 
 export interface BatchSceneItem {
@@ -582,11 +588,38 @@ const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   },
 ]
 
+const skyTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  {
+    title: '天空镜场',
+    capabilityCode: 'sky-studio',
+    optionId: 'sky-mirror-field',
+    image: skyMirrorFieldTutorial,
+  },
+  {
+    title: '夕阳车镜',
+    capabilityCode: 'sky-studio',
+    optionId: 'sunset-drive',
+    image: skySunsetDriveTutorial,
+  },
+  {
+    title: '云海展台',
+    capabilityCode: 'sky-studio',
+    optionId: 'cloud-sea-stage',
+    image: skyCloudSeaStageTutorial,
+  },
+  {
+    title: '云镜车场',
+    capabilityCode: 'sky-studio',
+    optionId: 'cloud-parking',
+    image: skyCloudParkingTutorial,
+  },
+]
+
 export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
   ...showroomTemplateRecommendations,
   ...outdoorTemplateRecommendations,
   ...toTemplateRecommendations('road-motion', roadOptions),
-  ...toTemplateRecommendations('sky-studio', skyOptions),
+  ...skyTemplateRecommendations,
 ]
 
 function menuTagVariant(

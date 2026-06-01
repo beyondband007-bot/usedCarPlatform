@@ -1,839 +1,856 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI CAR STUDIO - Light Studio Theme Mockup</title>
-    <style>
-      :root {
-        --bg: #f5f7fa;
-        --bg-soft: #eef2f6;
-        --panel: #ffffff;
-        --panel-soft: #f8fafc;
-        --card: #ffffff;
-        --card-muted: #f6f8fb;
-        --text: #111827;
-        --text-secondary: #475569;
-        --text-muted: #7b8794;
-        --line: #dde3ec;
-        --line-soft: #e8edf4;
-        --gold: #d4a017;
-        --gold-strong: #b88400;
-        --gold-bg: rgba(212, 160, 23, 0.1);
-        --gold-border: rgba(212, 160, 23, 0.48);
-        --gold-glow: rgba(212, 160, 23, 0.18);
-        --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06);
-        --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.08);
-        --radius-lg: 18px;
-        --radius-md: 16px;
-        --radius-sm: 12px;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background:
-          radial-gradient(circle at 76% 0%, rgba(212, 160, 23, 0.09), transparent 26%),
-          linear-gradient(180deg, #f8fafc 0%, var(--bg) 42%, var(--bg-soft) 100%);
-        color: var(--text);
-        font-family:
-          Inter,
-          "SF Pro Display",
-          "PingFang SC",
-          "Microsoft YaHei",
-          system-ui,
-          sans-serif;
-      }
-
-      .page {
-        width: 1600px;
-        height: 1000px;
-        overflow: hidden;
-        background:
-          radial-gradient(circle at 78% 8%, rgba(212, 160, 23, 0.1), transparent 24%),
-          linear-gradient(180deg, #f9fbfe 0%, #eef2f6 100%);
-      }
-
-      .topbar {
-        display: grid;
-        grid-template-columns: 280px 1fr auto;
-        align-items: center;
-        height: 76px;
-        padding: 0 28px;
-        border-bottom: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.86);
-        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
-      }
-
-      .brand {
-        color: #0f172a;
-        font-size: 28px;
-        font-weight: 950;
-        letter-spacing: 0.02em;
-      }
-
-      .topnav {
-        display: flex;
-        justify-content: center;
-        gap: 58px;
-        color: #334155;
-        font-size: 16px;
-        font-weight: 850;
-      }
-
-      .topnav span {
-        position: relative;
-        padding: 28px 0 24px;
-      }
-
-      .topnav .active {
-        color: var(--gold-strong);
-      }
-
-      .topnav .active::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 16px;
-        height: 3px;
-        border-radius: 999px;
-        background: var(--gold);
-      }
-
-      .top-actions {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: 38px;
-        padding: 0 18px;
-        border-radius: 999px;
-        border: 1px solid rgba(212, 160, 23, 0.24);
-        background: var(--gold);
-        color: #111827;
-        font-size: 14px;
-        font-weight: 900;
-        box-shadow: 0 8px 20px rgba(212, 160, 23, 0.18);
-      }
-
-      .ghost-pill {
-        background: #fffdf7;
-        border-color: #e8d7a7;
-        color: #3f3420;
-        box-shadow: none;
-      }
-
-      .subnav {
-        display: flex;
-        align-items: center;
-        gap: 70px;
-        height: 58px;
-        padding: 0 42px;
-        border-bottom: 1px solid var(--line-soft);
-        background: rgba(255, 250, 239, 0.74);
-        color: #3f3a2d;
-        font-size: 17px;
-        font-weight: 900;
-      }
-
-      .subnav span {
-        position: relative;
-        height: 58px;
-        display: inline-flex;
-        align-items: center;
-      }
-
-      .subnav .active {
-        color: var(--gold-strong);
-      }
-
-      .subnav .active::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 3px;
-        border-radius: 999px;
-        background: var(--gold);
-      }
-
-      .workspace {
-        display: grid;
-        grid-template-columns: 230px 480px 1fr;
-        gap: 18px;
-        height: calc(1000px - 134px);
-        padding: 18px;
-      }
-
-      .panel {
-        min-height: 0;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-lg);
-        background: var(--panel);
-        box-shadow: var(--shadow-md);
-      }
-
-      .sidebar {
-        padding: 18px 14px;
-      }
-
-      .group-title {
-        margin: 0 8px 10px;
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 850;
-      }
-
-      .menu {
-        display: grid;
-        gap: 8px;
-        margin-bottom: 24px;
-      }
-
-      .menu-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        min-height: 44px;
-        padding: 0 12px;
-        border: 1px solid transparent;
-        border-radius: var(--radius-sm);
-        color: #334155;
-        font-size: 14px;
-        font-weight: 900;
-      }
-
-      .menu-item .left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .menu-icon {
-        display: grid;
-        place-items: center;
-        width: 18px;
-        height: 18px;
-        color: #475569;
-      }
-
-      .menu-item.active {
-        border-color: var(--gold-border);
-        background: var(--gold-bg);
-        color: var(--gold-strong);
-        box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.08);
-      }
-
-      .menu-item.active .menu-icon {
-        color: var(--gold-strong);
-      }
-
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        height: 20px;
-        padding: 0 8px;
-        border-radius: 999px;
-        background: rgba(212, 160, 23, 0.12);
-        color: var(--gold-strong);
-        font-size: 11px;
-        font-weight: 900;
-      }
-
-      .main {
-        padding: 28px 30px;
-        overflow-y: auto;
-      }
-
-      .work-card {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        background: var(--card);
-        box-shadow: var(--shadow-sm);
-      }
-
-      .hero-card {
-        padding: 28px;
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin: 0;
-      }
-
-      .hero-card h1 {
-        font-size: 26px;
-        line-height: 1.2;
-        font-weight: 950;
-      }
-
-      .hero-card p {
-        margin-top: 14px;
-        color: var(--text-secondary);
-        font-size: 16px;
-        line-height: 1.8;
-        font-weight: 780;
-      }
-
-      .upload-box {
-        display: grid;
-        place-items: center;
-        align-content: center;
-        gap: 12px;
-        height: 210px;
-        margin-top: 34px;
-        border: 1px dashed #d6dee9;
-        border-radius: var(--radius-md);
-        background:
-          radial-gradient(circle at 50% 40%, rgba(212, 160, 23, 0.08), transparent 34%),
-          var(--card-muted);
-      }
-
-      .upload-box .camera {
-        font-size: 30px;
-      }
-
-      .upload-box strong {
-        font-size: 20px;
-        font-weight: 950;
-      }
-
-      .upload-box span {
-        color: var(--text-secondary);
-        font-size: 14px;
-        font-weight: 800;
-      }
-
-      .section-card {
-        margin-top: 18px;
-        padding: 18px;
-      }
-
-      .section-card h2 {
-        font-size: 21px;
-        font-weight: 950;
-      }
-
-      .scene-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 14px;
-      }
-
-      .scene-card {
-        overflow: hidden;
-        border: 1px solid #e3e8f0;
-        border-radius: 13px;
-        background: #fff;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
-      }
-
-      .scene-card.active {
-        border: 2px solid var(--gold);
-        background: #fffdf7;
-        box-shadow:
-          0 0 0 3px rgba(212, 160, 23, 0.12),
-          0 0 24px rgba(212, 160, 23, 0.16);
-      }
-
-      .scene-card img {
-        display: block;
-        width: 100%;
-        height: 112px;
-        object-fit: cover;
-      }
-
-      .scene-card strong {
-        display: block;
-        padding: 10px;
-        color: #334155;
-        text-align: center;
-        font-size: 14px;
-        font-weight: 900;
-      }
-
-      .scene-card.active strong {
-        color: var(--gold-strong);
-      }
-
-      .logo-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 18px;
-        padding: 20px;
-      }
-
-      .logo-card strong {
-        font-size: 18px;
-        font-weight: 950;
-      }
-
-      .switch {
-        position: relative;
-        width: 58px;
-        height: 32px;
-        border-radius: 999px;
-        background: var(--gold);
-        box-shadow: inset 0 0 0 1px rgba(184, 132, 0, 0.24);
-      }
-
-      .switch::after {
-        content: "";
-        position: absolute;
-        right: 4px;
-        top: 4px;
-        width: 24px;
-        height: 24px;
-        border-radius: 999px;
-        background: #fff;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
-      }
-
-      .assist {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        padding: 18px;
-        background:
-          radial-gradient(circle at 68% 0%, rgba(212, 160, 23, 0.11), transparent 28%),
-          var(--panel);
-      }
-
-      .tabs {
-        display: flex;
-        gap: 28px;
-        height: 34px;
-        color: #8a95a3;
-        font-size: 15px;
-        font-weight: 900;
-      }
-
-      .tabs span {
-        position: relative;
-      }
-
-      .tabs .active {
-        color: var(--gold-strong);
-      }
-
-      .tabs .active::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: -10px;
-        height: 2px;
-        border-radius: 999px;
-        background: var(--gold);
-      }
-
-      .assist-scroll {
-        min-height: 0;
-        overflow-y: auto;
-        padding-right: 6px;
-      }
-
-      .assist-scroll::-webkit-scrollbar,
-      .guide-flow::-webkit-scrollbar,
-      .template-gallery::-webkit-scrollbar {
-        width: 9px;
-        height: 9px;
-      }
-
-      .assist-scroll::-webkit-scrollbar-track,
-      .guide-flow::-webkit-scrollbar-track,
-      .template-gallery::-webkit-scrollbar-track {
-        border-radius: 999px;
-        background: #e8edf4;
-      }
-
-      .assist-scroll::-webkit-scrollbar-thumb,
-      .guide-flow::-webkit-scrollbar-thumb,
-      .template-gallery::-webkit-scrollbar-thumb {
-        border: 2px solid #e8edf4;
-        border-radius: 999px;
-        background: linear-gradient(180deg, #d4a017, #f0c84d);
-      }
-
-      .assist-section {
-        margin-top: 16px;
-        padding: 18px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        background: #fff;
-        box-shadow: var(--shadow-sm);
-      }
-
-      .assist-section h3 {
-        font-size: 17px;
-        font-weight: 950;
-      }
-
-      .guide-flow {
-        display: flex;
-        gap: 16px;
-        margin-top: 16px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 12px;
-      }
-
-      .step-card {
-        flex: 0 0 220px;
-        width: 220px;
-        height: 180px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        background: #fff;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-      }
-
-      .step-media {
-        position: relative;
-        height: 128px;
-        overflow: hidden;
-        background: #f8fafc;
-      }
-
-      .step-media img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-
-      .step-media.logo {
-        display: grid;
-        place-items: center;
-        background: linear-gradient(180deg, #fffaf0, #fff);
-      }
-
-      .logo-preview {
-        display: grid;
-        place-items: center;
-        width: 156px;
-        height: 44px;
-        border: 2px solid #5e4110;
-        border-radius: 8px;
-        background: #171209;
-        color: var(--gold);
-        font-size: 15px;
-        font-weight: 950;
-        letter-spacing: 0.06em;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
-      }
-
-      .step-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        height: 52px;
-        padding: 0 14px;
-        border-top: 1px solid var(--line-soft);
-        font-size: 14px;
-        font-weight: 950;
-      }
-
-      .step-num {
-        color: var(--gold-strong);
-        font-size: 12px;
-      }
-
-      .arrow {
-        display: grid;
-        flex: 0 0 36px;
-        place-items: center;
-        align-self: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        border: 1px solid rgba(212, 160, 23, 0.32);
-        background: rgba(212, 160, 23, 0.12);
-        color: var(--gold-strong);
-        font-size: 22px;
-        font-weight: 900;
-      }
-
-      .template-gallery {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
-        max-height: 300px;
-        margin-top: 16px;
-        overflow-y: auto;
-        padding-right: 4px;
-      }
-
-      .gallery-card {
-        position: relative;
-        overflow: hidden;
-        min-height: 176px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        background: #fff;
-        box-shadow: var(--shadow-sm);
-      }
-
-      .gallery-card.active {
-        border-color: var(--gold);
-        box-shadow:
-          0 0 0 1px rgba(212, 160, 23, 0.28),
-          0 0 20px rgba(212, 160, 23, 0.14);
-      }
-
-      .gallery-card img {
-        width: 100%;
-        height: 176px;
-        object-fit: cover;
-      }
-
-      .gallery-caption {
-        position: absolute;
-        inset-inline: 0;
-        bottom: 0;
-        display: grid;
-        gap: 4px;
-        padding: 42px 14px 14px;
-        background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
-        color: #fff;
-        text-align: center;
-      }
-
-      .gallery-caption strong {
-        font-size: 15px;
-        font-weight: 950;
-      }
-
-      .gallery-caption span {
-        color: rgba(255, 255, 255, 0.78);
-        font-size: 12px;
-        font-weight: 650;
-      }
-
-      .requirements {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 16px;
-      }
-
-      .req-card {
-        display: flex;
-        gap: 12px;
-        min-height: 86px;
-        padding: 14px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: var(--panel-soft);
-      }
-
-      .check {
-        display: grid;
-        flex: 0 0 32px;
-        place-items: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        background: rgba(212, 160, 23, 0.12);
-        color: var(--gold-strong);
-        font-weight: 950;
-      }
-
-      .req-card strong {
-        display: block;
-        font-size: 14px;
-        font-weight: 950;
-      }
-
-      .req-card span {
-        display: block;
-        margin-top: 4px;
-        color: #64748b;
-        font-size: 12px;
-        line-height: 1.45;
-        font-weight: 650;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="page">
-      <header class="topbar">
-        <div class="brand">AI CAR STUDIO</div>
-        <nav class="topnav">
-          <span>首页</span>
-          <span>企业套餐</span>
-          <span class="active">视觉工作台</span>
-        </nav>
-        <div class="top-actions">
-          <span class="pill">积分余额 55,000</span>
-          <span class="pill ghost-pill">夜间模式</span>
-          <span class="pill ghost-pill">企业用户</span>
-        </div>
-      </header>
-
-      <nav class="subnav">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI CARXEN - Light Studio Theme Mockup</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --bg-soft: #eef2f6;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --card: #ffffff;
+      --card-muted: #f6f8fb;
+      --text: #111827;
+      --text-secondary: #475569;
+      --text-muted: #7b8794;
+      --line: #dde3ec;
+      --line-soft: #e8edf4;
+      --gold: #d4a017;
+      --gold-strong: #b88400;
+      --gold-bg: rgba(212, 160, 23, 0.1);
+      --gold-border: rgba(212, 160, 23, 0.48);
+      --gold-glow: rgba(212, 160, 23, 0.18);
+      --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.08);
+      --radius-lg: 18px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 76% 0%, rgba(212, 160, 23, 0.09), transparent 26%),
+        linear-gradient(180deg, #f8fafc 0%, var(--bg) 42%, var(--bg-soft) 100%);
+      color: var(--text);
+      font-family:
+        Inter,
+        "SF Pro Display",
+        "PingFang SC",
+        "Microsoft YaHei",
+        system-ui,
+        sans-serif;
+    }
+
+    .page {
+      width: 1600px;
+      height: 1000px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 78% 8%, rgba(212, 160, 23, 0.1), transparent 24%),
+        linear-gradient(180deg, #f9fbfe 0%, #eef2f6 100%);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 280px 1fr auto;
+      align-items: center;
+      height: 76px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+    }
+
+    .brand {
+      color: #0f172a;
+      font-size: 28px;
+      font-weight: 950;
+      letter-spacing: 0.02em;
+    }
+
+    .topnav {
+      display: flex;
+      justify-content: center;
+      gap: 58px;
+      color: #334155;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .topnav span {
+      position: relative;
+      padding: 28px 0 24px;
+    }
+
+    .topnav .active {
+      color: var(--gold-strong);
+    }
+
+    .topnav .active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 16px;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--gold);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 38px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(212, 160, 23, 0.24);
+      background: var(--gold);
+      color: #111827;
+      font-size: 14px;
+      font-weight: 900;
+      box-shadow: 0 8px 20px rgba(212, 160, 23, 0.18);
+    }
+
+    .ghost-pill {
+      background: #fffdf7;
+      border-color: #e8d7a7;
+      color: #3f3420;
+      box-shadow: none;
+    }
+
+    .subnav {
+      display: flex;
+      align-items: center;
+      gap: 70px;
+      height: 58px;
+      padding: 0 42px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(255, 250, 239, 0.74);
+      color: #3f3a2d;
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .subnav span {
+      position: relative;
+      height: 58px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .subnav .active {
+      color: var(--gold-strong);
+    }
+
+    .subnav .active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--gold);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 230px 480px 1fr;
+      gap: 18px;
+      height: calc(1000px - 134px);
+      padding: 18px;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--panel);
+      box-shadow: var(--shadow-md);
+    }
+
+    .sidebar {
+      padding: 18px 14px;
+    }
+
+    .group-title {
+      margin: 0 8px 10px;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .menu {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      color: #334155;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .menu-item .left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .menu-icon {
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      color: #475569;
+    }
+
+    .menu-item.active {
+      border-color: var(--gold-border);
+      background: var(--gold-bg);
+      color: var(--gold-strong);
+      box-shadow: inset 0 0 0 1px rgba(212, 160, 23, 0.08);
+    }
+
+    .menu-item.active .menu-icon {
+      color: var(--gold-strong);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(212, 160, 23, 0.12);
+      color: var(--gold-strong);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .main {
+      padding: 28px 30px;
+      overflow-y: auto;
+    }
+
+    .work-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hero-card {
+      padding: 28px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    .hero-card h1 {
+      font-size: 26px;
+      line-height: 1.2;
+      font-weight: 950;
+    }
+
+    .hero-card p {
+      margin-top: 14px;
+      color: var(--text-secondary);
+      font-size: 16px;
+      line-height: 1.8;
+      font-weight: 780;
+    }
+
+    .upload-box {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 12px;
+      height: 210px;
+      margin-top: 34px;
+      border: 1px dashed #d6dee9;
+      border-radius: var(--radius-md);
+      background:
+        radial-gradient(circle at 50% 40%, rgba(212, 160, 23, 0.08), transparent 34%),
+        var(--card-muted);
+    }
+
+    .upload-box .camera {
+      font-size: 30px;
+    }
+
+    .upload-box strong {
+      font-size: 20px;
+      font-weight: 950;
+    }
+
+    .upload-box span {
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .section-card {
+      margin-top: 18px;
+      padding: 18px;
+    }
+
+    .section-card h2 {
+      font-size: 21px;
+      font-weight: 950;
+    }
+
+    .scene-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .scene-card {
+      overflow: hidden;
+      border: 1px solid #e3e8f0;
+      border-radius: 13px;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    }
+
+    .scene-card.active {
+      border: 2px solid var(--gold);
+      background: #fffdf7;
+      box-shadow:
+        0 0 0 3px rgba(212, 160, 23, 0.12),
+        0 0 24px rgba(212, 160, 23, 0.16);
+    }
+
+    .scene-card img {
+      display: block;
+      width: 100%;
+      height: 112px;
+      object-fit: cover;
+    }
+
+    .scene-card strong {
+      display: block;
+      padding: 10px;
+      color: #334155;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .scene-card.active strong {
+      color: var(--gold-strong);
+    }
+
+    .logo-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 18px;
+      padding: 20px;
+    }
+
+    .logo-card strong {
+      font-size: 18px;
+      font-weight: 950;
+    }
+
+    .switch {
+      position: relative;
+      width: 58px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--gold);
+      box-shadow: inset 0 0 0 1px rgba(184, 132, 0, 0.24);
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+    }
+
+    .assist {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 68% 0%, rgba(212, 160, 23, 0.11), transparent 28%),
+        var(--panel);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 28px;
+      height: 34px;
+      color: #8a95a3;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .tabs span {
+      position: relative;
+    }
+
+    .tabs .active {
+      color: var(--gold-strong);
+    }
+
+    .tabs .active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -10px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--gold);
+    }
+
+    .assist-scroll {
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    .assist-scroll::-webkit-scrollbar,
+    .guide-flow::-webkit-scrollbar,
+    .template-gallery::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+
+    .assist-scroll::-webkit-scrollbar-track,
+    .guide-flow::-webkit-scrollbar-track,
+    .template-gallery::-webkit-scrollbar-track {
+      border-radius: 999px;
+      background: #e8edf4;
+    }
+
+    .assist-scroll::-webkit-scrollbar-thumb,
+    .guide-flow::-webkit-scrollbar-thumb,
+    .template-gallery::-webkit-scrollbar-thumb {
+      border: 2px solid #e8edf4;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #d4a017, #f0c84d);
+    }
+
+    .assist-section {
+      margin-top: 16px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .assist-section h3 {
+      font-size: 17px;
+      font-weight: 950;
+    }
+
+    .guide-flow {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 12px;
+    }
+
+    .step-card {
+      flex: 0 0 220px;
+      width: 220px;
+      height: 180px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+    }
+
+    .step-media {
+      position: relative;
+      height: 128px;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .step-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .step-media.logo {
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #fffaf0, #fff);
+    }
+
+    .logo-preview {
+      display: grid;
+      place-items: center;
+      width: 156px;
+      height: 44px;
+      border: 2px solid #5e4110;
+      border-radius: 8px;
+      background: #171209;
+      color: var(--gold);
+      font-size: 15px;
+      font-weight: 950;
+      letter-spacing: 0.06em;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+    }
+
+    .step-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+      padding: 0 14px;
+      border-top: 1px solid var(--line-soft);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .step-num {
+      color: var(--gold-strong);
+      font-size: 12px;
+    }
+
+    .arrow {
+      display: grid;
+      flex: 0 0 36px;
+      place-items: center;
+      align-self: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(212, 160, 23, 0.32);
+      background: rgba(212, 160, 23, 0.12);
+      color: var(--gold-strong);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .template-gallery {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      max-height: 300px;
+      margin-top: 16px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .gallery-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 176px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .gallery-card.active {
+      border-color: var(--gold);
+      box-shadow:
+        0 0 0 1px rgba(212, 160, 23, 0.28),
+        0 0 20px rgba(212, 160, 23, 0.14);
+    }
+
+    .gallery-card img {
+      width: 100%;
+      height: 176px;
+      object-fit: cover;
+    }
+
+    .gallery-caption {
+      position: absolute;
+      inset-inline: 0;
+      bottom: 0;
+      display: grid;
+      gap: 4px;
+      padding: 42px 14px 14px;
+      background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
+      color: #fff;
+      text-align: center;
+    }
+
+    .gallery-caption strong {
+      font-size: 15px;
+      font-weight: 950;
+    }
+
+    .gallery-caption span {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .requirements {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .req-card {
+      display: flex;
+      gap: 12px;
+      min-height: 86px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .check {
+      display: grid;
+      flex: 0 0 32px;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: rgba(212, 160, 23, 0.12);
+      color: var(--gold-strong);
+      font-weight: 950;
+    }
+
+    .req-card strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .req-card span {
+      display: block;
+      margin-top: 4px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 650;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">AI CARXEN</div>
+      <nav class="topnav">
         <span>首页</span>
+        <span>企业套餐</span>
         <span class="active">视觉工作台</span>
-        <span>积分查询</span>
-        <span>套餐/积分</span>
       </nav>
+      <div class="top-actions">
+        <span class="pill">积分余额 55,000</span>
+        <span class="pill ghost-pill">夜间模式</span>
+        <span class="pill ghost-pill">企业用户</span>
+      </div>
+    </header>
 
-      <main class="workspace">
-        <aside class="panel sidebar">
-          <p class="group-title">场景影棚</p>
-          <div class="menu">
-            <div class="menu-item active">
-              <span class="left"><span class="menu-icon">▦</span>展厅灯光</span>
-              <span class="tag">可用</span>
+    <nav class="subnav">
+      <span>首页</span>
+      <span class="active">视觉工作台</span>
+      <span>积分查询</span>
+      <span>套餐/积分</span>
+    </nav>
+
+    <main class="workspace">
+      <aside class="panel sidebar">
+        <p class="group-title">场景影棚</p>
+        <div class="menu">
+          <div class="menu-item active">
+            <span class="left"><span class="menu-icon">▦</span>展厅灯光</span>
+            <span class="tag">可用</span>
+          </div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">▲</span>户外场景</span><span
+              class="tag">可用</span></div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">▰</span>道路动态</span><span
+              class="tag">可用</span></div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">☁</span>天空影棚</span><span
+              class="tag">可用</span></div>
+        </div>
+        <p class="group-title">车辆美容</p>
+        <div class="menu">
+          <div class="menu-item"><span class="left"><span class="menu-icon">▯</span>烤漆翻新</span><span
+              class="tag">演示</span></div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">✹</span>光污一致化</span><span
+              class="tag">演示</span></div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">◜</span>内饰清洁</span><span
+              class="tag">演示</span></div>
+        </div>
+        <p class="group-title">批量 & 交付</p>
+        <div class="menu">
+          <div class="menu-item"><span class="left"><span class="menu-icon">◇</span>批量上新</span><span
+              class="tag">高阶</span></div>
+          <div class="menu-item"><span class="left"><span class="menu-icon">▱</span>成片交付</span><span
+              class="tag">可用</span></div>
+        </div>
+      </aside>
+
+      <section class="panel main">
+        <div class="work-card hero-card">
+          <h1>单张生成</h1>
+          <p>三档企业套餐均可使用，单张生成不占用图组并发额度。</p>
+          <div class="upload-box">
+            <div class="camera">📷</div>
+            <strong>车辆外观图</strong>
+            <span>点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB</span>
+          </div>
+        </div>
+
+        <div class="work-card section-card">
+          <h2>场景选择</h2>
+          <div class="scene-grid">
+            <div class="scene-card active">
+              <img src="../src/assets/img/展厅灯光/经典白棚.png" alt="" />
+              <strong>经典白棚</strong>
             </div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">▲</span>户外场景</span><span class="tag">可用</span></div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">▰</span>道路动态</span><span class="tag">可用</span></div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">☁</span>天空影棚</span><span class="tag">可用</span></div>
-          </div>
-          <p class="group-title">车辆美容</p>
-          <div class="menu">
-            <div class="menu-item"><span class="left"><span class="menu-icon">▯</span>烤漆翻新</span><span class="tag">演示</span></div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">✹</span>光污一致化</span><span class="tag">演示</span></div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">◜</span>内饰清洁</span><span class="tag">演示</span></div>
-          </div>
-          <p class="group-title">批量 & 交付</p>
-          <div class="menu">
-            <div class="menu-item"><span class="left"><span class="menu-icon">◇</span>批量上新</span><span class="tag">高阶</span></div>
-            <div class="menu-item"><span class="left"><span class="menu-icon">▱</span>成片交付</span><span class="tag">可用</span></div>
-          </div>
-        </aside>
-
-        <section class="panel main">
-          <div class="work-card hero-card">
-            <h1>单张生成</h1>
-            <p>三档企业套餐均可使用，单张生成不占用图组并发额度。</p>
-            <div class="upload-box">
-              <div class="camera">📷</div>
-              <strong>车辆外观图</strong>
-              <span>点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB</span>
+            <div class="scene-card">
+              <img src="../src/assets/img/展厅灯光/玻璃展厅.png" alt="" />
+              <strong>玻璃展厅</strong>
+            </div>
+            <div class="scene-card">
+              <img src="../src/assets/img/展厅灯光/暗调奢华.png" alt="" />
+              <strong>暗调奢华</strong>
+            </div>
+            <div class="scene-card">
+              <img src="../src/assets/img/展厅灯光/柔光灯顶.png" alt="" />
+              <strong>柔光灯顶</strong>
             </div>
           </div>
+        </div>
 
-          <div class="work-card section-card">
-            <h2>场景选择</h2>
-            <div class="scene-grid">
-              <div class="scene-card active">
+        <div class="work-card logo-card">
+          <div>
+            <strong>使用 Logo</strong>
+            <p style="margin-top: 8px; color: #64748b; font-size: 13px; font-weight: 700;">开启后自动沿用当前账号默认 Logo。</p>
+          </div>
+          <span class="switch"></span>
+        </div>
+      </section>
+
+      <aside class="panel assist">
+        <div class="tabs">
+          <span class="active">使用教程</span>
+          <span>最近生成</span>
+        </div>
+
+        <div class="assist-scroll">
+          <section class="assist-section">
+            <h3>使用教程</h3>
+            <div class="guide-flow">
+              <article class="step-card">
+                <div class="step-media"><img src="../src/assets/img/展厅灯光/经典白棚.png" alt="" /></div>
+                <footer class="step-footer"><strong>上传车图</strong><span class="step-num">01</span></footer>
+              </article>
+              <span class="arrow">→</span>
+              <article class="step-card">
+                <div class="step-media"><img src="../src/assets/img/展厅灯光/玻璃展厅.png" alt="" /></div>
+                <footer class="step-footer"><strong>选择展厅模板</strong><span class="step-num">02</span></footer>
+              </article>
+              <span class="arrow">→</span>
+              <article class="step-card">
+                <div class="step-media logo"><span class="logo-preview">AI CARXEN</span></div>
+                <footer class="step-footer"><strong>选择 Logo</strong><span class="step-num">03</span></footer>
+              </article>
+              <span class="arrow">→</span>
+              <article class="step-card">
+                <div class="step-media"><img src="../src/img/home/feature-scene.png" alt="" /></div>
+                <footer class="step-footer"><strong>生成效果</strong><span class="step-num">04</span></footer>
+              </article>
+            </div>
+          </section>
+
+          <section class="assist-section">
+            <h3>初次使用？试试这些</h3>
+            <div class="template-gallery">
+              <article class="gallery-card active">
                 <img src="../src/assets/img/展厅灯光/经典白棚.png" alt="" />
-                <strong>经典白棚</strong>
-              </div>
-              <div class="scene-card">
+                <div class="gallery-caption"><strong>经典白棚</strong><span>纯净背景 · 突出车身线条</span></div>
+              </article>
+              <article class="gallery-card">
                 <img src="../src/assets/img/展厅灯光/玻璃展厅.png" alt="" />
-                <strong>玻璃展厅</strong>
-              </div>
-              <div class="scene-card">
+                <div class="gallery-caption"><strong>玻璃展厅</strong><span>通透空间 · 自然光影</span></div>
+              </article>
+              <article class="gallery-card">
                 <img src="../src/assets/img/展厅灯光/暗调奢华.png" alt="" />
-                <strong>暗调奢华</strong>
-              </div>
-              <div class="scene-card">
+                <div class="gallery-caption"><strong>暗调奢华</strong><span>低调密华 · 气氛质感</span></div>
+              </article>
+              <article class="gallery-card">
                 <img src="../src/assets/img/展厅灯光/柔光灯顶.png" alt="" />
-                <strong>柔光灯顶</strong>
+                <div class="gallery-caption"><strong>柔光灯顶</strong><span>均匀柔光 · 细节清晰</span></div>
+              </article>
+              <article class="gallery-card">
+                <img src="../src/assets/img/展厅灯光/极简留白.png" alt="" />
+                <div class="gallery-caption"><strong>极简留白</strong><span>留白克制 · 主体突出</span></div>
+              </article>
+              <article class="gallery-card">
+                <img src="../src/assets/img/展厅灯光/广角空间.png" alt="" />
+                <div class="gallery-caption"><strong>广角空间</strong><span>空间开阔 · 展示全景</span></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="assist-section">
+            <h3>素材要求</h3>
+            <div class="requirements">
+              <div class="req-card"><span class="check">✓</span>
+                <div><strong>车辆完整入镜</strong><span>建议四周留白，车辆完整不被切断。</span></div>
+              </div>
+              <div class="req-card"><span class="check">✓</span>
+                <div><strong>画面清晰无遮挡</strong><span>主体清晰，无重度雾气或前景遮挡物。</span></div>
+              </div>
+              <div class="req-card"><span class="check">✓</span>
+                <div><strong>光线均匀少反光</strong><span>避免强烈曝光、眩光、大面积镜面反射。</span></div>
               </div>
             </div>
-          </div>
+          </section>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
 
-          <div class="work-card logo-card">
-            <div>
-              <strong>使用 Logo</strong>
-              <p style="margin-top: 8px; color: #64748b; font-size: 13px; font-weight: 700;">开启后自动沿用当前账号默认 Logo。</p>
-            </div>
-            <span class="switch"></span>
-          </div>
-        </section>
-
-        <aside class="panel assist">
-          <div class="tabs">
-            <span class="active">使用教程</span>
-            <span>最近生成</span>
-          </div>
-
-          <div class="assist-scroll">
-            <section class="assist-section">
-              <h3>使用教程</h3>
-              <div class="guide-flow">
-                <article class="step-card">
-                  <div class="step-media"><img src="../src/assets/img/展厅灯光/经典白棚.png" alt="" /></div>
-                  <footer class="step-footer"><strong>上传车图</strong><span class="step-num">01</span></footer>
-                </article>
-                <span class="arrow">→</span>
-                <article class="step-card">
-                  <div class="step-media"><img src="../src/assets/img/展厅灯光/玻璃展厅.png" alt="" /></div>
-                  <footer class="step-footer"><strong>选择展厅模板</strong><span class="step-num">02</span></footer>
-                </article>
-                <span class="arrow">→</span>
-                <article class="step-card">
-                  <div class="step-media logo"><span class="logo-preview">AI CAR STUDIO</span></div>
-                  <footer class="step-footer"><strong>选择 Logo</strong><span class="step-num">03</span></footer>
-                </article>
-                <span class="arrow">→</span>
-                <article class="step-card">
-                  <div class="step-media"><img src="../src/img/home/feature-scene.png" alt="" /></div>
-                  <footer class="step-footer"><strong>生成效果</strong><span class="step-num">04</span></footer>
-                </article>
-              </div>
-            </section>
-
-            <section class="assist-section">
-              <h3>初次使用？试试这些</h3>
-              <div class="template-gallery">
-                <article class="gallery-card active">
-                  <img src="../src/assets/img/展厅灯光/经典白棚.png" alt="" />
-                  <div class="gallery-caption"><strong>经典白棚</strong><span>纯净背景 · 突出车身线条</span></div>
-                </article>
-                <article class="gallery-card">
-                  <img src="../src/assets/img/展厅灯光/玻璃展厅.png" alt="" />
-                  <div class="gallery-caption"><strong>玻璃展厅</strong><span>通透空间 · 自然光影</span></div>
-                </article>
-                <article class="gallery-card">
-                  <img src="../src/assets/img/展厅灯光/暗调奢华.png" alt="" />
-                  <div class="gallery-caption"><strong>暗调奢华</strong><span>低调密华 · 气氛质感</span></div>
-                </article>
-                <article class="gallery-card">
-                  <img src="../src/assets/img/展厅灯光/柔光灯顶.png" alt="" />
-                  <div class="gallery-caption"><strong>柔光灯顶</strong><span>均匀柔光 · 细节清晰</span></div>
-                </article>
-                <article class="gallery-card">
-                  <img src="../src/assets/img/展厅灯光/极简留白.png" alt="" />
-                  <div class="gallery-caption"><strong>极简留白</strong><span>留白克制 · 主体突出</span></div>
-                </article>
-                <article class="gallery-card">
-                  <img src="../src/assets/img/展厅灯光/广角空间.png" alt="" />
-                  <div class="gallery-caption"><strong>广角空间</strong><span>空间开阔 · 展示全景</span></div>
-                </article>
-              </div>
-            </section>
-
-            <section class="assist-section">
-              <h3>素材要求</h3>
-              <div class="requirements">
-                <div class="req-card"><span class="check">✓</span><div><strong>车辆完整入镜</strong><span>建议四周留白，车辆完整不被切断。</span></div></div>
-                <div class="req-card"><span class="check">✓</span><div><strong>画面清晰无遮挡</strong><span>主体清晰，无重度雾气或前景遮挡物。</span></div></div>
-                <div class="req-card"><span class="check">✓</span><div><strong>光线均匀少反光</strong><span>避免强烈曝光、眩光、大面积镜面反射。</span></div></div>
-              </div>
-            </section>
-          </div>
-        </aside>
-      </main>
-    </div>
-  </body>
 </html>

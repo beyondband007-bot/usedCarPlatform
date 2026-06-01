@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref } from "vue";
 
-import PreloadImage from '@/components/common/PreloadImage.vue'
-import { homeMainCapabilities, homeTechBadges } from '@/constants/home-page'
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import { homeMainCapabilities, homeTechBadges } from "@/constants/home-page";
+import { useAppStore } from "@/stores/app";
 
-const gridRef = ref<HTMLElement | null>(null)
+const appStore = useAppStore();
+const gridRef = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-  const root = gridRef.value
+  const root = gridRef.value;
   if (!root) {
-    return
+    return;
   }
 
   const observer = new IntersectionObserver(
@@ -18,30 +20,37 @@ onMounted(() => {
         if (entry.isIntersecting) {
           entry.target.animate(
             [
-              { opacity: 0, transform: 'translateY(22px)' },
-              { opacity: 1, transform: 'translateY(0)' },
+              { opacity: 0, transform: "translateY(22px)" },
+              { opacity: 1, transform: "translateY(0)" },
             ],
             {
               duration: 620,
-              easing: 'cubic-bezier(.16,1,.3,1)',
-              fill: 'both',
+              easing: "cubic-bezier(.16,1,.3,1)",
+              fill: "both",
             },
-          )
-          observer.unobserve(entry.target)
+          );
+          observer.unobserve(entry.target);
         }
-      })
+      });
     },
     { threshold: 0.12 },
-  )
+  );
 
-  root.querySelectorAll('.feature-card').forEach((item) => observer.observe(item))
-})
+  root
+    .querySelectorAll(".feature-card")
+    .forEach((item) => observer.observe(item));
+});
 </script>
 
 <template>
-  <section id="engine" class="section-block" aria-label="全链路能力">
+  <section
+    id="engine"
+    class="section-block"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    aria-label="全链路能力"
+  >
     <div class="section-title">
-      <h2>链路 AI 汽车电商内容生成引擎</h2>
+      <h2>一站式AI汽车电商内容生成引擎</h2>
       <p>聚焦汽车视觉内容全流程，打造从单张精修到批量交付的一站式生成能力</p>
     </div>
 
@@ -120,8 +129,9 @@ onMounted(() => {
 
 .feature-card::after {
   position: absolute;
-  inset: 0;
-  content: '';
+  inset: auto 0 0;
+  height: 42%;
+  content: "";
   pointer-events: none;
   background: var(--home-card-shine);
   opacity: 0;
@@ -138,7 +148,7 @@ onMounted(() => {
 }
 
 .feature-card:hover::after {
-  opacity: 1;
+  opacity: 0.55;
 }
 
 .feature-card-image {
@@ -146,12 +156,23 @@ onMounted(() => {
   width: 100%;
   height: auto;
   aspect-ratio: 341 / 183;
+  overflow: hidden;
+  isolation: isolate;
   border-radius: var(--home-radius-media, 22px);
-  transition: transform var(--home-motion-normal, 240ms ease), filter var(--home-motion-normal, 240ms ease);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.feature-card:hover .feature-card-image {
-  transform: scale(1.025);
+.feature-card-image :deep(.preload-image),
+.feature-card-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.feature-card-image :deep(.preload-image__img) {
+  image-rendering: auto;
 }
 
 .feature-card h3 {
@@ -176,35 +197,67 @@ onMounted(() => {
 
 .badge-row {
   display: flex;
-  justify-content: center;
-  gap: 80px;
-  flex-wrap: wrap;
-  width: min(808px, 100%);
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: nowrap;
+  width: 100%;
   margin: 38px auto 0;
+  padding: 0;
+  column-gap: clamp(12px, 1.6vw, 24px);
 }
 
 .badge-row span {
   position: relative;
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   min-height: 29px;
   padding: 0 15px;
-  color: var(--home-badge-text);
-  background: var(--home-badge-bg);
-  border: 1px solid var(--home-badge-border);
   border-radius: 999px;
-  font-size: 18px;
+  font-size: clamp(13px, 1.2vw, 18px);
   font-weight: 800;
+  white-space: nowrap;
   transition:
     transform var(--home-motion-fast, 160ms ease),
     border-color var(--home-motion-fast, 160ms ease),
-    color var(--home-motion-fast, 160ms ease);
+    color var(--home-motion-fast, 160ms ease),
+    background var(--home-motion-fast, 160ms ease),
+    box-shadow var(--home-motion-fast, 160ms ease);
 }
 
-.badge-row span:hover {
+.section-block.theme-dark .badge-row span {
+  color: #f8fafc;
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-block.theme-dark .badge-row span:hover {
   transform: translateY(-1px);
-  border-color: var(--home-card-hover-border);
-  color: var(--home-gold-strong);
+  border-color: color-mix(in srgb, var(--home-gold) 42%, transparent);
+  color: #ffffff;
+}
+
+.section-block.theme-dark .badge-row span::before {
+  background: linear-gradient(180deg, var(--home-gold-strong), #d6a617);
+}
+
+.section-block.theme-light .badge-row span {
+  color: #334155;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
+  border: 1px solid #e6eaf2;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 1px 2px rgba(47, 107, 255, 0.04);
+}
+
+.section-block.theme-light .badge-row span:hover {
+  transform: translateY(-1px);
+  border-color: #b8cdf4;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%);
+  color: #1e293b;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 6px 16px rgba(47, 107, 255, 0.1);
 }
 
 .badge-row span::before {
@@ -212,15 +265,25 @@ onMounted(() => {
   width: 18px;
   height: 18px;
   margin-right: 9px;
-  content: '';
-  background: linear-gradient(180deg, var(--home-gold-strong), #d6a617);
+  content: "";
   border-radius: 5px;
+}
+
+.section-block.theme-light .badge-row span::before {
+  background: linear-gradient(180deg, #4f7fff 0%, #2f6bff 100%);
+  box-shadow: 0 2px 6px rgba(47, 107, 255, 0.22);
 }
 
 @media (max-width: 1100px) {
   .feature-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 22px;
+  }
+
+  .badge-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 18px;
   }
 }
 

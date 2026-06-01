@@ -66,15 +66,18 @@ function handleLogout() {
 
 function resolveNavPermission(path: string) {
   if (path === "/home") return "menu:home";
-  if (path === "/workspace" || path.startsWith("/workspace/")) return "menu:workspace";
+  if (path === "/workspace" || path.startsWith("/workspace/"))
+    return "menu:workspace";
   if (path === "/pricing") return "menu:pricing";
   if (path === "/points" || path === "/credits") return "menu:points";
-  if (path === "/recharge" || path === "/package-points") return "menu:recharge";
+  if (path === "/recharge" || path === "/package-points")
+    return "menu:recharge";
   return "";
 }
 
 function canShowNavItem(item: NavItem) {
-  if (!authStore.isLoggedIn) return item.path !== "/credits" && item.path !== "/points";
+  if (!authStore.isLoggedIn)
+    return item.path !== "/credits" && item.path !== "/points";
   const permission = resolveNavPermission(item.path);
   return !permission || authStore.permissions.includes(permission);
 }
@@ -85,23 +88,26 @@ const navItems = computed(() => {
       return studioGuestNavigation;
     }
 
-    return topNavigation.filter((item) => item.path !== "/login" && canShowNavItem(item));
+    return topNavigation.filter(
+      (item) => item.path !== "/login" && canShowNavItem(item),
+    );
   }
 
   return authStore.isLoggedIn
-    ? topNavigation.filter((item) => item.path !== "/login" && canShowNavItem(item))
+    ? topNavigation.filter(
+        (item) => item.path !== "/login" && canShowNavItem(item),
+      )
     : topNavigation.filter(canShowNavItem);
 });
 </script>
 
 <template>
-  <div class="app-header-wrap" :class="{ 'app-header-wrap--home': usesStudioChrome }">
-    <header
-      v-if="usesStudioChrome"
-      class="site-header"
-      aria-label="顶部导航"
-    >
-      <RouterLink class="logo" to="/home">AI CAR STUDIO</RouterLink>
+  <div
+    class="app-header-wrap"
+    :class="{ 'app-header-wrap--home': usesStudioChrome }"
+  >
+    <header v-if="usesStudioChrome" class="site-header" aria-label="顶部导航">
+      <RouterLink class="logo" to="/home">AI CARXEN</RouterLink>
       <nav class="nav-links" aria-label="主导航">
         <button
           v-for="item in navItems"
@@ -162,7 +168,10 @@ const navItems = computed(() => {
               :aria-expanded="userMenuOpen"
               aria-haspopup="menu"
             >
-              <span class="user-menu-avatar user-menu-avatar--studio" aria-hidden="true">
+              <span
+                class="user-menu-avatar user-menu-avatar--studio"
+                aria-hidden="true"
+              >
                 <Icon icon="mdi:account-circle-outline" />
               </span>
               <span class="user-menu-name">{{ authStore.userName }}</span>
@@ -236,7 +245,9 @@ const navItems = computed(() => {
             v-if="item.icon"
             :icon="item.icon"
             class="text-xl"
-            :class="isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''"
+            :class="
+              isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''
+            "
           />
           <span>{{ item.label }}</span>
         </button>
@@ -301,7 +312,6 @@ const navItems = computed(() => {
             </button>
           </div>
         </NPopover>
-
       </div>
     </header>
   </div>
@@ -321,28 +331,26 @@ const navItems = computed(() => {
 }
 
 .site-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: clamp(16px, 2.5vw, 32px);
+  gap: clamp(20px, 2.8vw, 48px);
   width: 100%;
   max-width: none;
   box-sizing: border-box;
   min-height: var(--studio-chrome-header-height, 72px);
   padding: 12px var(--studio-chrome-pad-x, 24px);
   margin: 0;
-  background: var(--studio-chrome-header-bg, linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent));
+  background: var(
+    --studio-chrome-header-bg,
+    linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent)
+  );
   color: var(--studio-chrome-logo, #f3f3f3);
   font-family:
-    "Microsoft YaHei",
-    "PingFang SC",
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
+    "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
 .logo {
-  justify-self: start;
+  flex-shrink: 0;
   color: var(--studio-chrome-logo, #f3f3f3);
   font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
   font-weight: 900;
@@ -351,8 +359,8 @@ const navItems = computed(() => {
 }
 
 .nav-links {
-  justify-self: center;
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--studio-chrome-nav-gap, clamp(20px, 2.8vw, 56px));
   color: var(--studio-chrome-nav, #c9c9c9);
@@ -384,7 +392,7 @@ const navItems = computed(() => {
   bottom: 0;
   width: 0;
   height: 2px;
-  content: '';
+  content: "";
   border-radius: 2px;
   background: var(--studio-chrome-nav-underline, #2f6bff);
   transform: translateX(-50%);
@@ -424,7 +432,7 @@ const navItems = computed(() => {
 .site-header-actions {
   display: inline-flex;
   align-items: center;
-  justify-self: end;
+  margin-left: auto;
   gap: 10px;
 }
 
@@ -447,7 +455,10 @@ const navItems = computed(() => {
 }
 
 .theme-toggle:hover {
-  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
+  border-color: var(
+    --studio-chrome-user-hover-border,
+    rgba(239, 194, 76, 0.42)
+  );
   background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
 }
 
@@ -468,7 +479,10 @@ const navItems = computed(() => {
 }
 
 .user-menu-trigger--studio:hover {
-  border-color: var(--studio-chrome-user-hover-border, rgba(239, 194, 76, 0.42));
+  border-color: var(
+    --studio-chrome-user-hover-border,
+    rgba(239, 194, 76, 0.42)
+  );
   background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
   box-shadow: 0 4px 14px rgba(239, 194, 76, 0.12);
 }
@@ -479,10 +493,6 @@ const navItems = computed(() => {
 }
 
 @media (max-width: 1100px) {
-  .site-header {
-    grid-template-columns: 1fr auto;
-  }
-
   .nav-links {
     display: none;
   }
@@ -503,7 +513,6 @@ const navItems = computed(() => {
   }
 
   .site-header-actions {
-    grid-column: 2;
     justify-self: end;
   }
 
@@ -533,9 +542,14 @@ const navItems = computed(() => {
 }
 
 .user-menu-trigger:hover {
-  border-color: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 32%, var(--app-border));
+  border-color: color-mix(
+    in srgb,
+    var(--color-accent-blue, #2f6bff) 32%,
+    var(--app-border)
+  );
   background: var(--app-surface-soft, #f8fafd);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-accent-blue, #2f6bff) 12%, transparent);
+  box-shadow: 0 4px 14px
+    color-mix(in srgb, var(--color-accent-blue, #2f6bff) 12%, transparent);
 }
 
 .user-menu-avatar {
@@ -545,7 +559,11 @@ const navItems = computed(() => {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 12%, var(--app-header-chip-bg));
+  background: color-mix(
+    in srgb,
+    var(--color-accent-blue, #2f6bff) 12%,
+    var(--app-header-chip-bg)
+  );
   color: var(--color-accent-blue, #2f6bff);
   font-size: 18px;
 }
@@ -606,7 +624,9 @@ const navItems = computed(() => {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .user-menu-panel.is-light .user-menu-logout {
@@ -641,7 +661,7 @@ const navItems = computed(() => {
   opacity: 1;
 }
 
-[data-theme='dark'] .header-login-link {
+[data-theme="dark"] .header-login-link {
   background: var(--app-header-nav-active-bg);
   color: var(--app-header-nav-active);
 }

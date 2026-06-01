@@ -37,6 +37,7 @@ export interface CreateGenerationTaskPayload {
   inputAssetId: string | null
   optionId?: string
   useLogo?: boolean
+  logoAssetId?: string
   colorCode?: string
   outputRatio?: string
   resolution?: string
@@ -177,6 +178,8 @@ export interface BatchVisualConfig {
   enableLightConsistency: boolean
   enablePaintRefresh: boolean
   enableInteriorClean: boolean
+  enableInteriorCollage?: boolean
+  interiorCollage?: boolean
 }
 
 export interface BatchPreset {
@@ -217,11 +220,19 @@ export interface CreatedBatchTask {
   createdAt: string
 }
 
+export type BatchTaskItemKind =
+  | 'exterior'
+  | 'interior'
+  | 'interior_clean'
+  | 'interior_collage'
+  | 'interior_clean_collage'
+
 export interface BatchTaskDetailItem {
   itemId: string
   groupTitle: string
-  itemKind: 'exterior' | 'interior'
-  inputAssetId: string
+  itemKind: BatchTaskItemKind
+  inputAssetId?: string
+  sourceAssetIds?: string[]
   generationTaskId: string
   status: GenerationTaskStatus
   progress: number
@@ -540,6 +551,62 @@ export async function deleteDeliveryAssets(assetIds: string[]) {
   const response = await request.delete<ApiResponse<{ deleted: string[]; failed: string[] }>>(
     '/modules/delivery/assets',
     { data: { assetIds } },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getDeliveryPackage(packageId: string) {
+  const response = await request.get<ApiResponse<DeliveryPackage>>(
+    `/modules/delivery/packages/${encodeURIComponent(packageId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getDeliveryPackages(params?: {
+  taskId?: string
+  page?: number
+  pageSize?: number
+}) {
+  const response = await request.get<ApiResponse<PagedResult<DeliveryPackage>>>(
+    '/modules/delivery/packages',
+    { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function pollDeliveryPackage(
+  packageId: string,
+  options?: { maxAttempts?: number; intervalMs?: number },
+) {
+  const maxAttempts = options?.maxAttempts ?? 30
+  const intervalMs = options?.intervalMs ?? 3000
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const pkg = await getDeliveryPackage(packageId)
+
+    if (pkg.downloadUrl) {
+      return pkg
+    }
+
+    if (pkg.status === 'fail' || pkg.status === 'canceled') {
+      throw new Error('下载包生成失败')
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, attempt === 0 ? 1000 : intervalMs)
+      })
+    }
+  }
+
+  return getDeliveryPackage(packageId)
+}
+
+export async function createInteriorCleanTask(inputAssetId: string) {
+  const response = await request.post<ApiResponse<CreatedGenerationTask>>(
+    '/modules/interior-clean/tasks',
+    { inputAssetId },
+    generationRequestConfig,
   )
   return unwrapApiResponse(response)
 }

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
+import { useMessage } from "naive-ui";
+import { computed, nextTick, ref, watch } from "vue";
 
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import type { WorkspaceGenerateResult } from "@/types/workspace";
+import { downloadFile, sanitizeFilename } from "@/utils/download";
 import { buildImagePreviewFromGenerateResult } from "@/utils/workspace-image-preview";
 
 const props = defineProps<{
@@ -16,8 +18,29 @@ const emit = defineEmits<{
 
 const preview = computed(() => buildImagePreviewFromGenerateResult(props.result));
 const videoRef = ref<HTMLVideoElement | null>(null);
+const message = useMessage();
 const videoUrl = computed(() => props.result.previewVideo ?? props.result.downloadUrl);
-const isVideoResult = computed(() => props.result.mediaType === "video" && Boolean(videoUrl.value));
+const videoDownloadUrl = computed(() => props.result.downloadUrl ?? videoUrl.value);
+const isVideoResult = computed(
+  () => props.result.mediaType === "video" && Boolean(videoUrl.value),
+);
+const isDownloadingVideo = ref(false);
+
+async function handleDownloadVideo() {
+  if (!videoDownloadUrl.value || isDownloadingVideo.value) return;
+
+  isDownloadingVideo.value = true;
+
+  try {
+    const filename = sanitizeFilename("short-video-result.mp4");
+    await downloadFile(videoDownloadUrl.value, filename, { fallback: "none" });
+    message.success("视频下载已开始");
+  } catch {
+    message.error("视频下载失败，请稍后重试");
+  } finally {
+    isDownloadingVideo.value = false;
+  }
+}
 
 watch(videoUrl, async () => {
   await nextTick();
@@ -36,10 +59,15 @@ watch(videoUrl, async () => {
         <h2>短视频生成结果</h2>
         <span>{{ result.ratioLabel }}</span>
       </div>
-      <a class="video-download-button" :href="videoUrl" download target="_blank" rel="noreferrer">
+      <button
+        type="button"
+        class="video-download-button"
+        :disabled="isDownloadingVideo"
+        @click="handleDownloadVideo"
+      >
         <Icon icon="mdi:download" />
-        下载
-      </a>
+        {{ isDownloadingVideo ? "下载中" : "下载" }}
+      </button>
     </header>
 
     <div class="video-result-stage">
@@ -118,6 +146,7 @@ watch(videoUrl, async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 0;
   background: var(--assist-card);
   color: var(--assist-text);
   font-family: inherit;
@@ -145,8 +174,13 @@ watch(videoUrl, async () => {
   font-size: 13px;
 }
 
+.video-download-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .video-back-button:hover,
-.video-download-button:hover {
+.video-download-button:hover:not(:disabled) {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   transform: translateY(-1px);
 }

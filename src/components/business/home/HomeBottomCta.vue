@@ -50,7 +50,7 @@ onMounted(() => {
     aria-label="预约演示"
   >
     <h2>企业视觉内容生产，从一套车图开始</h2>
-    <p>企业套餐 ¥980 起，账号、积分、图组并发同步开通</p>
+    <p>企业套餐，超值优惠中，即开即用，一套车图解锁全渠道营销内容</p>
     <button
       v-if="!authStore.isLoggedIn"
       type="button"

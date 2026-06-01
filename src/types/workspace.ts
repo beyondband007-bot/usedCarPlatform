@@ -105,14 +105,22 @@ export interface WorkspaceGeneratePayload {
   resolution?: string
   optionId?: string
   useLogo?: boolean
+  logoAssetId?: string
   colorCode?: string
   prompt?: string
 }
 
+export type WorkspaceBatchItemKind =
+  | 'exterior'
+  | 'interior'
+  | 'interior_clean'
+  | 'interior_collage'
+  | 'interior_clean_collage'
+
 export interface WorkspaceBatchActiveItem {
   itemId: string
   groupTitle: string
-  itemKind: 'exterior' | 'interior'
+  itemKind: WorkspaceBatchItemKind
   status: WorkspaceRecentItem['status']
   progress: number
   thumbnail?: string
@@ -209,6 +217,7 @@ export interface BatchVisualTemplate {
   lightConsistency: boolean
   paintRefresh: boolean
   interiorEnhance: boolean
+  interiorCollage: boolean
   updatedAt: string
 }
 

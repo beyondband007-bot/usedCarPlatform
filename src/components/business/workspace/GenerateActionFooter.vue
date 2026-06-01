@@ -35,13 +35,11 @@ const emit = defineEmits<{
         <Icon icon="mdi:loading" aria-hidden="true" />
         <span>生成中...</span>
       </span>
-      <template v-else>
-        <span class="generate-action-main">
-          <strong>{{ actionLabel }}</strong>
-          <Icon icon="mdi:sparkles" aria-hidden="true" />
-        </span>
-        <span class="generate-action-sub">消耗{{ cost }}积分/{{ costUnit }}</span>
-      </template>
+      <span v-else class="generate-action-content">
+        <strong>{{ actionLabel }}</strong>
+        <span class="generate-action-cost">消耗{{ cost }}积分/{{ costUnit }}</span>
+        <Icon icon="mdi:sparkles" aria-hidden="true" />
+      </span>
     </button>
   </footer>
 </template>
@@ -53,32 +51,23 @@ const emit = defineEmits<{
   z-index: 2;
   flex-shrink: 0;
   padding-top: 12px;
-  border-top: 1px solid var(--app-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
-    var(--app-surface-soft) 24%,
-    var(--app-surface-soft) 100%
-  );
 }
 
 .generate-action-button {
   display: flex;
   width: 100%;
-  min-height: 58px;
-  flex-direction: column;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border: 0;
   border-radius: 999px;
   background: var(--workspace-accent, #efc24c);
   color: #111111;
   cursor: pointer;
   outline: none;
-  box-shadow: 0 10px 28px
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 34%, transparent);
+  box-shadow: 0 8px 22px
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 30%, transparent);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -102,29 +91,31 @@ const emit = defineEmits<{
   cursor: not-allowed;
 }
 
-.generate-action-main {
+.generate-action-content {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 18px;
+  gap: 8px;
+  font-size: 15px;
   line-height: 1.2;
 }
 
-.generate-action-main strong {
+.generate-action-content strong {
   font-weight: 900;
 }
 
-.generate-action-main :deep(svg) {
-  width: 18px;
-  height: 18px;
+.generate-action-content :deep(svg) {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
   color: rgba(17, 17, 17, 0.72);
 }
 
-.generate-action-sub {
-  color: rgba(17, 17, 17, 0.78);
-  font-size: 12px;
+.generate-action-cost {
+  color: rgba(17, 17, 17, 0.76);
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .generate-action-loading {

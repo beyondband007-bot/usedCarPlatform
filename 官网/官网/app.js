@@ -1,12 +1,12 @@
 const caseData = {
   used: {
-    title: "手车出海提交",
+    title: "出海提效",
     image: "./图片/ChatGPT Image 2026年5月28日 11_45_07 (4).png",
-    pain: "出海 listing 需要多语言文案、统一场景图、人工修图周期长、成本高",
-    service: "AI 场景影棚｜成片交付包｜外观图批量精修",
+    pain: "图片处理过程繁琐，本地化素材处理缓慢",
+    service: "适配各种车型的多角度外观图、内饰图、LOGO车牌处理",
   },
   showroom: {
-    title: "展厅批量拍摄",
+    title: "内容提效",
     image: "./图片/ChatGPT Image 2026年5月28日 16_11_28.png",
     pain: "门店车辆周转快，传统拍摄排期慢，难以统一灯光、角度和画面质感",
     service: "展厅棚拍｜姿态矫正｜统一背景与质感增强",

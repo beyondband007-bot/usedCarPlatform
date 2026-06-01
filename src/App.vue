@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watchEffect } from "vue";
 import {
   darkTheme,
   NConfigProvider,
@@ -9,9 +9,16 @@ import {
   type GlobalThemeOverrides,
 } from "naive-ui";
 
+import { syncDocumentTheme } from "@/composables/useDocumentTheme";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
+syncDocumentTheme(appStore.isDarkMode);
+
+watchEffect(() => {
+  syncDocumentTheme(appStore.isDarkMode);
+});
+
 const activeTheme = computed(() => (appStore.isDarkMode ? darkTheme : null));
 
 const themeOverrides = computed<GlobalThemeOverrides>(() =>
@@ -82,10 +89,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
     <NMessageProvider>
       <NDialogProvider>
         <NNotificationProvider>
-          <div
-            :data-theme="appStore.isDarkMode ? 'dark' : 'light'"
-            class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]"
-          >
+          <div class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
             <RouterView />
           </div>
         </NNotificationProvider>

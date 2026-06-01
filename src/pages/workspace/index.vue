@@ -367,7 +367,7 @@ function startBatchPolling() {
         void refreshBatchJob(job.batchId);
       }
     }
-  }, 4000);
+  }, 5000);
 }
 
 function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
@@ -1131,6 +1131,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       inputAssetId: payload.inputAssetId,
       optionId: payload.optionId,
       useLogo: payload.useLogo,
+      logoAssetId: payload.logoAssetId,
       colorCode: payload.colorCode,
       outputRatio:
         activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
@@ -1316,6 +1317,7 @@ onUnmounted(() => {
           />
           <CapabilityGeneratePanel
             v-else
+            :key="`${activeCapability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
             :is-generating="activeModuleGenerating"
@@ -1334,6 +1336,7 @@ onUnmounted(() => {
       >
         <WorkspaceAssistPanel
           ref="assistPanelRef"
+          :key="`${activeCapability.code}-${appStore.isDarkMode ? 'dark' : 'light'}-assist`"
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
           :is-generating="activeModuleGenerating"
@@ -1367,6 +1370,7 @@ onUnmounted(() => {
   --workspace-shadow: 0 18px 42px rgba(78, 111, 148, 0.11);
 
   display: flex;
+  width: 100%;
   height: 100%;
   max-height: 100%;
   min-height: 0;
@@ -1424,7 +1428,12 @@ onUnmounted(() => {
 
   color: var(--workspace-text);
 
-  background: var(--app-bg);
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  transform: none !important;
+  background: var(--app-bg) !important;
 }
 
 .workspace-page.theme-light .workspace-col--main {
@@ -1439,6 +1448,7 @@ onUnmounted(() => {
 
 .workspace-shell {
   display: grid;
+  width: 100%;
   min-height: 0;
   flex: 1;
   height: 100%;

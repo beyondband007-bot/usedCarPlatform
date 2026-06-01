@@ -7,7 +7,7 @@ import featureSceneImage from '@/img/home/feature-scene.png'
 import featureShowroomImage from '@/img/home/feature-showroom.png'
 import featureSkyImage from '@/img/home/feature-sky.png'
 import featureVideoImage from '@/img/home/feature-video.png'
-import homeHeroImage from '@/img/home/hero-car.png'
+import homeHeroImage from '@/assets/img/首页背景图/ae5148a4c2e2ae857a6f889b55bf0b8.png'
 import suiteEnterpriseImage from '@/img/home/suite-enterprise.png'
 import suiteWorkbenchImage from '@/img/home/suite-workbench.png'
 
@@ -34,7 +34,10 @@ export interface HomeCaseTab {
   pain: string
   service: string
   image: string
-  stats: Array<{ value: string; label: string }>
+  efficiencyTip: {
+    title: string
+    copy: string
+  }
 }
 
 export const homeHeroImageSrc = homeHeroImage
@@ -59,85 +62,80 @@ export const homeQuickEntries: HomeQuickEntry[] = [
 
 export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
-    title: 'AI 智能场景影棚',
-    description: '一键生成汽车展厅、多场景素材核心切换',
+    title: '场景背景一键更换',
+    description: '秒级替换车辆场景，适配各国营销风格',
     image: featureSceneImage,
   },
   {
-    title: '汽车外观精修',
-    description: '车漆、轮毂、玻璃等细节一键焕新',
+    title: '外观细节一键精修',
+    description: '智能优化车身细节，图片质感即刻提升',
     image: featureRefineImage,
   },
   {
-    title: '批量内容智能交付',
-    description: '多车型、多尺寸内容一键批量生成、打包交付',
+    title: '汽车信息批量上新',
+    description: '车型、配置、尺寸，一次修改全库同步',
     image: featureBatchImage,
   },
   {
-    title: '一键生成营销短视频',
-    description: '自动生成动态镜头汽车营销短视频',
+    title: '营销短视频一键出',
+    description: '输入素材即出短片，提高营销宣传节奏',
     image: featureVideoImage,
   },
   {
-    title: '展厅灯光棚拍',
-    description: '还原专业展厅灯光，打造精细级质感',
+    title: '展厅质感棚拍',
+    description: '模拟专业影棚布光，精准突出车身漆面与质感',
     image: featureShowroomImage,
   },
   {
-    title: '户外自然光场景',
-    description: '自然环境实景合成，还原真实光影效果',
+    title: '户外自然实景',
+    description: '真实街道融合自然风光，提升车辆场景代入感',
     image: featureOutdoorImage,
   },
   {
-    title: '道路动态特效',
-    description: '模拟车辆行驶动态，打造速度感视觉画面',
+    title: '行驶动态特效',
+    description: '营造速度与运动感，展现车辆的强劲行驶姿态',
     image: featureRoadImage,
   },
   {
-    title: '天空纯净影棚',
-    description: '用于净透天空背景，突出车辆主体视觉焦点',
+    title: '高质天空影棚',
+    description: '干净通透的天空场景，让车辆展示更清晰醒目',
     image: featureSkyImage,
   },
 ]
 
-export const homeTechBadges = ['姿态矫正', '智能抠图', '高清改尺寸', 'HD AI 超清']
+export const homeTechBadges = [
+  '姿态矫正',
+  '智能抠图',
+  '画质提升',
+  '一键消除',
+  '尺寸调整',
+  '智能调色',
+]
 
 export const homeCaseTabs: HomeCaseTab[] = [
   {
     id: 'used',
-    label: '二手车出海',
-    title: '手车出海提交',
-    pain: '出海 listing 需要多语言文案、统一场景图、人工修图周期长、成本高',
-    service: 'AI 场景影棚｜成片交付包｜外观图批量精修',
+    label: '出海提效',
+    title: '出海提效',
+    pain: '图片处理过程繁琐，本地化素材处理缓慢',
+    service: '适配各种车型的多角度外观图、内饰图、LOGO车牌处理',
     image: caseUsedImage,
-    stats: [
-      { value: '300%', label: '上架效率提升' },
-      { value: '75%', label: '成片周期缩短' },
-    ],
+    efficiencyTip: {
+      title: '效率提示',
+      copy: '每百张出海素材准备时间：8小时→15分钟',
+    },
   },
   {
     id: 'showroom',
-    label: '展厅拍摄',
-    title: '展厅批量拍摄',
-    pain: '门店车辆周转快，传统拍摄排期慢，难以统一灯光、角度和画面质感',
-    service: '展厅棚拍｜姿态矫正｜统一背景与质感增强',
+    label: '内容提效',
+    title: '内容提效',
+    pain: '海量车型需反复修图改文，人工操作耗时且质量不稳',
+    service: '姿态矫正、智能抠图、画质提升、烤漆换色、尺寸调整、光污染处理等',
     image: featureShowroomImage,
-    stats: [
-      { value: '300%', label: '上架效率提升' },
-      { value: '75%', label: '成片周期缩短' },
-    ],
-  },
-  {
-    id: 'new',
-    label: '新车套图',
-    title: '新车标准套图',
-    pain: '新车宣传需要覆盖官网、短视频封面、详情页和广告投放多种尺寸',
-    service: '高清改尺寸｜天空影棚｜营销短视频封面',
-    image: featureSkyImage,
-    stats: [
-      { value: '300%', label: '上架效率提升' },
-      { value: '75%', label: '成片周期缩短' },
-    ],
+    efficiencyTip: {
+      title: '效率提升',
+      copy: '单张图片精修时间：20分钟→10秒 / 100款车型详情页生成：1周→1天',
+    },
   },
 ]
 

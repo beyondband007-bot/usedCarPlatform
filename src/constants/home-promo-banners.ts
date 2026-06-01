@@ -1,47 +1,48 @@
-import banner01DetailMaterials from '@/img/home/promo-banners/banner-01-detail-materials.png'
-import banner02EnterpriseSuite from '@/img/home/promo-banners/banner-02-enterprise-suite.png'
-import banner03CaseUsed from '@/img/home/promo-banners/banner-03-case-used.png'
-import banner04ShowroomStudio from '@/img/home/promo-banners/banner-04-showroom-studio.png'
+import banner01LightPollution from '@/img/home/promo-banners/banner-01-light-pollution.png'
+import banner02AgentRecruitment from '@/img/home/promo-banners/banner-02-agent-recruitment.png'
+import banner03CreativeTeam from '@/img/home/promo-banners/banner-03-creative-team.png'
 
 export interface HomePromoBannerSlide {
   id: string
   image: string
   alt: string
-  title: string
-  subtitle?: string
+  title?: string
+  lines?: string[]
+  actionLabel?: string
+  actionTo?: string
+  opensConsultModal?: boolean
   to?: string
+  hideCopy?: boolean
 }
 
 /** 首页快捷入口区右侧海报轮播（资源目录：src/img/home/promo-banners/） */
+const promoBannerBodyLines = [
+  '企业团队专属套餐，5套组图一键生成',
+  '效率提高95%',
+] as const
+
 export const homePromoBannerSlides: HomePromoBannerSlide[] = [
   {
-    id: 'detail-materials',
-    image: banner01DetailMaterials,
-    alt: '详情页素材方案海报',
-    title: '详情页素材',
-    subtitle: '详情图、卖点卡、客户官方方案',
+    id: 'light-pollution',
+    image: banner01LightPollution,
+    alt: '批量生图，限时特惠中',
+    title: '批量生图，限时特惠中',
+    lines: [...promoBannerBodyLines],
   },
   {
-    id: 'enterprise-suite',
-    image: banner02EnterpriseSuite,
-    alt: '企业套餐开通海报',
-    title: '企业套餐',
-    subtitle: '账号、积分、品牌外观同步开通',
-    to: '/pricing',
+    id: 'agent-recruitment',
+    image: banner02AgentRecruitment,
+    alt: '系统代理火热招募中',
+    title: '系统代理火热招募中',
+    lines: ['名额有限，先到先得', '抢占 AI 汽车内容增长新机会'],
+    actionLabel: '立即咨询',
+    opensConsultModal: true,
   },
   {
-    id: 'case-used',
-    image: banner03CaseUsed,
-    alt: '二手车出海案例海报',
-    title: '二手车出海',
-    subtitle: '多语言 listing 与统一场景图交付',
-  },
-  {
-    id: 'showroom-studio',
-    image: banner04ShowroomStudio,
-    alt: '展厅棚拍能力海报',
-    title: '展厅灯光棚拍',
-    subtitle: '还原专业展厅灯光与质感',
+    id: 'creative-team',
+    image: banner03CreativeTeam,
+    alt: 'AI 汽车内容创作团队',
+    hideCopy: true,
   },
 ]
 

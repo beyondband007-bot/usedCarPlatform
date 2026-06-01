@@ -9,17 +9,21 @@ import {
   deleteDeliveryAssets,
   getDeliveryTaskAssets,
   getDeliveryTasks,
+  pollDeliveryPackage,
   uploadAsset,
+  type BatchVisualConfig,
   type DeliveryAsset,
   type DeliveryTaskItem,
   type UploadedAsset,
 } from "@/api/visual-workbench";
 import {
   batchSceneCategoryOptions,
+  getBatchSceneOptionId,
   getBatchScenesByCategory,
   getBatchSceneTitle,
 } from "@/constants/workspace";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
+import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 import { formatDate } from "@/utils/dayjs";
 import type {
   BatchVisualTemplate,
@@ -64,6 +68,7 @@ const {
 } = useBatchVisualTemplates();
 
 const useLogo = ref(false);
+const { recentLogo } = useWorkspaceLogo();
 const paintColorCode = ref("");
 const outputRatio = ref("1:1");
 const batchTab = ref<"create" | "visual">("create");
@@ -78,6 +83,7 @@ const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
 const interiorEnhance = ref(false);
+const interiorCollage = ref(false);
 const projectName = ref("5月展厅批量上新");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
@@ -85,7 +91,6 @@ const presetInput = ref(visualTemplates.value[0]?.name ?? "");
 const isApplyingTemplate = ref(false);
 const uploadedAsset = ref<UploadedAsset | null>(null);
 const batchExteriorUploads = ref<BatchExteriorUploadItem[]>([]);
-const uploadedInteriorAssets = ref<UploadedAsset[]>([]);
 const uploadedPreviewUrl = ref<string | null>(null);
 const isUploadingVehicle = ref(false);
 const isUploadingInterior = ref(false);
@@ -149,14 +154,14 @@ function resetInteriorCollageUploads() {
 
 function resetBatchCreateSection() {
   resetBatchExteriorUploads();
-  resetUploadedInterior();
+  resetInteriorCollageUploads();
   uploadInterior.value = false;
   projectName.value =
     getTemplateById(createTaskPresetId.value)?.name ?? "批量上新任务";
 }
 
 function resetUploadedInterior() {
-  uploadedInteriorAssets.value = [];
+  resetInteriorCollageUploads();
 }
 
 const outputRatioOptions = [
@@ -253,7 +258,7 @@ const canAddInteriorCollageImages = computed(
 const batchEstimatedCost = computed(() => {
   const inputCount =
     uploadedExteriorAssets.value.length +
-    (uploadInterior.value ? uploadedInteriorAssets.value.length : 0);
+    (uploadInterior.value ? uploadedInteriorCollageAssets.value.length : 0);
 
   return inputCount * 120;
 });
@@ -269,6 +274,26 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     lightConsistency: lightConsistency.value,
     paintRefresh: paintRefresh.value,
     interiorEnhance: interiorEnhance.value,
+    interiorCollage: interiorCollage.value,
+  };
+}
+
+function mapBatchVisualConfigFromTemplate(
+  template: BatchVisualTemplate,
+): BatchVisualConfig {
+  return {
+    enableSceneChange: template.enableSceneChange,
+    sceneOptionId: template.enableSceneChange
+      ? getBatchSceneOptionId(template.sceneCategory, template.sceneIndex)
+      : undefined,
+    sceneIndex: template.sceneIndex,
+    sceneCategory: template.sceneCategory,
+    outputRatio: template.outputRatio,
+    useRecentLogo: template.useRecentLogo,
+    enableLightConsistency: template.lightConsistency,
+    enablePaintRefresh: template.paintRefresh,
+    enableInteriorClean: template.interiorEnhance,
+    enableInteriorCollage: template.interiorCollage,
   };
 }
 
@@ -282,6 +307,7 @@ function applyTemplate(template: BatchVisualTemplate) {
   lightConsistency.value = template.lightConsistency;
   paintRefresh.value = template.paintRefresh;
   interiorEnhance.value = template.interiorEnhance;
+  interiorCollage.value = template.interiorCollage;
   isApplyingTemplate.value = false;
 }
 
@@ -306,6 +332,7 @@ function resetVisualConfigSelection() {
   lightConsistency.value = true;
   paintRefresh.value = false;
   interiorEnhance.value = false;
+  interiorCollage.value = false;
   isApplyingTemplate.value = false;
 }
 
@@ -636,26 +663,45 @@ function handleInteriorCollageRemove(id: string) {
   );
 }
 
-function handleInteriorFileSelected(file: File) {
-  isUploadingInterior.value = true;
-
-  void uploadAsset(file, "car_interior")
-    .then((asset) => {
-      uploadedInteriorAssets.value = [...uploadedInteriorAssets.value, asset];
-      message.success("内饰图上传成功");
-    })
-    .catch((error) => {
-      const text = error instanceof Error ? error.message : "内饰图上传失败";
-      message.error(text);
-    })
-    .finally(() => {
-      isUploadingInterior.value = false;
-    });
-}
-
 function handleInteriorImageRemove() {
   resetUploadedInterior();
   message.info("已清空内饰图");
+}
+
+function validateBatchInteriorAssets(template: BatchVisualTemplate) {
+  const needsInterior = template.interiorEnhance || template.interiorCollage;
+
+  if (!needsInterior) {
+    return true;
+  }
+
+  if (!uploadInterior.value) {
+    message.warning("当前预设已开启内饰处理，请同时上传内饰图");
+    return false;
+  }
+
+  const interiorAssetIds = uploadedInteriorCollageAssets.value.map(
+    (asset) => asset.assetId,
+  );
+
+  if (!interiorAssetIds.length) {
+    message.warning("请先上传内饰图");
+    return false;
+  }
+
+  if (template.interiorCollage) {
+    if (
+      interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
+      interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES
+    ) {
+      message.warning(
+        `开启内饰拼接需要上传 ${MIN_INTERIOR_COLLAGE_IMAGES}-${MAX_INTERIOR_COLLAGE_IMAGES} 张内饰图`,
+      );
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function handleGenerate() {
@@ -688,6 +734,12 @@ function handleGenerate() {
     optionId:
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
+    logoAssetId:
+      props.capability.kind === "scene" &&
+      useLogo.value &&
+      recentLogo.value?.assetId
+        ? recentLogo.value.assetId
+        : undefined,
     colorCode:
       props.capability.code === "paint-refresh"
         ? paintColorCode.value || undefined
@@ -695,25 +747,9 @@ function handleGenerate() {
   });
 }
 
-function mapBatchVisualConfig() {
-  const scenes = batchScenes.value;
-  return {
-    enableSceneChange: enableSceneChange.value,
-    sceneOptionId:
-      scenes[batchSceneIndex.value]?.optionId ?? scenes[0]?.optionId,
-    sceneIndex: batchSceneIndex.value,
-    sceneCategory: batchSceneCategory.value,
-    outputRatio: outputRatio.value,
-    useRecentLogo: useRecentLogo.value,
-    enableLightConsistency: lightConsistency.value,
-    enablePaintRefresh: paintRefresh.value,
-    enableInteriorClean: interiorEnhance.value,
-  };
-}
-
 async function handleCreateBatchTask() {
-  if (isUploadingVehicle.value) {
-    message.warning("外观图仍在上传，请稍候");
+  if (isUploadingVehicle.value || isUploadingInterior.value) {
+    message.warning("图片仍在上传，请稍候");
     return;
   }
 
@@ -727,9 +763,23 @@ async function handleCreateBatchTask() {
     return;
   }
 
+  const template = getTemplateById(createTaskPresetId.value);
+  if (!template) {
+    message.warning("视觉预设不存在，请重新选择");
+    return;
+  }
+
+  if (!validateBatchInteriorAssets(template)) {
+    return;
+  }
+
   isCreatingBatchTask.value = true;
 
   try {
+    const interiorAssetIds = uploadInterior.value
+      ? uploadedInteriorCollageAssets.value.map((item) => item.assetId)
+      : [];
+
     const created = await createBatchTask({
       projectName: projectName.value.trim() || "批量上新任务",
       presetId: createTaskPresetId.value,
@@ -739,12 +789,10 @@ async function handleCreateBatchTask() {
           exteriorAssetIds: uploadedExteriorAssets.value.map(
             (item) => item.assetId,
           ),
-          interiorAssetIds: uploadInterior.value
-            ? uploadedInteriorAssets.value.map((item) => item.assetId)
-            : [],
+          interiorAssetIds,
         },
       ],
-      visualConfig: mapBatchVisualConfig(),
+      visualConfig: mapBatchVisualConfigFromTemplate(template),
     });
 
     lastCreatedBatchId.value = created.batchId;
@@ -843,10 +891,16 @@ watch(
   },
 );
 
+let deliveryPollTimer: number | null = null;
+
 onUnmounted(() => {
   revokePreviewObjectUrl();
   resetBatchExteriorUploads();
   resetInteriorCollageUploads();
+  if (deliveryPollTimer !== null) {
+    window.clearInterval(deliveryPollTimer);
+    deliveryPollTimer = null;
+  }
 });
 
 watch(
@@ -878,11 +932,6 @@ watch(batchTab, (tab) => {
   }
 });
 
-onMounted(() => {
-  void ensureLoaded();
-  void refreshDeliveryTasks();
-});
-
 type DeliveryTask = DeliveryTaskItem & {
   selected: boolean;
   meta: string;
@@ -892,6 +941,24 @@ type DeliveryTask = DeliveryTaskItem & {
 
 const deliveryTasks = ref<DeliveryTask[]>([]);
 const brokenDeliveryThumbs = ref<Set<string>>(new Set());
+
+onMounted(() => {
+  void ensureLoaded();
+  void refreshDeliveryTasks();
+  deliveryPollTimer = window.setInterval(() => {
+    if (
+      props.capability.kind === "delivery" &&
+      deliveryTasks.value.some(
+        (task) =>
+          task.status === "waiting" ||
+          task.status === "queued" ||
+          task.status === "generating",
+      )
+    ) {
+      void refreshDeliveryTasks();
+    }
+  }, 8000);
+});
 
 function hasDeliveryThumbnail(task: DeliveryTask) {
   if (task.progress < 100) return false;
@@ -1001,8 +1068,14 @@ async function handleDeliveryBatchDownload() {
       assetIds,
     });
 
-    if (createdPackage.downloadUrl) {
-      window.open(createdPackage.downloadUrl, "_blank", "noopener,noreferrer");
+    const readyPackage = createdPackage.downloadUrl
+      ? createdPackage
+      : await pollDeliveryPackage(createdPackage.packageId);
+
+    if (readyPackage.downloadUrl) {
+      window.open(readyPackage.downloadUrl, "_blank", "noopener,noreferrer");
+    } else {
+      message.warning("下载包仍在生成，请稍后重试");
     }
 
     message.success(`下载包已生成，共 ${assetIds.length} 张图`);
@@ -1021,10 +1094,17 @@ async function handleDeleteDeliveryAssets() {
     return;
   }
 
-  const selectedAssets = selectedTaskIds.flatMap(
-    (taskId) =>
-      deliveryTaskAssets.value[taskId]?.map((asset) => asset.assetId) ?? [],
-  );
+  const selectedAssets = (
+    await Promise.all(
+      selectedTaskIds.map(async (taskId) => {
+        if (deliveryTaskAssets.value[taskId]?.length) {
+          return deliveryTaskAssets.value[taskId];
+        }
+
+        return loadDeliveryAssets(taskId);
+      }),
+    )
+  ).flatMap((assets) => assets.map((asset) => asset.assetId));
 
   if (!selectedAssets.length) {
     message.warning("当前没有可删除素材");
@@ -1204,6 +1284,13 @@ const activeCreateRatioLabel = computed(() => {
                   <Icon icon="mdi:seat-passenger" />
                   内饰清洁
                 </span>
+                <span
+                  v-if="activeCreateTemplate.interiorCollage"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:image-multiple-outline" />
+                  内饰拼接
+                </span>
               </div>
             </section>
 
@@ -1303,19 +1390,102 @@ const activeCreateRatioLabel = computed(() => {
               <NSwitch v-model:value="uploadInterior" size="large" />
             </section>
 
-            <UploadTaskCard
-              v-if="uploadInterior"
-              compact
-              :capability="props.capability"
-              upload-title="上传内饰图组"
-              upload-hint="用于成片交付中的内饰展示图，可选上传"
-              required-label="选填"
-              upload-icon="mdi:seat-passenger"
-              :upload-preview-url="uploadedInteriorAssets[0]?.url ?? null"
-              :is-uploading="isUploadingInterior"
-              @select-file="handleInteriorFileSelected"
-              @remove="handleInteriorImageRemove"
-            />
+            <section v-if="uploadInterior" class="batch-card batch-upload-card">
+              <input
+                ref="interiorCollageInputRef"
+                type="file"
+                class="batch-upload-input"
+                :accept="props.capability.accept"
+                multiple
+                @change="handleInteriorCollageInputChange"
+              />
+
+              <header class="batch-upload-head">
+                <div>
+                  <h3>上传内饰图组</h3>
+                  <p>
+                    支持 1-10 张；若预设开启内饰拼接，需上传
+                    {{ MIN_INTERIOR_COLLAGE_IMAGES }}-{{ MAX_INTERIOR_COLLAGE_IMAGES }}
+                    张。
+                  </p>
+                </div>
+                <span class="batch-upload-count">
+                  {{ interiorCollageUploads.length }}/{{
+                    MAX_INTERIOR_COLLAGE_IMAGES
+                  }}
+                </span>
+              </header>
+
+              <button
+                type="button"
+                class="batch-upload-drop"
+                :class="{ 'is-disabled': !canAddInteriorCollageImages }"
+                :disabled="!canAddInteriorCollageImages"
+                @click="openInteriorCollagePicker"
+                @dragover.prevent
+                @drop.prevent="handleInteriorCollageDrop"
+              >
+                <Icon icon="mdi:seat-passenger" />
+                <strong>{{
+                  interiorCollageUploads.length
+                    ? "继续添加内饰图"
+                    : "上传内饰图组"
+                }}</strong>
+                <span
+                  >JPG / PNG / WebP · 剩余
+                  {{ interiorCollageRemainingCount }} 张</span
+                >
+              </button>
+
+              <div
+                v-if="interiorCollageUploads.length"
+                class="batch-upload-grid"
+              >
+                <article
+                  v-for="item in interiorCollageUploads"
+                  :key="item.id"
+                  class="batch-upload-item"
+                  :class="`is-${item.status}`"
+                >
+                  <PreloadImage
+                    class="batch-upload-image"
+                    :src="item.previewUrl"
+                    :alt="item.name"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span
+                    v-if="item.status === 'uploading'"
+                    class="batch-upload-status"
+                  >
+                    <Icon icon="mdi:loading" />
+                  </span>
+                  <span
+                    v-else-if="item.status === 'fail'"
+                    class="batch-upload-status is-error"
+                  >
+                    <Icon icon="mdi:alert-circle-outline" />
+                  </span>
+                  <button
+                    type="button"
+                    class="batch-upload-remove"
+                    :aria-label="`删除${item.name}`"
+                    @click="handleInteriorCollageRemove(item.id)"
+                  >
+                    <Icon icon="mdi:close" />
+                  </button>
+                </article>
+              </div>
+
+              <button
+                v-if="interiorCollageUploads.length"
+                type="button"
+                class="batch-upload-clear"
+                @click="handleInteriorImageRemove"
+              >
+                清空内饰图
+              </button>
+            </section>
           </template>
 
           <template v-else>
@@ -1336,6 +1506,7 @@ const activeCreateRatioLabel = computed(() => {
                 <NButton
                   type="primary"
                   size="large"
+                  class="batch-primary-btn"
                   @click="handleSaveVisualPreset"
                 >
                   保存
@@ -1420,6 +1591,14 @@ const activeCreateRatioLabel = computed(() => {
               </div>
               <NSwitch v-model:value="interiorEnhance" size="large" />
             </section>
+
+            <section class="batch-card switch-card">
+              <div>
+                <h3>内饰拼接</h3>
+                <p>2-10 张内饰图按规则自动分组拼图，可与清洁增强组合。</p>
+              </div>
+              <NSwitch v-model:value="interiorCollage" size="large" />
+            </section>
           </template>
         </div>
 
@@ -1428,12 +1607,14 @@ const activeCreateRatioLabel = computed(() => {
             type="primary"
             size="large"
             block
+            class="batch-primary-btn"
             :loading="batchTab === 'create' && isCreatingBatchTask"
             :disabled="
               batchTab === 'create' &&
               (!createTaskPresetId ||
                 !uploadedExteriorAssets.length ||
-                isUploadingVehicle)
+                isUploadingVehicle ||
+                isUploadingInterior)
             "
             @click="handleStickyAction"
           >
@@ -2847,45 +3028,431 @@ const activeCreateRatioLabel = computed(() => {
     );
 }
 
-:global(.workspace-page.theme-light) .batch-card,
-:global(.workspace-page.theme-light) .batch-notice {
-  border-color: var(--workspace-line, #e8edf5);
-  background: var(--workspace-panel-soft, #f7fafd);
-  color: var(--workspace-text-secondary, #334155);
+:global(.workspace-page.theme-light) .generate-panel.is-batch {
+  --batch-brand: #f5c84c;
+  --batch-brand-strong: #ffd766;
+  --batch-brand-text: #1e293b;
+  --batch-brand-muted: #b7791f;
+  --batch-page-bg: #f8fafc;
+  --batch-shell-bg: #ffffff;
+  --batch-shell-border: #e6eaf2;
+  --batch-card-bg: #fcfdfe;
+  --batch-card-border: #edf2f7;
+  --batch-card-hover-border: #d8e2ee;
+  --batch-text-primary: #0f172a;
+  --batch-text-body: #334155;
+  --batch-text-muted: #64748b;
+  --batch-input-border: #d8e2ee;
+  --batch-upload-bg: #fafbfc;
+  --batch-upload-border: #cbd5e1;
 }
 
-:global(.workspace-page.theme-light) .batch-tabs button.active,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-panel {
+  min-height: 0;
+  flex: 1;
+  padding: 4px 2px 0;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-panel-scroll {
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-tabs {
+  border-bottom-color: #e6eaf2;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-tabs button {
+  color: #64748b;
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-tabs
+  button.active {
+  color: var(--batch-text-primary);
+  font-weight: 800;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-tabs
+  button.active::after {
+  background: var(--batch-brand);
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-notice {
+  padding: 20px 24px;
+  border: 1px solid rgba(245, 200, 76, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 200, 76, 0.12),
+    rgba(245, 200, 76, 0.04)
+  );
+  color: var(--batch-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.75;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-notice:hover {
+  border-color: rgba(245, 200, 76, 0.28);
+  box-shadow: 0 6px 20px rgba(245, 200, 76, 0.08);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-card:not(.batch-notice) {
+  padding: 24px;
+  border: 1px solid var(--batch-card-border);
+  border-radius: 16px;
+  background: var(--batch-card-bg);
+  color: var(--batch-text-body);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-card:not(.batch-notice):hover {
+  border-color: var(--batch-card-hover-border);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-card h3,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .inline-field
+  > span {
+  color: var(--batch-text-primary);
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-card
+  p,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .switch-card
+  p,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-head
+  p {
+  color: var(--batch-text-muted);
+  font-weight: 500;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-summary {
+  padding: 24px;
+  border: 1px solid var(--batch-card-border);
+  border-radius: 16px;
+  background: var(--batch-card-bg);
+  box-shadow: none;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-summary-icon {
+  background: rgba(245, 200, 76, 0.14);
+  color: var(--batch-brand-muted);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-summary-copy
+  p {
+  color: var(--batch-text-muted);
+  font-weight: 600;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-summary-copy
+  strong {
+  color: var(--batch-text-primary);
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-scene,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-ratio,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-on {
+  border: 1px solid rgba(245, 200, 76, 0.24);
+  background: rgba(245, 200, 76, 0.1);
+  color: var(--batch-brand-muted);
+  font-weight: 600;
+}
+
+:global(.workspace-page.theme-light) .generate-panel.is-batch .plain-input {
+  height: 48px;
+  border: 1px solid var(--batch-input-border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: none;
+  color: var(--batch-text-primary);
+  font-weight: 600;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .plain-input:hover {
+  border-color: var(--batch-brand);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .plain-input:focus {
+  border-color: var(--batch-brand);
+  box-shadow: 0 0 0 3px rgba(245, 200, 76, 0.15);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-count {
+  background: rgba(245, 200, 76, 0.14);
+  color: var(--batch-brand-muted);
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-drop {
+  min-height: 148px;
+  border: 2px dashed var(--batch-upload-border);
+  border-radius: 16px;
+  background: var(--batch-upload-bg);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-drop:hover:not(:disabled) {
+  border-color: var(--batch-brand);
+  background: #ffffff;
+  transform: none;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  .iconify {
+  color: var(--batch-brand);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  strong {
+  color: var(--batch-text-primary);
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  span {
+  color: var(--batch-text-muted);
+  font-weight: 500;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-item {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-scene-card {
+  padding: 24px;
+  border: 1px solid var(--batch-card-border);
+  border-radius: 16px;
+  background: var(--batch-upload-bg);
+  color: var(--batch-text-body);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-head
+  h3 {
+  color: var(--batch-text-primary);
+  font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-grid
+  article {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-grid
+  article.active {
+  border: 2px solid var(--batch-brand);
+  box-shadow: 0 0 0 4px rgba(245, 200, 76, 0.12);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-grid
+  article.active
+  strong {
+  background: var(--batch-brand);
+  color: var(--batch-brand-text);
+  font-weight: 600;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-grid
+  strong {
+  color: var(--batch-text-body);
+  font-weight: 600;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .scene-category-select
+  :deep(.n-base-selection) {
+  --n-border: 1px solid var(--batch-input-border) !important;
+  --n-border-hover: 1px solid var(--batch-brand) !important;
+  --n-border-focus: 1px solid var(--batch-brand) !important;
+  --n-border-radius: 12px !important;
+  --n-color: #ffffff !important;
+  --n-text-color: var(--batch-text-primary) !important;
+  --n-arrow-color: var(--batch-text-muted) !important;
+  --n-box-shadow-focus: 0 0 0 3px rgba(245, 200, 76, 0.15) !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-combobox
+  :deep(.n-base-selection),
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .inline-field
+  :deep(.n-base-selection) {
+  --n-height: 48px !important;
+  --n-border: 1px solid var(--batch-input-border) !important;
+  --n-border-hover: 1px solid var(--batch-brand) !important;
+  --n-border-focus: 1px solid var(--batch-brand) !important;
+  --n-border-radius: 12px !important;
+  --n-color: #ffffff !important;
+  --n-text-color: var(--batch-text-primary) !important;
+  --n-arrow-color: var(--batch-text-muted) !important;
+  --n-box-shadow-focus: 0 0 0 3px rgba(245, 200, 76, 0.15) !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .switch-card
+  :deep(.n-switch.n-switch--active .n-switch__rail) {
+  background-color: var(--batch-brand) !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .switch-card
+  :deep(.n-switch .n-switch__rail) {
+  background-color: #cbd5e1 !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .switch-card
+  :deep(.n-switch .n-switch__button) {
+  background-color: #ffffff !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-footer {
+  padding-top: 16px;
+  border-top: 1px solid #e6eaf2;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    #ffffff 24%,
+    #ffffff 100%
+  );
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button {
+  height: 52px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: linear-gradient(
+    135deg,
+    var(--batch-brand),
+    var(--batch-brand-strong)
+  ) !important;
+  color: var(--batch-brand-text) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(245, 200, 76, 0.28) !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
 :global(.workspace-page.theme-light) .delivery-tabs button.active {
   color: var(--workspace-accent, #2f6bff);
 }
 
-:global(.workspace-page.theme-light) .batch-tabs button.active::after,
 :global(.workspace-page.theme-light) .delivery-tabs button.active::after {
   background: var(--workspace-accent-underline, #4f7fff);
-}
-
-:global(.workspace-page.theme-light) .preset-summary {
-  border-color: var(--workspace-line, #e8edf5);
-  background:
-    linear-gradient(
-      135deg,
-      var(--workspace-accent-bg, #f2f7ff) 0%,
-      var(--app-surface) 58%
-    ),
-    var(--app-surface);
-}
-
-:global(.workspace-page.theme-light) .preset-tag.is-scene,
-:global(.workspace-page.theme-light) .preset-tag.is-ratio,
-:global(.workspace-page.theme-light) .preset-tag.is-on {
-  border-color: var(--workspace-accent-border, #cfe0ff);
-  background: var(--workspace-accent-bg, #f2f7ff);
-  color: var(--workspace-accent, #2f6bff);
-}
-
-:global(.workspace-page.theme-light) .scene-grid article.active {
-  border-color: var(--workspace-accent, #2f6bff);
-  box-shadow: 0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16));
 }
 
 :global(.workspace-page.theme-light) .delivery-item.is-checked {

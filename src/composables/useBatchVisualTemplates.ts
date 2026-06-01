@@ -27,6 +27,7 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     enableLightConsistency: input.lightConsistency,
     enablePaintRefresh: input.paintRefresh,
     enableInteriorClean: input.interiorEnhance,
+    enableInteriorCollage: input.interiorCollage,
   }
 }
 
@@ -47,6 +48,10 @@ async function ensureLoaded() {
       lightConsistency: item.visualConfig.enableLightConsistency,
       paintRefresh: item.visualConfig.enablePaintRefresh,
       interiorEnhance: item.visualConfig.enableInteriorClean,
+      interiorCollage:
+        item.visualConfig.enableInteriorCollage ??
+        item.visualConfig.interiorCollage ??
+        false,
       updatedAt: item.updatedAt,
     }))
     isReady.value = true
@@ -84,6 +89,10 @@ export function useBatchVisualTemplates() {
       lightConsistency: created.visualConfig.enableLightConsistency,
       paintRefresh: created.visualConfig.enablePaintRefresh,
       interiorEnhance: created.visualConfig.enableInteriorClean,
+      interiorCollage:
+        created.visualConfig.enableInteriorCollage ??
+        created.visualConfig.interiorCollage ??
+        false,
       updatedAt: created.updatedAt,
     }
 
@@ -109,6 +118,10 @@ export function useBatchVisualTemplates() {
       lightConsistency: updated.visualConfig.enableLightConsistency,
       paintRefresh: updated.visualConfig.enablePaintRefresh,
       interiorEnhance: updated.visualConfig.enableInteriorClean,
+      interiorCollage:
+        updated.visualConfig.enableInteriorCollage ??
+        updated.visualConfig.interiorCollage ??
+        false,
       updatedAt: updated.updatedAt,
     }
 

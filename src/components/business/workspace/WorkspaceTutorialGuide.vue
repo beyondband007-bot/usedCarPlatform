@@ -80,7 +80,7 @@ const tutorialTemplatePreviewImages = [
           <template v-else-if="index === 2">
             <div class="tutorial-logo-preview" aria-hidden="true">
               <span class="tutorial-logo-frame">
-                <span>AI CAR STUDIO</span>
+                <span>AI CARXEN</span>
               </span>
             </div>
           </template>
@@ -141,14 +141,13 @@ const tutorialTemplatePreviewImages = [
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 0;
   border-radius: 12px;
   background: rgba(17, 17, 17, 0.72);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
   transition:
     transform 0.25s ease,
-    box-shadow 0.25s ease,
-    border-color 0.25s ease;
+    box-shadow 0.25s ease;
 }
 
 .tutorial-step:hover {
@@ -156,13 +155,12 @@ const tutorialTemplatePreviewImages = [
 }
 
 .tutorial-section.theme-light .tutorial-step {
-  border: 1px solid #e5e7eb;
+  border: 0;
   background: #ffffff;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 .tutorial-section.theme-light .tutorial-step:hover {
-  border-color: #dbeafe;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
@@ -205,6 +203,8 @@ const tutorialTemplatePreviewImages = [
 .tutorial-step.is-step-4 .tutorial-placeholder {
   align-items: flex-start;
   justify-content: center;
+  padding: 10px;
+  box-sizing: border-box;
   background: transparent;
 }
 
@@ -248,20 +248,6 @@ const tutorialTemplatePreviewImages = [
   max-height: 100%;
   object-fit: contain;
   object-position: top center;
-  padding: 0;
-}
-
-.tutorial-image :deep(.preload-image) {
-  width: 100%;
-  height: 100%;
-  background: transparent !important;
-}
-
-.tutorial-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: top center;
 }
 
 .tutorial-mosaic {
@@ -269,7 +255,7 @@ const tutorialTemplatePreviewImages = [
   width: 100%;
   height: 100%;
   min-height: 0;
-  align-self: flex-start;
+  align-self: stretch;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 3px;

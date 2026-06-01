@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NCheckbox, NInput, useMessage } from "naive-ui";
+import { NButton, NInput, useMessage } from "naive-ui";
 import { motion } from "motion-v";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -17,7 +17,6 @@ const authStore = useAuthStore();
 
 const username = ref("enterprise");
 const password = ref("123456");
-const remember = ref(true);
 const submitting = ref(false);
 
 async function handleLogin() {
@@ -27,7 +26,7 @@ async function handleLogin() {
     await authStore.login({
       username: username.value.trim(),
       password: password.value,
-      remember: remember.value,
+      remember: true,
     });
 
     const redirect =
@@ -65,33 +64,36 @@ async function handleLogin() {
   >
     <form class="login-card" @submit.prevent="handleLogin">
       <h1>企业账号登录</h1>
-      <p>进入 AI CAR STUDIO 汽车内容生产平台</p>
+      <p>进入 AI CARXEN 汽车内容资产平台</p>
 
       <div class="login-fields">
         <label class="login-field">
           <span class="login-field-label">账号</span>
-          <NInput
-            v-model:value="username"
-            class="login-input"
-            size="large"
-            placeholder="admin / enterprise"
-          />
+          <div class="login-phone-input">
+            <span class="login-phone-prefix" aria-hidden="true">+86</span>
+            <NInput
+              v-model:value="username"
+              class="login-input login-input--phone"
+              size="large"
+              placeholder="11位手机号"
+            />
+          </div>
         </label>
+
         <label class="login-field">
-          <span class="login-field-label">密码</span>
+          <span class="login-field-row">
+            <span class="login-field-label">密码</span>
+            <button type="button" class="login-forgot">忘记密码？</button>
+          </span>
           <NInput
             v-model:value="password"
             class="login-input"
             size="large"
             type="password"
             show-password-on="click"
-            placeholder="123456"
+            placeholder="请输入密码"
           />
         </label>
-      </div>
-
-      <div class="login-options">
-        <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
       </div>
 
       <NButton
@@ -104,6 +106,11 @@ async function handleLogin() {
       >
         登录
       </NButton>
+
+      <p class="login-footer">
+        没有账号？
+        <button type="button" class="login-footer-link">去开通企业账户</button>
+      </p>
     </form>
   </motion.div>
 </template>
@@ -114,7 +121,7 @@ async function handleLogin() {
 }
 
 .login-panel--light {
-  --panel-bg: #ffffff;
+  --panel-bg: rgba(255, 255, 255, 0.94);
   --panel-border: rgba(15, 35, 60, 0.08);
   --panel-shadow: 0 24px 64px rgba(15, 35, 60, 0.12);
   --panel-text: #10233c;
@@ -123,22 +130,28 @@ async function handleLogin() {
   --field-border: #d5e0ed;
   --field-border-focus: #2f7cff;
   --field-focus-ring: rgba(47, 124, 255, 0.16);
-  --link-color: #2f6df6;
-  --submit-shadow: 0 14px 32px rgba(47, 124, 255, 0.28);
+  --accent: #d4a017;
+  --accent-strong: #e5b85c;
+  --accent-pressed: #b88912;
+  --submit-text: #ffffff;
+  --submit-shadow: 0 14px 32px rgba(47, 124, 255, 0.24);
 }
 
 .login-panel--dark {
-  --panel-bg: rgba(10, 18, 32, 0.94);
-  --panel-border: rgba(88, 140, 255, 0.28);
-  --panel-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
-  --panel-text: #f8fbff;
-  --panel-muted: rgba(198, 214, 236, 0.72);
+  --panel-bg: rgba(14, 14, 14, 0.78);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+  --panel-text: #ffffff;
+  --panel-muted: rgba(255, 255, 255, 0.58);
   --field-bg: rgba(255, 255, 255, 0.06);
   --field-border: rgba(255, 255, 255, 0.12);
-  --field-border-focus: rgba(88, 155, 255, 0.85);
-  --field-focus-ring: rgba(47, 124, 255, 0.22);
-  --link-color: #7eb0ff;
-  --submit-shadow: 0 16px 36px rgba(47, 124, 255, 0.35);
+  --field-border-focus: rgba(239, 194, 76, 0.72);
+  --field-focus-ring: rgba(239, 194, 76, 0.18);
+  --accent: #efc24c;
+  --accent-strong: #f4d36a;
+  --accent-pressed: #d4ad3f;
+  --submit-text: #1a1400;
+  --submit-shadow: 0 14px 32px rgba(239, 194, 76, 0.28);
 }
 
 .login-card {
@@ -146,14 +159,15 @@ async function handleLogin() {
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   background: var(--panel-bg);
-  padding: clamp(32px, 3.2vw, 40px);
+  padding: clamp(30px, 3vw, 38px);
   box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
 }
 
 .login-card h1 {
   margin: 0;
   color: var(--panel-text);
-  font-size: clamp(26px, 2.2vw, 32px);
+  font-size: clamp(24px, 2vw, 30px);
   line-height: 1.2;
   font-weight: 900;
 }
@@ -161,9 +175,9 @@ async function handleLogin() {
 .login-card > p {
   margin: 10px 0 0;
   color: var(--panel-muted);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.55;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .login-fields {
@@ -177,10 +191,45 @@ async function handleLogin() {
   gap: 8px;
 }
 
+.login-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .login-field-label {
   color: var(--panel-text);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
+}
+
+.login-phone-input {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.login-phone-input:focus-within {
+  border-color: var(--field-border-focus);
+  box-shadow: 0 0 0 3px var(--field-focus-ring);
+}
+
+.login-phone-prefix {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0 14px;
+  border-right: 1px solid var(--field-border);
+  color: var(--panel-muted);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .login-input {
@@ -194,49 +243,71 @@ async function handleLogin() {
   --n-box-shadow-focus: 0 0 0 3px var(--field-focus-ring) !important;
   --n-text-color: var(--panel-text) !important;
   --n-placeholder-color: var(--panel-muted) !important;
-  --n-caret-color: #2f7cff !important;
+  --n-caret-color: var(--accent) !important;
 }
 
-.login-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 18px;
-  color: var(--panel-muted);
+.login-panel--light .login-submit {
+  --n-color: #2f7cff !important;
+  --n-color-hover: #4a91ff !important;
+  --n-color-pressed: #2568db !important;
+  --n-color-focus: #2f7cff !important;
+}
+
+.login-input--phone {
+  flex: 1;
+  --n-border: none !important;
+  --n-border-hover: none !important;
+  --n-border-focus: none !important;
+  --n-box-shadow-focus: none !important;
+}
+
+.login-forgot,
+.login-footer-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.login-forgot:hover,
+.login-footer-link:hover {
+  color: var(--accent-strong);
 }
 
 .login-submit {
   margin-top: 24px;
   height: 48px !important;
+  border: none !important;
   border-radius: 8px !important;
   font-size: 16px !important;
   font-weight: 800 !important;
-  --n-color: #2f7cff !important;
-  --n-color-hover: #4a91ff !important;
-  --n-color-pressed: #2568db !important;
-  --n-color-focus: #2f7cff !important;
+  --n-color: var(--accent) !important;
+  --n-color-hover: var(--accent-strong) !important;
+  --n-color-pressed: var(--accent-pressed) !important;
+  --n-color-focus: var(--accent) !important;
+  --n-text-color: var(--submit-text) !important;
+  --n-text-color-hover: var(--submit-text) !important;
+  --n-text-color-pressed: var(--submit-text) !important;
+  --n-text-color-focus: var(--submit-text) !important;
   box-shadow: var(--submit-shadow);
 }
 
-.login-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 10px 12px;
-  margin-top: 20px;
+.login-footer {
+  margin: 20px 0 0;
   color: var(--panel-muted);
   text-align: center;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.5;
 }
 
 @media (max-width: 520px) {
-  .login-options {
+  .login-field-row {
     align-items: flex-start;
     flex-direction: column;
   }

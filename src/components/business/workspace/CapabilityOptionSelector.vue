@@ -4,12 +4,15 @@ import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
+import { useAppStore } from "@/stores/app";
 import type { WorkspaceCapability } from "@/types/workspace";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
 }>();
+
+const appStore = useAppStore();
 
 const emit = defineEmits<{
   select: [id: string];
@@ -28,7 +31,7 @@ const optionRows = computed(() => {
 
 <template>
   <motion.div
-    :key="capability.code"
+    :key="`${capability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
     :initial="{ opacity: 0, y: 18 }"
     :animate="{ opacity: 1, y: 0 }"
     :transition="{ duration: 0.42, delay: 0.08 }"
@@ -138,7 +141,7 @@ const optionRows = computed(() => {
 }
 
 .option-selector-card.is-scene .option-selector-title {
-  color: #1e293b;
+  color: #f2ca50;
   font-weight: 600;
 }
 

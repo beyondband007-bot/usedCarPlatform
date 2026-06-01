@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 
+import { syncDocumentTheme } from "@/composables/useDocumentTheme";
+
 export const useAppStore = defineStore("app", {
   state: () => ({
     appName: "脸谱AI汽车电商视觉平台",
@@ -8,6 +10,7 @@ export const useAppStore = defineStore("app", {
   actions: {
     toggleTheme() {
       this.isDarkMode = !this.isDarkMode;
+      syncDocumentTheme(this.isDarkMode);
     },
   },
 });

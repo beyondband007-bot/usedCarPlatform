@@ -4,7 +4,7 @@ import { homeFooterLinks } from '@/constants/home-page'
 
 <template>
   <footer id="footer" class="footer">
-    <h2>AI CAR STUDIO</h2>
+    <h2>AI CARXEN</h2>
     <nav aria-label="页脚导航">
       <template v-for="item in homeFooterLinks" :key="item.label">
         <RouterLink v-if="item.to" :to="item.to">{{ item.label }}</RouterLink>
@@ -12,7 +12,7 @@ import { homeFooterLinks } from '@/constants/home-page'
       </template>
     </nav>
     <p>
-      © {{ new Date().getFullYear() }} AI CAR STUDIO. All rights reserved.
+      © {{ new Date().getFullYear() }} AI CARXEN. All rights reserved.
       Professional Automotive AI Content Generation.
     </p>
   </footer>

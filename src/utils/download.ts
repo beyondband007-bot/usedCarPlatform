@@ -29,7 +29,11 @@ function triggerUrlDownload(url: string, filename: string) {
   link.remove()
 }
 
-export async function downloadFile(url: string, filename: string) {
+export async function downloadFile(
+  url: string,
+  filename: string,
+  options: { fallback?: 'new-tab' | 'none' } = {},
+) {
   try {
     const response = await fetch(url)
     if (!response.ok) throw new Error(`download failed: ${response.status}`)
@@ -37,6 +41,9 @@ export async function downloadFile(url: string, filename: string) {
     const blob = await response.blob()
     triggerBlobDownload(blob, filename)
   } catch {
+    if (options.fallback === 'none') {
+      throw new Error('download failed')
+    }
     triggerUrlDownload(url, filename)
   }
 }

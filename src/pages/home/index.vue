@@ -23,8 +23,8 @@ function openWorkbench() {
     class="home-page"
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <HomeHero @enter-workbench="openWorkbench" />
-    <HomeQuickAccess @enter-workbench="openWorkbench" />
+    <HomeHero />
+    <HomeQuickAccess />
     <HomeCapabilities />
     <HomeCaseStudies />
     <HomeBottomCta @enter-workbench="openWorkbench" />

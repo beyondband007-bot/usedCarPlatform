@@ -1,3 +1,5 @@
+import enterpriseLoginBg from '@/assets/img/enterprise-login-bg.png'
+
 export interface EnterpriseLoginFeature {
   icon: string
   title: string
@@ -7,20 +9,19 @@ export interface EnterpriseLoginFeature {
 export const enterpriseLoginFeatures: EnterpriseLoginFeature[] = [
   {
     icon: 'mdi:image-filter-hdr-outline',
-    title: '场景影棚',
-    description: '多场景模板',
+    title: '场景智能',
+    description: '适配各国风格',
   },
   {
     icon: 'mdi:creation-outline',
-    title: '智能生成',
-    description: 'AI 一键生成',
+    title: '车身精修',
+    description: '智能优化细节',
   },
   {
     icon: 'mdi:tray-arrow-down',
-    title: '高效交付',
-    description: '批量导出下载',
+    title: '批量上新',
+    description: '全库同步修改',
   },
 ]
 
-export const enterpriseLoginHeroImage =
-  'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=2400&q=85'
+export const enterpriseLoginHeroImage = enterpriseLoginBg
