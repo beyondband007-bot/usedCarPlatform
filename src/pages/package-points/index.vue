@@ -11,7 +11,10 @@ import {
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
-import { createRechargeOrder, type RechargeProduct } from "@/api/visual-workbench";
+import {
+  createRechargeOrder,
+  type RechargeProduct,
+} from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
 import planBasicBg from "@/img/充值积分/基础套餐.png";
 import planTeamBg from "@/img/充值积分/企业团队版.png";
@@ -73,10 +76,7 @@ const recordSummary: RecordSummary[] = [
   },
 ];
 
-const planTypeMeta: Record<
-  string,
-  { icon: string; tone: RechargePlanTone }
-> = {
+const planTypeMeta: Record<string, { icon: string; tone: RechargePlanTone }> = {
   企业基础版: { icon: "mdi:layers-triple-outline", tone: "blue" },
   企业团队版: { icon: "mdi:chart-bar", tone: "blue" },
   企业旗舰版: { icon: "mdi:crown-outline", tone: "gold" },
@@ -155,7 +155,9 @@ function clearPlanPress() {
 
 async function handlePlanSelect(name: string) {
   selectedPlanName.value = name;
-  const product = creditsStore.rechargeProducts.find((item) => item.name === name);
+  const product = creditsStore.rechargeProducts.find(
+    (item) => item.name === name,
+  );
   if (!product) {
     message.info("当前为原型套餐，未接入真实下单接口");
     return;
@@ -237,14 +239,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     width: 168,
     render(row) {
       const meta = planTypeMeta[row.plan] ?? planTypeMeta["企业基础版"];
-      return h(
-        "span",
-        { class: ["plan-type-pill", `is-${meta.tone}`] },
-        [
-          h(Icon, { icon: meta.icon, class: "plan-type-pill-icon" }),
-          h("span", row.plan),
-        ],
-      );
+      return h("span", { class: ["plan-type-pill", `is-${meta.tone}`] }, [
+        h(Icon, { icon: meta.icon, class: "plan-type-pill-icon" }),
+        h("span", row.plan),
+      ]);
     },
   },
   {
@@ -358,11 +356,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
                   size="medium"
                 />
 
-                <NButton
-                  class="export-button"
-                  size="medium"
-                  attr-type="button"
-                >
+                <NButton class="export-button" size="medium" attr-type="button">
                   <template #icon>
                     <Icon icon="mdi:tray-arrow-up" />
                   </template>
@@ -476,7 +470,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 .recharge-shell {
   width: 100%;
   max-width: 1500px;
-  min-height: calc(100vh - var(--app-header-offset) - var(--recharge-page-pad) - var(--recharge-page-pad));
+  min-height: calc(
+    100vh - var(--app-header-offset) - var(--recharge-page-pad) - var(
+        --recharge-page-pad
+      )
+  );
   margin: 0 auto;
 }
 
@@ -511,7 +509,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
 .recharge-page.theme-light .recharge-hero {
   background:
-    radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.08), transparent 55%),
+    radial-gradient(
+      circle at 80% 50%,
+      rgba(59, 130, 246, 0.08),
+      transparent 55%
+    ),
     var(--recharge-head);
 }
 
@@ -637,7 +639,8 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   flex-direction: column;
   align-items: center;
   gap: clamp(22px, 2.2vw, 32px);
-  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px) clamp(24px, 2vw, 32px);
+  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px)
+    clamp(24px, 2vw, 32px);
 }
 
 .plan-module {
@@ -709,8 +712,13 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   border: 1px solid rgba(188, 205, 223, 0.45);
   border-radius: 12px;
   background:
-    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1.5px) 0 0 / 18px 18px,
-    linear-gradient(135deg, rgba(241, 247, 255, 0.92), rgba(255, 255, 255, 0.88));
+    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1.5px) 0
+      0 / 18px 18px,
+    linear-gradient(
+      135deg,
+      rgba(241, 247, 255, 0.92),
+      rgba(255, 255, 255, 0.88)
+    );
 }
 
 .theme-dark .records-summary {
@@ -820,7 +828,10 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 
 .records-filter {
   display: grid;
-  grid-template-columns: minmax(260px, 1.25fr) minmax(150px, 0.72fr) minmax(92px, 0.42fr);
+  grid-template-columns: minmax(260px, 1.25fr) minmax(150px, 0.72fr) minmax(
+      92px,
+      0.42fr
+    );
   gap: 12px;
   align-items: center;
   width: min(100%, 620px);
@@ -841,7 +852,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   --n-color: var(--recharge-field);
   --n-color-active: var(--recharge-field);
   --n-color-focus: var(--recharge-field);
-  --n-color-hover: color-mix(in srgb, var(--recharge-field) 88%, var(--recharge-blue));
+  --n-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 88%,
+    var(--recharge-blue)
+  );
   --n-border: 1px solid var(--recharge-border-soft);
   --n-border-active: 1px solid rgba(52, 124, 255, 0.66);
   --n-border-focus: 1px solid rgba(52, 124, 255, 0.72);
@@ -1037,7 +1052,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   --n-item-size: 30px;
   --n-item-border-radius: 5px;
   --n-item-color: var(--recharge-field);
-  --n-item-color-hover: color-mix(in srgb, var(--recharge-field) 84%, var(--recharge-blue));
+  --n-item-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 84%,
+    var(--recharge-blue)
+  );
   --n-item-color-active: var(--recharge-blue);
   --n-item-color-active-hover: var(--recharge-blue);
   --n-item-border: 1px solid var(--recharge-border-soft);
@@ -1047,7 +1066,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   --n-item-text-color-hover: var(--recharge-text);
   --n-item-text-color-active: #fff;
   --n-button-color: var(--recharge-field);
-  --n-button-color-hover: color-mix(in srgb, var(--recharge-field) 84%, var(--recharge-blue));
+  --n-button-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 84%,
+    var(--recharge-blue)
+  );
   --n-button-border: 1px solid var(--recharge-border-soft);
   --n-button-border-hover: 1px solid rgba(52, 124, 255, 0.42);
   --n-button-icon-color: var(--recharge-muted);

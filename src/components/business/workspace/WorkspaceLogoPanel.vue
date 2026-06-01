@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { NSwitch, useMessage } from 'naive-ui'
-import { computed, ref, watch } from 'vue'
+import { Icon } from "@iconify/vue";
+import { NSwitch, useMessage } from "naive-ui";
+import { computed, ref, watch } from "vue";
 
-import PreloadImage from '@/components/common/PreloadImage.vue'
-import { useWorkspaceLogo } from '@/composables/useWorkspaceLogo'
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'scene' | 'batch'
+    variant?: "scene" | "batch";
   }>(),
   {
-    variant: 'scene',
+    variant: "scene",
   },
-)
+);
 
-const enabled = defineModel<boolean>('enabled', { default: false })
+const enabled = defineModel<boolean>("enabled", { default: false });
 
-const message = useMessage()
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const message = useMessage();
+const fileInputRef = ref<HTMLInputElement | null>(null);
 
 const {
   recentLogo,
@@ -29,76 +29,76 @@ const {
   refreshDefaultLogo,
   uploadLogoFile,
   selectRecentLogo,
-} = useWorkspaceLogo()
+} = useWorkspaceLogo();
 
-const isBatch = computed(() => props.variant === 'batch')
+const isBatch = computed(() => props.variant === "batch");
 const panelTitle = computed(() =>
-  isBatch.value ? '使用最近 Logo' : '使用 Logo',
-)
+  isBatch.value ? "使用最近 Logo" : "使用 Logo",
+);
 const panelDescription = computed(() =>
   isBatch.value
-    ? '开启后可沿用最近上传 Logo，也可重新上传。'
-    : '开启后创建任务会传 useLogo，后端自动使用当前账号默认 Logo。',
-)
+    ? "开启后可沿用最近上传 Logo，也可重新上传。"
+    : "开启后默认沿用最近上传的Logo，也可重新上传；如未上传，则自动使用当前账号的默认Logo。",
+);
 const recentTitle = computed(() => {
   if (!recentLogo.value) {
-    return isBatch.value ? '暂无最近 Logo' : '暂无默认 Logo'
+    return isBatch.value ? "暂无最近 Logo" : "暂无默认 Logo";
   }
 
-  return isBatch.value ? '使用最近 Logo' : '使用默认 Logo'
-})
+  return isBatch.value ? "使用最近 Logo" : "使用默认 Logo";
+});
 const recentHint = computed(() => {
-  if (recentLogo.value) return uploadedAtLabel.value
-  return '请先上传 PNG / SVG Logo'
-})
+  if (recentLogo.value) return uploadedAtLabel.value;
+  return "请先上传 PNG / SVG Logo";
+});
 const reuploadLabel = computed(() => {
-  if (isUploading.value) return '上传中...'
-  if (recentLogo.value) return '重新上传'
-  return '上传 Logo'
-})
+  if (isUploading.value) return "上传中...";
+  if (recentLogo.value) return "重新上传";
+  return "上传 Logo";
+});
 
 watch(
   enabled,
   async (value) => {
-    if (!value) return
+    if (!value) return;
 
     try {
-      await refreshDefaultLogo()
+      await refreshDefaultLogo();
     } catch {
-      message.warning('Logo 读取失败，请稍后重试')
+      message.warning("Logo 读取失败，请稍后重试");
     }
   },
   { immediate: true },
-)
+);
 
 function openUpload() {
-  fileInputRef.value?.click()
+  fileInputRef.value?.click();
 }
 
 async function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
 
-  input.value = ''
+  input.value = "";
 
-  if (!file) return
+  if (!file) return;
 
   try {
-    await uploadLogoFile(file)
-    message.success('Logo 上传成功')
+    await uploadLogoFile(file);
+    message.success("Logo 上传成功");
   } catch (error) {
-    const text = error instanceof Error ? error.message : 'Logo 上传失败'
-    message.error(text)
+    const text = error instanceof Error ? error.message : "Logo 上传失败";
+    message.error(text);
   }
 }
 
 function handleSelectRecent() {
   if (!selectRecentLogo()) {
-    message.info('请先上传 Logo')
-    return
+    message.info("请先上传 Logo");
+    return;
   }
 
-  message.success('已选择默认 Logo')
+  message.success("已选择默认 Logo");
 }
 </script>
 
@@ -122,10 +122,14 @@ function handleSelectRecent() {
       <div class="logo-setting-head px-6 py-5">
         <div class="flex items-start justify-between gap-5">
           <div class="min-w-0">
-            <h3 class="text-base font-black tracking-normal text-[var(--app-text)]">
+            <h3
+              class="text-base font-black tracking-normal text-[var(--app-text)]"
+            >
               {{ panelTitle }}
             </h3>
-            <p class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]">
+            <p
+              class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]"
+            >
               {{ panelDescription }}
             </p>
           </div>
@@ -179,7 +183,7 @@ function handleSelectRecent() {
       @click="openUpload"
     >
       <Icon icon="mdi:tag-heart-outline" />
-      <strong>{{ isUploading ? '上传中...' : '上传 Logo' }}</strong>
+      <strong>{{ isUploading ? "上传中..." : "上传 Logo" }}</strong>
       <span>PNG / SVG · <= 2MB</span>
     </button>
   </div>
@@ -188,24 +192,60 @@ function handleSelectRecent() {
 <style scoped lang="scss">
 .workspace-logo-panel {
   --logo-accent: var(--workspace-accent, #efc24c);
-  --logo-accent-border: color-mix(in srgb, var(--logo-accent) 55%, var(--workspace-line, var(--app-border)));
-  --logo-drop-bg: color-mix(in srgb, var(--workspace-panel, var(--app-surface)) 92%, var(--logo-accent) 8%);
-  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 44%, var(--workspace-line, var(--app-border)));
-  --logo-preview-bg: color-mix(in srgb, var(--workspace-panel-deep, #111722) 92%, transparent);
+  --logo-accent-border: color-mix(
+    in srgb,
+    var(--logo-accent) 55%,
+    var(--workspace-line, var(--app-border))
+  );
+  --logo-drop-bg: color-mix(
+    in srgb,
+    var(--workspace-panel, var(--app-surface)) 92%,
+    var(--logo-accent) 8%
+  );
+  --logo-drop-border: color-mix(
+    in srgb,
+    var(--logo-accent) 44%,
+    var(--workspace-line, var(--app-border))
+  );
+  --logo-preview-bg: color-mix(
+    in srgb,
+    var(--workspace-panel-deep, #111722) 92%,
+    transparent
+  );
   --logo-preview-text: var(--workspace-accent-strong, #f5d37a);
-  --logo-preview-border: color-mix(in srgb, var(--workspace-accent-strong, #f5d37a) 62%, transparent);
+  --logo-preview-border: color-mix(
+    in srgb,
+    var(--workspace-accent-strong, #f5d37a) 62%,
+    transparent
+  );
   --logo-icon: var(--workspace-accent-strong, #f4a329);
 
   display: grid;
   gap: 12px;
 }
 
-:global([data-theme='dark']) .workspace-logo-panel {
-  --logo-drop-bg: color-mix(in srgb, var(--workspace-panel, var(--app-surface)) 78%, var(--logo-accent) 22%);
-  --logo-drop-border: color-mix(in srgb, var(--logo-accent) 55%, var(--workspace-line, var(--app-border)));
-  --logo-preview-bg: color-mix(in srgb, var(--workspace-panel-deep, #0a101c) 94%, transparent);
+:global([data-theme="dark"]) .workspace-logo-panel {
+  --logo-drop-bg: color-mix(
+    in srgb,
+    var(--workspace-panel, var(--app-surface)) 78%,
+    var(--logo-accent) 22%
+  );
+  --logo-drop-border: color-mix(
+    in srgb,
+    var(--logo-accent) 55%,
+    var(--workspace-line, var(--app-border))
+  );
+  --logo-preview-bg: color-mix(
+    in srgb,
+    var(--workspace-panel-deep, #0a101c) 94%,
+    transparent
+  );
   --logo-preview-text: var(--workspace-accent-strong, #f8d891);
-  --logo-preview-border: color-mix(in srgb, var(--workspace-accent-strong, #f8d891) 45%, transparent);
+  --logo-preview-border: color-mix(
+    in srgb,
+    var(--workspace-accent-strong, #f8d891) 45%,
+    transparent
+  );
 }
 
 .workspace-logo-panel--batch {
