@@ -226,6 +226,7 @@ class TasksService {
       "paint-refresh": "烤漆翻新演示",
       "light-consistency": "光污一致化演示",
       "interior-clean": "内饰清洁演示",
+      "interior-collage": "内饰拼图任务",
       "watermark-remove": "去水印演示",
       "creative-image": "创意生图任务",
       "short-video": "短视频生成任务",
