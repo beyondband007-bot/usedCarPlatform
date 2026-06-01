@@ -228,6 +228,19 @@ onUnmounted(() => {
   z-index: 1;
 }
 
+.promo-banner-slide:not(.is-image-only)::before {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: '';
+  background: var(--home-media-overlay-full);
+  pointer-events: none;
+}
+
+.promo-banner-slide:has(.promo-banner-copy.is-overlay-hidden)::before {
+  content: none;
+}
+
 .promo-banner-image {
   position: absolute;
   inset: 0;
@@ -257,7 +270,7 @@ onUnmounted(() => {
 
 .promo-banner-copy {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -267,7 +280,7 @@ onUnmounted(() => {
   max-width: 58%;
   padding: 117px 35px 35px;
   text-align: left;
-  background: var(--home-media-overlay);
+  background: transparent;
 }
 
 .promo-banner-copy h2 {

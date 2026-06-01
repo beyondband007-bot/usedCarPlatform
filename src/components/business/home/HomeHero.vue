@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import PreloadImage from '@/components/common/PreloadImage.vue'
-import { homeHeroImageSrc } from '@/constants/home-page'
+import { computed } from "vue";
+
+import PreloadImage from "@/components/common/PreloadImage.vue";
+import {
+  homeHeroImageDarkSrc,
+  homeHeroImageLightSrc,
+} from "@/constants/home-page";
+import { useAppStore } from "@/stores/app";
+
+const appStore = useAppStore();
 
 /** 原图 1672×941，展示纵向 25%~90% 区间 */
-const HERO_IMAGE_WIDTH = 1672
-const HERO_IMAGE_HEIGHT = 941
-const HERO_CROP_TOP = 0.25
-const HERO_CROP_BOTTOM = 0.9
-const HERO_CROP_HEIGHT = HERO_CROP_BOTTOM - HERO_CROP_TOP
-const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_CROP_HEIGHT}`
+const HERO_IMAGE_WIDTH = 1672;
+const HERO_IMAGE_HEIGHT = 941;
+const HERO_CROP_TOP = 0.25;
+const HERO_CROP_BOTTOM = 0.9;
+const HERO_CROP_HEIGHT = HERO_CROP_BOTTOM - HERO_CROP_TOP;
+const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_CROP_HEIGHT}`;
+
+const homeHeroImageSrc = computed(() =>
+  appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,
+);
 </script>
 
 <template>
-  <section id="top" class="hero">
+  <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
     <div class="hero-visual">
       <div
         class="hero-media"
@@ -112,6 +124,16 @@ const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_C
   color: var(--home-hero-sub, #d5d5d5);
   font-size: clamp(16px, 1.27vw, 25px);
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
+}
+
+.hero.is-light h1 {
+  color: #0f172a;
+  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.78);
+}
+
+.hero.is-light .subtitle {
+  color: #475569;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.65);
 }
 
 @keyframes hero-copy-in {

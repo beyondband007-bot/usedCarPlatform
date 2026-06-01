@@ -7,7 +7,8 @@ import featureSceneImage from '@/img/home/feature-scene.png'
 import featureShowroomImage from '@/img/home/feature-showroom.png'
 import featureSkyImage from '@/img/home/feature-sky.png'
 import featureVideoImage from '@/img/home/feature-video.png'
-import homeHeroImage from '@/assets/img/首页背景图/ae5148a4c2e2ae857a6f889b55bf0b8.png'
+import homeHeroImageDark from '@/assets/img/首页背景图/ae5148a4c2e2ae857a6f889b55bf0b8.png'
+import homeHeroImageLight from '@/assets/img/首页背景图/hero日间.png'
 import suiteEnterpriseImageDark from '@/img/home/suite-enterprise.png'
 import suiteEnterpriseImageLight from '@/img/home/suite-enterprise-light.png'
 import suiteWorkbenchImageDark from '@/img/home/suite-workbench.png'
@@ -43,8 +44,10 @@ export interface HomeCaseTab {
   }
 }
 
-export const homeHeroImageSrc = homeHeroImage
-export const homeHeroPosterSrc = homeHeroImage
+export const homeHeroImageDarkSrc = homeHeroImageDark
+export const homeHeroImageLightSrc = homeHeroImageLight
+export const homeHeroImageSrc = homeHeroImageDark
+export const homeHeroPosterSrc = homeHeroImageDark
 
 export const homeQuickEntries: HomeQuickEntry[] = [
   {

@@ -53,9 +53,7 @@ export const homePromoBannerSlides: HomePromoBannerSlide[] = [
     lines: ['名额有限，先到先得', '抢占 AI 汽车内容增长新机会'],
     actionLabel: '立即咨询',
     opensConsultModal: true,
-    copyOverlay: false,
     copyLayout: 'elevated',
-    copyTone: 'dark',
   },
 ]
 
