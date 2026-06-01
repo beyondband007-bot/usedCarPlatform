@@ -59,6 +59,7 @@ Detailed phase notes:
 - [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
 - [Three-role credits back office](./reusable-credits-three-role-back-office.md)
 - [First release account creation policy](./first-release-account-creation-policy.md)
+- [Auth login demo accounts](./auth-login-demo-accounts.md)
 
 ## Important Implementation Notes
 
@@ -85,6 +86,8 @@ During development, usedCarPlatform resolves credits identity in this order:
 The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
 
 For the first release, every user/customer account must be created by platform owner roles: developer or company admin. Agent-created client accounts are intentionally disabled in the back-office UI and documented as a future approval/audit workflow.
+
+The current frontend mock login now supports four demo identities: `developer`, `admin`, `agent`, and `enterprise`, all with password `123456`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
 ## Revised Next Plan
 

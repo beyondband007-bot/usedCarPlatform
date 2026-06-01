@@ -72,8 +72,15 @@ interface RoleProfile {
 
 const authStore = useAuthStore();
 
+function defaultConsoleRole(): ConsoleRole {
+  if (authStore.role === "developer" || authStore.role === "admin" || authStore.role === "agent") {
+    return authStore.role;
+  }
+  return "admin";
+}
+
 const isLoading = ref(false);
-const selectedRole = ref<ConsoleRole>("developer");
+const selectedRole = ref<ConsoleRole>(defaultConsoleRole());
 const activePageKey = ref("devOverview");
 const searchKeyword = ref("");
 const statusFilter = ref("all");
@@ -825,8 +832,16 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
   },
 }));
 
+const visibleRoleEntries = computed(() => {
+  const entries = Object.entries(roleProfiles.value) as Array<[ConsoleRole, RoleProfile]>;
+  if (authStore.role === "developer") return entries;
+  if (authStore.role === "admin") return entries.filter(([value]) => value === "admin" || value === "agent");
+  if (authStore.role === "agent") return entries.filter(([value]) => value === "agent");
+  return entries.filter(([value]) => value === "admin");
+});
+
 const roleOptions = computed(() =>
-  (Object.entries(roleProfiles.value) as Array<[ConsoleRole, RoleProfile]>).map(([value, role]) => ({
+  visibleRoleEntries.value.map(([value, role]) => ({
     label: role.loginText,
     value,
   })),
@@ -901,6 +916,7 @@ function actionReason(action: string | ConsoleActionItem) {
 }
 
 function selectRole(role: ConsoleRole) {
+  if (!roleOptions.value.some((option) => option.value === role)) return;
   selectedRole.value = role;
   activePageKey.value = Object.keys(roleProfiles.value[role].pages)[0];
   searchKeyword.value = "";
@@ -947,6 +963,14 @@ async function loadOverview() {
 }
 
 onMounted(() => {
+  const allowedRole = roleOptions.value.some((option) => option.value === selectedRole.value)
+    ? selectedRole.value
+    : roleOptions.value[0]?.value ?? "admin";
+  if (allowedRole !== selectedRole.value) {
+    selectRole(allowedRole);
+  } else {
+    activePageKey.value = Object.keys(roleProfiles.value[allowedRole].pages)[0];
+  }
   void loadOverview();
 });
 </script>

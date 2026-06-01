@@ -3,6 +3,16 @@ import type { LoginRequest, LoginResponse, UserInfo } from '@/types/auth'
 import { mockDelay } from './mock-storage'
 
 const permissions = {
+  developer: [
+    'menu:home',
+    'menu:workspace',
+    'menu:pricing',
+    'menu:points',
+    'menu:recharge',
+    'menu:admin',
+    'account:create:platform',
+    'backoffice:developer',
+  ],
   admin: [
     'menu:home',
     'menu:workspace',
@@ -11,6 +21,16 @@ const permissions = {
     'menu:recharge',
     'menu:admin',
     'account:create:platform',
+    'backoffice:admin',
+  ],
+  agent: [
+    'menu:home',
+    'menu:workspace',
+    'menu:pricing',
+    'menu:points',
+    'menu:recharge',
+    'menu:admin',
+    'backoffice:agent',
   ],
   enterprise: [
     'menu:home',
@@ -25,6 +45,17 @@ const mockUsers: Record<
   string,
   { password: string; token: string; userInfo: UserInfo }
 > = {
+  developer: {
+    password: '123456',
+    token: 'mock_developer_token',
+    userInfo: {
+      id: 'user_developer',
+      username: 'developer',
+      displayName: '平台开发者',
+      role: 'developer',
+      permissions: [...permissions.developer],
+    },
+  },
   admin: {
     password: '123456',
     token: 'mock_admin_token',
@@ -34,6 +65,17 @@ const mockUsers: Record<
       displayName: '管理员',
       role: 'admin',
       permissions: [...permissions.admin],
+    },
+  },
+  agent: {
+    password: '123456',
+    token: 'mock_agent_token',
+    userInfo: {
+      id: 'user_agent',
+      username: 'agent',
+      displayName: '代理商',
+      role: 'agent',
+      permissions: [...permissions.agent],
     },
   },
   enterprise: {

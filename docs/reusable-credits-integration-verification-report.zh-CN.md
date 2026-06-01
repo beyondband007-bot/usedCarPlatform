@@ -203,6 +203,20 @@ username: admin
 password: 123456
 ```
 
+开发者用户：
+
+```text
+username: developer
+password: 123456
+```
+
+代理商用户：
+
+```text
+username: agent
+password: 123456
+```
+
 使用 `enterprise` 测试普通用户页面：
 
 - `/workspace`
@@ -212,6 +226,8 @@ password: 123456
 使用 `admin` 测试：
 
 - `/credits-admin`
+
+使用 `developer` 可以评审所有后台角色视图。使用 `agent` 可以验证代理商只能看到代理商后台视图。
 
 `/credits-admin` 内部的角色切换器目前用于原型/演示评审。真实的开发者/管理员/代理商登录与权限隔离属于后续生产认证与权限阶段。
 

@@ -203,6 +203,20 @@ username: admin
 password: 123456
 ```
 
+Developer user:
+
+```text
+username: developer
+password: 123456
+```
+
+Agent user:
+
+```text
+username: agent
+password: 123456
+```
+
 Use `enterprise` to test normal user pages:
 
 - `/workspace`
@@ -212,6 +226,8 @@ Use `enterprise` to test normal user pages:
 Use `admin` to test:
 
 - `/credits-admin`
+
+Use `developer` to review all back-office role views. Use `agent` to verify that the agent can only see the agent back-office view.
 
 The role switcher inside `/credits-admin` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
 
