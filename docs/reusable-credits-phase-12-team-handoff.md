@@ -130,15 +130,15 @@ The Reusable Credits Platform demo seed creates:
 
 The usedCar login page currently uses frontend mock auth:
 
-Exactly three platform roles are used in the lower-level auth and back-office logic:
+Exactly three roles are used in the Three-Role Credits Back Office:
 
 - `developer` / `123456`
 - `admin` / `123456`
 - `agent` / `123456`
 
-The username `enterprise` / `123456` is kept as a compatibility login name from the existing colleague frontend, but it is normalized internally to the `agent` role. It is not a fourth platform role.
+The username `enterprise` / `123456` is kept as the regular product-user login from the existing colleague frontend. It is not a back-office role and cannot access `/credits-admin`.
 
-Use `developer` to review all three back-office views. Use `admin` to review admin and agent views. Use `agent` or `enterprise` to verify the agent-only view.
+Use `developer` to review all three back-office views. Use `admin` to review admin and agent views. Use `agent` to verify the agent-only view. Use `enterprise` to verify normal product pages and confirm back-office access is denied.
 
 ## Three-Role Back Office
 
@@ -184,17 +184,19 @@ npm run build
 
 ## Manual Review Checklist
 
-1. Log in as `enterprise` or `agent` and choose the personal mock credits identity.
+1. Log in as `enterprise` and choose the personal mock credits identity.
 2. Confirm the header and subnav show a real credits balance.
 3. Open `/credits` and confirm the transaction list is populated from Reusable Credits Platform data.
 4. Open `/package-points` and confirm recharge products are loaded from the credits platform.
 5. Select a recharge product and confirm a pending payment order is created.
-6. Log in as `developer`.
-7. Open `/credits-admin` and switch through the developer, company admin, and agent views.
-8. Confirm live applications, functions, accounts, products, and transactions load in the developer/admin credit sections.
-9. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.
-10. Run `npm run phase11:smoke`.
-11. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
+6. Try to open `/credits-admin` as `enterprise` and confirm access is denied.
+7. Log in as `developer`.
+8. Open `/credits-admin` and switch through the developer, company admin, and agent views.
+9. Confirm live applications, functions, accounts, products, and transactions load in the developer/admin credit sections.
+10. Log in as `agent` and confirm only the agent back-office view is available.
+11. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.
+12. Run `npm run phase11:smoke`.
+13. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
 
 ## Known Limitations
 

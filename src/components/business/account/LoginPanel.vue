@@ -32,9 +32,9 @@ const identitySelectOptions = mockIdentityOptions.map((option) => ({
 }))
 const mockAccountOptions = [
   {
-    label: '企业账号（代理）',
+    label: '普通企业用户',
     username: 'enterprise',
-    helper: '兼容同事前端的 enterprise 登录名，底层按 agent 角色处理。',
+    helper: '普通产品用户，可进入工作台、积分和充值页面，不能进入三角色积分后台。',
   },
   {
     label: '平台开发者',
@@ -168,7 +168,7 @@ async function handleLogin() {
 
       <div class="login-options">
         <NCheckbox v-model:checked="remember">记住登录状态</NCheckbox>
-        <span>Mock账号：developer / admin / agent / enterprise，其中 enterprise 归入 agent</span>
+        <span>Mock账号：developer / admin / agent / enterprise，其中 enterprise 不能进入积分后台</span>
       </div>
 
       <NButton

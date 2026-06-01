@@ -32,6 +32,13 @@ const permissions = {
     'menu:admin',
     'backoffice:agent',
   ],
+  user: [
+    'menu:home',
+    'menu:workspace',
+    'menu:pricing',
+    'menu:points',
+    'menu:recharge',
+  ],
 } as const
 
 const mockUsers: Record<
@@ -77,9 +84,9 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_enterprise',
       username: 'enterprise',
-      displayName: '企业用户（代理商）',
-      role: 'agent',
-      permissions: [...permissions.agent],
+      displayName: '企业用户',
+      role: 'user',
+      permissions: [...permissions.user],
     },
   },
 }
@@ -107,16 +114,16 @@ export function normalizeMockUserInfo(userInfo: UserInfo | null): UserInfo | nul
 
   const role = (userInfo as unknown as { role?: string }).role
 
-  if (role === 'enterprise') {
+  if (userInfo.username === 'enterprise' || role === 'enterprise') {
     return {
       ...userInfo,
-      displayName: userInfo.displayName === '企业用户' ? '企业用户（代理商）' : userInfo.displayName,
-      role: 'agent',
-      permissions: [...permissions.agent],
+      displayName: userInfo.displayName === '企业用户（代理商）' ? '企业用户' : userInfo.displayName,
+      role: 'user',
+      permissions: [...permissions.user],
     }
   }
 
-  if (role === 'developer' || role === 'admin' || role === 'agent') {
+  if (role === 'developer' || role === 'admin' || role === 'agent' || role === 'user') {
     return userInfo
   }
 
