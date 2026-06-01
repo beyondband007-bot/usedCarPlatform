@@ -39,6 +39,7 @@ We should not merge the MySQL and PostgreSQL databases for the first integration
 | Phase 9: Credits Admin Console | Done | `phase-9-admin-console-20260531` | Adds a read-only credits admin console backed by the usedCar credit proxy boundary. |
 | Phase 10: Identity and mock login | Done | `phase-10-mock-identity-20260601` | Adds an explicit frontend mock credits identity selector and sends that identity through request headers. |
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
+| Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
 
 Detailed phase notes:
 
@@ -53,6 +54,7 @@ Detailed phase notes:
 - [Phase 9 admin console](./reusable-credits-phase-9-admin-console.md)
 - [Phase 10 mock identity](./reusable-credits-phase-10-mock-identity.md)
 - [Phase 11 E2E testing](./reusable-credits-phase-11-e2e-testing.md)
+- [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
 
 ## Important Implementation Notes
 
@@ -197,15 +199,17 @@ Expected deliverable:
 
 ### Phase 12: Team Handoff And PR
 
-Prepare the team-facing handoff:
+Status: done in this branch.
 
-- architecture summary
-- setup steps
-- required environment variables
-- local demo account information, without secrets
-- completed phase links
-- testing checklist
-- known limitations
+Prepared the team-facing handoff:
+
+- architecture summary: done
+- setup steps: done
+- required environment variables: done
+- local demo account information, without secrets: done
+- completed phase links: done
+- testing checklist: done
+- known limitations: done
 
 Expected deliverable:
 
@@ -213,6 +217,6 @@ Expected deliverable:
 
 ## Current Recommendation
 
-Continue with Phase 12 next.
+Ready for team review.
 
-The integration now has a repeatable local smoke runner and documented manual checklist. The next step is the team handoff and PR preparation.
+The integration branch is synced with upstream `master`, documented, and ready for PR review.
