@@ -15,6 +15,22 @@ Agents cannot create client login accounts in the first release.
 
 This keeps the first launch operationally safer while real authentication, tenant membership validation, approval history, and audit trails are still being finalized.
 
+## Regular User To Agent Login
+
+A regular product user can become an agent login only through the Three-Role Credits Back Office.
+
+Allowed operator roles:
+
+- developer
+- company admin
+
+Not allowed:
+
+- regular users cannot self-upgrade from the front-office login
+- agents cannot create or promote agent/client login accounts in the first release
+
+In the current mock/demo setup, `enterprise` represents a regular product user and `agent` represents an already-opened agent login. Production should implement this as an audited role/category change, not as a front-office registration shortcut.
+
 ## Current Implementation
 
 The policy is represented in the usedCarPlatform frontend through:
@@ -32,6 +48,7 @@ account:create:platform
 In `/credits-admin`:
 
 - developer and company admin views show user/customer account creation as a platform-owner responsibility
+- developer and company admin views show that regular users can be opened as agents from agent management
 - agent views show client account creation as a disabled future action
 - disabled agent actions explain that first release account creation belongs to platform developer/admin users
 
@@ -51,6 +68,15 @@ Agent-side client account creation needs more than a UI button. Before it is saf
 
 Until those backend and audit rules exist, agents should submit customer information or leads, and platform owner roles should create the actual login accounts.
 
+For regular-user-to-agent conversion, production should record:
+
+- original user id
+- target agent id or generated agent profile id
+- operator user id and role
+- approval status
+- agent level, commission ratio, settlement profile, and effective date
+- audit reason and timestamp
+
 ## Future Agent-Created Account Flow
 
 A later release can allow agents to create client accounts through a controlled approval workflow:
@@ -65,6 +91,7 @@ A later release can allow agents to create client accounts through a controlled 
 Suggested future database/API concepts:
 
 - `account_creation_requests`
+- `agent_onboarding_requests`
 - `created_by_user_id`
 - `created_by_role`
 - `approved_by_user_id`

@@ -13,6 +13,8 @@ The current login is still frontend mock auth. The Three-Role Credits Back Offic
 
 The `enterprise` username is kept as the regular product-user login from the existing frontend. It is outside the Three-Role Credits Back Office and cannot enter `/credits-admin`.
 
+If a regular user should become an agent, the account must be opened or promoted through the Three-Role Credits Back Office by `developer` or `admin`. A regular user cannot self-upgrade from the front-office login.
+
 | Username | Password | Role | Default Landing | Access |
 | --- | --- | --- | --- | --- |
 | `developer` | `123456` | Platform developer | `/credits-admin` | Full back-office role review: developer, company admin, agent. |
@@ -49,6 +51,12 @@ The first release account creation policy is also reflected in mock permissions:
 - `enterprise` is a regular product user and does not have account creation permission
 
 Agent-side client account creation is shown as a disabled future action in the back-office UI.
+
+Agent login creation is different from agent-created client accounts:
+
+- `developer` and `admin` may open a regular product user as an agent through the back office
+- `agent` may not create or promote agent/client login accounts in the first release
+- `enterprise` remains a normal front-office user until a platform owner changes its account category
 
 ## Production Gap
 

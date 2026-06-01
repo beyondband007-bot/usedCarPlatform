@@ -198,6 +198,8 @@ password: 123456
 
 This username is kept for compatibility with the existing frontend. It is a regular product-user login, not a Three-Role Credits Back Office role.
 
+If this user needs to become an agent, a platform `developer` or `admin` must open/promote it through the Three-Role Credits Back Office. The user cannot self-upgrade from the front-office login.
+
 Admin user:
 
 ```text
@@ -238,6 +240,7 @@ The role switcher inside `/credits-admin` is currently for prototype/demo review
 First release account creation policy:
 
 - user/customer accounts must be created by platform owner roles: developer or company admin
+- regular users can become agent logins only after developer/admin opens them through the back office
 - agents cannot create client login accounts yet
 - the agent view shows client account creation as a disabled future action
 - later agent-created client accounts should go through an approval/audit flow

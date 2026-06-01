@@ -22,6 +22,8 @@ The console has a role switcher with three operational views:
 
 The role switcher is inside the page for prototype/demo purposes. Production should derive role and menu access from real usedCar session data.
 
+Regular product users are not part of the Three-Role Credits Back Office. They can use the front-office product pages only. If a regular user should become an agent, a developer or company admin must open that user as an agent from the back office.
+
 ## Implemented Pages
 
 Developer:
@@ -87,6 +89,8 @@ The following back-office workflow rows are currently local UI data because used
 
 These mock sections are intentional. They define the expected product surface and permission boundaries before backend schema/API work starts.
 
+Agent management now explicitly includes regular-user-to-agent onboarding. The `enterprise` demo user remains a regular front-office user unless a platform owner opens a separate agent login/category for that user through back-office agent management.
+
 ## Local Start
 
 Start the two APIs and the frontend:
@@ -151,5 +155,7 @@ For the first release, all user/customer accounts must be created by platform ow
 - company admin
 
 Agents cannot create client login accounts in the first release. In the three-role console, agent-side customer account creation is shown as a disabled future action so reviewers can see the intended later workflow without assuming it is already available.
+
+Developer and company admin users may open a regular product user as an agent login from the back office. This is a platform-owner operation and should be audited. Regular users cannot self-upgrade from the front office.
 
 Later, agents may be allowed to create client accounts through a controlled approval flow. That future flow should still record creator role, creator id, tenant/customer ownership, agent relation, approval status, and audit history.

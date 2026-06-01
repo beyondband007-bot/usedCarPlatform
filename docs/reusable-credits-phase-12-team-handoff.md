@@ -140,6 +140,8 @@ The username `enterprise` / `123456` is kept as the regular product-user login f
 
 Use `developer` to review all three back-office views. Use `admin` to review admin and agent views. Use `agent` to verify the agent-only view. Use `enterprise` to verify normal product pages and confirm back-office access is denied.
 
+A regular product user becomes an agent login only when `developer` or `admin` opens/promotes that user in the Three-Role Credits Back Office. This is represented in the current UI as a non-mutating agent-management action; production still needs audited backend APIs for the actual role/category change.
+
 ## Three-Role Back Office
 
 The shared static prototype `积分后台-三角色静态原型.html` has been ported into the Vue route:
@@ -193,10 +195,11 @@ npm run build
 7. Log in as `developer`.
 8. Open `/credits-admin` and switch through the developer, company admin, and agent views.
 9. Confirm live applications, functions, accounts, products, and transactions load in the developer/admin credit sections.
-10. Log in as `agent` and confirm only the agent back-office view is available.
-11. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.
-12. Run `npm run phase11:smoke`.
-13. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
+10. In agent management, confirm developer/admin can see the action to open a regular user as an agent.
+11. Log in as `agent` and confirm only the agent back-office view is available.
+12. Confirm agent workflow pages render leads, customers, consumption, commission, settlement, materials, and tickets.
+13. Run `npm run phase11:smoke`.
+14. Reopen `/credits-admin` and confirm recent `phase11_*` activity is inspectable.
 
 ## Known Limitations
 

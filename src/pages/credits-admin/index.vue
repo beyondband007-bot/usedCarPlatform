@@ -13,6 +13,7 @@ import {
 import {
   canAgentCreateClientAccount,
   canCreatePlatformAccount,
+  canPromoteUserToAgent,
   type AccountProvisioningRole,
 } from "@/policies/accountProvisioning";
 import { useAuthStore } from "@/stores/auth";
@@ -235,6 +236,7 @@ const staticRows = {
     { cells: ["华东渠道-陈牧", "AGT-3008", "approved", "12%", "18", "¥ 4,628", "2026-05 待确认", "查看/调整"], tone: "green" },
     { cells: ["西南渠道-罗青", "AGT-3011", "approved", "10%", "9", "¥ 1,840", "资料待补", "查看/提醒"], tone: "orange" },
     { cells: ["华南渠道-周岚", "AGT-3018", "pending", "8%", "0", "¥ 0", "待审核", "审核"], tone: "orange" },
+    { cells: ["enterprise 普通用户", "USER-ENTERPRISE", "regular_user", "-", "0", "¥ 0", "仅前台登录", "开通代理"], tone: "blue" },
   ] satisfies ConsoleRow[],
   leads: [
     { cells: ["上海云车出海", "林总 186****4219", "线下展会", "需求确认", "¥ 30,000", "剩余 24 天", "编辑"], tone: "orange" },
@@ -681,17 +683,17 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "本月返佣", value: "¥ 46,200", hint: "demo", icon: "mdi:cash-multiple" },
           { label: "归属争议", value: "4", hint: "需判定", icon: "mdi:source-branch" },
         ],
-        actions: ["新增代理", "审核代理", "调整等级", "导出结算"],
-        tableTitle: "代理商列表",
+        actions: ["从普通用户开通代理", "审核代理", "调整等级", "导出结算"],
+        tableTitle: "代理商与候选用户",
         columns: ["代理商", "agentId", "状态", "返佣比例", "客户数", "待结算", "结算状态", "操作"],
         rows: staticRows.agents,
         sideTitle: "渠道规则",
         side: [
-          { title: "准入", desc: "营业资料和结算账户需审核。", tag: "审核", tone: "orange" },
+          { title: "准入", desc: "普通用户必须由开发者/管理员在后台开通后才有代理登录。", tag: "后台开通", tone: "orange" },
           { title: "比例", desc: "等级控制默认返佣比例。", tag: "配置", tone: "cyan" },
           { title: "争议", desc: "同客户归属冲突进入工单。", tag: "工单", tone: "red" },
         ],
-        note: "代理商模块目前为经营后台 mock 数据，后续需要 agent APIs 落库。",
+        note: "普通用户默认只能进入前台；必须由开发者/管理员在三角色积分后台开通为代理后，才可使用代理商登录与代理后台。当前为非写入原型，后续需要 agent APIs 落库。",
       },
     },
   },
@@ -737,17 +739,17 @@ const roleProfiles = computed<Record<ConsoleRole, RoleProfile>>(() => ({
           { label: "资料过期", value: "3", hint: "30 天内", icon: "mdi:file-alert-outline" },
           { label: "争议工单", value: "4", hint: "处理中", icon: "mdi:ticket-outline" },
         ],
-        actions: ["审核代理", "提醒补资料", "导出代理"],
-        tableTitle: "代理商列表",
+        actions: ["从普通用户开通代理", "审核代理", "提醒补资料", "导出代理"],
+        tableTitle: "代理商与候选用户",
         columns: ["代理商", "agentId", "状态", "返佣比例", "客户数", "待结算", "结算状态", "操作"],
         rows: staticRows.agents,
         sideTitle: "审核材料",
         side: [
-          { title: "营业执照", desc: "需验证统一社会信用代码。", tag: "必填", tone: "red" },
+          { title: "后台开通", desc: "普通用户不能自助升级代理，需管理员审核并开通代理身份。", tag: "Owner", tone: "red" },
           { title: "收款账户", desc: "需与主体信息匹配。", tag: "财务", tone: "orange" },
           { title: "渠道协议", desc: "按区域和等级配置返佣。", tag: "合同", tone: "cyan" },
         ],
-        note: "管理员拥有代理商功能，但开发者保留系统参数和接口配置权限。",
+        note: "管理员可以把普通产品用户开通为代理登录；普通用户在开通前只能进入前台页面，不能进入三角色积分后台。",
       },
       tenantsLimited: {
         menu: "客户管理",
@@ -853,6 +855,9 @@ const activePage = computed(() => activeRole.value.pages[activePageKey.value] ??
 const canActiveRoleCreatePlatformAccount = computed(() =>
   canCreatePlatformAccount(selectedRole.value),
 );
+const canActiveRolePromoteUserToAgent = computed(() =>
+  canPromoteUserToAgent(selectedRole.value),
+);
 
 const statusOptions = [
   { label: "全部状态", value: "all" },
@@ -903,12 +908,18 @@ function isActionDisabled(action: string | ConsoleActionItem) {
   if (item.label.includes("账号") && item.label.includes("新") && !canActiveRoleCreatePlatformAccount.value) {
     return true;
   }
+  if (item.label.includes("代理") && item.label.includes("开通") && !canActiveRolePromoteUserToAgent.value) {
+    return true;
+  }
   return false;
 }
 
 function actionReason(action: string | ConsoleActionItem) {
   const item = normalizeAction(action);
   if (item.reason) return item.reason;
+  if (item.label.includes("代理") && item.label.includes("开通") && !canActiveRolePromoteUserToAgent.value) {
+    return "普通用户升级为代理登录必须由开发者或管理员在三角色积分后台开通。";
+  }
   if (isActionDisabled(action)) {
     return "首发版本仅平台开发者和管理员可以创建用户/客户账号。";
   }
