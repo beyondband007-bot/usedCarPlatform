@@ -2,7 +2,6 @@
 import { computed, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 
-import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceImagePreview } from "@/types/workspace";
 import { downloadFile, sanitizeFilename } from "@/utils/download";
 
@@ -85,14 +84,13 @@ async function handleDownload() {
     </header>
 
     <div class="image-preview-body" aria-label="图片预览区域">
-      <PreloadImage
+      <img
         class="image-preview-image"
         :style="mediaStyle"
         :src="preview.imageUrl"
         :alt="preview.imageAlt"
         loading="eager"
         decoding="async"
-        fit="contain"
         @load="handlePreviewLoad"
       />
     </div>
@@ -165,7 +163,7 @@ async function handleDownload() {
   display: flex;
   min-height: 0;
   flex: 1;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow: auto;
   overscroll-behavior: contain;
@@ -177,6 +175,8 @@ async function handleDownload() {
   height: auto;
   max-width: 100%;
   max-height: 100%;
+  object-fit: contain;
+  background: transparent;
 }
 
 .image-preview-foot {

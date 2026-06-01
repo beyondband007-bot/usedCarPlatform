@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
@@ -631,7 +631,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     syncWorkspaceFromTask(task)
 
     if (task.status !== 'success') {
-      message.error(task.error?.message || '生成任务失败')
+      message.error('查看图片失败')
       return
     }
 
@@ -651,8 +651,7 @@ async function resolveGenerationTask(taskId: string, options: { restored?: boole
     await assistPanelRef.value?.refreshRecentItems()
   } catch (error) {
     clearActiveGenerationTask(taskId)
-    const text = error instanceof Error ? error.message : '生成任务查询失败'
-    message.error(text)
+    message.error('查看图片失败')
   } finally {
     clearActiveGenerationTask(taskId)
     isGenerating.value = false
@@ -715,6 +714,17 @@ async function ensureCreativeConversation(prompt?: string) {
   saveActiveCreativeConversationId(conversation.conversationId)
   creativeConversations.value = [conversation, ...creativeConversations.value]
   return conversation.conversationId
+}
+
+function syncCreativeConversationTitle(conversationId: string, prompt: string) {
+  const title = prompt.trim().slice(0, 24)
+  if (!title) return
+
+  creativeConversations.value = creativeConversations.value.map((item) =>
+    item.conversationId === conversationId
+      ? { ...item, title, lastMessage: prompt.trim() }
+      : item,
+  )
 }
 
 async function handleNewCreativeConversation() {
@@ -819,6 +829,8 @@ async function handleCreativeGenerate(payload: {
     message.info('任务已创建，正在轮询生成结果', { duration: 3000 })
     await refreshRunningTaskSummary()
     creativeImageCaption.value = payload.prompt
+    syncCreativeConversationTitle(conversationId, payload.prompt)
+    await refreshCreativeConversations()
     await loadCreativeConversationThread(conversationId)
     await resolveGenerationTask(created.taskId)
     await refreshCreativeConversations()
@@ -840,6 +852,11 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     return
   }
 
+  if (activeCode.value === 'interior-stitch') {
+    message.info('内饰拼接功能暂未接入接口，当前仅展示效果图')
+    return
+  }
+
   if (!(await canStartGeneration())) {
     return
   }
@@ -854,7 +871,10 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       optionId: payload.optionId,
       useLogo: payload.useLogo,
       colorCode: payload.colorCode,
-      outputRatio: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? '16:9' : undefined,
+      outputRatio:
+        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
+          ? '16:9'
+          : payload.outputRatio,
       extra: activeCode.value === SHORT_VIDEO_CAPABILITY_CODE ? { videoResolution: '720p' } : undefined,
     }
 
@@ -904,9 +924,19 @@ function buildResultFromRecent(item: WorkspaceRecentItem): WorkspaceGenerateResu
 }
 
 function handlePickRecent(item: WorkspaceRecentItem) {
+  if (item.status === 'fail' || item.status === 'canceled') {
+    message.error('查看图片失败')
+    return
+  }
+
   if (item.status === 'success') {
     const result = buildResultFromRecent(item)
-    if (result) generationResult.value = result
+    if (result) {
+      generationResult.value = result
+      return
+    }
+
+    message.error('查看图片失败')
     return
   }
 
@@ -957,7 +987,8 @@ onUnmounted(() => {
           activeCode === 'watermark-remove'
           || activeCode === 'paint-refresh'
           || activeCode === 'light-consistency'
-          || activeCode === 'interior-clean',
+          || activeCode === 'interior-clean'
+          || activeCode === 'interior-stitch',
         'workspace-page--creative-image': activeCode === 'creative-image',
       },
     ]"

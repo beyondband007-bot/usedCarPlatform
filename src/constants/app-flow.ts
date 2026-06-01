@@ -61,9 +61,9 @@ export const workspaceFlowModules = [
   {
     id: 'interior',
     title: '内饰',
-    description: '内饰清洁增强',
+    description: '内饰清洁增强与拼接展示',
     defaultCapabilityCode: 'interior-clean',
-    capabilityCodes: ['interior-clean'],
+    capabilityCodes: ['interior-clean', 'interior-stitch'],
   },
   {
     id: 'batch-delivery',

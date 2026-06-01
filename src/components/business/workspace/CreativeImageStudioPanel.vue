@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NInput } from 'naive-ui'
+import { NInput, NSelect } from 'naive-ui'
 
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
@@ -99,9 +99,16 @@ const displayPrompt = computed(
     '',
 )
 
+const creativeImageAspectRatioOptions = computed(() =>
+  creativeImageAspectRatios.map((item) => ({
+    label: item.label,
+    value: item.value,
+  })),
+)
+
 const ratioMetaLabel = computed(() => {
   if (props.generationResult?.ratioLabel) return props.generationResult.ratioLabel
-  return `${activeRatio.value.label} · ${activeRatio.value.resolution}`
+  return activeRatio.value.label
 })
 
 const threadItems = computed<CreativeThreadTurn[]>(() => {
@@ -496,18 +503,15 @@ function toggleSidebar() {
 
         <footer class="creative-composer-foot">
           <div class="creative-submit-row">
-            <div class="creative-ratio-group" role="group" aria-label="输出比例">
-              <button
-                v-for="item in creativeImageAspectRatios"
-                :key="item.value"
-                type="button"
-                :class="{ active: selectedRatio === item.value }"
+            <div class="creative-ratio-field">
+              <span class="creative-ratio-label">输出比例</span>
+              <NSelect
+                v-model:value="selectedRatio"
+                :options="creativeImageAspectRatioOptions"
+                size="large"
                 :disabled="props.isGenerating"
-                @click="selectedRatio = item.value"
-              >
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.resolution }}</span>
-              </button>
+                class="creative-ratio-select"
+              />
             </div>
             <span v-if="referencePreview" class="creative-reference-pill">
               已选参考图
@@ -541,9 +545,6 @@ function toggleSidebar() {
   --creative-icon: #dce3ee;
   --creative-accent: #00d6ff;
   --creative-accent-border: rgba(0, 214, 255, 0.18);
-  --creative-ratio-active-border: rgba(239, 194, 76, 0.85);
-  --creative-ratio-active-bg: rgba(239, 194, 76, 0.12);
-  --creative-ratio-active-text: #f4c64a;
   --creative-submit-bg: #f4f7fb;
   --creative-submit-text: #101114;
   --creative-submit-disabled-bg: #3b414d;
@@ -576,9 +577,6 @@ function toggleSidebar() {
   --creative-icon: #475569;
   --creative-accent: #0a8fb8;
   --creative-accent-border: rgba(10, 143, 184, 0.22);
-  --creative-ratio-active-border: #2f6bff;
-  --creative-ratio-active-bg: #f2f7ff;
-  --creative-ratio-active-text: #2f6bff;
   --creative-submit-bg: #172033;
   --creative-submit-text: #ffffff;
   --creative-submit-disabled-bg: #e8edf5;
@@ -1211,44 +1209,24 @@ function toggleSidebar() {
   margin-top: 2px;
 }
 
-.creative-ratio-group {
-  display: flex;
-  gap: 6px;
-}
-
-.creative-ratio-group button {
+.creative-ratio-field {
   display: grid;
-  gap: 1px;
-  min-width: 64px;
-  min-height: 34px;
-  padding: 5px 8px;
-  border: 1px solid var(--creative-line);
-  border-radius: 8px;
-  background: transparent;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 360px;
+}
+
+.creative-ratio-label {
   color: var(--creative-text-soft);
-  font-size: 13px;
-  font-weight: 900;
-  text-align: left;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-.creative-ratio-group button.active {
-  border-color: var(--creative-ratio-active-border);
-  background: var(--creative-ratio-active-bg);
-  color: var(--creative-ratio-active-text);
-}
-
-.creative-ratio-group strong,
-.creative-ratio-group span {
-  line-height: 1.1;
-}
-
-.creative-ratio-group strong {
-  font-size: 12px;
-}
-
-.creative-ratio-group span {
-  color: var(--creative-muted);
-  font-size: 10px;
+.creative-ratio-select {
+  min-width: 0;
 }
 
 .creative-reference-pill {

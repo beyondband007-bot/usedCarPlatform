@@ -62,10 +62,6 @@ function handleUploadChange(options: { file: UploadFileInfo }) {
   emit("selectFile", file);
 }
 
-function handleRemove() {
-  emit("remove");
-}
-
 function handleReupload() {
   replaceInputRef.value?.click();
 }
@@ -134,15 +130,6 @@ function openPreviewModal() {
                 fit="contain"
               />
             </button>
-
-            <button
-              type="button"
-              class="upload-preview-remove"
-              aria-label="删除车辆图片"
-              @click="handleRemove"
-            >
-              <Icon icon="mdi:close" />
-            </button>
           </div>
 
           <NButton
@@ -154,6 +141,8 @@ function openPreviewModal() {
           >
             重新生成
           </NButton>
+
+          <slot name="after-reupload" />
         </div>
 
         <div v-else-if="isPreviewLoading" class="upload-loading">
@@ -361,31 +350,6 @@ function openPreviewModal() {
   height: auto;
   max-height: min(70vh, 480px);
   border-radius: 12px;
-}
-
-.upload-preview-remove {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 5;
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--workspace-panel-deep, #101010) 72%, transparent);
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-
-.upload-preview-remove:hover {
-  background: rgba(220, 38, 38, 0.88);
-  transform: scale(1.04);
 }
 
 .upload-reupload-btn {

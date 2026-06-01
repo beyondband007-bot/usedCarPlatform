@@ -34,6 +34,7 @@ import type {
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
+import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
 const props = defineProps<{
@@ -49,14 +50,6 @@ const emit = defineEmits<{
   previewDeliveryTask: [task: WorkspaceDeliveryTaskPreview];
   batchCreated: [payload: WorkspaceBatchCreatedPayload];
 }>();
-
-const outputRatioLabelMap: Record<string, string> = {
-  "1:1": "主图 1:1",
-  "3:4": "主图 3:4",
-  "4:3": "主图 4:3",
-  "9:16": "主图 9:16",
-  "16:9": "主图 16:9",
-};
 
 const message = useMessage();
 const {
@@ -82,6 +75,7 @@ const batchScenes = computed(() =>
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
+const paintTargetColor = ref("");
 const interiorEnhance = ref(false);
 const projectName = ref("5月展厅批量上新");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
@@ -342,17 +336,22 @@ async function handleVehicleFileSelected(file: File) {
   isUploadingVehicle.value = true;
 
   try {
-    const purpose = props.capability.code === "interior-clean" ? "car_interior" : "car_exterior";
+    const purpose =
+      props.capability.kind === "interior" ? "car_interior" : "car_exterior";
     const asset = await uploadAsset(file, purpose);
     uploadedAsset.value = asset;
     revokePreviewObjectUrl();
     uploadedPreviewUrl.value = asset.url;
-    message.success(props.capability.code === "interior-clean" ? "内饰图片上传成功" : "车辆图片上传成功");
+    message.success(
+      props.capability.kind === "interior"
+        ? "内饰图片上传成功"
+        : "车辆图片上传成功",
+    );
   } catch (error) {
     resetUploadedVehicle();
     const text = error instanceof Error
       ? error.message
-      : props.capability.code === "interior-clean"
+      : props.capability.kind === "interior"
         ? "内饰图片上传失败"
         : "车辆图片上传失败";
     message.error(text);
@@ -363,6 +362,7 @@ async function handleVehicleFileSelected(file: File) {
 
 function handleVehicleImageRemove() {
   resetUploadedVehicle();
+  paintTargetColor.value = "";
   message.info("已删除车辆图片");
 }
 
@@ -523,11 +523,14 @@ function handleGenerate() {
 
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
-    outputRatio:
-      outputRatioLabelMap[outputRatio.value] ?? `主图 ${outputRatio.value}`,
+    outputRatio: outputRatio.value,
     optionId:
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
+    colorCode:
+      props.capability.code === "paint-refresh"
+        ? paintTargetColor.value || undefined
+        : undefined,
   });
 }
 
@@ -1272,46 +1275,49 @@ const activeCreateRatioLabel = computed(() => {
     </template>
 
     <template v-else-if="props.capability.code === 'short-video'">
-      <section class="batch-card batch-notice short-video-notice">
-        上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
-      </section>
+      <div class="generate-panel-body">
+        <section class="batch-card batch-notice short-video-notice">
+          上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
+        </section>
 
-      <UploadTaskCard
-        :capability="props.capability"
-        :upload-preview-url="uploadedPreviewUrl"
-        :is-uploading="isUploadingVehicle"
-        @select-file="handleVehicleFileSelected"
-        @remove="handleVehicleImageRemove"
-      />
+        <UploadTaskCard
+          :capability="props.capability"
+          :upload-preview-url="uploadedPreviewUrl"
+          :is-uploading="isUploadingVehicle"
+          @select-file="handleVehicleFileSelected"
+          @remove="handleVehicleImageRemove"
+        />
 
-      <CapabilityOptionSelector
-        v-if="hasBlock('selector')"
-        :capability="props.capability"
-        :selected-option-id="props.selectedOptionId"
-        @select="emit('selectOption', $event)"
-      />
-
-      <div
-        v-if="hasBlock('actions')"
-        class="flex flex-wrap items-center justify-center gap-4 pt-3"
-      >
-        <NTag type="warning" round :bordered="false">
-          预计消耗 {{ props.capability.cost }} 积分
-        </NTag>
-        <NTag type="success" round :bordered="false">
-          余额 {{ props.capability.balance }} 积分
-        </NTag>
-        <NButton
-          type="warning"
-          size="large"
-          class="min-w-48 !rounded-xl"
-          :loading="props.isGenerating"
-          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-          @click="handleGenerate"
-        >
-          {{ props.capability.actionLabel }} {{ props.capability.cost }}
-        </NButton>
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
       </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingVehicle || props.isGenerating || !uploadedAsset
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">
@@ -1446,75 +1452,83 @@ const activeCreateRatioLabel = computed(() => {
     </template>
 
     <template v-else>
-      <UploadTaskCard
-        :capability="props.capability"
-        :upload-preview-url="uploadedPreviewUrl"
-        :is-uploading="isUploadingVehicle"
-        @select-file="handleVehicleFileSelected"
-        @remove="handleVehicleImageRemove"
-      />
+      <div class="generate-panel-body">
+        <UploadTaskCard
+          :capability="props.capability"
+          :upload-preview-url="uploadedPreviewUrl"
+          :is-uploading="isUploadingVehicle"
+          @select-file="handleVehicleFileSelected"
+          @remove="handleVehicleImageRemove"
+        />
 
-      <CapabilityOptionSelector
-        v-if="hasBlock('selector')"
-        :capability="props.capability"
-        :selected-option-id="props.selectedOptionId"
-        @select="emit('selectOption', $event)"
-      />
+        <CapabilityOptionSelector
+          v-if="hasBlock('selector')"
+          :capability="props.capability"
+          :selected-option-id="props.selectedOptionId"
+          @select="emit('selectOption', $event)"
+        />
 
-      <template
-        v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
-      >
-        <WorkspaceLogoPanel v-model:enabled="useLogo" />
-
-        <div
-          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+        <template
+          v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
-          <div class="flex items-center gap-4">
-            <span
-              class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
-            >
-              输出比例
-            </span>
-            <NSelect
-              v-model:value="outputRatio"
-              :options="outputRatioOptions"
-              size="large"
-              class="min-w-0 flex-1"
-            />
+          <WorkspaceLogoPanel v-model:enabled="useLogo" />
+
+          <div
+            class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+          >
+            <div class="flex items-center gap-4">
+              <span
+                class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
+              >
+                输出比例
+              </span>
+              <NSelect
+                v-model:value="outputRatio"
+                :options="outputRatioOptions"
+                size="large"
+                class="min-w-0 flex-1"
+              />
+            </div>
           </div>
-        </div>
-      </template>
-
-      <div
-        v-if="hasBlock('actions')"
-        class="flex flex-wrap items-center justify-center gap-4 pt-3"
-      >
-        <NTag type="warning" round :bordered="false">
-          预计消耗 {{ props.capability.cost }} 积分
-        </NTag>
-        <NTag type="success" round :bordered="false">
-          余额 {{ props.capability.balance }} 积分
-        </NTag>
-        <NButton
-          type="warning"
-          size="large"
-          class="min-w-48 !rounded-xl"
-          :loading="props.isGenerating"
-          :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-          @click="handleGenerate"
-        >
-          {{ props.capability.actionLabel }} {{ props.capability.cost }}
-        </NButton>
+        </template>
       </div>
+
+      <footer v-if="hasBlock('actions')" class="generate-panel-footer">
+        <div class="generate-panel-actions">
+          <NTag type="warning" round :bordered="false">
+            预计消耗 {{ props.capability.cost }} 积分
+          </NTag>
+          <NTag type="success" round :bordered="false">
+            余额 {{ props.capability.balance }} 积分
+          </NTag>
+          <NButton
+            type="warning"
+            size="large"
+            class="min-w-48 !rounded-xl"
+            :loading="props.isGenerating"
+            :disabled="
+              isUploadingVehicle || props.isGenerating || !uploadedAsset
+            "
+            @click="handleGenerate"
+          >
+            {{ props.capability.actionLabel }} {{ props.capability.cost }}
+          </NButton>
+        </div>
+      </footer>
     </template>
   </div>
 </template>
 
 <style scoped lang="scss">
 .generate-panel {
-  padding-bottom: 8px;
-  display: grid;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+  flex-direction: column;
   gap: 18px;
+  overflow: hidden;
+  padding-bottom: 0;
 }
 
 .generate-panel.is-batch,
@@ -1525,6 +1539,23 @@ const activeCreateRatioLabel = computed(() => {
   flex-direction: column;
   gap: clamp(12px, 1.2vw, 16px);
   padding-bottom: 0;
+}
+
+.generate-panel-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  padding-bottom: 4px;
+}
+
+.generate-panel-body > * {
+  flex-shrink: 0;
 }
 
 .batch-panel {
@@ -1562,6 +1593,29 @@ const activeCreateRatioLabel = computed(() => {
     var(--app-surface-soft) 24%,
     var(--app-surface-soft) 100%
   );
+}
+
+.generate-panel-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-soft) 0%, transparent) 0%,
+    var(--app-surface-soft) 24%,
+    var(--app-surface-soft) 100%
+  );
+}
+
+.generate-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
 .delivery-panel {

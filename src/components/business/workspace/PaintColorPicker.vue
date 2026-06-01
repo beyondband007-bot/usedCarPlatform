@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { NColorPicker } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 
-const props = defineProps<{
-  modelValue?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    compact?: boolean
+  }>(),
+  {
+    modelValue: '',
+    compact: false,
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -36,11 +44,19 @@ function handleColorUpdate(value: string | null) {
   colorValue.value = value ? normalizeHex(value) : null
   emit('update:modelValue', value ? normalizeHex(value) : '')
 }
+
+function handleClear() {
+  handleColorUpdate(null)
+}
 </script>
 
 <template>
-  <section class="paint-color-card" aria-label="目标色号选择">
-    <header class="paint-color-head">
+  <section
+    class="paint-color-card"
+    :class="{ 'is-compact': compact }"
+    aria-label="目标色号选择"
+  >
+    <header v-if="!compact" class="paint-color-head">
       <div>
         <h3 class="paint-color-title">选择目标色号</h3>
         <p class="paint-color-subtitle">
@@ -50,10 +66,22 @@ function handleColorUpdate(value: string | null) {
     </header>
 
     <div class="paint-color-field">
-      <p class="paint-color-field-label">
-        <template v-if="displayHex">颜色 ({{ displayHex }})</template>
-        <template v-else>未选择色号</template>
-      </p>
+      <div class="paint-color-field-head">
+        <p class="paint-color-field-label">
+          <template v-if="displayHex">颜色 ({{ displayHex }})</template>
+          <template v-else>未选择色号</template>
+        </p>
+        <button
+          v-if="displayHex"
+          type="button"
+          class="paint-color-delete"
+          aria-label="删除色号"
+          @click="handleClear"
+        >
+          <Icon icon="mdi:close" />
+          删除
+        </button>
+      </div>
 
       <NColorPicker
         :value="colorValue"
@@ -75,7 +103,13 @@ function handleColorUpdate(value: string | null) {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
 
-:global([data-theme='dark']) .paint-color-card {
+.paint-color-card.is-compact {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:global([data-theme='dark']) .paint-color-card:not(.is-compact) {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
 }
 
@@ -105,12 +139,39 @@ function handleColorUpdate(value: string | null) {
   gap: 6px;
 }
 
+.paint-color-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .paint-color-field-label {
   margin: 0;
+  min-width: 0;
   color: var(--app-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.paint-color-delete {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--app-text-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.paint-color-delete:hover {
+  color: #e25555;
 }
 
 .paint-color-picker {
