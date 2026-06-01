@@ -59,6 +59,7 @@ Detailed phase notes:
 - [Phase 12 team handoff](./reusable-credits-phase-12-team-handoff.md)
 - [Three-role credits back office](./reusable-credits-three-role-back-office.md)
 - [Enterprise plan business logic](./enterprise-plan-business-logic.md)
+- [Frontend balance and transaction API](./frontend-balance-transaction-api.md)
 - [First release account creation policy](./first-release-account-creation-policy.md)
 - [Auth login demo accounts](./auth-login-demo-accounts.md)
 
