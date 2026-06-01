@@ -13,6 +13,7 @@ export interface MockCreditsIdentityOption {
 }
 
 export const CREDITS_IDENTITY_STORAGE_KEY = 'prototype-credits-identity'
+const LEGACY_CREDITS_IDENTITY_STORAGE_KEY = 'ai-car-studio:credits-identity'
 
 const DEFAULT_MOCK_USER_ID = 4
 const DEFAULT_MOCK_TENANT_ID = 4
@@ -36,7 +37,7 @@ const getMockTenantId = () =>
 export const normalizeCreditsIdentity = (identity: unknown): CreditsIdentity | null => {
   if (!identity || typeof identity !== 'object') return null
 
-  const candidate = identity as Partial<CreditsIdentity>
+  const candidate = identity as Partial<CreditsIdentity> & { tenantId?: number | string | null }
   const userId = parsePositiveInteger(candidate.userId)
   const accountScope = parseAccountScope(candidate.accountScope)
   const tenantId = parsePositiveInteger(candidate.tenantId)
@@ -75,10 +76,10 @@ export const getDefaultMockCreditsIdentity = (): CreditsIdentity => {
   return options.find((option) => option.identity.accountScope === configuredScope)?.identity ?? options[0].identity
 }
 
-export const readCreditsIdentity = (): CreditsIdentity | null => {
+const readIdentityFromStorageKey = (key: string): CreditsIdentity | null => {
   if (typeof window === 'undefined') return null
 
-  const raw = window.localStorage.getItem(CREDITS_IDENTITY_STORAGE_KEY)
+  const raw = window.localStorage.getItem(key)
   if (!raw) return null
 
   try {
@@ -88,15 +89,52 @@ export const readCreditsIdentity = (): CreditsIdentity | null => {
   }
 }
 
+export const readCreditsIdentity = (): CreditsIdentity | null => {
+  return (
+    readIdentityFromStorageKey(CREDITS_IDENTITY_STORAGE_KEY) ??
+    readIdentityFromStorageKey(LEGACY_CREDITS_IDENTITY_STORAGE_KEY)
+  )
+}
+
 export const writeCreditsIdentity = (identity: CreditsIdentity) => {
   if (typeof window === 'undefined') return
-
   window.localStorage.setItem(CREDITS_IDENTITY_STORAGE_KEY, JSON.stringify(identity))
 }
 
 export const clearCreditsIdentity = () => {
   if (typeof window === 'undefined') return
-
   window.localStorage.removeItem(CREDITS_IDENTITY_STORAGE_KEY)
+  window.localStorage.removeItem(LEGACY_CREDITS_IDENTITY_STORAGE_KEY)
 }
 
+export const getCreditsIdentity = (): CreditsIdentity => {
+  return readCreditsIdentity() ?? getDefaultMockCreditsIdentity()
+}
+
+export const setCreditsIdentity = (
+  next: Partial<CreditsIdentity> & { tenantId?: number | string | null },
+) => {
+  const merged = normalizeCreditsIdentity({
+    ...getCreditsIdentity(),
+    ...next,
+  })
+
+  if (merged) writeCreditsIdentity(merged)
+}
+
+export const resetCreditsIdentity = () => {
+  writeCreditsIdentity(getDefaultMockCreditsIdentity())
+}
+
+export const toCreditsHeaders = (identity: CreditsIdentity = getCreditsIdentity()): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'x-credits-user-id': String(identity.userId),
+    'x-credits-account-scope': identity.accountScope,
+  }
+
+  if (identity.accountScope === 'tenant' && identity.tenantId) {
+    headers['x-credits-tenant-id'] = String(identity.tenantId)
+  }
+
+  return headers
+}

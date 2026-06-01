@@ -86,11 +86,23 @@ export interface WorkspaceDeliveryTaskPreview {
   previewImage?: string
   progress: number
   imageCount: number
+  assets: Array<{
+    id: string
+    title: string
+    imageUrl: string
+    thumbnailUrl?: string
+    ratio: string
+    createdAt: string
+    width?: number
+    height?: number
+  }>
 }
 
 export interface WorkspaceGeneratePayload {
   inputAssetId?: string
+  assetIds?: string[]
   outputRatio: string
+  resolution?: string
   optionId?: string
   useLogo?: boolean
   colorCode?: string

@@ -1,5 +1,6 @@
 import interiorCleanAfter from '@/assets/img/内饰清洁/清洁后.png'
 import interiorCleanBefore from '@/assets/img/内饰清洁/清洁前.png'
+import interiorStitchResult from '@/assets/img/内饰清洁/内饰拼接.png'
 import lightConsistencyAfter from '@/assets/img/光污一致化/修复后.png'
 import lightConsistencyBefore from '@/assets/img/光污一致化/修复前.png'
 import paintRefreshAfter from '@/assets/img/烤漆翻新/翻新后.png'
@@ -18,6 +19,7 @@ export interface WorkspaceFeatureCompareContent {
   heroBadge: string
   heroTitle: string
   heroDesc: string
+  mode?: 'compare' | 'result'
   compareTitle: string
   compareHint: string
   beforeAlt: string
@@ -33,6 +35,7 @@ export const workspaceFeatureCompareCodes = [
   'paint-refresh',
   'light-consistency',
   'interior-clean',
+  'interior-stitch',
 ] as const
 
 export type WorkspaceFeatureCompareCode = (typeof workspaceFeatureCompareCodes)[number]
@@ -100,6 +103,22 @@ export const workspaceFeatureCompareMap: Record<
     generatingTitle: '正在内饰清洁',
     generatingDesc: 'AI 正在优化座椅、仪表台与地毯洁净度，请稍候。',
     cards: [{ before: interiorCleanBefore, after: interiorCleanAfter }],
+  },
+  'interior-stitch': {
+    tabListLabel: '内饰拼接视图切换',
+    featureSectionLabel: '内饰拼接功能描述',
+    heroBadge: 'AI 内饰拼接能力',
+    heroTitle: '生成更完整的内饰效果图',
+    heroDesc: '适用于内饰图补全与展示优化，突出座椅、仪表台和中控区域的整体效果。',
+    mode: 'result',
+    compareTitle: '生成效果图',
+    compareHint: '展示内饰拼接后的效果图预览',
+    beforeAlt: '内饰拼接效果图',
+    afterAlt: '内饰拼接效果图',
+    handleAriaLabel: '内饰拼接效果图预览',
+    generatingTitle: '正在生成效果图',
+    generatingDesc: 'AI 正在生成内饰拼接效果图，请稍候。',
+    cards: [{ before: interiorStitchResult, after: interiorStitchResult }],
   },
 }
 

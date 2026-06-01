@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { NPopover } from "naive-ui";
-import { ref } from "vue";
-import { computed, inject, onMounted } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { isWorkbenchSectionPath } from "@/constants/app-flow";
 import { studioGuestNavigation, topNavigation } from "@/constants/prototype";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import { useStudioChrome } from "@/composables/useStudioChrome";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
+import { useCreditsStore } from "@/stores/credits";
 import type { NavItem } from "@/types/prototype";
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
+const creditsStore = useCreditsStore();
 const router = useRouter();
 const route = useRoute();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
@@ -22,9 +22,28 @@ const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 const userMenuOpen = ref(false);
 const { usesStudioChrome } = useStudioChrome();
 
+const creditsBalanceText = computed(() => {
+  if (creditsStore.accountsLoaded) {
+    return Number(creditsStore.availableBalance ?? 0).toLocaleString("zh-CN");
+  }
+  return authStore.credits;
+});
+
+watch(
+  () => authStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      void creditsStore.hydrateAccounts();
+    } else {
+      creditsStore.reset();
+    }
+  },
+  { immediate: true },
+);
+
 function isNavItemActive(item: NavItem) {
   if (item.workbenchEntry) {
-    return isWorkbenchSectionPath(route.path);
+    return route.path === "/workspace" || route.path.startsWith("/workspace/");
   }
 
   return route.path === item.path || route.path.startsWith(`${item.path}/`);
@@ -55,7 +74,7 @@ function resolveNavPermission(path: string) {
 }
 
 function canShowNavItem(item: NavItem) {
-  if (!authStore.isLoggedIn) return true;
+  if (!authStore.isLoggedIn) return item.path !== "/credits" && item.path !== "/points";
   const permission = resolveNavPermission(item.path);
   return !permission || authStore.permissions.includes(permission);
 }
@@ -71,11 +90,7 @@ const navItems = computed(() => {
 
   return authStore.isLoggedIn
     ? topNavigation.filter((item) => item.path !== "/login" && canShowNavItem(item))
-    : topNavigation;
-});
-
-onMounted(() => {
-  void authStore.refreshCredits();
+    : topNavigation.filter(canShowNavItem);
 });
 </script>
 
@@ -106,11 +121,11 @@ onMounted(() => {
           to="/credits"
           aria-label="查看积分余额与流水"
         >
-          积分余额 {{ authStore.credits }}
+          积分余额 {{ creditsBalanceText }}
         </RouterLink>
         <RouterLink
           v-else-if="route.path !== '/login'"
-          class="credit-pill"
+          class="credit-pill site-login-fallback"
           to="/login"
         >
           企业账号登录
@@ -176,7 +191,7 @@ onMounted(() => {
 
     <header
       v-else
-      class="flex min-h-[72px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
+      class="flex min-h-[60px] w-full max-w-full items-center gap-4 overflow-hidden bg-[var(--app-header-bg)] px-4 text-[var(--app-text)] shadow-[var(--app-header-shadow)] xl:gap-6 xl:px-6"
     >
       <RouterLink
         to="/home"
@@ -287,14 +302,6 @@ onMounted(() => {
           </div>
         </NPopover>
 
-        <RouterLink
-          v-else-if="route.path !== '/login'"
-          to="/login"
-          class="header-login-link inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold no-underline transition hover:opacity-90"
-        >
-          <Icon icon="mdi:account-key-outline" class="text-base" />
-          <span class="hidden sm:inline">登录</span>
-        </RouterLink>
       </div>
     </header>
   </div>
@@ -320,7 +327,9 @@ onMounted(() => {
   gap: clamp(16px, 2.5vw, 32px);
   width: 100%;
   max-width: none;
-  padding: clamp(24px, 2.5vw, 34px) var(--studio-chrome-pad-x, 24px);
+  box-sizing: border-box;
+  min-height: var(--studio-chrome-header-height, 72px);
+  padding: 12px var(--studio-chrome-pad-x, 24px);
   margin: 0;
   background: var(--studio-chrome-header-bg, linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent));
   color: var(--studio-chrome-logo, #f3f3f3);
@@ -408,6 +417,10 @@ onMounted(() => {
   background: var(--studio-chrome-credit-hover, #e5b85c);
 }
 
+.site-login-fallback {
+  display: none;
+}
+
 .site-header-actions {
   display: inline-flex;
   align-items: center;
@@ -473,11 +486,15 @@ onMounted(() => {
   .nav-links {
     display: none;
   }
+
+  .site-login-fallback {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 700px) {
   .site-header {
-    padding: 20px var(--studio-chrome-pad-x, 18px);
+    padding: 14px var(--studio-chrome-pad-x, 18px);
   }
 
   .credit-pill {

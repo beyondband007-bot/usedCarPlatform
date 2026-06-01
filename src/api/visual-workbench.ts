@@ -222,6 +222,34 @@ export interface CreatedGenerationTask {
   createdAt: string
 }
 
+export interface InteriorCollageTaskGroup {
+  groupIndex: number
+  inputAssetIds: string[]
+  inputImageCount: number
+}
+
+export interface CreatedInteriorCollageTask extends CreatedGenerationTask {
+  groupIndex: number
+  groupCount: number
+  inputAssetIds: string[]
+}
+
+export interface CreatedInteriorCollageBatch {
+  moduleCode: 'interior-collage'
+  status: GenerationTaskStatus
+  inputImageCount: number
+  outputCount: number
+  groups: InteriorCollageTaskGroup[]
+  tasks: CreatedInteriorCollageTask[]
+  createdAt: string
+}
+
+export interface CreateInteriorCollageTaskPayload {
+  assetIds: string[]
+  outputRatio?: string
+  resolution?: string
+}
+
 export interface GenerationResultImage {
   url: string
   sourceUrl?: string
@@ -284,6 +312,7 @@ export interface CreativeImageMessage {
     resolution?: string
     [key: string]: unknown
   } | null
+  resultUrl?: string | null
   createdAt: string
 }
 
@@ -525,6 +554,18 @@ export async function createGenerationTask(
 ) {
   const response = await request.post<ApiResponse<CreatedGenerationTask>>(
     `/modules/${moduleCode}/tasks`,
+    payload,
+    generationRequestConfig,
+  )
+
+  return unwrapApiResponse(response)
+}
+
+export async function createInteriorCollageTask(
+  payload: CreateInteriorCollageTaskPayload,
+) {
+  const response = await request.post<ApiResponse<CreatedInteriorCollageBatch>>(
+    '/modules/interior-collage/tasks',
     payload,
     generationRequestConfig,
   )

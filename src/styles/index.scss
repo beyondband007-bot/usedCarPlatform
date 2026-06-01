@@ -75,11 +75,11 @@ $theme-vars: (
 }
 
 .app-layout--studio-chrome[data-subnav="true"] {
-  --app-header-offset: 148px;
+  --app-header-offset: 118px;
 }
 
 .app-layout--studio-chrome:not([data-subnav="true"]) {
-  --app-header-offset: 96px;
+  --app-header-offset: 72px;
 }
 
 :root {

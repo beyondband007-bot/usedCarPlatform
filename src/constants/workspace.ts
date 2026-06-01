@@ -7,12 +7,34 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
+import outdoorScene1 from '@/assets/img/户外场景/场景/图1.png'
+import outdoorScene2 from '@/assets/img/户外场景/场景/图2.png'
+import outdoorScene3 from '@/assets/img/户外场景/场景/图3.png'
+import outdoorScene4 from '@/assets/img/户外场景/场景/图4.png'
+import outdoorTutorial1 from '@/assets/img/户外场景/教程/教程1.png'
+import outdoorTutorial2 from '@/assets/img/户外场景/教程/教程2.png'
+import outdoorTutorial3 from '@/assets/img/户外场景/教程/教程3.png'
+import outdoorTutorial4 from '@/assets/img/户外场景/教程/教程4.png'
+import roadMotionScene1 from '@/assets/img/道路动态/场景选择/道路动态1.png'
+import roadMotionScene2 from '@/assets/img/道路动态/场景选择/道路动态2.png'
+import roadMotionScene3 from '@/assets/img/道路动态/场景选择/道路动态3.png'
+import roadMotionScene4 from '@/assets/img/道路动态/场景选择/道路动态4.png'
 import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
 import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
 import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
 import showroomSoftTop from '@/assets/img/展厅灯光/柔光灯顶.png'
+import showroomTutorialClassicWhite from '@/assets/img/展厅灯光/教程图片/经典白棚.png'
+import showroomTutorialGlass from '@/assets/img/展厅灯光/教程图片/玻璃展厅.png'
+import showroomTutorialLuxuryDark from '@/assets/img/展厅灯光/教程图片/暗调豪华.png'
+import showroomTutorialSoftTop from '@/assets/img/展厅灯光/教程图片/柔光灯顶.png'
 import showroomMinimal from '@/assets/img/展厅灯光/极简留白.png'
 import showroomWideAngle from '@/assets/img/展厅灯光/广角空间.png'
+import skyCloudParking from '@/assets/img/天空影棚/云境车场.png'
+import skyCloudSeaStage from '@/assets/img/天空影棚/云海展台.png'
+import skyEndless from '@/assets/img/天空影棚/天境无垠.png'
+import skyMirrorField from '@/assets/img/天空影棚/天空镜场.png'
+import skyRealm from '@/assets/img/天空影棚/天空之境.png'
+import skySunsetDrive from '@/assets/img/天空影棚/夕阳车境.png'
 
 const tutorial = [
   {
@@ -48,72 +70,26 @@ const showroomOptions = createOptions([
 ])
 
 const outdoorOptions = createOptions([
-  [
-    'tree-park',
-    '林荫公园',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'mountain-lake',
-    '山野湖畔',
-    'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'city-block',
-    '城市街区',
-    'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'coast-daylight',
-    '海边日光',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['tree-park', '林荫公园', outdoorScene1],
+  ['mountain-lake', '山野湖畔', outdoorScene2],
+  ['city-block', '城市街区', outdoorScene3],
+  ['coast-daylight', '海边日光', outdoorScene4],
 ])
 
 const roadOptions = createOptions([
-  [
-    'urban-road',
-    '城市公路',
-    'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'bridge-motion',
-    '高架动态',
-    'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'night-road',
-    '夜景车流',
-    'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'highway',
-    '高速行驶',
-    'https://images.unsplash.com/photo-1533106418989-88406c7cc8ca?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['urban-road', '道路动态1', roadMotionScene1],
+  ['bridge-motion', '道路动态2', roadMotionScene2],
+  ['night-road', '道路动态3', roadMotionScene3],
+  ['highway', '道路动态4', roadMotionScene4],
 ])
 
 const skyOptions = createOptions([
-  [
-    'clear-sky',
-    '晴空蓝天',
-    'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'sunset',
-    '落日金辉',
-    'https://images.unsplash.com/photo-1501973801540-537f08ccae7b?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'cloudy',
-    '柔云漫射',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=520&q=80',
-  ],
-  [
-    'night-sky',
-    '夜幕星光',
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=520&q=80',
-  ],
+  ['sky-mirror-field', '天空镜场', skyMirrorField],
+  ['sunset-drive', '夕阳车境', skySunsetDrive],
+  ['endless-sky', '天境无垠', skyEndless],
+  ['cloud-sea-stage', '云海展台', skyCloudSeaStage],
+  ['cloud-parking', '云境车场', skyCloudParking],
+  ['sky-realm', '天空之境', skyRealm],
 ])
 
 export interface BatchSceneItem {
@@ -384,7 +360,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     selectorTag: '车辆美容',
     middleBlocks: onlyActions,
     options: beautyOptions,
-    actionLabel: '生成演示',
+    actionLabel: '生成',
   }),
   createCapability({
     code: 'light-consistency',
@@ -403,7 +379,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     selectorTag: '车辆美容',
     middleBlocks: onlyActions,
     options: beautyOptions,
-    actionLabel: '生成演示',
+    actionLabel: '生成',
   }),
   createCapability({
     code: 'interior-clean',
@@ -422,7 +398,26 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     selectorTag: '内饰',
     middleBlocks: onlyActions,
     options: interiorOptions,
-    actionLabel: '生成演示',
+    actionLabel: '生成',
+  }),
+  createCapability({
+    code: 'interior-stitch',
+    apiCode: 'interior-collage',
+    kind: 'interior',
+    groupTitle: '内饰',
+    icon: 'mdi:image-multiple-outline',
+    label: '内饰拼接',
+    tag: 'Beta',
+    tagType: 'info',
+    title: '内饰拼接',
+    description: '上传车辆内饰图，演示座椅、仪表台与地毯区域的拼接增强效果。',
+    uploadTitle: '上传内饰图',
+    uploadHint: '方向盘/座椅/中控尽量清晰 · JPG / PNG / WebP',
+    selectorTitle: '拼接区域',
+    selectorTag: '内饰',
+    middleBlocks: onlyActions,
+    options: interiorOptions,
+    actionLabel: '生成效果图',
   }),
   createCapability({
     code: 'watermark-remove',
@@ -441,7 +436,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     selectorTag: '营销',
     middleBlocks: onlyActions,
     options: watermarkOptions,
-    actionLabel: '生成演示',
+    actionLabel: '生成',
   }),
   createCapability({
     code: 'creative-image',
@@ -521,13 +516,78 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
 
-export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] =
-  showroomOptions.map((option) => ({
+function toTemplateRecommendations(
+  capabilityCode: string,
+  options: WorkspaceOption[],
+): WorkspaceTemplateRecommendation[] {
+  return options.map((option) => ({
     title: option.title,
-    capabilityCode: 'showroom-light',
+    capabilityCode,
     optionId: option.id,
     image: option.image,
   }))
+}
+
+const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  {
+    title: '经典白棚',
+    capabilityCode: 'showroom-light',
+    optionId: 'white-studio',
+    image: showroomTutorialClassicWhite,
+  },
+  {
+    title: '玻璃展厅',
+    capabilityCode: 'showroom-light',
+    optionId: 'glass-hall',
+    image: showroomTutorialGlass,
+  },
+  {
+    title: '暗调奢华',
+    capabilityCode: 'showroom-light',
+    optionId: 'luxury-dark',
+    image: showroomTutorialLuxuryDark,
+  },
+  {
+    title: '柔光灯顶',
+    capabilityCode: 'showroom-light',
+    optionId: 'soft-top-light',
+    image: showroomTutorialSoftTop,
+  },
+]
+
+const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  {
+    title: '林荫公园',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'tree-park',
+    image: outdoorTutorial1,
+  },
+  {
+    title: '山野湖畔',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'mountain-lake',
+    image: outdoorTutorial2,
+  },
+  {
+    title: '城市街区',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'city-block',
+    image: outdoorTutorial3,
+  },
+  {
+    title: '海边日光',
+    capabilityCode: 'outdoor-scene',
+    optionId: 'coast-daylight',
+    image: outdoorTutorial4,
+  },
+]
+
+export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
+  ...showroomTemplateRecommendations,
+  ...outdoorTemplateRecommendations,
+  ...toTemplateRecommendations('road-motion', roadOptions),
+  ...toTemplateRecommendations('sky-studio', skyOptions),
+]
 
 function menuTagVariant(
   tag: string,
@@ -609,7 +669,7 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   },
   {
     title: '内饰',
-    items: pickMenuItems(['interior-clean']),
+    items: pickMenuItems(['interior-clean', 'interior-stitch']),
   },
   {
     title: '批量 & 交付',

@@ -111,6 +111,23 @@ export class TasksRepository extends Repository {
     return rows[0] ? mapRow(rows[0]) : null;
   }
 
+  async findByIds(ids: string[]) {
+    if (!ids.length) return [] as GenerationTaskRecord[];
+    const params: Record<string, unknown> = {};
+    const placeholders = ids
+      .map((id, index) => {
+        const key = `id${index}`;
+        params[key] = id;
+        return `:${key}`;
+      })
+      .join(",");
+    const rows = await this.query<GenerationTaskRow[]>(
+      `SELECT * FROM generation_tasks WHERE id IN (${placeholders})`,
+      params,
+    );
+    return rows.map(mapRow);
+  }
+
   async listRecent(input: {
     moduleCode?: string;
     status?: string;

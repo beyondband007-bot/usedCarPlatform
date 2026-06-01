@@ -15,6 +15,11 @@ import {
 /** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
 export const studioGuestNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
+  {
+    path: '/workspace',
+    label: '视觉工作台',
+    workbenchEntry: true,
+  },
   { path: '/pricing', label: '企业套餐' },
   { path: '/login', label: '企业账号登录' },
 ]
@@ -29,6 +34,7 @@ export const topNavigation: NavItem[] = [
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
+  { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
   { path: '/login', label: '企业账号登录', icon: 'mdi:account-key-outline' },
 ]
 

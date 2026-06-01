@@ -1,11 +1,17 @@
 ﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { motion } from "motion-v";
 import { useMessage } from "naive-ui";
 
-import { getRecentGenerationTasks, type RecentGenerationTask } from "@/api/visual-workbench";
+import {
+  getRecentGenerationTasks,
+  type RecentGenerationTask,
+} from "@/api/visual-workbench";
+import SceneTemplateRecommendations, {
+  type SceneTemplateRecommendationItem,
+} from "@/components/business/workspace/SceneTemplateRecommendations.vue";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
+import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTutorialGuide.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
@@ -17,22 +23,22 @@ import {
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadAllDeliveryResults } from "@/utils/delivery-download";
+import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
-import { formatDate } from '@/utils/dayjs'
+import { formatDate } from "@/utils/dayjs";
 import {
   recentStatusIconMap,
   recentStatusLabelMap,
   resolveWorkspaceOptionTitle,
-} from '@/utils/workspace-recent'
+} from "@/utils/workspace-recent";
 import {
   isWorkspaceFeatureCompareCode,
   workspaceFeatureCompareMap,
-} from '@/constants/workspace-feature-compare'
-import tutorialCarImage from '@/assets/img/tutorial/upload-car.png'
-import tutorialResultImage from '@/assets/img/tutorial/generate-result.png'
+} from "@/constants/workspace-feature-compare";
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
+  WorkspaceDeliveryTaskPreview,
   WorkspaceGenerateResult,
   WorkspaceImagePreview,
   WorkspaceRecentItem,
@@ -43,6 +49,7 @@ const props = defineProps<{
   selectedOptionId: string;
   isGenerating?: boolean;
   generationResult?: WorkspaceGenerateResult | null;
+  deliveryTaskPreview?: WorkspaceDeliveryTaskPreview | null;
   deliveryImagePreview?: WorkspaceImagePreview | null;
   shortVideoPlayRequest?: number;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
@@ -52,12 +59,16 @@ const emit = defineEmits<{
   backFromResult: [];
   closeDeliveryImagePreview: [];
   openDeliveryImagePreview: [preview: WorkspaceImagePreview];
+  openDeliveryAssetResult: [result: WorkspaceGenerateResult];
   pickTemplate: [payload: { capabilityCode: string; optionId: string }];
   pickRecent: [item: WorkspaceRecentItem];
 }>();
 
 function canOpenRecent(item: WorkspaceRecentItem) {
-  return Boolean(item.taskId) || (item.status === "success" && Boolean(item.previewImage));
+  return (
+    Boolean(item.taskId) ||
+    (item.status === "success" && Boolean(item.previewImage))
+  );
 }
 
 function handleRecentPick(item: WorkspaceRecentItem) {
@@ -65,9 +76,45 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   emit("pickRecent", item);
 }
 
-const templateCards = workspaceTemplateRecommendations;
+const templateDescriptionMap: Record<string, string> = {
+  经典白棚: "纯净背景·突出车身线条",
+  玻璃展厅: "通透空间·自然光影",
+  暗调奢华: "低调奢华·气质感",
+  柔光灯顶: "柔光均匀·减少硬阴影",
+  极简留白: "留白克制·主体更集中",
+  广角空间: "空间更开阔·适合展示全景",
+  林荫公园: "自然绿意·日常外景",
+  山野湖畔: "山野开阔·环境更自然",
+  城市街区: "城市质感·适合门店传播",
+  海边日光: "明亮通透·度假氛围",
+  道路动态1: "高速跟拍·突出速度感",
+  道路动态2: "城市动感·增强行驶氛围",
+  道路动态3: "夜景道路·强化光轨质感",
+  道路动态4: "山路弯道·突出操控感",
+  天空镜场: "镜面天空·反射质感更强",
+  夕阳车境: "暖色夕照·氛围更柔和",
+  天境无垠: "开阔天境·视野更通透",
+  云海展台: "云海展台·层次更丰富",
+  云境车场: "云境车场·场景更完整",
+  天空之境: "纯净天境·主体更突出",
+};
 
-const featureCompareActiveView = ref<"features" | "recent" | "generating">("features");
+const templateCards = computed<SceneTemplateRecommendationItem[]>(() =>
+  workspaceTemplateRecommendations
+    .filter((item) => item.capabilityCode === props.capability.code)
+    .slice(0, 4)
+    .map((item) => ({
+      id: item.optionId,
+      title: item.title,
+      image: item.image,
+      description:
+        templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景",
+    })),
+);
+
+const featureCompareActiveView = ref<"features" | "recent" | "generating">(
+  "features",
+);
 
 const isFeatureCompareCapability = computed(() =>
   isWorkspaceFeatureCompareCode(props.capability.code),
@@ -89,17 +136,10 @@ const activeFeatureCompareDrag = ref<{
   pointerId: number;
 } | null>(null);
 
-function isTemplateActive(item: (typeof templateCards)[number]) {
-  return (
-    props.capability.code === item.capabilityCode &&
-    props.selectedOptionId === item.optionId
-  );
-}
-
-function handleTemplatePick(item: (typeof templateCards)[number]) {
+function handleTemplatePick(item: SceneTemplateRecommendationItem) {
   emit("pickTemplate", {
-    capabilityCode: item.capabilityCode,
-    optionId: item.optionId,
+    capabilityCode: props.capability.code,
+    optionId: item.id,
   });
 }
 
@@ -108,7 +148,8 @@ function clampFeatureCompareProgress(value: number) {
 }
 
 function setFeatureCompareMediaRef(index: number, element: unknown) {
-  featureCompareMediaRefs.value[index] = element instanceof HTMLElement ? element : null;
+  featureCompareMediaRefs.value[index] =
+    element instanceof HTMLElement ? element : null;
 }
 
 function updateFeatureCompareProgress(index: number, clientX: number) {
@@ -148,7 +189,9 @@ function startFeatureCompareDrag(index: number, event: PointerEvent) {
 }
 
 const appStore = useAppStore();
-const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">("guide");
+const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">(
+  "guide",
+);
 const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
@@ -156,7 +199,9 @@ const shortVideoInitialView = ref<"preview" | "recent">("preview");
 let recentRefreshTimer: number | null = null;
 
 const isBatchProcessingView = computed(
-  () => props.capability.kind === "batch" && (props.batchActiveJobs?.length ?? 0) > 0,
+  () =>
+    props.capability.kind === "batch" &&
+    (props.batchActiveJobs?.length ?? 0) > 0,
 );
 
 interface BatchDisplayCard {
@@ -180,7 +225,8 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
         cards.push({
           id: `${job.batchId}-${item.itemId}`,
           title: item.groupTitle || job.projectName,
-          sceneLabel: item.itemKind === "interior" ? "内饰增强" : job.projectName,
+          sceneLabel:
+            item.itemKind === "interior" ? "内饰增强" : job.projectName,
           createdAt,
           status: item.status,
           thumbnail: item.thumbnail || job.previewUrl || undefined,
@@ -205,63 +251,15 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
 
 const showTemplateRecommendations = computed(
   () =>
-    props.capability.kind !== 'beauty' &&
-    props.capability.kind !== 'interior' &&
-    props.capability.kind !== 'batch',
-)
-
-const tutorialSteps = [
-  {
-    title: "上传车图",
-    icon: "mdi:cloud-upload-outline",
-  },
-  {
-    title: "选择展厅模板",
-    icon: "mdi:view-gallery-outline",
-  },
-  {
-    title: "选择 Logo",
-    icon: "mdi:badge-account-horizontal-outline",
-  },
-  {
-    title: "生成效果",
-    icon: "mdi:car-select",
-  },
-] as const;
-
-const tutorialCards = computed(() => {
-  const templatePreview = templateCards[1]?.image ?? templateCards[0]?.image ?? "";
-
-  return tutorialSteps.map((step, index) => ({
-    ...step,
-    image:
-      index === 0
-        ? tutorialCarImage
-        : index === 1
-          ? templatePreview
-          : index === 3
-            ? tutorialResultImage
-            : "",
-  }));
-});
-
-const tutorialTemplatePreviewImages = computed(() =>
-  templateCards.slice(0, 4).map((item) => item.image),
+    props.capability.kind !== "beauty" &&
+    props.capability.kind !== "interior" &&
+    props.capability.kind !== "batch",
 );
 
-const templateDescriptionMap: Record<string, string> = {
-  "经典白棚": "纯净背景·突出车身线条",
-  "玻璃展厅": "通透空间·自然光影",
-  "暗调奢华": "低调奢华·气质感",
-  "柔光灯顶": "柔光均匀·减少硬阴影",
-  "极简留白": "留白克制·主体更集中",
-  "广角空间": "空间更开阔·适合展示全景",
-};
-
 const requirementDescriptionMap: Record<string, string> = {
-  "车辆完整入镜": "建议四周留白，车辆完整不被切断。",
-  "画面清晰无遮挡": "主体清晰，无重度雾气或前景遮挡物。",
-  "光线均匀少反光": "避免强烈曝光、眩光、大面积镜面反射。",
+  车辆完整入镜: "建议四周留白，车辆完整不被切断。",
+  画面清晰无遮挡: "主体清晰，无重度雾气或前景遮挡物。",
+  光线均匀少反光: "避免强烈曝光、眩光、大面积镜面反射。",
 };
 
 const requirementCards = computed(() =>
@@ -274,6 +272,7 @@ const requirementCards = computed(() =>
 const deliveryResultCount = deliveryResults.length;
 const message = useMessage();
 const isDownloadingAllDelivery = ref(false);
+const isDownloadingDeliveryGroup = ref(false);
 
 watch(
   () => props.capability.kind,
@@ -289,8 +288,50 @@ function openDeliveryResultPreview(item: DeliveryResultItem) {
   );
 }
 
+function openDeliveryGroupAssetPreview(
+  asset: WorkspaceDeliveryTaskPreview["assets"][number],
+) {
+  emit("openDeliveryAssetResult", {
+    createdAt: asset.createdAt,
+    statusText: `已完成 · ${asset.title} · 成片交付结果`,
+    ratioLabel: asset.ratio,
+    mediaType: "image",
+    previewImage: asset.imageUrl,
+    previewAlt: asset.title,
+    downloadUrl: asset.imageUrl,
+    imageWidth: asset.width,
+    imageHeight: asset.height,
+  });
+}
+
 function closeDeliveryImagePreview() {
   emit("closeDeliveryImagePreview");
+}
+
+async function handleDownloadDeliveryGroup() {
+  const task = props.deliveryTaskPreview;
+  if (!task?.assets.length) {
+    message.warning("当前任务组没有可下载成片");
+    return;
+  }
+
+  isDownloadingDeliveryGroup.value = true;
+
+  try {
+    const files = task.assets.map((asset, index) => ({
+      url: asset.imageUrl,
+      filename: `${sanitizeFilename(task.title)}-${String(index + 1).padStart(2, "0")}-${sanitizeFilename(asset.title)}.jpg`,
+    }));
+    const count = await downloadFilesAsZip(
+      files,
+      `${sanitizeFilename(task.title)}-成片交付.zip`,
+    );
+    message.success(`已开始下载 ${count} 张成片`);
+  } catch {
+    message.error("批量下载失败，请稍后重试");
+  } finally {
+    isDownloadingDeliveryGroup.value = false;
+  }
 }
 
 async function handleDownloadAllDelivery() {
@@ -314,6 +355,7 @@ const recentTaskModuleCodes = new Set([
   "paint-refresh",
   "light-consistency",
   "interior-clean",
+  "interior-stitch",
   "watermark-remove",
   "short-video",
   "batch-new",
@@ -323,17 +365,24 @@ function canLoadRecentTasks() {
   return recentTaskModuleCodes.has(props.capability.code);
 }
 
-function mapRecentStatus(item: RecentGenerationTask): WorkspaceRecentItem["status"] {
-  const status = (item.uiStatus ?? item.status ?? "waiting") as WorkspaceRecentItem["status"];
+function mapRecentStatus(
+  item: RecentGenerationTask,
+): WorkspaceRecentItem["status"] {
+  const status = (item.uiStatus ??
+    item.status ??
+    "waiting") as WorkspaceRecentItem["status"];
   return status === "queue" ? "queued" : status;
 }
 
 function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
-  const sceneTitle = resolveWorkspaceOptionTitle(item.moduleCode, item.sceneLabel);
+  const sceneTitle = resolveWorkspaceOptionTitle(
+    item.moduleCode,
+    item.sceneLabel,
+  );
   const isShortVideo = item.moduleCode === "short-video";
   const thumbnail = isShortVideo
-    ? item.inputAssetUrl ?? item.thumbnail ?? undefined
-    : item.thumbnail ?? item.inputAssetUrl ?? undefined;
+    ? (item.inputAssetUrl ?? item.thumbnail ?? undefined)
+    : (item.thumbnail ?? item.inputAssetUrl ?? undefined);
   const previewImage = item.previewImage ?? item.inputAssetUrl ?? undefined;
 
   return {
@@ -342,13 +391,19 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     moduleCode: item.moduleCode,
     title: item.title,
     status: mapRecentStatus(item),
-    createdAt: formatDate(item.createdAt, 'YYYY-MM-DD HH:mm'),
-    updatedAt: item.updatedAt ? formatDate(item.updatedAt, 'YYYY-MM-DD HH:mm') : undefined,
+    createdAt: formatDate(item.createdAt, "YYYY-MM-DD HH:mm"),
+    updatedAt: item.updatedAt
+      ? formatDate(item.updatedAt, "YYYY-MM-DD HH:mm")
+      : undefined,
     thumbnail,
     previewImage,
     downloadUrl: item.downloadUrl ?? previewImage,
-    ratioLabel: isShortVideo ? '16:9 · 720p · 10秒' : item.ratioLabel ?? undefined,
-    sceneLabel: isShortVideo ? '营销短视频' : sceneTitle ?? item.sceneLabel ?? undefined,
+    ratioLabel: isShortVideo
+      ? "16:9 · 720p · 10秒"
+      : (item.ratioLabel ?? undefined),
+    sceneLabel: isShortVideo
+      ? "营销短视频"
+      : (sceneTitle ?? item.sceneLabel ?? undefined),
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
     inputAssetUrl: item.inputAssetUrl ?? undefined,
@@ -357,7 +412,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     error:
       typeof item.error === "string"
         ? item.error
-        : item.error?.message ?? undefined,
+        : (item.error?.message ?? undefined),
   };
 }
 
@@ -374,7 +429,8 @@ function shouldPollRecent() {
   }
   if (
     isFeatureCompareCapability.value &&
-    (featureCompareActiveView.value === "recent" || featureCompareActiveView.value === "generating")
+    (featureCompareActiveView.value === "recent" ||
+      featureCompareActiveView.value === "generating")
   ) {
     return canAutoRefreshRecent(recentItems.value);
   }
@@ -394,7 +450,10 @@ async function loadRecentItems() {
 
   try {
     const result = await getRecentGenerationTasks({
-      moduleCode: props.capability.code,
+      moduleCode:
+        props.capability.code === "interior-stitch"
+          ? "interior-collage"
+          : props.capability.code,
       page: 1,
       pageSize: 20,
     });
@@ -412,7 +471,10 @@ async function loadRecentItems() {
 }
 
 function handleResultBack() {
-  if (props.capability.code === "short-video" && props.generationResult?.mediaType === "video") {
+  if (
+    props.capability.code === "short-video" &&
+    props.generationResult?.mediaType === "video"
+  ) {
     shortVideoInitialView.value = "recent";
   }
 
@@ -485,7 +547,9 @@ watch(
     recentLoaded.value = false;
 
     if (isFeatureCompareCapability.value) {
-      featureCompareActiveView.value = props.isGenerating ? "generating" : "features";
+      featureCompareActiveView.value = props.isGenerating
+        ? "generating"
+        : "features";
       featureCompareProgress.value = featureCompareCards.value.map(() => 50);
     } else if (isBatchProcessingView.value) {
       activeTab.value = "batchProcessing";
@@ -523,7 +587,8 @@ watch(
 );
 
 watch(
-  () => [activeTab.value, props.isGenerating, isBatchProcessingView.value] as const,
+  () =>
+    [activeTab.value, props.isGenerating, isBatchProcessingView.value] as const,
   ([tab]) => {
     if (tab === "recent" || tab === "generating" || tab === "batchProcessing") {
       if (!recentLoaded.value) {
@@ -551,8 +616,6 @@ onUnmounted(() => {
 defineExpose({
   refreshRecentItems: loadRecentItems,
 });
-
-
 </script>
 
 <template>
@@ -572,10 +635,92 @@ defineExpose({
       @back="closeDeliveryImagePreview"
     />
 
+    <section
+      v-else-if="deliveryTaskPreview"
+      class="delivery-group-preview"
+      aria-label="成片图组预览"
+    >
+      <header class="delivery-group-head">
+        <div class="delivery-group-copy">
+          <p>成片交付</p>
+          <h2>{{ deliveryTaskPreview.title }}</h2>
+          <span>
+            {{ deliveryTaskPreview.meta }} · {{ deliveryTaskPreview.assets.length }} 张成片
+          </span>
+        </div>
+        <div class="delivery-group-actions">
+          <button
+            type="button"
+            class="delivery-group-download-all"
+            :disabled="isDownloadingDeliveryGroup"
+            @click="handleDownloadDeliveryGroup"
+          >
+            <Icon icon="mdi:download-multiple" />
+            {{ isDownloadingDeliveryGroup ? "下载中..." : "全部下载" }}
+          </button>
+          <button
+            type="button"
+            class="delivery-group-back"
+            @click="closeDeliveryImagePreview"
+          >
+            返回
+          </button>
+        </div>
+      </header>
+
+      <div class="delivery-group-grid">
+        <article
+          v-for="asset in deliveryTaskPreview.assets"
+          :key="asset.id"
+          class="delivery-group-card is-clickable"
+          role="button"
+          tabindex="0"
+          :aria-label="`查看大图：${asset.title}`"
+          @click="openDeliveryGroupAssetPreview(asset)"
+          @keydown.enter.prevent="openDeliveryGroupAssetPreview(asset)"
+          @keydown.space.prevent="openDeliveryGroupAssetPreview(asset)"
+        >
+          <div class="delivery-group-media">
+            <PreloadImage
+              class="delivery-group-image"
+              :src="asset.thumbnailUrl || asset.imageUrl"
+              :alt="asset.title"
+              loading="lazy"
+              decoding="async"
+              :draggable="false"
+              fit="cover"
+              object-position="center"
+            />
+          </div>
+          <footer class="delivery-group-foot">
+            <div>
+              <strong>{{ asset.title }}</strong>
+              <span>{{ asset.ratio }}</span>
+            </div>
+            <a
+              class="delivery-group-download"
+              :href="asset.imageUrl"
+              download
+              target="_blank"
+              rel="noreferrer"
+              aria-label="下载成片"
+              @click.stop
+            >
+              <Icon icon="mdi:download" />
+            </a>
+          </footer>
+        </article>
+      </div>
+    </section>
+
     <template v-else-if="isFeatureCompareCapability && featureCompareContent">
       <div class="assist-shell">
         <header class="assist-tabs">
-          <div class="tab-group" role="tablist" :aria-label="featureCompareContent.tabListLabel">
+          <div
+            class="tab-group"
+            role="tablist"
+            :aria-label="featureCompareContent.tabListLabel"
+          >
             <template v-if="isGenerating">
               <button
                 type="button"
@@ -642,6 +787,9 @@ defineExpose({
           <section
             v-else-if="featureCompareActiveView === 'features'"
             class="watermark-feature-layout"
+            :class="{
+              'is-result-mode': featureCompareContent.mode === 'result',
+            }"
             :aria-label="featureCompareContent.featureSectionLabel"
           >
             <section class="watermark-assist-hero">
@@ -652,7 +800,42 @@ defineExpose({
               </div>
             </section>
 
-            <section class="watermark-compare-section" aria-label="效果对比">
+            <section
+              v-if="featureCompareContent.mode === 'result'"
+              class="watermark-result-section"
+              aria-label="生成效果图"
+            >
+              <header class="watermark-section-head">
+                <div>
+                  <h3>{{ featureCompareContent.compareTitle }}</h3>
+                  <p>{{ featureCompareContent.compareHint }}</p>
+                </div>
+              </header>
+
+              <article class="watermark-result-card">
+                <div class="watermark-result-media">
+                  <PreloadImage
+                    class="watermark-result-image"
+                    :src="
+                      featureCompareCards[0]?.after ??
+                      featureCompareCards[0]?.before
+                    "
+                    :alt="featureCompareContent.afterAlt"
+                    loading="lazy"
+                    decoding="async"
+                    :draggable="false"
+                    fit="cover"
+                    object-position="center"
+                  />
+                </div>
+              </article>
+            </section>
+
+            <section
+              v-else
+              class="watermark-compare-section"
+              aria-label="效果对比"
+            >
               <header class="watermark-section-head">
                 <div>
                   <h3>{{ featureCompareContent.compareTitle }}</h3>
@@ -667,10 +850,16 @@ defineExpose({
                   class="watermark-compare-card"
                 >
                   <div
-                    :ref="(element) => setFeatureCompareMediaRef(index, element)"
+                    :ref="
+                      (element) => setFeatureCompareMediaRef(index, element)
+                    "
                     class="watermark-compare-media"
-                    :style="{ '--compare-progress': `${featureCompareProgress[index]}%` }"
-                    @pointerdown.prevent="startFeatureCompareDrag(index, $event)"
+                    :style="{
+                      '--compare-progress': `${featureCompareProgress[index]}%`,
+                    }"
+                    @pointerdown.prevent="
+                      startFeatureCompareDrag(index, $event)
+                    "
                   >
                     <PreloadImage
                       class="watermark-compare-image"
@@ -689,15 +878,23 @@ defineExpose({
                     <div class="watermark-compare-divider" aria-hidden="true">
                       <span></span>
                     </div>
-                    <span class="watermark-compare-badge watermark-compare-badge--before">处理前</span>
-                    <span class="watermark-compare-badge watermark-compare-badge--after">处理后</span>
+                    <span
+                      class="watermark-compare-badge watermark-compare-badge--before"
+                      >处理前</span
+                    >
+                    <span
+                      class="watermark-compare-badge watermark-compare-badge--after"
+                      >处理后</span
+                    >
                     <button
                       type="button"
                       class="watermark-compare-handle"
                       :aria-label="featureCompareContent.handleAriaLabel"
-                      @pointerdown.prevent.stop="startFeatureCompareDrag(index, $event)"
+                      @pointerdown.prevent.stop="
+                        startFeatureCompareDrag(index, $event)
+                      "
                     >
-                      <Icon icon="mdi:unfold-more-horizontal" />
+                      <Icon icon="mdi:arrow-left-right" />
                     </button>
                   </div>
                 </article>
@@ -706,7 +903,10 @@ defineExpose({
           </section>
 
           <section v-else class="recent-layout" aria-label="最近生成">
-            <div v-if="recentLoading && !recentItems.length" class="recent-empty-state">
+            <div
+              v-if="recentLoading && !recentItems.length"
+              class="recent-empty-state"
+            >
               <Icon icon="mdi:loading" class="recent-loading-icon" />
               <span>正在加载最近生成</span>
             </div>
@@ -721,7 +921,9 @@ defineExpose({
               :class="{ 'is-clickable': canOpenRecent(item) }"
               :role="canOpenRecent(item) ? 'button' : undefined"
               :tabindex="canOpenRecent(item) ? 0 : undefined"
-              :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
+              :aria-label="
+                canOpenRecent(item) ? `查看${item.title}` : item.title
+              "
               @click="handleRecentPick(item)"
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
@@ -742,13 +944,18 @@ defineExpose({
                   <Icon icon="mdi:image-outline" />
                 </div>
                 <span class="recent-status" :class="`is-${item.status}`">
-                  <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
+                  <Icon
+                    :icon="statusIconMap[item.status]"
+                    class="recent-status-icon"
+                  />
                   {{ statusLabelMap[item.status] }}
                 </span>
               </div>
               <footer class="recent-foot">
                 <strong class="recent-name">{{ item.title }}</strong>
-                <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
+                <p v-if="item.sceneLabel" class="recent-scene">
+                  {{ item.sceneLabel }}
+                </p>
                 <span class="recent-time">
                   <Icon icon="mdi:clock-outline" class="recent-time-icon" />
                   {{ item.createdAt }}
@@ -825,304 +1032,242 @@ defineExpose({
       <div class="assist-shell">
         <header class="assist-tabs">
           <div class="tab-group" role="tablist" aria-label="辅助面板">
-          <template v-if="isBatchProcessingView">
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'batchProcessing'"
-              :class="{ active: activeTab === 'batchProcessing' }"
-              @click="activeTab = 'batchProcessing'"
-            >
-              正在处理
-            </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'recent'"
-              :class="{ active: activeTab === 'recent' }"
-              @click="activeTab = 'recent'"
-            >
-              最近生成
-            </button>
-          </template>
-          <template v-else-if="isGenerating">
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'generating'"
-              :class="{ active: activeTab === 'generating' }"
-              @click="activeTab = 'generating'"
-            >
-              正在生成
-            </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'recent'"
-              :class="{ active: activeTab === 'recent' }"
-              @click="activeTab = 'recent'"
-            >
-              最近生成
-            </button>
-          </template>
-          <template v-else>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'guide'"
-              :class="{ active: activeTab === 'guide' }"
-              @click="activeTab = 'guide'"
-            >
-              使用教程
-            </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === 'recent'"
-              :class="{ active: activeTab === 'recent' }"
-              @click="activeTab = 'recent'"
-            >
-              最近生成
-            </button>
-          </template>
-        </div>
-      </header>
-
-      <div class="assist-body">
-      <section
-        v-if="isBatchProcessingView && activeTab === 'batchProcessing'"
-        class="recent-layout batch-processing-layout"
-        aria-label="批量任务处理中"
-      >
-        <article
-          v-for="item in batchDisplayCards"
-          :key="item.id"
-          class="recent-card"
-        >
-          <div class="recent-media">
-            <PreloadImage
-              v-if="item.thumbnail"
-              class="recent-image"
-              :src="item.thumbnail"
-              :alt="item.title"
-              loading="lazy"
-              decoding="async"
-              :draggable="false"
-              fit="cover"
-              object-position="center"
-            />
-            <div v-else class="recent-empty">
-              <Icon icon="mdi:image-outline" />
-            </div>
-            <span class="recent-status" :class="`is-${item.status}`">
-              <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
-              {{ statusLabelMap[item.status] }}
-            </span>
+            <template v-if="isBatchProcessingView">
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'batchProcessing'"
+                :class="{ active: activeTab === 'batchProcessing' }"
+                @click="activeTab = 'batchProcessing'"
+              >
+                正在处理
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'recent'"
+                :class="{ active: activeTab === 'recent' }"
+                @click="activeTab = 'recent'"
+              >
+                最近生成
+              </button>
+            </template>
+            <template v-else-if="isGenerating">
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'generating'"
+                :class="{ active: activeTab === 'generating' }"
+                @click="activeTab = 'generating'"
+              >
+                正在生成
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'recent'"
+                :class="{ active: activeTab === 'recent' }"
+                @click="activeTab = 'recent'"
+              >
+                最近生成
+              </button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'guide'"
+                :class="{ active: activeTab === 'guide' }"
+                @click="activeTab = 'guide'"
+              >
+                使用教程
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'recent'"
+                :class="{ active: activeTab === 'recent' }"
+                @click="activeTab = 'recent'"
+              >
+                最近生成
+              </button>
+            </template>
           </div>
-          <footer class="recent-foot">
-            <strong class="recent-name">{{ item.title }}</strong>
-            <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
-            <span class="recent-time">
-              <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-              {{ item.createdAt }}
-              <template v-if="item.progress !== undefined && item.progress < 100">
-                · 进度 {{ item.progress }}%
-              </template>
-            </span>
-          </footer>
-        </article>
-      </section>
+        </header>
 
-      <section
-        v-else-if="isGenerating && activeTab === 'generating'"
-        class="generation-waiting"
-        aria-live="polite"
-      >
-        <div class="waiting-visual" aria-hidden="true">
-          <span class="waiting-scan"></span>
-          <Icon icon="mdi:image-sync-outline" />
-        </div>
-        <div class="waiting-copy">
-          <p>图片待生成</p>
-          <h2>正在生成效果图</h2>
-          <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
-        </div>
-        <div class="waiting-progress" aria-hidden="true">
-          <span></span>
-        </div>
-      </section>
-
-      <section
-        v-else-if="!isGenerating && activeTab === 'guide' && !isBatchProcessingView"
-        class="guide-layout"
-        :class="{ 'is-compact-guide': !showTemplateRecommendations }"
-      >
-        <section class="tutorial-section" aria-label="使用教程流程">
-          <div class="section-head">
-            <h2>使用教程</h2>
-          </div>
-          <div class="tutorial-flow">
-            <motion.article
-              v-for="(step, index) in tutorialCards"
-              :key="`${capability.code}-${step.title}`"
-              :initial="{ opacity: 0, y: 14 }"
-              :animate="{ opacity: 1, y: 0 }"
-              :transition="{ duration: 0.32, delay: index * 0.04 }"
-              class="tutorial-step"
-              :class="`is-step-${index + 1}`"
+        <div class="assist-body">
+          <section
+            v-if="isBatchProcessingView && activeTab === 'batchProcessing'"
+            class="recent-layout batch-processing-layout"
+            aria-label="批量任务处理中"
+          >
+            <article
+              v-for="item in batchDisplayCards"
+              :key="item.id"
+              class="recent-card"
             >
-              <div class="tutorial-placeholder">
-                <template v-if="index === 1">
-                  <div class="tutorial-mosaic" aria-hidden="true">
-                    <PreloadImage
-                      v-for="(image, mosaicIndex) in tutorialTemplatePreviewImages"
-                      :key="image"
-                      class="tutorial-mosaic-image"
-                      :class="`is-mosaic-${mosaicIndex + 1}`"
-                      :src="image"
-                      :alt="step.title"
-                      loading="lazy"
-                      :draggable="false"
-                      fit="contain"
-                    />
-                  </div>
-                </template>
-                <template v-else-if="index === 2">
-                  <div class="tutorial-logo-preview" aria-hidden="true">
-                    <span class="tutorial-logo-frame">
-                      <span>AI CAR STUDIO</span>
-                    </span>
-                  </div>
-                </template>
+              <div class="recent-media">
                 <PreloadImage
-                  v-else
-                  class="tutorial-image"
-                  :src="step.image"
-                  :alt="step.title"
+                  v-if="item.thumbnail"
+                  class="recent-image"
+                  :src="item.thumbnail"
+                  :alt="item.title"
                   loading="lazy"
+                  decoding="async"
                   :draggable="false"
-                  fit="contain"
+                  fit="cover"
+                  object-position="center"
                 />
+                <div v-else class="recent-empty">
+                  <Icon icon="mdi:image-outline" />
+                </div>
+                <span class="recent-status" :class="`is-${item.status}`">
+                  <Icon
+                    :icon="statusIconMap[item.status]"
+                    class="recent-status-icon"
+                  />
+                  {{ statusLabelMap[item.status] }}
+                </span>
               </div>
-              <footer class="tutorial-step-foot">
-                <strong>{{ step.title }}</strong>
+              <footer class="recent-foot">
+                <strong class="recent-name">{{ item.title }}</strong>
+                <p v-if="item.sceneLabel" class="recent-scene">
+                  {{ item.sceneLabel }}
+                </p>
+                <span class="recent-time">
+                  <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+                  {{ item.createdAt }}
+                  <template
+                    v-if="item.progress !== undefined && item.progress < 100"
+                  >
+                    · 进度 {{ item.progress }}%
+                  </template>
+                </span>
               </footer>
-              <span class="tutorial-step-arrow" aria-hidden="true">
-                <Icon
-                  :icon="index < tutorialCards.length - 1 ? 'mdi:arrow-right' : 'mdi:check'"
-                />
-              </span>
-            </motion.article>
-          </div>
-        </section>
-
-        <section
-          v-if="showTemplateRecommendations"
-          class="template-section"
-          aria-label="模板推荐"
-        >
-          <h2>初次使用？试试这些</h2>
-          <div class="template-grid">
-            <article
-              v-for="item in templateCards"
-              :key="item.title"
-              role="button"
-              tabindex="0"
-              class="template-card"
-              :class="{ 'is-active': isTemplateActive(item) }"
-              :aria-pressed="isTemplateActive(item)"
-              :aria-label="`选择${item.title}场景`"
-              @click="handleTemplatePick(item)"
-              @keydown.enter.prevent="handleTemplatePick(item)"
-              @keydown.space.prevent="handleTemplatePick(item)"
-            >
-              <PreloadImage
-                class="template-image"
-                :src="item.image"
-                :alt="item.title"
-                loading="lazy"
-                :draggable="false"
-              />
-              <div class="template-title">
-                <strong>{{ item.title }}</strong>
-                <span>{{ templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景" }}</span>
-              </div>
             </article>
-          </div>
-        </section>
+          </section>
 
-        <section class="requirement-section" aria-label="素材要求">
-          <strong class="requirement-title">素材要求</strong>
-          <div class="requirement-grid">
-            <article
-              v-for="item in requirementCards"
-              :key="item.title"
-              class="requirement-card"
-            >
-              <span class="requirement-card-icon" aria-hidden="true">
-                <Icon icon="mdi:check" />
-              </span>
-              <div class="requirement-card-copy">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.desc }}</span>
-              </div>
-            </article>
-          </div>
-        </section>
-      </section>
-
-      <section v-else class="recent-layout" aria-label="最近生成">
-        <div v-if="recentLoading && !recentItems.length" class="recent-empty-state">
-          <Icon icon="mdi:loading" class="recent-loading-icon" />
-          <span>正在加载最近生成</span>
-        </div>
-        <div v-else-if="!recentItems.length" class="recent-empty-state">
-          <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
-          <span>暂无最近生成记录</span>
-        </div>
-        <article
-          v-for="item in recentItems"
-          :key="item.id"
-          class="recent-card"
-          :class="{ 'is-clickable': canOpenRecent(item) }"
-          :role="canOpenRecent(item) ? 'button' : undefined"
-          :tabindex="canOpenRecent(item) ? 0 : undefined"
-          :aria-label="canOpenRecent(item) ? `查看${item.title}` : item.title"
-          @click="handleRecentPick(item)"
-          @keydown.enter.prevent="handleRecentPick(item)"
-          @keydown.space.prevent="handleRecentPick(item)"
-        >
-          <div class="recent-media">
-            <PreloadImage
-              v-if="item.thumbnail"
-              class="recent-image"
-              :src="item.thumbnail"
-              :alt="item.title"
-              loading="lazy"
-              decoding="async"
-              :draggable="false"
-              fit="cover"
-              object-position="center"
-            />
-            <div v-else class="recent-empty">
-              <Icon icon="mdi:image-outline" />
+          <section
+            v-else-if="isGenerating && activeTab === 'generating'"
+            class="generation-waiting"
+            aria-live="polite"
+          >
+            <div class="waiting-visual" aria-hidden="true">
+              <span class="waiting-scan"></span>
+              <Icon icon="mdi:image-sync-outline" />
             </div>
-            <span class="recent-status" :class="`is-${item.status}`">
-              <Icon :icon="statusIconMap[item.status]" class="recent-status-icon" />
-              {{ statusLabelMap[item.status] }}
-            </span>
-          </div>
-          <footer class="recent-foot">
-            <strong class="recent-name">{{ item.title }}</strong>
-            <p v-if="item.sceneLabel" class="recent-scene">{{ item.sceneLabel }}</p>
-            <span class="recent-time">
-              <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-              {{ item.createdAt }}
-            </span>
-          </footer>
-        </article>
-      </section>
-      </div>
+            <div class="waiting-copy">
+              <p>图片待生成</p>
+              <h2>正在生成效果图</h2>
+              <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
+            </div>
+            <div class="waiting-progress" aria-hidden="true">
+              <span></span>
+            </div>
+          </section>
+
+          <section
+            v-else-if="
+              !isGenerating && activeTab === 'guide' && !isBatchProcessingView
+            "
+            class="guide-layout"
+            :class="{ 'is-compact-guide': !showTemplateRecommendations }"
+          >
+            <WorkspaceTutorialGuide
+              :animation-key="capability.code"
+              :theme="appStore.isDarkMode ? 'dark' : 'light'"
+            />
+
+            <SceneTemplateRecommendations
+              v-if="showTemplateRecommendations"
+              :items="templateCards"
+              :active-id="selectedOptionId"
+              :theme="appStore.isDarkMode ? 'dark' : 'light'"
+              @select="handleTemplatePick"
+            />
+
+            <section class="requirement-section" aria-label="素材要求">
+              <strong class="requirement-title">素材要求</strong>
+              <div class="requirement-grid">
+                <article
+                  v-for="item in requirementCards"
+                  :key="item.title"
+                  class="requirement-card"
+                >
+                  <span class="requirement-card-icon" aria-hidden="true">
+                    <Icon icon="mdi:check" />
+                  </span>
+                  <div class="requirement-card-copy">
+                    <strong>{{ item.title }}</strong>
+                    <span>{{ item.desc }}</span>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </section>
+
+          <section v-else class="recent-layout" aria-label="最近生成">
+            <div
+              v-if="recentLoading && !recentItems.length"
+              class="recent-empty-state"
+            >
+              <Icon icon="mdi:loading" class="recent-loading-icon" />
+              <span>正在加载最近生成</span>
+            </div>
+            <div v-else-if="!recentItems.length" class="recent-empty-state">
+              <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
+              <span>暂无最近生成记录</span>
+            </div>
+            <article
+              v-for="item in recentItems"
+              :key="item.id"
+              class="recent-card"
+              :class="{ 'is-clickable': canOpenRecent(item) }"
+              :role="canOpenRecent(item) ? 'button' : undefined"
+              :tabindex="canOpenRecent(item) ? 0 : undefined"
+              :aria-label="
+                canOpenRecent(item) ? `查看${item.title}` : item.title
+              "
+              @click="handleRecentPick(item)"
+              @keydown.enter.prevent="handleRecentPick(item)"
+              @keydown.space.prevent="handleRecentPick(item)"
+            >
+              <div class="recent-media">
+                <PreloadImage
+                  v-if="item.thumbnail"
+                  class="recent-image"
+                  :src="item.thumbnail"
+                  :alt="item.title"
+                  loading="lazy"
+                  decoding="async"
+                  :draggable="false"
+                  fit="cover"
+                  object-position="center"
+                />
+                <div v-else class="recent-empty">
+                  <Icon icon="mdi:image-outline" />
+                </div>
+                <span class="recent-status" :class="`is-${item.status}`">
+                  <Icon
+                    :icon="statusIconMap[item.status]"
+                    class="recent-status-icon"
+                  />
+                  {{ statusLabelMap[item.status] }}
+                </span>
+              </div>
+              <footer class="recent-foot">
+                <strong class="recent-name">{{ item.title }}</strong>
+                <p v-if="item.sceneLabel" class="recent-scene">
+                  {{ item.sceneLabel }}
+                </p>
+                <span class="recent-time">
+                  <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+                  {{ item.createdAt }}
+                </span>
+              </footer>
+            </article>
+          </section>
+        </div>
       </div>
     </template>
   </aside>
@@ -1159,18 +1304,240 @@ defineExpose({
 }
 
 .assist-panel.theme-light {
-  --assist-bg: var(--workspace-panel, #ffffff);
-  --assist-card: rgba(255, 255, 255, 0.92);
-  --assist-card-strong: #f7fafd;
-  --assist-border: var(--workspace-line, #e8edf5);
+  --assist-bg: #f6faff;
+  --assist-card: #ffffff;
+  --assist-card-strong: #f8fbff;
+  --assist-border: #e1eaf5;
   --assist-border-soft: #edf4ff;
   --assist-text: var(--workspace-text, var(--app-text));
-  --assist-muted: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
+  --assist-muted: var(
+    --workspace-muted,
+    var(--app-text-muted, var(--app-text-soft))
+  );
   --assist-blue: var(--workspace-accent, #2f6bff);
   --assist-green: var(--workspace-accent-strong, #2f6bff);
-  --assist-shadow: var(--workspace-shadow, 0 14px 34px rgba(78, 111, 148, 0.09));
+  --assist-shadow: var(
+    --workspace-shadow,
+    0 14px 34px rgba(78, 111, 148, 0.09)
+  );
 
-  background: var(--assist-bg);
+  border-color: #dce6f3;
+  background:
+    radial-gradient(
+      circle at 62% 32%,
+      rgba(207, 224, 255, 0.46),
+      rgba(246, 250, 255, 0) 34%
+    ),
+    linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 18px 42px rgba(78, 111, 148, 0.1);
+}
+
+.delivery-group-preview {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.delivery-group-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.delivery-group-copy {
+  min-width: 0;
+}
+
+.delivery-group-copy p,
+.delivery-group-copy h2,
+.delivery-group-copy span {
+  margin: 0;
+}
+
+.delivery-group-copy p {
+  color: var(--assist-blue);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.delivery-group-copy h2 {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--assist-text);
+  font-size: clamp(18px, 1.35vw, 24px);
+  font-weight: 950;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-group-copy span {
+  display: block;
+  margin-top: 8px;
+  color: var(--assist-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.delivery-group-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.delivery-group-back,
+.delivery-group-download-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--assist-card-strong);
+  color: var(--assist-text);
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.delivery-group-download-all {
+  color: var(--assist-blue);
+}
+
+.delivery-group-download-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.delivery-group-back:hover,
+.delivery-group-download-all:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+}
+
+.delivery-group-grid {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 20px 0;
+}
+
+.delivery-group-card {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid var(--assist-border);
+  border-radius: 12px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
+.delivery-group-card.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.delivery-group-card.is-clickable:hover {
+  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--assist-blue) 12%, transparent),
+    var(--assist-shadow);
+  transform: translateY(-1px);
+}
+
+.delivery-group-card.is-clickable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--assist-blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.delivery-group-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--assist-card-strong);
+}
+
+.delivery-group-image,
+.delivery-group-image :deep(.preload-image),
+.delivery-group-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+}
+
+.delivery-group-foot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.delivery-group-foot div {
+  min-width: 0;
+}
+
+.delivery-group-foot strong {
+  display: block;
+  overflow: hidden;
+  color: var(--assist-text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-group-foot span {
+  display: block;
+  margin-top: 4px;
+  color: var(--assist-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.delivery-group-download {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+  color: var(--assist-blue);
+  font-size: 18px;
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.delivery-group-download:hover {
+  background: color-mix(in srgb, var(--assist-blue) 16%, var(--assist-card-strong));
+  transform: translateY(-1px);
 }
 
 .assist-tabs {
@@ -1210,7 +1577,11 @@ defineExpose({
   border: 1px solid var(--assist-border);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
+      transparent 42%
+    ),
     var(--assist-card);
   box-shadow: var(--assist-shadow);
 }
@@ -1221,19 +1592,36 @@ defineExpose({
   place-items: center;
   width: min(100%, 320px);
   aspect-ratio: 16 / 10;
-  border: 1px dashed color-mix(in srgb, var(--assist-blue) 28%, var(--assist-border));
+  border: 1px dashed
+    color-mix(in srgb, var(--assist-blue) 28%, var(--assist-border));
   border-radius: 18px;
   background:
-    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.02)
+    ),
     var(--assist-card-strong);
   overflow: hidden;
 }
 
 .theme-light .waiting-visual {
   background:
-    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(241, 247, 255, 0.82)),
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.88),
+      rgba(241, 247, 255, 0.82)
+    ),
     var(--assist-card-strong);
 }
 
@@ -1242,7 +1630,10 @@ defineExpose({
   z-index: 2;
   color: var(--assist-blue);
   font-size: clamp(58px, 7vw, 92px);
-  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, transparent));
+  filter: drop-shadow(
+    0 8px 24px
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, transparent)
+  );
   animation: waiting-pulse 1.6s ease-in-out infinite;
 }
 
@@ -1250,14 +1641,13 @@ defineExpose({
   position: absolute;
   inset: 12% 16%;
   border-radius: 14px;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent) 48%,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 4%, transparent) 52%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent) 48%,
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 4%, transparent) 52%,
+    transparent 100%
+  );
   opacity: 0.75;
   animation: waiting-scan 1.8s linear infinite;
 }
@@ -1304,7 +1694,11 @@ defineExpose({
   width: min(100%, 320px);
   height: 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--assist-blue) 12%, var(--assist-border-soft));
+  background: color-mix(
+    in srgb,
+    var(--assist-blue) 12%,
+    var(--assist-border-soft)
+  );
   overflow: hidden;
 }
 
@@ -1365,9 +1759,14 @@ defineExpose({
 .delivery-download-all {
   flex-shrink: 0;
   height: 40px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 34%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 34%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 13%,
+    transparent
+  );
   color: var(--assist-blue);
   padding: 0 16px;
   font-family: inherit;
@@ -1380,8 +1779,16 @@ defineExpose({
 }
 
 .delivery-download-all:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--workspace-accent, #efc24c) 50%, transparent);
-  background: color-mix(in srgb, var(--workspace-accent, #efc24c) 20%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 50%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 20%,
+    transparent
+  );
 }
 
 .delivery-download-all:disabled {
@@ -1447,8 +1854,13 @@ defineExpose({
 }
 
 .delivery-result-card.is-clickable:hover {
-  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--assist-blue) 42%,
+    var(--assist-border)
+  );
+  box-shadow: 0 10px 24px
+    color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1463,7 +1875,11 @@ defineExpose({
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
+      transparent 42%
+    ),
     var(--assist-card-strong);
 }
 
@@ -1520,6 +1936,14 @@ defineExpose({
   padding: 0 6px 24px 0;
 }
 
+.watermark-feature-layout.is-result-mode {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: 14px;
+  overflow: hidden;
+  padding: 0 6px 0 0;
+}
+
 .watermark-assist-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1530,6 +1954,17 @@ defineExpose({
   border-radius: 14px;
   background: var(--assist-card);
   box-shadow: var(--assist-shadow);
+}
+
+.assist-panel.theme-light .watermark-assist-hero,
+.assist-panel.theme-light .watermark-compare-section,
+.assist-panel.theme-light .watermark-result-section,
+.assist-panel.theme-light .generation-waiting {
+  border-color: #e1eaf5;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 16px 36px rgba(78, 111, 148, 0.08);
 }
 
 .watermark-assist-copy {
@@ -1574,6 +2009,17 @@ defineExpose({
   box-shadow: var(--assist-shadow);
 }
 
+.watermark-result-section {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background: var(--assist-card);
+  box-shadow: var(--assist-shadow);
+}
+
 .watermark-section-head {
   display: flex;
   align-items: flex-end;
@@ -1605,6 +2051,51 @@ defineExpose({
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.watermark-result-card {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.watermark-result-media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--assist-border);
+  border-radius: 14px;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(207, 224, 255, 0.52),
+      rgba(248, 251, 255, 0) 44%
+    ),
+    var(--assist-card-strong);
+}
+
+.watermark-result-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--assist-card-strong);
+}
+
+.assist-panel.theme-light .watermark-result-media {
+  border-color: #dce6f3;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(207, 224, 255, 0.5),
+      rgba(248, 251, 255, 0) 44%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.78),
+    0 14px 32px rgba(78, 111, 148, 0.1);
 }
 
 .watermark-compare-card {
@@ -1653,7 +2144,12 @@ defineExpose({
   display: block;
   width: 2px;
   height: 100%;
-  background: linear-gradient(180deg, transparent, var(--assist-blue), transparent);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--assist-blue),
+    transparent
+  );
 }
 
 .watermark-compare-handle {
@@ -1676,7 +2172,7 @@ defineExpose({
 }
 
 .watermark-compare-handle .iconify {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .watermark-compare-badge {
@@ -1755,19 +2251,17 @@ defineExpose({
 }
 
 .guide-layout {
-  display: grid;
+  display: flex;
   flex: 1;
   min-height: 0;
-  grid-auto-rows: max-content;
-  align-content: start;
-  gap: 14px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0 6px 18px 0;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  padding: 0 6px 0 0;
 }
 
 .guide-layout.is-compact-guide {
-  grid-auto-rows: max-content;
+  gap: 12px;
 }
 
 .recent-card {
@@ -1776,39 +2270,12 @@ defineExpose({
   box-shadow: var(--assist-shadow);
 }
 
-.tutorial-section,
-.template-section {
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 18px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.tutorial-section {
-  min-height: 0;
-}
-
-.assist-panel.theme-light .tutorial-section,
-.assist-panel.theme-light .template-section,
 .assist-panel.theme-light .requirement-section {
   border-color: rgba(203, 213, 225, 0.82);
   background: #ffffff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
-.tutorial-section h2,
-.template-section h2 {
-  margin: 0;
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.3;
-  font-weight: 900;
-}
-
-.assist-panel.theme-light .tutorial-section h2,
-.assist-panel.theme-light .template-section h2,
 .assist-panel.theme-light .requirement-title {
   color: #111827;
 }
@@ -1820,322 +2287,13 @@ defineExpose({
   gap: 12px;
 }
 
-.tutorial-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  min-height: 0;
-  margin-top: 16px;
-}
-
-.tutorial-step {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  aspect-ratio: 1 / 1;
-  height: auto;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.tutorial-step:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-.assist-panel.theme-light .tutorial-step {
-  border-color: rgba(203, 213, 225, 0.9);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-}
-
-.assist-panel.theme-light .tutorial-step:hover {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
-}
-
-.tutorial-step-arrow {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(212, 160, 23, 0.25);
-  border-radius: 999px;
-  background: rgba(212, 160, 23, 0.12);
-  color: #d4a017;
-  pointer-events: none;
-}
-
-.tutorial-step-arrow > .iconify {
-  font-size: 20px;
-}
-
-.tutorial-placeholder {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  margin: 10px 10px 0;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #111111;
-}
-
-.tutorial-image {
-  width: 100%;
-  height: 100%;
-  background: #111111;
-}
-
-.tutorial-image :deep(.preload-image) {
-  width: 100%;
-  height: 100%;
-  background: transparent;
-}
-
-.tutorial-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 12px;
-}
-
-.tutorial-step.is-step-1 .tutorial-image,
-.tutorial-step.is-step-4 .tutorial-image {
-  background: #f5f5f3;
-}
-
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
-  background: #f5f5f3;
-}
-
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
-  object-fit: contain;
-  padding: 0;
-}
-
-.tutorial-mosaic {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px;
-  background: #111111;
-}
-
-.assist-panel.theme-light .tutorial-mosaic {
-  background: #f8fafc;
-}
-
-.tutorial-mosaic-image {
-  overflow: hidden;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  min-height: 0;
-}
-
-.tutorial-mosaic-image :deep(.preload-image) {
-  width: 100%;
-  height: 100%;
-  background: transparent;
-}
-
-.tutorial-mosaic-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.tutorial-logo-preview {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  padding: 10px;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(212, 160, 23, 0.18), transparent 44%),
-    linear-gradient(180deg, #f6f9fc, #ffffff);
-}
-
-.tutorial-logo-frame {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(92%, 180px);
-  height: 44px;
-  border: 2px solid #5e4110;
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(244, 202, 79, 0.16), transparent 45%),
-    #171209;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 232, 139, 0.38),
-    0 10px 24px rgba(0, 0, 0, 0.24);
-}
-
-.tutorial-logo-frame::before,
-.tutorial-logo-frame::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #d4a017;
-  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
-  transform: translateY(-50%);
-}
-
-.tutorial-logo-frame::before {
-  left: 10px;
-}
-
-.tutorial-logo-frame::after {
-  right: 10px;
-}
-
-.tutorial-logo-frame span {
-  color: #d4a017;
-  font-size: clamp(12px, 1.1cqw, 16px);
-  font-weight: 950;
-  letter-spacing: 0.06em;
-}
-
-.tutorial-step-foot {
-  display: flex;
-  min-width: 0;
-  flex: 0 0 auto;
-  align-items: flex-end;
-  padding: 8px 48px 10px 12px;
-}
-
-.tutorial-step-foot strong {
-  min-width: 0;
-  color: #ffffff;
-  font-size: 14px;
-  line-height: 1.35;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.assist-panel.theme-light .tutorial-step-foot strong {
-  color: #111827;
-}
-
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 12px;
-}
-
-.template-section {
-  max-height: clamp(270px, 34vh, 390px);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.template-card {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: #111111;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  outline: none;
-  transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.assist-panel.theme-light .template-card {
-  border-color: rgba(203, 213, 225, 0.9);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-}
-
-.template-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--workspace-accent, #d4a017) 42%, rgba(255, 255, 255, 0.08));
-}
-
-.template-card.is-active {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.35),
-    0 0 24px rgba(212, 160, 23, 0.2),
-    0 12px 28px rgba(0, 0, 0, 0.3);
-}
-
-.template-card:focus-visible {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.32),
-    0 0 24px rgba(212, 160, 23, 0.18);
-}
-
-.assist-panel.theme-light .template-card.is-active {
-  border-color: #d4a017;
-  box-shadow:
-    0 0 0 1px rgba(212, 160, 23, 0.32),
-    0 0 22px rgba(212, 160, 23, 0.14),
-    0 12px 24px rgba(15, 23, 42, 0.1);
-}
-
-.template-image {
-  width: 100%;
-  height: 100%;
-}
-
-.template-title {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  display: grid;
-  gap: 2px;
-  min-height: 64px;
-  padding: 14px 14px 12px;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
-}
-
-.template-title strong {
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 900;
-}
-
-.template-title span {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 600;
-}
-
 .requirement-section {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  margin-top: auto;
+  flex-shrink: 0;
   border-radius: 16px;
-  padding: 18px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #111111;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -2151,16 +2309,16 @@ defineExpose({
 .requirement-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 6px;
 }
 
 .requirement-card {
   display: flex;
   min-width: 0;
   align-items: flex-start;
-  gap: 12px;
-  min-height: 86px;
-  padding: 14px 16px;
+  gap: 8px;
+  min-height: 60px;
+  padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
@@ -2179,7 +2337,11 @@ defineExpose({
 
 .requirement-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--workspace-accent, #d4a017) 34%, rgba(255, 255, 255, 0.08));
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #d4a017) 34%,
+    rgba(255, 255, 255, 0.08)
+  );
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
@@ -2191,17 +2353,17 @@ defineExpose({
 
 .requirement-card-icon {
   display: grid;
-  flex: 0 0 32px;
+  flex: 0 0 26px;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   background: rgba(212, 160, 23, 0.12);
   color: var(--workspace-accent-strong, #d4a017);
 }
 
 .requirement-card-icon > .iconify {
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .requirement-card-copy {
@@ -2212,7 +2374,7 @@ defineExpose({
 
 .requirement-card-copy strong {
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.35;
   font-weight: 900;
 }
@@ -2223,8 +2385,8 @@ defineExpose({
 
 .requirement-card-copy span {
   color: rgba(255, 255, 255, 0.68);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.3;
   font-weight: 600;
 }
 
@@ -2320,10 +2482,17 @@ defineExpose({
 
 .recent-card.is-clickable:hover {
   transform: translateY(-1px);
-  border-color: var(--workspace-accent-border, color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border)));
+  border-color: var(
+    --workspace-accent-border,
+    color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border))
+  );
   background: var(--workspace-hover-bg, inherit);
   box-shadow:
-    0 0 0 2px var(--workspace-accent-glow, color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent)),
+    0 0 0 2px
+      var(
+        --workspace-accent-glow,
+        color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent)
+      ),
     var(--assist-shadow);
 }
 
@@ -2340,7 +2509,11 @@ defineExpose({
   overflow: hidden;
   border-radius: 10px 10px 0 0;
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent), transparent 42%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
+      transparent 42%
+    ),
     var(--assist-card-strong);
 
   :deep(.preload-image) {
@@ -2526,18 +2699,8 @@ defineExpose({
   }
 
   .guide-layout {
-    gap: 12px;
+    gap: 10px;
     padding-right: 4px;
-    padding-bottom: 14px;
-  }
-
-  .tutorial-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .template-grid {
-    gap: 12px;
   }
 
   .requirement-grid {
@@ -2562,9 +2725,8 @@ defineExpose({
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .template-grid,
   .requirement-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2582,7 +2744,6 @@ defineExpose({
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .template-grid,
   .requirement-grid {
     grid-template-columns: minmax(0, 1fr);
   }

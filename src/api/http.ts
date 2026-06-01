@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosHeaders, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
-import { readCreditsIdentity } from '@/utils/credits-identity'
+import { toCreditsHeaders } from '@/utils/credits-identity'
 
 // 创建 axios 实例
 export const http = axios.create({
@@ -22,15 +22,8 @@ http.interceptors.request.use(
       headers.set('Authorization', `Bearer ${token}`)
     }
 
-    const creditsIdentity = readCreditsIdentity()
-    if (creditsIdentity) {
-      headers.set('x-credits-user-id', String(creditsIdentity.userId))
-      headers.set('x-credits-account-scope', creditsIdentity.accountScope)
-      if (creditsIdentity.tenantId) {
-        headers.set('x-credits-tenant-id', String(creditsIdentity.tenantId))
-      } else {
-        headers.delete('x-credits-tenant-id')
-      }
+    for (const [key, value] of Object.entries(toCreditsHeaders())) {
+      headers.set(key, value)
     }
 
     config.headers = headers
