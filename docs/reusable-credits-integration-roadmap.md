@@ -90,6 +90,8 @@ For the first release, every user/customer account must be created by platform o
 
 The current frontend mock login keeps exactly three Three-Role Credits Back Office roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as the regular product-user login from the existing frontend, but it is not a back-office role and cannot access `/credits-admin`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
+First-release enterprise plan business logic is centralized in `src/domain/enterprise-plans.ts`. Flagship mother/child account visibility is separated in `src/domain/enterprise-account-hierarchy.ts`: the flagship mother account can view its three child accounts' points and transactions, while lower plans do not get child-account visibility.
+
 ## Revised Next Plan
 
 The original plan is still directionally correct, but the next phases should now focus on frontend/admin visibility and identity, because backend task billing is mostly in place.

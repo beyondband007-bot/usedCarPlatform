@@ -27,6 +27,32 @@ scripts/seed-used-car-platform.cjs
 | 企业团队档 | ¥3,980 | 1 个账号 | 100,000 | 可生成 2,500 张图，约 250-300 辆车；可同时执行 5 套图 |
 | 企业旗舰档 | ¥9,800 | 1 + 3 个账号 | 800,000 | 可生成 15,000 张图，约 1,500 辆车；每个账号可同时执行 20 套图 |
 
+## Flagship Mother/Child Account Rule
+
+企业旗舰档 includes:
+
+- 1 mother account
+- 3 child accounts
+
+First-release visibility rule:
+
+- the mother account can view its own points and transactions
+- the mother account can also view all 3 child accounts' points and transactions
+- each child account is shown as a separate account in the credits page
+- regular/basic/team plans do not get child-account visibility
+
+Canonical usedCar frontend source:
+
+```text
+src/domain/enterprise-account-hierarchy.ts
+```
+
+Current implementation scope:
+
+- the rule is implemented in frontend business logic for the credits page
+- child account rows and transactions are local first-release demo/business logic
+- production backend still needs persisted account hierarchy, server-side permission checks, and ledger queries across mother/child accounts
+
 ## Used By
 
 The centralized plan module feeds:
@@ -37,6 +63,7 @@ The centralized plan module feeds:
 - mock recharge orders
 - mock points defaults
 - batch-workbench concurrency display
+- flagship mother/child account visibility in the credits page
 
 The Reusable Credits Platform seed was also updated so real local payment orders grant the same first-release points as the frontend plan display.
 
@@ -50,3 +77,5 @@ If the change affects real recharge/payment behavior, also update the Reusable C
 cd "/Users/shenghangwang/Documents/Reusable Credits Platform"
 npm run seed:used-car:demo
 ```
+
+When changing account hierarchy behavior, update `src/domain/enterprise-account-hierarchy.ts` first. Production should later mirror this rule in backend RBAC and account-query APIs.

@@ -14,11 +14,18 @@ import type { DataTableColumns } from "naive-ui";
 import {
   getCreditAccounts,
   getCreditTransactions,
-  type CreditAccount,
   type CreditTransaction,
 } from "@/api/visual-workbench";
+import {
+  accountDisplayName,
+  buildEnterpriseAccountViews,
+  buildFlagshipChildTransactions,
+  canMotherAccountViewChildren,
+  type EnterpriseAccountView,
+} from "@/domain/enterprise-account-hierarchy";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
+import { useSubscriptionStore } from "@/stores/subscription";
 import {
   creditsAccountOptions,
   creditsFlowData,
@@ -30,11 +37,13 @@ import type { CreditFlowRow } from "@/constants/credits-page";
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
+const subscriptionStore = useSubscriptionStore();
 const copy = creditsPageCopy;
 const isLoadingCredits = ref(false);
-const accounts = ref<CreditAccount[]>([]);
+const accounts = ref<EnterpriseAccountView[]>([]);
 const transactions = ref<CreditTransaction[]>([]);
-const flowRows = ref<CreditFlowRow[]>(creditsFlowData);
+const fallbackFlowRows = ref<CreditFlowRow[]>(creditsFlowData);
+const selectedAccountValue = ref("all-account");
 
 const formatPoints = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0);
@@ -54,12 +63,6 @@ const formatDateTime = (value: string) => {
     second: "2-digit",
     hour12: false,
   }).format(date).replace(/\//g, "-");
-};
-
-const accountName = (account: CreditAccount | undefined) => {
-  if (!account) return "—";
-  if (account.accountScope === "tenant") return `企业账户 #${account.tenantId ?? account.id}`;
-  return `个人账户 #${account.id}`;
 };
 
 const transactionTypeLabel = (type: string) => {
@@ -86,27 +89,57 @@ const mapTransaction = (transaction: CreditTransaction): CreditFlowRow => ({
   flowType: transactionTypeLabel(transaction.txnType),
   delta: signedPoints(transaction.points),
   balance: formatPoints(transaction.balanceAfter),
-  account: accountName(accounts.value.find((account) => account.id === transaction.accountId)),
+  account: accountDisplayName(accounts.value.find((account) => account.id === transaction.accountId)),
   createdAt: formatDateTime(transaction.createdAt),
   remark: transaction.remark ?? transaction.bizType ?? "—",
 });
 
+const selectedAccountIds = computed(() => {
+  if (selectedAccountValue.value === "all-account") return accounts.value.map((account) => account.id);
+
+  const selectedId = Number(selectedAccountValue.value);
+  const selected = accounts.value.find((account) => account.id === selectedId);
+  if (!selected) return [];
+
+  if (selected.relation === "mother") {
+    return accounts.value
+      .filter((account) => account.id === selected.id || account.parentAccountId === selected.id)
+      .map((account) => account.id);
+  }
+
+  return [selected.id];
+});
+
+const visibleTransactions = computed(() => {
+  const selectedIds = new Set(selectedAccountIds.value);
+  if (!selectedIds.size) return transactions.value;
+  return transactions.value.filter((transaction) => selectedIds.has(transaction.accountId));
+});
+
+const selectedAccounts = computed(() => {
+  const selectedIds = new Set(selectedAccountIds.value);
+  if (!selectedIds.size) return accounts.value;
+  return accounts.value.filter((account) => selectedIds.has(account.id));
+});
+
 const stats = computed(() => creditsStats.map((stat) => {
-  const positiveTotal = transactions.value.reduce((sum, transaction) => {
+  const positiveTotal = visibleTransactions.value.reduce((sum, transaction) => {
     const points = Number(transaction.points);
     return points > 0 ? sum + points : sum;
   }, 0);
-  const negativeTotal = transactions.value.reduce((sum, transaction) => {
+  const negativeTotal = visibleTransactions.value.reduce((sum, transaction) => {
     const points = Number(transaction.points);
     return points < 0 ? sum + Math.abs(points) : sum;
   }, 0);
-  const currentAccount =
-    accounts.value.find((account) => account.accountScope === "personal") ?? accounts.value[0] ?? null;
-  const recentTotal = transactions.value.reduce((sum, transaction) => sum + Number(transaction.points || 0), 0);
+  const availableBalance = selectedAccounts.value.reduce(
+    (sum, account) => sum + Number(account.availableBalance || 0),
+    0,
+  );
+  const recentTotal = visibleTransactions.value.reduce((sum, transaction) => sum + Number(transaction.points || 0), 0);
   const values: Record<string, string> = {
     累计获得: `+${formatPoints(positiveTotal)}`,
     累计消耗: `-${formatPoints(negativeTotal)}`,
-    当前可用: formatPoints(currentAccount?.availableBalance ?? 0),
+    当前可用: formatPoints(availableBalance),
     近30天流水: `${recentTotal >= 0 ? "+" : ""}${formatPoints(recentTotal)}`,
   };
   const visual =
@@ -124,19 +157,30 @@ const stats = computed(() => creditsStats.map((stat) => {
 const accountOptions = computed(() => {
   if (!accounts.value.length) return creditsAccountOptions;
   return [
-    { label: "全部账号", value: "all-account" },
+    {
+      label: canMotherAccountViewChildren(subscriptionStore.currentPlan)
+        ? "母账号 + 3 个子账号"
+        : "全部账号",
+      value: "all-account",
+    },
     ...accounts.value.map((account) => ({
-      label: accountName(account),
+      label: accountDisplayName(account),
       value: String(account.id),
     })),
   ];
 });
 
+const flowRows = computed(() => {
+  if (!transactions.value.length) return fallbackFlowRows.value;
+  return visibleTransactions.value.map(mapTransaction);
+});
+
 async function loadCreditsPage() {
   isLoadingCredits.value = true;
   try {
+    await subscriptionStore.hydrate();
     const accountResult = await getCreditAccounts();
-    accounts.value = accountResult.accounts;
+    accounts.value = buildEnterpriseAccountViews(subscriptionStore.currentPlan, accountResult.accounts);
     const account = accountResult.accounts.find((item) => item.accountScope === "personal") ?? accountResult.accounts[0];
     if (account) {
       authStore.credits = formatPoints(account.availableBalance);
@@ -144,15 +188,18 @@ async function loadCreditsPage() {
         accountId: account.id,
         limit: 50,
       });
-      transactions.value = transactionResult.transactions;
-      flowRows.value = transactionResult.transactions.map(mapTransaction);
+      transactions.value = [
+        ...transactionResult.transactions,
+        ...buildFlagshipChildTransactions(subscriptionStore.currentPlan, accounts.value),
+      ];
+      fallbackFlowRows.value = [];
     } else {
       transactions.value = [];
-      flowRows.value = [];
+      fallbackFlowRows.value = [];
     }
   } catch (error) {
     console.warn("failed to load credits page data", error);
-    flowRows.value = creditsFlowData;
+    fallbackFlowRows.value = creditsFlowData;
   } finally {
     isLoadingCredits.value = false;
   }
@@ -282,8 +329,8 @@ onMounted(() => {
 
           <NSelect
             class="filter-select"
+            v-model:value="selectedAccountValue"
             :options="accountOptions"
-            default-value="all-account"
             size="large"
           />
 
