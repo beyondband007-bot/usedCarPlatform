@@ -31,8 +31,15 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     enablePaintRefresh: input.paintRefresh,
     colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
     enableInteriorClean: input.interiorEnhance,
-    enableInteriorCollage: input.interiorCollage,
+    enableInteriorCollage: input.interiorEnhance && input.interiorCollage,
   }
+}
+
+function mapInteriorCollage(
+  interiorEnhance: boolean,
+  interiorCollage?: boolean | null,
+) {
+  return interiorEnhance && Boolean(interiorCollage)
 }
 
 async function ensureLoaded() {
@@ -53,10 +60,11 @@ async function ensureLoaded() {
       paintRefresh: item.visualConfig.enablePaintRefresh,
       colorCode: item.visualConfig.colorCode ?? null,
       interiorEnhance: item.visualConfig.enableInteriorClean,
-      interiorCollage:
+      interiorCollage: mapInteriorCollage(
+        item.visualConfig.enableInteriorClean,
         item.visualConfig.enableInteriorCollage ??
-        item.visualConfig.interiorCollage ??
-        false,
+          item.visualConfig.interiorCollage,
+      ),
       updatedAt: item.updatedAt,
     }))
     isReady.value = true
@@ -95,10 +103,11 @@ export function useBatchVisualTemplates() {
       paintRefresh: created.visualConfig.enablePaintRefresh,
       colorCode: created.visualConfig.colorCode ?? null,
       interiorEnhance: created.visualConfig.enableInteriorClean,
-      interiorCollage:
+      interiorCollage: mapInteriorCollage(
+        created.visualConfig.enableInteriorClean,
         created.visualConfig.enableInteriorCollage ??
-        created.visualConfig.interiorCollage ??
-        false,
+          created.visualConfig.interiorCollage,
+      ),
       updatedAt: created.updatedAt,
     }
 
@@ -125,10 +134,11 @@ export function useBatchVisualTemplates() {
       paintRefresh: updated.visualConfig.enablePaintRefresh,
       colorCode: updated.visualConfig.colorCode ?? null,
       interiorEnhance: updated.visualConfig.enableInteriorClean,
-      interiorCollage:
+      interiorCollage: mapInteriorCollage(
+        updated.visualConfig.enableInteriorClean,
         updated.visualConfig.enableInteriorCollage ??
-        updated.visualConfig.interiorCollage ??
-        false,
+          updated.visualConfig.interiorCollage,
+      ),
       updatedAt: updated.updatedAt,
     }
 
