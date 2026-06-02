@@ -90,28 +90,15 @@ function handleRecentPick(item: WorkspaceRecentItem) {
         <h2>上传车辆外观图后生成营销视频</h2>
         <span>默认使用 16:9、720p、10 秒配置，任务创建后会自动轮询生成结果。</span>
       </div>
-      <div class="short-video-status" :class="{ 'is-generating': props.isGenerating }">
-        <Icon :icon="props.isGenerating ? 'mdi:progress-clock' : 'mdi:play-circle-outline'" />
-        <span>{{ props.isGenerating ? "生成中" : "结果预览" }}</span>
-      </div>
     </header>
 
     <div class="short-video-tabs" role="tablist" aria-label="short video views">
       <button
         type="button"
         role="tab"
-        :aria-selected="activeView === 'preview'"
-        :class="{ active: activeView === 'preview' }"
-        @click="activeView = 'preview'"
-      >
-        结果预览
-      </button>
-      <button
-        type="button"
-        role="tab"
         :aria-selected="activeView === 'recent'"
         :class="{ active: activeView === 'recent' }"
-        @click="activeView = 'recent'"
+        @click="activeView = activeView === 'recent' ? 'preview' : 'recent'"
       >
         最近生成
       </button>
@@ -300,28 +287,6 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.55;
-}
-
-.short-video-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--assist-card);
-  color: var(--assist-muted);
-  padding: 10px 14px;
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.short-video-status .iconify {
-  font-size: 18px;
-}
-
-.short-video-status.is-generating {
-  color: var(--assist-blue);
 }
 
 .short-video-tabs {
