@@ -3,6 +3,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
@@ -61,9 +62,12 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         logoAsset = await userLogoService.resolveLogoAsset();
       }
 
-      const outputRatio = "16:9";
+      const outputRatio = resolveOutputRatio(body.outputRatio);
       const resolution = "2K";
-      const prompt = logoAsset ? config.logoPrompt : config.defaultPrompt;
+      const prompt = appendOutputRatioPrompt(
+        logoAsset ? config.logoPrompt : config.defaultPrompt,
+        outputRatio,
+      );
       const scene = getScene(body.optionId);
       const taskId = createId("task");
 

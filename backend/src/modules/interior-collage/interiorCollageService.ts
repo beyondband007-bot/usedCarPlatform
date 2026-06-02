@@ -2,6 +2,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio, Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import { tasksRepository } from "../tasks/tasksRepository";
@@ -60,8 +61,9 @@ class InteriorCollageService {
       });
     }
 
-    const outputRatio = body.outputRatio ?? "16:9";
+    const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = body.resolution ?? "2K";
+    const prompt = appendOutputRatioPrompt(interiorCollagePrompt, outputRatio);
     const groups = splitAssets(interiorAssets);
     const tasks = [];
 
@@ -78,7 +80,7 @@ class InteriorCollageService {
         outputRatio,
         resolution,
         logoAssetId: null,
-        prompt: interiorCollagePrompt,
+        prompt,
       });
 
       const lease = await kieKeyPool.acquire();
@@ -95,7 +97,7 @@ class InteriorCollageService {
         }
         const inputUrls = uploaded.map((item) => item.fileUrl);
         const kieTask = await kieClient.createImageToImageTaskWithLease(lease, {
-          prompt: interiorCollagePrompt,
+          prompt,
           inputUrls,
           aspectRatio: outputRatio,
           resolution,
@@ -108,7 +110,7 @@ class InteriorCollageService {
           requestJson: {
             model: "gpt-image-2-image-to-image",
             moduleCode: "interior-collage",
-            prompt: interiorCollagePrompt,
+            prompt,
             inputAssetIds: group.map((asset) => asset.id),
             inputUrls,
             groupIndex: index + 1,

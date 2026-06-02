@@ -2,6 +2,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
 import { tasksRepository } from "../tasks/tasksRepository";
@@ -25,8 +26,9 @@ class WatermarkRemoveService {
       });
     }
 
-    const outputRatio = "16:9";
+    const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
+    const prompt = appendOutputRatioPrompt(watermarkRemovePrompt, outputRatio);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
@@ -37,7 +39,7 @@ class WatermarkRemoveService {
       outputRatio,
       resolution,
       logoAssetId: null,
-      prompt: watermarkRemovePrompt,
+      prompt,
     });
 
     const lease = await kieKeyPool.acquire();
@@ -49,7 +51,7 @@ class WatermarkRemoveService {
       );
       const inputUrls = [uploadedVehicle.fileUrl];
       const kieTask = await kieClient.createImageToImageTaskWithLease(lease, {
-        prompt: watermarkRemovePrompt,
+        prompt,
         inputUrls,
         aspectRatio: outputRatio,
         resolution,
@@ -62,7 +64,7 @@ class WatermarkRemoveService {
         requestJson: {
           model: "gpt-image-2-image-to-image",
           moduleCode: "watermark-remove",
-          prompt: watermarkRemovePrompt,
+          prompt,
           inputUrls,
           aspectRatio: outputRatio,
           resolution,

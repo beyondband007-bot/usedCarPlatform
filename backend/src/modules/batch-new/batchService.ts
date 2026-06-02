@@ -6,6 +6,7 @@ import { tasksService } from "../tasks/tasksService";
 import { userLogoService } from "../user-logo/userLogoService";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
+import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio } from "../../shared/types";
 import { deliveryRepository } from "../delivery/deliveryRepository";
 import {
@@ -21,10 +22,7 @@ import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTas
 const DEFAULT_USER_ID = "default_user";
 const terminalStatuses = ["success", "fail", "canceled"];
 
-const outputRatioOrDefault = (value?: string): OutputRatio =>
-  ["auto", "1:1", "3:4", "4:3", "9:16", "16:9"].includes(String(value))
-    ? (value as OutputRatio)
-    : "1:1";
+const outputRatioOrDefault = (value?: string): OutputRatio => resolveOutputRatio(value, "1:1");
 
 const booleanFlag = (config: BatchVisualConfig, a: keyof BatchVisualConfig, b?: keyof BatchVisualConfig) =>
   config[a] === true || (b ? config[b] === true : false);
@@ -87,6 +85,7 @@ class BatchService {
       useRecentLogo: false,
       enableLightConsistency: true,
       enablePaintRefresh: false,
+      colorCode: null,
       enableInteriorClean: false,
       enableInteriorCollage: false,
     };

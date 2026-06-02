@@ -3,6 +3,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { buildPaintRefreshColorPrompt, paintRefreshPrompt } from "./paintRefreshPrompts";
@@ -37,8 +38,11 @@ class PaintRefreshService {
     }
 
     const colorCode = resolveColorCode(body);
-    const prompt = colorCode ? buildPaintRefreshColorPrompt(colorCode) : paintRefreshPrompt;
-    const outputRatio = "16:9";
+    const outputRatio = resolveOutputRatio(body.outputRatio);
+    const prompt = appendOutputRatioPrompt(
+      colorCode ? buildPaintRefreshColorPrompt(colorCode) : paintRefreshPrompt,
+      outputRatio,
+    );
     const resolution = "2K";
     const taskId = createId("task");
 

@@ -12,6 +12,7 @@ export interface BatchVisualConfig {
   lightConsistency?: boolean;
   enablePaintRefresh?: boolean;
   paintRefresh?: boolean;
+  colorCode?: string | null;
   enableInteriorClean?: boolean;
   interiorEnhance?: boolean;
   enableInteriorCollage?: boolean;
