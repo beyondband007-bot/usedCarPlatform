@@ -234,13 +234,17 @@ export class CreativeImageRepository extends Repository {
     lastMessage?: string | null;
     lastTaskId?: string | null;
     lastResultUrl?: string | null;
+    resetLastResultUrl?: boolean;
   }) {
     await this.execute(
       `UPDATE creative_conversations
        SET title = COALESCE(:title, title),
            last_message = COALESCE(:lastMessage, last_message),
            last_task_id = COALESCE(:lastTaskId, last_task_id),
-           last_result_url = COALESCE(:lastResultUrl, last_result_url)
+           last_result_url = CASE
+             WHEN :resetLastResultUrl THEN NULL
+             ELSE COALESCE(:lastResultUrl, last_result_url)
+           END
        WHERE id = :conversationId`,
       {
         conversationId: input.conversationId,
@@ -248,6 +252,7 @@ export class CreativeImageRepository extends Repository {
         lastMessage: input.lastMessage ?? null,
         lastTaskId: input.lastTaskId ?? null,
         lastResultUrl: input.lastResultUrl ?? null,
+        resetLastResultUrl: input.resetLastResultUrl ? 1 : 0,
       },
     );
   }

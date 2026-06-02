@@ -103,6 +103,7 @@ const creativeConversations = ref<CreativeImageConversation[]>([]);
 const creativeThreadTurns = ref<CreativeThreadTurn[]>([]);
 const activeCreativeConversationId = ref<string | null>(null);
 const creativeReferenceAsset = ref<UploadedAsset | null>(null);
+const creativeGeneratingConversations = ref<Record<string, string>>({});
 const isUploadingCreativeReference = ref(false);
 const isCreatingCreativeConversation = ref(false);
 const isLoadingCreativeConversation = ref(false);
@@ -113,6 +114,8 @@ const isDeliveryListLoading = ref(false);
 const isGenerating = ref(false);
 const generatingCapabilityCode = ref<string | null>(null);
 const shortVideoPlayRequest = ref(0);
+/** 仅当前会话：本次页面内刚生成成功的短视频，刷新后清空 */
+const shortVideoSessionPreview = ref<WorkspaceGenerateResult | null>(null);
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(
   null,
 );
@@ -322,6 +325,19 @@ function trackRunningTask(taskId: string, moduleCode: string) {
   });
 }
 
+function setCreativeConversationGenerating(
+  conversationId: string,
+  taskId: string | null,
+) {
+  const next = { ...creativeGeneratingConversations.value };
+  if (taskId) {
+    next[conversationId] = taskId;
+  } else {
+    delete next[conversationId];
+  }
+  creativeGeneratingConversations.value = next;
+}
+
 function stopGlobalGenerationPolling() {
   if (globalGenerationPollTimer !== null) {
     window.clearInterval(globalGenerationPollTimer);
@@ -370,6 +386,19 @@ function resolveCreativeMessageRatioLabel(message: CreativeImageMessage) {
   return undefined;
 }
 
+function isCreativeTaskGenerating(
+  taskId?: string | null,
+  conversationId?: string | null,
+) {
+  if (!taskId) return false;
+
+  return Boolean(
+    trackedRunningTasks.value[taskId] ||
+      (conversationId &&
+        creativeGeneratingConversations.value[conversationId] === taskId),
+  );
+}
+
 function buildCreativeThreadTurns(
   messages: CreativeImageMessage[],
   conversation: CreativeImageConversation | null,
@@ -397,7 +426,10 @@ function buildCreativeThreadTurns(
       createdAt: message.createdAt,
       ratioLabel: resolveCreativeMessageRatioLabel(message),
       resultUrl: message.resultUrl ?? null,
-      isGenerating: false,
+      isGenerating: isCreativeTaskGenerating(
+        message.taskId,
+        message.conversationId,
+      ),
     };
     turns.push(turn);
     lastUserTurn = turn;
@@ -422,13 +454,49 @@ function buildCreativeThreadTurns(
       .reverse()
       .find((turn) => turn.taskId === conversation.lastTaskId);
     if (lastTurn) {
-      if (!lastTurn.resultUrl) {
-        lastTurn.resultUrl = conversation.lastResultUrl;
-      }
-      lastTurn.isGenerating = Boolean(
-        conversation.lastTaskId && !lastTurn.resultUrl,
-      );
+      const pendingOnServer =
+        lastTurn.taskId === conversation.lastTaskId && !conversation.lastResultUrl;
+      lastTurn.isGenerating =
+        isCreativeTaskGenerating(
+          conversation.lastTaskId,
+          conversation.conversationId,
+        ) || pendingOnServer;
     }
+  }
+
+  return turns;
+}
+
+async function hydrateCreativeThreadGeneratingState(
+  turns: CreativeThreadTurn[],
+  conversation: CreativeImageConversation | null,
+) {
+  if (!conversation?.lastTaskId) return turns;
+
+  const lastTurn = [...turns]
+    .reverse()
+    .find((turn) => turn.taskId === conversation.lastTaskId);
+  if (!lastTurn || lastTurn.resultUrl) return turns;
+
+  try {
+    const task = await getGenerationTask(conversation.lastTaskId);
+    if (!isTerminalGenerationStatus(task)) {
+      lastTurn.isGenerating = true;
+      trackRunningTask(conversation.lastTaskId, task.moduleCode);
+      setCreativeConversationGenerating(
+        conversation.conversationId,
+        conversation.lastTaskId,
+      );
+      return turns;
+    }
+
+    const result = buildResultFromTask(task);
+    if (result?.previewImage) {
+      lastTurn.resultUrl = result.previewImage;
+      lastTurn.isGenerating = false;
+    }
+  } catch {
+    // 任务状态查询失败时保留线程默认展示。
   }
 
   return turns;
@@ -771,6 +839,20 @@ const activeCreativeConversation = computed(
     ) ?? null,
 );
 
+const activeCreativeConversationGenerating = computed(() => {
+  const conversationId = activeCreativeConversationId.value;
+  if (!conversationId) return false;
+
+  if (creativeGeneratingConversations.value[conversationId]) {
+    return true;
+  }
+
+  const conversation = activeCreativeConversation.value;
+  return Boolean(
+    conversation?.lastTaskId && trackedRunningTasks.value[conversation.lastTaskId],
+  );
+});
+
 const hasActiveCreativeConversationDraft = computed(() => {
   const conversation = activeCreativeConversation.value;
   if (!conversation) return false;
@@ -784,7 +866,7 @@ const hasActiveCreativeConversationDraft = computed(() => {
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? "");
 
-watch(activeCode, () => {
+watch(activeCode, (code, previousCode) => {
   const capability = activeCapability.value;
   const hasSelected = capability.options.some(
     (item) => item.id === selectedOptionId.value,
@@ -792,6 +874,13 @@ watch(activeCode, () => {
 
   if (!hasSelected) {
     selectedOptionId.value = capability.options[0]?.id ?? "";
+  }
+
+  if (
+    previousCode === SHORT_VIDEO_CAPABILITY_CODE &&
+    code !== SHORT_VIDEO_CAPABILITY_CODE
+  ) {
+    shortVideoSessionPreview.value = null;
   }
 
   generationResult.value = null;
@@ -1019,9 +1108,19 @@ async function resolveGenerationTask(
     }
 
     if (shouldSyncAfterPoll) {
-      generationResult.value = result;
-      if (!options.restored) {
-        message.success("生成完成");
+      if (isShortVideoModuleCode(task.moduleCode)) {
+        generationResult.value = null;
+        if (!options.restored) {
+          shortVideoSessionPreview.value = result;
+          shortVideoPlayRequest.value += 1;
+          assistPanelRef.value?.focusShortVideoPreviewView?.();
+          message.success("生成完成");
+        }
+      } else {
+        generationResult.value = result;
+        if (!options.restored) {
+          message.success("生成完成");
+        }
       }
     } else if (!options.restored) {
       const label = taskCapabilityCode
@@ -1045,6 +1144,55 @@ async function resolveGenerationTask(
     generatingCapabilityCode.value = null;
     refreshCreditsBalance();
     void refreshRunningTaskSummary();
+  }
+}
+
+async function resolveCreativeGenerationTask(
+  taskId: string,
+  conversationId: string,
+) {
+  try {
+    const initialTask = await getGenerationTask(taskId);
+    const task = isTerminalGenerationStatus(initialTask)
+      ? initialTask
+      : await pollGenerationTask(taskId);
+
+    if (!task) {
+      message.warning("任务仍在处理中，请稍后刷新查看");
+      return;
+    }
+
+    if (task.status !== "success") {
+      message.error(getViewMediaFailureMessage(task.moduleCode));
+      return;
+    }
+
+    const result = buildResultFromTask(task);
+    if (!result) {
+      message.warning("任务完成，但没有返回图片");
+      return;
+    }
+
+    if (
+      activeCode.value === "creative-image" &&
+      activeCreativeConversationId.value === conversationId
+    ) {
+      generationResult.value = result;
+      message.success("生成完成");
+    } else {
+      message.success("创意生图生成完成，可在最近对话中查看");
+    }
+  } catch {
+    message.error(getViewMediaFailureMessage("creative-image"));
+  } finally {
+    clearActiveGenerationTask(taskId);
+    setCreativeConversationGenerating(conversationId, null);
+    await refreshRunningTaskSummary();
+    await refreshCreativeConversations();
+    if (activeCreativeConversationId.value === conversationId) {
+      await loadCreativeConversationThread(conversationId);
+    }
+    await assistPanelRef.value?.refreshRecentItems();
   }
 }
 
@@ -1091,13 +1239,18 @@ async function loadCreativeConversationThread(conversationId: string) {
   try {
     const result = await getCreativeImageMessages(conversationId);
     if (activeCreativeConversationId.value !== conversationId) return;
-    creativeThreadTurns.value = buildCreativeThreadTurns(
-      result.items,
+    const turns = buildCreativeThreadTurns(result.items, conversation);
+    creativeThreadTurns.value = await hydrateCreativeThreadGeneratingState(
+      turns,
       conversation,
     );
   } catch {
     if (activeCreativeConversationId.value !== conversationId) return;
-    creativeThreadTurns.value = buildCreativeThreadTurns([], conversation);
+    const turns = buildCreativeThreadTurns([], conversation);
+    creativeThreadTurns.value = await hydrateCreativeThreadGeneratingState(
+      turns,
+      conversation,
+    );
   } finally {
     if (activeCreativeConversationId.value === conversationId) {
       isLoadingCreativeConversation.value = false;
@@ -1117,13 +1270,22 @@ async function ensureCreativeConversation(prompt?: string) {
   return conversation.conversationId;
 }
 
-function syncCreativeConversationTitle(conversationId: string, prompt: string) {
+function syncCreativeConversationPendingTask(
+  conversationId: string,
+  prompt: string,
+  taskId: string,
+) {
   const title = prompt.trim().slice(0, 24);
-  if (!title) return;
 
   creativeConversations.value = creativeConversations.value.map((item) =>
     item.conversationId === conversationId
-      ? { ...item, title, lastMessage: prompt.trim() }
+      ? {
+          ...item,
+          title: title || item.title,
+          lastMessage: prompt.trim(),
+          lastTaskId: taskId,
+          lastResultUrl: null,
+        }
       : item,
   );
 }
@@ -1221,9 +1383,10 @@ async function handleCreativeGenerate(payload: {
   generationResult.value = null;
   creativeImageCaption.value = null;
   generatingCapabilityCode.value = "creative-image";
+  let conversationId: string | null = null;
 
   try {
-    const conversationId = await ensureCreativeConversation(payload.prompt);
+    conversationId = await ensureCreativeConversation(payload.prompt);
     const created = await createCreativeImageGeneration(conversationId, {
       prompt: payload.prompt,
       outputRatio: payload.outputRatio,
@@ -1234,6 +1397,7 @@ async function handleCreativeGenerate(payload: {
       sourceTaskId: payload.sourceTaskId,
       sourceImageUrl: payload.sourceImageUrl,
     });
+    setCreativeConversationGenerating(conversationId, created.taskId);
     saveActiveGenerationTask({
       taskId: created.taskId,
       moduleCode: created.moduleCode,
@@ -1242,14 +1406,17 @@ async function handleCreativeGenerate(payload: {
     message.info("任务已创建，正在轮询生成结果", { duration: 3000 });
     await refreshRunningTaskSummary();
     creativeImageCaption.value = payload.prompt;
-    syncCreativeConversationTitle(conversationId, payload.prompt);
+    syncCreativeConversationPendingTask(
+      conversationId,
+      payload.prompt,
+      created.taskId,
+    );
     await refreshCreativeConversations();
-    await loadCreativeConversationThread(conversationId);
-    await resolveGenerationTask(created.taskId);
-    await refreshCreativeConversations();
-    await loadCreativeConversationThread(conversationId);
-    await assistPanelRef.value?.refreshRecentItems();
+    void resolveCreativeGenerationTask(created.taskId, conversationId);
   } catch (error) {
+    if (conversationId) {
+      setCreativeConversationGenerating(conversationId, null);
+    }
     clearActiveGenerationTask();
     const text =
       error instanceof Error ? error.message : "创意生图任务创建失败";
@@ -1338,6 +1505,9 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
   isGenerating.value = true;
   generationResult.value = null;
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    shortVideoSessionPreview.value = null;
+  }
   const startedOnCode = activeCapability.value.code;
   generatingCapabilityCode.value = startedOnCode;
 
@@ -1426,7 +1596,12 @@ function handlePickRecent(item: WorkspaceRecentItem) {
   if (item.status === "success") {
     const result = buildResultFromRecent(item);
     if (result) {
-      generationResult.value = result;
+      if (isShortVideoModuleCode(item.moduleCode)) {
+        generationResult.value = result;
+        assistPanelRef.value?.focusShortVideoPreviewView?.();
+      } else {
+        generationResult.value = result;
+      }
       return;
     }
 
@@ -1452,14 +1627,28 @@ function handlePickTemplate(payload: {
   generationResult.value = null;
 }
 
-onMounted(() => {
-  clearLegacyWorkspaceStorage();
-  loadWorkspaceOwnerState();
-  void refreshRunningTaskSummary();
-  void refreshCreativeConversations();
+onMounted(async () => {
+  await refreshRunningTaskSummary();
+  await refreshCreativeConversations();
 
   const activeTask = readActiveGenerationTask();
   if (!activeTask) return;
+
+  if (activeTask.moduleCode === "creative-image") {
+    const conversationId = readActiveCreativeConversationId();
+    if (conversationId) {
+      setCreativeConversationGenerating(conversationId, activeTask.taskId);
+      trackRunningTask(activeTask.taskId, activeTask.moduleCode);
+      if (activeCreativeConversationId.value === conversationId) {
+        await loadCreativeConversationThread(conversationId);
+      }
+    }
+    void resolveCreativeGenerationTask(
+      activeTask.taskId,
+      conversationId ?? "",
+    );
+    return;
+  }
 
   syncWorkspaceFromTask({
     moduleCode: activeTask.moduleCode,
@@ -1515,7 +1704,7 @@ onUnmounted(() => {
           <CreativeImageStudioPanel
             v-if="activeCode === 'creative-image'"
             :capability="activeCapability"
-            :is-generating="activeModuleGenerating"
+            :is-generating="activeCreativeConversationGenerating"
             :is-uploading-reference="isUploadingCreativeReference"
             :generation-result="generationResult"
             :caption="creativeImageCaption"
@@ -1566,6 +1755,7 @@ onUnmounted(() => {
           :delivery-image-preview="deliveryImagePreview"
           :delivery-list-loading="isDeliveryListLoading"
           :short-video-play-request="shortVideoPlayRequest"
+          :short-video-session-preview="shortVideoSessionPreview"
           :batch-active-jobs="batchActiveJobs"
           @back-from-result="clearGenerationResult"
           @close-delivery-image-preview="clearDeliveryImagePreview"

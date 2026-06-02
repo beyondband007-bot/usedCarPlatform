@@ -51,6 +51,7 @@ const props = defineProps<{
   deliveryImagePreview?: WorkspaceImagePreview | null;
   deliveryListLoading?: boolean;
   shortVideoPlayRequest?: number;
+  shortVideoSessionPreview?: WorkspaceGenerateResult | null;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
 
@@ -522,12 +523,25 @@ watch(
 
 function syncShortVideoInitialView() {
   if (props.capability.code !== "short-video") return;
-  shortVideoInitialView.value = props.isGenerating ? "generating" : "guide";
+  if (props.isGenerating) {
+    shortVideoInitialView.value = "generating";
+    return;
+  }
+  if (props.shortVideoSessionPreview?.previewVideo) {
+    shortVideoInitialView.value = "preview";
+    return;
+  }
+  shortVideoInitialView.value = "guide";
 }
 
 function focusShortVideoGeneratingView() {
   if (props.capability.code !== "short-video") return;
   shortVideoInitialView.value = "generating";
+}
+
+function focusShortVideoPreviewView() {
+  if (props.capability.code !== "short-video") return;
+  shortVideoInitialView.value = "preview";
 }
 
 watch(
@@ -554,6 +568,19 @@ watch(
 
     if (wasGenerating) {
       void loadRecentItems();
+    }
+
+    if (props.capability.code === "short-video") {
+      syncShortVideoInitialView();
+    }
+  },
+);
+
+watch(
+  () => props.shortVideoSessionPreview?.previewVideo,
+  () => {
+    if (props.capability.code === "short-video") {
+      syncShortVideoInitialView();
     }
   },
 );
@@ -637,6 +664,7 @@ onUnmounted(() => {
 defineExpose({
   refreshRecentItems: loadRecentItems,
   focusShortVideoGeneratingView,
+  focusShortVideoPreviewView,
 });
 </script>
 
@@ -646,7 +674,7 @@ defineExpose({
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
     <WorkspaceGenerateResultPanel
-      v-if="generationResult"
+      v-if="generationResult && capability.code !== 'short-video'"
       :result="generationResult"
       @back="handleResultBack"
     />
@@ -1029,6 +1057,7 @@ defineExpose({
       v-else-if="capability.code === 'short-video'"
       :play-request="shortVideoPlayRequest"
       :is-generating="props.isGenerating"
+      :session-preview="props.shortVideoSessionPreview"
       :generation-result="props.generationResult"
       :recent-items="recentItems"
       :recent-loading="recentLoading"

@@ -62,6 +62,7 @@ const editingReference = ref<{
   taskId?: string | null
   resultUrl: string
 } | null>(null)
+const pendingTurns = ref<CreativeThreadTurn[]>([])
 
 const activeRatio = computed(
   () =>
@@ -70,7 +71,12 @@ const activeRatio = computed(
 )
 
 const promptLength = computed(() => prompt.value.length)
-const canSubmit = computed(() => prompt.value.trim().length > 0 && !props.isGenerating)
+const canSubmit = computed(
+  () =>
+    prompt.value.trim().length > 0 &&
+    !props.isGenerating &&
+    pendingTurns.value.length === 0,
+)
 
 const activeConversation = computed(() =>
   props.conversations?.find((item) => item.conversationId === props.activeConversationId) ?? null,
@@ -94,7 +100,6 @@ const hasHistoryContext = computed(
           activeConversation.value?.lastTaskId),
     ),
 )
-const pendingTurns = ref<CreativeThreadTurn[]>([])
 const hasConversation = computed(
   () =>
     props.isGenerating ||
@@ -330,7 +335,7 @@ function applyPromptSuggestion(text: string) {
 }
 
 function openReferencePicker() {
-  if (props.isUploadingReference || props.isGenerating) return
+  if (props.isUploadingReference || props.isGenerating || pendingTurns.value.length > 0) return
   fileInputRef.value?.click()
 }
 
@@ -477,8 +482,9 @@ function toggleSidebar() {
           </div>
         </section>
 
-        <section v-else ref="threadScrollRef" class="creative-thread" aria-live="polite">
-          <div class="creative-content-shell">
+        <div v-else class="creative-thread-scroll">
+          <section ref="threadScrollRef" class="creative-thread" aria-live="polite">
+            <div class="creative-content-shell">
           <div
             v-if="props.isLoadingConversation && !threadItems.length"
             class="creative-turn"
@@ -566,7 +572,8 @@ function toggleSidebar() {
             </article>
           </div>
           </div>
-        </section>
+          </section>
+        </div>
       </div>
 
       <Teleport to="body">
@@ -637,7 +644,7 @@ function toggleSidebar() {
             type="button"
             class="creative-upload"
             :class="{ 'is-spinning': props.isGenerating || props.isUploadingReference }"
-            :disabled="props.isGenerating"
+            :disabled="props.isGenerating || pendingTurns.length > 0"
             aria-label="上传参考图"
             @click="openReferencePicker"
           >
@@ -680,7 +687,7 @@ function toggleSidebar() {
                 v-model:value="selectedRatio"
                 :options="creativeImageAspectRatioOptions"
                 size="large"
-                :disabled="props.isGenerating"
+                :disabled="props.isGenerating || pendingTurns.length > 0"
                 class="creative-ratio-select"
               />
             </div>
@@ -719,6 +726,9 @@ function toggleSidebar() {
   --creative-submit-disabled-text: #737b89;
   --creative-composer-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
   --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(255, 255, 255, 0.035), transparent 30%);
+  --creative-scroll-track: rgba(255, 255, 255, 0.14);
+  --creative-scroll-thumb: rgba(255, 255, 255, 0.52);
+  --creative-scroll-thumb-hover: rgba(255, 255, 255, 0.68);
 
   display: grid;
   min-height: 0;
@@ -751,6 +761,9 @@ function toggleSidebar() {
   --creative-submit-disabled-text: #cbd5e1;
   --creative-composer-shadow: 0 18px 48px rgba(78, 111, 148, 0.09);
   --creative-main-glow: radial-gradient(circle at 54% 42%, rgba(47, 107, 255, 0.05), transparent 32%);
+  --creative-scroll-track: #dce3ed;
+  --creative-scroll-thumb: #8b9bb0;
+  --creative-scroll-thumb-hover: #64748b;
 }
 
 .creative-sidebar {
@@ -897,7 +910,30 @@ function toggleSidebar() {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 6px;
+  scrollbar-width: auto;
+  scrollbar-color: var(--creative-scroll-thumb) var(--creative-scroll-track);
+}
+
+.creative-recent-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.creative-recent-list::-webkit-scrollbar-track {
+  background: var(--creative-scroll-track);
+  border-radius: 999px;
+}
+
+.creative-recent-list::-webkit-scrollbar-thumb {
+  background: var(--creative-scroll-thumb);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.creative-recent-list::-webkit-scrollbar-thumb:hover {
+  background: var(--creative-scroll-thumb-hover);
+  background-clip: padding-box;
 }
 
 .creative-recent p {
@@ -970,7 +1006,7 @@ function toggleSidebar() {
   overflow: hidden;
   border: 1px solid var(--creative-line);
   border-radius: 14px;
-  margin: 12px;
+  margin: 12px 24px 12px 12px;
   background: var(--creative-main-glow), var(--creative-main-bg);
 }
 
@@ -998,16 +1034,46 @@ function toggleSidebar() {
 }
 
 .creative-empty-state,
+.creative-thread-scroll,
 .creative-thread {
   min-height: 0;
   width: 100%;
 }
 
-.creative-thread {
+.creative-thread-scroll {
   flex: 1;
+  min-width: 0;
+  padding-right: 24px;
+  box-sizing: border-box;
+}
+
+.creative-thread {
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   padding: 24px 0 32px;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: var(--creative-scroll-thumb) var(--creative-scroll-track);
+}
+
+.creative-thread::-webkit-scrollbar {
+  width: 12px;
+}
+
+.creative-thread::-webkit-scrollbar-track {
+  margin-block: 4px;
+  background: var(--creative-scroll-track);
+  border-radius: 999px;
+}
+
+.creative-thread::-webkit-scrollbar-thumb {
+  background: var(--creative-scroll-thumb);
+  border-radius: 999px;
+}
+
+.creative-thread::-webkit-scrollbar-thumb:hover {
+  background: var(--creative-scroll-thumb-hover);
 }
 
 .creative-composer.is-docked {

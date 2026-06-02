@@ -12,6 +12,8 @@ import {
 const props = defineProps<{
   playRequest?: number;
   isGenerating?: boolean;
+  /** 当前页面会话内刚生成成功的视频，刷新后由父级清空 */
+  sessionPreview?: WorkspaceGenerateResult | null;
   generationResult?: WorkspaceGenerateResult | null;
   recentItems?: WorkspaceRecentItem[];
   recentLoading?: boolean;
@@ -27,10 +29,26 @@ const PENDING_RECENT_STATUSES = new Set([
   "generating",
 ]);
 
+const showSessionPreviewTab = computed(() =>
+  Boolean(props.sessionPreview?.previewVideo),
+);
+
+const activePreviewVideo = computed(() => {
+  if (activeView.value !== "preview") return "";
+  return (
+    props.generationResult?.previewVideo ??
+    props.sessionPreview?.previewVideo ??
+    ""
+  );
+});
+
 function resolveShortVideoView(preferred?: ShortVideoView): ShortVideoView {
   if (props.isGenerating) return "generating";
-  if (preferred === "recent" || preferred === "preview") return preferred;
-  return preferred ?? "guide";
+  if (preferred === "recent" || preferred === "preview" || preferred === "guide") {
+    return preferred;
+  }
+  if (showSessionPreviewTab.value) return "preview";
+  return "guide";
 }
 
 const emit = defineEmits<{
@@ -72,10 +90,21 @@ watch(
 );
 
 watch(
-  () => props.generationResult?.previewVideo,
-  (videoUrl) => {
-    if (!videoUrl || activeView.value !== "preview") return;
+  () => [props.generationResult?.previewVideo, props.sessionPreview?.previewVideo],
+  () => {
+    if (!activePreviewVideo.value || activeView.value !== "preview") return;
     void playGeneratedVideo();
+  },
+);
+
+watch(
+  () => props.sessionPreview?.previewVideo,
+  (videoUrl, previousUrl) => {
+    if (!videoUrl || props.isGenerating) return;
+    if (!previousUrl) {
+      activeView.value = "preview";
+      void playGeneratedVideo();
+    }
   },
 );
 
@@ -95,19 +124,21 @@ watch(
     }
 
     if (activeView.value === "generating") {
-      activeView.value = "guide";
+      activeView.value = showSessionPreviewTab.value ? "preview" : "guide";
     }
   },
   { immediate: true },
 );
 
-function toggleRecentView() {
-  if (activeView.value === "recent") {
-    activeView.value = props.isGenerating ? "generating" : "guide";
-    return;
-  }
-
+function openRecentView() {
   activeView.value = "recent";
+}
+
+function openPreviewView() {
+  activeView.value = "preview";
+  if (activePreviewVideo.value) {
+    void playGeneratedVideo();
+  }
 }
 
 function canOpenRecentVideo(item: WorkspaceRecentItem) {
@@ -149,6 +180,16 @@ function handleRecentPick(item: WorkspaceRecentItem) {
         正在生成
       </button>
       <button
+        v-else-if="showSessionPreviewTab"
+        type="button"
+        role="tab"
+        :aria-selected="activeView === 'preview'"
+        :class="{ active: activeView === 'preview' }"
+        @click="openPreviewView"
+      >
+        预览视频
+      </button>
+      <button
         v-else
         type="button"
         role="tab"
@@ -163,7 +204,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
         role="tab"
         :aria-selected="activeView === 'recent'"
         :class="{ active: activeView === 'recent' }"
-        @click="toggleRecentView"
+        @click="openRecentView"
       >
         最近生成
       </button>
@@ -251,17 +292,14 @@ function handleRecentPick(item: WorkspaceRecentItem) {
       </div>
     </section>
 
-    <div
-      v-else-if="activeView === 'preview' && props.generationResult?.previewVideo"
-      class="short-video-stage"
-    >
+    <div v-else-if="activeView === 'preview' && activePreviewVideo" class="short-video-stage">
       <video
         ref="videoRef"
         class="short-video-player"
         controls
         playsinline
         preload="metadata"
-        :src="props.generationResult.previewVideo"
+        :src="activePreviewVideo"
       >
         当前浏览器不支持视频播放。
       </video>
