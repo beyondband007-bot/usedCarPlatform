@@ -49,6 +49,8 @@ function buildSubscriptionSnapshot(planCode: SubscriptionPlanCode): Subscription
     currentPlan: plan.plan,
     accountLimit: plan.accountLimit,
     concurrentTaskLimit: plan.concurrentTaskLimit,
+    visualConcurrentTaskLimit: plan.visualConcurrentTaskLimit,
+    batchConcurrentTaskLimit: plan.batchConcurrentTaskLimit,
     giftPoints: plan.giftPoints,
     expireTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   }

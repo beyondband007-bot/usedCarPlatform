@@ -53,6 +53,7 @@ const props = defineProps<{
   selectedOptionId: string;
   isGenerating?: boolean;
   previewedDeliveryTaskId?: string | null;
+  canCreateBatchTask?: () => boolean | Promise<boolean>;
 }>();
 
 const emit = defineEmits<{
@@ -893,6 +894,10 @@ async function handleCreateBatchTask() {
   }
 
   if (!validateBatchInteriorAssets(template)) {
+    return;
+  }
+
+  if (props.canCreateBatchTask && !(await props.canCreateBatchTask())) {
     return;
   }
 

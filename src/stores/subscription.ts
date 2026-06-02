@@ -31,11 +31,18 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const initialized = ref(false)
 
   const currentPlan = computed(() => snapshot.value?.currentPlan ?? 'team')
-  const accountLimit = computed(() => snapshot.value?.accountLimit ?? subscriptionPlans.team.accountLimit)
+  const currentPlanConfig = computed(() => subscriptionPlans[currentPlan.value] ?? subscriptionPlans.team)
+  const accountLimit = computed(() => snapshot.value?.accountLimit ?? currentPlanConfig.value.accountLimit)
   const concurrentTaskLimit = computed(
-    () => snapshot.value?.concurrentTaskLimit ?? subscriptionPlans.team.concurrentTaskLimit,
+    () => snapshot.value?.concurrentTaskLimit ?? currentPlanConfig.value.concurrentTaskLimit,
   )
-  const giftPoints = computed(() => snapshot.value?.giftPoints ?? subscriptionPlans.team.giftPoints)
+  const visualConcurrentTaskLimit = computed(
+    () => snapshot.value?.visualConcurrentTaskLimit ?? currentPlanConfig.value.visualConcurrentTaskLimit,
+  )
+  const batchConcurrentTaskLimit = computed(
+    () => snapshot.value?.batchConcurrentTaskLimit ?? currentPlanConfig.value.batchConcurrentTaskLimit,
+  )
+  const giftPoints = computed(() => snapshot.value?.giftPoints ?? currentPlanConfig.value.giftPoints)
   const expireTime = computed(() => snapshot.value?.expireTime ?? '')
 
   async function hydrate() {
@@ -62,6 +69,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     currentPlan,
     accountLimit,
     concurrentTaskLimit,
+    visualConcurrentTaskLimit,
+    batchConcurrentTaskLimit,
     giftPoints,
     expireTime,
     hydrate,

@@ -8,6 +8,7 @@ import {
   createCreativeImageGeneration,
   createInteriorCollageTask,
   createGenerationTask,
+  getBatchTasks,
   getBatchTaskDetail,
   getCreativeImageConversations,
   getCreativeImageMessages,
@@ -60,6 +61,16 @@ const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
 const ACTIVE_GENERATION_TASK_KEY = "workspace-active-generation-task";
 const RECENT_GENERATION_SCAN_PAGE_SIZE = 50;
+const BATCH_GENERATION_SCAN_PAGE_SIZE = 50;
+const visualPlanPoolCapabilityCodes = new Set([
+  "showroom-light",
+  "outdoor-scene",
+  "road-motion",
+  "sky-studio",
+  "paint-refresh",
+  "light-consistency",
+  "interior-clean",
+]);
 const runningGenerationStatuses = new Set([
   "waiting",
   "queued",
@@ -200,9 +211,36 @@ function isRunningGenerationStatus(status?: string | null) {
   return Boolean(status && runningGenerationStatuses.has(status));
 }
 
+function isVisualPlanPoolModule(moduleCode: string) {
+  const capabilityCode = resolveCapabilityCodeFromModule(moduleCode);
+  return Boolean(
+    capabilityCode && visualPlanPoolCapabilityCodes.has(capabilityCode),
+  );
+}
+
+function countVisualPlanPoolTasks() {
+  return Object.values(trackedRunningTasks.value).filter((moduleCode) =>
+    isVisualPlanPoolModule(moduleCode),
+  ).length;
+}
+
+function countRunningBatchJobs() {
+  return batchActiveJobs.value.filter(
+    (job) => !isTerminalBatchStatus(job.status),
+  ).length;
+}
+
+function countTotalRunningTasks() {
+  return Object.keys(trackedRunningTasks.value).length + countRunningBatchJobs();
+}
+
+function syncRunningTaskSummaryCount() {
+  pointsStore.setRunningTasks(countTotalRunningTasks());
+}
+
 function setTrackedRunningTasks(next: Record<string, string>) {
   trackedRunningTasks.value = next;
-  pointsStore.setRunningTasks(Object.keys(next).length);
+  syncRunningTaskSummaryCount();
 
   if (Object.keys(next).length) {
     startGlobalGenerationPolling();
@@ -341,6 +379,7 @@ async function refreshBatchJob(batchId: string) {
       detail,
       batchActiveJobs.value[index],
     );
+    syncRunningTaskSummaryCount();
   } catch {
     // Keep placeholder card visible while polling retries.
   }
@@ -390,8 +429,43 @@ function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
     progress: payload.progress,
     items: [],
   });
+  syncRunningTaskSummaryCount();
   void refreshBatchJob(payload.batchId);
   startBatchPolling();
+}
+
+async function refreshRunningBatchJobs() {
+  const listed = await getBatchTasks({
+    status: "generating",
+    page: 1,
+    pageSize: BATCH_GENERATION_SCAN_PAGE_SIZE,
+  });
+  const next = [...batchActiveJobs.value];
+  const knownIds = new Set(next.map((job) => job.batchId));
+
+  for (const item of listed.items) {
+    if (knownIds.has(item.batchId) || isTerminalBatchStatus(item.status)) {
+      continue;
+    }
+
+    next.push({
+      batchId: item.batchId,
+      projectName: item.projectName,
+      previewUrl: "",
+      createdAt: item.createdAt,
+      status: mapBatchStatus(item.status),
+      total: item.total,
+      completed: item.completed,
+      failed: item.failed,
+      progress: item.progress,
+      items: [],
+    });
+  }
+
+  batchActiveJobs.value = next;
+  syncRunningTaskSummaryCount();
+  startBatchPolling();
+  return countRunningBatchJobs();
 }
 
 function syncWorkspaceFromTask(
@@ -509,16 +583,43 @@ async function refreshRunningTaskSummary() {
     await pointsStore.hydrate();
   }
 
-  return refreshTrackedRunningTasks();
+  await Promise.allSettled([
+    refreshTrackedRunningTasks(),
+    refreshRunningBatchJobs(),
+  ]);
+  syncRunningTaskSummaryCount();
+  return countTotalRunningTasks();
 }
 
 async function canStartGeneration() {
-  const runningTasks = await refreshRunningTaskSummary();
-  const limit = subscriptionStore.concurrentTaskLimit;
+  await refreshRunningTaskSummary();
+  const usesVisualPool = visualPlanPoolCapabilityCodes.has(activeCode.value);
+  const runningTasks = usesVisualPool
+    ? countVisualPlanPoolTasks()
+    : countTotalRunningTasks();
+  const limit = usesVisualPool
+    ? subscriptionStore.visualConcurrentTaskLimit
+    : subscriptionStore.concurrentTaskLimit;
+  const limitLabel = usesVisualPool ? "场景更换/车辆美容" : "套餐";
 
   if (runningTasks >= limit) {
     message.warning(
-      `当前已有 ${runningTasks} 个任务正在生成，已达到套餐并发上限 ${limit} 个，请等待任务完成后再提交`,
+      `当前已有 ${runningTasks} 个任务正在生成，已达到${limitLabel}并发上限 ${limit} 个，请等待任务完成后再提交`,
+    );
+    return false;
+  }
+
+  return true;
+}
+
+async function canStartBatchGeneration() {
+  await refreshRunningTaskSummary();
+  const runningTasks = countRunningBatchJobs();
+  const limit = subscriptionStore.batchConcurrentTaskLimit;
+
+  if (runningTasks >= limit) {
+    message.warning(
+      `当前已有 ${runningTasks} 个批量上新任务正在生成，已达到批量上新并发上限 ${limit} 个，请等待任务完成后再提交`,
     );
     return false;
   }
@@ -1336,6 +1437,7 @@ onUnmounted(() => {
             :selected-option-id="selectedOptionId"
             :is-generating="activeModuleGenerating"
             :previewed-delivery-task-id="previewedDeliveryTaskId"
+            :can-create-batch-task="canStartBatchGeneration"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
             @preview-delivery-task="handlePreviewDeliveryTask"

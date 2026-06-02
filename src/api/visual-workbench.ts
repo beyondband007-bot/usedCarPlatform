@@ -225,6 +225,27 @@ export interface CreatedBatchTask {
   createdAt: string
 }
 
+export interface BatchTaskListItem {
+  batchId: string
+  projectName: string
+  status: GenerationTaskStatus
+  total: number
+  completed: number
+  failed: number
+  progress: number
+  estimatedPoints?: string | null
+  settledPoints?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BatchTaskList {
+  items: BatchTaskListItem[]
+  page: number
+  pageSize: number
+  total: number
+}
+
 export type BatchTaskItemKind =
   | 'exterior'
   | 'interior'
@@ -514,6 +535,17 @@ export async function createBatchTask(payload: CreateBatchTaskPayload) {
     payload,
     generationRequestConfig,
   )
+  return unwrapApiResponse(response)
+}
+
+export async function getBatchTasks(params?: {
+  status?: string
+  page?: number
+  pageSize?: number
+}) {
+  const response = await request.get<ApiResponse<BatchTaskList>>('/modules/batch-new/tasks', {
+    params,
+  })
   return unwrapApiResponse(response)
 }
 
