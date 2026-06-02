@@ -71,8 +71,18 @@ const isKnownKieVideoCreateFailure = (error: unknown) =>
   error instanceof Error &&
   [
     "kie create video task failed",
+    "kie video task rejected",
     "kie video response missing taskId",
   ].some((message) => error.message.includes(message));
+
+const getKieResponseCode = (raw: unknown) => {
+  const record = asRecord(raw);
+  const code = Number(record.code ?? record.statusCode ?? record.status);
+  return Number.isFinite(code) ? code : null;
+};
+
+const isKieClientErrorCode = (code: number | null) =>
+  code !== null && code >= 400 && code < 500;
 
 class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
@@ -251,15 +261,27 @@ class KieClient {
 
       const raw = await response.json().catch(() => ({}));
       if (!response.ok) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        if (response.status < 400 || response.status >= 500) {
+          await kieKeyPool.markFailure(lease.accountHash);
+        }
         throw errors.generationFailed("kie create video task failed", raw);
       }
 
       const rawRecord = asRecord(raw);
+      const rawCode = getKieResponseCode(raw);
+      if (isKieClientErrorCode(rawCode)) {
+        const message =
+          typeof rawRecord.msg === "string" && rawRecord.msg
+            ? rawRecord.msg
+            : "kie video task rejected";
+        throw errors.generationFailed(message, raw);
+      }
       const data = asRecord(rawRecord.data ?? rawRecord);
       const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        if (!isKieClientErrorCode(rawCode)) {
+          await kieKeyPool.markFailure(lease.accountHash);
+        }
         throw errors.generationFailed("kie video response missing taskId", raw);
       }
 

@@ -520,6 +520,16 @@ watch(
   },
 );
 
+function syncShortVideoInitialView() {
+  if (props.capability.code !== "short-video") return;
+  shortVideoInitialView.value = props.isGenerating ? "generating" : "guide";
+}
+
+function focusShortVideoGeneratingView() {
+  if (props.capability.code !== "short-video") return;
+  shortVideoInitialView.value = "generating";
+}
+
 watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
@@ -529,6 +539,7 @@ watch(
       } else {
         activeTab.value = "generating";
       }
+      syncShortVideoInitialView();
       void loadRecentItems();
       return;
     }
@@ -561,6 +572,8 @@ watch(
       featureCompareProgress.value = featureCompareCards.value.map(() => 50);
     } else if (isBatchProcessingView.value) {
       activeTab.value = "batchProcessing";
+    } else if (props.capability.code === "short-video") {
+      syncShortVideoInitialView();
     } else {
       activeTab.value = props.isGenerating ? "generating" : "guide";
     }
@@ -623,6 +636,7 @@ onUnmounted(() => {
 
 defineExpose({
   refreshRecentItems: loadRecentItems,
+  focusShortVideoGeneratingView,
 });
 </script>
 

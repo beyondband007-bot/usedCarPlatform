@@ -95,7 +95,7 @@ export const pricingPlans: PricingPlan[] = [
     icon: 'mdi:account-group-outline',
     tone: 'orange',
     benefits: [
-      '赠送 55,000 积分',
+      '赠送 100,000 积分',
       '5 个企业账号',
       '每个账号同时上传 5 套外观图组',
       '每个账号同时上传 5 套内饰图组',
@@ -112,8 +112,8 @@ export const pricingPlans: PricingPlan[] = [
     icon: 'mdi:shield-crown-outline',
     tone: 'green',
     benefits: [
-      '赠送 980,000 积分',
-      '20 个企业账号',
+      '赠送 800,000 积分',
+      '1+3 个企业账号',
       '每个账号同时上传 20 套外观图组',
       '每个账号同时上传 20 套内饰图组',
       '可定制 20 个专属场景',
@@ -173,7 +173,7 @@ export const pricingPageCopy = {
   tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
   plansTitle: '选择适合您的套餐方案',
   plansSubtitle: '三档套餐，适配试运行、团队上新、集团交付',
-  unit: '/ 套餐',
+  unit: '/ 套',
   recommended: '推荐',
   footer: '所有套餐积分自购买之日起 12 个月内有效，过期未使用积分将自动清零。',
   footerAction: '查看套餐说明',

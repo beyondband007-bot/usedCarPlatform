@@ -51,7 +51,6 @@ class ShortVideoService {
         purpose: asset.purpose,
       });
     }
-
     const aspectRatio = normalizeRatio(body.outputRatio);
     const videoResolution = normalizeVideoResolution(body.extra?.videoResolution);
     const duration = 10;

@@ -710,6 +710,13 @@ function handleSelectCapability(code: string) {
   activeCode.value = code;
   void refreshRunningTaskSummary();
 
+  if (
+    code === SHORT_VIDEO_CAPABILITY_CODE &&
+    sidebarGeneratingCodes.value.includes(code)
+  ) {
+    assistPanelRef.value?.focusShortVideoGeneratingView?.();
+  }
+
   if (route.params.code !== code) {
     router.replace({ name: "Workspace", params: { code } });
   }
