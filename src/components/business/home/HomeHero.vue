@@ -105,13 +105,14 @@ const homeHeroImageSrc = computed(() =>
   width: min(900px, calc(100% - 40px));
   margin: 0 auto;
   padding: 0;
+  line-height: normal;
   text-align: center;
   pointer-events: none;
   animation: hero-copy-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hero h1 {
-  margin: 0 0 24px;
+  margin: 0 0 14px;
   color: var(--home-hero-title, #f3f3f3);
   font-size: clamp(34px, 2.8vw, 55px);
   line-height: 1.08;
@@ -123,6 +124,7 @@ const homeHeroImageSrc = computed(() =>
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
   font-size: clamp(16px, 1.27vw, 25px);
+  line-height: 1.4;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 

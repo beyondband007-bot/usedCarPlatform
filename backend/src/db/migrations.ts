@@ -171,7 +171,7 @@ export const migrations = [
     last_result_url VARCHAR(1024) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    INDEX idx_creative_conversations_user_updated (user_id, updated_at)
+    INDEX idx_creative_conversations_user_status_updated (user_id, status, updated_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS creative_messages (

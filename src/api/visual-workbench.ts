@@ -456,6 +456,13 @@ export async function getCreativeImageConversation(conversationId: string) {
   return unwrapApiResponse(response)
 }
 
+export async function deleteCreativeImageConversation(conversationId: string) {
+  const response = await request.delete<
+    ApiResponse<{ conversationId: string; deleted: boolean }>
+  >(`/modules/creative-image/conversations/${encodeURIComponent(conversationId)}`)
+  return unwrapApiResponse(response)
+}
+
 export async function getCreativeImageMessages(conversationId: string) {
   const response = await request.get<ApiResponse<{ items: CreativeImageMessage[] }>>(
     `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/messages`,

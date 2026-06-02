@@ -82,7 +82,7 @@ function close() {
   --visitor-pad: 34px;
 
   position: relative;
-  width: min(100%, 600px);
+  width: min(100%, 640px);
   margin-inline: auto;
   padding: var(--visitor-pad);
   border: 1px solid var(--visitor-modal-border);

@@ -73,6 +73,18 @@ class CreativeImageService {
     return this.toConversationResponse(conversation);
   }
 
+  async deleteConversation(conversationId: string) {
+    const conversation = await this.requireConversation(conversationId);
+    await creativeImageRepository.markConversationDeleted({
+      conversationId,
+      userId: conversation.userId,
+    });
+    return {
+      conversationId,
+      deleted: true,
+    };
+  }
+
   async listMessages(conversationId: string) {
     await this.requireConversation(conversationId);
     const messages = await creativeImageRepository.listMessages(conversationId);
@@ -136,6 +148,7 @@ class CreativeImageService {
       conversationId,
       role: "user",
       content: prompt,
+      taskId,
       referenceAssetId: reference.assetId,
       sourceTaskId: body.sourceTaskId ?? null,
       sourceImageUrl: body.sourceImageUrl ?? null,
