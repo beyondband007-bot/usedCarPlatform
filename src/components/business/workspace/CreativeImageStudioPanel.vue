@@ -568,7 +568,6 @@ function toggleSidebar() {
                   loading="lazy"
                   decoding="async"
                 />
-                <span class="creative-ai-badge" aria-hidden="true">AI 生成</span>
               </button>
               <div
                 v-else
@@ -1304,21 +1303,6 @@ function toggleSidebar() {
   border-top-color: var(--creative-accent);
   border-radius: 999px;
   animation: creative-spin 0.9s linear infinite;
-}
-
-.creative-ai-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.92);
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  pointer-events: none;
 }
 
 .creative-lightbox {
