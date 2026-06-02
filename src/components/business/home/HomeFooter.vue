@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import contactSupportWechatQr from "@/assets/img/contact-support-wechat-qr.png";
 import footerBrandLogo from "@/assets/img/footer-brand-logo.png";
 import { useAppStore } from "@/stores/app";
 
@@ -26,22 +27,18 @@ const appStore = useAppStore();
         <div class="brand-body">
           <div class="qr-codes">
             <div class="qr-item">
-              <div class="qr-placeholder" aria-hidden="true">
-                <div class="qr-pattern">
-                  <div class="qr-inner"></div>
-                  <div class="qr-center"></div>
-                </div>
+              <div class="qr-frame">
+                <img
+                  class="qr-image"
+                  :src="contactSupportWechatQr"
+                  alt="客服微信二维码"
+                  width="88"
+                  height="88"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <span class="qr-label">客服微信</span>
-            </div>
-            <div class="qr-item">
-              <div class="qr-placeholder" aria-hidden="true">
-                <div class="qr-pattern">
-                  <div class="qr-inner"></div>
-                  <div class="qr-center"></div>
-                </div>
-              </div>
-              <span class="qr-label">微信公众号</span>
             </div>
           </div>
 
@@ -158,7 +155,6 @@ const appStore = useAppStore();
   --footer-link: rgba(255, 255, 255, 0.72);
   --footer-muted: rgba(255, 255, 255, 0.56);
   --footer-subtle: rgba(255, 255, 255, 0.42);
-  --footer-qr-bg: #ffffff;
   --footer-qr-border: rgba(255, 255, 255, 0.14);
   --footer-tag-beta-bg: rgba(239, 194, 76, 0.16);
   --footer-tag-beta-text: #efc24c;
@@ -183,7 +179,6 @@ const appStore = useAppStore();
   --footer-link: #64748b;
   --footer-muted: #94a3b8;
   --footer-subtle: #94a3b8;
-  --footer-qr-bg: #ffffff;
   --footer-qr-border: #e6eaf2;
   --footer-tag-beta-bg: #fffbeb;
   --footer-tag-beta-text: #b7791f;
@@ -244,8 +239,7 @@ const appStore = useAppStore();
   text-align: center;
 }
 
-.qr-placeholder {
-  position: relative;
+.qr-frame {
   display: flex;
   width: 88px;
   height: 88px;
@@ -253,65 +247,16 @@ const appStore = useAppStore();
   justify-content: center;
   margin-bottom: 8px;
   overflow: hidden;
-  background-color: var(--footer-qr-bg);
+  background-color: #ffffff;
   border: 1px solid var(--footer-qr-border);
   border-radius: 6px;
 }
 
-.qr-pattern {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  background: #fff;
-}
-
-.qr-pattern::before {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 16px;
-  height: 16px;
-  content: "";
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-pattern::after {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
-  content: "";
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-inner {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  width: 16px;
-  height: 16px;
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 16px;
-  height: 16px;
-  background: #7c3aed;
-  border-radius: 2px;
-  transform: translate(-50%, -50%);
+.qr-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .qr-label {

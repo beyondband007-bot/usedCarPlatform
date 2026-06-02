@@ -101,7 +101,7 @@ const homeHeroImageSrc = computed(() =>
 .hero-copy {
   position: absolute;
   z-index: 2;
-  top: 48px;
+  top: 13%;
   right: 0;
   left: 0;
   width: min(900px, calc(100% - 40px));

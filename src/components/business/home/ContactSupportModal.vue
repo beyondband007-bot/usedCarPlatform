@@ -1,27 +1,28 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
-import { NModal } from 'naive-ui'
-import { computed } from 'vue'
+import { Icon } from "@iconify/vue";
+import { NModal } from "naive-ui";
+import { computed } from "vue";
 
-import { contactSupportInfo } from '@/constants/contact-support'
-import { useAppStore } from '@/stores/app'
+import contactSupportWechatQr from "@/assets/img/contact-support-wechat-qr.png";
+import { contactSupportInfo } from "@/constants/contact-support";
+import { useAppStore } from "@/stores/app";
 
 defineProps<{
-  show: boolean
-}>()
+  show: boolean;
+}>();
 
 const emit = defineEmits<{
-  'update:show': [value: boolean]
-}>()
+  "update:show": [value: boolean];
+}>();
 
-const appStore = useAppStore()
+const appStore = useAppStore();
 
 const modalThemeClass = computed(() =>
-  appStore.isDarkMode ? 'support-modal--dark' : 'support-modal--light',
-)
+  appStore.isDarkMode ? "support-modal--dark" : "support-modal--light",
+);
 
 function close() {
-  emit('update:show', false)
+  emit("update:show", false);
 }
 </script>
 
@@ -48,33 +49,29 @@ function close() {
       </button>
 
       <header class="support-modal-header">
-        <h2 id="support-modal-title" class="support-modal-title">
-          联系客服
-        </h2>
+        <h2 id="support-modal-title" class="support-modal-title">联系客服</h2>
         <div class="support-modal-divider" aria-hidden="true" />
       </header>
 
       <div class="support-modal-info">
-        <a
-          class="support-modal-info-row"
-          :href="`tel:${contactSupportInfo.phone.replace(/-/g, '')}`"
-        >
-          客服手机号：{{ contactSupportInfo.phone.replace(/-/g, '') }}
-        </a>
-        <a
-          class="support-modal-info-row"
-          :href="`mailto:${contactSupportInfo.email}`"
-        >
+        <p class="support-modal-info-row">
+          客服手机号：{{ contactSupportInfo.phone }}
+        </p>
+        <p class="support-modal-info-row">
           联系邮箱：{{ contactSupportInfo.email }}
-        </a>
+        </p>
       </div>
 
       <div class="support-modal-channels">
         <div class="support-modal-channel">
           <div class="support-modal-qr" aria-label="微信客服二维码">
-            <div class="support-modal-qr-pattern">
-              <div class="support-modal-qr-inner" />
-            </div>
+            <img
+              class="support-modal-qr-image"
+              :src="contactSupportWechatQr"
+              alt="微信客服二维码"
+              width="88"
+              height="88"
+            />
           </div>
           <span class="support-modal-channel-label">扫码联系</span>
         </div>
@@ -86,7 +83,7 @@ function close() {
             aria-hidden="true"
           />
           <span class="support-modal-channel-label">
-            QQ: {{ contactSupportInfo.qq }}
+            QQ：{{ contactSupportInfo.qq }}
           </span>
         </div>
       </div>
@@ -116,9 +113,6 @@ function close() {
   --support-close-hover: rgba(255, 255, 255, 0.1);
   --support-divider: rgba(255, 255, 255, 0.12);
   --support-info-bg: #2c3e66;
-  --support-info-bg-hover: #354a75;
-  --support-qr-module: #ffffff;
-  --support-qr-hole: #1a2b4b;
   --support-icon: #ffffff;
 }
 
@@ -131,9 +125,6 @@ function close() {
   --support-close-hover: rgba(15, 23, 42, 0.06);
   --support-divider: #e2e8f0;
   --support-info-bg: #eef2f7;
-  --support-info-bg-hover: #e2e8f0;
-  --support-qr-module: #1e293b;
-  --support-qr-hole: #ffffff;
   --support-icon: #2f6bff;
 }
 
@@ -190,7 +181,7 @@ function close() {
 }
 
 .support-modal-info-row {
-  display: block;
+  margin: 0;
   padding: 12px 14px;
   border-radius: 8px;
   background: var(--support-info-bg);
@@ -198,12 +189,17 @@ function close() {
   font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
-  text-decoration: none;
-  transition: background 0.2s ease;
+  cursor: default;
+  user-select: text;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.support-modal-info-row:hover {
-  background: var(--support-info-bg-hover);
+/* 阻止移动端浏览器对号码/邮箱的自动识别链接 */
+.support-modal-info-row :deep(a) {
+  color: inherit !important;
+  text-decoration: none !important;
+  pointer-events: none;
+  cursor: default;
 }
 
 .support-modal-channels {
@@ -226,56 +222,21 @@ function close() {
   height: 88px;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #ffffff;
 }
 
-.support-modal-qr-pattern {
-  position: relative;
+.support-modal-qr-image {
+  display: block;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
-  background:
-    linear-gradient(90deg, var(--support-qr-module) 2px, transparent 2px) 0 0 /
-      8px 8px,
-    linear-gradient(var(--support-qr-module) 2px, transparent 2px) 0 0 / 8px 8px;
-  opacity: 0.92;
-}
-
-.support-modal-qr-pattern::before,
-.support-modal-qr-pattern::after {
-  position: absolute;
-  top: 4px;
-  width: 18px;
-  height: 18px;
-  content: '';
-  border: 3px solid var(--support-qr-module);
-  border-radius: 2px;
-  background: transparent;
-  box-shadow: inset 0 0 0 4px var(--support-qr-hole);
-}
-
-.support-modal-qr-pattern::before {
-  left: 4px;
-}
-
-.support-modal-qr-pattern::after {
-  right: 4px;
-}
-
-.support-modal-qr-inner {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  width: 18px;
-  height: 18px;
-  border: 3px solid var(--support-qr-module);
-  border-radius: 2px;
-  background: transparent;
-  box-shadow: inset 0 0 0 4px var(--support-qr-hole);
+  object-fit: contain;
 }
 
 .support-modal-qq-icon {
-  width: 56px;
-  height: 56px;
+  width: 88px;
+  height: 88px;
   color: var(--support-icon);
 }
 
