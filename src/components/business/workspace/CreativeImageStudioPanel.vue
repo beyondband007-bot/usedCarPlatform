@@ -6,6 +6,7 @@ import { NInput, NSelect } from 'naive-ui'
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
   creativeImageAspectRatios,
+  creativeImageDefaultOutputRatio,
   creativeImageDefaultPreview,
   creativeImagePromptMaxLength,
 } from '@/constants/creative-image-studio'
@@ -49,7 +50,7 @@ const emit = defineEmits<{
 }>()
 
 const prompt = ref('')
-const selectedRatio = ref(creativeImageAspectRatios[0].value)
+const selectedRatio = ref<string>(creativeImageDefaultOutputRatio)
 const lastSubmittedPrompt = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const threadScrollRef = ref<HTMLElement | null>(null)

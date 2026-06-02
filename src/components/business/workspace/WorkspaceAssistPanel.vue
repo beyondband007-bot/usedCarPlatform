@@ -12,6 +12,7 @@ import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTut
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
+import { formatOutputRatioLabel } from "@/constants/output-ratio";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
@@ -390,7 +391,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     downloadUrl: item.downloadUrl ?? previewImage,
     ratioLabel: isShortVideo
       ? "16:9 · 720p · 10秒"
-      : (item.ratioLabel ?? undefined),
+      : (item.ratioLabel ?? formatOutputRatioLabel(item.outputRatio) ?? undefined),
     sceneLabel: isShortVideo
       ? "营销短视频"
       : (sceneTitle ?? item.sceneLabel ?? undefined),
@@ -633,7 +634,13 @@ defineExpose({
       <header class="delivery-group-head">
         <div class="delivery-group-copy">
           <p>成片交付</p>
-          <h2>{{ deliveryTaskPreview.title }}</h2>
+          <h2
+            class="delivery-ellipsis-text"
+            :data-tooltip="deliveryTaskPreview.title"
+            :title="deliveryTaskPreview.title"
+          >
+            {{ deliveryTaskPreview.title }}
+          </h2>
           <span>
             {{ deliveryTaskPreview.meta }} ·
             {{ deliveryTaskPreview.completedCount }}/{{ deliveryTaskPreview.totalCount }}
@@ -701,14 +708,17 @@ defineExpose({
             <div v-else class="delivery-group-pending" aria-hidden="true">
               <span class="delivery-group-pending-scan"></span>
               <Icon icon="mdi:image-sync-outline" />
-              <strong>{{
-                asset.title.includes("待生成") ? "待生成" : "生成中"
-              }}</strong>
+              <strong>{{ asset.pendingStatusText ?? "生成中" }}</strong>
             </div>
           </div>
           <footer class="delivery-group-foot">
             <div>
-              <strong>{{ asset.title }}</strong>
+              <strong
+                class="delivery-ellipsis-text"
+                :data-tooltip="asset.title"
+                :title="asset.title"
+                >{{ asset.title }}</strong
+              >
               <span>{{ asset.ratio }}</span>
               <span v-if="asset.createdAt" class="delivery-group-time">{{
                 asset.createdAt
@@ -1344,6 +1354,7 @@ defineExpose({
 }
 
 .delivery-group-copy {
+  position: relative;
   min-width: 0;
 }
 
@@ -1362,13 +1373,41 @@ defineExpose({
 
 .delivery-group-copy h2 {
   margin-top: 6px;
+}
+
+.delivery-ellipsis-text {
+  display: block;
   overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-ellipsis-text[data-tooltip]:hover::after {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  bottom: calc(100% + 8px);
+  max-width: min(360px, 70vw);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #12151c 92%, transparent);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  color: #f5f7fb;
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.delivery-group-copy h2.delivery-ellipsis-text {
   color: var(--assist-text);
   font-size: clamp(18px, 1.35vw, 24px);
   font-weight: 950;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .delivery-group-copy span {
@@ -1420,16 +1459,29 @@ defineExpose({
 }
 
 .delivery-group-grid {
+  --delivery-group-columns: 4;
   display: grid;
   flex: 1;
   min-height: 0;
   align-content: start;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(var(--delivery-group-columns), minmax(0, 1fr));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 6px 20px 0;
+}
+
+@media (max-width: 1180px) {
+  .delivery-group-grid {
+    --delivery-group-columns: 3;
+  }
+}
+
+@media (max-width: 860px) {
+  .delivery-group-grid {
+    --delivery-group-columns: 2;
+  }
 }
 
 .delivery-group-card {
@@ -1548,17 +1600,14 @@ defineExpose({
 
 .delivery-group-foot div {
   min-width: 0;
+  position: relative;
 }
 
-.delivery-group-foot strong {
-  display: block;
-  overflow: hidden;
+.delivery-group-foot strong.delivery-ellipsis-text {
   color: var(--assist-text);
   font-size: 12px;
   font-weight: 900;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .delivery-group-foot span {

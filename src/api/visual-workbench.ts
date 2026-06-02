@@ -205,6 +205,8 @@ export interface CreateBatchTaskPayload {
     interiorAssetIds?: string[]
   }>
   visualConfig: BatchVisualConfig
+  /** 与 visualConfig.outputRatio 一致，供后端写入任务表 */
+  outputRatio?: string
 }
 
 export interface CreatedBatchTask {
@@ -606,10 +608,14 @@ export async function pollDeliveryPackage(
   return getDeliveryPackage(packageId)
 }
 
-export async function createInteriorCleanTask(inputAssetId: string) {
+export async function createInteriorCleanTask(payload: {
+  inputAssetId: string
+  outputRatio?: string
+  resolution?: string
+}) {
   const response = await request.post<ApiResponse<CreatedGenerationTask>>(
     '/modules/interior-clean/tasks',
-    { inputAssetId },
+    payload,
     generationRequestConfig,
   )
   return unwrapApiResponse(response)

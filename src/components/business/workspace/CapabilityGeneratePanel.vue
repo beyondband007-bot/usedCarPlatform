@@ -17,6 +17,12 @@ import {
   type UploadedAsset,
 } from "@/api/visual-workbench";
 import {
+  DEFAULT_BATCH_OUTPUT_RATIO,
+  DEFAULT_GENERATION_OUTPUT_RATIO,
+  getOutputRatioOptionLabel,
+  outputRatioSelectOptions,
+} from "@/constants/output-ratio";
+import {
   batchSceneCategoryOptions,
   getBatchSceneOptionId,
   getBatchScenesByCategory,
@@ -72,7 +78,7 @@ const useLogo = ref(false);
 const { recentLogo } = useWorkspaceLogo();
 const paintColorCode = ref("");
 const batchPaintColorCode = ref("");
-const outputRatio = ref("1:1");
+const outputRatio = ref<string>(DEFAULT_GENERATION_OUTPUT_RATIO);
 const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
@@ -166,14 +172,6 @@ function resetBatchCreateSection() {
 function resetUploadedInterior() {
   resetInteriorCollageUploads();
 }
-
-const outputRatioOptions = [
-  { label: "1:1 主图", value: "1:1" },
-  { label: "3:4 竖图", value: "3:4" },
-  { label: "4:3 横图", value: "4:3" },
-  { label: "9:16 竖图", value: "9:16" },
-  { label: "16:9 横图", value: "16:9" },
-];
 
 const visualPresetOptions = computed(() =>
   visualTemplates.value.map((item) => ({
@@ -333,7 +331,7 @@ function resetVisualConfigSelection() {
   enableSceneChange.value = false;
   batchSceneIndex.value = 0;
   batchSceneCategory.value = "展厅灯光";
-  outputRatio.value = "1:1";
+  outputRatio.value = DEFAULT_BATCH_OUTPUT_RATIO;
   useRecentLogo.value = false;
   lightConsistency.value = true;
   paintRefresh.value = false;
@@ -731,7 +729,7 @@ function handleGenerate() {
 
     emit("generate", {
       assetIds,
-      outputRatio: "16:9",
+      outputRatio: outputRatio.value,
       resolution: "2K",
     });
     return;
@@ -794,6 +792,8 @@ async function handleCreateBatchTask() {
       ? uploadedInteriorCollageAssets.value.map((item) => item.assetId)
       : [];
 
+    const visualConfig = mapBatchVisualConfigFromTemplate(template);
+
     const created = await createBatchTask({
       projectName: projectName.value.trim() || "批量上新任务",
       presetId: createTaskPresetId.value,
@@ -806,7 +806,8 @@ async function handleCreateBatchTask() {
           interiorAssetIds,
         },
       ],
-      visualConfig: mapBatchVisualConfigFromTemplate(template),
+      visualConfig,
+      outputRatio: visualConfig.outputRatio,
     });
 
     lastCreatedBatchId.value = created.batchId;
@@ -986,12 +987,16 @@ watch(createTaskPresetId, (presetId) => {
 
 watch(
   () => props.capability.code,
-  () => {
+  (code) => {
     resetUploadedVehicle();
     resetBatchExteriorUploads();
     resetInteriorCollageUploads();
     paintColorCode.value = "";
     batchPaintColorCode.value = "";
+    outputRatio.value =
+      code === "batch-new"
+        ? DEFAULT_BATCH_OUTPUT_RATIO
+        : DEFAULT_GENERATION_OUTPUT_RATIO;
   },
 );
 
@@ -1103,28 +1108,14 @@ type DeliveryTask = DeliveryTaskItem & {
 };
 
 function buildDeliveryDisplayTitle(item: DeliveryTaskItem) {
-  if (item.presetName && item.projectName) {
-    return `${item.presetName}-${item.projectName}`;
-  }
+  const projectName = item.projectName?.trim();
+  if (projectName) return projectName;
 
-  return item.title.replace(/\s*[·?]\s*成片交付\s*$/u, "").trim() || item.title;
+  return item.title.replace(/\s*[·•]\s*成片交付\s*$/u, "").trim() || item.title;
 }
 
-function formatDeliveryAssetTitle(displayTitle: string, rawTitle: string) {
-  const parts = rawTitle.split(/\s*[·?]\s+/u);
-  const kind = parts.length > 1 ? parts[parts.length - 1]?.trim() : "";
-  const knownKinds = new Set([
-    "外观成片",
-    "内饰清洁",
-    "内饰拼图",
-    "内饰清洁拼图",
-  ]);
-
-  if (kind && knownKinds.has(kind)) {
-    return `${displayTitle} · ${kind}`;
-  }
-
-  return displayTitle;
+function formatDeliveryImageIndexTitle(projectName: string, index: number) {
+  return `${projectName}图${index}`;
 }
 
 function buildDeliveryTaskMetrics(item: DeliveryTaskItem) {
@@ -1174,10 +1165,11 @@ function buildDeliveryPreviewSlots(
   task: DeliveryTask,
   assets: Awaited<ReturnType<typeof getDeliveryAssetsForTask>>,
 ): WorkspaceDeliveryTaskPreview["assets"] {
+  const projectName = task.displayTitle;
   const totalCount = Math.max(task.deliveryTotal, assets.length);
-  const readyAssets = assets.map((asset) => ({
+  const readyAssets = assets.map((asset, index) => ({
     id: asset.assetId,
-    title: formatDeliveryAssetTitle(task.displayTitle, asset.title),
+    title: formatDeliveryImageIndexTitle(projectName, index + 1),
     imageUrl: asset.url,
     thumbnailUrl: asset.thumbnailUrl ?? undefined,
     ratio: asset.ratio,
@@ -1191,9 +1183,13 @@ function buildDeliveryPreviewSlots(
   const pendingCount = Math.max(0, totalCount - readyAssets.length);
   const pendingSlots = Array.from({ length: pendingCount }, (_, index) => ({
     id: `pending-${task.taskId}-${index}`,
-    title: `${task.displayTitle} · ${pendingLabel}`,
+    title: formatDeliveryImageIndexTitle(
+      projectName,
+      readyAssets.length + index + 1,
+    ),
     ratio: defaultRatio,
     status: "pending" as const,
+    pendingStatusText: pendingLabel,
   }));
 
   return [...readyAssets, ...pendingSlots];
@@ -1442,6 +1438,29 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
+const showOutputRatioForGenerate = computed(() => {
+  const { code, kind } = props.capability;
+
+  if (
+    code === "delivery" ||
+    code === "creative-image" ||
+    code === "short-video" ||
+    code === "batch-new"
+  ) {
+    return false;
+  }
+
+  if (kind === "delivery" || kind === "batch") {
+    return false;
+  }
+
+  if (kind === "scene" && hasBlock("scene-settings")) {
+    return false;
+  }
+
+  return hasBlock("actions") || code === "interior-stitch";
+});
+
 const activeCreateTemplate = computed(() =>
   createTaskPresetId.value
     ? getTemplateById(createTaskPresetId.value)
@@ -1450,9 +1469,7 @@ const activeCreateTemplate = computed(() =>
 
 const activeCreateRatioLabel = computed(() => {
   const ratio = activeCreateTemplate.value?.outputRatio;
-  return (
-    outputRatioOptions.find((item) => item.value === ratio)?.label ?? ratio
-  );
+  return getOutputRatioOptionLabel(ratio ?? DEFAULT_BATCH_OUTPUT_RATIO);
 });
 </script>
 
@@ -1844,7 +1861,7 @@ const activeCreateRatioLabel = computed(() => {
               <span>输出比例</span>
               <NSelect
                 v-model:value="outputRatio"
-                :options="outputRatioOptions"
+                :options="outputRatioSelectOptions"
                 size="large"
               />
             </section>
@@ -2017,6 +2034,25 @@ const activeCreateRatioLabel = computed(() => {
           :selected-option-id="props.selectedOptionId"
           @select="emit('selectOption', $event)"
         />
+
+        <div
+          v-if="showOutputRatioForGenerate"
+          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+        >
+          <div class="flex items-center gap-4">
+            <span
+              class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
+            >
+              输出比例
+            </span>
+            <NSelect
+              v-model:value="outputRatio"
+              :options="outputRatioSelectOptions"
+              size="large"
+              class="min-w-0 flex-1"
+            />
+          </div>
+        </div>
       </div>
 
       <GenerateActionFooter
@@ -2146,7 +2182,7 @@ const activeCreateRatioLabel = computed(() => {
                 </div>
 
                 <div class="delivery-copy">
-                  <h3>{{ task.displayTitle }}</h3>
+                  <h3 :title="task.displayTitle">{{ task.displayTitle }}</h3>
                   <p>{{ task.meta }}</p>
                 </div>
 
@@ -2240,6 +2276,25 @@ const activeCreateRatioLabel = computed(() => {
           @select="emit('selectOption', $event)"
         />
 
+        <div
+          v-if="showOutputRatioForGenerate"
+          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+        >
+          <div class="flex items-center gap-4">
+            <span
+              class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
+            >
+              输出比例
+            </span>
+            <NSelect
+              v-model:value="outputRatio"
+              :options="outputRatioSelectOptions"
+              size="large"
+              class="min-w-0 flex-1"
+            />
+          </div>
+        </div>
+
         <template
           v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
@@ -2256,7 +2311,7 @@ const activeCreateRatioLabel = computed(() => {
               </span>
               <NSelect
                 v-model:value="outputRatio"
-                :options="outputRatioOptions"
+                :options="outputRatioSelectOptions"
                 size="large"
                 class="min-w-0 flex-1"
               />

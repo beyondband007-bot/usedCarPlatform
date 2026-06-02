@@ -28,6 +28,9 @@ import CreativeImageStudioPanel from "@/components/business/workspace/CreativeIm
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
 import {
+  DEFAULT_GENERATION_OUTPUT_RATIO,
+} from "@/constants/output-ratio";
+import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,
 } from "@/constants/workspace";
@@ -1065,7 +1068,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       return;
     }
 
-    const outputRatio = payload.outputRatio || "16:9";
+    const outputRatio = payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO;
     const resolution = payload.resolution || "2K";
 
     isGenerating.value = true;
@@ -1142,7 +1145,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       outputRatio:
         activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
           ? "16:9"
-          : payload.outputRatio,
+          : payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO,
       extra:
         activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
           ? { videoResolution: "720p" }
@@ -1194,7 +1197,8 @@ function buildResultFromRecent(
       : `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel: isShortVideo
       ? `${item.outputRatio ?? "16:9"} · 720p · 10秒`
-      : (item.ratioLabel ?? "主图"),
+      : (item.ratioLabel ??
+        (item.outputRatio ? `${item.outputRatio} · 2K` : "主图")),
     mediaType: isShortVideo ? "video" : "image",
     previewImage: isShortVideo ? "" : item.previewImage,
     previewVideo: isShortVideo ? mediaUrl : undefined,

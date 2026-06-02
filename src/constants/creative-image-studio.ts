@@ -1,15 +1,20 @@
+import {
+  DEFAULT_BATCH_OUTPUT_RATIO,
+  outputRatioSelectOptions,
+} from '@/constants/output-ratio'
+
 export interface CreativeImageAspectRatio {
   value: string
   label: string
 }
 
-export const creativeImageAspectRatios: CreativeImageAspectRatio[] = [
-  { value: '1:1', label: '1:1 主图' },
-  { value: '3:4', label: '3:4 竖图' },
-  { value: '4:3', label: '4:3 横图' },
-  { value: '9:16', label: '9:16 竖图' },
-  { value: '16:9', label: '16:9 横图' },
-]
+/** 创意生图不含 auto，默认 1:1 */
+export const creativeImageAspectRatios: CreativeImageAspectRatio[] =
+  outputRatioSelectOptions
+    .filter((item) => item.value !== 'auto')
+    .map((item) => ({ value: item.value, label: item.label }))
+
+export const creativeImageDefaultOutputRatio = DEFAULT_BATCH_OUTPUT_RATIO
 
 export const creativeImagePromptMaxLength = 2000
 

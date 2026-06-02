@@ -85,6 +85,8 @@ export interface WorkspaceDeliveryTaskPreviewAsset {
   title: string
   ratio: string
   status: WorkspaceDeliveryTaskPreviewAssetStatus
+  /** 占位图叠层文案，如「待生成」「生成中」 */
+  pendingStatusText?: string
   createdAt?: string
   imageUrl?: string
   thumbnailUrl?: string
