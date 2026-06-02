@@ -317,6 +317,16 @@ const createPresetOptions = computed(() =>
   })),
 );
 
+const activeCreateTemplate = computed(() =>
+  createTaskPresetId.value
+    ? getTemplateById(createTaskPresetId.value)
+    : undefined,
+);
+
+const showCreateInteriorUpload = computed(() =>
+  Boolean(activeCreateTemplate.value?.interiorEnhance),
+);
+
 const uploadedExteriorAssets = computed(() =>
   batchExteriorUploads.value
     .filter(
@@ -382,7 +392,7 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     paintRefresh: paintRefresh.value,
     colorCode: paintRefresh.value ? batchPaintColorCode.value.trim() || null : null,
     interiorEnhance: interiorEnhance.value,
-    interiorCollage: interiorCollage.value,
+    interiorCollage: interiorEnhance.value && interiorCollage.value,
   };
 }
 
@@ -405,7 +415,8 @@ function mapBatchVisualConfigFromTemplate(
     enablePaintRefresh: template.paintRefresh,
     colorCode: template.paintRefresh ? template.colorCode?.trim() || null : null,
     enableInteriorClean: template.interiorEnhance,
-    enableInteriorCollage: template.interiorCollage,
+    enableInteriorCollage:
+      template.interiorEnhance && template.interiorCollage,
   };
 }
 
@@ -420,7 +431,8 @@ function applyTemplate(template: BatchVisualTemplate) {
   paintRefresh.value = template.paintRefresh;
   batchPaintColorCode.value = template.colorCode ?? "";
   interiorEnhance.value = template.interiorEnhance;
-  interiorCollage.value = template.interiorCollage;
+  interiorCollage.value =
+    template.interiorEnhance && template.interiorCollage;
   isApplyingTemplate.value = false;
 }
 
@@ -462,6 +474,17 @@ watch(batchSceneCategory, () => {
 watch(paintRefresh, (enabled) => {
   if (isApplyingTemplate.value || enabled) return;
   batchPaintColorCode.value = "";
+});
+
+watch(interiorEnhance, (enabled) => {
+  if (isApplyingTemplate.value || enabled) return;
+  interiorCollage.value = false;
+});
+
+watch(showCreateInteriorUpload, (enabled) => {
+  if (enabled) return;
+  uploadInterior.value = false;
+  resetInteriorCollageUploads();
 });
 
 async function handleSaveVisualPreset() {
@@ -790,9 +813,7 @@ function handleInteriorImageRemove() {
 }
 
 function validateBatchInteriorAssets(template: BatchVisualTemplate) {
-  const needsInterior = template.interiorEnhance || template.interiorCollage;
-
-  if (!needsInterior) {
+  if (!template.interiorEnhance) {
     return true;
   }
 
@@ -810,7 +831,7 @@ function validateBatchInteriorAssets(template: BatchVisualTemplate) {
     return false;
   }
 
-  if (template.interiorCollage) {
+  if (template.interiorEnhance && template.interiorCollage) {
     if (
       interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
       interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES
@@ -1617,12 +1638,6 @@ const showOutputRatioForGenerate = computed(() => {
   return hasBlock("actions") || code === "interior-stitch";
 });
 
-const activeCreateTemplate = computed(() =>
-  createTaskPresetId.value
-    ? getTemplateById(createTaskPresetId.value)
-    : undefined,
-);
-
 const activeCreateRatioLabel = computed(() => {
   const ratio = activeCreateTemplate.value?.outputRatio;
   return getOutputRatioOptionLabel(ratio ?? DEFAULT_BATCH_OUTPUT_RATIO);
@@ -1744,7 +1759,10 @@ const activeCreateRatioLabel = computed(() => {
                   内饰清洁
                 </span>
                 <span
-                  v-if="activeCreateTemplate.interiorCollage"
+                  v-if="
+                    activeCreateTemplate.interiorEnhance &&
+                    activeCreateTemplate.interiorCollage
+                  "
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:image-multiple-outline" />
@@ -1846,7 +1864,10 @@ const activeCreateRatioLabel = computed(() => {
               </div>
             </section>
 
-            <section class="batch-card switch-card">
+            <section
+              v-if="showCreateInteriorUpload"
+              class="batch-card switch-card"
+            >
               <div>
                 <h3>同时上传内饰图</h3>
                 <p>开启后，每套外观图组可补充内饰图，用于成片交付包。</p>
@@ -1854,7 +1875,10 @@ const activeCreateRatioLabel = computed(() => {
               <NSwitch v-model:value="uploadInterior" size="large" />
             </section>
 
-            <section v-if="uploadInterior" class="batch-card batch-upload-card">
+            <section
+              v-if="showCreateInteriorUpload && uploadInterior"
+              class="batch-card batch-upload-card"
+            >
               <input
                 ref="interiorCollageInputRef"
                 type="file"
@@ -2063,7 +2087,10 @@ const activeCreateRatioLabel = computed(() => {
               <NSwitch v-model:value="interiorEnhance" size="large" />
             </section>
 
-            <section class="batch-card switch-card">
+            <section
+              v-if="interiorEnhance"
+              class="batch-card switch-card"
+            >
               <div>
                 <h3>内饰拼接</h3>
                 <p>2-10 张内饰图按规则自动分组拼图，可与清洁增强组合。</p>
