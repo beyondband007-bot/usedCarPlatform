@@ -67,8 +67,8 @@ class InteriorCleanService {
       throw error;
     }
 
-    const lease = await kieKeyPool.acquire();
     try {
+      const lease = await kieKeyPool.acquire();
       const uploadedInterior = await kieClient.uploadLocalFileWithLease(
         lease,
         asset.localPath,

@@ -6,6 +6,7 @@ import { tasksService } from "../tasks/tasksService";
 import { userLogoService } from "../user-logo/userLogoService";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
+import type { KieAccountLease } from "../../providers/kie/kieTypes";
 import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio } from "../../shared/types";
 import {
@@ -451,8 +452,9 @@ class BatchService {
 
     const inputUrls: string[] = [];
     let billing: FrozenGenerationBilling | null = null;
-    const lease = await kieKeyPool.acquire();
+    let lease: KieAccountLease | null = null;
     try {
+      lease = await kieKeyPool.acquire();
       billing = await freezeGenerationBilling({
         taskId: task.id,
         functionCode: batchItemFunctionCode(item.itemKind),
@@ -519,7 +521,7 @@ class BatchService {
         resultCount: 0,
       });
     } catch (error) {
-      await kieKeyPool.release(lease.accountHash);
+      if (lease) await kieKeyPool.release(lease.accountHash);
       try {
         await refundFrozenGenerationBilling(task.id, billing, batchItemBillingScope(item.itemId));
       } catch {

@@ -65,8 +65,8 @@ export const roadMotionService = {
       prompt,
     });
 
-    const lease = await kieKeyPool.acquire();
     try {
+      const lease = await kieKeyPool.acquire();
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(lease, asset.localPath, uploadPath);
       const uploadedLogo = logoAsset
         ? await kieClient.uploadLocalFileWithLease(lease, logoAsset.localPath, `${uploadPath}/logo`)

@@ -137,8 +137,8 @@ class InteriorCollageService {
     for (const entry of taskEntries) {
       const { taskId, group, groupIndex, groupCount, billing } = entry;
 
-      const lease = await kieKeyPool.acquire();
       try {
+        const lease = await kieKeyPool.acquire();
         const uploaded = [];
         for (const asset of group) {
           uploaded.push(

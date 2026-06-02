@@ -108,8 +108,8 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         throw error;
       }
 
-      const lease = await kieKeyPool.acquire();
       try {
+        const lease = await kieKeyPool.acquire();
         const uploadedVehicle = await kieClient.uploadLocalFileWithLease(
           lease,
           asset.localPath,

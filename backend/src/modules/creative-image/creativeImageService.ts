@@ -143,8 +143,8 @@ class CreativeImageService {
       prompt,
     });
 
-    const lease = await kieKeyPool.acquire();
     try {
+      const lease = await kieKeyPool.acquire();
       const kieTask =
         reference.mode === "text_to_image"
           ? await kieClient.createTextToImageTaskWithLease(lease, {

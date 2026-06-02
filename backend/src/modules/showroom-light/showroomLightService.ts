@@ -90,8 +90,8 @@ class ShowroomLightService {
       throw error;
     }
 
-    const lease = await kieKeyPool.acquire();
     try {
+      const lease = await kieKeyPool.acquire();
       const uploaded = await kieClient.uploadLocalFileWithLease(
         lease,
         asset.localPath,
