@@ -6,6 +6,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio, Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import { assetsService } from "../assets/assetsService";
@@ -22,7 +23,6 @@ import type {
 const defaultUserId = "default_user";
 const resultPublicPrefix = `${env.publicBaseUrl.replace(/\/$/, "")}/results/creative-image/`;
 
-const normalizeRatio = (value: OutputRatio | undefined): OutputRatio => value ?? "1:1";
 const normalizeResolution = (value: Resolution | undefined): Resolution => value ?? "2K";
 
 const assertPrompt = (prompt: string | undefined) => {
@@ -113,7 +113,7 @@ class CreativeImageService {
   async createGeneration(conversationId: string, body: CreateGenerationRequest) {
     await this.requireConversation(conversationId);
     const prompt = assertPrompt(body.prompt);
-    const outputRatio = normalizeRatio(body.outputRatio);
+    const outputRatio = resolveOutputRatio(body.outputRatio, "1:1");
     const resolution = normalizeResolution(body.resolution);
     const reference = await this.resolveReference(conversationId, body);
     const taskId = createId("task");

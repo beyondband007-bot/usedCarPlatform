@@ -3,6 +3,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
@@ -48,9 +49,9 @@ export const roadMotionService = {
     }
 
     const scene = resolveRoadMotionScene(body.optionId);
-    const outputRatio = "16:9";
+    const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
-    const prompt = logoAsset ? scene.logoPrompt : scene.prompt;
+    const prompt = appendOutputRatioPrompt(logoAsset ? scene.logoPrompt : scene.prompt, outputRatio);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
