@@ -23,6 +23,10 @@ export interface BatchTaskRecord {
   updatedAt: Date;
 }
 
+export interface BatchItemTaskLink extends BatchItemSummary {
+  batchId: string;
+}
+
 interface BatchTaskRow extends RowDataPacket {
   id: string;
   project_name: string;
@@ -214,6 +218,19 @@ export class BatchRepository extends Repository {
     return rows.map(mapItem);
   }
 
+  async findItemByGenerationTaskId(generationTaskId: string): Promise<BatchItemTaskLink | null> {
+    const rows = await this.query<BatchItemRow[]>(
+      `SELECT * FROM batch_task_items WHERE generation_task_id = :generationTaskId LIMIT 1`,
+      { generationTaskId },
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      ...mapItem(row),
+      batchId: row.batch_id,
+    };
+  }
+
   async listWaitingItems(batchId: string, limit: number) {
     const rows = await this.query<BatchItemRow[]>(
       `SELECT * FROM batch_task_items
@@ -252,6 +269,7 @@ export class BatchRepository extends Repository {
           COUNT(*) total,
           SUM(status = 'success') completed,
           SUM(status = 'fail') failed,
+          SUM(status = 'canceled') canceled,
           ROUND(AVG(progress)) progress
         FROM batch_task_items
         WHERE batch_id = :batchId
@@ -262,9 +280,10 @@ export class BatchRepository extends Repository {
            bt.failed = agg.failed,
            bt.progress = agg.progress,
            bt.status = CASE
-             WHEN agg.failed > 0 AND agg.completed + agg.failed = agg.total THEN 'fail'
+             WHEN agg.canceled = agg.total THEN 'canceled'
+             WHEN agg.failed + agg.canceled > 0 AND agg.completed + agg.failed + agg.canceled = agg.total THEN 'fail'
              WHEN agg.completed = agg.total THEN 'success'
-             WHEN agg.completed + agg.failed = 0 AND agg.progress = 0 THEN 'waiting'
+             WHEN agg.completed + agg.failed + agg.canceled = 0 AND agg.progress = 0 THEN 'waiting'
              ELSE 'generating'
            END
        WHERE bt.id = :batchId`,

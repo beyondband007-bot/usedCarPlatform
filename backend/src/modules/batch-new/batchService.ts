@@ -274,8 +274,24 @@ class BatchService {
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
     const listed = await batchRepository.listBatches({ status: input.status, page, pageSize });
+    let shouldRelist = false;
+
+    for (const item of listed.items) {
+      if (item.status !== "generating") continue;
+      try {
+        await this.refreshActiveBatch(item.id);
+        shouldRelist = true;
+      } catch {
+        // Keep the batch list usable even if one upstream status refresh fails.
+      }
+    }
+
+    const current = shouldRelist
+      ? await batchRepository.listBatches({ status: input.status, page, pageSize })
+      : listed;
+
     return {
-      items: listed.items.map((item) => ({
+      items: current.items.map((item) => ({
         batchId: item.id,
         projectName: item.projectName,
         status: item.status,
@@ -293,8 +309,22 @@ class BatchService {
       })),
       page,
       pageSize,
-      total: listed.total,
+      total: current.total,
     };
+  }
+
+  private async refreshActiveBatch(batchId: string) {
+    const items = await batchRepository.listItems(batchId);
+    for (const item of items) {
+      if (item.status === "waiting") continue;
+      if (!terminalStatuses.includes(item.status)) {
+        await this.refreshItem(batchId, item);
+      } else if (item.status === "success" && item.resultCount === 0) {
+        await this.persistDeliveryAssets(batchId, item);
+      }
+    }
+    await batchRepository.recalcBatch(batchId);
+    await batchRepository.recalcBatchBilling(batchId);
   }
 
   async advanceBatch(batchId: string) {

@@ -8,6 +8,7 @@ import { downloadFile } from "../../shared/downloadFile";
 import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
 import { creativeImageRepository } from "../creative-image/creativeImageRepository";
+import { syncBatchItemFromGenerationTask } from "../batch-new/batchTaskSync";
 import {
   finalizeGenerationBilling,
   shouldFinalizeGenerationBilling,
@@ -20,6 +21,7 @@ import {
 } from "./tasksRepository";
 
 const terminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
+const staleWaitingTaskMs = 15 * 60 * 1000;
 
 const getApiKeyByHash = (accountHash: string | null | undefined) => {
   if (!accountHash) return null;
@@ -52,12 +54,21 @@ class TasksService {
       page,
       pageSize,
     });
+    const shouldRelist = await this.reconcileRecentTasks(listed.items);
+    const current = shouldRelist
+      ? await tasksRepository.listRecent({
+          moduleCode: input.moduleCode,
+          status: input.status,
+          page,
+          pageSize,
+        })
+      : listed;
 
     return {
-      items: listed.items.map((task) => this.toRecentResponse(task)),
+      items: current.items.map((task) => this.toRecentResponse(task)),
       page,
       pageSize,
-      total: listed.total,
+      total: current.total,
     };
   }
 
@@ -76,26 +87,74 @@ class TasksService {
       const refreshed = await tasksRepository.findById(taskId);
       if (!refreshed) throw errors.taskNotFound();
       await this.syncCreativeConversationResult(refreshed);
-      if (finalizeBilling && shouldFinalizeGenerationBilling(refreshed)) {
-        await finalizeGenerationBilling(refreshed);
-        const finalized = await tasksRepository.findById(taskId);
-        if (!finalized) throw errors.taskNotFound();
-        await this.syncCreativeConversationResult(finalized);
-        return this.toResponse(finalized);
-      }
-      return this.toResponse(refreshed);
-    }
-
-    await this.syncCreativeConversationResult(task);
-    if (finalizeBilling && shouldFinalizeGenerationBilling(task)) {
-      await finalizeGenerationBilling(task);
-      const finalized = await tasksRepository.findById(taskId);
-      if (!finalized) throw errors.taskNotFound();
+      const finalized = await this.finalizeTaskBilling(refreshed, finalizeBilling);
       await this.syncCreativeConversationResult(finalized);
       return this.toResponse(finalized);
     }
 
-    return this.toResponse(task);
+    await this.syncCreativeConversationResult(task);
+    const finalized = await this.finalizeTaskBilling(task, finalizeBilling);
+    if (finalized !== task) await this.syncCreativeConversationResult(finalized);
+    return this.toResponse(finalized);
+  }
+
+  private async reconcileRecentTasks(tasks: GenerationTaskRecord[]) {
+    const activeTasks = tasks.filter(
+      (task) => task.kieTaskId && !terminalStatuses.includes(task.status),
+    );
+    const staleWaitingTasks = tasks.filter((task) => this.isStaleWaitingTask(task));
+    let changed = false;
+
+    for (const task of staleWaitingTasks) {
+      try {
+        await tasksRepository.markCanceled(
+          task.id,
+          "STALE_WAITING_TASK_CANCELED",
+          "Canceled stale waiting task with no upstream KIE job",
+        );
+        const canceled = await tasksRepository.findById(task.id);
+        if (canceled) await syncBatchItemFromGenerationTask(canceled);
+        changed = true;
+      } catch {
+        // Recent-task lists should stay usable even if stale cleanup fails.
+      }
+    }
+
+    for (const task of activeTasks) {
+      try {
+        await this.refreshFromKie(task);
+        const refreshed = await tasksRepository.findById(task.id);
+        if (!refreshed) continue;
+        await this.syncCreativeConversationResult(refreshed);
+        await this.finalizeTaskBilling(refreshed, true);
+        changed = true;
+      } catch {
+        // Recent-task lists should not fail just because one upstream status check failed.
+      }
+    }
+
+    return changed;
+  }
+
+  private isStaleWaitingTask(task: GenerationTaskRecord) {
+    return (
+      task.status === "waiting" &&
+      !task.kieTaskId &&
+      Date.now() - task.createdAt.getTime() > staleWaitingTaskMs
+    );
+  }
+
+  private async finalizeTaskBilling(task: GenerationTaskRecord, finalizeBilling: boolean) {
+    if (!finalizeBilling || !shouldFinalizeGenerationBilling(task)) return task;
+
+    if (task.moduleCode === "batch-new") {
+      const synced = await syncBatchItemFromGenerationTask(task);
+      if (!synced) return task;
+    } else {
+      await finalizeGenerationBilling(task);
+    }
+
+    return (await tasksRepository.findById(task.id)) ?? task;
   }
 
   private async syncCreativeConversationResult(task: GenerationTaskRecord) {

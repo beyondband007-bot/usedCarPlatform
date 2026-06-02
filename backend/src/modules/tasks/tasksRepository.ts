@@ -267,6 +267,18 @@ export class TasksRepository extends Repository {
     );
   }
 
+  async markCanceled(id: string, errorCode: string, errorMessage: string) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET status = 'canceled',
+           progress = 100,
+           error_code = :errorCode,
+           error_message = :errorMessage
+       WHERE id = :id`,
+      { id, errorCode, errorMessage },
+    );
+  }
+
   async updateFromKie(
     id: string,
     patch: {
