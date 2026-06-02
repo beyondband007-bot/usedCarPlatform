@@ -12,6 +12,10 @@ export class AppError extends Error {
 }
 
 export const errors = {
+  unauthorized: (message = "unauthorized", details?: unknown) =>
+    new AppError(401, 40100, message, details),
+  forbidden: (message = "forbidden", details?: unknown) =>
+    new AppError(403, 40300, message, details),
   invalidParameter: (message = "invalid parameter", details?: unknown) =>
     new AppError(400, 40003, message, details),
   fileTypeUnsupported: (details?: unknown) =>

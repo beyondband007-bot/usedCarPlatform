@@ -16,6 +16,7 @@ import {
 } from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { singleImageGenerationPoints } from "../billing/generationPointRules";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { resolveRoadMotionScene } from "./roadMotionScenes";
 
 const moduleCode = "road-motion";
@@ -61,6 +62,7 @@ export const roadMotionService = {
     const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
     const prompt = appendOutputRatioPrompt(logoAsset ? scene.logoPrompt : scene.prompt, outputRatio);
+    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
@@ -72,6 +74,8 @@ export const roadMotionService = {
       resolution,
       logoAssetId: logoAsset?.id ?? null,
       prompt,
+      subscriptionUserKey: subscription.userKey,
+      subscriptionPlanCode: subscription.planCode,
     });
 
     let billing: FrozenGenerationBilling | null = null;

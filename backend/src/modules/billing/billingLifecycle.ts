@@ -63,7 +63,7 @@ export const freezeGenerationBilling = async (input: {
   context?: BillingRequestContext;
   scope?: BillingOperationScope;
 }): Promise<FrozenGenerationBilling | null> => {
-  const identity = resolveBillingIdentity(input.body, input.context);
+  const identity = await resolveBillingIdentity(input.body, input.context);
   if (!identity) return null;
   const scope = resolveBillingScope(input.taskId, input.scope);
 

@@ -1,25 +1,14 @@
 import { defineStore } from 'pinia'
 
-import { getUserInfo, login as mockLogin, logout as mockLogout } from '@/mock/mock-auth'
-import { subscriptionPlans } from '@/mock/mock-subscription'
+import { getCurrentUser, login as apiLogin, logout as apiLogout } from '@/api/auth'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
-import type { SubscriptionPlanCode, SubscriptionStateSnapshot } from '@/types/subscription'
+import { resetCreditsIdentity, setCreditsIdentity } from '@/utils/credits-identity'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
 const USER_KEY = 'ai-car-studio:user-info'
-const SUBSCRIPTION_KEY = 'ai-car-studio:subscription'
 const SUBSCRIPTION_STATE_KEY = 'ai-car-studio:subscription-state'
-const POINTS_SUMMARY_KEY = 'ai-car-studio:points-summary'
-
-const planAccountMap: Record<string, SubscriptionPlanCode> = {
-  basic: 'basic',
-  team: 'team',
-  enterprise: 'team',
-  flagship: 'flagship',
-  admin: 'flagship',
-}
 
 interface AuthState {
   token: string
@@ -31,47 +20,41 @@ interface AuthState {
 }
 
 function readPointsText() {
-  if (typeof window === 'undefined') return '55,000'
+  if (typeof window === 'undefined') return '100,000'
 
   const raw = window.localStorage.getItem('ai-car-studio:points-summary')
-  if (!raw) return '55,000'
+  if (!raw) return '100,000'
 
   try {
     const parsed = JSON.parse(raw) as { currentPoints?: number }
     return Number(parsed.currentPoints ?? 0).toLocaleString('zh-CN')
   } catch {
-    return '55,000'
+    return '100,000'
   }
 }
 
-function buildSubscriptionSnapshot(planCode: SubscriptionPlanCode): SubscriptionStateSnapshot {
-  const plan = subscriptionPlans[planCode]
-  return {
-    currentPlan: plan.plan,
-    accountLimit: plan.accountLimit,
-    concurrentTaskLimit: plan.concurrentTaskLimit,
-    visualConcurrentTaskLimit: plan.visualConcurrentTaskLimit,
-    batchConcurrentTaskLimit: plan.batchConcurrentTaskLimit,
-    giftPoints: plan.giftPoints,
-    expireTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-  }
+function readToken() {
+  if (typeof window === 'undefined') return ''
+  return window.localStorage.getItem(TOKEN_KEY) ?? ''
 }
 
-function writePlanDemoState(username: string) {
-  const planCode = planAccountMap[username]
-  if (!planCode) return null
+function writeToken(token: string) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(TOKEN_KEY, token)
+}
 
-  const snapshot = buildSubscriptionSnapshot(planCode)
-  writeMockStorage(SUBSCRIPTION_KEY, snapshot)
-  writeMockStorage(SUBSCRIPTION_STATE_KEY, snapshot)
-  writeMockStorage(POINTS_SUMMARY_KEY, {
-    currentPoints: snapshot.giftPoints,
-    freezePoints: 0,
-    totalConsume: 0,
-    totalRecharge: snapshot.giftPoints,
-    currentRunningTasks: 0,
+function removeToken() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(TOKEN_KEY)
+}
+
+function syncCreditsIdentity(userInfo: UserInfo) {
+  if (!userInfo.creditsUserId) return
+  setCreditsIdentity({
+    userId: userInfo.creditsUserId,
+    accountScope: userInfo.accountScope === 'tenant' ? 'tenant' : 'personal',
+    tenantId: userInfo.creditsTenantId ?? null,
   })
-  return snapshot
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -79,7 +62,7 @@ export const useAuthStore = defineStore('auth', {
     const userInfo = readMockStorage<UserInfo | null>(USER_KEY, null)
 
     return {
-      token: readMockStorage(TOKEN_KEY, ''),
+      token: readToken(),
       userInfo,
       role: userInfo?.role ?? null,
       permissions: userInfo?.permissions ?? [],
@@ -93,57 +76,70 @@ export const useAuthStore = defineStore('auth', {
     credits: () => readPointsText(),
   },
   actions: {
-    hydrate() {
+    async hydrate() {
       if (this.initialized) return
       this.initialized = true
-      if (this.token && !this.userInfo) {
-        void this.logout(false)
+
+      if (!this.token) return
+
+      try {
+        const response = await getCurrentUser()
+        this.userInfo = response.userInfo
+        this.role = response.userInfo.role
+        this.permissions = [...response.userInfo.permissions]
+        writeMockStorage(USER_KEY, response.userInfo)
+        syncCreditsIdentity(response.userInfo)
+        useSubscriptionStore().applySubscriptionSnapshot(response.subscription)
+      } catch {
+        await this.logout(false)
       }
     },
     async login(payload: LoginRequest) {
-      const response = await mockLogin(payload)
-      const userInfo = await getUserInfo(response.token)
-      const subscriptionSnapshot = writePlanDemoState(userInfo.username)
-      if (subscriptionSnapshot) {
-        useSubscriptionStore().applySubscriptionSnapshot(subscriptionSnapshot)
-      }
+      const response = await apiLogin(payload)
+      const subscriptionStore = useSubscriptionStore()
 
       this.token = response.token
-      this.userInfo = userInfo
-      this.role = userInfo.role
-      this.permissions = [...userInfo.permissions]
+      this.userInfo = response.userInfo
+      this.role = response.userInfo.role
+      this.permissions = [...response.userInfo.permissions]
       this.remember = Boolean(payload.remember)
 
-      if (this.remember) {
-        writeMockStorage(TOKEN_KEY, response.token)
-        writeMockStorage(USER_KEY, userInfo)
-      } else {
-        removeMockStorage(TOKEN_KEY)
-        removeMockStorage(USER_KEY)
-      }
+      subscriptionStore.applySubscriptionSnapshot(response.subscription)
+      syncCreditsIdentity(response.userInfo)
+      writeToken(response.token)
+      writeMockStorage(USER_KEY, response.userInfo)
 
-      return userInfo
+      return response.userInfo
     },
     async logout(persist = true) {
-      await mockLogout()
+      if (persist) {
+        try {
+          await apiLogout()
+        } catch {
+          // Local cleanup still needs to happen when the session already expired.
+        }
+      }
+
       this.token = ''
       this.userInfo = null
       this.role = null
       this.permissions = []
 
-      if (persist) {
-        removeMockStorage(TOKEN_KEY)
-        removeMockStorage(USER_KEY)
-      }
+      removeToken()
+      removeMockStorage(USER_KEY)
+      removeMockStorage(SUBSCRIPTION_STATE_KEY)
+      resetCreditsIdentity()
     },
     async refreshUserInfo() {
       if (!this.token) return null
-      const userInfo = await getUserInfo(this.token)
-      this.userInfo = userInfo
-      this.role = userInfo.role
-      this.permissions = [...userInfo.permissions]
-      writeMockStorage(USER_KEY, userInfo)
-      return userInfo
+      const response = await getCurrentUser()
+      this.userInfo = response.userInfo
+      this.role = response.userInfo.role
+      this.permissions = [...response.userInfo.permissions]
+      writeMockStorage(USER_KEY, response.userInfo)
+      syncCreditsIdentity(response.userInfo)
+      useSubscriptionStore().applySubscriptionSnapshot(response.subscription)
+      return response.userInfo
     },
   },
 })

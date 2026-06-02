@@ -15,6 +15,7 @@ import {
 import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { interiorCollagePrompt } from "./interiorCollagePrompts";
 
 interface CreateInteriorCollageRequest {
@@ -79,6 +80,7 @@ class InteriorCollageService {
     const resolution = body.resolution ?? "2K";
     const prompt = appendOutputRatioPrompt(interiorCollagePrompt, outputRatio);
     const groups = splitAssets(interiorAssets);
+    const subscription = await assertCanStartGeneration(context, { requestedSlots: groups.length });
     const taskEntries = [];
     const tasks = [];
 
@@ -96,6 +98,8 @@ class InteriorCollageService {
         resolution,
         logoAssetId: null,
         prompt,
+        subscriptionUserKey: subscription.userKey,
+        subscriptionPlanCode: subscription.planCode,
       });
 
       taskEntries.push({

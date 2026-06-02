@@ -20,6 +20,7 @@ import {
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import { normalizeTaskResults, tasksRepository, type GenerationTaskRecord } from "../tasks/tasksRepository";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { creativeImageRepository } from "./creativeImageRepository";
 import type {
   CreateConversationRequest,
@@ -137,6 +138,7 @@ class CreativeImageService {
     const outputRatio = resolveOutputRatio(body.outputRatio, "1:1");
     const resolution = normalizeResolution(body.resolution);
     const reference = await this.resolveReference(conversationId, body);
+    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await creativeImageRepository.updateConversationSummary({
@@ -168,6 +170,8 @@ class CreativeImageService {
       resolution,
       logoAssetId: null,
       prompt,
+      subscriptionUserKey: subscription.userKey,
+      subscriptionPlanCode: subscription.planCode,
     });
 
     let billing: FrozenGenerationBilling | null = null;

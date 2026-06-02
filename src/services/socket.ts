@@ -159,7 +159,7 @@ class SocketService {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       auth: {
-        token: localStorage.getItem('token'),
+        token: localStorage.getItem('ai-car-studio:auth-token'),
         userId,
       },
     })

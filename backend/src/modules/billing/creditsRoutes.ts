@@ -46,8 +46,8 @@ const parsePayChannel = (value: unknown) => {
 const parseAccountScope = (value: unknown) =>
   value === "personal" || value === "tenant" ? value : null;
 
-const resolveProxyIdentity = (body: ProxyIdentityBody, headers: Record<string, string | string[] | undefined>) => {
-  const identity = resolveBillingIdentity(body, { headers }, { requireEnabled: false });
+const resolveProxyIdentity = async (body: ProxyIdentityBody, headers: Record<string, string | string[] | undefined>) => {
+  const identity = await resolveBillingIdentity(body, { headers }, { requireEnabled: false });
   if (!identity) {
     throw errors.invalidParameter("credits user id is required", {
       headers: ["x-credits-user-id", "x-user-id"],
@@ -86,7 +86,7 @@ export const creditsRoutes = Router();
 creditsRoutes.get(
   "/admin/overview",
   asyncHandler(async (req, res) => {
-    const identity = resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    const identity = await resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
     ok(res, await getCreditsAdminOverview(identity));
   }),
 );
@@ -94,7 +94,7 @@ creditsRoutes.get(
 creditsRoutes.get(
   "/accounts",
   asyncHandler(async (req, res) => {
-    const identity = resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    const identity = await resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
     ok(res, await creditsClient.listAccounts({ userId: identity.userId }));
   }),
 );
@@ -103,7 +103,7 @@ creditsRoutes.get(
   "/transactions",
   asyncHandler(async (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const identity = resolveProxyIdentity(query, req.headers);
+    const identity = await resolveProxyIdentity(query, req.headers);
     const accountId = parsePositiveInteger(query.accountId, "accountId");
     const limit = parseLimit(query.limit);
     const accountsResult = await creditsClient.listAccounts({ userId: identity.userId });
@@ -145,7 +145,7 @@ creditsRoutes.post(
   "/payment-orders",
   asyncHandler(async (req, res) => {
     const body = req.body as Record<string, unknown>;
-    const identity = resolveProxyIdentity(body, req.headers);
+    const identity = await resolveProxyIdentity(body, req.headers);
     const productId = parseRequiredPositiveInteger(body.productId, "productId");
     const payChannel = parsePayChannel(body.payChannel);
     const idempotencyKey =

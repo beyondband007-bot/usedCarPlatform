@@ -156,13 +156,13 @@ export const packageOptions: PackageOption[] = [
   },
   {
     price: '¥3,980',
-    description: '赠 55,000 积分 · 5账号 · 5套并发',
+    description: '赠 100,000 积分 · 1账号 · 5套并发',
     action: '选择',
     active: true,
   },
   {
     price: '¥9,800',
-    description: '980,000 积分 · 20账号 · 20专属场景',
+    description: '800,000 积分 · 1+3账号 · 20专属场景',
     action: '预约演示',
   },
 ]

@@ -1,5 +1,7 @@
 import type { LoginRequest, LoginResponse, UserInfo } from '@/types/auth'
+import type { SubscriptionPlanCode } from '@/types/subscription'
 
+import { subscriptionPlans } from './mock-subscription'
 import { mockDelay } from './mock-storage'
 
 const permissions = {
@@ -19,6 +21,14 @@ const permissions = {
     'menu:recharge',
   ],
 } as const
+
+const planAccountMap: Record<string, SubscriptionPlanCode> = {
+  basic: 'basic',
+  team: 'team',
+  enterprise: 'team',
+  flagship: 'flagship',
+  admin: 'flagship',
+}
 
 const mockUsers: Record<
   string,
@@ -81,13 +91,31 @@ const mockUsers: Record<
   },
 }
 
+function buildSubscription(username: string) {
+  const planCode = planAccountMap[username] ?? 'team'
+  const plan = subscriptionPlans[planCode]
+  return {
+    currentPlan: plan.plan,
+    accountLimit: plan.accountLimit,
+    concurrentTaskLimit: plan.concurrentTaskLimit,
+    visualConcurrentTaskLimit: plan.visualConcurrentTaskLimit,
+    batchConcurrentTaskLimit: plan.batchConcurrentTaskLimit,
+    giftPoints: plan.giftPoints,
+    expireTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   const matched = mockUsers[payload.username]
   if (!matched || matched.password !== payload.password) {
     throw new Error('账号或密码错误')
   }
 
-  return mockDelay({ token: matched.token })
+  return mockDelay({
+    token: matched.token,
+    userInfo: matched.userInfo,
+    subscription: buildSubscription(matched.userInfo.username),
+  })
 }
 
 export async function getUserInfo(token: string): Promise<UserInfo> {

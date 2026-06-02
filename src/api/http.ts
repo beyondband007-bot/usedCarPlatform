@@ -2,6 +2,8 @@ import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from '
 
 import { toCreditsHeaders } from '@/utils/credits-identity'
 
+const TOKEN_KEY = 'ai-car-studio:auth-token'
+
 export function normalizeApiErrorMessage(message: string) {
   if (!message) return ''
 
@@ -23,6 +25,18 @@ export function normalizeApiErrorMessage(message: string) {
     return '短视频任务创建失败，请稍后重试'
   }
 
+  if (normalized.includes('subscription concurrent task limit reached')) {
+    return '当前套餐并发任务已达上限，请等待任务完成后再提交'
+  }
+
+  if (normalized.includes('subscription batch concurrent task limit reached')) {
+    return '当前套餐批量任务并发已达上限，请等待任务完成后再提交'
+  }
+
+  if (normalized.includes('login is required')) {
+    return '请先登录后再操作'
+  }
+
   return message
 }
 
@@ -36,7 +50,7 @@ export const http = axios.create({
 
 http.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem(TOKEN_KEY)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -66,8 +80,10 @@ http.interceptors.response.use(
 
       switch (status) {
         case 401:
-          localStorage.removeItem('token')
-          window.location.href = '/login'
+          localStorage.removeItem(TOKEN_KEY)
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
           break
         case 403:
           console.error('没有权限访问该资源')

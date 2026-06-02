@@ -23,6 +23,7 @@ import {
 } from "../billing/billingIdentity";
 import { batchItemGenerationPoints } from "../billing/generationPointRules";
 import { deliveryRepository } from "../delivery/deliveryRepository";
+import { assertCanStartBatchGeneration, type SubscriptionIdentity } from "../subscription/subscriptionService";
 import {
   batchInteriorCleanCollagePrompt,
   batchInteriorCollagePrompt,
@@ -157,7 +158,8 @@ class BatchService {
     }
     if (!body.visualConfig) throw errors.invalidParameter("visualConfig is required");
 
-    const billingIdentity = resolveBillingIdentity(body, context);
+    const billingIdentity = await resolveBillingIdentity(body, context);
+    const subscription = await assertCanStartBatchGeneration(context);
     const batchId = createId("batch");
     const config = body.visualConfig;
     const interiorClean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
@@ -186,6 +188,8 @@ class BatchService {
       creditsUserId: billingIdentity?.userId ?? null,
       creditsTenantId: billingIdentity?.tenantId ?? null,
       accountScope: billingIdentity?.accountScope ?? null,
+      subscriptionUserKey: subscription.userKey,
+      subscriptionPlanCode: subscription.planCode,
     });
 
     let sortOrder = 0;
@@ -199,6 +203,7 @@ class BatchService {
           itemKind: "exterior",
           sortOrder: sortOrder++,
           config,
+          subscription,
         });
       }
       if (interiorClean || interiorCollage) {
@@ -215,6 +220,7 @@ class BatchService {
             itemKind,
             sortOrder: sortOrder++,
             config,
+            subscription,
             optionId:
               interiorCollage && interiorGroups.length > 1
                 ? `${itemKind}-${interiorGroupIndex + 1}-of-${interiorGroups.length}`
@@ -368,6 +374,7 @@ class BatchService {
     itemKind: BatchItemKind;
     sortOrder: number;
     config: BatchVisualConfig;
+    subscription: SubscriptionIdentity;
     optionId?: string;
   }) {
     const asset = await assetsRepository.findById(input.assetIds[0]);
@@ -392,6 +399,8 @@ class BatchService {
       resolution: "2K",
       logoAssetId: null,
       prompt,
+      subscriptionUserKey: input.subscription.userKey,
+      subscriptionPlanCode: input.subscription.planCode,
     });
     await batchRepository.createItem({
       id: createId("batch_item"),

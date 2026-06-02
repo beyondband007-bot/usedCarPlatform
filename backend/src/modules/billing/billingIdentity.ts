@@ -1,5 +1,6 @@
 import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
+import { getCurrentUserFromHeaders } from "../auth/authService";
 
 export type AccountScope = "personal" | "tenant";
 
@@ -39,12 +40,27 @@ const parseAccountScope = (value: unknown): AccountScope | null => {
   return value === "personal" || value === "tenant" ? value : null;
 };
 
-export const resolveBillingIdentity = (
+export const resolveBillingIdentity = async (
   body: BillingIdentityBody,
   context?: BillingRequestContext,
   options: { requireEnabled?: boolean } = {},
-): BillingIdentity | null => {
+): Promise<BillingIdentity | null> => {
   if ((options.requireEnabled ?? true) && !env.credits.enabled) return null;
+
+  const current = await getCurrentUserFromHeaders(context?.headers);
+  if (current?.user.creditsUserId) {
+    if (current.user.accountScope === "tenant" && !current.user.creditsTenantId) {
+      throw errors.invalidParameter("credits tenant id is required for tenant billing", {
+        userId: current.user.id,
+      });
+    }
+
+    return {
+      userId: current.user.creditsUserId,
+      accountScope: current.user.accountScope,
+      tenantId: current.user.accountScope === "tenant" ? current.user.creditsTenantId ?? undefined : undefined,
+    };
+  }
 
   const userId =
     parsePositiveInteger(firstHeader(context?.headers, "x-credits-user-id")) ??

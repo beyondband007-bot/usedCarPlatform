@@ -1,3 +1,5 @@
+import type { SubscriptionStateSnapshot } from './subscription'
+
 export type UserRole = 'admin' | 'enterprise'
 
 export interface UserInfo {
@@ -6,6 +8,9 @@ export interface UserInfo {
   displayName: string
   role: UserRole
   permissions: string[]
+  creditsUserId?: number | null
+  creditsTenantId?: number | null
+  accountScope?: 'personal' | 'tenant'
 }
 
 export interface LoginRequest {
@@ -16,4 +21,6 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
+  userInfo: UserInfo
+  subscription: SubscriptionStateSnapshot
 }

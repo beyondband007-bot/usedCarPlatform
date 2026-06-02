@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrate.ts",
+    "sync:credits-accounts": "tsx src/db/syncCreditsAccounts.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "phase11:smoke": "node scripts/phase11-e2e-smoke.mjs"
   },

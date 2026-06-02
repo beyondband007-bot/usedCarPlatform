@@ -15,6 +15,7 @@ import {
 import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { interiorCleanPrompt } from "./interiorCleanPrompts";
 
 class InteriorCleanService {
@@ -38,6 +39,7 @@ class InteriorCleanService {
     const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
     const prompt = appendOutputRatioPrompt(interiorCleanPrompt, outputRatio);
+    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
@@ -49,6 +51,8 @@ class InteriorCleanService {
       resolution,
       logoAssetId: null,
       prompt,
+      subscriptionUserKey: subscription.userKey,
+      subscriptionPlanCode: subscription.planCode,
     });
 
     let billing: FrozenGenerationBilling | null = null;

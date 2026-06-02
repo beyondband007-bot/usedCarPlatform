@@ -19,14 +19,6 @@ const username = ref("enterprise");
 const password = ref("123456");
 const submitting = ref(false);
 
-const demoAccounts = [
-  "basic / 123456：企业基础版",
-  "team / 123456：企业团队版",
-  "flagship / 123456：企业旗舰版",
-  "enterprise / 123456：普通企业用户",
-  "admin / 123456：管理员",
-];
-
 async function handleLogin() {
   submitting.value = true;
 
@@ -83,7 +75,7 @@ async function handleLogin() {
               v-model:value="username"
               class="login-input login-input--phone"
               size="large"
-              placeholder="basic / team / flagship / enterprise / admin"
+              placeholder="请输入账号"
             />
           </div>
         </label>
@@ -91,7 +83,7 @@ async function handleLogin() {
         <label class="login-field">
           <span class="login-field-row">
             <span class="login-field-label">密码</span>
-            <button type="button" class="login-forgot">忘记密码？</button>
+            <button type="button" class="login-forgot">忘记密码?</button>
           </span>
           <NInput
             v-model:value="password"
@@ -114,11 +106,6 @@ async function handleLogin() {
       >
         登录
       </NButton>
-
-      <p class="login-footer">
-        Demo 账号：
-        <span class="login-footer-link">{{ demoAccounts.join("，") }}</span>
-      </p>
     </form>
   </motion.div>
 </template>
@@ -269,8 +256,7 @@ async function handleLogin() {
   --n-box-shadow-focus: none !important;
 }
 
-.login-forgot,
-.login-footer-link {
+.login-forgot {
   border: 0;
   padding: 0;
   background: transparent;
@@ -282,8 +268,7 @@ async function handleLogin() {
   transition: color 0.2s ease;
 }
 
-.login-forgot:hover,
-.login-footer-link:hover {
+.login-forgot:hover {
   color: var(--accent-strong);
 }
 
@@ -303,15 +288,6 @@ async function handleLogin() {
   --n-text-color-pressed: var(--submit-text) !important;
   --n-text-color-focus: var(--submit-text) !important;
   box-shadow: var(--submit-shadow);
-}
-
-.login-footer {
-  margin: 20px 0 0;
-  color: var(--panel-muted);
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
 }
 
 @media (max-width: 520px) {

@@ -69,5 +69,13 @@ export const env = {
     defaultAccountScope:
       process.env.CREDITS_DEFAULT_ACCOUNT_SCOPE === "tenant" ? "tenant" : "personal",
     requestTimeoutMs: toNumber(process.env.CREDITS_REQUEST_TIMEOUT_MS, 8000),
+    mysql: {
+      host: process.env.CREDITS_MYSQL_HOST ?? "127.0.0.1",
+      port: toNumber(process.env.CREDITS_MYSQL_PORT, 3310),
+      database: process.env.CREDITS_MYSQL_DATABASE ?? "credits_platform",
+      user: process.env.CREDITS_MYSQL_USER ?? "credits",
+      password: process.env.CREDITS_MYSQL_PASSWORD ?? "credits",
+      connectionLimit: toNumber(process.env.CREDITS_MYSQL_CONNECTION_LIMIT, 5),
+    },
   },
 };

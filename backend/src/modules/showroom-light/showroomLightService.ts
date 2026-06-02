@@ -16,6 +16,7 @@ import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { showroomLightPrompt, showroomLightWithLogoPrompt } from "./showroomLightPrompts";
 import { getShowroomLightScene } from "./showroomLightScenes";
 
@@ -61,6 +62,7 @@ class ShowroomLightService {
       outputRatio,
     );
     const scene = getShowroomLightScene(body.optionId);
+    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
@@ -72,6 +74,8 @@ class ShowroomLightService {
       resolution,
       logoAssetId: logoAsset?.id ?? null,
       prompt,
+      subscriptionUserKey: subscription.userKey,
+      subscriptionPlanCode: subscription.planCode,
     });
 
     let billing: FrozenGenerationBilling | null = null;

@@ -5,6 +5,7 @@ import express from "express";
 
 import { env } from "./config/env";
 import { assetsRoutes } from "./modules/assets/assetsRoutes";
+import { authRoutes } from "./modules/auth/authRoutes";
 import { creditsRoutes } from "./modules/billing/creditsRoutes";
 import { moduleRoutes } from "./modules/moduleRoutes";
 import { tasksRoutes } from "./modules/tasks/tasksRoutes";
@@ -25,6 +26,7 @@ export const createApp = () => {
     res.json({ ok: true });
   });
 
+  app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1/assets", assetsRoutes);
   app.use("/api/v1/credits", creditsRoutes);
   app.use("/api/v1/tasks", tasksRoutes);

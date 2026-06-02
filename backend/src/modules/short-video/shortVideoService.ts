@@ -4,6 +4,8 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
+import type { BillingRequestContext } from "../billing/billingIdentity";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
 
@@ -35,7 +37,7 @@ const buildTaskErrorMessage = (error: unknown) => {
 };
 
 class ShortVideoService {
-  async createTask(body: CreateModuleTaskRequest) {
+  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -54,6 +56,7 @@ class ShortVideoService {
     const aspectRatio = normalizeRatio(body.outputRatio);
     const videoResolution = normalizeVideoResolution(body.extra?.videoResolution);
     const duration = 10;
+    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     const lease = await kieKeyPool.acquire();
@@ -68,6 +71,8 @@ class ShortVideoService {
         resolution: "2K",
         logoAssetId: null,
         prompt: shortVideoPrompt,
+        subscriptionUserKey: subscription.userKey,
+        subscriptionPlanCode: subscription.planCode,
       });
       taskCreated = true;
 

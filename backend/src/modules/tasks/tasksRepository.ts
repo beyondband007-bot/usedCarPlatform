@@ -28,6 +28,8 @@ export interface GenerationTaskRecord {
   billingStatus?: string | null;
   estimatedPoints?: string | null;
   settledPoints?: string | null;
+  subscriptionUserKey?: string | null;
+  subscriptionPlanCode?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +67,8 @@ interface GenerationTaskRow extends RowDataPacket {
   billing_status: string | null;
   estimated_points: string | null;
   settled_points: string | null;
+  subscription_user_key: string | null;
+  subscription_plan_code: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -102,6 +106,8 @@ const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   billingStatus: row.billing_status,
   estimatedPoints: row.estimated_points,
   settledPoints: row.settled_points,
+  subscriptionUserKey: row.subscription_user_key,
+  subscriptionPlanCode: row.subscription_plan_code,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -233,13 +239,21 @@ export class TasksRepository extends Repository {
     resolution: Resolution;
     logoAssetId?: string | null;
     prompt: string;
+    subscriptionUserKey?: string | null;
+    subscriptionPlanCode?: string | null;
   }) {
     await this.execute(
       `INSERT INTO generation_tasks
-        (id, module_code, status, progress, input_asset_id, option_id, output_ratio, resolution, logo_asset_id, prompt)
+        (id, module_code, status, progress, input_asset_id, option_id, output_ratio, resolution, logo_asset_id, prompt,
+         subscription_user_key, subscription_plan_code)
        VALUES
-        (:id, :moduleCode, 'waiting', 0, :inputAssetId, :optionId, :outputRatio, :resolution, :logoAssetId, :prompt)`,
-      input as unknown as Record<string, unknown>,
+        (:id, :moduleCode, 'waiting', 0, :inputAssetId, :optionId, :outputRatio, :resolution, :logoAssetId, :prompt,
+         :subscriptionUserKey, :subscriptionPlanCode)`,
+      {
+        ...input,
+        subscriptionUserKey: input.subscriptionUserKey ?? null,
+        subscriptionPlanCode: input.subscriptionPlanCode ?? null,
+      } as unknown as Record<string, unknown>,
     );
   }
 

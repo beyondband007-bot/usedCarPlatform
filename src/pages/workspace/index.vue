@@ -143,11 +143,6 @@ function scopedWorkspaceStorageKey(key: string) {
   return `${key}:${workspaceOwnerKey.value}`;
 }
 
-function clearLegacyWorkspaceStorage() {
-  window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY);
-  window.localStorage.removeItem(ACTIVE_CREATIVE_CONVERSATION_KEY);
-}
-
 function readActiveGenerationTask() {
   const raw = window.localStorage.getItem(
     scopedWorkspaceStorageKey(ACTIVE_GENERATION_TASK_KEY),

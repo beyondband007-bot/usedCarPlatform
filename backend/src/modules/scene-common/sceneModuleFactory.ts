@@ -16,6 +16,7 @@ import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
+import { assertCanStartGeneration } from "../subscription/subscriptionService";
 
 export interface SceneOption {
   optionId: string;
@@ -79,6 +80,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         outputRatio,
       );
       const scene = getScene(body.optionId);
+      const subscription = await assertCanStartGeneration(context);
       const taskId = createId("task");
 
       await tasksRepository.createWaitingTask({
@@ -90,6 +92,8 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         resolution,
         logoAssetId: logoAsset?.id ?? null,
         prompt,
+        subscriptionUserKey: subscription.userKey,
+        subscriptionPlanCode: subscription.planCode,
       });
 
       let billing: FrozenGenerationBilling | null = null;

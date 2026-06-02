@@ -19,6 +19,8 @@ export interface BatchTaskRecord {
   accountScope?: "personal" | "tenant" | null;
   estimatedPoints?: string | null;
   settledPoints?: string | null;
+  subscriptionUserKey?: string | null;
+  subscriptionPlanCode?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +44,8 @@ interface BatchTaskRow extends RowDataPacket {
   account_scope: "personal" | "tenant" | null;
   estimated_points: string | null;
   settled_points: string | null;
+  subscription_user_key: string | null;
+  subscription_plan_code: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -97,6 +101,8 @@ const mapBatch = (row: BatchTaskRow): BatchTaskRecord => ({
   accountScope: row.account_scope,
   estimatedPoints: row.estimated_points,
   settledPoints: row.settled_points,
+  subscriptionUserKey: row.subscription_user_key,
+  subscriptionPlanCode: row.subscription_plan_code,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -151,20 +157,24 @@ export class BatchRepository extends Repository {
     creditsUserId?: number | null;
     creditsTenantId?: number | null;
     accountScope?: "personal" | "tenant" | null;
+    subscriptionUserKey?: string | null;
+    subscriptionPlanCode?: string | null;
   }) {
     await this.execute(
       `INSERT INTO batch_tasks
         (id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json,
-         credits_user_id, credits_tenant_id, account_scope)
+         credits_user_id, credits_tenant_id, account_scope, subscription_user_key, subscription_plan_code)
        VALUES
         (:id, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig,
-         :creditsUserId, :creditsTenantId, :accountScope)`,
+         :creditsUserId, :creditsTenantId, :accountScope, :subscriptionUserKey, :subscriptionPlanCode)`,
       {
         ...input,
         visualConfig: JSON.stringify(input.visualConfig),
         creditsUserId: input.creditsUserId ?? null,
         creditsTenantId: input.creditsTenantId ?? null,
         accountScope: input.accountScope ?? null,
+        subscriptionUserKey: input.subscriptionUserKey ?? null,
+        subscriptionPlanCode: input.subscriptionPlanCode ?? null,
       },
     );
   }

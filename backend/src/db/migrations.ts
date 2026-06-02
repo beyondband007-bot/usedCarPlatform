@@ -34,6 +34,8 @@ export const migrations = [
     credits_user_id BIGINT NULL,
     credits_tenant_id BIGINT NULL,
     account_scope VARCHAR(16) NULL,
+    subscription_user_key VARCHAR(64) NULL,
+    subscription_plan_code VARCHAR(32) NULL,
     billing_task_id BIGINT NULL,
     billing_status VARCHAR(24) NULL,
     estimated_points DECIMAL(18, 4) NULL,
@@ -45,6 +47,7 @@ export const migrations = [
     INDEX idx_generation_tasks_kie_task (kie_task_id),
     INDEX idx_generation_tasks_billing_task (billing_task_id),
     INDEX idx_generation_tasks_credits_user_created (credits_user_id, created_at),
+    INDEX idx_generation_tasks_subscription_running (subscription_user_key, status, created_at),
     INDEX idx_generation_tasks_billing_status (billing_status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
@@ -61,12 +64,136 @@ export const migrations = [
     credits_user_id BIGINT NULL,
     credits_tenant_id BIGINT NULL,
     account_scope VARCHAR(16) NULL,
+    subscription_user_key VARCHAR(64) NULL,
+    subscription_plan_code VARCHAR(32) NULL,
     estimated_points DECIMAL(18, 4) NULL,
     settled_points DECIMAL(18, 4) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_batch_tasks_status_created (status, created_at),
-    INDEX idx_batch_tasks_credits_user_created (credits_user_id, created_at)
+    INDEX idx_batch_tasks_credits_user_created (credits_user_id, created_at),
+    INDEX idx_batch_tasks_subscription_running (subscription_user_key, status, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS subscription_plans (
+    code VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    price DECIMAL(12, 2) NOT NULL,
+    account_limit INT NOT NULL,
+    concurrent_task_limit INT NOT NULL,
+    visual_concurrent_task_limit INT NOT NULL,
+    batch_concurrent_task_limit INT NOT NULL,
+    gift_points INT NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS app_roles (
+    code VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    description VARCHAR(255) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS app_role_permissions (
+    role_code VARCHAR(32) NOT NULL,
+    permission_code VARCHAR(80) NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (role_code, permission_code),
+    CONSTRAINT app_role_permissions_role_fk FOREIGN KEY (role_code) REFERENCES app_roles (code)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS app_users (
+    id VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(120) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    credits_user_id BIGINT NULL,
+    credits_tenant_id BIGINT NULL,
+    account_scope VARCHAR(16) NOT NULL DEFAULT 'personal',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_app_users_username (username),
+    INDEX idx_app_users_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS app_user_roles (
+    user_id VARCHAR(64) NOT NULL,
+    role_code VARCHAR(32) NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (user_id, role_code),
+    CONSTRAINT app_user_roles_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT app_user_roles_role_fk FOREIGN KEY (role_code) REFERENCES app_roles (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS user_subscriptions (
+    user_id VARCHAR(64) PRIMARY KEY,
+    plan_code VARCHAR(32) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    starts_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    expires_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_user_subscriptions_plan (plan_code),
+    CONSTRAINT user_subscriptions_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT user_subscriptions_plan_fk FOREIGN KEY (plan_code) REFERENCES subscription_plans (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS enterprise_tenants (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    owner_user_id VARCHAR(64) NOT NULL,
+    subscription_user_id VARCHAR(64) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_enterprise_tenants_owner (owner_user_id),
+    INDEX idx_enterprise_tenants_subscription_user (subscription_user_id),
+    INDEX idx_enterprise_tenants_status (status),
+    CONSTRAINT enterprise_tenants_owner_fk FOREIGN KEY (owner_user_id) REFERENCES app_users (id)
+      ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT enterprise_tenants_subscription_user_fk FOREIGN KEY (subscription_user_id) REFERENCES app_users (id)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS enterprise_members (
+    id VARCHAR(64) PRIMARY KEY,
+    tenant_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    member_role VARCHAR(24) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    joined_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_enterprise_members_tenant_user (tenant_id, user_id),
+    INDEX idx_enterprise_members_user (user_id),
+    INDEX idx_enterprise_members_role_status (member_role, status),
+    CONSTRAINT enterprise_members_tenant_fk FOREIGN KEY (tenant_id) REFERENCES enterprise_tenants (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT enterprise_members_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS auth_sessions (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    expires_at DATETIME(3) NOT NULL,
+    revoked_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_auth_sessions_token_hash (token_hash),
+    INDEX idx_auth_sessions_user_expires (user_id, expires_at),
+    CONSTRAINT auth_sessions_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS batch_task_items (
