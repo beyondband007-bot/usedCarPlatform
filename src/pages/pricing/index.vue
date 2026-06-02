@@ -177,7 +177,7 @@ function handlePlanConsult() {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: clamp(24px, 3.5vh, 54px);
+  gap: 0;
   align-items: center;
   zoom: var(--pricing-content-scale);
 }
@@ -191,6 +191,7 @@ function handlePlanConsult() {
 
 .pricing-hero {
   flex: 0 0 auto;
+  margin-bottom: 48px;
   text-align: center;
 }
 
@@ -229,6 +230,7 @@ function handlePlanConsult() {
   align-items: center;
   width: 100%;
   min-width: 0;
+  margin-bottom: clamp(24px, 3.5vh, 54px);
 }
 
 .pricing-footer-bar {
@@ -238,8 +240,8 @@ function handlePlanConsult() {
   gap: clamp(16px, 3.2vw, 58px);
   width: 100%;
   min-width: 0;
-  min-height: clamp(88px, 9.8vh, 108px);
-  padding: clamp(19px, 2.2vh, 26px) clamp(26px, 4.8vw, 84px);
+  min-height: clamp(120px, 12vh, 148px);
+  padding: clamp(24px, 2.8vh, 32px) clamp(26px, 4.8vw, 84px);
   border: 1px solid var(--pricing-footer-border);
   border-radius: 28px;
   background: var(--pricing-footer-bg);
@@ -284,19 +286,18 @@ function handlePlanConsult() {
 .footer-feature h3 {
   margin: 0;
   color: var(--pricing-hero-text);
-  font-size: clamp(14px, 1.15vw, 20px);
+  font-size: 32px;
   font-weight: 900;
   line-height: 1.3;
   white-space: nowrap;
 }
 
 .footer-feature p {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   color: var(--pricing-hero-sub);
-  font-size: clamp(10px, 0.68vw, 12px);
+  font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
-  white-space: nowrap;
 }
 
 @media (max-height: 760px) {
@@ -306,10 +307,6 @@ function handlePlanConsult() {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
   }
-
-  .footer-feature p {
-    display: none;
-  }
 }
 
 @media (max-height: 820px) {
@@ -318,8 +315,8 @@ function handlePlanConsult() {
     padding-bottom: clamp(12px, 2vh, 18px);
   }
 
-  .pricing-shell {
-    gap: clamp(14px, 2.1vh, 22px);
+  .pricing-plans-grid {
+    margin-bottom: clamp(14px, 2.1vh, 22px);
   }
 
   .pricing-hero h1 {
@@ -332,12 +329,8 @@ function handlePlanConsult() {
   }
 
   .pricing-footer-bar {
-    min-height: 64px;
-    padding-block: 14px;
-  }
-
-  .footer-feature p {
-    display: none;
+    min-height: 108px;
+    padding-block: 20px;
   }
 }
 
@@ -349,7 +342,10 @@ function handlePlanConsult() {
 
   .pricing-shell {
     width: min(980px, calc(100vw - 28px), calc((100dvh - 72px) * 1.65));
-    gap: 18px;
+  }
+
+  .pricing-plans-grid {
+    margin-bottom: 18px;
   }
 
   .pricing-footer-bar {
@@ -359,10 +355,6 @@ function handlePlanConsult() {
 
   .footer-feature {
     justify-content: flex-start;
-  }
-
-  .footer-feature h3 {
-    font-size: 12px;
   }
 }
 </style>

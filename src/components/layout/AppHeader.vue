@@ -112,10 +112,17 @@ const navItems = computed(() => {
     class="app-header-wrap"
     :class="{ 'app-header-wrap--home': usesStudioChrome }"
   >
-    <header v-if="usesStudioChrome" class="site-header" aria-label="顶部导航">
+    <header
+      v-if="usesStudioChrome"
+      class="site-header"
+      :class="{ 'is-light': !appStore.isDarkMode }"
+      aria-label="顶部导航"
+    >
       <div class="site-brand">
         <RouterLink class="logo" to="/home">AI CARXEN</RouterLink>
-        <span class="logo-cn-name">车新新</span>
+        <div class="logo-cn-badge">
+          <span class="logo-cn-name">车新新</span>
+        </div>
       </div>
       <nav class="nav-links" aria-label="主导航">
         <button
@@ -376,33 +383,52 @@ const navItems = computed(() => {
     "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
-.logo,
-.logo-cn-name {
-  color: var(--studio-chrome-logo, #f3f3f3);
-  font-family: inherit;
-  font-weight: 900;
-}
-
 .logo {
   flex-shrink: 0;
+  color: var(--studio-chrome-logo, #f3f3f3);
+  font-family: inherit;
   font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
+  font-weight: 900;
   letter-spacing: 0;
+  line-height: 1;
   text-decoration: none;
 }
 
 .site-brand {
   display: flex;
   flex-shrink: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
-.logo-cn-name {
+.logo-cn-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) - 2px);
   margin-right: 24px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.logo-cn-name {
+  color: #0f172a;
+  font-family: inherit;
   font-size: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2);
-  letter-spacing: 0.22em;
+  font-weight: 900;
+  letter-spacing: 0;
   line-height: 1;
   white-space: nowrap;
+}
+
+.site-header.is-light .logo-cn-badge {
+  background: #000;
+}
+
+.site-header.is-light .logo-cn-name {
+  color: #fff;
 }
 
 .nav-links {
