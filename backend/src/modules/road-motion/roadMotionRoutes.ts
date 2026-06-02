@@ -9,8 +9,7 @@ export const roadMotionRoutes = Router();
 roadMotionRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await roadMotionService.createTask(req.body);
+    const result = await roadMotionService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );
-

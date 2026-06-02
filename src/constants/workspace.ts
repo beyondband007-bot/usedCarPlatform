@@ -276,14 +276,14 @@ const creativeImageOptions = createOptions([
 type CapabilityInput = Omit<
   WorkspaceCapability,
   'accept' | 'requiredLabel' | 'balance' | 'cost' | 'tutorial' | 'requirements'
->
+> & { cost?: number }
 
 const createCapability = (capability: CapabilityInput): WorkspaceCapability => ({
   ...capability,
   accept: 'image/jpeg,image/png,image/webp',
   requiredLabel: '必填',
   balance: 1250,
-  cost: 30,
+  cost: capability.cost ?? 30,
   tutorial,
   requirements: commonRequirements,
 })
@@ -536,6 +536,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     middleBlocks: onlyActions,
     options: showroomOptions,
     actionLabel: '生成短视频',
+    cost: 4000,
   }),
 ]
 

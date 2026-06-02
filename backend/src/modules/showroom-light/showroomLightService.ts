@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
@@ -78,6 +79,7 @@ class ShowroomLightService {
       billing = await freezeGenerationBilling({
         taskId,
         functionCode: "showroom-light",
+        estimatedPoints: singleImageGenerationPoints(),
         body,
         context,
       });

@@ -4,6 +4,15 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
+import { shortVideoGenerationPoints } from "../billing/generationPointRules";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
 
@@ -25,7 +34,7 @@ const normalizeVideoResolution = (value: unknown): VideoResolution => {
 };
 
 class ShortVideoService {
-  async createTask(body: CreateModuleTaskRequest) {
+  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -57,6 +66,24 @@ class ShortVideoService {
       logoAssetId: null,
       prompt: shortVideoPrompt,
     });
+
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: "short-video",
+        estimatedPoints: shortVideoGenerationPoints(),
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
 
     try {
       const lease = await kieKeyPool.acquire();
@@ -101,10 +128,16 @@ class ShortVideoService {
         aspectRatio,
         videoResolution,
         inputImageCount: 1,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "SHORT_VIDEO_CREATE_FAILED",

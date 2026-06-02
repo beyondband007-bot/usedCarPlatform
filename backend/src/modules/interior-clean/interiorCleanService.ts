@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { interiorCleanPrompt } from "./interiorCleanPrompts";
@@ -55,6 +56,7 @@ class InteriorCleanService {
       billing = await freezeGenerationBilling({
         taskId,
         functionCode: "interior-clean",
+        estimatedPoints: singleImageGenerationPoints(),
         body,
         context,
       });

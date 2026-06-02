@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { watermarkRemovePrompt } from "./watermarkRemovePrompts";
@@ -55,6 +56,7 @@ class WatermarkRemoveService {
       billing = await freezeGenerationBilling({
         taskId,
         functionCode: "watermark-remove",
+        estimatedPoints: singleImageGenerationPoints(),
         body,
         context,
       });

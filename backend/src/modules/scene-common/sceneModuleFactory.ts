@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
@@ -96,6 +97,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         billing = await freezeGenerationBilling({
           taskId,
           functionCode: config.moduleCode,
+          estimatedPoints: singleImageGenerationPoints(),
           body,
           context,
         });

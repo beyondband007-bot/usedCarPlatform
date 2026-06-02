@@ -78,7 +78,11 @@ creativeImageRoutes.post(
 creativeImageRoutes.post(
   "/conversations/:conversationId/generations",
   asyncHandler(async (req, res) => {
-    const result = await creativeImageService.createGeneration(String(req.params.conversationId), req.body);
+    const result = await creativeImageService.createGeneration(
+      String(req.params.conversationId),
+      req.body,
+      { headers: req.headers },
+    );
     ok(res, result);
   }),
 );

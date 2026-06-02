@@ -7,13 +7,22 @@ import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/output
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import { resolveRoadMotionScene } from "./roadMotionScenes";
 
 const moduleCode = "road-motion";
 const uploadPath = "used-car-platform/road-motion";
 
 export const roadMotionService = {
-  async createTask(body: CreateModuleTaskRequest) {
+  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -65,6 +74,24 @@ export const roadMotionService = {
       prompt,
     });
 
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: moduleCode,
+        estimatedPoints: singleImageGenerationPoints(),
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
+
     try {
       const lease = await kieKeyPool.acquire();
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(lease, asset.localPath, uploadPath);
@@ -111,10 +138,16 @@ export const roadMotionService = {
         sceneReferenceImageUrl: null,
         logoAssetId: logoAsset?.id ?? null,
         inputImageCount: inputUrls.length,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "ROAD_MOTION_CREATE_FAILED",

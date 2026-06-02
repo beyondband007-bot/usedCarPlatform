@@ -1,6 +1,7 @@
 import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
 import type { BillingIdentity } from "./billingIdentity";
+import type { CreditFunctionCatalogItem } from "./creditFunctionCatalog";
 
 export type BillingTaskStatus =
   | "estimated"
@@ -153,6 +154,20 @@ class CreditsClient {
   async listFunctions(applicationCode: string) {
     return this.get<{ applicationCode: string; functions: CreditsFunctionResponse[] }>(
       `/integration/applications/${encodeURIComponent(applicationCode)}/functions`,
+    );
+  }
+
+  async registerFunction(input: CreditFunctionCatalogItem) {
+    return this.post<CreditsFunctionResponse>(
+      `/integration/applications/${encodeURIComponent(env.credits.applicationCode)}/functions`,
+      {
+        code: input.code,
+        name: input.name,
+        description: input.description,
+        chargeMode: input.chargeMode,
+        defaultPoints: input.defaultPoints,
+        status: input.status,
+      },
     );
   }
 

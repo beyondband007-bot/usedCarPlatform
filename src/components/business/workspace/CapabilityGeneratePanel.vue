@@ -364,8 +364,10 @@ const batchEstimatedCost = computed(() => {
   const inputCount =
     uploadedExteriorAssets.value.length +
     (uploadInterior.value ? uploadedInteriorCollageAssets.value.length : 0);
+  const itemCost =
+    30 + (lightConsistency.value ? 10 : 0) + (paintRefresh.value ? 10 : 0);
 
-  return inputCount * 120;
+  return inputCount * itemCost;
 });
 
 function buildTemplateInput(): BatchVisualTemplateInput {

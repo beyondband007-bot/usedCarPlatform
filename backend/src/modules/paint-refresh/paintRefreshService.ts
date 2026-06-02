@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { buildPaintRefreshColorPrompt, paintRefreshPrompt } from "./paintRefreshPrompts";
@@ -70,6 +71,7 @@ class PaintRefreshService {
       billing = await freezeGenerationBilling({
         taskId,
         functionCode: "paint-refresh",
+        estimatedPoints: singleImageGenerationPoints(),
         body,
         context,
       });

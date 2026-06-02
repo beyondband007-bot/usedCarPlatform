@@ -14,6 +14,11 @@ export interface CreateGenerationRequest {
   useLastReference?: boolean;
   outputRatio?: OutputRatio;
   resolution?: Resolution;
+  userId?: number | string;
+  creditsUserId?: number | string;
+  tenantId?: number | string;
+  creditsTenantId?: number | string;
+  accountScope?: "personal" | "tenant";
 }
 
 export interface CreativeConversationRecord {

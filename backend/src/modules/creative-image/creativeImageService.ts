@@ -10,6 +10,15 @@ import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio, Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import { assetsService } from "../assets/assetsService";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import { normalizeTaskResults, tasksRepository, type GenerationTaskRecord } from "../tasks/tasksRepository";
 import { creativeImageRepository } from "./creativeImageRepository";
 import type {
@@ -110,7 +119,7 @@ class CreativeImageService {
     };
   }
 
-  async createGeneration(conversationId: string, body: CreateGenerationRequest) {
+  async createGeneration(conversationId: string, body: CreateGenerationRequest, context?: BillingRequestContext) {
     await this.requireConversation(conversationId);
     const prompt = assertPrompt(body.prompt);
     const outputRatio = resolveOutputRatio(body.outputRatio, "1:1");
@@ -142,6 +151,24 @@ class CreativeImageService {
       logoAssetId: null,
       prompt,
     });
+
+    let billing: FrozenGenerationBilling | null = null;
+    try {
+      billing = await freezeGenerationBilling({
+        taskId,
+        functionCode: "creative-image",
+        estimatedPoints: singleImageGenerationPoints(),
+        body,
+        context,
+      });
+    } catch (error) {
+      await tasksRepository.markFailed(
+        taskId,
+        "BILLING_FREEZE_FAILED",
+        error instanceof Error ? error.message : "billing freeze failed",
+      );
+      throw error;
+    }
 
     try {
       const lease = await kieKeyPool.acquire();
@@ -209,10 +236,16 @@ class CreativeImageService {
         sourceImageUrl: body.sourceImageUrl ?? null,
         outputRatio,
         resolution,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
+      try {
+        await refundFrozenGenerationBilling(taskId, billing);
+      } catch {
+        await markGenerationBillingRefundFailed(taskId, billing);
+      }
       await tasksRepository.markFailed(
         taskId,
         "CREATIVE_IMAGE_CREATE_FAILED",

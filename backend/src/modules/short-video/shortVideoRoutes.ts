@@ -9,7 +9,7 @@ export const shortVideoRoutes = Router();
 shortVideoRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await shortVideoService.createTask(req.body);
+    const result = await shortVideoService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );

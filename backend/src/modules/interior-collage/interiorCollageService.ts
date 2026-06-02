@@ -12,6 +12,7 @@ import {
   toBillingResponseFields,
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
+import { singleImageGenerationPoints } from "../billing/generationPointRules";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { interiorCollagePrompt } from "./interiorCollagePrompts";
@@ -112,6 +113,7 @@ class InteriorCollageService {
         entry.billing = await freezeGenerationBilling({
           taskId: entry.taskId,
           functionCode: "interior-collage",
+          estimatedPoints: singleImageGenerationPoints(),
           body,
           context,
         });
