@@ -6,6 +6,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ensurePersonalCreditsAccount } from "../billing/creditsAccountLinkService";
+import { normalizePhone, toLocalChinaPhone, verificationService } from "./verificationService";
 import type {
   AuthenticatedUser,
   AuthUserRow,
@@ -89,6 +90,33 @@ const findUserByUsername = async (username: string) => {
     { username },
   );
   return rows[0] ?? null;
+};
+
+const createSessionForUser = async (row: AuthUserRow, remember?: unknown) => {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(
+    Date.now() + (remember ? SESSION_DAYS.remember : SESSION_DAYS.normal) * 24 * 60 * 60 * 1000,
+  );
+
+  await pool.query(
+    `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at)
+     VALUES (:id, :userId, :tokenHash, :expiresAt)`,
+    {
+      id: createId("sess"),
+      userId: row.id,
+      tokenHash: hashToken(token),
+      expiresAt,
+    },
+  );
+
+  const user = mapUser(row);
+  const subscription = await getSubscriptionSnapshotForUser(user.id);
+
+  return {
+    token,
+    userInfo: user,
+    subscription,
+  };
 };
 
 const getPlanSeed = async (planCode: string) => {
@@ -271,43 +299,93 @@ export const authService = {
     };
   },
 
+  async sendLoginCode(input: { phone?: unknown }) {
+    return verificationService.sendSmsCode({
+      phone: input.phone,
+      scene: "login",
+    });
+  },
+
+  async sendResetPasswordCode(input: { phone?: unknown }) {
+    return verificationService.sendSmsCode({
+      phone: input.phone,
+      scene: "reset",
+    });
+  },
+
   async login(input: { username?: unknown; password?: unknown; remember?: unknown }) {
     const username = typeof input.username === "string" ? input.username.trim().toLowerCase() : "";
     const password = typeof input.password === "string" ? input.password : "";
 
     if (!username || !password) {
-      throw errors.invalidParameter("username and password are required");
+      throw errors.invalidParameter("请输入手机号和密码。");
     }
 
-    const row = await findUserByUsername(username);
+    const normalizedPhone = normalizePhone(username);
+    const localPhone = normalizedPhone ? toLocalChinaPhone(normalizedPhone).toLowerCase() : username;
+    const row = (await findUserByUsername(username)) ?? (localPhone !== username ? await findUserByUsername(localPhone) : null);
     if (!row || row.status !== "active" || !verifyPassword(password, row.password_hash)) {
-      throw errors.unauthorized("账号或密码错误");
+      throw errors.unauthorized("账号或密码错误。");
     }
 
-    const token = randomBytes(32).toString("base64url");
-    const expiresAt = new Date(
-      Date.now() + (input.remember ? SESSION_DAYS.remember : SESSION_DAYS.normal) * 24 * 60 * 60 * 1000,
-    );
+    return createSessionForUser(row, input.remember);
+  },
+
+  async loginWithCode(input: { phone?: unknown; code?: unknown; remember?: unknown }) {
+    const verifiedPhone = verificationService.verifySmsCode("login", input.phone, input.code);
+    const username = toLocalChinaPhone(verifiedPhone).toLowerCase();
+    const row =
+      (await findUserByUsername(username)) ??
+      (verifiedPhone.toLowerCase() !== username ? await findUserByUsername(verifiedPhone.toLowerCase()) : null);
+
+    if (!row || row.status !== "active") {
+      throw errors.unauthorized("该手机号未注册或账号不可用。");
+    }
+
+    return createSessionForUser(row, input.remember);
+  },
+
+  async resetPassword(input: { phone?: unknown; code?: unknown; password?: unknown; confirmPassword?: unknown }) {
+    const verifiedPhone = verificationService.verifySmsCode("reset", input.phone, input.code);
+    const username = toLocalChinaPhone(verifiedPhone).toLowerCase();
+    const password = typeof input.password === "string" ? input.password : "";
+    const confirmPassword = typeof input.confirmPassword === "string" ? input.confirmPassword : "";
+
+    if (password.length < 6) {
+      throw errors.invalidParameter("密码至少需要 6 位。");
+    }
+
+    if (password !== confirmPassword) {
+      throw errors.invalidParameter("两次输入的密码不一致。");
+    }
+
+    const row =
+      (await findUserByUsername(username)) ??
+      (verifiedPhone.toLowerCase() !== username ? await findUserByUsername(verifiedPhone.toLowerCase()) : null);
+    if (!row) {
+      throw errors.invalidParameter("该手机号未注册。");
+    }
 
     await pool.query(
-      `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at)
-       VALUES (:id, :userId, :tokenHash, :expiresAt)`,
+      `UPDATE app_users
+       SET password_hash = :passwordHash,
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE id = :userId`,
       {
-        id: createId("sess"),
         userId: row.id,
-        tokenHash: hashToken(token),
-        expiresAt,
+        passwordHash: hashPassword(password),
       },
     );
 
-    const user = mapUser(row);
-    const subscription = await getSubscriptionSnapshotForUser(user.id);
+    await pool.query(
+      `UPDATE auth_sessions
+       SET revoked_at = CURRENT_TIMESTAMP(3)
+       WHERE user_id = :userId
+         AND revoked_at IS NULL`,
+      { userId: row.id },
+    );
 
-    return {
-      token,
-      userInfo: user,
-      subscription,
-    };
+    return { success: true };
   },
 
   async me(headers?: IncomingHttpHeaders | Record<string, string | string[] | undefined>) {

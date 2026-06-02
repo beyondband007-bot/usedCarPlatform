@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 
-import { getCurrentUser, login as apiLogin, logout as apiLogout } from '@/api/auth'
+import {
+  getCurrentUser,
+  login as apiLogin,
+  loginWithCode as apiLoginWithCode,
+  logout as apiLogout,
+  type LoginWithCodeRequest,
+} from '@/api/auth'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
@@ -96,6 +102,23 @@ export const useAuthStore = defineStore('auth', {
     },
     async login(payload: LoginRequest) {
       const response = await apiLogin(payload)
+      const subscriptionStore = useSubscriptionStore()
+
+      this.token = response.token
+      this.userInfo = response.userInfo
+      this.role = response.userInfo.role
+      this.permissions = [...response.userInfo.permissions]
+      this.remember = Boolean(payload.remember)
+
+      subscriptionStore.applySubscriptionSnapshot(response.subscription)
+      syncCreditsIdentity(response.userInfo)
+      writeToken(response.token)
+      writeMockStorage(USER_KEY, response.userInfo)
+
+      return response.userInfo
+    },
+    async loginWithCode(payload: LoginWithCodeRequest) {
+      const response = await apiLoginWithCode(payload)
       const subscriptionStore = useSubscriptionStore()
 
       this.token = response.token

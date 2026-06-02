@@ -494,7 +494,23 @@ class BatchService {
 
       if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
         const scene = resolveBatchScene(config.sceneOptionId, config.sceneIndex);
-        inputUrls.push(config.sceneReferenceImageUrl ?? scene.referenceImageUrl);
+        const uploadedScene = scene.referenceImagePath
+          ? await runKieOperation(() =>
+              kieClient.uploadLocalFileWithLease(
+                lease as KieAccountLease,
+                scene.referenceImagePath as string,
+                "used-car-platform/batch-new/scene",
+              ),
+            )
+          : null;
+        const sceneReferenceImageUrl =
+          uploadedScene?.fileUrl ?? config.sceneReferenceImageUrl ?? scene.referenceImageUrl;
+        if (!sceneReferenceImageUrl) {
+          throw errors.invalidParameter("batch-new scene reference image is missing", {
+            optionId: scene.optionId,
+          });
+        }
+        inputUrls.push(sceneReferenceImageUrl);
       }
 
       if (item.itemKind === "exterior" && config.useRecentLogo) {
@@ -545,6 +561,9 @@ class BatchService {
         resultCount: 0,
       });
     } catch (error) {
+      if (error instanceof Error && error.message.includes("no available kie api key")) {
+        throw error;
+      }
       if (lease && !leaseReleasedByKieClient) await kieKeyPool.release(lease.accountHash);
       try {
         await refundFrozenGenerationBilling(task.id, billing, batchItemBillingScope(item.itemId));

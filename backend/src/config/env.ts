@@ -2,6 +2,9 @@ import path from "node:path";
 
 import dotenv from "dotenv";
 
+const rootDir = path.resolve(__dirname, "../..");
+
+dotenv.config({ path: path.resolve(rootDir, ".env") });
 dotenv.config();
 
 const toNumber = (value: string | undefined, fallback: number) => {
@@ -26,8 +29,6 @@ const toOptionalNumber = (value: string | undefined) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
-
-const rootDir = path.resolve(__dirname, "../..");
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
@@ -77,5 +78,17 @@ export const env = {
       password: process.env.CREDITS_MYSQL_PASSWORD ?? "credits",
       connectionLimit: toNumber(process.env.CREDITS_MYSQL_CONNECTION_LIMIT, 5),
     },
+  },
+  verification: {
+    tencentSecretId: process.env.TENCENTCLOUD_SECRET_ID ?? "",
+    tencentSecretKey: process.env.TENCENTCLOUD_SECRET_KEY ?? "",
+    tencentRegion: process.env.TENCENTCLOUD_REGION ?? "ap-guangzhou",
+    smsSdkAppId: process.env.SMS_SDK_APP_ID ?? "",
+    smsSignName: process.env.SMS_SIGN_NAME ?? "",
+    smsLoginTemplateId: process.env.SMS_LOGIN_TEMPLATE_ID ?? "",
+    smsReviseTemplateId: process.env.SMS_REVISE_TEMPLATE_ID ?? "",
+    smsTemplateParamMode: process.env.SMS_TEMPLATE_PARAM_MODE ?? "code_time",
+    smsCodeExpireMinutes: toNumber(process.env.SMS_CODE_EXPIRE_MINUTES, 5),
+    smsDryRun: toBoolean(process.env.SMS_DRY_RUN, false),
   },
 };

@@ -14,8 +14,51 @@ export interface CurrentUserResponse {
   subscription: SubscriptionStateSnapshot
 }
 
+export interface SendCodeRequest {
+  phone: string
+}
+
+export interface SendCodeResponse {
+  success: boolean
+  message: string
+  debugCode?: string
+}
+
+export interface ResetPasswordRequest {
+  phone: string
+  code: string
+  password: string
+  confirmPassword: string
+}
+
+export interface LoginWithCodeRequest {
+  phone: string
+  code: string
+  remember?: boolean
+}
+
+export async function sendLoginCode(payload: SendCodeRequest) {
+  const response = await request.post<ApiResponse<SendCodeResponse>>('/auth/login-code', payload)
+  return response.data
+}
+
+export async function sendResetPasswordCode(payload: SendCodeRequest) {
+  const response = await request.post<ApiResponse<SendCodeResponse>>('/auth/reset-password-code', payload)
+  return response.data
+}
+
+export async function resetPassword(payload: ResetPasswordRequest) {
+  const response = await request.post<ApiResponse<{ success: boolean }>>('/auth/reset-password', payload)
+  return response.data
+}
+
 export async function login(payload: LoginRequest) {
   const response = await request.post<ApiResponse<LoginResponse>>('/auth/login', payload)
+  return response.data
+}
+
+export async function loginWithCode(payload: LoginWithCodeRequest) {
+  const response = await request.post<ApiResponse<LoginResponse>>('/auth/login-with-code', payload)
   return response.data
 }
 
