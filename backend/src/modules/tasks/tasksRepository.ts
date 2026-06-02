@@ -35,6 +35,11 @@ export interface GenerationTaskRecord {
 export interface RecentGenerationRecord extends GenerationTaskRecord {
   inputAssetUrl?: string | null;
   inputAssetFileName?: string | null;
+  batchProjectName?: string | null;
+  batchItemKind?: string | null;
+  batchSortOrder?: number | null;
+  batchExteriorCount?: number | null;
+  batchInteriorCollage?: boolean;
 }
 
 interface GenerationTaskRow extends RowDataPacket {
@@ -67,6 +72,11 @@ interface GenerationTaskRow extends RowDataPacket {
 interface RecentGenerationRow extends GenerationTaskRow {
   input_asset_url: string | null;
   input_asset_file_name: string | null;
+  batch_project_name: string | null;
+  batch_item_kind: string | null;
+  batch_sort_order: number | null;
+  batch_exterior_count: number | null;
+  batch_interior_collage: number | null;
 }
 
 const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
@@ -96,10 +106,38 @@ const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   updatedAt: row.updated_at,
 });
 
+const parseInteriorCollageFlag = (value: unknown) => {
+  if (!value) return false;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>;
+      return Boolean(parsed.enableInteriorCollage ?? parsed.interiorCollage);
+    } catch {
+      return false;
+    }
+  }
+  if (typeof value === "object") {
+    const config = value as Record<string, unknown>;
+    return Boolean(config.enableInteriorCollage ?? config.interiorCollage);
+  }
+  return false;
+};
+
 const mapRecentRow = (row: RecentGenerationRow): RecentGenerationRecord => ({
   ...mapRow(row),
   inputAssetUrl: row.input_asset_url,
   inputAssetFileName: row.input_asset_file_name,
+  batchProjectName: row.batch_project_name,
+  batchItemKind: row.batch_item_kind,
+  batchSortOrder:
+    row.batch_sort_order === null || row.batch_sort_order === undefined
+      ? null
+      : Number(row.batch_sort_order),
+  batchExteriorCount:
+    row.batch_exterior_count === null || row.batch_exterior_count === undefined
+      ? null
+      : Number(row.batch_exterior_count),
+  batchInteriorCollage: parseInteriorCollageFlag(row.batch_interior_collage),
 });
 
 export class TasksRepository extends Repository {
@@ -155,9 +193,21 @@ export class TasksRepository extends Repository {
       `SELECT
           gt.*,
           a.public_url AS input_asset_url,
-          a.file_name AS input_asset_file_name
+          a.file_name AS input_asset_file_name,
+          bt.project_name AS batch_project_name,
+          bti.item_kind AS batch_item_kind,
+          bti.sort_order AS batch_sort_order,
+          bt.visual_config_json AS batch_interior_collage,
+          (
+            SELECT COUNT(*)
+            FROM batch_task_items exterior_items
+            WHERE exterior_items.batch_id = bti.batch_id
+              AND exterior_items.item_kind = 'exterior'
+          ) AS batch_exterior_count
        FROM generation_tasks gt
        LEFT JOIN assets a ON a.id = gt.input_asset_id
+       LEFT JOIN batch_task_items bti ON bti.generation_task_id = gt.id
+       LEFT JOIN batch_tasks bt ON bt.id = bti.batch_id
        ${where}
        ORDER BY gt.created_at DESC
        LIMIT :limit OFFSET :offset`,

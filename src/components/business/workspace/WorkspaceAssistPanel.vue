@@ -17,6 +17,9 @@ import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import {
+  resolveBatchRecentSceneLabel,
+} from "@/utils/batch-display-title";
+import {
   getBatchItemKindLabel,
   isInteriorBatchItemKind,
 } from "@/utils/batch-task";
@@ -403,7 +406,9 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
       : (item.ratioLabel ?? formatOutputRatioLabel(item.outputRatio) ?? undefined),
     sceneLabel: isShortVideo
       ? "营销短视频"
-      : (sceneTitle ?? item.sceneLabel ?? undefined),
+      : item.moduleCode === "batch-new"
+        ? resolveBatchRecentSceneLabel(item.sceneLabel)
+        : (sceneTitle ?? item.sceneLabel ?? undefined),
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
     inputAssetUrl: item.inputAssetUrl ?? undefined,
