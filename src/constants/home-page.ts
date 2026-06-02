@@ -98,7 +98,7 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
     title: '户外自然实景',
     description: '真实街道融合自然风光，提升车辆场景代入感',
-    image: featureOutdoorImage,
+    image: featureSkyImage,
   },
   {
     title: '行驶动态特效',
@@ -108,7 +108,7 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
     title: '高质天空影棚',
     description: '干净通透的天空场景，让车辆展示更清晰醒目',
-    image: featureSkyImage,
+    image: featureOutdoorImage,
   },
 ]
 
