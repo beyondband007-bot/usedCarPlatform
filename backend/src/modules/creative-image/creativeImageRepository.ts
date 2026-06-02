@@ -109,7 +109,9 @@ export class CreativeImageRepository extends Repository {
 
   async findConversationById(id: string) {
     const rows = await this.query<ConversationRow[]>(
-      `${this.conversationSelectSql} WHERE c.id = :id LIMIT 1`,
+      `${this.conversationSelectSql}
+       WHERE c.id = :id AND c.status <> 'deleted'
+       LIMIT 1`,
       { id },
     );
     return rows[0] ? mapConversation(rows[0]) : null;
@@ -123,13 +125,15 @@ export class CreativeImageRepository extends Repository {
     };
     const rows = await this.query<ConversationRow[]>(
       `${this.conversationSelectSql}
-       WHERE c.user_id = :userId
+       WHERE c.user_id = :userId AND c.status = 'active'
        ORDER BY c.updated_at DESC
        LIMIT :limit OFFSET :offset`,
       params,
     );
     const totalRows = await this.query<Array<RowDataPacket & { total: number }>>(
-      `SELECT COUNT(*) total FROM creative_conversations WHERE user_id = :userId`,
+      `SELECT COUNT(*) total
+       FROM creative_conversations
+       WHERE user_id = :userId AND status = 'active'`,
       params,
     );
     return {
@@ -254,6 +258,18 @@ export class CreativeImageRepository extends Repository {
         lastResultUrl: input.lastResultUrl ?? null,
         resetLastResultUrl: input.resetLastResultUrl ? 1 : 0,
       },
+    );
+  }
+
+  async markConversationDeleted(input: { conversationId: string; userId: string }) {
+    await this.execute(
+      `UPDATE creative_conversations
+       SET status = 'deleted',
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE id = :conversationId
+         AND user_id = :userId
+         AND status <> 'deleted'`,
+      input,
     );
   }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NInput, NSelect } from 'naive-ui'
+import { NDropdown, NInput, NSelect } from 'naive-ui'
 
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
@@ -45,6 +45,7 @@ const emit = defineEmits<{
   }]
   newConversation: []
   selectConversation: [conversationId: string]
+  deleteConversation: [conversationId: string]
   uploadReference: [file: File]
   removeReference: []
 }>()
@@ -162,6 +163,20 @@ function findChainSource(beforeTurnId?: string): CreativeThreadTurn | null {
 }
 
 const recentConversations = computed(() => props.conversations ?? [])
+const recentConversationMenuOptions = [{ label: '删除对话', key: 'delete' }]
+
+function handleRecentConversationMenuSelect(
+  key: string | number,
+  conversationId: string,
+) {
+  if (key === 'delete') {
+    emit('deleteConversation', conversationId)
+  }
+}
+
+function selectRecentConversation(conversationId: string) {
+  emit('selectConversation', conversationId)
+}
 
 const pendingReferenceObjectUrl = ref<string | null>(null)
 const pendingReferencePreview = ref<string | null>(null)
@@ -417,13 +432,20 @@ function toggleSidebar() {
       <section class="creative-recent">
         <p>最近</p>
         <div class="creative-recent-list">
-          <button
+          <div
             v-for="conversation in recentConversations"
             :key="conversation.conversationId"
-            type="button"
             class="creative-recent-item"
             :class="{ active: conversation.conversationId === props.activeConversationId }"
-            @click="emit('selectConversation', conversation.conversationId)"
+            role="button"
+            tabindex="0"
+            @click="selectRecentConversation(conversation.conversationId)"
+            @keydown.enter.prevent="
+              selectRecentConversation(conversation.conversationId)
+            "
+            @keydown.space.prevent="
+              selectRecentConversation(conversation.conversationId)
+            "
           >
             <span class="creative-recent-thumb">
               <PreloadImage
@@ -433,8 +455,31 @@ function toggleSidebar() {
                 fit="cover"
               />
             </span>
-            <span>{{ resolveConversationTitle(conversation) }}</span>
-          </button>
+            <span class="creative-recent-label">
+              {{ resolveConversationTitle(conversation) }}
+            </span>
+            <NDropdown
+              trigger="click"
+              placement="bottom-end"
+              :options="recentConversationMenuOptions"
+              @select="
+                (key) =>
+                  handleRecentConversationMenuSelect(
+                    key,
+                    conversation.conversationId,
+                  )
+              "
+            >
+              <button
+                type="button"
+                class="creative-recent-more"
+                aria-label="更多操作"
+                @click.stop
+              >
+                <Icon icon="mdi:dots-horizontal" />
+              </button>
+            </NDropdown>
+          </div>
         </div>
       </section>
 
@@ -768,7 +813,7 @@ function toggleSidebar() {
 
 .creative-sidebar {
   display: grid;
-  width: 280px;
+  width: 304px;
   min-width: 0;
   min-height: 0;
   grid-template-rows: auto auto 1fr auto;
@@ -955,6 +1000,13 @@ function toggleSidebar() {
   color: var(--creative-text);
   padding: 8px;
   text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.creative-recent-item:is(:hover, :focus-within, .active) {
+  grid-template-columns: 42px minmax(0, 1fr) 28px;
+  background: color-mix(in srgb, var(--creative-text) 8%, var(--creative-surface));
 }
 
 .creative-recent-thumb {
@@ -964,12 +1016,41 @@ function toggleSidebar() {
   border-radius: 8px;
 }
 
-.creative-recent-item > span:not(.creative-recent-thumb) {
+.creative-recent-label {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
   font-weight: 800;
+}
+
+.creative-recent-more {
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--creative-icon);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  font-family: inherit;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.creative-recent-item:is(:hover, :focus-within, .active) .creative-recent-more {
+  display: grid;
+}
+
+.creative-recent-more:hover {
+  background: color-mix(in srgb, var(--creative-text) 12%, transparent);
+  color: var(--creative-text);
 }
 
 .creative-recent-item.active {
@@ -1573,7 +1654,7 @@ function toggleSidebar() {
 
 @media (max-width: 1200px) {
   .creative-sidebar {
-    width: 240px;
+    width: 264px;
   }
 
   .creative-composer-foot {

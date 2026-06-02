@@ -113,7 +113,10 @@ const navItems = computed(() => {
     :class="{ 'app-header-wrap--home': usesStudioChrome }"
   >
     <header v-if="usesStudioChrome" class="site-header" aria-label="顶部导航">
-      <RouterLink class="logo" to="/home">AI CARXEN</RouterLink>
+      <div class="site-brand">
+        <RouterLink class="logo" to="/home">AI CARXEN</RouterLink>
+        <span class="logo-cn-name">车新新</span>
+      </div>
       <nav class="nav-links" aria-label="主导航">
         <button
           v-for="item in navItems"
@@ -373,13 +376,33 @@ const navItems = computed(() => {
     "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
+.logo,
+.logo-cn-name {
+  color: var(--studio-chrome-logo, #f3f3f3);
+  font-family: inherit;
+  font-weight: 900;
+}
+
 .logo {
   flex-shrink: 0;
-  color: var(--studio-chrome-logo, #f3f3f3);
   font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
-  font-weight: 900;
   letter-spacing: 0;
   text-decoration: none;
+}
+
+.site-brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.logo-cn-name {
+  margin-right: 24px;
+  font-size: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2);
+  letter-spacing: 0.22em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .nav-links {

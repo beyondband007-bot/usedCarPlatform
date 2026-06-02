@@ -54,6 +54,14 @@ creativeImageRoutes.get(
   }),
 );
 
+creativeImageRoutes.delete(
+  "/conversations/:conversationId",
+  asyncHandler(async (req, res) => {
+    const result = await creativeImageService.deleteConversation(String(req.params.conversationId));
+    ok(res, result);
+  }),
+);
+
 creativeImageRoutes.get(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {

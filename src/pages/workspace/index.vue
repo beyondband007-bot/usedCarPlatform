@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useMessage } from "naive-ui";
+import { useDialog, useMessage } from "naive-ui";
 
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
   createInteriorCollageTask,
   createGenerationTask,
+  deleteCreativeImageConversation,
   getBatchTaskDetail,
   getCreativeImageConversations,
   getCreativeImageMessages,
@@ -53,6 +54,7 @@ import { useAppStore } from "@/stores/app";
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
+const dialog = useDialog();
 const appStore = useAppStore();
 const pointsStore = usePointsStore();
 const subscriptionStore = useSubscriptionStore();
@@ -359,7 +361,9 @@ function buildCreativeThreadTurns(
       .find((turn) => turn.taskId === conversation.lastTaskId);
     if (lastTurn) {
       const pendingOnServer =
-        lastTurn.taskId === conversation.lastTaskId && !conversation.lastResultUrl;
+        lastTurn.taskId === conversation.lastTaskId &&
+        !lastTurn.resultUrl &&
+        !conversation.lastResultUrl;
       lastTurn.isGenerating =
         isCreativeTaskGenerating(
           conversation.lastTaskId,
@@ -709,16 +713,50 @@ const activeCreativeConversationGenerating = computed(() => {
   );
 });
 
-const hasActiveCreativeConversationDraft = computed(() => {
-  const conversation = activeCreativeConversation.value;
-  if (!conversation) return false;
+function isCreativeConversationDraft(conversation: CreativeImageConversation) {
   return (
     !conversation.lastMessage &&
     !conversation.lastTaskId &&
     !conversation.lastResultUrl &&
     !conversation.lastReferenceAssetId
   );
-});
+}
+
+function orderCreativeConversations(
+  items: CreativeImageConversation[],
+): CreativeImageConversation[] {
+  const drafts = items.filter(isCreativeConversationDraft);
+  const primaryDraft =
+    drafts.length > 0
+      ? [...drafts].sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )[0]
+      : null;
+  const nonDrafts = items
+    .filter((item) => !isCreativeConversationDraft(item))
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+
+  return primaryDraft ? [primaryDraft, ...nonDrafts] : nonDrafts;
+}
+
+function findCreativeConversationDraft() {
+  return (
+    creativeConversations.value.find(isCreativeConversationDraft) ?? null
+  );
+}
+
+function focusCreativeDraftConversation(conversationId: string) {
+  activeCreativeConversationId.value = conversationId;
+  saveActiveCreativeConversationId(conversationId);
+  creativeReferenceAsset.value = null;
+  generationResult.value = null;
+  creativeImageCaption.value = null;
+  creativeThreadTurns.value = [];
+}
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? "");
 
@@ -1004,6 +1042,7 @@ async function resolveGenerationTask(
 async function resolveCreativeGenerationTask(
   taskId: string,
   conversationId: string,
+  options: { restored?: boolean } = {},
 ) {
   try {
     const initialTask = await getGenerationTask(taskId);
@@ -1012,18 +1051,24 @@ async function resolveCreativeGenerationTask(
       : await pollGenerationTask(taskId);
 
     if (!task) {
-      message.warning("任务仍在处理中，请稍后刷新查看");
+      if (!options.restored) {
+        message.warning("任务仍在处理中，请稍后刷新查看");
+      }
       return;
     }
 
     if (task.status !== "success") {
-      message.error(getViewMediaFailureMessage(task.moduleCode));
+      if (!options.restored) {
+        message.error(getViewMediaFailureMessage(task.moduleCode));
+      }
       return;
     }
 
     const result = buildResultFromTask(task);
     if (!result) {
-      message.warning("任务完成，但没有返回图片");
+      if (!options.restored) {
+        message.warning("任务完成，但没有返回图片");
+      }
       return;
     }
 
@@ -1032,12 +1077,18 @@ async function resolveCreativeGenerationTask(
       activeCreativeConversationId.value === conversationId
     ) {
       generationResult.value = result;
-      message.success("生成完成");
+      if (!options.restored) {
+        message.success("生成完成");
+      }
     } else {
-      message.success("创意生图生成完成，可在最近对话中查看");
+      if (!options.restored) {
+        message.success("创意生图生成完成，可在最近对话中查看");
+      }
     }
   } catch {
-    message.error(getViewMediaFailureMessage("creative-image"));
+    if (!options.restored) {
+      message.error(getViewMediaFailureMessage("creative-image"));
+    }
   } finally {
     clearActiveGenerationTask(taskId);
     setCreativeConversationGenerating(conversationId, null);
@@ -1056,14 +1107,30 @@ async function refreshCreativeConversations() {
       page: 1,
       pageSize: 20,
     });
-    creativeConversations.value = result.items;
+    creativeConversations.value = orderCreativeConversations(result.items);
+
+    const primaryDraft = findCreativeConversationDraft();
+    const activeId =
+      activeCreativeConversationId.value ?? readActiveCreativeConversationId();
+    if (activeId && primaryDraft && activeId !== primaryDraft.conversationId) {
+      const activeInRaw = result.items.find(
+        (item) => item.conversationId === activeId,
+      );
+      if (activeInRaw && isCreativeConversationDraft(activeInRaw)) {
+        activeCreativeConversationId.value = primaryDraft.conversationId;
+        saveActiveCreativeConversationId(primaryDraft.conversationId);
+      }
+    }
+
     const savedConversationId = readActiveCreativeConversationId();
     const nextConversationId =
       activeCreativeConversationId.value ??
       (savedConversationId &&
-      result.items.some((item) => item.conversationId === savedConversationId)
+      creativeConversations.value.some(
+        (item) => item.conversationId === savedConversationId,
+      )
         ? savedConversationId
-        : result.items[0]?.conversationId);
+        : creativeConversations.value[0]?.conversationId);
 
     if (
       nextConversationId &&
@@ -1113,14 +1180,25 @@ async function loadCreativeConversationThread(conversationId: string) {
 }
 
 async function ensureCreativeConversation(prompt?: string) {
-  if (activeCreativeConversationId.value)
+  if (activeCreativeConversationId.value) {
     return activeCreativeConversationId.value;
+  }
+
+  const existingDraft = findCreativeConversationDraft();
+  if (existingDraft) {
+    activeCreativeConversationId.value = existingDraft.conversationId;
+    saveActiveCreativeConversationId(existingDraft.conversationId);
+    return existingDraft.conversationId;
+  }
 
   const title = prompt?.trim().slice(0, 24) || "创意生图对话";
   const conversation = await createCreativeImageConversation({ title });
   activeCreativeConversationId.value = conversation.conversationId;
   saveActiveCreativeConversationId(conversation.conversationId);
-  creativeConversations.value = [conversation, ...creativeConversations.value];
+  creativeConversations.value = orderCreativeConversations([
+    conversation,
+    ...creativeConversations.value,
+  ]);
   return conversation.conversationId;
 }
 
@@ -1131,23 +1209,33 @@ function syncCreativeConversationPendingTask(
 ) {
   const title = prompt.trim().slice(0, 24);
 
-  creativeConversations.value = creativeConversations.value.map((item) =>
-    item.conversationId === conversationId
-      ? {
-          ...item,
-          title: title || item.title,
-          lastMessage: prompt.trim(),
-          lastTaskId: taskId,
-          lastResultUrl: null,
-        }
-      : item,
+  creativeConversations.value = orderCreativeConversations(
+    creativeConversations.value.map((item) =>
+      item.conversationId === conversationId
+        ? {
+            ...item,
+            title: title || item.title,
+            lastMessage: prompt.trim(),
+            lastTaskId: taskId,
+            lastResultUrl: null,
+          }
+        : item,
+    ),
   );
 }
 
 async function handleNewCreativeConversation() {
   if (isCreatingCreativeConversation.value) return;
-  if (hasActiveCreativeConversationDraft.value) {
-    message.info("当前已经是新对话");
+
+  const existingDraft = findCreativeConversationDraft();
+  if (existingDraft) {
+    if (activeCreativeConversationId.value === existingDraft.conversationId) {
+      message.info("当前已经是新对话");
+      return;
+    }
+
+    focusCreativeDraftConversation(existingDraft.conversationId);
+    message.info("已回到新对话");
     return;
   }
 
@@ -1156,16 +1244,11 @@ async function handleNewCreativeConversation() {
     const conversation = await createCreativeImageConversation({
       title: "创意生图对话",
     });
-    activeCreativeConversationId.value = conversation.conversationId;
-    saveActiveCreativeConversationId(conversation.conversationId);
-    creativeReferenceAsset.value = null;
-    generationResult.value = null;
-    creativeImageCaption.value = null;
-    creativeThreadTurns.value = [];
-    creativeConversations.value = [
+    focusCreativeDraftConversation(conversation.conversationId);
+    creativeConversations.value = orderCreativeConversations([
       conversation,
       ...creativeConversations.value,
-    ];
+    ]);
     message.success("已新建对话");
   } catch (error) {
     const text = error instanceof Error ? error.message : "新建对话失败";
@@ -1185,10 +1268,62 @@ function handleSelectCreativeConversation(conversationId: string) {
   generationResult.value = null;
   creativeThreadTurns.value = [];
 
-  if (conversation?.lastTaskId) {
-    void resolveGenerationTask(conversation.lastTaskId, { restored: true });
+  if (conversation?.lastTaskId && !conversation.lastResultUrl) {
+    void resolveCreativeGenerationTask(conversation.lastTaskId, conversationId, {
+      restored: true,
+    });
   }
   void loadCreativeConversationThread(conversationId);
+}
+
+async function handleDeleteCreativeConversation(conversationId: string) {
+  try {
+    await deleteCreativeImageConversation(conversationId);
+    const index = creativeConversations.value.findIndex(
+      (item) => item.conversationId === conversationId,
+    );
+    if (index < 0) return;
+
+    const remaining = creativeConversations.value.filter(
+      (item) => item.conversationId !== conversationId,
+    );
+    creativeConversations.value = orderCreativeConversations(remaining);
+    setCreativeConversationGenerating(conversationId, null);
+
+    if (activeCreativeConversationId.value !== conversationId) {
+      message.success("对话已删除");
+      return;
+    }
+
+    const nextConversation =
+      remaining[index] ?? remaining[index - 1] ?? findCreativeConversationDraft();
+
+    if (nextConversation) {
+      handleSelectCreativeConversation(nextConversation.conversationId);
+    } else {
+      activeCreativeConversationId.value = null;
+      saveActiveCreativeConversationId(null);
+      creativeReferenceAsset.value = null;
+      generationResult.value = null;
+      creativeImageCaption.value = null;
+      creativeThreadTurns.value = [];
+    }
+
+    message.success("对话已删除");
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "删除对话失败";
+    message.error(text);
+  }
+}
+
+function handleConfirmDeleteCreativeConversation(conversationId: string) {
+  dialog.warning({
+    title: "删除对话",
+    content: `确认删除吗，删除后无法找回对话`,
+    positiveText: "删除",
+    negativeText: "取消",
+    onPositiveClick: () => handleDeleteCreativeConversation(conversationId),
+  });
 }
 
 async function handleUploadCreativeReference(file: File) {
@@ -1500,6 +1635,7 @@ onMounted(async () => {
     void resolveCreativeGenerationTask(
       activeTask.taskId,
       conversationId ?? "",
+      { restored: true },
     );
     return;
   }
@@ -1566,14 +1702,12 @@ onUnmounted(() => {
             :thread-turns="creativeThreadTurns"
             :is-loading-conversation="isLoadingCreativeConversation"
             :active-conversation-id="activeCreativeConversationId"
-            :is-new-conversation-disabled="
-              isCreatingCreativeConversation ||
-              hasActiveCreativeConversationDraft
-            "
+            :is-new-conversation-disabled="isCreatingCreativeConversation"
             :reference-asset="creativeReferenceAsset"
             @generate="handleCreativeGenerate"
             @new-conversation="handleNewCreativeConversation"
             @select-conversation="handleSelectCreativeConversation"
+            @delete-conversation="handleConfirmDeleteCreativeConversation"
             @upload-reference="handleUploadCreativeReference"
             @remove-reference="handleRemoveCreativeReference"
           />

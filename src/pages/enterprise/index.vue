@@ -39,7 +39,10 @@ const enterpriseLoginHeroImage = computed(() =>
 
     <div class="enterprise-login-shell">
       <section class="enterprise-login-copy" aria-label="企业登录介绍">
-        <h1>每一辆车<br />都值得被精心呈现</h1>
+        <h1 class="enterprise-login-title">
+          <span>每一辆车</span>
+          <span>都值得被精心呈现</span>
+        </h1>
         <p class="enterprise-login-subtitle">AI驱动的汽车电商内容生产平台</p>
 
         <ul class="enterprise-login-features">
@@ -117,7 +120,7 @@ const enterpriseLoginHeroImage = computed(() =>
   filter: saturate(0.95) brightness(1.06);
 }
 
-.enterprise-login-page.theme-light .enterprise-login-copy h1 {
+.enterprise-login-page.theme-light .enterprise-login-title {
   text-shadow: 0 4px 18px rgba(255, 255, 255, 0.45);
 }
 
@@ -160,7 +163,10 @@ const enterpriseLoginHeroImage = computed(() =>
   color: var(--login-text);
 }
 
-.enterprise-login-copy h1 {
+.enterprise-login-title {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin: 0;
   max-width: 560px;
   color: var(--login-text);

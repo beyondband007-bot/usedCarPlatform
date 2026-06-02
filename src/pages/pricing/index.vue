@@ -166,6 +166,9 @@ function handlePlanConsult() {
 }
 
 .pricing-shell {
+  /* 在默认尺寸基础上累计缩小：先 10%，再 15% → 0.9 × 0.85 */
+  --pricing-content-scale: 0.765;
+
   position: relative;
   z-index: 1;
   display: flex;
@@ -176,6 +179,14 @@ function handlePlanConsult() {
   flex-direction: column;
   gap: clamp(24px, 3.5vh, 54px);
   align-items: center;
+  zoom: var(--pricing-content-scale);
+}
+
+@supports not (zoom: 1) {
+  .pricing-shell {
+    transform: scale(var(--pricing-content-scale));
+    transform-origin: top center;
+  }
 }
 
 .pricing-hero {
