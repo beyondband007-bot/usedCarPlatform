@@ -330,10 +330,6 @@ function handleEditTurn(turn: CreativeThreadTurn) {
   prompt.value = text
 }
 
-function resolveTurnRatioLabel(turn: CreativeThreadTurn) {
-  return turn.ratioLabel || ratioMetaLabel.value
-}
-
 function shouldShowResultCard(turn: CreativeThreadTurn) {
   return Boolean(turn.resultUrl || turn.taskId || turn.isLoadingImage)
 }
@@ -558,11 +554,6 @@ function toggleSidebar() {
               v-else-if="shouldShowResultCard(turn)"
               class="creative-result-card"
             >
-              <p class="creative-result-status">已完成 <Icon icon="mdi:chevron-right" /></p>
-              <h2>
-                已提交生成创意图片，输出 {{ resolveTurnRatioLabel(turn) }}，提示词：{{ turn.prompt }}
-              </h2>
-
               <button
                 v-if="turn.resultUrl"
                 type="button"
@@ -577,7 +568,7 @@ function toggleSidebar() {
                   loading="lazy"
                   decoding="async"
                 />
-                <span>AI 生成</span>
+                <span class="creative-ai-badge" aria-hidden="true">AI 生成</span>
               </button>
               <div
                 v-else
@@ -1262,28 +1253,11 @@ function toggleSidebar() {
   margin: 0;
 }
 
-.creative-result-status,
 .creative-result-meta {
   margin: 0;
   color: var(--creative-muted);
   font-size: 15px;
   font-weight: 800;
-}
-
-.creative-result-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 28px;
-}
-
-.creative-result-card h2 {
-  margin: 0 0 28px;
-  max-width: 980px;
-  color: var(--creative-text);
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.75;
 }
 
 .creative-result-preview {
@@ -1332,16 +1306,18 @@ function toggleSidebar() {
   animation: creative-spin 0.9s linear infinite;
 }
 
-.creative-result-preview span {
+.creative-ai-badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.24);
-  color: rgba(255, 255, 255, 0.68);
-  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
   pointer-events: none;
 }
 

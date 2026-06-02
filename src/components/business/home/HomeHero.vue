@@ -101,7 +101,7 @@ const homeHeroImageSrc = computed(() =>
 .hero-copy {
   position: absolute;
   z-index: 2;
-  top: clamp(18px, 7.5cqh, 96px);
+  top: 48px;
   right: 0;
   left: 0;
   width: min(900px, calc(100% - 40px));
@@ -153,10 +153,6 @@ const homeHeroImageSrc = computed(() =>
 }
 
 @supports not (container-type: size) {
-  .hero-copy {
-    top: clamp(18px, 5vw, 96px);
-  }
-
   .hero h1 {
     font-size: clamp(16px, 2.6vw, 55px);
   }

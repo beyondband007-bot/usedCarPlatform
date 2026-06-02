@@ -30,16 +30,20 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     enableLightConsistency: input.lightConsistency,
     enablePaintRefresh: input.paintRefresh,
     colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
-    enableInteriorClean: input.interiorEnhance,
-    enableInteriorCollage: input.interiorEnhance && input.interiorCollage,
+    enableInteriorClean: input.interiorCollage && input.interiorEnhance,
+    enableInteriorCollage: input.interiorCollage,
   }
 }
 
-function mapInteriorCollage(
-  interiorEnhance: boolean,
-  interiorCollage?: boolean | null,
-) {
-  return interiorEnhance && Boolean(interiorCollage)
+function mapInteriorFlags(config: BatchVisualConfig) {
+  const collage = Boolean(
+    config.enableInteriorCollage ?? config.interiorCollage,
+  )
+
+  return {
+    interiorCollage: collage,
+    interiorEnhance: collage && Boolean(config.enableInteriorClean),
+  }
 }
 
 async function ensureLoaded() {
@@ -59,12 +63,7 @@ async function ensureLoaded() {
       lightConsistency: item.visualConfig.enableLightConsistency,
       paintRefresh: item.visualConfig.enablePaintRefresh,
       colorCode: item.visualConfig.colorCode ?? null,
-      interiorEnhance: item.visualConfig.enableInteriorClean,
-      interiorCollage: mapInteriorCollage(
-        item.visualConfig.enableInteriorClean,
-        item.visualConfig.enableInteriorCollage ??
-          item.visualConfig.interiorCollage,
-      ),
+      ...mapInteriorFlags(item.visualConfig),
       updatedAt: item.updatedAt,
     }))
     isReady.value = true
@@ -102,12 +101,7 @@ export function useBatchVisualTemplates() {
       lightConsistency: created.visualConfig.enableLightConsistency,
       paintRefresh: created.visualConfig.enablePaintRefresh,
       colorCode: created.visualConfig.colorCode ?? null,
-      interiorEnhance: created.visualConfig.enableInteriorClean,
-      interiorCollage: mapInteriorCollage(
-        created.visualConfig.enableInteriorClean,
-        created.visualConfig.enableInteriorCollage ??
-          created.visualConfig.interiorCollage,
-      ),
+      ...mapInteriorFlags(created.visualConfig),
       updatedAt: created.updatedAt,
     }
 
@@ -133,12 +127,7 @@ export function useBatchVisualTemplates() {
       lightConsistency: updated.visualConfig.enableLightConsistency,
       paintRefresh: updated.visualConfig.enablePaintRefresh,
       colorCode: updated.visualConfig.colorCode ?? null,
-      interiorEnhance: updated.visualConfig.enableInteriorClean,
-      interiorCollage: mapInteriorCollage(
-        updated.visualConfig.enableInteriorClean,
-        updated.visualConfig.enableInteriorCollage ??
-          updated.visualConfig.interiorCollage,
-      ),
+      ...mapInteriorFlags(updated.visualConfig),
       updatedAt: updated.updatedAt,
     }
 
@@ -158,7 +147,8 @@ export function useBatchVisualTemplates() {
     NEW_PRESET_VALUE,
     templates: presetOptions,
     isLoading,
-    ensureLoaded: reloadTemplates,
+    ensureLoaded,
+    reloadTemplates,
     getTemplateById,
     saveTemplate,
     updateTemplate,

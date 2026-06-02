@@ -1,40 +1,42 @@
 <script setup lang="ts">
-import { NColorPicker } from 'naive-ui'
-import { computed, ref, watch } from 'vue'
+import { NColorPicker } from "naive-ui";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps<{
-  modelValue?: string
-}>()
+  modelValue?: string;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-}>()
+  "update:modelValue": [value: string];
+}>();
 
 function normalizeHex(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  return trimmed.startsWith('#') ? trimmed.toUpperCase() : `#${trimmed.toUpperCase()}`
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("#")
+    ? trimmed.toUpperCase()
+    : `#${trimmed.toUpperCase()}`;
 }
 
 const colorValue = ref<string | null>(
   props.modelValue ? normalizeHex(props.modelValue) : null,
-)
+);
 
-const displayHex = computed(() => colorValue.value ?? '')
+const displayHex = computed(() => colorValue.value ?? "");
 
 watch(
   () => props.modelValue,
   (value) => {
-    const next = value ? normalizeHex(value) : null
+    const next = value ? normalizeHex(value) : null;
     if (next !== colorValue.value) {
-      colorValue.value = next
+      colorValue.value = next;
     }
   },
-)
+);
 
 function handleColorUpdate(value: string | null) {
-  colorValue.value = value ? normalizeHex(value) : null
-  emit('update:modelValue', value ? normalizeHex(value) : '')
+  colorValue.value = value ? normalizeHex(value) : null;
+  emit("update:modelValue", value ? normalizeHex(value) : "");
 }
 </script>
 
@@ -44,7 +46,7 @@ function handleColorUpdate(value: string | null) {
       <div>
         <h3 class="paint-color-title">选择目标色号</h3>
         <p class="paint-color-subtitle">
-          选择车身改色目标，生成时将按所选色号进行烤漆翻新演示
+          选择车身改色目标，生成时将按所选色号进行烤漆翻新
         </p>
       </div>
     </header>
@@ -87,7 +89,7 @@ function handleColorUpdate(value: string | null) {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
 
-:global([data-theme='dark']) .paint-color-card {
+:global([data-theme="dark"]) .paint-color-card {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
 }
 
@@ -164,11 +166,13 @@ function handleColorUpdate(value: string | null) {
   border-radius: 4px;
 }
 
-.paint-color-picker :deep(.n-color-picker-trigger .n-color-picker-trigger__fill) {
+.paint-color-picker
+  :deep(.n-color-picker-trigger .n-color-picker-trigger__fill) {
   border-radius: 3px;
 }
 
-.paint-color-picker :deep(.n-color-picker-trigger .n-color-picker-trigger__value) {
+.paint-color-picker
+  :deep(.n-color-picker-trigger .n-color-picker-trigger__value) {
   font-size: 14px;
   font-weight: 700;
 }

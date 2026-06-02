@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { computed, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 
 import type { WorkspaceImagePreview } from "@/types/workspace";
@@ -22,6 +23,44 @@ const emit = defineEmits<{
 }>();
 
 const message = useMessage();
+const naturalSize = ref<{ width: number; height: number } | null>(null);
+
+const frameStyle = computed(() => {
+  const width = naturalSize.value?.width ?? props.preview.imageWidth;
+  const height = naturalSize.value?.height ?? props.preview.imageHeight;
+
+  if (!width || !height) {
+    return {
+      height: "100%",
+      maxWidth: "100%",
+    };
+  }
+
+  return {
+    aspectRatio: `${width} / ${height}`,
+    height: "100%",
+    width: "auto",
+    maxWidth: "100%",
+  };
+});
+
+watch(
+  () => props.preview.imageUrl,
+  () => {
+    naturalSize.value = null;
+  },
+);
+
+function handlePreviewLoad(event: Event) {
+  const image = event.target as HTMLImageElement;
+
+  if (!image.naturalWidth || !image.naturalHeight) return;
+
+  naturalSize.value = {
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+  };
+}
 
 async function handleDownload() {
   try {
@@ -54,13 +93,16 @@ async function handleDownload() {
     </header>
 
     <div class="image-preview-body" aria-label="图片预览区域">
-      <img
-        class="image-preview-image"
-        :src="preview.imageUrl"
-        :alt="preview.imageAlt"
-        loading="eager"
-        decoding="async"
-      />
+      <div class="image-preview-frame" :style="frameStyle">
+        <img
+          class="image-preview-image"
+          :src="preview.imageUrl"
+          :alt="preview.imageAlt"
+          loading="eager"
+          decoding="async"
+          @load="handlePreviewLoad"
+        />
+      </div>
     </div>
 
     <footer class="image-preview-foot">
@@ -136,23 +178,33 @@ async function handleDownload() {
 }
 
 .image-preview-body {
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1;
-  place-items: center;
+  align-items: stretch;
+  justify-content: center;
   overflow: hidden;
   overscroll-behavior: contain;
+  padding: 16px;
   border: 1px solid var(--assist-border, #e1eaf5);
   border-radius: 16px;
   background: transparent;
+}
+
+.image-preview-frame {
+  display: flex;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .image-preview-image {
   display: block;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
   object-fit: contain;
   background: transparent;
 }

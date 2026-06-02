@@ -38,7 +38,7 @@ const panelTitle = computed(() =>
 const panelDescription = computed(() =>
   isBatch.value
     ? "开启后可沿用最近上传 Logo，也可重新上传。"
-    : "开启后默认沿用最近上传的Logo，也可重新上传；如未上传，则自动使用当前账号的默认Logo。",
+    : "开启后默认沿用最近上传的Logo，也可重新上传",
 );
 const recentTitle = computed(() => {
   if (!recentLogo.value) {
