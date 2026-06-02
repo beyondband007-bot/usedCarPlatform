@@ -90,7 +90,6 @@ const rangeText = computed(() => {
 });
 
 const showCustomDate = computed(() => props.filters.dateRange === "custom");
-const showRechargeButton = computed(() => props.config.canRecharge);
 
 function patchFilters(patch: Partial<PointsQueryFilters>) {
   emit("update:filters", {
@@ -238,7 +237,6 @@ function setPage(page: number) {
         </div>
 
         <button
-          v-if="showRechargeButton"
           type="button"
           class="points-recharge-button"
           @click="emit('recharge')"

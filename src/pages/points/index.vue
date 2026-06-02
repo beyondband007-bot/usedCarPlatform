@@ -5,6 +5,7 @@ import { useRoute } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import PointsFlowTable from "@/components/business/points/PointsFlowTable.vue";
 import PointsQueryHeader from "@/components/business/points/PointsQueryHeader.vue";
+import PointsRechargeModal from "@/components/business/points/PointsRechargeModal.vue";
 import PointsSummaryCards from "@/components/business/points/PointsSummaryCards.vue";
 import type {
   PointsFlowRecord,
@@ -525,6 +526,7 @@ function resolveVersion(raw: unknown): PointsQueryVersion {
 const version = ref<PointsQueryVersion>(resolveVersion(route.query.view));
 const filters = ref<PointsQueryFilters>(defaultFilters());
 const currentPage = ref(1);
+const rechargeModalVisible = ref(false);
 
 const viewConfigMap: Record<PointsQueryVersion, PointsQueryViewConfig> = {
   personal: {
@@ -544,7 +546,6 @@ const viewConfigMap: Record<PointsQueryVersion, PointsQueryViewConfig> = {
     showCurrentMember: false,
     showMemberColumns: false,
     adminTheme: false,
-    canRecharge: true,
   },
   member: {
     version: "member",
@@ -570,7 +571,6 @@ const viewConfigMap: Record<PointsQueryVersion, PointsQueryViewConfig> = {
     currentMemberName: "李芳",
     showMemberColumns: false,
     adminTheme: false,
-    canRecharge: true,
   },
   admin: {
     version: "admin",
@@ -595,7 +595,6 @@ const viewConfigMap: Record<PointsQueryVersion, PointsQueryViewConfig> = {
     showCurrentMember: false,
     showMemberColumns: true,
     adminTheme: true,
-    canRecharge: true,
   },
 };
 
@@ -844,11 +843,7 @@ function handleRecharge() {
     return;
   }
 
-  window.alert(
-    version.value === "admin"
-      ? "充值功能：为选中成员进行积分充值"
-      : "充值功能：积分充值",
-  );
+  rechargeModalVisible.value = true;
 }
 
 watch(
@@ -896,6 +891,8 @@ watch(filteredRecords, () => {
         @recharge="handleRecharge"
       />
     </div>
+
+    <PointsRechargeModal v-model:show="rechargeModalVisible" />
   </main>
 </template>
 

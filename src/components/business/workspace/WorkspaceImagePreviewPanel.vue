@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { computed, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 
 import type { WorkspaceImagePreview } from "@/types/workspace";
@@ -23,36 +22,6 @@ const emit = defineEmits<{
 }>();
 
 const message = useMessage();
-const naturalSize = ref<{ width: number; height: number } | null>(null);
-
-const mediaStyle = computed(() => {
-  const width = naturalSize.value?.width ?? props.preview.imageWidth;
-  const height = naturalSize.value?.height ?? props.preview.imageHeight;
-
-  if (!width || !height) return undefined;
-
-  return {
-    aspectRatio: `${width} / ${height}`,
-  };
-});
-
-watch(
-  () => props.preview.imageUrl,
-  () => {
-    naturalSize.value = null;
-  },
-);
-
-function handlePreviewLoad(event: Event) {
-  const image = event.target as HTMLImageElement;
-
-  if (!image.naturalWidth || !image.naturalHeight) return;
-
-  naturalSize.value = {
-    width: image.naturalWidth,
-    height: image.naturalHeight,
-  };
-}
 
 async function handleDownload() {
   try {
@@ -87,12 +56,10 @@ async function handleDownload() {
     <div class="image-preview-body" aria-label="图片预览区域">
       <img
         class="image-preview-image"
-        :style="mediaStyle"
         :src="preview.imageUrl"
         :alt="preview.imageAlt"
         loading="eager"
         decoding="async"
-        @load="handlePreviewLoad"
       />
     </div>
 
@@ -162,12 +129,11 @@ async function handleDownload() {
 }
 
 .image-preview-body {
-  display: flex;
+  display: grid;
   min-height: 0;
   flex: 1;
-  align-items: flex-start;
-  justify-content: center;
-  overflow: auto;
+  place-items: center;
+  overflow: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--assist-border, #e1eaf5);
   border-radius: 16px;
@@ -177,7 +143,7 @@ async function handleDownload() {
 .image-preview-image {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;

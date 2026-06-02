@@ -786,10 +786,21 @@ watch(activeCode, (code, previousCode) => {
 });
 
 function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview | null) {
+  if (!task) {
+    deliveryTaskPreview.value = null;
+    previewedDeliveryTaskId.value = null;
+    return;
+  }
+
+  const isSameTask = deliveryTaskPreview.value?.id === task.id;
   deliveryTaskPreview.value = task;
-  deliveryImagePreview.value = null;
-  generationResult.value = null;
-  previewedDeliveryTaskId.value = task?.id ?? null;
+  previewedDeliveryTaskId.value = task.id;
+
+  // 轮询刷新同一任务时不要清空大图/单张预览，否则预览会被动关闭
+  if (!isSameTask) {
+    deliveryImagePreview.value = null;
+    generationResult.value = null;
+  }
 }
 
 function handleDeliveryListLoadingChange(loading: boolean) {
@@ -1856,14 +1867,20 @@ onUnmounted(() => {
   grid-template-columns: minmax(0, 1fr);
   background: var(--workspace-panel-deep);
 
-  @media (width >= 1024px) {
+  @media (width >= 1024px) and (width < 1180px) {
+    gap: 12px;
+    grid-template-columns: 220px 420px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  @media (width >= 1180px) {
     gap: 14px;
-    grid-template-columns: 240px minmax(360px, 500px) minmax(0, 1fr);
+    grid-template-columns: 240px 440px minmax(420px, 1fr);
     padding: 16px;
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px minmax(380px, 520px) minmax(0, 1fr);
+    grid-template-columns: 260px 500px minmax(520px, 1fr);
     padding: 18px;
   }
 }
@@ -1922,7 +1939,7 @@ onUnmounted(() => {
   }
 }
 
-@media (width < 1024px) {
+@media (width < 960px) {
   .workspace-page {
     height: auto;
     max-height: none;
@@ -1953,17 +1970,25 @@ onUnmounted(() => {
 }
 
 .workspace-page--feature-compare .workspace-shell {
-  @media (width >= 1024px) {
-    grid-template-columns: 240px minmax(340px, 430px) minmax(0, 1fr);
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 220px 400px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
+    grid-template-columns: 240px 420px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px minmax(360px, 440px) minmax(0, 1fr);
+    grid-template-columns: 260px 440px minmax(520px, 1fr);
   }
 }
 
 .workspace-page--creative-image .workspace-shell {
-  @media (width >= 1024px) {
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
     grid-template-columns: 240px minmax(0, 1fr);
   }
 
