@@ -4,15 +4,6 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
-import {
-  freezeGenerationBilling,
-  markGenerationBillingRefundFailed,
-  refundFrozenGenerationBilling,
-  toBillingResponseFields,
-  type FrozenGenerationBilling,
-} from "../billing/billingLifecycle";
-import type { BillingRequestContext } from "../billing/billingIdentity";
-import { shortVideoGenerationPoints } from "../billing/generationPointRules";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
 
@@ -33,8 +24,18 @@ const normalizeVideoResolution = (value: unknown): VideoResolution => {
   return allowedVideoResolutions.includes(value as VideoResolution) ? (value as VideoResolution) : "720p";
 };
 
+const buildTaskErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "short-video task creation failed";
+  const details = error && typeof error === "object" && "details" in error ? (error as { details?: unknown }).details : undefined;
+
+  if (details === undefined) return message;
+
+  const detailsText = JSON.stringify(details);
+  return `${message}\nKIE response: ${detailsText.slice(0, 4000)}`;
+};
+
 class ShortVideoService {
-  async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
+  async createTask(body: CreateModuleTaskRequest) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
     }
@@ -56,37 +57,21 @@ class ShortVideoService {
     const duration = 10;
     const taskId = createId("task");
 
-    await tasksRepository.createWaitingTask({
-      id: taskId,
-      moduleCode: "short-video",
-      inputAssetId: asset.id,
-      optionId: KIE_KLING_VIDEO_OPTION_ID,
-      outputRatio: aspectRatio,
-      resolution: "2K",
-      logoAssetId: null,
-      prompt: shortVideoPrompt,
-    });
-
-    let billing: FrozenGenerationBilling | null = null;
+    const lease = await kieKeyPool.acquire();
+    let taskCreated = false;
     try {
-      billing = await freezeGenerationBilling({
-        taskId,
-        functionCode: "short-video",
-        estimatedPoints: shortVideoGenerationPoints(),
-        body,
-        context,
+      await tasksRepository.createWaitingTask({
+        id: taskId,
+        moduleCode: "short-video",
+        inputAssetId: asset.id,
+        optionId: KIE_KLING_VIDEO_OPTION_ID,
+        outputRatio: aspectRatio,
+        resolution: "2K",
+        logoAssetId: null,
+        prompt: shortVideoPrompt,
       });
-    } catch (error) {
-      await tasksRepository.markFailed(
-        taskId,
-        "BILLING_FREEZE_FAILED",
-        error instanceof Error ? error.message : "billing freeze failed",
-      );
-      throw error;
-    }
+      taskCreated = true;
 
-    try {
-      const lease = await kieKeyPool.acquire();
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(
         lease,
         asset.localPath,
@@ -128,21 +113,21 @@ class ShortVideoService {
         aspectRatio,
         videoResolution,
         inputImageCount: 1,
-        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
       try {
-        await refundFrozenGenerationBilling(taskId, billing);
-      } catch {
-        await markGenerationBillingRefundFailed(taskId, billing);
+        if (taskCreated) {
+          await tasksRepository.markFailed(
+            taskId,
+            "SHORT_VIDEO_CREATE_FAILED",
+            buildTaskErrorMessage(error),
+          );
+        }
+      } finally {
+        await kieKeyPool.release(lease.accountHash);
       }
-      await tasksRepository.markFailed(
-        taskId,
-        "SHORT_VIDEO_CREATE_FAILED",
-        error instanceof Error ? error.message : "short-video task creation failed",
-      );
       throw error;
     }
   }

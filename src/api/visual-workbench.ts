@@ -1,4 +1,4 @@
-import { request } from '@/api/http'
+import { normalizeApiErrorMessage, request } from '@/api/http'
 
 export interface ApiResponse<T> {
   code: number
@@ -359,7 +359,7 @@ export interface RecentGenerationTask {
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
-    throw new Error(response.message || 'request failed')
+    throw new Error(normalizeApiErrorMessage(response.message || 'request failed'))
   }
 
   return response.data

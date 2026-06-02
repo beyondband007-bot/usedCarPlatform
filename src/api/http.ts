@@ -2,7 +2,30 @@ import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from '
 
 import { toCreditsHeaders } from '@/utils/credits-identity'
 
-// 创建 axios 实例
+export function normalizeApiErrorMessage(message: string) {
+  if (!message) return ''
+
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('no available kie api key')) {
+    return '短视频服务暂时繁忙，请稍后再试'
+  }
+
+  if (normalized.includes('kie video response missing taskid')) {
+    return '短视频任务创建失败，请稍后重试'
+  }
+
+  if (normalized.includes('kie create video task failed')) {
+    return '短视频服务创建任务失败，请稍后重试'
+  }
+
+  if (normalized.includes('short-video task creation failed')) {
+    return '短视频任务创建失败，请稍后重试'
+  }
+
+  return message
+}
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3101/api/v1',
   timeout: 20_000,
@@ -11,16 +34,13 @@ export const http = axios.create({
   },
 })
 
-// 请求拦截器
 http.interceptors.request.use(
   (config) => {
-    // 可以在这里添加 token
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    // 自动注入 credits 身份头（mock，对接 Reusable Credits Platform 代理）
     const creditsHeaders = toCreditsHeaders()
     for (const [key, value] of Object.entries(creditsHeaders)) {
       config.headers[key] = value
@@ -28,28 +48,24 @@ http.interceptors.request.use(
 
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error),
 )
 
-// 响应拦截器
 http.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // 直接返回响应数据
-    return response.data
-  },
+  (response: AxiosResponse) => response.data,
   (error: AxiosError) => {
-    // 统一错误处理
     const { response } = error
-    
+    let backendMessage = ''
+
     if (response) {
       const status = response.status
-      const data = response.data as any
-      
+      const data = response.data as { message?: unknown } | undefined
+      backendMessage = normalizeApiErrorMessage(
+        typeof data?.message === 'string' ? data.message : '',
+      )
+
       switch (status) {
         case 401:
-          // 未授权，清除 token 并跳转登录
           localStorage.removeItem('token')
           window.location.href = '/login'
           break
@@ -63,34 +79,34 @@ http.interceptors.response.use(
           console.error('服务器内部错误')
           break
         default:
-          console.error(data?.message || '请求失败')
+          console.error(backendMessage || '请求失败')
       }
     } else {
-      console.error('网络错误，请检查网络连接')
+      backendMessage = '网络错误，请检查网络连接'
+      console.error(backendMessage)
     }
-    
-    return Promise.reject(error)
-  }
+
+    return Promise.reject(backendMessage ? new Error(backendMessage) : error)
+  },
 )
 
-// 封装常用请求方法
 export const request = {
   get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
     return http.get(url, config)
   },
-  
+
   post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
     return http.post(url, data, config)
   },
-  
+
   put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
     return http.put(url, data, config)
   },
-  
+
   delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
     return http.delete(url, config)
   },
-  
+
   patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
     return http.patch(url, data, config)
   },
