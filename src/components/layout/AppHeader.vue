@@ -483,13 +483,19 @@ const navItems = computed(() => {
 }
 
 .credit-pill {
-  padding: clamp(8px, 0.65vw, 10px) clamp(14px, 1.2vw, 20px);
-  color: var(--studio-chrome-credit-text, #ffffff);
-  background: var(--studio-chrome-credit-bg, #d4a017);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 5px 12px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 900;
+  background: var(--studio-chrome-credit-bg, #d4a017);
+  color: var(--studio-chrome-credit-text, #ffffff);
+  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  font-weight: 700;
+  line-height: 1.2;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.2s ease;
@@ -582,8 +588,9 @@ const navItems = computed(() => {
   }
 
   .credit-pill {
-    padding: 8px 12px;
-    font-size: clamp(11px, 3.2vw, 13px);
+    min-height: 40px;
+    padding: 5px 10px;
+    font-size: clamp(12px, 3.2vw, 14px);
   }
 
   .site-header-actions {
