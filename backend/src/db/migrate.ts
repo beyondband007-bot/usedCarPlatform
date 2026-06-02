@@ -39,6 +39,11 @@ const addIndexIfMissing = async (tableName: string, indexName: string, definitio
   await pool.query(`ALTER TABLE ${tableName} ADD INDEX ${indexName} ${definition}`);
 };
 
+const addUniqueIndexIfMissing = async (tableName: string, indexName: string, definition: string) => {
+  if (await indexExists(tableName, indexName)) return;
+  await pool.query(`ALTER TABLE ${tableName} ADD UNIQUE KEY ${indexName} ${definition}`);
+};
+
 const tableExists = async (tableName: string) => {
   const [rows] = await pool.query<any[]>(
     `SELECT 1
@@ -113,21 +118,62 @@ const seedAuthData = async () => {
   );
 
   const users = [
-    { id: "user_admin", username: "admin", displayName: "管理员", role: "admin", plan: "flagship", creditsUserId: 1 },
-    { id: "user_enterprise", username: "enterprise", displayName: "企业用户", role: "enterprise", plan: "team", creditsUserId: 2 },
-    { id: "user_basic", username: "basic", displayName: "基础版企业用户", role: "enterprise", plan: "basic", creditsUserId: 3 },
-    { id: "user_team", username: "team", displayName: "团队版企业用户", role: "enterprise", plan: "team", creditsUserId: 4 },
-    { id: "user_flagship", username: "flagship", displayName: "旗舰版企业用户", role: "enterprise", plan: "flagship", creditsUserId: 5 },
+    {
+      id: "user_admin",
+      username: "admin",
+      phone: "13800000001",
+      displayName: "管理员",
+      role: "admin",
+      plan: "flagship",
+      creditsUserId: 1,
+    },
+    {
+      id: "user_enterprise",
+      username: "enterprise",
+      phone: "13800000002",
+      displayName: "企业用户",
+      role: "enterprise",
+      plan: "team",
+      creditsUserId: 2,
+    },
+    {
+      id: "user_basic",
+      username: "basic",
+      phone: "13800000003",
+      displayName: "基础版企业用户",
+      role: "enterprise",
+      plan: "basic",
+      creditsUserId: 3,
+    },
+    {
+      id: "user_team",
+      username: "team",
+      phone: "13800000004",
+      displayName: "团队版企业用户",
+      role: "enterprise",
+      plan: "team",
+      creditsUserId: 4,
+    },
+    {
+      id: "user_flagship",
+      username: "flagship",
+      phone: "13800000005",
+      displayName: "旗舰版企业用户",
+      role: "enterprise",
+      plan: "flagship",
+      creditsUserId: 5,
+    },
   ];
 
   for (const user of users) {
     await pool.query(
       `INSERT INTO app_users
-        (id, username, password_hash, display_name, status, credits_user_id, account_scope)
+        (id, username, phone, password_hash, display_name, status, credits_user_id, account_scope)
        VALUES
-        (:id, :username, :passwordHash, :displayName, 'active', :creditsUserId, 'personal')
+        (:id, :username, :phone, :passwordHash, :displayName, 'active', :creditsUserId, 'personal')
        ON DUPLICATE KEY UPDATE
         username = VALUES(username),
+        phone = VALUES(phone),
         display_name = VALUES(display_name),
         status = VALUES(status),
         credits_user_id = VALUES(credits_user_id),
@@ -173,18 +219,21 @@ const seedFlagshipEnterpriseTenant = async () => {
     {
       id: "user_flagship_sub_sales",
       username: "flagship_sub_sales",
+      phone: "13800000006",
       displayName: "旗舰子账号-销售",
       creditsUserId: 5,
     },
     {
       id: "user_flagship_sub_ops",
       username: "flagship_sub_ops",
+      phone: "13800000007",
       displayName: "旗舰子账号-运营",
       creditsUserId: 5,
     },
     {
       id: "user_flagship_sub_design",
       username: "flagship_sub_design",
+      phone: "13800000008",
       displayName: "旗舰子账号-设计",
       creditsUserId: 5,
     },
@@ -193,11 +242,12 @@ const seedFlagshipEnterpriseTenant = async () => {
   for (const user of childUsers) {
     await pool.query(
       `INSERT INTO app_users
-        (id, username, password_hash, display_name, status, credits_user_id, account_scope)
+        (id, username, phone, password_hash, display_name, status, credits_user_id, account_scope)
        VALUES
-        (:id, :username, :passwordHash, :displayName, 'active', :creditsUserId, 'personal')
+        (:id, :username, :phone, :passwordHash, :displayName, 'active', :creditsUserId, 'personal')
        ON DUPLICATE KEY UPDATE
         username = VALUES(username),
+        phone = VALUES(phone),
         display_name = VALUES(display_name),
         status = VALUES(status),
         credits_user_id = VALUES(credits_user_id),
@@ -252,6 +302,8 @@ const run = async () => {
     for (const migration of migrations) {
       await connection.query(migration);
     }
+    await addColumnIfMissing("app_users", "phone", "VARCHAR(32) NULL AFTER username");
+    await addUniqueIndexIfMissing("app_users", "uk_app_users_phone", "(phone)");
     await addColumnIfMissing("delivery_assets", "local_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_assets", "deleted_at", "DATETIME(3) NULL");
     await addColumnIfMissing("delivery_packages", "task_id", "VARCHAR(64) NULL");

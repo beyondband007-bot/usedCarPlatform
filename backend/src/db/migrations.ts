@@ -109,6 +109,7 @@ export const migrations = [
   `CREATE TABLE IF NOT EXISTS app_users (
     id VARCHAR(64) PRIMARY KEY,
     username VARCHAR(64) NOT NULL,
+    phone VARCHAR(32) NULL,
     password_hash VARCHAR(255) NOT NULL,
     display_name VARCHAR(120) NOT NULL,
     status VARCHAR(24) NOT NULL DEFAULT 'active',
@@ -118,6 +119,7 @@ export const migrations = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     UNIQUE KEY uk_app_users_username (username),
+    UNIQUE KEY uk_app_users_phone (phone),
     INDEX idx_app_users_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 

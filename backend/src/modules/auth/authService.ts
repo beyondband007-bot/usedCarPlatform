@@ -25,6 +25,7 @@ const userSelectSql = `
   SELECT
     u.id,
     u.username,
+    u.phone,
     u.password_hash,
     u.display_name,
     u.status,
@@ -41,6 +42,7 @@ const userSelectSql = `
 const mapUser = (row: AuthUserRow): AuthenticatedUser => ({
   id: row.id,
   username: row.username,
+  phone: row.phone,
   displayName: row.display_name,
   role: row.role_code ?? "enterprise",
   permissions: row.permissions_csv ? row.permissions_csv.split(",").filter(Boolean) : [],
@@ -88,6 +90,37 @@ const findUserByUsername = async (username: string) => {
      GROUP BY u.id
      LIMIT 1`,
     { username },
+  );
+  return rows[0] ?? null;
+};
+
+const findUserByLoginAccount = async (account: string) => {
+  const normalizedPhone = normalizePhone(account);
+  const localPhone = normalizedPhone ? toLocalChinaPhone(normalizedPhone).toLowerCase() : "";
+  const candidates = Array.from(new Set([account, localPhone, normalizedPhone.toLowerCase()].filter(Boolean)));
+
+  const [rows] = await pool.query<AuthUserRow[]>(
+    `${userSelectSql}
+     WHERE u.username IN (:candidates)
+        OR u.phone IN (:candidates)
+     GROUP BY u.id
+     LIMIT 1`,
+    { candidates },
+  );
+  return rows[0] ?? null;
+};
+
+const findUserByVerifiedPhone = async (phone: string) => {
+  const localPhone = toLocalChinaPhone(phone).toLowerCase();
+  const candidates = Array.from(new Set([phone.toLowerCase(), localPhone].filter(Boolean)));
+
+  const [rows] = await pool.query<AuthUserRow[]>(
+    `${userSelectSql}
+     WHERE u.phone IN (:candidates)
+        OR u.username IN (:candidates)
+     GROUP BY u.id
+     LIMIT 1`,
+    { candidates },
   );
   return rows[0] ?? null;
 };
@@ -189,6 +222,7 @@ export const getCurrentUserByToken = async (token: string) => {
        s.expires_at,
        u.id,
        u.username,
+       u.phone,
        u.password_hash,
        u.display_name,
        u.status,
@@ -318,12 +352,10 @@ export const authService = {
     const password = typeof input.password === "string" ? input.password : "";
 
     if (!username || !password) {
-      throw errors.invalidParameter("请输入手机号和密码。");
+      throw errors.invalidParameter("请输入账号和密码。");
     }
 
-    const normalizedPhone = normalizePhone(username);
-    const localPhone = normalizedPhone ? toLocalChinaPhone(normalizedPhone).toLowerCase() : username;
-    const row = (await findUserByUsername(username)) ?? (localPhone !== username ? await findUserByUsername(localPhone) : null);
+    const row = await findUserByLoginAccount(username);
     if (!row || row.status !== "active" || !verifyPassword(password, row.password_hash)) {
       throw errors.unauthorized("账号或密码错误。");
     }
@@ -333,10 +365,7 @@ export const authService = {
 
   async loginWithCode(input: { phone?: unknown; code?: unknown; remember?: unknown }) {
     const verifiedPhone = verificationService.verifySmsCode("login", input.phone, input.code);
-    const username = toLocalChinaPhone(verifiedPhone).toLowerCase();
-    const row =
-      (await findUserByUsername(username)) ??
-      (verifiedPhone.toLowerCase() !== username ? await findUserByUsername(verifiedPhone.toLowerCase()) : null);
+    const row = await findUserByVerifiedPhone(verifiedPhone);
 
     if (!row || row.status !== "active") {
       throw errors.unauthorized("该手机号未注册或账号不可用。");
@@ -347,7 +376,6 @@ export const authService = {
 
   async resetPassword(input: { phone?: unknown; code?: unknown; password?: unknown; confirmPassword?: unknown }) {
     const verifiedPhone = verificationService.verifySmsCode("reset", input.phone, input.code);
-    const username = toLocalChinaPhone(verifiedPhone).toLowerCase();
     const password = typeof input.password === "string" ? input.password : "";
     const confirmPassword = typeof input.confirmPassword === "string" ? input.confirmPassword : "";
 
@@ -359,9 +387,7 @@ export const authService = {
       throw errors.invalidParameter("两次输入的密码不一致。");
     }
 
-    const row =
-      (await findUserByUsername(username)) ??
-      (verifiedPhone.toLowerCase() !== username ? await findUserByUsername(verifiedPhone.toLowerCase()) : null);
+    const row = await findUserByVerifiedPhone(verifiedPhone);
     if (!row) {
       throw errors.invalidParameter("该手机号未注册。");
     }

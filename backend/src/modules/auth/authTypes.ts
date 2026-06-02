@@ -6,6 +6,7 @@ export type SubscriptionPlanCode = "basic" | "team" | "flagship";
 export type AuthenticatedUser = {
   id: string;
   username: string;
+  phone: string | null;
   displayName: string;
   role: UserRole;
   permissions: string[];
@@ -27,6 +28,7 @@ export type SubscriptionSnapshot = {
 export type AuthUserRow = RowDataPacket & {
   id: string;
   username: string;
+  phone: string | null;
   password_hash: string;
   display_name: string;
   status: string;

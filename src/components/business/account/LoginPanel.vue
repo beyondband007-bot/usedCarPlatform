@@ -47,10 +47,19 @@ const loginCodeButtonText = computed(() => {
   return "获取验证码";
 });
 
+const accountLabel = computed(() => (loginMode.value === "password" ? "账号/手机号" : "手机号"));
+const accountPlaceholder = computed(() =>
+  loginMode.value === "password" ? "请输入手机号或用户名" : "请输入手机号",
+);
+
 const resetCodeButtonText = computed(() => {
   if (resetCountdown.value > 0) return `${resetCountdown.value}s 后重发`;
   return "获取验证码";
 });
+
+function normalizeAccountInput(value: string) {
+  return value.trim().replace(/\s/g, "");
+}
 
 function normalizePhoneInput(value: string) {
   return value.trim().replace(/[\s-]/g, "");
@@ -120,8 +129,14 @@ async function handleSendResetCode() {
 }
 
 async function handleLogin() {
+  const account = normalizeAccountInput(username.value);
   const phone = normalizePhoneInput(username.value);
-  if (!phone) {
+  if (loginMode.value === "password" && !account) {
+    message.warning("请输入手机号或用户名");
+    return;
+  }
+
+  if (loginMode.value === "code" && !phone) {
     message.warning("请输入手机号");
     return;
   }
@@ -147,7 +162,7 @@ async function handleLogin() {
       });
     } else {
       await authStore.login({
-        username: phone,
+        username: account,
         password: password.value,
         remember: true,
       });
@@ -255,14 +270,13 @@ onBeforeUnmount(() => {
         </div>
 
         <label class="login-field">
-          <span class="login-field-label">手机号</span>
+          <span class="login-field-label">{{ accountLabel }}</span>
           <div class="login-phone-input">
-            <span class="login-phone-prefix" aria-hidden="true">+86</span>
             <NInput
               v-model:value="username"
               class="login-input login-input--phone"
               size="large"
-              placeholder="请输入手机号"
+              :placeholder="accountPlaceholder"
             />
           </div>
         </label>
@@ -328,7 +342,6 @@ onBeforeUnmount(() => {
         <label class="login-field">
           <span class="login-field-label">手机号</span>
           <div class="login-phone-input">
-            <span class="login-phone-prefix" aria-hidden="true">+86</span>
             <NInput
               v-model:value="resetForm.phone"
               class="login-input login-input--phone"
@@ -546,17 +559,6 @@ onBeforeUnmount(() => {
 .login-phone-input:focus-within {
   border-color: var(--field-border-focus);
   box-shadow: 0 0 0 3px var(--field-focus-ring);
-}
-
-.login-phone-prefix {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  padding: 0 14px;
-  border-right: 1px solid var(--field-border);
-  color: var(--panel-muted);
-  font-size: 15px;
-  font-weight: 700;
 }
 
 .login-input {

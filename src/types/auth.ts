@@ -5,6 +5,7 @@ export type UserRole = 'admin' | 'enterprise'
 export interface UserInfo {
   id: string
   username: string
+  phone?: string | null
   displayName: string
   role: UserRole
   permissions: string[]

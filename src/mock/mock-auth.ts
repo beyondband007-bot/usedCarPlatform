@@ -40,6 +40,7 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_admin',
       username: 'admin',
+      phone: '13800000001',
       displayName: '管理员',
       role: 'admin',
       permissions: [...permissions.admin],
@@ -51,6 +52,7 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_enterprise',
       username: 'enterprise',
+      phone: '13800000002',
       displayName: '企业用户',
       role: 'enterprise',
       permissions: [...permissions.enterprise],
@@ -62,6 +64,7 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_basic',
       username: 'basic',
+      phone: '13800000003',
       displayName: '基础版企业用户',
       role: 'enterprise',
       permissions: [...permissions.enterprise],
@@ -73,6 +76,7 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_team',
       username: 'team',
+      phone: '13800000004',
       displayName: '团队版企业用户',
       role: 'enterprise',
       permissions: [...permissions.enterprise],
@@ -84,6 +88,7 @@ const mockUsers: Record<
     userInfo: {
       id: 'user_flagship',
       username: 'flagship',
+      phone: '13800000005',
       displayName: '旗舰版企业用户',
       role: 'enterprise',
       permissions: [...permissions.enterprise],
@@ -106,7 +111,10 @@ function buildSubscription(username: string) {
 }
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  const matched = mockUsers[payload.username]
+  const account = payload.username.trim().toLowerCase()
+  const matched =
+    mockUsers[account] ??
+    Object.values(mockUsers).find((item) => item.userInfo.phone === account)
   if (!matched || matched.password !== payload.password) {
     throw new Error('账号或密码错误')
   }
