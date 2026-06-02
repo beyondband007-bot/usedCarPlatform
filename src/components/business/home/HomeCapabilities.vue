@@ -60,7 +60,19 @@ onMounted(() => {
         :key="item.title"
         class="feature-card"
       >
+        <video
+          v-if="item.video"
+          class="feature-card-image feature-card-video"
+          :src="item.video"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="metadata"
+          :aria-label="item.title"
+        />
         <PreloadImage
+          v-else-if="item.image"
           class="feature-card-image"
           :src="item.image"
           :alt="item.title"
@@ -173,6 +185,11 @@ onMounted(() => {
 
 .feature-card-image :deep(.preload-image__img) {
   image-rendering: auto;
+}
+
+.feature-card-video {
+  object-fit: cover;
+  background: #0b0b0b;
 }
 
 .feature-card h3 {

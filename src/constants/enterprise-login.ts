@@ -1,4 +1,5 @@
-import enterpriseLoginBg from '@/assets/img/enterprise-login-bg.png'
+import enterpriseLoginBgDark from '@/assets/img/enterprise-login-bg.png'
+import enterpriseLoginBgLight from '@/assets/img/enterprise-login-bg-light.png'
 
 export interface EnterpriseLoginFeature {
   icon: string
@@ -24,4 +25,5 @@ export const enterpriseLoginFeatures: EnterpriseLoginFeature[] = [
   },
 ]
 
-export const enterpriseLoginHeroImage = enterpriseLoginBg
+export const enterpriseLoginHeroImageDark = enterpriseLoginBgDark
+export const enterpriseLoginHeroImageLight = enterpriseLoginBgLight

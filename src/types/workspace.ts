@@ -216,6 +216,7 @@ export interface BatchVisualTemplate {
   useRecentLogo: boolean
   lightConsistency: boolean
   paintRefresh: boolean
+  colorCode?: string | null
   interiorEnhance: boolean
   interiorCollage: boolean
   updatedAt: string

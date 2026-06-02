@@ -6,7 +6,7 @@ import featureRoadImage from '@/img/home/feature-road.png'
 import featureSceneImage from '@/img/home/feature-scene.png'
 import featureShowroomImage from '@/img/home/feature-showroom.png'
 import featureSkyImage from '@/img/home/feature-sky.png'
-import featureVideoImage from '@/img/home/feature-video.png'
+import featureMarketingVideo from '@/assets/video/营销短视频.mp4'
 import homeHeroImageDark from '@/assets/img/首页背景图/ae5148a4c2e2ae857a6f889b55bf0b8.png'
 import homeHeroImageLight from '@/assets/img/首页背景图/hero日间.png'
 import suiteEnterpriseImageDark from '@/img/home/suite-enterprise.png'
@@ -28,7 +28,8 @@ export interface HomeQuickEntry {
 export interface HomeCapabilityCard {
   title: string
   description: string
-  image: string
+  image?: string
+  video?: string
 }
 
 export interface HomeCaseTab {
@@ -87,7 +88,7 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
     title: '营销短视频一键出',
     description: '输入素材即出短片，提高营销宣传节奏',
-    image: featureVideoImage,
+    video: featureMarketingVideo,
   },
   {
     title: '展厅质感棚拍',

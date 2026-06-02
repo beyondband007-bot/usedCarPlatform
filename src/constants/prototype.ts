@@ -69,9 +69,11 @@ export const homeFeatures: FeatureEntry[] = [
   },
 ]
 
+export const pricingPlanActionLabel = '立即开通 / 咨询我们'
+
 export const pricingPlans: PricingPlan[] = [
   {
-    name: '企业基础档',
+    name: '企业基础档（入门优选）',
     price: '¥980',
     description: '适合新团队启动视觉生产流程，先验证素材标准与交付节奏。',
     icon: 'mdi:rocket-launch-outline',
@@ -79,27 +81,28 @@ export const pricingPlans: PricingPlan[] = [
     benefits: [
       '赠送 20,000 积分',
       '1 个企业账号',
-      '每账号同时上传 1 套外观图组',
-      '单张生成正常使用',
+      '每个账号同时上传 1 套外观图组',
+      '每个账号同时上传 1 套内饰图组',
+      '单张图片生成正常使用',
       '适合小团队试运行',
     ],
-    action: '订阅基础档',
+    action: pricingPlanActionLabel,
   },
   {
-    name: '企业团队档',
+    name: '企业团队档（首选推荐）',
     price: '¥3,980',
     description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
     icon: 'mdi:account-group-outline',
     tone: 'orange',
-    badge: '最划算',
     benefits: [
       '赠送 55,000 积分',
       '5 个企业账号',
-      '每账号同时上传 5 套外观图组',
-      '单张生成正常使用',
+      '每个账号同时上传 5 套外观图组',
+      '每个账号同时上传 5 套内饰图组',
+      '单张图片生成正常使用',
       '适合车商团队批量上新',
     ],
-    action: '订阅团队档',
+    action: pricingPlanActionLabel,
     featured: true,
   },
   {
@@ -111,11 +114,12 @@ export const pricingPlans: PricingPlan[] = [
     benefits: [
       '赠送 980,000 积分',
       '20 个企业账号',
-      '每账号同时上传 20 套外观图组',
+      '每个账号同时上传 20 套外观图组',
+      '每个账号同时上传 20 套内饰图组',
       '可定制 20 个专属场景',
       '适合集团化和出海团队',
     ],
-    action: '咨询旗舰档',
+    action: pricingPlanActionLabel,
   },
 ]
 
@@ -168,7 +172,7 @@ export const pricingPageCopy = {
   subtitle: '面向汽车电商与出海车商，按账号、积分、外观图组并发和专属场景配置团队产能',
   tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
   plansTitle: '选择适合您的套餐方案',
-  plansSubtitle: '三档套餐覆盖试运行、团队批量上新与集团化交付场景',
+  plansSubtitle: '三档套餐，适配试运行、团队上新、集团交付',
   unit: '/ 套餐',
   recommended: '推荐',
   footer: '所有套餐积分自购买之日起 12 个月内有效，过期未使用积分将自动清零。',

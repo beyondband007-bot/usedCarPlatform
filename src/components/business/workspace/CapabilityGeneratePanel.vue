@@ -70,6 +70,7 @@ const {
 const useLogo = ref(false);
 const { recentLogo } = useWorkspaceLogo();
 const paintColorCode = ref("");
+const batchPaintColorCode = ref("");
 const outputRatio = ref("1:1");
 const batchTab = ref<"create" | "visual">("create");
 const uploadInterior = ref(false);
@@ -273,6 +274,7 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     useRecentLogo: useRecentLogo.value,
     lightConsistency: lightConsistency.value,
     paintRefresh: paintRefresh.value,
+    colorCode: paintRefresh.value ? batchPaintColorCode.value.trim() || null : null,
     interiorEnhance: interiorEnhance.value,
     interiorCollage: interiorCollage.value,
   };
@@ -292,6 +294,7 @@ function mapBatchVisualConfigFromTemplate(
     useRecentLogo: template.useRecentLogo,
     enableLightConsistency: template.lightConsistency,
     enablePaintRefresh: template.paintRefresh,
+    colorCode: template.paintRefresh ? template.colorCode?.trim() || null : null,
     enableInteriorClean: template.interiorEnhance,
     enableInteriorCollage: template.interiorCollage,
   };
@@ -306,6 +309,7 @@ function applyTemplate(template: BatchVisualTemplate) {
   useRecentLogo.value = template.useRecentLogo;
   lightConsistency.value = template.lightConsistency;
   paintRefresh.value = template.paintRefresh;
+  batchPaintColorCode.value = template.colorCode ?? "";
   interiorEnhance.value = template.interiorEnhance;
   interiorCollage.value = template.interiorCollage;
   isApplyingTemplate.value = false;
@@ -331,6 +335,7 @@ function resetVisualConfigSelection() {
   useRecentLogo.value = false;
   lightConsistency.value = true;
   paintRefresh.value = false;
+  batchPaintColorCode.value = "";
   interiorEnhance.value = false;
   interiorCollage.value = false;
   isApplyingTemplate.value = false;
@@ -343,6 +348,11 @@ watch(presetInput, (value) => {
 watch(batchSceneCategory, () => {
   if (isApplyingTemplate.value) return;
   batchSceneIndex.value = 0;
+});
+
+watch(paintRefresh, (enabled) => {
+  if (isApplyingTemplate.value || enabled) return;
+  batchPaintColorCode.value = "";
 });
 
 async function handleSaveVisualPreset() {
@@ -557,7 +567,9 @@ function updateInteriorCollageUpload(
   id: string,
   patch: Partial<InteriorCollageUploadItem>,
 ) {
-  const index = interiorCollageUploads.value.findIndex((item) => item.id === id);
+  const index = interiorCollageUploads.value.findIndex(
+    (item) => item.id === id,
+  );
   if (index < 0) return;
 
   interiorCollageUploads.value[index] = {
@@ -823,14 +835,36 @@ async function refreshDeliveryTasks() {
 
   try {
     const result = await getDeliveryTasks({ page: 1, pageSize: 20 });
+    const selectedByTaskId = new Map(
+      deliveryTasks.value.map((task) => [task.taskId, task.selected]),
+    );
     deliveryTasks.value = await Promise.all(
-      result.items.map(async (item, index) => ({
-        ...item,
-        selected: deliveryTasks.value[index]?.selected ?? index === 0,
-        meta: `${item.completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
-        image: await resolveDeliveryTaskImage(item),
-        imageCount: item.assetCount,
-      })),
+      result.items.map(async (item, index) => {
+        const imageCount = item.assetCount;
+        const hasDeliveredAssets = imageCount > 0;
+        const progress = hasDeliveredAssets
+          ? Math.max(item.progress, 100)
+          : item.progress;
+        const completed = hasDeliveredAssets
+          ? Math.max(item.completed, imageCount)
+          : item.completed;
+
+        return {
+          ...item,
+          progress,
+          completed,
+          selected: selectedByTaskId.get(item.taskId) ?? index === 0,
+          meta: hasDeliveredAssets
+            ? `已完成 ${imageCount} 张 · ${formatDate(item.updatedAt)}`
+            : `${completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
+          image: await resolveDeliveryTaskImage({
+            ...item,
+            progress,
+            completed,
+          }),
+          imageCount,
+        };
+      }),
     );
     brokenDeliveryThumbs.value = new Set();
   } catch (error) {
@@ -888,6 +922,7 @@ watch(
     resetBatchExteriorUploads();
     resetInteriorCollageUploads();
     paintColorCode.value = "";
+    batchPaintColorCode.value = "";
   },
 );
 
@@ -961,7 +996,7 @@ onMounted(() => {
 });
 
 function hasDeliveryThumbnail(task: DeliveryTask) {
-  if (task.progress < 100) return false;
+  if (task.progress < 100 && task.assetCount <= 0) return false;
   if (brokenDeliveryThumbs.value.has(task.taskId)) return false;
   return Boolean(task.image?.trim());
 }
@@ -977,7 +1012,7 @@ async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
   const cachedUrl = cached?.thumbnailUrl ?? cached?.url ?? "";
   if (cachedUrl) return cachedUrl;
 
-  if (task.progress < 100 || task.assetCount <= 0) return "";
+  if (task.progress < 100 && task.assetCount <= 0) return "";
 
   try {
     const result = await getDeliveryTaskAssets(task.taskId, {
@@ -1003,8 +1038,9 @@ const deliverySelectedCount = computed(
 
 const deliveryDownloadableCount = computed(
   () =>
-    deliveryTasks.value.filter((task) => task.selected && task.progress >= 100)
-      .length,
+    deliveryTasks.value.filter(
+      (task) => task.selected && (task.progress >= 100 || task.assetCount > 0),
+    ).length,
 );
 
 const isDeliveryBatchDownloading = ref(false);
@@ -1036,7 +1072,7 @@ function toggleSelectAllDelivery() {
 
 async function handleDeliveryBatchDownload() {
   const selectedTasks = deliveryTasks.value.filter(
-    (task) => task.selected && task.progress >= 100,
+    (task) => task.selected && (task.progress >= 100 || task.assetCount > 0),
   );
 
   if (!selectedTasks.length) {
@@ -1126,7 +1162,7 @@ async function handleDeleteDeliveryAssets() {
 }
 
 async function handlePreviewDeliveryTask(task: DeliveryTask) {
-  if (task.progress < 100) {
+  if (task.progress < 100 && task.assetCount <= 0) {
     message.info("任务未完成，暂不可预览");
     return;
   }
@@ -1278,6 +1314,16 @@ const activeCreateRatioLabel = computed(() => {
                   漆面翻新
                 </span>
                 <span
+                  v-if="
+                    activeCreateTemplate.paintRefresh &&
+                    activeCreateTemplate.colorCode
+                  "
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:palette" />
+                  {{ activeCreateTemplate.colorCode }}
+                </span>
+                <span
                   v-if="activeCreateTemplate.interiorEnhance"
                   class="preset-tag is-on"
                 >
@@ -1405,7 +1451,9 @@ const activeCreateRatioLabel = computed(() => {
                   <h3>上传内饰图组</h3>
                   <p>
                     支持 1-10 张；若预设开启内饰拼接，需上传
-                    {{ MIN_INTERIOR_COLLAGE_IMAGES }}-{{ MAX_INTERIOR_COLLAGE_IMAGES }}
+                    {{ MIN_INTERIOR_COLLAGE_IMAGES }}-{{
+                      MAX_INTERIOR_COLLAGE_IMAGES
+                    }}
                     张。
                   </p>
                 </div>
@@ -1584,6 +1632,11 @@ const activeCreateRatioLabel = computed(() => {
               <NSwitch v-model:value="paintRefresh" size="large" />
             </section>
 
+            <PaintColorPicker
+              v-if="paintRefresh"
+              v-model="batchPaintColorCode"
+            />
+
             <section class="batch-card switch-card">
               <div>
                 <h3>内饰清洁增强</h3>
@@ -1632,7 +1685,8 @@ const activeCreateRatioLabel = computed(() => {
     <template v-else-if="props.capability.code === 'interior-stitch'">
       <div class="generate-panel-body">
         <section class="batch-card batch-notice short-video-notice">
-          前端只负责收集 2-10 张内饰图并提交 `assetIds`，后端会自动分组生成 1-3 张拼图结果。
+          前端只负责收集 2-10 张内饰图并提交 `assetIds`，后端会自动分组生成 1-3
+          张拼图结果。
         </section>
 
         <section class="batch-card batch-upload-card">
@@ -1671,9 +1725,7 @@ const activeCreateRatioLabel = computed(() => {
           >
             <Icon icon="mdi:image-multiple-outline" />
             <strong>{{
-              interiorCollageUploads.length
-                ? "继续添加内饰图"
-                : "上传内饰图组"
+              interiorCollageUploads.length ? "继续添加内饰图" : "上传内饰图组"
             }}</strong>
             <span
               >JPG / PNG / WebP · 剩余
@@ -1681,10 +1733,7 @@ const activeCreateRatioLabel = computed(() => {
             >
           </button>
 
-          <div
-            v-if="interiorCollageUploads.length"
-            class="batch-upload-grid"
-          >
+          <div v-if="interiorCollageUploads.length" class="batch-upload-grid">
             <article
               v-for="item in interiorCollageUploads"
               :key="item.id"
@@ -1784,7 +1833,7 @@ const activeCreateRatioLabel = computed(() => {
         </div>
 
         <section class="batch-notice delivery-notice">
-          这里展示批量上新里已完成的任务。点击任务卡片可在右侧查看大图；仅勾选复选框用于批量下载。
+          此处展示批量上新中已完成的任务，点击任务卡片可在右侧查看大图，勾选复选框即可批量下载。
         </section>
 
         <section class="delivery-board" aria-label="成片交付任务列表">
@@ -1796,7 +1845,7 @@ const activeCreateRatioLabel = computed(() => {
               :class="{
                 'is-checked': task.selected,
                 'is-previewing': props.previewedDeliveryTaskId === task.taskId,
-                'is-loading': task.progress < 100,
+                'is-loading': task.progress < 100 && task.assetCount <= 0,
               }"
             >
               <label class="delivery-check" @click.stop>
@@ -1811,7 +1860,7 @@ const activeCreateRatioLabel = computed(() => {
               <button
                 type="button"
                 class="delivery-item-body"
-                :disabled="task.progress < 100"
+                :disabled="task.progress < 100 && task.assetCount <= 0"
                 :aria-label="`查看${task.title}大图`"
                 @click="handlePreviewDeliveryTask(task)"
               >
@@ -3029,22 +3078,24 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 :global(.workspace-page.theme-light) .generate-panel.is-batch {
-  --batch-brand: #f5c84c;
-  --batch-brand-strong: #ffd766;
-  --batch-brand-text: #1e293b;
-  --batch-brand-muted: #b7791f;
-  --batch-page-bg: #f8fafc;
-  --batch-shell-bg: #ffffff;
-  --batch-shell-border: #e6eaf2;
-  --batch-card-bg: #fcfdfe;
-  --batch-card-border: #edf2f7;
-  --batch-card-hover-border: #d8e2ee;
-  --batch-text-primary: #0f172a;
-  --batch-text-body: #334155;
-  --batch-text-muted: #64748b;
-  --batch-input-border: #d8e2ee;
-  --batch-upload-bg: #fafbfc;
-  --batch-upload-border: #cbd5e1;
+  --batch-brand: var(--workspace-accent, #2f6bff);
+  --batch-brand-strong: var(--workspace-accent-strong, #2f6bff);
+  --batch-brand-text: #ffffff;
+  --batch-brand-muted: #2f6bff;
+  --batch-page-bg: var(--workspace-panel, #ffffff);
+  --batch-shell-bg: var(--workspace-panel, #ffffff);
+  --batch-shell-border: var(--workspace-line, #d6e0ed);
+  --batch-card-bg: var(--workspace-panel, #ffffff);
+  --batch-card-border: var(--workspace-line, #d6e0ed);
+  --batch-card-hover-border: var(--workspace-line-strong, #aebfd5);
+  --batch-text-primary: var(--workspace-text, #172033);
+  --batch-text-body: var(--workspace-text-secondary, #334155);
+  --batch-text-muted: var(--workspace-muted, #64748b);
+  --batch-input-border: var(--workspace-line, #d6e0ed);
+  --batch-upload-bg: var(--workspace-panel-soft, #f7fafd);
+  --batch-upload-border: var(--workspace-line-strong, #cbd5e1);
+
+  background: var(--batch-page-bg);
 }
 
 :global(.workspace-page.theme-light) .generate-panel.is-batch .batch-panel {
@@ -3053,7 +3104,9 @@ const activeCreateRatioLabel = computed(() => {
   padding: 4px 2px 0;
 }
 
-:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-panel-scroll {
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-panel-scroll {
   gap: 20px;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
@@ -3089,7 +3142,10 @@ const activeCreateRatioLabel = computed(() => {
   border-bottom-color: #e6eaf2;
 }
 
-:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-tabs button {
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-tabs
+  button {
   color: #64748b;
   font-weight: 700;
 }
@@ -3111,14 +3167,10 @@ const activeCreateRatioLabel = computed(() => {
 
 :global(.workspace-page.theme-light) .generate-panel.is-batch .batch-notice {
   padding: 20px 24px;
-  border: 1px solid rgba(245, 200, 76, 0.18);
+  border: 1px solid var(--workspace-accent-border, #b8cdf4);
   border-radius: 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(245, 200, 76, 0.12),
-    rgba(245, 200, 76, 0.04)
-  );
-  color: var(--batch-text-primary);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--batch-text-body);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.75;
@@ -3127,8 +3179,12 @@ const activeCreateRatioLabel = computed(() => {
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-notice:hover {
-  border-color: rgba(245, 200, 76, 0.28);
-  box-shadow: 0 6px 20px rgba(245, 200, 76, 0.08);
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-accent, #2f6bff) 36%,
+    transparent
+  );
+  box-shadow: 0 6px 20px rgba(47, 107, 255, 0.08);
 }
 
 :global(.workspace-page.theme-light)
@@ -3160,14 +3216,8 @@ const activeCreateRatioLabel = computed(() => {
   font-weight: 700;
 }
 
-:global(.workspace-page.theme-light)
-  .generate-panel.is-batch
-  .batch-card
-  p,
-:global(.workspace-page.theme-light)
-  .generate-panel.is-batch
-  .switch-card
-  p,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-card p,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .switch-card p,
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-upload-head
@@ -3187,8 +3237,8 @@ const activeCreateRatioLabel = computed(() => {
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .preset-summary-icon {
-  background: rgba(245, 200, 76, 0.14);
-  color: var(--batch-brand-muted);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--workspace-accent, #2f6bff);
 }
 
 :global(.workspace-page.theme-light)
@@ -3207,12 +3257,18 @@ const activeCreateRatioLabel = computed(() => {
   font-weight: 700;
 }
 
-:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-scene,
-:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-ratio,
-:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-tag.is-on {
-  border: 1px solid rgba(245, 200, 76, 0.24);
-  background: rgba(245, 200, 76, 0.1);
-  color: var(--batch-brand-muted);
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-tag.is-scene,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-tag.is-ratio,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-tag.is-on {
+  border: 1px solid var(--workspace-accent-border, #b8cdf4);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--workspace-accent, #2f6bff);
   font-weight: 600;
 }
 
@@ -3236,14 +3292,14 @@ const activeCreateRatioLabel = computed(() => {
   .generate-panel.is-batch
   .plain-input:focus {
   border-color: var(--batch-brand);
-  box-shadow: 0 0 0 3px rgba(245, 200, 76, 0.15);
+  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16));
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-upload-count {
-  background: rgba(245, 200, 76, 0.14);
-  color: var(--batch-brand-muted);
+  background: var(--workspace-accent-bg, #f2f7ff);
+  color: var(--workspace-accent, #2f6bff);
   font-weight: 700;
 }
 
@@ -3305,10 +3361,7 @@ const activeCreateRatioLabel = computed(() => {
   color: var(--batch-text-body);
 }
 
-:global(.workspace-page.theme-light)
-  .generate-panel.is-batch
-  .scene-head
-  h3 {
+:global(.workspace-page.theme-light) .generate-panel.is-batch .scene-head h3 {
   color: var(--batch-text-primary);
   font-weight: 700;
 }
@@ -3327,7 +3380,7 @@ const activeCreateRatioLabel = computed(() => {
   .scene-grid
   article.active {
   border: 2px solid var(--batch-brand);
-  box-shadow: 0 0 0 4px rgba(245, 200, 76, 0.12);
+  box-shadow: 0 0 0 4px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16));
 }
 
 :global(.workspace-page.theme-light)
@@ -3359,7 +3412,8 @@ const activeCreateRatioLabel = computed(() => {
   --n-color: #ffffff !important;
   --n-text-color: var(--batch-text-primary) !important;
   --n-arrow-color: var(--batch-text-muted) !important;
-  --n-box-shadow-focus: 0 0 0 3px rgba(245, 200, 76, 0.15) !important;
+  --n-box-shadow-focus: 0 0 0 3px
+    var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)) !important;
 }
 
 :global(.workspace-page.theme-light)
@@ -3378,7 +3432,8 @@ const activeCreateRatioLabel = computed(() => {
   --n-color: #ffffff !important;
   --n-text-color: var(--batch-text-primary) !important;
   --n-arrow-color: var(--batch-text-muted) !important;
-  --n-box-shadow-focus: 0 0 0 3px rgba(245, 200, 76, 0.15) !important;
+  --n-box-shadow-focus: 0 0 0 3px
+    var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)) !important;
 }
 
 :global(.workspace-page.theme-light)
@@ -3424,7 +3479,7 @@ const activeCreateRatioLabel = computed(() => {
   background: linear-gradient(
     135deg,
     var(--batch-brand),
-    var(--batch-brand-strong)
+    color-mix(in srgb, var(--batch-brand-strong) 88%, #1d4ed8)
   ) !important;
   color: var(--batch-brand-text) !important;
   font-weight: 600 !important;
@@ -3438,7 +3493,7 @@ const activeCreateRatioLabel = computed(() => {
   .generate-panel.is-batch
   .batch-primary-btn.n-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(245, 200, 76, 0.28) !important;
+  box-shadow: 0 12px 30px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)) !important;
 }
 
 :global(.workspace-page.theme-light)

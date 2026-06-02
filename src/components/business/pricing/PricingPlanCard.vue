@@ -17,6 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [];
+  consult: [];
   pointerdown: [];
   pointerup: [];
   pointerleave: [];
@@ -80,9 +81,8 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
         <button
           type="button"
-          class="plan-action"
-          :class="{ 'is-solid': plan.featured }"
-          @click.stop="emit('select')"
+          class="plan-action is-solid"
+          @click.stop="emit('consult')"
         >
           {{ plan.action }}
         </button>
@@ -186,6 +186,9 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-action-text: #172033;
   --plan-action-hover-border: color-mix(in srgb, var(--plan-accent) 42%, #d8e2f0);
   --plan-action-hover-text: var(--plan-accent);
+  --plan-action-solid-bg: #2f6bff;
+  --plan-action-solid-text: #ffffff;
+  --plan-action-solid-shadow: 0 10px 22px rgba(47, 107, 255, 0.22);
   --plan-badge-bg: color-mix(in srgb, var(--plan-accent) 12%, #ffffff);
   --plan-badge-text: var(--plan-accent);
 
@@ -204,9 +207,6 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-card-bg: #ffffff;
   --plan-card-border: rgba(47, 107, 255, 0.28);
   --plan-card-shadow: 0 14px 34px rgba(47, 107, 255, 0.1);
-  --plan-action-solid-bg: #2f6bff;
-  --plan-action-solid-text: #ffffff;
-  --plan-action-solid-shadow: 0 10px 22px rgba(47, 107, 255, 0.22);
   --plan-badge-bg: #edf4ff;
   --plan-badge-text: #1d4ed8;
 }

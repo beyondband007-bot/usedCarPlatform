@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { ref } from "vue";
+import { computed, inject, ref } from "vue";
 
 import PricingPlanCard from "@/components/business/pricing/PricingPlanCard.vue";
+import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import {
   pricingFooterFeatures,
   pricingPageCopy,
@@ -10,17 +11,19 @@ import {
 } from "@/constants/prototype";
 import { useAppStore } from "@/stores/app";
 
-import pricingHeroBg from "@/assets/img/pricing-hero-bg.png";
+import pricingHeroBgDark from "@/assets/img/pricing-hero-bg.png";
+import pricingHeroBgLight from "@/assets/img/pricing-hero-bg-light.png";
 
 const copy = pricingPageCopy;
 const appStore = useAppStore();
+const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const selectedPlanName = ref<string | null>(null);
 const pressingPlanName = ref<string | null>(null);
 
-const pageStyle = {
-  "--pricing-bg-image": `url(${pricingHeroBg})`,
-};
+const pageStyle = computed(() => ({
+  "--pricing-bg-image": `url(${appStore.isDarkMode ? pricingHeroBgDark : pricingHeroBgLight})`,
+}));
 
 function handlePlanPointerDown(name: string) {
   pressingPlanName.value = name;
@@ -32,6 +35,10 @@ function clearPlanPress() {
 
 function handlePlanSelect(name: string) {
   selectedPlanName.value = name;
+}
+
+function handlePlanConsult() {
+  workbenchEntry?.openVisitorModal();
 }
 </script>
 
@@ -58,6 +65,7 @@ function handlePlanSelect(name: string) {
           :selected="selectedPlanName === plan.name"
           :pressing="pressingPlanName === plan.name"
           @select="handlePlanSelect(plan.name)"
+          @consult="handlePlanConsult"
           @pointerdown="handlePlanPointerDown(plan.name)"
           @pointerup="clearPlanPress"
           @pointerleave="clearPlanPress"
@@ -136,14 +144,6 @@ function handlePlanSelect(name: string) {
     );
 
   color: var(--pricing-hero-text);
-}
-
-.pricing-page.theme-light .pricing-bg {
-  background-image: none;
-}
-
-.pricing-page.theme-light .pricing-bg::after {
-  background: none;
 }
 
 .pricing-bg {

@@ -177,6 +177,7 @@ export interface BatchVisualConfig {
   useRecentLogo: boolean
   enableLightConsistency: boolean
   enablePaintRefresh: boolean
+  colorCode?: string | null
   enableInteriorClean: boolean
   enableInteriorCollage?: boolean
   interiorCollage?: boolean

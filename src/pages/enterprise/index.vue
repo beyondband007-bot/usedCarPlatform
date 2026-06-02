@@ -6,12 +6,16 @@ import PreloadImage from "@/components/common/PreloadImage.vue";
 import LoginPanel from "@/components/business/account/LoginPanel.vue";
 import {
   enterpriseLoginFeatures,
-  enterpriseLoginHeroImage,
+  enterpriseLoginHeroImageDark,
+  enterpriseLoginHeroImageLight,
 } from "@/constants/enterprise-login";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
 const isDark = computed(() => appStore.isDarkMode);
+const enterpriseLoginHeroImage = computed(() =>
+  isDark.value ? enterpriseLoginHeroImageDark : enterpriseLoginHeroImageLight,
+);
 </script>
 
 <template>

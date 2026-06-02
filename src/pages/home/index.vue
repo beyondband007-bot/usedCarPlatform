@@ -65,7 +65,7 @@ function openWorkbench() {
   --home-card-bg: linear-gradient(180deg, #151515, #0b0b0b);
   --home-card-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
   --home-media-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
-  --home-media-overlay-full: rgba(4, 4, 4, 0.72);
+  --home-media-overlay-full: linear-gradient(90deg, rgba(4, 4, 4, 0.88) 0%, rgba(4, 4, 4, 0) 50%);
   --home-media-title: #fff;
   --home-media-desc: #d5d5d5;
   --home-card-title: #f3f3f3;
@@ -105,7 +105,7 @@ function openWorkbench() {
   --home-card-bg: linear-gradient(180deg, #ffffff, #f8fafd);
   --home-card-overlay: linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.42));
   --home-media-overlay: linear-gradient(90deg, rgba(24, 18, 10, 0.8), rgba(24, 18, 10, 0.18));
-  --home-media-overlay-full: rgba(24, 18, 10, 0.65);
+  --home-media-overlay-full: linear-gradient(90deg, rgba(24, 18, 10, 0.8) 0%, rgba(24, 18, 10, 0) 50%);
   --home-media-title: #fff;
   --home-media-desc: rgba(255, 255, 255, 0.84);
   --home-card-title: var(--color-text-primary);

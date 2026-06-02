@@ -26,6 +26,7 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     useRecentLogo: input.useRecentLogo,
     enableLightConsistency: input.lightConsistency,
     enablePaintRefresh: input.paintRefresh,
+    colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
     enableInteriorClean: input.interiorEnhance,
     enableInteriorCollage: input.interiorCollage,
   }
@@ -47,6 +48,7 @@ async function ensureLoaded() {
       useRecentLogo: item.visualConfig.useRecentLogo,
       lightConsistency: item.visualConfig.enableLightConsistency,
       paintRefresh: item.visualConfig.enablePaintRefresh,
+      colorCode: item.visualConfig.colorCode ?? null,
       interiorEnhance: item.visualConfig.enableInteriorClean,
       interiorCollage:
         item.visualConfig.enableInteriorCollage ??
@@ -88,6 +90,7 @@ export function useBatchVisualTemplates() {
       useRecentLogo: created.visualConfig.useRecentLogo,
       lightConsistency: created.visualConfig.enableLightConsistency,
       paintRefresh: created.visualConfig.enablePaintRefresh,
+      colorCode: created.visualConfig.colorCode ?? null,
       interiorEnhance: created.visualConfig.enableInteriorClean,
       interiorCollage:
         created.visualConfig.enableInteriorCollage ??
@@ -117,6 +120,7 @@ export function useBatchVisualTemplates() {
       useRecentLogo: updated.visualConfig.useRecentLogo,
       lightConsistency: updated.visualConfig.enableLightConsistency,
       paintRefresh: updated.visualConfig.enablePaintRefresh,
+      colorCode: updated.visualConfig.colorCode ?? null,
       interiorEnhance: updated.visualConfig.enableInteriorClean,
       interiorCollage:
         updated.visualConfig.enableInteriorCollage ??
