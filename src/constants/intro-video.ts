@@ -1,4 +1,6 @@
 export const INTRO_VIDEO_SESSION_KEY = 'used-car-platform:intro-video-played'
+export const INTRO_VIDEO_URL =
+  'https://1849524247.v.123pan.cn/1849524247/34033961'
 
 let reloadHandled = false
 

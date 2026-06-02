@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
-import introVideoUrl from '@/assets/video/首页视频.mp4'
-import { INTRO_VIDEO_SESSION_KEY, markIntroVideoPlayed } from '@/constants/intro-video'
+import { INTRO_VIDEO_SESSION_KEY, INTRO_VIDEO_URL, markIntroVideoPlayed } from '@/constants/intro-video'
 
 const router = useRouter()
 
@@ -22,7 +21,7 @@ function finishIntro() {
   <main class="intro-video-page">
     <video
       class="intro-video-page__video"
-      :src="introVideoUrl"
+      :src="INTRO_VIDEO_URL"
       autoplay
       playsinline
       muted
