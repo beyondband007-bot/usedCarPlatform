@@ -361,7 +361,8 @@ onUnmounted(() => {
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
+  padding: 0;
 }
 
 .promo-banner-dot {
@@ -370,7 +371,7 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: #fff;
   cursor: pointer;
   transition:
     width var(--home-motion-normal, 240ms ease),
@@ -384,7 +385,7 @@ onUnmounted(() => {
 
 .promo-banner-dot.is-active {
   width: 22px;
-  background: var(--home-gold, #f4c840);
+  background: linear-gradient(180deg, var(--home-gold-strong, #ffd94d), var(--home-gold, #f4c840));
 }
 
 @media (max-width: 700px) {

@@ -38,14 +38,6 @@ export const homePromoBannerSlides: HomePromoBannerSlide[] = [
   },
 
   {
-    id: 'light-pollution-quality',
-    image: banner02AgentRecruitment,
-    alt: '光污染消除，还原真实品质',
-    title: '光污染消除，还原真实品质',
-    lines: ['精准去除反光与杂光', '真实还原漆面质感与车身细节'],
-    copyLayout: 'elevated',
-  },
-  {
     id: 'agent-recruitment',
     image: banner03CreativeTeam,
     alt: '系统代理火热招募中',
@@ -53,6 +45,14 @@ export const homePromoBannerSlides: HomePromoBannerSlide[] = [
     lines: ['名额有限，先到先得', '抢占 AI 汽车内容增长新机会'],
     actionLabel: '立即咨询',
     opensConsultModal: true,
+    copyLayout: 'elevated',
+  },
+  {
+    id: 'light-pollution-quality',
+    image: banner02AgentRecruitment,
+    alt: '光污染消除，还原真实品质',
+    title: '光污染消除，还原真实品质',
+    lines: ['精准去除反光与杂光', '真实还原漆面质感与车身细节'],
     copyLayout: 'elevated',
   },
 ]
