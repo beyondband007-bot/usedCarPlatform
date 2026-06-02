@@ -6,7 +6,7 @@ const SUMMARY_KEY = 'ai-car-studio:points-summary'
 const RECORDS_KEY = 'ai-car-studio:points-records'
 
 const initialSummary: PointsSummary = {
-  currentPoints: 55000,
+  currentPoints: 100000,
   freezePoints: 0,
   totalConsume: 8320,
   totalRecharge: 3980,
@@ -18,10 +18,10 @@ const initialRecords: PointRecord[] = [
     id: 'point_20260520090001',
     type: 'gift',
     title: '套餐赠送',
-    amount: 55000,
-    balance: 55000,
+    amount: 100000,
+    balance: 100000,
     createdAt: '2026-05-20 09:00:00',
-    remark: '企业团队版开通',
+    remark: '企业团队档开通',
   },
   {
     id: 'point_20260520093202',
@@ -37,7 +37,7 @@ const initialRecords: PointRecord[] = [
     type: 'consume',
     title: '批量上新任务',
     amount: -120,
-    balance: 54865,
+    balance: 99865,
     createdAt: '2026-05-20 09:18:45',
     remark: '5月展厅批量上新',
   },

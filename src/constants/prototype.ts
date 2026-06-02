@@ -4,7 +4,13 @@ import type {
   PackageOption,
   PointTransaction,
   PricingPlan,
+  PricingPlanTone,
 } from '@/types/prototype'
+import {
+  enterprisePlanList,
+  formatPlanPrice,
+  type EnterprisePlan,
+} from '@/domain/enterprise-plans'
 
 /** 官网首页顶栏导航（与 官网/官网/index.html 一致） */
 export const studioGuestNavigation: NavItem[] = [
@@ -21,23 +27,24 @@ export const studioGuestNavigation: NavItem[] = [
 /** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */
 export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
+  { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   {
     path: '/workspace',
     label: '视觉工作台',
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
-  { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
   { path: '/login', label: '企业账号登录', icon: 'mdi:account-key-outline' },
 ]
 
-/** 旧版登录后二级导航配置，仅保留给历史组件引用 */
+/** 登录后二级导航 */
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/workspace', label: '视觉工作台' },
   { path: '/pricing', label: '企业套餐' },
   { path: '/credits', label: '积分查询' },
+  { path: '/package-points', label: '套餐/积分' },
   { path: '/credits-admin', label: '积分后台' },
 ]
 
@@ -69,64 +76,41 @@ export const homeFeatures: FeatureEntry[] = [
   },
 ]
 
-export const pricingPlanActionLabel = '立即开通 / 咨询我们'
-
-export const pricingPlans: PricingPlan[] = [
-  {
-    name: '企业基础档（入门优选）',
-    price: '¥980',
-    description: '适合新团队启动视觉生产流程，先验证素材标准与交付节奏。',
+const pricingPlanVisuals: Record<
+  EnterprisePlan['plan'],
+  { icon: string; tone: PricingPlanTone; badge?: string; featured?: boolean; action: string }
+> = {
+  basic: {
     icon: 'mdi:rocket-launch-outline',
     tone: 'blue',
-    benefits: [
-      '赠送 20,000 积分',
-      '1 个企业账号',
-      '每个账号同时上传 1 套外观图组',
-      '每个账号同时上传 1 套内饰图组',
-      '单张图片生成正常使用',
-      '适合小团队试运行',
-    ],
-    action: pricingPlanActionLabel,
+    action: '订阅基础档',
   },
-  {
-    name: '企业团队档（首选推荐）',
-    price: '¥3,980',
-    description: '适合门店或车商团队并行上新，兼顾账号、积分与图组并发。',
+  team: {
     icon: 'mdi:account-group-outline',
     tone: 'orange',
-    benefits: [
-      '赠送 55,000 积分',
-      '5 个企业账号',
-      '每个账号同时上传 5 套外观图组',
-      '每个账号同时上传 5 套内饰图组',
-      '单张图片生成正常使用',
-      '适合车商团队批量上新',
-    ],
-    action: pricingPlanActionLabel,
+    badge: '最划算',
     featured: true,
+    action: '订阅团队档',
   },
-  {
-    name: '企业旗舰档',
-    price: '¥9,800',
-    description: '适合集团化业务、出海车源与专属场景长期配置。',
+  flagship: {
     icon: 'mdi:shield-crown-outline',
     tone: 'green',
-    benefits: [
-      '赠送 980,000 积分',
-      '20 个企业账号',
-      '每个账号同时上传 20 套外观图组',
-      '每个账号同时上传 20 套内饰图组',
-      '可定制 20 个专属场景',
-      '适合集团化和出海团队',
-    ],
-    action: pricingPlanActionLabel,
+    action: '咨询旗舰档',
   },
-]
+}
+
+export const pricingPlans: PricingPlan[] = enterprisePlanList.map((plan) => ({
+  name: plan.name,
+  price: formatPlanPrice(plan),
+  description: plan.description,
+  benefits: plan.featureDetails,
+  ...pricingPlanVisuals[plan.plan],
+}))
 
 export const pointTransactions: PointTransaction[] = [
   {
     title: '套餐赠送',
-    amount: '+550 积分',
+    amount: '+100,000 积分',
     positive: true,
     description: '2026-05-20 09:00 · 企业团队档开通',
   },
@@ -148,28 +132,16 @@ export const pointTransactions: PointTransaction[] = [
   },
 ]
 
-export const packageOptions: PackageOption[] = [
-  {
-    price: '¥980',
-    description: '赠 200 积分 · 1账号 · 1套并发',
-    action: '选择',
-  },
-  {
-    price: '¥3,980',
-    description: '赠 55,000 积分 · 5账号 · 5套并发',
-    action: '选择',
-    active: true,
-  },
-  {
-    price: '¥9,800',
-    description: '980,000 积分 · 20账号 · 20专属场景',
-    action: '预约演示',
-  },
-]
+export const packageOptions: PackageOption[] = enterprisePlanList.map((plan) => ({
+  price: formatPlanPrice(plan),
+  description: `${plan.giftPoints.toLocaleString('zh-CN')} 积分 · ${plan.accountLabel} · ${plan.concurrencyLabel}`,
+  action: plan.plan === 'flagship' ? '预约演示' : '选择',
+  active: plan.plan === 'team',
+}))
 
 export const pricingPageCopy = {
   title: '企业套餐',
-  subtitle: '面向汽车电商与出海车商，按账号、积分、外观图组并发和专属场景配置团队产能',
+  subtitle: '面向汽车电商与出海车商，按账号、积分和后台生成请求并发配置团队产能',
   tag: '套餐内积分可用于账号使用、功能服务及专属场景配置等',
   plansTitle: '选择适合您的套餐方案',
   plansSubtitle: '三档套餐，适配试运行、团队上新、集团交付',

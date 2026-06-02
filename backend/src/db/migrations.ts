@@ -31,11 +31,21 @@ export const migrations = [
     result_json JSON NULL,
     error_code VARCHAR(120) NULL,
     error_message TEXT NULL,
+    credits_user_id BIGINT NULL,
+    credits_tenant_id BIGINT NULL,
+    account_scope VARCHAR(16) NULL,
+    billing_task_id BIGINT NULL,
+    billing_status VARCHAR(24) NULL,
+    estimated_points DECIMAL(18, 4) NULL,
+    settled_points DECIMAL(18, 4) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_generation_tasks_module_created (module_code, created_at),
     INDEX idx_generation_tasks_status (status),
-    INDEX idx_generation_tasks_kie_task (kie_task_id)
+    INDEX idx_generation_tasks_kie_task (kie_task_id),
+    INDEX idx_generation_tasks_billing_task (billing_task_id),
+    INDEX idx_generation_tasks_credits_user_created (credits_user_id, created_at),
+    INDEX idx_generation_tasks_billing_status (billing_status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS batch_tasks (
@@ -48,9 +58,15 @@ export const migrations = [
     failed INT NOT NULL DEFAULT 0,
     progress INT NOT NULL DEFAULT 0,
     visual_config_json JSON NULL,
+    credits_user_id BIGINT NULL,
+    credits_tenant_id BIGINT NULL,
+    account_scope VARCHAR(16) NULL,
+    estimated_points DECIMAL(18, 4) NULL,
+    settled_points DECIMAL(18, 4) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    INDEX idx_batch_tasks_status_created (status, created_at)
+    INDEX idx_batch_tasks_status_created (status, created_at),
+    INDEX idx_batch_tasks_credits_user_created (credits_user_id, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS batch_task_items (

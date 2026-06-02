@@ -1,4 +1,4 @@
-import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios'
+import axios, { AxiosError, AxiosHeaders, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
 import { toCreditsHeaders } from '@/utils/credits-identity'
 
@@ -15,17 +15,18 @@ export const http = axios.create({
 http.interceptors.request.use(
   (config) => {
     // 可以在这里添加 token
-    const token = localStorage.getItem('token')
+    const token = typeof window === 'undefined' ? null : window.localStorage.getItem('token')
+    const headers = AxiosHeaders.from(config.headers)
+
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      headers.set('Authorization', `Bearer ${token}`)
     }
 
-    // 自动注入 credits 身份头（mock，对接 Reusable Credits Platform 代理）
-    const creditsHeaders = toCreditsHeaders()
-    for (const [key, value] of Object.entries(creditsHeaders)) {
-      config.headers[key] = value
+    for (const [key, value] of Object.entries(toCreditsHeaders())) {
+      headers.set(key, value)
     }
 
+    config.headers = headers
     return config
   },
   (error) => {
@@ -50,8 +51,10 @@ http.interceptors.response.use(
       switch (status) {
         case 401:
           // 未授权，清除 token 并跳转登录
-          localStorage.removeItem('token')
-          window.location.href = '/login'
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem('token')
+            window.location.href = '/login'
+          }
           break
         case 403:
           console.error('没有权限访问该资源')

@@ -9,7 +9,7 @@ export const lightConsistencyRoutes = Router();
 lightConsistencyRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
-    const result = await lightConsistencyService.createTask(req.body);
+    const result = await lightConsistencyService.createTask(req.body, { headers: req.headers });
     ok(res, result);
   }),
 );

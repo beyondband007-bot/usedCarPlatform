@@ -5,6 +5,7 @@ import express from "express";
 
 import { env } from "./config/env";
 import { assetsRoutes } from "./modules/assets/assetsRoutes";
+import { creditsRoutes } from "./modules/billing/creditsRoutes";
 import { moduleRoutes } from "./modules/moduleRoutes";
 import { tasksRoutes } from "./modules/tasks/tasksRoutes";
 import { userLogoRoutes } from "./modules/user-logo/userLogoRoutes";
@@ -25,6 +26,7 @@ export const createApp = () => {
   });
 
   app.use("/api/v1/assets", assetsRoutes);
+  app.use("/api/v1/credits", creditsRoutes);
   app.use("/api/v1/tasks", tasksRoutes);
   app.use("/api/v1/modules", moduleRoutes);
   app.use("/api/v1/user", userLogoRoutes);

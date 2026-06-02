@@ -5,6 +5,14 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
 
@@ -28,7 +36,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
     config.scenes.find((scene) => scene.optionId === optionId) ?? config.scenes[0];
 
   return {
-    async createTask(body: CreateModuleTaskRequest) {
+    async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
       if (!body.inputAssetId) {
         throw errors.invalidParameter("inputAssetId is required");
       }
@@ -82,6 +90,23 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         logoAssetId: logoAsset?.id ?? null,
         prompt,
       });
+
+      let billing: FrozenGenerationBilling | null = null;
+      try {
+        billing = await freezeGenerationBilling({
+          taskId,
+          functionCode: config.moduleCode,
+          body,
+          context,
+        });
+      } catch (error) {
+        await tasksRepository.markFailed(
+          taskId,
+          "BILLING_FREEZE_FAILED",
+          error instanceof Error ? error.message : "billing freeze failed",
+        );
+        throw error;
+      }
 
       const lease = await kieKeyPool.acquire();
       try {
@@ -146,10 +171,16 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
           sceneReferenceImageUrl,
           logoAssetId: logoAsset?.id ?? null,
           inputImageCount: inputUrls.length,
+          ...toBillingResponseFields(billing),
           pollingUrl: `/api/v1/tasks/${taskId}`,
           createdAt: new Date().toISOString(),
         };
       } catch (error) {
+        try {
+          await refundFrozenGenerationBilling(taskId, billing);
+        } catch {
+          await markGenerationBillingRefundFailed(taskId, billing);
+        }
         await tasksRepository.markFailed(
           taskId,
           `${config.moduleCode.toUpperCase().replace(/-/g, "_")}_CREATE_FAILED`,
@@ -160,4 +191,3 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
     },
   };
 };
-

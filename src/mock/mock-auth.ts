@@ -3,6 +3,16 @@ import type { LoginRequest, LoginResponse, UserInfo } from '@/types/auth'
 import { mockDelay } from './mock-storage'
 
 const permissions = {
+  developer: [
+    'menu:home',
+    'menu:workspace',
+    'menu:pricing',
+    'menu:points',
+    'menu:recharge',
+    'menu:admin',
+    'account:create:platform',
+    'backoffice:developer',
+  ],
   admin: [
     'menu:home',
     'menu:workspace',
@@ -10,8 +20,19 @@ const permissions = {
     'menu:points',
     'menu:recharge',
     'menu:admin',
+    'account:create:platform',
+    'backoffice:admin',
   ],
-  enterprise: [
+  agent: [
+    'menu:home',
+    'menu:workspace',
+    'menu:pricing',
+    'menu:points',
+    'menu:recharge',
+    'menu:admin',
+    'backoffice:agent',
+  ],
+  user: [
     'menu:home',
     'menu:workspace',
     'menu:pricing',
@@ -24,6 +45,17 @@ const mockUsers: Record<
   string,
   { password: string; token: string; userInfo: UserInfo }
 > = {
+  developer: {
+    password: '123456',
+    token: 'mock_developer_token',
+    userInfo: {
+      id: 'user_developer',
+      username: 'developer',
+      displayName: '平台开发者',
+      role: 'developer',
+      permissions: [...permissions.developer],
+    },
+  },
   admin: {
     password: '123456',
     token: 'mock_admin_token',
@@ -35,6 +67,17 @@ const mockUsers: Record<
       permissions: [...permissions.admin],
     },
   },
+  agent: {
+    password: '123456',
+    token: 'mock_agent_token',
+    userInfo: {
+      id: 'user_agent',
+      username: 'agent',
+      displayName: '代理商',
+      role: 'agent',
+      permissions: [...permissions.agent],
+    },
+  },
   enterprise: {
     password: '123456',
     token: 'mock_enterprise_token',
@@ -42,8 +85,8 @@ const mockUsers: Record<
       id: 'user_enterprise',
       username: 'enterprise',
       displayName: '企业用户',
-      role: 'enterprise',
-      permissions: [...permissions.enterprise],
+      role: 'user',
+      permissions: [...permissions.user],
     },
   },
 }
@@ -64,6 +107,27 @@ export async function getUserInfo(token: string): Promise<UserInfo> {
   }
 
   return mockDelay(matched.userInfo)
+}
+
+export function normalizeMockUserInfo(userInfo: UserInfo | null): UserInfo | null {
+  if (!userInfo) return null
+
+  const role = (userInfo as unknown as { role?: string }).role
+
+  if (userInfo.username === 'enterprise' || role === 'enterprise') {
+    return {
+      ...userInfo,
+      displayName: userInfo.displayName === '企业用户（代理商）' ? '企业用户' : userInfo.displayName,
+      role: 'user',
+      permissions: [...permissions.user],
+    }
+  }
+
+  if (role === 'developer' || role === 'admin' || role === 'agent' || role === 'user') {
+    return userInfo
+  }
+
+  return null
 }
 
 export async function logout() {

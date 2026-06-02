@@ -7,6 +7,99 @@ export interface ApiResponse<T> {
   requestId: string
 }
 
+export interface CreditAccount {
+  id: number
+  tenantId: number | null
+  userId: number | null
+  accountScope: 'personal' | 'tenant'
+  totalBalance: string
+  lockedBalance: string
+  availableBalance: string
+  currency: string
+  status: string
+}
+
+export interface CreditTransaction {
+  id: number
+  tenantId: number | null
+  userId: number
+  accountId: number
+  billingTaskId: number | null
+  paymentOrderId: number | null
+  applicationId: number | null
+  functionId: number | null
+  txnType: string
+  points: string
+  balanceBefore: string
+  balanceAfter: string
+  bizType: string | null
+  bizId: string | null
+  refTxnId: number | null
+  remark: string | null
+  createdAt: string
+}
+
+export interface RechargeProduct {
+  id: number
+  name: string
+  amount: string
+  points: string
+  bonusPoints: string
+  currency: string
+  sort: number
+  enabled: boolean
+}
+
+export interface PaymentOrder {
+  paymentOrderId: number
+  tenantId: number | null
+  userId: number
+  accountId: number
+  productId: number
+  orderNo: string
+  amount: string
+  points: string
+  bonusPoints: string
+  payChannel: 'alipay' | 'wechat' | 'card'
+  status: 'pending' | 'paid' | 'failed' | 'refunded'
+  paidAt: string | null
+  notifyId: string | null
+  idempotentReplay: boolean
+}
+
+export interface CreditsApplication {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  status: string
+}
+
+export interface CreditsFunction {
+  id: number
+  applicationId: number
+  applicationCode?: string
+  code: string
+  name: string
+  description: string | null
+  chargeMode: 'fixed' | 'dynamic' | 'estimate_required'
+  defaultPoints: string
+  status: string
+}
+
+export interface CreditsAdminOverview {
+  identity: {
+    userId: number
+    accountScope: 'personal' | 'tenant'
+    tenantId?: number
+  }
+  applications: CreditsApplication[]
+  functions: CreditsFunction[]
+  accounts: CreditAccount[]
+  transactions: CreditTransaction[]
+  rechargeProducts: RechargeProduct[]
+}
+
 export interface UploadedAsset {
   assetId: string
   purpose: string
@@ -14,6 +107,67 @@ export interface UploadedAsset {
   fileName: string
   mimeType: string
   size: number
+}
+
+export async function getCreditAccounts(params?: {
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.get<ApiResponse<{ accounts: CreditAccount[] }>>('/credits/accounts', {
+    params,
+  })
+  return response.data
+}
+
+export async function getCreditTransactions(params?: {
+  accountId?: number | string
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  limit?: number | string
+}) {
+  const response = await request.get<ApiResponse<{ account: CreditAccount; transactions: CreditTransaction[] }>>(
+    '/credits/transactions',
+    { params },
+  )
+  return response.data
+}
+
+export async function getRechargeProducts() {
+  const response = await request.get<ApiResponse<{ products: RechargeProduct[] }>>('/credits/recharge-products')
+  return response.data
+}
+
+export async function createPaymentOrder(payload: {
+  productId: number
+  payChannel: 'alipay' | 'wechat' | 'card'
+  idempotencyKey?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.post<ApiResponse<PaymentOrder>>('/credits/payment-orders', payload)
+  return response.data
+}
+
+export async function getCreditsAdminOverview(params?: {
+  userId?: number | string
+  creditsUserId?: number | string
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number | string
+  creditsTenantId?: number | string
+}) {
+  const response = await request.get<ApiResponse<CreditsAdminOverview>>('/credits/admin/overview', {
+    params,
+  })
+  return response.data
 }
 
 export type AssetPurpose = 'car_exterior' | 'car_interior' | 'logo'
@@ -42,6 +196,11 @@ export interface CreateGenerationTaskPayload {
   colorCode?: string
   outputRatio?: string
   resolution?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
   extra?: Record<string, unknown>
 }
 
@@ -57,6 +216,10 @@ export interface CreatedGenerationTask {
   logoAssetId?: string | null
   colorCode?: string | null
   inputImageCount: number
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
   pollingUrl: string
   createdAt: string
 }
@@ -108,6 +271,10 @@ export interface GenerationTaskDetail {
   outputRatio: string
   resolution: string
   resultImages: GenerationResultImage[]
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   resultVideos?: GenerationResultImage[]
   videoUrl?: string
   previewVideo?: string
@@ -209,6 +376,11 @@ export interface CreateBatchTaskPayload {
   visualConfig: BatchVisualConfig
   /** 与 visualConfig.outputRatio 一致，供后端写入任务表 */
   outputRatio?: string
+  userId?: number | string
+  creditsUserId?: number | string
+  tenantId?: number | string
+  creditsTenantId?: number | string
+  accountScope?: 'personal' | 'tenant'
 }
 
 export interface CreatedBatchTask {
@@ -221,6 +393,8 @@ export interface CreatedBatchTask {
   progress: number
   pollingUrl: string
   estimatedCost: number
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   balance: number
   createdAt: string
 }
@@ -255,6 +429,11 @@ export interface BatchTaskDetail {
   failed: number
   progress: number
   assetCount: number
+  creditsUserId?: number | null
+  creditsTenantId?: number | null
+  accountScope?: 'personal' | 'tenant' | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   items: BatchTaskDetailItem[]
   createdAt: string
   updatedAt: string
@@ -333,6 +512,10 @@ export interface RecentGenerationTask {
   inputAssetId?: string | null
   inputAssetUrl?: string | null
   resultCount?: number | null
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
   error?: string | { code?: string; message?: string } | null
 }
 
@@ -627,148 +810,6 @@ export async function createInteriorCleanTask(payload: {
     '/modules/interior-clean/tasks',
     payload,
     generationRequestConfig,
-  )
-  return unwrapApiResponse(response)
-}
-
-// ===================== Reusable Credits Platform 代理接口 =====================
-// 详见 文档/积分文档.md 第 2/8 节。
-// 请求头 x-credits-user-id / x-credits-account-scope 由 http.ts 拦截器自动注入。
-
-export type CreditsAccountStatus = 'active' | 'frozen' | 'closed' | string
-
-export interface CreditsAccount {
-  id: number | string
-  userId: number | string
-  tenantId: number | string | null
-  accountScope: 'personal' | 'tenant' | string
-  totalBalance: number
-  lockedBalance: number
-  availableBalance: number
-  status: CreditsAccountStatus
-}
-
-export interface RechargeProduct {
-  id: number | string
-  code: string
-  name: string
-  description?: string | null
-  priceCents?: number
-  priceText?: string
-  giftPoints: number
-  totalPoints?: number
-  status?: string
-  badge?: string | null
-  highlights?: string[]
-}
-
-export type CreditsTransactionType =
-  | 'estimate'
-  | 'freeze'
-  | 'settle'
-  | 'refund'
-  | 'recharge'
-  | 'adjust'
-  | string
-
-export interface CreditsTransaction {
-  id: number | string
-  txnType: CreditsTransactionType
-  points: number
-  balanceBefore?: number
-  balanceAfter?: number
-  billingTaskId?: string | null
-  paymentOrderId?: string | null
-  bizType?: string | null
-  bizId?: string | null
-  remark?: string | null
-  createdAt: string
-}
-
-export interface PaymentOrderResult {
-  id: number | string
-  orderNo: string
-  productId: number | string
-  productName?: string
-  amountCents?: number
-  amountText?: string
-  giftPoints: number
-  totalPoints?: number
-  status: 'pending' | 'paid' | 'failed' | 'canceled' | string
-  payUrl?: string | null
-  qrCodeUrl?: string | null
-  createdAt: string
-}
-
-export interface CreditsAdminOverview {
-  application: {
-    id: number | string
-    code: string
-    name: string
-    status: string
-  } | null
-  applicationFunctions: Array<{
-    code: string
-    name: string
-    defaultPoints: number
-    status: string
-  }>
-  creditAccounts: CreditsAccount[]
-  rechargeProducts: RechargeProduct[]
-  recentTransactions: CreditsTransaction[]
-}
-
-export async function getCreditsAccounts() {
-  const response = await request.get<ApiResponse<{ items: CreditsAccount[] }> | ApiResponse<CreditsAccount[]>>(
-    '/credits/accounts',
-  )
-  const payload = unwrapApiResponse(response as ApiResponse<unknown>)
-  if (Array.isArray(payload)) return payload as CreditsAccount[]
-  return (payload as { items: CreditsAccount[] }).items ?? []
-}
-
-export async function getRechargeProducts() {
-  const response = await request.get<ApiResponse<{ items: RechargeProduct[] }> | ApiResponse<RechargeProduct[]>>(
-    '/credits/recharge-products',
-  )
-  const payload = unwrapApiResponse(response as ApiResponse<unknown>)
-  if (Array.isArray(payload)) return payload as RechargeProduct[]
-  return (payload as { items: RechargeProduct[] }).items ?? []
-}
-
-export async function getCreditsTransactions(params?: {
-  page?: number
-  pageSize?: number
-  txnType?: CreditsTransactionType
-  from?: string
-  to?: string
-}) {
-  const response = await request.get<
-    ApiResponse<{ items: CreditsTransaction[]; total?: number } | CreditsTransaction[]>
-  >('/credits/transactions', { params })
-  const payload = unwrapApiResponse(response)
-  if (Array.isArray(payload)) return { items: payload, total: payload.length }
-  return {
-    items: payload.items ?? [],
-    total: payload.total ?? payload.items?.length ?? 0,
-  }
-}
-
-export async function createRechargeOrder(payload: {
-  productId: number | string
-  quantity?: number
-  remark?: string
-}) {
-  const response = await request.post<ApiResponse<PaymentOrderResult>>(
-    '/credits/payment-orders',
-    payload,
-  )
-  return unwrapApiResponse(response)
-}
-
-export async function getCreditsAdminOverview() {
-  const response = await request.get<ApiResponse<CreditsAdminOverview>>(
-    '/credits/admin/overview',
   )
   return unwrapApiResponse(response)
 }

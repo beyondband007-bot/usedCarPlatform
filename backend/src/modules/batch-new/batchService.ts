@@ -8,6 +8,19 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio } from "../../shared/types";
+import {
+  finalizeGenerationBilling,
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  shouldFinalizeGenerationBilling,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
+import {
+  resolveBillingIdentity,
+  type BillingRequestContext,
+} from "../billing/billingIdentity";
+import { batchItemGenerationPoints } from "../billing/generationPointRules";
 import { deliveryRepository } from "../delivery/deliveryRepository";
 import {
   batchInteriorCleanCollagePrompt,
@@ -15,7 +28,7 @@ import {
   batchInteriorPrompt,
   resolveBatchExteriorPrompt,
 } from "./batchPrompts";
-import { batchRepository } from "./batchRepository";
+import { batchRepository, type BatchTaskRecord } from "./batchRepository";
 import { resolveBatchScene } from "./batchScenes";
 import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
 
@@ -71,6 +84,24 @@ const deliveryTitleByKind: Record<BatchItemKind, string> = {
   interior_clean_collage: "内饰清洁拼图",
 };
 
+const batchItemFunctionCode = (itemKind: BatchItemKind) => {
+  if (itemKind === "exterior") return "batch-new-exterior";
+  return "batch-new-interior";
+};
+
+const batchItemBillingScope = (itemId: string) => ({
+  bizType: "batch_item",
+  bizId: itemId,
+  idempotencyType: "batch_item",
+  idempotencyId: itemId,
+});
+
+const batchBillingBody = (batch: BatchTaskRecord) => ({
+  creditsUserId: batch.creditsUserId,
+  creditsTenantId: batch.creditsTenantId,
+  accountScope: batch.accountScope,
+});
+
 class BatchService {
   async listPresets() {
     const items = await batchRepository.listPresets(DEFAULT_USER_ID);
@@ -117,7 +148,7 @@ class BatchService {
     return { presetId, name: body.name, visualConfig: body.visualConfig, updatedAt: new Date().toISOString() };
   }
 
-  async createBatchTask(body: CreateBatchTaskRequest) {
+  async createBatchTask(body: CreateBatchTaskRequest, context?: BillingRequestContext) {
     if (!body.projectName?.trim()) throw errors.invalidParameter("projectName is required");
     if (!body.presetId) throw errors.invalidParameter("presetId is required");
     if (!Array.isArray(body.carGroups) || body.carGroups.length === 0) {
@@ -125,6 +156,7 @@ class BatchService {
     }
     if (!body.visualConfig) throw errors.invalidParameter("visualConfig is required");
 
+    const billingIdentity = resolveBillingIdentity(body, context);
     const batchId = createId("batch");
     const config = body.visualConfig;
     const interiorClean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
@@ -150,6 +182,9 @@ class BatchService {
       presetId: body.presetId,
       total,
       visualConfig: config,
+      creditsUserId: billingIdentity?.userId ?? null,
+      creditsTenantId: billingIdentity?.tenantId ?? null,
+      accountScope: billingIdentity?.accountScope ?? null,
     });
 
     let sortOrder = 0;
@@ -199,7 +234,9 @@ class BatchService {
       failed: detail.failed,
       progress: detail.progress,
       pollingUrl: `/api/v1/modules/batch-new/tasks/${batchId}`,
-      estimatedCost: total * 120,
+      estimatedCost: Number(detail.estimatedPoints ?? 0),
+      estimatedPoints: detail.estimatedPoints,
+      settledPoints: detail.settledPoints,
       balance: 0,
       createdAt: detail.createdAt,
     };
@@ -223,6 +260,11 @@ class BatchService {
       assetCount,
       visualConfig: batch.visualConfig,
       items,
+      creditsUserId: batch.creditsUserId ?? null,
+      creditsTenantId: batch.creditsTenantId ?? null,
+      accountScope: batch.accountScope ?? null,
+      estimatedPoints: batch.estimatedPoints ?? null,
+      settledPoints: batch.settledPoints ?? null,
       createdAt: batch.createdAt.toISOString(),
       updatedAt: batch.updatedAt.toISOString(),
     };
@@ -241,6 +283,11 @@ class BatchService {
         completed: item.completed,
         failed: item.failed,
         progress: item.progress,
+        creditsUserId: item.creditsUserId ?? null,
+        creditsTenantId: item.creditsTenantId ?? null,
+        accountScope: item.accountScope ?? null,
+        estimatedPoints: item.estimatedPoints ?? null,
+        settledPoints: item.settledPoints ?? null,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
       })),
@@ -266,7 +313,7 @@ class BatchService {
     const waiting = await batchRepository.listWaitingItems(batchId, 2);
     for (const item of waiting) {
       try {
-        await this.submitItem(batch.visualConfig, item);
+        await this.submitItem(batch, item);
       } catch (error) {
         if (error instanceof Error && error.message.includes("no available kie api key")) break;
         await batchRepository.updateItemFromTask({
@@ -280,6 +327,7 @@ class BatchService {
     }
 
     await batchRepository.recalcBatch(batchId);
+    await batchRepository.recalcBatchBilling(batchId);
   }
 
   private async createSubTask(input: {
@@ -340,7 +388,11 @@ class BatchService {
   }
 
   private async refreshItem(batchId: string, item: BatchItemSummary) {
-    const task = await tasksService.getTaskDetail(item.generationTaskId);
+    const task = await tasksService.getTaskDetail(item.generationTaskId, { finalizeBilling: false });
+    const refreshedTask = await tasksRepository.findById(item.generationTaskId);
+    if (refreshedTask && shouldFinalizeGenerationBilling(refreshedTask)) {
+      await finalizeGenerationBilling(refreshedTask, batchItemBillingScope(item.itemId));
+    }
     const resultCount = task.resultImages.length;
     await batchRepository.updateItemFromTask({
       itemId: item.itemId,
@@ -354,7 +406,8 @@ class BatchService {
     }
   }
 
-  private async submitItem(config: BatchVisualConfig, item: BatchItemSummary) {
+  private async submitItem(batch: BatchTaskRecord, item: BatchItemSummary) {
+    const config = batch.visualConfig;
     const task = await tasksRepository.findById(item.generationTaskId);
     if (!task) throw errors.taskNotFound();
     if (!task.inputAssetId) throw errors.assetNotFound();
@@ -367,8 +420,17 @@ class BatchService {
     }
 
     const inputUrls: string[] = [];
+    let billing: FrozenGenerationBilling | null = null;
     const lease = await kieKeyPool.acquire();
     try {
+      billing = await freezeGenerationBilling({
+        taskId: task.id,
+        functionCode: batchItemFunctionCode(item.itemKind),
+        estimatedPoints: batchItemGenerationPoints(config),
+        body: batchBillingBody(batch),
+        scope: batchItemBillingScope(item.itemId),
+      });
+
       for (const asset of sourceAssets) {
         const uploaded = await kieClient.uploadLocalFileWithLease(
           lease,
@@ -428,18 +490,32 @@ class BatchService {
       });
     } catch (error) {
       await kieKeyPool.release(lease.accountHash);
+      try {
+        await refundFrozenGenerationBilling(task.id, billing, batchItemBillingScope(item.itemId));
+      } catch {
+        await markGenerationBillingRefundFailed(task.id, billing);
+      }
+      await tasksRepository.markFailed(
+        task.id,
+        "BATCH_ITEM_SUBMIT_FAILED",
+        error instanceof Error ? error.message : "batch item submit failed",
+      );
       throw error;
     }
   }
 
   private async persistDeliveryAssets(batchId: string, item: BatchItemSummary) {
-    const task = await tasksService.getTaskDetail(item.generationTaskId);
+    const task = await tasksService.getTaskDetail(item.generationTaskId, { finalizeBilling: false });
+    const refreshedTask = await tasksRepository.findById(item.generationTaskId);
+    if (refreshedTask && shouldFinalizeGenerationBilling(refreshedTask)) {
+      await finalizeGenerationBilling(refreshedTask, batchItemBillingScope(item.itemId));
+    }
     let index = 0;
     for (const image of task.resultImages) {
       await deliveryRepository.upsertAsset({
         id: `delivery_${item.generationTaskId}_${index}`,
         sourceTaskId: batchId,
-        title: `${item.groupTitle} ? ${deliveryTitleByKind[item.itemKind] ?? "??"}`,
+        title: `${item.groupTitle} · ${deliveryTitleByKind[item.itemKind] ?? "成片"}`,
         url: image.url,
         thumbnailUrl: image.url,
         ratio: task.outputRatio,
