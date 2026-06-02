@@ -7,33 +7,26 @@ import {
   NDatePicker,
   NPagination,
   NSelect,
+  useMessage,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
 import {
-  createPaymentOrder,
-  getCreditAccounts,
-  getCreditTransactions,
-  getRechargeProducts,
-  type CreditTransaction,
+  createRechargeOrder,
   type RechargeProduct,
 } from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
+import planBasicBg from "@/img/充值积分/基础套餐.png";
+import planTeamBg from "@/img/充值积分/企业团队版.png";
+import planFlagshipBg from "@/img/充值积分/企业旗舰版.png";
 import {
   rechargePlanToneMap,
   rechargePlans,
   type RechargePlan,
   type RechargePlanTone,
 } from "@/constants/recharge-plans";
-import {
-  enterprisePlans,
-  formatPlanPoints,
-  formatPlanPrice,
-  resolveEnterprisePlanCodeFromName,
-  resolveEnterprisePlanName,
-} from "@/domain/enterprise-plans";
 import { useAppStore } from "@/stores/app";
-import { useAuthStore } from "@/stores/auth";
+import { useCreditsStore } from "@/stores/credits";
 
 type RechargeRecord = {
   orderNo: string;
@@ -56,67 +49,100 @@ function getPlanTone(plan: string): RechargePlanTone {
   return tone === "purple" ? "blue" : tone;
 }
 
-const formatNumber = (value: string | number | null | undefined) => {
-  const parsed = Number(value ?? 0);
-  if (!Number.isFinite(parsed)) return "0";
-  return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(parsed);
+const recordSummary: RecordSummary[] = [
+  {
+    label: "今日充值金额 (元)",
+    value: "12,680",
+    tone: "blue",
+    icon: "mdi:cash-multiple",
+  },
+  {
+    label: "今日获得积分",
+    value: "126,800",
+    tone: "gold",
+    icon: "mdi:diamond-stone",
+  },
+  {
+    label: "累计充值金额 (元)",
+    value: "236,580",
+    tone: "gold",
+    icon: "mdi:chart-line",
+  },
+  {
+    label: "累计获得积分",
+    value: "2,365,800",
+    tone: "navy",
+    icon: "mdi:star-four-points",
+  },
+];
+
+const planTypeMeta: Record<string, { icon: string; tone: RechargePlanTone }> = {
+  企业基础版: { icon: "mdi:layers-triple-outline", tone: "blue" },
+  企业团队版: { icon: "mdi:chart-bar", tone: "blue" },
+  企业旗舰版: { icon: "mdi:crown-outline", tone: "gold" },
 };
 
-const formatCurrency = (value: string | number | null | undefined) => `¥${formatNumber(value)}`;
-
-const formatDateTime = (value: string | null | undefined) => {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date).replace(/\//g, "-");
-};
-
-const productDisplayName = (product: RechargeProduct, index: number) => {
-  const planCode = resolveEnterprisePlanCodeFromName(product.name);
-  if (planCode) return resolveEnterprisePlanName(planCode);
-  return rechargePlans[index]?.name ?? product.name;
-};
-
-const productTone = (name: string, index: number): RechargePlanTone => {
-  const planCode = resolveEnterprisePlanCodeFromName(name);
-  if (planCode === "flagship") return "gold";
-  if (planCode === "team") return "blue";
-  return index === 2 ? "gold" : "blue";
-};
-
-const planTypeMeta: Record<
-  string,
-  { icon: string; tone: RechargePlanTone }
-> = {
-  企业基础档: { icon: "mdi:layers-triple-outline", tone: "blue" },
-  企业团队档: { icon: "mdi:chart-bar", tone: "blue" },
-  企业旗舰档: { icon: "mdi:crown-outline", tone: "gold" },
-};
-
-const selectedPlanName = ref(enterprisePlans.team.name);
+const selectedPlanName = ref("企业团队版");
 const pressingPlanName = ref<string | null>(null);
-const plans = ref<RechargePlan[]>(rechargePlans);
-const productsByPlan = ref<Record<string, RechargeProduct>>({});
-const records = ref<RechargeRecord[]>([]);
-const isLoadingRecharge = ref(false);
 const isCreatingOrder = ref(false);
 
 const appStore = useAppStore();
-const authStore = useAuthStore();
+const creditsStore = useCreditsStore();
+const message = useMessage();
+
+onMounted(async () => {
+  await creditsStore.hydrateRechargeProducts();
+  // 默认选中第一项 API 产品
+  const first = creditsStore.rechargeProducts[0];
+  if (first) selectedPlanName.value = first.name;
+});
+
+function resolveBackgroundImage(tone: RechargePlanTone) {
+  if (tone === "purple") return planTeamBg;
+  if (tone === "gold") return planFlagshipBg;
+  return planBasicBg;
+}
+
+function resolveIcon(tone: RechargePlanTone) {
+  if (tone === "purple") return "mdi:chart-bar";
+  if (tone === "gold") return "mdi:crown-outline";
+  return "mdi:layers-triple-outline";
+}
+
+function formatPrice(product: RechargeProduct) {
+  if (product.priceText) return product.priceText;
+  if (typeof product.priceCents === "number") {
+    return `¥${(product.priceCents / 100).toLocaleString("zh-CN")}`;
+  }
+  return "-";
+}
+
+function mapProductToPlan(product: RechargeProduct): RechargePlan {
+  const tone: RechargePlanTone = rechargePlanToneMap[product.name] ?? "blue";
+  return {
+    name: product.name,
+    subtitle: product.description ?? "",
+    price: formatPrice(product),
+    giftPoints: Number(product.giftPoints ?? 0).toLocaleString("zh-CN"),
+    tone,
+    icon: resolveIcon(tone),
+    badge: product.badge ?? undefined,
+    backgroundImage: resolveBackgroundImage(tone),
+    benefits: product.highlights ?? [],
+  };
+}
+
+const displayPlans = computed<RechargePlan[]>(() =>
+  creditsStore.rechargeProducts.length > 0
+    ? creditsStore.rechargeProducts.map(mapProductToPlan)
+    : rechargePlans,
+);
 
 const recordTypeOptions = [
   { label: "全部类型", value: "all" },
-  { label: enterprisePlans.basic.name, value: "basic" },
-  { label: enterprisePlans.team.name, value: "advanced" },
-  { label: enterprisePlans.flagship.name, value: "premium" },
+  { label: "企业基础版", value: "basic" },
+  { label: "企业团队版", value: "advanced" },
+  { label: "企业旗舰版", value: "premium" },
 ];
 
 function handlePlanPointerDown(name: string) {
@@ -127,133 +153,78 @@ function clearPlanPress() {
   pressingPlanName.value = null;
 }
 
-function handlePlanSelect(name: string) {
+async function handlePlanSelect(name: string) {
   selectedPlanName.value = name;
-  void createOrderForPlan(name);
-}
-
-const recordSummary = computed<RecordSummary[]>(() => {
-  const successfulRecords = records.value.filter((record) => record.status === "支付成功");
-  const today = new Date().toISOString().slice(0, 10);
-  const todayRecords = successfulRecords.filter((record) => record.paidAt.startsWith(today));
-  const sumAmount = (items: RechargeRecord[]) =>
-    items.reduce((sum, record) => sum + Number(record.amount.replace(/[¥,]/g, "")), 0);
-  const sumPoints = (items: RechargeRecord[]) =>
-    items.reduce((sum, record) => sum + Number(record.points.replace(/,/g, "")), 0);
-
-  return [
-    {
-      label: "今日充值金额 (元)",
-      value: formatNumber(sumAmount(todayRecords)),
-      tone: "blue",
-      icon: "mdi:cash-multiple",
-    },
-    {
-      label: "今日获得积分",
-      value: formatNumber(sumPoints(todayRecords)),
-      tone: "blue",
-      icon: "mdi:diamond-stone",
-    },
-    {
-      label: "累计充值金额 (元)",
-      value: formatNumber(sumAmount(successfulRecords)),
-      tone: "gold",
-      icon: "mdi:chart-line",
-    },
-    {
-      label: "累计获得积分",
-      value: formatNumber(sumPoints(successfulRecords)),
-      tone: "navy",
-      icon: "mdi:star-four-points",
-    },
-  ];
-});
-
-function mapProductToPlan(product: RechargeProduct, index: number): RechargePlan {
-  const fallback = rechargePlans[index] ?? rechargePlans[0];
-  const name = productDisplayName(product, index);
-  const planCode = resolveEnterprisePlanCodeFromName(name);
-  const enterprisePlan = planCode ? enterprisePlans[planCode] : null;
-  return {
-    ...fallback,
-    name,
-    price: enterprisePlan ? formatPlanPrice(enterprisePlan) : formatCurrency(product.amount),
-    giftPoints: enterprisePlan
-      ? formatPlanPoints(enterprisePlan)
-      : formatNumber(Number(product.points) + Number(product.bonusPoints)),
-    tone: productTone(name, index),
-    badge: fallback.badge,
-  };
-}
-
-function mapTransactionToRechargeRecord(transaction: CreditTransaction): RechargeRecord | null {
-  if (!transaction.paymentOrderId || Number(transaction.points) <= 0) return null;
-  return {
-    orderNo: String(transaction.paymentOrderId),
-    plan: "积分充值",
-    amount: "—",
-    points: formatNumber(transaction.points),
-    status: "支付成功",
-    paidAt: formatDateTime(transaction.createdAt),
-  };
-}
-
-async function loadRechargeData() {
-  isLoadingRecharge.value = true;
-  try {
-    const [{ products }, { accounts }] = await Promise.all([
-      getRechargeProducts(),
-      getCreditAccounts(),
-    ]);
-    const enabledProducts = products.filter((product) => product.enabled);
-    plans.value = enabledProducts.map(mapProductToPlan);
-    productsByPlan.value = Object.fromEntries(
-      enabledProducts.map((product, index) => [productDisplayName(product, index), product]),
-    );
-    selectedPlanName.value = plans.value[1]?.name ?? plans.value[0]?.name ?? selectedPlanName.value;
-    const account = accounts.find((item) => item.accountScope === "personal") ?? accounts[0];
-    if (account) {
-      authStore.credits = formatNumber(account.availableBalance);
-      const transactionResult = await getCreditTransactions({ accountId: account.id, limit: 50 });
-      records.value = transactionResult.transactions
-        .map(mapTransactionToRechargeRecord)
-        .filter((record): record is RechargeRecord => Boolean(record));
-    }
-  } catch (error) {
-    console.warn("failed to load recharge data", error);
-    plans.value = rechargePlans;
-  } finally {
-    isLoadingRecharge.value = false;
+  const product = creditsStore.rechargeProducts.find(
+    (item) => item.name === name,
+  );
+  if (!product) {
+    message.info("当前为原型套餐，未接入真实下单接口");
+    return;
   }
-}
-
-async function createOrderForPlan(name: string) {
-  const product = productsByPlan.value[name];
-  if (!product || isCreatingOrder.value) return;
-  const enterprisePlan = enterprisePlans[resolveEnterprisePlanCodeFromName(name) ?? "team"];
-
+  if (isCreatingOrder.value) return;
   isCreatingOrder.value = true;
   try {
-    const order = await createPaymentOrder({
-      productId: product.id,
-      payChannel: "wechat",
-      idempotencyKey: `recharge:${product.id}:${Date.now()}`,
-    });
-    records.value = [
-      {
-        orderNo: order.orderNo,
-        plan: name,
-        amount: formatPlanPrice(enterprisePlan),
-        points: formatPlanPoints(enterprisePlan),
-        status: order.status === "failed" ? "支付失败" : order.status === "paid" ? "支付成功" : "支付中",
-        paidAt: formatDateTime(order.paidAt) === "—" ? formatDateTime(new Date().toISOString()) : formatDateTime(order.paidAt),
-      },
-      ...records.value,
-    ];
+    const order = await createRechargeOrder({ productId: product.id });
+    message.success(`充值订单已创建（${order.orderNo}），等待支付`);
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "创建充值订单失败";
+    message.error(text);
   } finally {
     isCreatingOrder.value = false;
   }
 }
+
+const records: RechargeRecord[] = [
+  {
+    orderNo: "202605200001",
+    plan: "企业团队版",
+    amount: "¥3,980",
+    points: "550",
+    status: "支付成功",
+    paidAt: "2026-05-20 10:30:45",
+  },
+  {
+    orderNo: "202605190002",
+    plan: "企业基础版",
+    amount: "¥980",
+    points: "200",
+    status: "支付成功",
+    paidAt: "2026-05-19 15:20:18",
+  },
+  {
+    orderNo: "202605180003",
+    plan: "企业旗舰版",
+    amount: "¥9,800",
+    points: "9800",
+    status: "支付成功",
+    paidAt: "2026-05-18 09:15:33",
+  },
+  {
+    orderNo: "202605160006",
+    plan: "企业旗舰版",
+    amount: "¥9,800",
+    points: "9800",
+    status: "支付中",
+    paidAt: "2026-05-16 14:22:09",
+  },
+  {
+    orderNo: "202605150004",
+    plan: "企业团队版",
+    amount: "¥3,980",
+    points: "550",
+    status: "支付失败",
+    paidAt: "2026-05-15 11:05:22",
+  },
+  {
+    orderNo: "202605100005",
+    plan: "企业基础版",
+    amount: "¥980",
+    points: "200",
+    status: "支付成功",
+    paidAt: "2026-05-10 16:40:11",
+  },
+];
 
 const recordsColumns: DataTableColumns<RechargeRecord> = [
   {
@@ -267,15 +238,11 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     key: "plan",
     width: 168,
     render(row) {
-      const meta = planTypeMeta[row.plan] ?? planTypeMeta[enterprisePlans.basic.name];
-      return h(
-        "span",
-        { class: ["plan-type-pill", `is-${meta.tone}`] },
-        [
-          h(Icon, { icon: meta.icon, class: "plan-type-pill-icon" }),
-          h("span", row.plan),
-        ],
-      );
+      const meta = planTypeMeta[row.plan] ?? planTypeMeta["企业基础版"];
+      return h("span", { class: ["plan-type-pill", `is-${meta.tone}`] }, [
+        h(Icon, { icon: meta.icon, class: "plan-type-pill-icon" }),
+        h("span", row.plan),
+      ]);
     },
   },
   {
@@ -342,10 +309,6 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
     },
   },
 ];
-
-onMounted(() => {
-  void loadRechargeData();
-});
 </script>
 
 <template>
@@ -359,7 +322,7 @@ onMounted(() => {
           <section class="plan-module" aria-label="选择充值套餐">
             <div class="plan-grid">
               <RechargePlanCard
-                v-for="plan in plans"
+                v-for="plan in displayPlans"
                 :key="plan.name"
                 :plan="plan"
                 :selected="selectedPlanName === plan.name"
@@ -393,11 +356,7 @@ onMounted(() => {
                   size="medium"
                 />
 
-                <NButton
-                  class="export-button"
-                  size="medium"
-                  attr-type="button"
-                >
+                <NButton class="export-button" size="medium" attr-type="button">
                   <template #icon>
                     <Icon icon="mdi:tray-arrow-up" />
                   </template>
@@ -429,7 +388,6 @@ onMounted(() => {
                   class="records-data-table"
                   :columns="recordsColumns"
                   :data="records"
-                  :loading="isLoadingRecharge || isCreatingOrder"
                   :bordered="false"
                   :single-line="false"
                   :pagination="false"
@@ -438,12 +396,12 @@ onMounted(() => {
               </div>
 
               <footer class="records-footer">
-                <p class="records-total">共 {{ records.length }} 条</p>
+                <p class="records-total">共 128 条</p>
                 <NPagination
                   class="records-pager"
                   :page="1"
                   :page-size="10"
-                  :item-count="records.length"
+                  :item-count="128"
                   :page-sizes="[10, 20, 50]"
                   show-size-picker
                   show-quick-jumper
@@ -506,19 +464,17 @@ onMounted(() => {
   --recharge-gold: #d4a017;
   --shell-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
 
-  background:
-    radial-gradient(
-      860px 220px at 63% 0%,
-      rgba(47, 107, 255, 0.06),
-      transparent 72%
-    ),
-    #f6f9fc;
+  background: #f6f9fc;
 }
 
 .recharge-shell {
   width: 100%;
   max-width: 1500px;
-  min-height: calc(100vh - var(--app-header-offset) - var(--recharge-page-pad) - var(--recharge-page-pad));
+  min-height: calc(
+    100vh - var(--app-header-offset) - var(--recharge-page-pad) - var(
+        --recharge-page-pad
+      )
+  );
   margin: 0 auto;
 }
 
@@ -535,9 +491,7 @@ onMounted(() => {
 }
 
 .recharge-page.theme-light .recharge-panel {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
-    var(--recharge-panel);
+  background: var(--recharge-panel);
 }
 
 .recharge-hero {
@@ -555,7 +509,11 @@ onMounted(() => {
 
 .recharge-page.theme-light .recharge-hero {
   background:
-    radial-gradient(circle at 80% 50%, rgba(59, 130, 246, 0.08), transparent 55%),
+    radial-gradient(
+      circle at 80% 50%,
+      rgba(59, 130, 246, 0.08),
+      transparent 55%
+    ),
     var(--recharge-head);
 }
 
@@ -681,7 +639,8 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: clamp(22px, 2.2vw, 32px);
-  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px) clamp(24px, 2vw, 32px);
+  padding: clamp(18px, 1.6vw, 24px) clamp(22px, 2.4vw, 34px)
+    clamp(24px, 2vw, 32px);
 }
 
 .plan-module {
@@ -704,7 +663,7 @@ onMounted(() => {
 
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   gap: var(--plan-gap);
   margin-top: 0;
@@ -753,8 +712,13 @@ onMounted(() => {
   border: 1px solid rgba(188, 205, 223, 0.45);
   border-radius: 12px;
   background:
-    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1.5px) 0 0 / 18px 18px,
-    linear-gradient(135deg, rgba(241, 247, 255, 0.92), rgba(255, 255, 255, 0.88));
+    radial-gradient(circle, rgba(148, 163, 184, 0.14) 1px, transparent 1.5px) 0
+      0 / 18px 18px,
+    linear-gradient(
+      135deg,
+      rgba(241, 247, 255, 0.92),
+      rgba(255, 255, 255, 0.88)
+    );
 }
 
 .theme-dark .records-summary {
@@ -864,7 +828,10 @@ onMounted(() => {
 
 .records-filter {
   display: grid;
-  grid-template-columns: minmax(260px, 1.25fr) minmax(150px, 0.72fr) minmax(92px, 0.42fr);
+  grid-template-columns: minmax(260px, 1.25fr) minmax(150px, 0.72fr) minmax(
+      92px,
+      0.42fr
+    );
   gap: 12px;
   align-items: center;
   width: min(100%, 620px);
@@ -885,7 +852,11 @@ onMounted(() => {
   --n-color: var(--recharge-field);
   --n-color-active: var(--recharge-field);
   --n-color-focus: var(--recharge-field);
-  --n-color-hover: color-mix(in srgb, var(--recharge-field) 88%, var(--recharge-blue));
+  --n-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 88%,
+    var(--recharge-blue)
+  );
   --n-border: 1px solid var(--recharge-border-soft);
   --n-border-active: 1px solid rgba(52, 124, 255, 0.66);
   --n-border-focus: 1px solid rgba(52, 124, 255, 0.72);
@@ -1081,7 +1052,11 @@ onMounted(() => {
   --n-item-size: 30px;
   --n-item-border-radius: 5px;
   --n-item-color: var(--recharge-field);
-  --n-item-color-hover: color-mix(in srgb, var(--recharge-field) 84%, var(--recharge-blue));
+  --n-item-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 84%,
+    var(--recharge-blue)
+  );
   --n-item-color-active: var(--recharge-blue);
   --n-item-color-active-hover: var(--recharge-blue);
   --n-item-border: 1px solid var(--recharge-border-soft);
@@ -1091,7 +1066,11 @@ onMounted(() => {
   --n-item-text-color-hover: var(--recharge-text);
   --n-item-text-color-active: #fff;
   --n-button-color: var(--recharge-field);
-  --n-button-color-hover: color-mix(in srgb, var(--recharge-field) 84%, var(--recharge-blue));
+  --n-button-color-hover: color-mix(
+    in srgb,
+    var(--recharge-field) 84%,
+    var(--recharge-blue)
+  );
   --n-button-border: 1px solid var(--recharge-border-soft);
   --n-button-border-hover: 1px solid rgba(52, 124, 255, 0.42);
   --n-button-icon-color: var(--recharge-muted);

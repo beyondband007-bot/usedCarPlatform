@@ -3,11 +3,35 @@ import type {
   SubscriptionPlanCode,
   SubscriptionStateSnapshot,
 } from '@/types/subscription'
-import { enterprisePlans } from '@/domain/enterprise-plans'
 
 import { mockDelay, readMockStorage, writeMockStorage } from './mock-storage'
 
-export const subscriptionPlans: Record<SubscriptionPlanCode, SubscriptionPlan> = enterprisePlans
+export const subscriptionPlans: Record<SubscriptionPlanCode, SubscriptionPlan> = {
+  basic: {
+    plan: 'basic',
+    name: '企业基础版',
+    price: 980,
+    accountLimit: 1,
+    concurrentTaskLimit: 1,
+    giftPoints: 20000,
+  },
+  team: {
+    plan: 'team',
+    name: '企业团队版',
+    price: 3980,
+    accountLimit: 5,
+    concurrentTaskLimit: 5,
+    giftPoints: 55000,
+  },
+  flagship: {
+    plan: 'flagship',
+    name: '企业旗舰版',
+    price: 9800,
+    accountLimit: 20,
+    concurrentTaskLimit: 20,
+    giftPoints: 980000,
+  },
+}
 
 const STORAGE_KEY = 'ai-car-studio:subscription'
 

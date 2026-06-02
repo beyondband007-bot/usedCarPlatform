@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { computed, h, onMounted, ref } from "vue";
+import { h } from "vue";
 import {
   NButton,
   NDataTable,
@@ -11,21 +11,7 @@ import {
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 
-import {
-  getCreditAccounts,
-  getCreditTransactions,
-  type CreditTransaction,
-} from "@/api/visual-workbench";
-import {
-  accountDisplayName,
-  buildEnterpriseAccountViews,
-  buildFlagshipChildTransactions,
-  canMotherAccountViewChildren,
-  type EnterpriseAccountView,
-} from "@/domain/enterprise-account-hierarchy";
 import { useAppStore } from "@/stores/app";
-import { useAuthStore } from "@/stores/auth";
-import { useSubscriptionStore } from "@/stores/subscription";
 import {
   creditsAccountOptions,
   creditsFlowData,
@@ -36,112 +22,9 @@ import {
 import type { CreditFlowRow } from "@/constants/credits-page";
 
 const appStore = useAppStore();
-const authStore = useAuthStore();
-const subscriptionStore = useSubscriptionStore();
 const copy = creditsPageCopy;
-const isLoadingCredits = ref(false);
-const accounts = ref<EnterpriseAccountView[]>([]);
-const transactions = ref<CreditTransaction[]>([]);
-const fallbackFlowRows = ref<CreditFlowRow[]>(creditsFlowData);
-const selectedAccountValue = ref("all-account");
 
-const formatPoints = (value: string | number | null | undefined) => {
-  const parsed = Number(value ?? 0);
-  if (!Number.isFinite(parsed)) return "0";
-  return new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(parsed);
-};
-
-const formatDateTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date).replace(/\//g, "-");
-};
-
-const transactionTypeLabel = (type: string) => {
-  const labels: Record<string, string> = {
-    grant: "套餐赠送",
-    recharge: "套餐赠送",
-    estimate: "费用预估",
-    freeze: "任务冻结",
-    settle: "任务结算",
-    refund: "失败退款",
-    release: "释放冻结",
-  };
-  return labels[type] ?? type;
-};
-
-const signedPoints = (points: string) => {
-  const parsed = Number(points);
-  if (!Number.isFinite(parsed)) return points;
-  return `${parsed > 0 ? "+" : ""}${formatPoints(parsed)}`;
-};
-
-const mapTransaction = (transaction: CreditTransaction): CreditFlowRow => ({
-  flowNo: String(transaction.id),
-  flowType: transactionTypeLabel(transaction.txnType),
-  delta: signedPoints(transaction.points),
-  balance: formatPoints(transaction.balanceAfter),
-  account: accountDisplayName(accounts.value.find((account) => account.id === transaction.accountId)),
-  createdAt: formatDateTime(transaction.createdAt),
-  remark: transaction.remark ?? transaction.bizType ?? "—",
-});
-
-const selectedAccountIds = computed(() => {
-  if (selectedAccountValue.value === "all-account") return accounts.value.map((account) => account.id);
-
-  const selectedId = Number(selectedAccountValue.value);
-  const selected = accounts.value.find((account) => account.id === selectedId);
-  if (!selected) return [];
-
-  if (selected.relation === "mother") {
-    return accounts.value
-      .filter((account) => account.id === selected.id || account.parentAccountId === selected.id)
-      .map((account) => account.id);
-  }
-
-  return [selected.id];
-});
-
-const visibleTransactions = computed(() => {
-  const selectedIds = new Set(selectedAccountIds.value);
-  if (!selectedIds.size) return transactions.value;
-  return transactions.value.filter((transaction) => selectedIds.has(transaction.accountId));
-});
-
-const selectedAccounts = computed(() => {
-  const selectedIds = new Set(selectedAccountIds.value);
-  if (!selectedIds.size) return accounts.value;
-  return accounts.value.filter((account) => selectedIds.has(account.id));
-});
-
-const stats = computed(() => creditsStats.map((stat) => {
-  const positiveTotal = visibleTransactions.value.reduce((sum, transaction) => {
-    const points = Number(transaction.points);
-    return points > 0 ? sum + points : sum;
-  }, 0);
-  const negativeTotal = visibleTransactions.value.reduce((sum, transaction) => {
-    const points = Number(transaction.points);
-    return points < 0 ? sum + Math.abs(points) : sum;
-  }, 0);
-  const availableBalance = selectedAccounts.value.reduce(
-    (sum, account) => sum + Number(account.availableBalance || 0),
-    0,
-  );
-  const recentTotal = visibleTransactions.value.reduce((sum, transaction) => sum + Number(transaction.points || 0), 0);
-  const values: Record<string, string> = {
-    累计获得: `+${formatPoints(positiveTotal)}`,
-    累计消耗: `-${formatPoints(negativeTotal)}`,
-    当前可用: formatPoints(availableBalance),
-    近30天流水: `${recentTotal >= 0 ? "+" : ""}${formatPoints(recentTotal)}`,
-  };
+const stats = creditsStats.map((stat) => {
   const visual =
     stat.tone === "success"
       ? { className: "is-green", glyph: "累", icon: "mdi:leaf" }
@@ -151,59 +34,8 @@ const stats = computed(() => creditsStats.map((stat) => {
           ? { className: "is-blue", glyph: "当", icon: "mdi:diamond-stone" }
           : { className: "is-purple", glyph: "近", icon: "mdi:chart-timeline-variant-shimmer" };
 
-  return { ...stat, value: values[stat.label] ?? stat.value, ...visual };
-}));
-
-const accountOptions = computed(() => {
-  if (!accounts.value.length) return creditsAccountOptions;
-  return [
-    {
-      label: canMotherAccountViewChildren(subscriptionStore.currentPlan)
-        ? "母账号 + 3 个子账号"
-        : "全部账号",
-      value: "all-account",
-    },
-    ...accounts.value.map((account) => ({
-      label: accountDisplayName(account),
-      value: String(account.id),
-    })),
-  ];
+  return { ...stat, ...visual };
 });
-
-const flowRows = computed(() => {
-  if (!transactions.value.length) return fallbackFlowRows.value;
-  return visibleTransactions.value.map(mapTransaction);
-});
-
-async function loadCreditsPage() {
-  isLoadingCredits.value = true;
-  try {
-    await subscriptionStore.hydrate();
-    const accountResult = await getCreditAccounts();
-    accounts.value = buildEnterpriseAccountViews(subscriptionStore.currentPlan, accountResult.accounts);
-    const account = accountResult.accounts.find((item) => item.accountScope === "personal") ?? accountResult.accounts[0];
-    if (account) {
-      authStore.credits = formatPoints(account.availableBalance);
-      const transactionResult = await getCreditTransactions({
-        accountId: account.id,
-        limit: 50,
-      });
-      transactions.value = [
-        ...transactionResult.transactions,
-        ...buildFlagshipChildTransactions(subscriptionStore.currentPlan, accounts.value),
-      ];
-      fallbackFlowRows.value = [];
-    } else {
-      transactions.value = [];
-      fallbackFlowRows.value = [];
-    }
-  } catch (error) {
-    console.warn("failed to load credits page data", error);
-    fallbackFlowRows.value = creditsFlowData;
-  } finally {
-    isLoadingCredits.value = false;
-  }
-}
 
 const tagClass = (flowType: string) => {
   if (flowType === "套餐赠送" || flowType === "失败退款") return "is-positive";
@@ -290,10 +122,6 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
     },
   },
 ];
-
-onMounted(() => {
-  void loadCreditsPage();
-});
 </script>
 
 <template>
@@ -305,7 +133,7 @@ onMounted(() => {
             <h1>{{ copy.title }}</h1>
             <p>{{ copy.subtitle }}</p>
           </div>
-          <NButton class="query-button" type="primary" attr-type="button" :loading="isLoadingCredits" @click="loadCreditsPage">
+          <NButton class="query-button" type="primary" attr-type="button">
             查分查询
           </NButton>
         </header>
@@ -329,8 +157,8 @@ onMounted(() => {
 
           <NSelect
             class="filter-select"
-            v-model:value="selectedAccountValue"
-            :options="accountOptions"
+            :options="creditsAccountOptions"
+            default-value="all-account"
             size="large"
           />
 
@@ -364,8 +192,7 @@ onMounted(() => {
           <NDataTable
             class="flow-data-table"
             :columns="flowColumns"
-            :data="flowRows"
-            :loading="isLoadingCredits"
+            :data="creditsFlowData"
             :bordered="false"
             :single-line="false"
             :pagination="false"

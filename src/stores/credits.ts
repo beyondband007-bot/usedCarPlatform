@@ -2,18 +2,18 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import {
-  getCreditAccounts,
-  getCreditTransactions,
+  getCreditsAccounts,
+  getCreditsTransactions,
   getRechargeProducts,
-  type CreditAccount,
-  type CreditTransaction,
+  type CreditsAccount,
+  type CreditsTransaction,
   type RechargeProduct,
 } from '@/api/visual-workbench'
 import { getCreditsIdentity } from '@/utils/credits-identity'
 
 export const useCreditsStore = defineStore('credits', () => {
-  const accounts = ref<CreditAccount[]>([])
-  const transactions = ref<CreditTransaction[]>([])
+  const accounts = ref<CreditsAccount[]>([])
+  const transactions = ref<CreditsTransaction[]>([])
   const rechargeProducts = ref<RechargeProduct[]>([])
 
   const isLoadingAccounts = ref(false)
@@ -26,7 +26,7 @@ export const useCreditsStore = defineStore('credits', () => {
 
   const lastError = ref<string | null>(null)
 
-  const activeAccount = computed<CreditAccount | null>(() => {
+  const activeAccount = computed<CreditsAccount | null>(() => {
     const identity = getCreditsIdentity()
     const matched = accounts.value.find(
       (account) => String(account.userId) === String(identity.userId)
@@ -35,16 +35,15 @@ export const useCreditsStore = defineStore('credits', () => {
     return matched ?? accounts.value[0] ?? null
   })
 
-  const availableBalance = computed(() => Number(activeAccount.value?.availableBalance ?? 0))
-  const lockedBalance = computed(() => Number(activeAccount.value?.lockedBalance ?? 0))
-  const totalBalance = computed(() => Number(activeAccount.value?.totalBalance ?? 0))
+  const availableBalance = computed(() => activeAccount.value?.availableBalance ?? 0)
+  const lockedBalance = computed(() => activeAccount.value?.lockedBalance ?? 0)
+  const totalBalance = computed(() => activeAccount.value?.totalBalance ?? 0)
 
   async function hydrateAccounts(force = false) {
     if (!force && accountsLoaded.value) return
     isLoadingAccounts.value = true
     try {
-      const result = await getCreditAccounts()
-      accounts.value = result.accounts
+      accounts.value = await getCreditsAccounts()
       accountsLoaded.value = true
       lastError.value = null
     } catch (error) {
@@ -57,10 +56,11 @@ export const useCreditsStore = defineStore('credits', () => {
   async function loadTransactions(params?: { page?: number; pageSize?: number }) {
     isLoadingTransactions.value = true
     try {
-      const result = await getCreditTransactions({
-        limit: params?.pageSize ?? 50,
+      const result = await getCreditsTransactions({
+        page: params?.page ?? 1,
+        pageSize: params?.pageSize ?? 50,
       })
-      transactions.value = result.transactions
+      transactions.value = result.items
       transactionsLoaded.value = true
       lastError.value = null
     } catch (error) {
@@ -74,8 +74,7 @@ export const useCreditsStore = defineStore('credits', () => {
     if (!force && productsLoaded.value) return
     isLoadingProducts.value = true
     try {
-      const result = await getRechargeProducts()
-      rechargeProducts.value = result.products
+      rechargeProducts.value = await getRechargeProducts()
       productsLoaded.value = true
       lastError.value = null
     } catch (error) {

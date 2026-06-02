@@ -1,445 +1,607 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch } from 'vue'
-import { Icon } from '@iconify/vue'
-import { NButton, NDataTable, NDatePicker, NInput, NPagination, NSelect, NTag } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import { computed, ref, watch } from "vue";
 
-import { useAppStore } from '@/stores/app'
-import { usePointsStore } from '@/stores/points'
-import { useSubscriptionStore } from '@/stores/subscription'
-import { resolveEnterprisePlanName } from '@/domain/enterprise-plans'
-import type { PointRecord, PointRecordType } from '@/types/points'
+import PointsFilterPanel from "@/components/business/points/PointsFilterPanel.vue";
+import PointsFlowTable from "@/components/business/points/PointsFlowTable.vue";
+import PointsQueryHeader from "@/components/business/points/PointsQueryHeader.vue";
+import PointsSummaryCards from "@/components/business/points/PointsSummaryCards.vue";
+import type {
+  PointsFlowRecord,
+  PointsQueryFilters,
+  PointsQueryVersion,
+  PointsSummaryCard,
+} from "@/types/points-query";
 
-const appStore = useAppStore()
-const pointsStore = usePointsStore()
-const subscriptionStore = useSubscriptionStore()
+const pageSize = 12;
 
-onMounted(async () => {
-  await subscriptionStore.hydrate()
-  await pointsStore.hydrate()
-})
+const version = ref<PointsQueryVersion>("personal");
+const currentPage = ref(1);
+const filters = ref<PointsQueryFilters>({
+  member: "",
+  txnType: "",
+  dateRange: "",
+  startDate: "2025-05-01",
+  endDate: "2025-05-31",
+  bizSource: "",
+});
+const appliedFilters = ref<PointsQueryFilters>({ ...filters.value });
 
-const planName = computed(() => resolveEnterprisePlanName(subscriptionStore.currentPlan))
+const personalRecords: PointsFlowRecord[] = [
+  {
+    id: "TXN-20250528-001",
+    txnType: "consume",
+    pointsChange: -120,
+    balanceAfter: 4340,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "展厅光影",
+    remark: "经典白棚",
+    createdAt: "2025-05-28 14:32:18",
+  },
+  {
+    id: "TXN-20250527-002",
+    txnType: "consume",
+    pointsChange: -80,
+    balanceAfter: 4460,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "户外街景",
+    remark: "春季新品",
+    createdAt: "2025-05-27 09:15:42",
+  },
+  {
+    id: "TXN-20250526-003",
+    txnType: "gift",
+    pointsChange: 500,
+    balanceAfter: 4540,
+    bizSource: "package",
+    title: "套餐赠送",
+    functionName: "月度套餐",
+    remark: "5月会员福利",
+    createdAt: "2025-05-26 10:00:00",
+  },
+  {
+    id: "TXN-20250525-004",
+    txnType: "consume",
+    pointsChange: -200,
+    balanceAfter: 4040,
+    bizSource: "batch",
+    title: "批量上新",
+    functionName: "批量生成",
+    remark: "5月展厅批量上新",
+    createdAt: "2025-05-25 16:45:30",
+  },
+  {
+    id: "TXN-20250524-005",
+    txnType: "recharge",
+    pointsChange: 1000,
+    balanceAfter: 4240,
+    bizSource: "purchase",
+    title: "充值购买",
+    functionName: "积分充值",
+    remark: "支付宝支付",
+    createdAt: "2025-05-24 11:22:08",
+  },
+  {
+    id: "TXN-20250523-006",
+    txnType: "consume",
+    pointsChange: -150,
+    balanceAfter: 3240,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "家居场景",
+    remark: "北欧风格",
+    createdAt: "2025-05-23 13:50:15",
+  },
+  {
+    id: "TXN-20250522-007",
+    txnType: "refund",
+    pointsChange: 80,
+    balanceAfter: 3390,
+    bizSource: "fail",
+    title: "失败退款",
+    functionName: "单图生成",
+    remark: "生成失败自动退款",
+    createdAt: "2025-05-22 08:30:00",
+  },
+  {
+    id: "TXN-20250521-008",
+    txnType: "consume",
+    pointsChange: -300,
+    balanceAfter: 3310,
+    bizSource: "batch",
+    title: "批量上新",
+    functionName: "批量生成",
+    remark: "夏季系列",
+    createdAt: "2025-05-21 15:10:22",
+  },
+  {
+    id: "TXN-20250520-009",
+    txnType: "recharge",
+    pointsChange: 2000,
+    balanceAfter: 3610,
+    bizSource: "purchase",
+    title: "充值购买",
+    functionName: "积分充值",
+    remark: "企业采购",
+    createdAt: "2025-05-20 09:00:00",
+  },
+  {
+    id: "TXN-20250519-010",
+    txnType: "consume",
+    pointsChange: -90,
+    balanceAfter: 1610,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "产品特写",
+    remark: "细节展示",
+    createdAt: "2025-05-19 11:35:48",
+  },
+  {
+    id: "TXN-20250518-011",
+    txnType: "gift",
+    pointsChange: 200,
+    balanceAfter: 1700,
+    bizSource: "package",
+    title: "套餐赠送",
+    functionName: "季度套餐",
+    remark: "老客户回馈",
+    createdAt: "2025-05-18 14:00:00",
+  },
+  {
+    id: "TXN-20250517-012",
+    txnType: "consume",
+    pointsChange: -60,
+    balanceAfter: 1500,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "场景合成",
+    remark: "室内场景",
+    createdAt: "2025-05-17 10:20:33",
+  },
+];
 
-const flowKeyword = ref('')
-const selectedFlowType = ref<'all' | PointRecordType>('all')
-const dateRange = ref<[number, number] | null>(null)
-const flowPage = ref(1)
-const flowPageSize = 10
+const enterpriseRecords: PointsFlowRecord[] = [
+  {
+    id: "TXN-20250528-101",
+    txnType: "consume",
+    pointsChange: -120,
+    balanceAfter: 4340,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "展厅光影",
+    remark: "经典白棚",
+    memberId: "u001",
+    memberName: "张小明",
+    isOwner: true,
+    createdAt: "2025-05-28 14:32:18",
+  },
+  {
+    id: "TXN-20250528-102",
+    txnType: "consume",
+    pointsChange: -200,
+    balanceAfter: 3800,
+    bizSource: "batch",
+    title: "批量上新",
+    functionName: "批量生成",
+    remark: "5月上新",
+    memberId: "u002",
+    memberName: "李芳",
+    isOwner: false,
+    createdAt: "2025-05-28 11:15:30",
+  },
+  {
+    id: "TXN-20250527-103",
+    txnType: "recharge",
+    pointsChange: 5000,
+    balanceAfter: 8800,
+    bizSource: "purchase",
+    title: "充值购买",
+    functionName: "积分充值",
+    remark: "团队充值",
+    memberId: "u001",
+    memberName: "张小明",
+    isOwner: true,
+    createdAt: "2025-05-27 09:00:00",
+  },
+  {
+    id: "TXN-20250527-104",
+    txnType: "consume",
+    pointsChange: -80,
+    balanceAfter: 3720,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "户外街景",
+    remark: "春季新品",
+    memberId: "u003",
+    memberName: "王强",
+    isOwner: false,
+    createdAt: "2025-05-27 10:45:12",
+  },
+  {
+    id: "TXN-20250526-105",
+    txnType: "gift",
+    pointsChange: 500,
+    balanceAfter: 4220,
+    bizSource: "package",
+    title: "套餐赠送",
+    functionName: "月度套餐",
+    remark: "5月福利",
+    memberId: "u001",
+    memberName: "张小明",
+    isOwner: true,
+    createdAt: "2025-05-26 10:00:00",
+  },
+  {
+    id: "TXN-20250526-106",
+    txnType: "consume",
+    pointsChange: -150,
+    balanceAfter: 3570,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "家居场景",
+    remark: "北欧风格",
+    memberId: "u004",
+    memberName: "赵雪",
+    isOwner: false,
+    createdAt: "2025-05-26 14:20:05",
+  },
+  {
+    id: "TXN-20250525-107",
+    txnType: "consume",
+    pointsChange: -300,
+    balanceAfter: 3270,
+    bizSource: "batch",
+    title: "批量上新",
+    functionName: "批量生成",
+    remark: "夏季系列",
+    memberId: "u002",
+    memberName: "李芳",
+    isOwner: false,
+    createdAt: "2025-05-25 16:45:30",
+  },
+  {
+    id: "TXN-20250525-108",
+    txnType: "refund",
+    pointsChange: 120,
+    balanceAfter: 3390,
+    bizSource: "fail",
+    title: "失败退款",
+    functionName: "批量生成",
+    remark: "生成失败",
+    memberId: "u003",
+    memberName: "王强",
+    isOwner: false,
+    createdAt: "2025-05-25 08:10:00",
+  },
+  {
+    id: "TXN-20250524-109",
+    txnType: "recharge",
+    pointsChange: 2000,
+    balanceAfter: 5270,
+    bizSource: "purchase",
+    title: "充值购买",
+    functionName: "积分充值",
+    remark: "支付宝",
+    memberId: "u001",
+    memberName: "张小明",
+    isOwner: true,
+    createdAt: "2025-05-24 11:22:08",
+  },
+  {
+    id: "TXN-20250524-110",
+    txnType: "consume",
+    pointsChange: -90,
+    balanceAfter: 3180,
+    bizSource: "single",
+    title: "单图生成",
+    functionName: "产品特写",
+    remark: "细节展示",
+    memberId: "u004",
+    memberName: "赵雪",
+    isOwner: false,
+    createdAt: "2025-05-24 13:30:00",
+  },
+  {
+    id: "TXN-20250523-111",
+    txnType: "consume",
+    pointsChange: -250,
+    balanceAfter: 2930,
+    bizSource: "batch",
+    title: "批量上新",
+    functionName: "批量生成",
+    remark: "新品上架",
+    memberId: "u002",
+    memberName: "李芳",
+    isOwner: false,
+    createdAt: "2025-05-23 09:45:18",
+  },
+  {
+    id: "TXN-20250523-112",
+    txnType: "gift",
+    pointsChange: 300,
+    balanceAfter: 3230,
+    bizSource: "package",
+    title: "套餐赠送",
+    functionName: "季度套餐",
+    remark: "活动赠送",
+    memberId: "u001",
+    memberName: "张小明",
+    isOwner: true,
+    createdAt: "2025-05-23 15:00:00",
+  },
+];
 
-const flowTypeOptions: Array<{ label: string; value: 'all' | PointRecordType }> = [
-  { label: '全部类型', value: 'all' },
-  { label: '充值入账', value: 'recharge' },
-  { label: '任务消费', value: 'consume' },
-  { label: '套餐赠送', value: 'gift' },
-  { label: '失败退回', value: 'refund' },
-]
+const sourceRecords = computed(() =>
+  version.value === "personal" ? personalRecords : enterpriseRecords,
+);
 
-const flowTypeLabelMap: Record<PointRecordType, string> = {
-  recharge: '充值入账',
-  consume: '任务消费',
-  gift: '套餐赠送',
-  refund: '失败退回',
-}
+const summaryCards = computed<PointsSummaryCard[]>(() => {
+  if (version.value === "enterprise") {
+    return [
+      {
+        key: "teamBalance",
+        label: "团队总余额",
+        value: "18,650",
+        unit: "积分",
+        icon: "mdi:bank-outline",
+        tone: "blue",
+      },
+      {
+        key: "memberCount",
+        label: "成员总数",
+        value: "5",
+        unit: "人",
+        icon: "mdi:account-group-outline",
+        tone: "violet",
+      },
+      {
+        key: "activeMemberCount",
+        label: "活跃成员数",
+        value: "4",
+        unit: "人",
+        note: "（近30天）",
+        icon: "mdi:account-check-outline",
+        tone: "cyan",
+      },
+      {
+        key: "totalGained",
+        label: "累计获得",
+        value: "45,200",
+        unit: "积分",
+        icon: "mdi:arrow-bottom-left",
+        tone: "emerald",
+      },
+      {
+        key: "totalConsumed",
+        label: "累计消耗",
+        value: "26,550",
+        unit: "积分",
+        icon: "mdi:arrow-top-right",
+        tone: "rose",
+      },
+      {
+        key: "recentNet",
+        label: "近30天净变动",
+        value: "+3,680",
+        unit: "积分",
+        icon: "mdi:pulse",
+        tone: "amber",
+      },
+    ];
+  }
 
-const flowTypeToneMap: Record<PointRecordType, string> = {
-  recharge: 'is-positive',
-  consume: 'is-cost',
-  gift: 'is-positive',
-  refund: 'is-refund',
-}
-
-function parseRecordTime(value: string) {
-  const time = new Date(value.replace(/-/g, '/')).getTime()
-  return Number.isFinite(time) ? time : 0
-}
+  return [
+    {
+      key: "totalGained",
+      label: "累计获得",
+      value: "12,580",
+      unit: "积分",
+      icon: "mdi:arrow-bottom-left",
+      tone: "blue",
+    },
+    {
+      key: "totalConsumed",
+      label: "累计消耗",
+      value: "8,240",
+      unit: "积分",
+      icon: "mdi:arrow-top-right",
+      tone: "rose",
+    },
+    {
+      key: "available",
+      label: "当前可用",
+      value: "4,340",
+      unit: "积分",
+      icon: "mdi:wallet-outline",
+      tone: "emerald",
+    },
+    {
+      key: "recentNet",
+      label: "近30天净变动",
+      value: "+1,250",
+      unit: "积分",
+      icon: "mdi:pulse",
+      tone: "amber",
+    },
+  ];
+});
 
 const filteredRecords = computed(() => {
-  const keyword = flowKeyword.value.trim().toLowerCase()
-  const [start, end] = dateRange.value ?? []
+  const active = appliedFilters.value;
+  const now = new Date("2025-06-01 00:00:00").getTime();
 
-  return pointsStore.records.filter((item) => {
-    const matchType = selectedFlowType.value === 'all' || item.type === selectedFlowType.value
-    const matchKeyword =
-      !keyword ||
-      item.id.toLowerCase().includes(keyword) ||
-      item.title.toLowerCase().includes(keyword) ||
-      item.remark.toLowerCase().includes(keyword)
-    const recordTime = parseRecordTime(item.createdAt)
-    const matchDate = !start || !end || (recordTime >= start && recordTime <= end)
+  return sourceRecords.value.filter((record) => {
+    if (active.txnType && record.txnType !== active.txnType) return false;
+    if (active.bizSource && record.bizSource !== active.bizSource) return false;
 
-    return matchType && matchKeyword && matchDate
-  })
-})
+    if (version.value === "enterprise" && active.member) {
+      const memberId = active.member === "self" ? "u001" : active.member;
+      if (record.memberId !== memberId) return false;
+    }
+
+    const recordDate = new Date(record.createdAt.replace(/-/g, "/")).getTime();
+    if (active.dateRange && active.dateRange !== "custom") {
+      const days = Number(active.dateRange);
+      const cutoff = now - days * 24 * 60 * 60 * 1000;
+      if (recordDate < cutoff) return false;
+    }
+
+    if (active.dateRange === "custom") {
+      const start = new Date(`${active.startDate} 00:00:00`.replace(/-/g, "/")).getTime();
+      const end = new Date(`${active.endDate} 23:59:59`.replace(/-/g, "/")).getTime();
+      if (recordDate < start || recordDate > end) return false;
+    }
+
+    return true;
+  });
+});
 
 const pagedRecords = computed(() => {
-  const start = (flowPage.value - 1) * flowPageSize
-  return filteredRecords.value.slice(start, start + flowPageSize)
-})
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredRecords.value.slice(start, start + pageSize);
+});
 
-function formatAmount(amount: number) {
-  return `${amount > 0 ? '+' : ''}${amount.toLocaleString('zh-CN')}`
+function handleQuery() {
+  appliedFilters.value = { ...filters.value };
+  currentPage.value = 1;
 }
 
-function resetFlowFilters() {
-  flowKeyword.value = ''
-  selectedFlowType.value = 'all'
-  dateRange.value = null
-  flowPage.value = 1
+function escapeCsv(value: string | number | undefined) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
-watch([flowKeyword, selectedFlowType, dateRange], () => {
-  flowPage.value = 1
-})
+function handleExport() {
+  const headers =
+    version.value === "enterprise"
+      ? [
+          "流水编号",
+          "流水类型",
+          "变动积分",
+          "变动后余额",
+          "业务来源",
+          "标题",
+          "功能",
+          "补充说明",
+          "操作人",
+          "身份",
+          "发生时间",
+        ]
+      : [
+          "流水编号",
+          "流水类型",
+          "变动积分",
+          "变动后余额",
+          "业务来源",
+          "标题",
+          "功能",
+          "补充说明",
+          "发生时间",
+        ];
 
-const flowColumns: DataTableColumns<PointRecord> = [
-  {
-    title: '流水编号',
-    key: 'id',
-    width: 190,
-    ellipsis: { tooltip: true },
-  },
-  {
-    title: '流水类型',
-    key: 'type',
-    width: 130,
-    render(row) {
-      return h(
-        NTag,
-        {
-          round: true,
-          bordered: false,
-          class: ['flow-type-tag', flowTypeToneMap[row.type]],
-        },
-        { default: () => flowTypeLabelMap[row.type] },
-      )
-    },
-  },
-  {
-    title: '业务名称',
-    key: 'title',
-    width: 190,
-    ellipsis: { tooltip: true },
-  },
-  {
-    title: '积分变动',
-    key: 'amount',
-    width: 130,
-    render(row) {
-      return h(
-        'span',
-        { class: ['flow-amount', row.amount > 0 ? 'is-up' : 'is-down'] },
-        formatAmount(row.amount),
-      )
-    },
-  },
-  {
-    title: '变动后余额',
-    key: 'balance',
-    width: 140,
-    render(row) {
-      return row.balance.toLocaleString('zh-CN')
-    },
-  },
-  {
-    title: '发生时间',
-    key: 'createdAt',
-    width: 190,
-  },
-  {
-    title: '备注',
-    key: 'remark',
-    minWidth: 220,
-    ellipsis: { tooltip: true },
-  },
-]
+  const rows = filteredRecords.value.map((record) => {
+    const base = [
+      record.id,
+      record.txnType,
+      record.pointsChange,
+      record.balanceAfter,
+      record.bizSource,
+      record.title,
+      record.functionName,
+      record.remark,
+    ];
 
-const summary = computed(() => [
-  {
-    label: '积分余额',
-    value: pointsStore.summary.currentPoints.toLocaleString('zh-CN'),
-    icon: 'mdi:diamond-stone',
-  },
-  {
-    label: '累计充值',
-    value: pointsStore.summary.totalRecharge.toLocaleString('zh-CN'),
-    icon: 'mdi:cash-plus',
-  },
-  {
-    label: '累计消费',
-    value: pointsStore.summary.totalConsume.toLocaleString('zh-CN'),
-    icon: 'mdi:cash-minus',
-  },
-  {
-    label: '并行任务额度',
-    value: `${subscriptionStore.concurrentTaskLimit}`,
-    icon: 'mdi:counter',
-  },
-  {
-    label: '当前运行任务数',
-    value: `${pointsStore.summary.currentRunningTasks}`,
-    icon: 'mdi:play-circle-outline',
-  },
-  {
-    label: '剩余可用任务数',
-    value: `${pointsStore.remainingTasks}`,
-    icon: 'mdi:timer-outline',
-  },
-])
+    if (version.value === "enterprise") {
+      base.push(record.memberName ?? "", record.isOwner ? "主账号" : "成员");
+    }
+
+    base.push(record.createdAt);
+    return base.map(escapeCsv).join(",");
+  });
+
+  const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `points-flow-${version.value}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+watch(version, () => {
+  filters.value = {
+    member: "",
+    txnType: "",
+    dateRange: "",
+    startDate: "2025-05-01",
+    endDate: "2025-05-31",
+    bizSource: "",
+  };
+  appliedFilters.value = { ...filters.value };
+  currentPage.value = 1;
+});
 </script>
 
 <template>
-  <main class="points-page" :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'">
-    <section class="points-shell">
-      <header class="points-head">
-        <div>
-          <p class="eyebrow">积分中心</p>
-          <h1>当前套餐与积分额度</h1>
-          <span>Mock API + Pinia + LocalStorage 驱动，后续只替换 API 层即可接入真实后端。</span>
-        </div>
-      </header>
+  <main class="points-query-page">
+    <PointsQueryHeader v-model:version="version" />
 
-      <section class="overview-layout">
-        <article class="overview-card plan-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:briefcase-check-outline" /></span>
-          <div>
-            <p>套餐信息卡片</p>
-            <h2>{{ planName }}</h2>
-            <span>账号额度 {{ subscriptionStore.accountLimit }} 个 · 后台生成并发 {{ subscriptionStore.concurrentTaskLimit }} 个请求 · 赠送积分 {{ subscriptionStore.giftPoints.toLocaleString('zh-CN') }}</span>
-          </div>
-        </article>
-        <article class="overview-card balance-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:diamond-stone" /></span>
-          <div>
-            <p>积分余额卡片</p>
-            <h2>{{ pointsStore.summary.currentPoints.toLocaleString('zh-CN') }}</h2>
-            <span>冻结 {{ pointsStore.summary.freezePoints.toLocaleString('zh-CN') }} · 累计充值 {{ pointsStore.summary.totalRecharge.toLocaleString('zh-CN') }} · 累计消费 {{ pointsStore.summary.totalConsume.toLocaleString('zh-CN') }}</span>
-          </div>
-        </article>
-        <article class="overview-card task-overview">
-          <span class="points-icon overview-icon" aria-hidden="true"><Icon icon="mdi:progress-clock" /></span>
-          <div>
-            <p>任务额度卡片</p>
-            <h2>{{ pointsStore.remainingTasks }}</h2>
-            <span>后台并发额度 {{ subscriptionStore.concurrentTaskLimit }} · 运行中 {{ pointsStore.summary.currentRunningTasks }} · 剩余可用 {{ pointsStore.remainingTasks }}</span>
-          </div>
-        </article>
-      </section>
+    <div class="points-query-shell">
+      <PointsFilterPanel
+        v-model:filters="filters"
+        :version="version"
+        @query="handleQuery"
+      />
 
-      <section class="points-grid">
-        <article v-for="item in summary" :key="item.label" class="points-card">
-          <span class="points-icon" aria-hidden="true"><Icon :icon="item.icon" /></span>
-          <div>
-            <p>{{ item.label }}</p>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </article>
-      </section>
+      <PointsSummaryCards :cards="summaryCards" />
 
-      <section class="points-table">
-        <header class="points-table-head">
-          <div>
-            <h2>积分流水</h2>
-            <p>按发生时间、流水类型、业务名称或备注快速核对积分变化。</p>
-          </div>
-          <span>{{ filteredRecords.length }} / {{ pointsStore.records.length }} 条记录</span>
-        </header>
-
-        <form class="flow-filter" aria-label="积分流水查询条件" @submit.prevent>
-          <NDatePicker
-            v-model:value="dateRange"
-            class="flow-date-picker"
-            type="daterange"
-            clearable
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-          />
-
-          <NSelect
-            v-model:value="selectedFlowType"
-            class="flow-type-select"
-            :options="flowTypeOptions"
-          />
-
-          <NInput
-            v-model:value="flowKeyword"
-            class="flow-keyword"
-            clearable
-            placeholder="搜索流水编号 / 业务名称 / 备注"
-          >
-            <template #prefix>
-              <Icon icon="mdi:magnify" />
-            </template>
-          </NInput>
-
-          <NButton class="flow-query-button" type="primary" attr-type="submit">
-            查询
-          </NButton>
-
-          <NButton class="flow-reset-button" attr-type="button" @click="resetFlowFilters">
-            重置
-          </NButton>
-        </form>
-
-        <div class="flow-table-wrap">
-          <NDataTable
-            class="flow-data-table"
-            :columns="flowColumns"
-            :data="pagedRecords"
-            :bordered="false"
-            :single-line="false"
-            :pagination="false"
-            :row-key="(row) => row.id"
-            :scroll-x="1190"
-          />
-        </div>
-
-        <footer class="flow-table-footer">
-          <p>共 {{ filteredRecords.length }} 条流水</p>
-          <NPagination
-            v-model:page="flowPage"
-            class="flow-pagination"
-            :page-size="flowPageSize"
-            :item-count="filteredRecords.length"
-          />
-        </footer>
-      </section>
-    </section>
+      <PointsFlowTable
+        v-model:current-page="currentPage"
+        :version="version"
+        :records="pagedRecords"
+        :total="filteredRecords.length"
+        :page-size="pageSize"
+        @export="handleExport"
+      />
+    </div>
   </main>
 </template>
 
 <style scoped lang="scss">
-.points-page {
-  min-height: calc(100dvh - var(--app-header-offset));
-  padding: clamp(16px, 2vw, 24px);
-  background: var(--app-bg);
-  color: var(--app-text);
+.points-query-page {
+  min-height: calc(100dvh - var(--app-header-offset, 0px));
+  background: #f8fafc;
+  color: #0f172a;
+  font-family:
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Noto Sans SC",
+    system-ui,
+    sans-serif;
 }
-.points-shell {
-  max-width: 1400px;
+
+.points-query-page,
+.points-query-page *,
+.points-query-page *::before,
+.points-query-page *::after {
+  box-sizing: border-box;
+}
+
+.points-query-shell {
+  display: grid;
+  width: min(100%, 1440px);
+  gap: 20px;
   margin: 0 auto;
-  display: grid;
-  gap: 18px;
-}
-.points-head h1 { margin: 0; font-size: 32px; font-weight: 900; }
-.points-head .eyebrow { margin: 0 0 8px; color: var(--color-brand-primary); font-weight: 900; }
-.points-head span { color: var(--app-text-soft); }
-.overview-layout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
-.overview-card {
-  display: flex;
-  min-width: 0;
-  min-height: 138px;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--radius-card);
-  background: var(--app-surface);
-  box-shadow: var(--shadow-panel);
-}
-.overview-icon {
-  flex: 0 0 42px;
-  width: 42px;
-  height: 42px;
+  padding: 24px;
 }
 
-.overview-card div span {
-  display: block;
-  margin-top: 8px;
-  color: var(--app-text-soft);
-  font-size: 13px;
-  line-height: 1.6;
-  font-weight: 700;
+@media (max-width: 640px) {
+  .points-query-shell {
+    padding: 16px;
+  }
 }
-.points-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  align-items: stretch;
-}
-.overview-card p,
-.overview-card h2 {
-  margin: 0;
-}
-
-.overview-card p {
-  color: var(--app-text-soft);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.overview-card h2 {
-  margin-top: 6px;
-  color: var(--app-text);
-  font-size: clamp(24px, 2vw, 34px);
-  font-weight: 900;
-  line-height: 1.1;
-}
-
-.points-card, .points-table { border: 1px solid var(--app-border); border-radius: var(--radius-card); background: var(--app-surface); box-shadow: var(--shadow-panel); }
-.points-card {
-  display: flex;
-  min-height: 110px;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-}
-.points-card > div {
-  min-width: 0;
-}
-.points-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-accent-blue) 12%, transparent);
-  color: var(--color-brand-primary);
-  font-size: 22px;
-}
-
-.points-icon :deep(svg) {
-  color: currentColor;
-}
-.points-card p, .points-card strong { margin: 0; }
-.points-card p { color: var(--app-text-soft); font-size: 13px; font-weight: 700; }
-.points-card strong { display: block; margin-top: 4px; font-size: 24px; font-weight: 900; }
-.points-table { padding: 16px; }
-.points-table-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.points-table-head h2 { margin: 0; font-size: 20px; }
-.points-table-head p { margin: 6px 0 0; color: var(--app-text-soft); font-size: 13px; font-weight: 700; line-height: 1.5; }
-.points-table-head span { flex: 0 0 auto; color: var(--app-text-soft); font-weight: 700; }
-.flow-filter { display: grid; grid-template-columns: minmax(260px, 1.2fr) minmax(150px, 0.62fr) minmax(260px, 1fr) 86px 86px; gap: 12px; align-items: center; margin-bottom: 14px; padding: 14px; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface-soft); }
-.flow-date-picker, .flow-type-select, .flow-keyword { width: 100%; min-width: 0; }
-.flow-date-picker, .flow-type-select, .flow-keyword, .flow-query-button, .flow-reset-button { --n-height: 40px; --n-border-radius: 8px; --n-color: var(--app-surface); --n-color-active: var(--app-surface); --n-color-focus: var(--app-surface); --n-color-hover: #f8fafd; --n-border: 1px solid var(--app-border); --n-border-active: 1px solid color-mix(in srgb, var(--color-accent-blue) 72%, var(--app-border)); --n-border-focus: 1px solid color-mix(in srgb, var(--color-accent-blue) 72%, var(--app-border)); --n-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 56%, var(--app-border)); --n-box-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--color-accent-blue) 14%, transparent); --n-text-color: var(--app-text); --n-placeholder-color: var(--app-text-soft); --n-icon-color: var(--app-text-soft); }
-.flow-keyword :deep(.n-input__prefix) { color: var(--app-text-soft); font-size: 18px; }
-.flow-query-button { --n-color: #2f6bff; --n-color-hover: #4f7fff; --n-color-pressed: #1d4ed8; --n-color-focus: #2f6bff; --n-border: 0; --n-border-hover: 0; --n-border-pressed: 0; --n-border-focus: 0; --n-text-color: #fff; --n-text-color-hover: #fff; --n-text-color-pressed: #fff; --n-text-color-focus: #fff; font-weight: 800; }
-.flow-reset-button { --n-color: #ffffff; --n-color-hover: #f8fafd; --n-color-pressed: #f1f5f9; --n-color-focus: #ffffff; --n-border: 1px solid #d8e2f0; --n-border-hover: 1px solid #d8e2f0; --n-border-pressed: 1px solid #d8e2f0; --n-border-focus: 1px solid #d8e2f0; --n-text-color: #64748b; --n-text-color-hover: #64748b; --n-text-color-pressed: #64748b; --n-text-color-focus: #64748b; font-weight: 800; }
-.flow-table-wrap { min-width: 0; overflow: auto; border: 1px solid var(--app-border); border-radius: 14px; background: var(--app-surface); }
-.flow-data-table { --n-font-size: 14px; --n-th-color: var(--app-surface-soft); --n-th-color-hover: var(--app-surface-soft); --n-th-text-color: var(--app-text-soft); --n-td-color: transparent; --n-td-color-hover: color-mix(in srgb, var(--color-accent-blue) 7%, transparent); --n-td-text-color: var(--app-text); --n-border-color: var(--app-border); color: var(--app-text); }
-.flow-data-table :deep(.n-data-table-th) { height: 48px; padding: 0 16px; font-size: 13px; font-weight: 900; white-space: nowrap; }
-.flow-data-table :deep(.n-data-table-td) { height: 58px; padding: 0 16px; font-weight: 700; }
-.flow-data-table :deep(.flow-type-tag) { --n-height: 26px; --n-border-radius: 999px; --n-font-size: 13px; --n-font-weight: 800; padding: 0 12px; }
-.flow-data-table :deep(.flow-type-tag.is-positive) { --n-color: color-mix(in srgb, var(--color-success) 14%, transparent); --n-text-color: var(--color-success); color: var(--color-success); background: color-mix(in srgb, var(--color-success) 14%, transparent); }
-.flow-data-table :deep(.flow-type-tag.is-cost) { --n-color: color-mix(in srgb, var(--color-error) 12%, transparent); --n-text-color: var(--color-error); color: var(--color-error); background: color-mix(in srgb, var(--color-error) 12%, transparent); }
-.flow-data-table :deep(.flow-type-tag.is-refund) { --n-color: color-mix(in srgb, var(--color-brand-primary) 12%, transparent); --n-text-color: var(--color-brand-primary); color: var(--color-brand-primary); background: color-mix(in srgb, var(--color-brand-primary) 12%, transparent); }
-.flow-data-table :deep(.flow-amount) { font-weight: 900; }
-.flow-data-table :deep(.flow-amount.is-up) { color: var(--color-success); }
-.flow-data-table :deep(.flow-amount.is-down) { color: var(--color-error); }
-.flow-table-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.flow-table-footer p { margin: 0; color: var(--app-text-soft); font-size: 13px; font-weight: 700; }
-.flow-pagination { --n-item-size: 30px; --n-item-border-radius: 6px; --n-item-color: var(--app-surface-soft); --n-item-color-hover: #f8fafd; --n-item-color-active: #2f6bff; --n-item-color-active-hover: #4f7fff; --n-item-border: 1px solid var(--app-border); --n-item-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 44%, var(--app-border)); --n-item-border-active: 1px solid #2f6bff; --n-item-text-color: var(--app-text-soft); --n-item-text-color-hover: var(--app-text); --n-item-text-color-active: #fff; --n-button-color: var(--app-surface-soft); --n-button-color-hover: #f8fafd; --n-button-border: 1px solid var(--app-border); --n-button-border-hover: 1px solid color-mix(in srgb, var(--color-accent-blue) 44%, var(--app-border)); --n-button-icon-color: var(--app-text-soft); --n-button-icon-color-hover: var(--app-text); }
-.points-table-body { display: grid; gap: 10px; }
-.points-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--app-border); border-radius: 12px; background: var(--app-surface-soft); }
-.points-row strong, .points-row p, .points-row time { margin: 0; }
-.points-row strong { display: block; font-weight: 800; }
-.points-row p, .points-row time { color: var(--app-text-soft); font-size: 13px; }
-.record-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.compact-table { min-width: 0; }
-.points-row.three-col { grid-template-columns: minmax(0, 1fr) auto minmax(128px, auto); }
-.empty-text { margin: 0; padding: 18px; border: 1px dashed var(--app-border); border-radius: 12px; color: var(--app-text-soft); text-align: center; font-weight: 700; }
-.up { color: var(--color-success); font-weight: 900; }
-.down { color: var(--color-error); font-weight: 900; }
-@media (max-width: 1100px) { .overview-layout, .record-columns { grid-template-columns: minmax(0, 1fr); } .points-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .flow-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); } .points-row, .points-row.three-col { grid-template-columns: minmax(0, 1fr) auto; } .points-row time { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .points-grid, .flow-filter { grid-template-columns: minmax(0, 1fr); } .points-table-head, .flow-table-footer { align-items: flex-start; flex-direction: column; } .points-row, .points-row.three-col { grid-template-columns: minmax(0, 1fr); } }
 </style>

@@ -27,8 +27,6 @@ import {
   getBatchScenesByCategory,
   getBatchSceneTitle,
 } from "@/constants/workspace";
-import { resolveEnterprisePlanName } from "@/domain/enterprise-plans";
-import { useSubscriptionStore } from "@/stores/subscription";
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 import { formatDate } from "@/utils/dayjs";
@@ -66,7 +64,6 @@ const emit = defineEmits<{
 }>();
 
 const message = useMessage();
-const subscriptionStore = useSubscriptionStore();
 const {
   NEW_PRESET_VALUE,
   templates: visualTemplates,
@@ -90,12 +87,6 @@ const batchSceneCategory = ref("展厅灯光");
 const batchScenes = computed(() =>
   getBatchScenesByCategory(batchSceneCategory.value),
 );
-const batchNoticeText = computed(() => {
-  const limit = subscriptionStore.concurrentTaskLimit;
-  const running = 2;
-  const remaining = Math.max(0, limit - running);
-  return `当前套餐：${resolveEnterprisePlanName(subscriptionStore.currentPlan)} · 当前账号后台并发上限 ${limit} 个生成请求 · 进行中 ${running} 个 · 可继续提交 ${remaining} 个。`;
-});
 const useRecentLogo = ref(false);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
@@ -1659,7 +1650,8 @@ const activeCreateRatioLabel = computed(() => {
         </div>
 
         <section class="batch-card batch-notice">
-          {{ batchNoticeText }}
+          当前套餐：企业团队版 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传
+          3 套。单张生成仍可正常使用。
         </section>
 
         <div class="batch-panel-scroll">

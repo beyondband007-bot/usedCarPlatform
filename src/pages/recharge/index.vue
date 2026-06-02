@@ -89,7 +89,7 @@ const rechargeStatusText = computed(() => {
             <strong>{{ plan.name }}</strong>
             <span>￥{{ plan.price }}</span>
           </div>
-          <p>{{ plan.accountLimit }} 账号 / 后台并发 {{ plan.concurrentTaskLimit }} 个生成请求 / 赠送 {{ plan.giftPoints }} 积分</p>
+          <p>{{ plan.accountLimit }} 账号 / {{ plan.concurrentTaskLimit }} 并行 / 赠送 {{ plan.giftPoints }} 积分</p>
         </article>
       </section>
 
