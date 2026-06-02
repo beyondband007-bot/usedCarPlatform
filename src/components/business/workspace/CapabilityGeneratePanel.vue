@@ -324,7 +324,7 @@ const activeCreateTemplate = computed(() =>
 );
 
 const showCreateInteriorUpload = computed(() =>
-  Boolean(activeCreateTemplate.value?.interiorEnhance),
+  Boolean(activeCreateTemplate.value?.interiorCollage),
 );
 
 const uploadedExteriorAssets = computed(() =>
@@ -391,8 +391,8 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     lightConsistency: lightConsistency.value,
     paintRefresh: paintRefresh.value,
     colorCode: paintRefresh.value ? batchPaintColorCode.value.trim() || null : null,
-    interiorEnhance: interiorEnhance.value,
-    interiorCollage: interiorEnhance.value && interiorCollage.value,
+    interiorEnhance: interiorCollage.value && interiorEnhance.value,
+    interiorCollage: interiorCollage.value,
   };
 }
 
@@ -414,9 +414,8 @@ function mapBatchVisualConfigFromTemplate(
     enableLightConsistency: template.lightConsistency,
     enablePaintRefresh: template.paintRefresh,
     colorCode: template.paintRefresh ? template.colorCode?.trim() || null : null,
-    enableInteriorClean: template.interiorEnhance,
-    enableInteriorCollage:
-      template.interiorEnhance && template.interiorCollage,
+    enableInteriorClean: template.interiorCollage && template.interiorEnhance,
+    enableInteriorCollage: template.interiorCollage,
   };
 }
 
@@ -430,9 +429,8 @@ function applyTemplate(template: BatchVisualTemplate) {
   lightConsistency.value = template.lightConsistency;
   paintRefresh.value = template.paintRefresh;
   batchPaintColorCode.value = template.colorCode ?? "";
-  interiorEnhance.value = template.interiorEnhance;
-  interiorCollage.value =
-    template.interiorEnhance && template.interiorCollage;
+  interiorCollage.value = template.interiorCollage;
+  interiorEnhance.value = template.interiorCollage && template.interiorEnhance;
   isApplyingTemplate.value = false;
 }
 
@@ -476,9 +474,9 @@ watch(paintRefresh, (enabled) => {
   batchPaintColorCode.value = "";
 });
 
-watch(interiorEnhance, (enabled) => {
+watch(interiorCollage, (enabled) => {
   if (isApplyingTemplate.value || enabled) return;
-  interiorCollage.value = false;
+  interiorEnhance.value = false;
 });
 
 watch(showCreateInteriorUpload, (enabled) => {
@@ -813,12 +811,12 @@ function handleInteriorImageRemove() {
 }
 
 function validateBatchInteriorAssets(template: BatchVisualTemplate) {
-  if (!template.interiorEnhance) {
+  if (!template.interiorCollage) {
     return true;
   }
 
   if (!uploadInterior.value) {
-    message.warning("当前预设已开启内饰处理，请同时上传内饰图");
+    message.warning("当前预设已开启内饰拼接，请同时上传内饰图");
     return false;
   }
 
@@ -831,16 +829,14 @@ function validateBatchInteriorAssets(template: BatchVisualTemplate) {
     return false;
   }
 
-  if (template.interiorEnhance && template.interiorCollage) {
-    if (
-      interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
-      interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES
-    ) {
-      message.warning(
-        `开启内饰拼接需要上传 ${MIN_INTERIOR_COLLAGE_IMAGES}-${MAX_INTERIOR_COLLAGE_IMAGES} 张内饰图`,
-      );
-      return false;
-    }
+  if (
+    interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
+    interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES
+  ) {
+    message.warning(
+      `开启内饰拼接需要上传 ${MIN_INTERIOR_COLLAGE_IMAGES}-${MAX_INTERIOR_COLLAGE_IMAGES} 张内饰图`,
+    );
+    return false;
   }
 
   return true;
@@ -1114,14 +1110,22 @@ async function getDeliveryAssetsForTask(
 
 watch(
   visualPreset,
-  (presetId) => {
-    if (isApplyingTemplate.value || presetId === NEW_PRESET_VALUE) return;
+  (presetId, previousPresetId) => {
+    if (
+      isApplyingTemplate.value ||
+      presetId === NEW_PRESET_VALUE ||
+      presetId === previousPresetId
+    ) {
+      return;
+    }
 
     const template = getTemplateById(presetId);
     if (!template) return;
 
+    isApplyingTemplate.value = true;
     presetInput.value = template.name;
     applyTemplate(template);
+    isApplyingTemplate.value = false;
   },
   { immediate: true },
 );
@@ -1211,27 +1215,32 @@ onUnmounted(() => {
   }
 });
 
-watch(
-  visualTemplates,
-  (list) => {
-    if (!list.length) {
+function syncPresetSelectionFromTemplates() {
+  const list = visualTemplates.value;
+  if (!list.length) {
+    if (createTaskPresetId.value) {
       createTaskPresetId.value = "";
-      return;
     }
+    return;
+  }
 
-    if (!list.some((item) => item.id === createTaskPresetId.value)) {
-      createTaskPresetId.value = list[0].id;
-    }
+  if (!list.some((item) => item.id === createTaskPresetId.value)) {
+    createTaskPresetId.value = list[0].id;
+  }
 
-    if (
-      visualPreset.value !== NEW_PRESET_VALUE &&
-      !list.some((item) => item.id === visualPreset.value)
-    ) {
-      visualPreset.value = list[0].id;
-      presetInput.value = list[0].name;
-    }
+  if (
+    visualPreset.value !== NEW_PRESET_VALUE &&
+    !list.some((item) => item.id === visualPreset.value)
+  ) {
+    visualPreset.value = list[0].id;
+  }
+}
+
+watch(
+  () => visualTemplates.value.map((item) => item.id).join("\n"),
+  () => {
+    syncPresetSelectionFromTemplates();
   },
-  { deep: true },
 );
 
 watch(batchTab, (tab) => {
@@ -1752,21 +1761,21 @@ const activeCreateRatioLabel = computed(() => {
                   {{ activeCreateTemplate.colorCode }}
                 </span>
                 <span
-                  v-if="activeCreateTemplate.interiorEnhance"
-                  class="preset-tag is-on"
-                >
-                  <Icon icon="mdi:seat-passenger" />
-                  内饰清洁
-                </span>
-                <span
-                  v-if="
-                    activeCreateTemplate.interiorEnhance &&
-                    activeCreateTemplate.interiorCollage
-                  "
+                  v-if="activeCreateTemplate.interiorCollage"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:image-multiple-outline" />
                   内饰拼接
+                </span>
+                <span
+                  v-if="
+                    activeCreateTemplate.interiorCollage &&
+                    activeCreateTemplate.interiorEnhance
+                  "
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:seat-passenger" />
+                  内饰清洁
                 </span>
               </div>
             </section>
@@ -2081,21 +2090,21 @@ const activeCreateRatioLabel = computed(() => {
 
             <section class="batch-card switch-card">
               <div>
-                <h3>内饰清洁增强</h3>
-                <p>对已上传内饰图做清洁与质感增强。</p>
-              </div>
-              <NSwitch v-model:value="interiorEnhance" size="large" />
-            </section>
-
-            <section
-              v-if="interiorEnhance"
-              class="batch-card switch-card"
-            >
-              <div>
                 <h3>内饰拼接</h3>
                 <p>2-10 张内饰图按规则自动分组拼图，可与清洁增强组合。</p>
               </div>
               <NSwitch v-model:value="interiorCollage" size="large" />
+            </section>
+
+            <section
+              v-if="interiorCollage"
+              class="batch-card switch-card"
+            >
+              <div>
+                <h3>内饰清洁增强</h3>
+                <p>对已上传内饰图做清洁与质感增强。</p>
+              </div>
+              <NSwitch v-model:value="interiorEnhance" size="large" />
             </section>
           </template>
         </div>

@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 
+import { useAppStore } from "@/stores/app";
 import type { PointsSummaryCard } from "@/types/points-query";
 
 defineProps<{
   cards: PointsSummaryCard[];
   adminTheme?: boolean;
 }>();
+
+const appStore = useAppStore();
 </script>
 
 <template>
-  <section class="points-summary-section">
+  <section
+    class="points-summary-section"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+  >
     <div
       class="points-summary-grid animate-fade-in"
       :class="[adminTheme ? 'is-admin' : 'is-standard', `is-${cards.length}`]"
@@ -40,7 +46,9 @@ defineProps<{
                   {{ card.value }}
                 </span>
                 <span class="summary-unit">{{ card.unit }}</span>
-                <span v-if="card.note" class="summary-note">{{ card.note }}</span>
+                <span v-if="card.note" class="summary-note">{{
+                  card.note
+                }}</span>
               </div>
             </div>
           </div>
@@ -284,5 +292,90 @@ defineProps<{
   .points-summary-grid.is-admin {
     grid-template-columns: 1fr;
   }
+}
+
+.points-summary-section.theme-dark .card {
+  border-color: #263347;
+  background: #111827;
+  box-shadow: none;
+}
+
+.points-summary-section.theme-dark .card:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 24%);
+}
+
+.points-summary-section.theme-dark .summary-orb.blue {
+  background: rgb(59 130 246 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-orb.emerald {
+  background: rgb(16 185 129 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-orb.rose {
+  background: rgb(239 68 68 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-orb.amber {
+  background: rgb(245 166 35 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-orb.violet {
+  background: rgb(139 92 246 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-orb.cyan {
+  background: rgb(6 182 212 / 12%);
+}
+
+.points-summary-section.theme-dark .summary-icon.blue {
+  background: rgb(59 130 246 / 18%);
+  color: #3b82f6;
+}
+
+.points-summary-section.theme-dark .summary-icon.emerald {
+  background: rgb(16 185 129 / 18%);
+  color: #10b981;
+}
+
+.points-summary-section.theme-dark .summary-icon.rose {
+  background: rgb(239 68 68 / 18%);
+  color: #ef4444;
+}
+
+.points-summary-section.theme-dark .summary-icon.amber {
+  background: rgb(245 166 35 / 18%);
+  color: #f5a623;
+}
+
+.points-summary-section.theme-dark .summary-icon.violet {
+  background: rgb(139 92 246 / 18%);
+  color: #a78bfa;
+}
+
+.points-summary-section.theme-dark .summary-icon.cyan {
+  background: rgb(6 182 212 / 18%);
+  color: #22d3ee;
+}
+
+.points-summary-section.theme-dark .summary-card p {
+  color: #9ca3af;
+}
+
+.points-summary-section.theme-dark .summary-value {
+  color: #f3f4f6;
+}
+
+.points-summary-section.theme-dark .summary-value.is-positive {
+  color: #10b981;
+}
+
+.points-summary-section.theme-dark .summary-value.is-negative {
+  color: #ef4444;
+}
+
+.points-summary-section.theme-dark .summary-unit,
+.points-summary-section.theme-dark .summary-note {
+  color: #9ca3af;
 }
 </style>

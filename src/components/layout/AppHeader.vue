@@ -416,7 +416,9 @@ const navItems = computed(() => {
 .logo-cn-name {
   color: #0f172a;
   font-family: inherit;
-  font-size: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2);
+  font-size: calc(
+    var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2
+  );
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -483,13 +485,18 @@ const navItems = computed(() => {
 }
 
 .credit-pill {
-  padding: clamp(8px, 0.65vw, 10px) clamp(14px, 1.2vw, 20px);
-  color: var(--studio-chrome-credit-text, #ffffff);
-  background: var(--studio-chrome-credit-bg, #d4a017);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
   border: 1px solid transparent;
   border-radius: 999px;
+  background: var(--studio-chrome-credit-bg, #d4a017);
+  color: var(--studio-chrome-credit-text, #ffffff);
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 900;
+  font-weight: 700;
+  line-height: 1.2;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.2s ease;
@@ -582,8 +589,8 @@ const navItems = computed(() => {
   }
 
   .credit-pill {
-    padding: 8px 12px;
-    font-size: clamp(11px, 3.2vw, 13px);
+    padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
+    font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   }
 
   .site-header-actions {

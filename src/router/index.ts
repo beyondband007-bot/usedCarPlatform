@@ -35,6 +35,10 @@ router.beforeEach((to) => {
   const authStore = useAuthStore()
   authStore.hydrate()
 
+  if (to.path === '/' || to.matched.length === 0) {
+    return '/home'
+  }
+
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const guestOnly = to.matched.some((record) => record.meta.guestOnly)
   const requiredPermission = to.matched

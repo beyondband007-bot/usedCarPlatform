@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { motion } from "motion-v";
 import { computed } from "vue";
 
 import type { PricingPlan } from "@/types/prototype";
@@ -10,7 +9,6 @@ const appStore = useAppStore();
 
 const props = defineProps<{
   plan: PricingPlan;
-  index: number;
   selected?: boolean;
   pressing?: boolean;
 }>();
@@ -39,10 +37,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 </script>
 
 <template>
-  <motion.div
-    :initial="{ opacity: 0, y: 18 }"
-    :animate="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.36, delay: index * 0.06 }"
+  <div
     class="pricing-plan-motion"
     :class="{ 'is-plan-selected': selected }"
   >
@@ -88,7 +83,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
         </button>
       </div>
     </article>
-  </motion.div>
+  </div>
 </template>
 
 <style scoped lang="scss">
@@ -170,8 +165,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   background:
     radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--plan-accent) 18%, transparent), transparent 28%),
     radial-gradient(circle at 50% 104%, color-mix(in srgb, var(--plan-accent) 16%, transparent), transparent 34%);
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  opacity: 1;
 }
 
 .pricing-plan-card.theme-light {
@@ -280,8 +274,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
     0 0 0 2px rgba(47, 107, 255, 0.42);
 }
 
-.pricing-plan-card.is-selected::before,
-.pricing-plan-card.is-selected::after {
+.pricing-plan-card.is-selected::before {
   opacity: 1;
 }
 
@@ -292,10 +285,6 @@ const showBadge = computed(() => Boolean(props.plan.badge));
       color-mix(in srgb, var(--plan-accent) 5%, transparent),
       transparent 42%
     );
-}
-
-.pricing-plan-card.theme-light.is-selected::after {
-  opacity: 1;
 }
 
 .pricing-plan-card.is-pressing {

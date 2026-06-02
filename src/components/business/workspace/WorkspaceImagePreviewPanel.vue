@@ -25,14 +25,22 @@ const emit = defineEmits<{
 const message = useMessage();
 const naturalSize = ref<{ width: number; height: number } | null>(null);
 
-const mediaStyle = computed(() => {
+const frameStyle = computed(() => {
   const width = naturalSize.value?.width ?? props.preview.imageWidth;
   const height = naturalSize.value?.height ?? props.preview.imageHeight;
 
-  if (!width || !height) return undefined;
+  if (!width || !height) {
+    return {
+      height: "100%",
+      maxWidth: "100%",
+    };
+  }
 
   return {
     aspectRatio: `${width} / ${height}`,
+    height: "100%",
+    width: "auto",
+    maxWidth: "100%",
   };
 });
 
@@ -85,20 +93,25 @@ async function handleDownload() {
     </header>
 
     <div class="image-preview-body" aria-label="图片预览区域">
-      <img
-        class="image-preview-image"
-        :style="mediaStyle"
-        :src="preview.imageUrl"
-        :alt="preview.imageAlt"
-        loading="eager"
-        decoding="async"
-        @load="handlePreviewLoad"
-      />
+      <div class="image-preview-frame" :style="frameStyle">
+        <img
+          class="image-preview-image"
+          :src="preview.imageUrl"
+          :alt="preview.imageAlt"
+          loading="eager"
+          decoding="async"
+          @load="handlePreviewLoad"
+        />
+      </div>
     </div>
 
     <footer class="image-preview-foot">
       <p class="image-preview-ratio">{{ preview.ratioLabel }}</p>
-      <button type="button" class="image-preview-download" @click="handleDownload">
+      <button
+        type="button"
+        class="image-preview-download"
+        @click="handleDownload"
+      >
         <Icon icon="mdi:download-outline" class="image-preview-download-icon" />
         {{ downloadLabel }}
       </button>
@@ -153,33 +166,45 @@ async function handleDownload() {
   font-size: 14px;
   font-weight: 900;
   cursor: pointer;
-  transition:
-    background 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .image-preview-back:hover {
-  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+  background: color-mix(
+    in srgb,
+    var(--assist-blue) 10%,
+    var(--assist-card-strong)
+  );
 }
 
 .image-preview-body {
   display: flex;
   min-height: 0;
   flex: 1;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
+  padding: 16px;
   border: 1px solid var(--assist-border, #e1eaf5);
   border-radius: 16px;
   background: transparent;
 }
 
+.image-preview-frame {
+  display: flex;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
 .image-preview-image {
   display: block;
   width: 100%;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  height: 100%;
   object-fit: contain;
   background: transparent;
 }
@@ -207,8 +232,8 @@ async function handleDownload() {
   margin: 0 auto;
   padding: 0 24px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #F5C84C 0%, #FFD766 100%);
-  color: #1E293B;
+  background: linear-gradient(135deg, #f5c84c 0%, #ffd766 100%);
+  color: #1e293b;
   font-family: inherit;
   font-size: 15px;
   font-weight: 600;

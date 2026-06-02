@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue";
-
+import contactSupportWechatQr from "@/assets/img/contact-support-wechat-qr.png";
+import footerBrandLogo from "@/assets/img/footer-brand-logo.png";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
@@ -14,79 +14,71 @@ const appStore = useAppStore();
   >
     <div class="footer-container">
       <div class="footer-brand">
-        <div class="brand-logo">
-          <div class="logo-icon">脸</div>
-          <span class="brand-name">脸谱AI</span>
-        </div>
-        <button
-          type="button"
-          class="footer-theme-toggle"
-          :aria-label="appStore.isDarkMode ? '切换到日间模式' : '切换到夜间模式'"
-          @click="appStore.toggleTheme()"
-        >
-          <Icon
-            :icon="
-              appStore.isDarkMode
-                ? 'mdi:white-balance-sunny'
-                : 'mdi:moon-waning-crescent'
-            "
-          />
-          <span>{{ appStore.isDarkMode ? "日间模式" : "夜间模式" }}</span>
-        </button>
-        <p class="brand-desc">
-          面向汽车电商、二手车商和企业运营团队的 AI SaaS 工作台
-        </p>
-        <div class="qr-codes">
-          <div class="qr-item">
-            <div class="qr-placeholder">
-              <div class="qr-pattern">
-                <div class="qr-inner"></div>
-                <div class="qr-center"></div>
+        <img
+          class="brand-logo-image"
+          :src="footerBrandLogo"
+          alt="Facemini 脸谱科技"
+          width="168"
+          height="40"
+          loading="lazy"
+          decoding="async"
+        />
+
+        <div class="brand-body">
+          <div class="qr-codes">
+            <div class="qr-item">
+              <div class="qr-frame">
+                <img
+                  class="qr-image"
+                  :src="contactSupportWechatQr"
+                  alt="客服微信二维码"
+                  width="88"
+                  height="88"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
+              <span class="qr-label">客服微信</span>
             </div>
-            <span class="qr-label">客服微信</span>
           </div>
-          <div class="qr-item">
-            <div class="qr-placeholder">
-              <div class="qr-pattern">
-                <div class="qr-inner"></div>
-                <div class="qr-center"></div>
-              </div>
-            </div>
-            <span class="qr-label">微信公众号</span>
+
+          <div class="brand-copy">
+            <p class="brand-desc">
+              面向汽车电商、二手车商和企业运营团队的 AI SaaS 工作台
+            </p>
+            <p class="brand-tip">
+              添加客服微信，了解更多定制服务<br />
+              关注脸谱AI公众号，获取产品更新
+            </p>
           </div>
         </div>
-        <p class="brand-tip">
-          添加客服微信，了解更多定制服务<br>
-          关注脸谱AI公众号，获取产品更新
-        </p>
       </div>
 
       <div class="footer-nav">
         <div class="nav-column">
           <h3 class="nav-title">场景更换</h3>
           <ul class="nav-list">
-            <li><a href="#">展厅棚拍</a></li>
-            <li><a href="#">户外实景</a></li>
-            <li><a href="#">行驶动效</a></li>
-            <li><a href="#">天空影棚</a></li>
+            <li><span class="nav-item">展厅棚拍</span></li>
+            <li><span class="nav-item">户外实景</span></li>
+            <li><span class="nav-item">行驶动效</span></li>
+            <li><span class="nav-item">天空影棚</span></li>
           </ul>
         </div>
 
         <div class="nav-column">
           <h3 class="nav-title">车辆美容</h3>
           <ul class="nav-list">
-            <li><a href="#">烤漆翻新</a></li>
-            <li><a href="#">光污美化</a></li>
-            <li><a href="#">内饰清洁</a></li>
+            <li><span class="nav-item">烤漆翻新</span></li>
+            <li><span class="nav-item">光污美化</span></li>
+            <li><span class="nav-item">内饰清洁</span></li>
           </ul>
         </div>
 
         <div class="nav-column">
           <h3 class="nav-title">智能交付</h3>
           <ul class="nav-list">
-            <li><a href="#">批量上新</a></li>
-            <li><a href="#">成片交付</a></li>
+            <li><span class="nav-item">批量上新</span></li>
+            <li><span class="nav-item">成片交付</span></li>
           </ul>
         </div>
 
@@ -94,22 +86,34 @@ const appStore = useAppStore();
           <h3 class="nav-title">营销工具</h3>
           <ul class="nav-list">
             <li>
-              <a href="#">去水印<span class="tag tag-beta">Beta</span></a>
+              <span class="nav-item"
+                >去水印<span class="tag tag-beta">Beta</span></span
+              >
             </li>
             <li>
-              <a href="#">创意生图<span class="tag tag-beta">Beta</span></a>
+              <span class="nav-item"
+                >创意生图<span class="tag tag-beta">Beta</span></span
+              >
             </li>
             <li>
-              <a href="#">主图套版<span class="tag tag-plan">规划中</span></a>
+              <span class="nav-item"
+                >主图套版<span class="tag tag-plan">开发中</span></span
+              >
             </li>
             <li>
-              <a href="#">短视频生成<span class="tag tag-beta">Beta</span></a>
+              <span class="nav-item"
+                >短视频生成<span class="tag tag-beta">Beta</span></span
+              >
             </li>
             <li>
-              <a href="#">详情页物料<span class="tag tag-plan">规划中</span></a>
+              <span class="nav-item"
+                >详情页物料<span class="tag tag-plan">开发中</span></span
+              >
             </li>
             <li>
-              <a href="#">多平台分发<span class="tag tag-plan">规划中</span></a>
+              <span class="nav-item"
+                >多平台分发<span class="tag tag-plan">开发中</span></span
+              >
             </li>
           </ul>
         </div>
@@ -117,21 +121,21 @@ const appStore = useAppStore();
         <div class="nav-column">
           <h3 class="nav-title">联系我们</h3>
           <ul class="nav-list">
-            <li><a href="#">商务合作：sales@lianpu.ai</a></li>
-            <li><a href="#">媒体联系：media@lianpu.ai</a></li>
-            <li><a href="#">关于我们</a></li>
-            <li><a href="#">帮助中心</a></li>
+            <li><span class="nav-item">关于我们</span></li>
+            <li><span class="nav-item">帮助中心</span></li>
+            <li><span class="nav-item">商务合作：sales@lianpu.ai</span></li>
+            <li><span class="nav-item">媒体联系：media@lianpu.ai</span></li>
           </ul>
         </div>
       </div>
     </div>
 
     <div class="footer-bottom">
-      <p>脸谱AI 版权所有</p>
+      <p>脸谱AI版权所有</p>
       <div class="footer-bottom-links">
-        <a href="#">隐私政策</a>
-        <a href="#">服务条款</a>
-        <a href="#">京ICP备xxxxxxxx号</a>
+        <span>隐私政策</span>
+        <span>服务条款</span>
+        <span>京ICP备xxxxxxxx号</span>
       </div>
     </div>
   </footer>
@@ -144,49 +148,27 @@ const appStore = useAppStore();
 }
 
 .footer {
-  --footer-bg: #101010;
-  --footer-border: #1f1f1f;
-  --footer-title: #f3f3f3;
-  --footer-text: #e8e8e8;
-  --footer-link: #888;
-  --footer-link-hover: #2f6bff;
-  --footer-muted: #777;
-  --footer-subtle: #555;
-  --footer-qr-bg: #1a1a1a;
-  --footer-qr-border: #2a2a2a;
-  --footer-brand-bg: linear-gradient(135deg, #2f6bff, #5c8dff);
-  --footer-toggle-bg: rgba(255, 255, 255, 0.06);
-  --footer-toggle-border: rgba(255, 255, 255, 0.1);
-  --footer-toggle-text: #e8e8e8;
-  --footer-toggle-hover: #2f6bff;
-  --footer-toggle-hover-border: rgba(47, 107, 255, 0.28);
-  --footer-toggle-hover-shadow: rgba(47, 107, 255, 0.08);
-  --footer-tag-beta-bg: rgba(239, 194, 76, 0.12);
+  --footer-bg: #000000;
+  --footer-border: rgba(255, 255, 255, 0.12);
+  --footer-title: #ffffff;
+  --footer-text: rgba(255, 255, 255, 0.88);
+  --footer-link: rgba(255, 255, 255, 0.72);
+  --footer-muted: rgba(255, 255, 255, 0.56);
+  --footer-subtle: rgba(255, 255, 255, 0.42);
+  --footer-qr-border: rgba(255, 255, 255, 0.14);
+  --footer-tag-beta-bg: rgba(239, 194, 76, 0.16);
   --footer-tag-beta-text: #efc24c;
   --footer-tag-beta-border: transparent;
-  --footer-tag-plan-bg: rgba(136, 136, 136, 0.12);
-  --footer-tag-plan-text: #666;
-  --footer-tag-plan-border: transparent;
 
   display: block;
   width: 100%;
   margin: 0;
-  padding: 56px 0 32px;
+  padding: 48px 0 28px;
   color: var(--footer-text);
   font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Microsoft YaHei",
-    "Helvetica Neue",
-    Helvetica,
-    Arial,
-    sans-serif;
+    "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   text-align: left;
   background-color: var(--footer-bg);
-  border-top: 1px solid var(--footer-border);
 }
 
 .footer--light {
@@ -195,206 +177,106 @@ const appStore = useAppStore();
   --footer-title: #0f172a;
   --footer-text: #334155;
   --footer-link: #64748b;
-  --footer-link-hover: #334155;
   --footer-muted: #94a3b8;
   --footer-subtle: #94a3b8;
-  --footer-qr-bg: #ffffff;
   --footer-qr-border: #e6eaf2;
-  --footer-brand-bg: #f5c84c;
-  --footer-toggle-bg: #ffffff;
-  --footer-toggle-border: #e6eaf2;
-  --footer-toggle-text: #334155;
-  --footer-toggle-hover: #0f172a;
-  --footer-toggle-hover-border: #e6eaf2;
-  --footer-toggle-hover-shadow: rgba(15, 23, 42, 0.06);
   --footer-tag-beta-bg: #fffbeb;
   --footer-tag-beta-text: #b7791f;
   --footer-tag-beta-border: #fde68a;
-  --footer-tag-plan-bg: #f8fafc;
-  --footer-tag-plan-text: #64748b;
-  --footer-tag-plan-border: #e2e8f0;
 }
 
 .footer-container {
   display: flex;
-  width: min(100%, 1200px);
-  max-width: 1200px;
+  width: min(100%, 1440px);
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 32px;
-  gap: 64px;
+  padding: 0 40px;
+  gap: 128px;
   align-items: flex-start;
   justify-content: space-between;
 }
 
 .footer-brand {
-  flex: 0 0 260px;
-  width: 260px;
+  flex: 0 0 420px;
+  width: min(100%, 420px);
 }
 
-.brand-logo {
+.brand-logo-image {
+  display: block;
+  width: auto;
+  max-width: 168px;
+  height: 40px;
+  margin-bottom: 24px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.brand-body {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 20px;
+  align-items: flex-start;
 }
 
-.logo-icon {
-  display: flex;
-  width: 38px;
-  height: 38px;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  background: var(--footer-brand-bg);
-  border-radius: 10px;
-}
-
-.brand-name {
-  color: var(--footer-title);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
-}
-
-.footer-theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 24px;
-  padding: 7px 11px;
-  border: 1px solid var(--footer-toggle-border);
-  border-radius: 999px;
-  background: var(--footer-toggle-bg);
-  color: var(--footer-toggle-text);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    background 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.footer-theme-toggle:hover {
-  color: var(--footer-toggle-hover);
-  border-color: var(--footer-toggle-hover-border);
-  box-shadow: 0 8px 22px var(--footer-toggle-hover-shadow);
-}
-
-.footer-theme-toggle :deep(svg) {
-  flex-shrink: 0;
-  font-size: 15px;
+.brand-copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .brand-desc {
-  margin: 0 0 24px;
-  color: var(--footer-link);
+  margin: 0 0 12px;
+  color: var(--footer-text);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
 .qr-codes {
   display: flex;
-  gap: 16px;
+  flex-shrink: 0;
+  gap: 12px;
 }
 
 .qr-item {
   text-align: center;
 }
 
-.qr-placeholder {
-  position: relative;
+.qr-frame {
   display: flex;
-  width: 90px;
-  height: 90px;
+  width: 88px;
+  height: 88px;
   align-items: center;
   justify-content: center;
   margin-bottom: 8px;
   overflow: hidden;
-  background-color: var(--footer-qr-bg);
+  background-color: #ffffff;
   border: 1px solid var(--footer-qr-border);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
-.qr-pattern {
-  position: relative;
-  width: 68px;
-  height: 68px;
-  background: #fff;
-}
-
-.qr-pattern::before {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 18px;
-  height: 18px;
-  content: "";
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-pattern::after {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 18px;
-  height: 18px;
-  content: "";
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-inner {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  width: 18px;
-  height: 18px;
-  background: #000;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #000;
-}
-
-.qr-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 18px;
-  height: 18px;
-  background: var(--footer-brand-bg);
-  border-radius: 3px;
-  transform: translate(-50%, -50%);
+.qr-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .qr-label {
   color: var(--footer-muted);
   font-size: 12px;
+  line-height: 1.3;
 }
 
 .brand-tip {
-  margin: 16px 0 0;
-  color: var(--footer-subtle);
+  margin: 0;
+  color: var(--footer-muted);
   font-size: 12px;
-  line-height: 1.8;
+  line-height: 1.75;
 }
 
 .footer-nav {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 32px;
+  gap: 40px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -404,7 +286,7 @@ const appStore = useAppStore();
 }
 
 .nav-title {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   color: var(--footer-title);
   font-size: 14px;
   font-weight: 600;
@@ -421,19 +303,14 @@ const appStore = useAppStore();
   margin-bottom: 10px;
 }
 
-.nav-list a {
+.nav-list .nav-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--footer-link);
   font-size: 13px;
   line-height: 1.6;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.nav-list a:hover {
-  color: var(--footer-link-hover);
+  cursor: default;
 }
 
 .tag {
@@ -451,19 +328,19 @@ const appStore = useAppStore();
 }
 
 .tag-plan {
-  color: var(--footer-tag-plan-text);
-  background-color: var(--footer-tag-plan-bg);
-  border-color: var(--footer-tag-plan-border);
+  color: var(--footer-tag-beta-text);
+  background-color: var(--footer-tag-beta-bg);
+  border-color: var(--footer-tag-beta-border);
 }
 
 .footer-bottom {
   display: flex;
-  width: min(100%, 1200px);
-  max-width: 1200px;
+  width: min(100%, 1440px);
+  max-width: 1440px;
   align-items: center;
   justify-content: space-between;
-  margin: 48px auto 0;
-  padding: 20px 32px 0;
+  margin: 40px auto 0;
+  padding: 20px 40px 0;
   border-top: 1px solid var(--footer-border);
 }
 
@@ -478,31 +355,49 @@ const appStore = useAppStore();
   gap: 24px;
 }
 
-.footer-bottom-links a {
+.footer-bottom-links span {
   color: var(--footer-subtle);
   font-size: 12px;
-  text-decoration: none;
-  transition: color 0.2s ease;
+  cursor: default;
 }
 
-.footer-bottom-links a:hover {
-  color: #888;
-}
-
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .footer-container {
     flex-direction: column;
-    gap: 36px;
+    gap: 40px;
+  }
+
+  .footer-brand {
+    width: 100%;
+    max-width: none;
   }
 
   .footer-nav {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
+    gap: 28px 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .footer-container,
+  .footer-bottom {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .brand-body {
+    flex-direction: column;
+  }
+
+  .footer-nav {
+    flex-direction: column;
+    gap: 24px;
   }
 
   .nav-column {
-    width: calc(50% - 16px);
+    width: 100%;
   }
 
   .footer-bottom {
@@ -510,24 +405,10 @@ const appStore = useAppStore();
     align-items: flex-start;
     flex-direction: column;
   }
-}
 
-@media (max-width: 560px) {
-  .footer-container,
-  .footer-bottom {
-    padding-right: 20px;
-    padding-left: 20px;
-  }
-
-  .footer-brand,
-  .nav-column {
-    width: 100%;
-  }
-
-  .footer-nav,
   .footer-bottom-links {
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 }
 </style>

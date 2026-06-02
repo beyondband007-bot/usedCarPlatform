@@ -64,6 +64,8 @@ const homeHeroImageSrc = computed(() =>
 }
 
 .hero-media {
+  container-type: size;
+  container-name: hero-media;
   position: relative;
   width: 100%;
   overflow: hidden;
@@ -99,7 +101,7 @@ const homeHeroImageSrc = computed(() =>
 .hero-copy {
   position: absolute;
   z-index: 2;
-  top: calc(clamp(56px, 12%, 120px) + 20px);
+  top: 13%;
   right: 0;
   left: 0;
   width: min(900px, calc(100% - 40px));
@@ -112,10 +114,10 @@ const homeHeroImageSrc = computed(() =>
 }
 
 .hero h1 {
-  margin: 0 0 14px;
+  margin: 0 0 clamp(6px, 1.4cqh, 14px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: clamp(34px, 2.8vw, 55px);
-  line-height: 1.08;
+  font-size: clamp(14px, 6.8cqh, 55px);
+  line-height: 1.1;
   letter-spacing: 0;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
@@ -123,8 +125,8 @@ const homeHeroImageSrc = computed(() =>
 .subtitle {
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
-  font-size: clamp(16px, 1.27vw, 25px);
-  line-height: 1.4;
+  font-size: clamp(10px, 3.6cqh, 25px);
+  line-height: 1.35;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 
@@ -150,14 +152,19 @@ const homeHeroImageSrc = computed(() =>
   }
 }
 
-@media (max-width: 700px) {
-  .hero-copy {
-    top: calc(clamp(48px, 10%, 88px) + 20px);
-    width: min(100% - 28px, 900px);
+@supports not (container-type: size) {
+  .hero h1 {
+    font-size: clamp(16px, 2.6vw, 55px);
   }
 
-  .hero h1 {
-    font-size: 36px;
+  .subtitle {
+    font-size: clamp(11px, 1.4vw, 25px);
+  }
+}
+
+@media (max-width: 700px) {
+  .hero-copy {
+    width: min(100% - 28px, 900px);
   }
 }
 </style>

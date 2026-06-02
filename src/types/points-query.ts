@@ -65,5 +65,4 @@ export interface PointsQueryViewConfig {
   currentMemberName?: string;
   showMemberColumns: boolean;
   adminTheme: boolean;
-  canRecharge: boolean;
 }

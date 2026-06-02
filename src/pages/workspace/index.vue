@@ -102,6 +102,8 @@ const activeCode = ref(resolveCapabilityCode(route.params.code));
 const generationResult = ref<WorkspaceGenerateResult | null>(null);
 const creativeImageCaption = ref<string | null>(null);
 const creativeConversations = ref<CreativeImageConversation[]>([]);
+/** 含草稿在内的完整会话列表，仅用于内部复用草稿，不展示在侧边栏 */
+const creativeConversationsAll = ref<CreativeImageConversation[]>([]);
 const creativeThreadTurns = ref<CreativeThreadTurn[]>([]);
 const activeCreativeConversationId = ref<string | null>(null);
 const creativeReferenceAsset = ref<UploadedAsset | null>(null);
@@ -737,7 +739,8 @@ async function canStartBatchGeneration() {
 function loadWorkspaceOwnerState() {
   setTrackedRunningTasks(readTrackedRunningTasks());
   setBatchActiveJobs(readBatchActiveJobs());
-  activeCreativeConversationId.value = readActiveCreativeConversationId();
+  const savedConversationId = readActiveCreativeConversationId();
+  activeCreativeConversationId.value = savedConversationId || null;
 }
 
 function resetWorkspaceViewStateForOwner() {
@@ -746,6 +749,7 @@ function resetWorkspaceViewStateForOwner() {
   generationResult.value = null;
   creativeImageCaption.value = null;
   creativeConversations.value = [];
+  creativeConversationsAll.value = [];
   creativeThreadTurns.value = [];
   creativeReferenceAsset.value = null;
   activeCreativeConversationId.value = null;
@@ -852,6 +856,10 @@ const activeCreativeConversationGenerating = computed(() => {
   );
 });
 
+const isCreativeNewConversationDisabled = computed(
+  () => isCreatingCreativeConversation.value || isCreativeNewChatMode(),
+);
+
 function isCreativeConversationDraft(conversation: CreativeImageConversation) {
   return (
     !conversation.lastMessage &&
@@ -864,37 +872,48 @@ function isCreativeConversationDraft(conversation: CreativeImageConversation) {
 function orderCreativeConversations(
   items: CreativeImageConversation[],
 ): CreativeImageConversation[] {
-  const drafts = items.filter(isCreativeConversationDraft);
-  const primaryDraft =
-    drafts.length > 0
-      ? [...drafts].sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        )[0]
-      : null;
-  const nonDrafts = items
-    .filter((item) => !isCreativeConversationDraft(item))
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+  return [...items].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+}
 
-  return primaryDraft ? [primaryDraft, ...nonDrafts] : nonDrafts;
+function listVisibleCreativeConversations(
+  items: CreativeImageConversation[],
+): CreativeImageConversation[] {
+  return orderCreativeConversations(
+    items.filter((item) => !isCreativeConversationDraft(item)),
+  );
 }
 
 function findCreativeConversationDraft() {
   return (
-    creativeConversations.value.find(isCreativeConversationDraft) ?? null
+    creativeConversationsAll.value.find(isCreativeConversationDraft) ?? null
   );
 }
 
-function focusCreativeDraftConversation(conversationId: string) {
-  activeCreativeConversationId.value = conversationId;
-  saveActiveCreativeConversationId(conversationId);
+function isCreativeNewChatMode() {
+  return (
+    !activeCreativeConversationId.value &&
+    !generationResult.value &&
+    !creativeImageCaption.value &&
+    !creativeThreadTurns.value.length &&
+    !creativeReferenceAsset.value &&
+    !activeCreativeConversationGenerating.value
+  );
+}
+
+function enterCreativeNewChatMode() {
+  const alreadyNewChat = isCreativeNewChatMode();
+
+  activeCreativeConversationId.value = null;
+  saveActiveCreativeConversationId(null);
   creativeReferenceAsset.value = null;
   generationResult.value = null;
   creativeImageCaption.value = null;
   creativeThreadTurns.value = [];
+  isLoadingCreativeConversation.value = false;
+
+  return alreadyNewChat;
 }
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? "");
@@ -925,10 +944,21 @@ watch(activeCode, (code, previousCode) => {
 });
 
 function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview | null) {
+  if (!task) {
+    deliveryTaskPreview.value = null;
+    previewedDeliveryTaskId.value = null;
+    return;
+  }
+
+  const isSameTask = deliveryTaskPreview.value?.id === task.id;
   deliveryTaskPreview.value = task;
-  deliveryImagePreview.value = null;
-  generationResult.value = null;
-  previewedDeliveryTaskId.value = task?.id ?? null;
+  previewedDeliveryTaskId.value = task.id;
+
+  // 轮询刷新同一任务时不要清空大图/单张预览，否则预览会被动关闭
+  if (!isSameTask) {
+    deliveryImagePreview.value = null;
+    generationResult.value = null;
+  }
 }
 
 function handleDeliveryListLoadingChange(loading: boolean) {
@@ -1248,35 +1278,21 @@ async function refreshCreativeConversations() {
       page: 1,
       pageSize: 20,
     });
-    creativeConversations.value = orderCreativeConversations(result.items);
-
-    const primaryDraft = findCreativeConversationDraft();
-    const activeId =
-      activeCreativeConversationId.value ?? readActiveCreativeConversationId();
-    if (activeId && primaryDraft && activeId !== primaryDraft.conversationId) {
-      const activeInRaw = result.items.find(
-        (item) => item.conversationId === activeId,
-      );
-      if (activeInRaw && isCreativeConversationDraft(activeInRaw)) {
-        activeCreativeConversationId.value = primaryDraft.conversationId;
-        saveActiveCreativeConversationId(primaryDraft.conversationId);
-      }
-    }
+    creativeConversationsAll.value = result.items;
+    creativeConversations.value = listVisibleCreativeConversations(result.items);
 
     const savedConversationId = readActiveCreativeConversationId();
+    const candidateId =
+      activeCreativeConversationId.value ?? savedConversationId;
+    const candidateConversation = candidateId
+      ? result.items.find((item) => item.conversationId === candidateId)
+      : null;
     const nextConversationId =
-      activeCreativeConversationId.value ??
-      (savedConversationId &&
-      creativeConversations.value.some(
-        (item) => item.conversationId === savedConversationId,
-      )
-        ? savedConversationId
-        : creativeConversations.value[0]?.conversationId);
+      candidateConversation && !isCreativeConversationDraft(candidateConversation)
+        ? candidateConversation.conversationId
+        : null;
 
-    if (
-      nextConversationId &&
-      activeCreativeConversationId.value !== nextConversationId
-    ) {
+    if (activeCreativeConversationId.value !== nextConversationId) {
       activeCreativeConversationId.value = nextConversationId;
       saveActiveCreativeConversationId(nextConversationId);
     }
@@ -1336,10 +1352,7 @@ async function ensureCreativeConversation(prompt?: string) {
   const conversation = await createCreativeImageConversation({ title });
   activeCreativeConversationId.value = conversation.conversationId;
   saveActiveCreativeConversationId(conversation.conversationId);
-  creativeConversations.value = orderCreativeConversations([
-    conversation,
-    ...creativeConversations.value,
-  ]);
+  creativeConversationsAll.value = [conversation, ...creativeConversationsAll.value];
   return conversation.conversationId;
 }
 
@@ -1350,53 +1363,30 @@ function syncCreativeConversationPendingTask(
 ) {
   const title = prompt.trim().slice(0, 24);
 
-  creativeConversations.value = orderCreativeConversations(
-    creativeConversations.value.map((item) =>
-      item.conversationId === conversationId
-        ? {
-            ...item,
-            title: title || item.title,
-            lastMessage: prompt.trim(),
-            lastTaskId: taskId,
-            lastResultUrl: null,
-          }
-        : item,
-    ),
+  const nextAll = creativeConversationsAll.value.map((item) =>
+    item.conversationId === conversationId
+      ? {
+          ...item,
+          title: title || item.title,
+          lastMessage: prompt.trim(),
+          lastTaskId: taskId,
+          lastResultUrl: null,
+        }
+      : item,
   );
+  creativeConversationsAll.value = nextAll;
+  creativeConversations.value = listVisibleCreativeConversations(nextAll);
 }
 
-async function handleNewCreativeConversation() {
+function handleNewCreativeConversation() {
   if (isCreatingCreativeConversation.value) return;
 
-  const existingDraft = findCreativeConversationDraft();
-  if (existingDraft) {
-    if (activeCreativeConversationId.value === existingDraft.conversationId) {
-      message.info("当前已经是新对话");
-      return;
-    }
-
-    focusCreativeDraftConversation(existingDraft.conversationId);
-    message.info("已回到新对话");
+  if (enterCreativeNewChatMode()) {
+    message.info("当前已经是新对话");
     return;
   }
 
-  isCreatingCreativeConversation.value = true;
-  try {
-    const conversation = await createCreativeImageConversation({
-      title: "创意生图对话",
-    });
-    focusCreativeDraftConversation(conversation.conversationId);
-    creativeConversations.value = orderCreativeConversations([
-      conversation,
-      ...creativeConversations.value,
-    ]);
-    message.success("已新建对话");
-  } catch (error) {
-    const text = error instanceof Error ? error.message : "新建对话失败";
-    message.error(text);
-  } finally {
-    isCreatingCreativeConversation.value = false;
-  }
+  message.info("已回到新对话");
 }
 
 function handleSelectCreativeConversation(conversationId: string) {
@@ -1425,10 +1415,11 @@ async function handleDeleteCreativeConversation(conversationId: string) {
     );
     if (index < 0) return;
 
-    const remaining = creativeConversations.value.filter(
+    const remainingAll = creativeConversationsAll.value.filter(
       (item) => item.conversationId !== conversationId,
     );
-    creativeConversations.value = orderCreativeConversations(remaining);
+    creativeConversationsAll.value = remainingAll;
+    creativeConversations.value = listVisibleCreativeConversations(remainingAll);
     setCreativeConversationGenerating(conversationId, null);
 
     if (activeCreativeConversationId.value !== conversationId) {
@@ -1436,18 +1427,14 @@ async function handleDeleteCreativeConversation(conversationId: string) {
       return;
     }
 
+    const visibleRemaining = creativeConversations.value;
     const nextConversation =
-      remaining[index] ?? remaining[index - 1] ?? findCreativeConversationDraft();
+      visibleRemaining[index] ?? visibleRemaining[index - 1] ?? null;
 
     if (nextConversation) {
       handleSelectCreativeConversation(nextConversation.conversationId);
     } else {
-      activeCreativeConversationId.value = null;
-      saveActiveCreativeConversationId(null);
-      creativeReferenceAsset.value = null;
-      generationResult.value = null;
-      creativeImageCaption.value = null;
-      creativeThreadTurns.value = [];
+      enterCreativeNewChatMode();
     }
 
     message.success("对话已删除");
@@ -1843,7 +1830,7 @@ onUnmounted(() => {
             :thread-turns="creativeThreadTurns"
             :is-loading-conversation="isLoadingCreativeConversation"
             :active-conversation-id="activeCreativeConversationId"
-            :is-new-conversation-disabled="isCreatingCreativeConversation"
+            :is-new-conversation-disabled="isCreativeNewConversationDisabled"
             :reference-asset="creativeReferenceAsset"
             @generate="handleCreativeGenerate"
             @new-conversation="handleNewCreativeConversation"
@@ -1998,14 +1985,20 @@ onUnmounted(() => {
   grid-template-columns: minmax(0, 1fr);
   background: var(--workspace-panel-deep);
 
-  @media (width >= 1024px) {
+  @media (width >= 1024px) and (width < 1180px) {
+    gap: 12px;
+    grid-template-columns: 220px 420px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  @media (width >= 1180px) {
     gap: 14px;
-    grid-template-columns: 240px minmax(360px, 500px) minmax(0, 1fr);
+    grid-template-columns: 240px 440px minmax(420px, 1fr);
     padding: 16px;
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px minmax(380px, 520px) minmax(0, 1fr);
+    grid-template-columns: 260px 500px minmax(520px, 1fr);
     padding: 18px;
   }
 }
@@ -2064,7 +2057,7 @@ onUnmounted(() => {
   }
 }
 
-@media (width < 1024px) {
+@media (width < 960px) {
   .workspace-page {
     height: auto;
     max-height: none;
@@ -2095,17 +2088,25 @@ onUnmounted(() => {
 }
 
 .workspace-page--feature-compare .workspace-shell {
-  @media (width >= 1024px) {
-    grid-template-columns: 240px minmax(340px, 430px) minmax(0, 1fr);
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 220px 400px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
+    grid-template-columns: 240px 420px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px minmax(360px, 440px) minmax(0, 1fr);
+    grid-template-columns: 260px 440px minmax(520px, 1fr);
   }
 }
 
 .workspace-page--creative-image .workspace-shell {
-  @media (width >= 1024px) {
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
     grid-template-columns: 240px minmax(0, 1fr);
   }
 
