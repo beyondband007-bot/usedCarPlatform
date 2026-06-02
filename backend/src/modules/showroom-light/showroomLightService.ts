@@ -72,6 +72,14 @@ class ShowroomLightService {
         asset.localPath,
         "used-car-platform/showroom-light",
       );
+      const uploadedScene =
+        !body.sceneReferenceImageUrl && scene.referenceImagePath
+          ? await kieClient.uploadLocalFileWithLease(
+              lease,
+              scene.referenceImagePath,
+              "used-car-platform/showroom-light/scene",
+            )
+          : null;
       const uploadedLogo = logoAsset
         ? await kieClient.uploadLocalFileWithLease(
             lease,
@@ -79,9 +87,15 @@ class ShowroomLightService {
             "used-car-platform/showroom-light/logo",
           )
         : null;
+      const sceneReferenceImageUrl = body.sceneReferenceImageUrl ?? uploadedScene?.fileUrl ?? scene.referenceImageUrl;
+      if (!sceneReferenceImageUrl) {
+        throw errors.invalidParameter("showroom-light scene reference image is missing", {
+          optionId: scene.optionId,
+        });
+      }
       const inputUrls = [
         uploaded.fileUrl,
-        scene.referenceImageUrl,
+        sceneReferenceImageUrl,
         ...(uploadedLogo ? [uploadedLogo.fileUrl] : []),
       ];
       const kieTask = await kieClient.createImageToImageTaskWithLease(lease, {
@@ -102,7 +116,10 @@ class ShowroomLightService {
           inputUrls,
           aspectRatio: outputRatio,
           resolution,
-          scene,
+          scene: {
+            ...scene,
+            referenceImageUrl: sceneReferenceImageUrl,
+          },
           logoAssetId: logoAsset?.id ?? null,
         },
         responseJson: kieTask.raw,
@@ -116,7 +133,7 @@ class ShowroomLightService {
         kieTaskId: kieTask.kieTaskId,
         optionId: scene.optionId,
         sceneTitle: scene.title,
-        sceneReferenceImageUrl: scene.referenceImageUrl,
+        sceneReferenceImageUrl,
         logoAssetId: logoAsset?.id ?? null,
         inputImageCount: inputUrls.length,
         pollingUrl: `/api/v1/tasks/${taskId}`,

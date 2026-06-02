@@ -140,6 +140,24 @@ export class DeliveryRepository extends Repository {
     return assetIds;
   }
 
+  async deleteAssetsBySourceTaskIds(taskIds: string[]) {
+    if (!taskIds.length) return;
+    const placeholders = taskIds.map((_, index) => `:taskId${index}`).join(", ");
+    await this.execute(
+      `DELETE FROM delivery_assets WHERE source_task_id IN (${placeholders})`,
+      Object.fromEntries(taskIds.map((taskId, index) => [`taskId${index}`, taskId])),
+    );
+  }
+
+  async deletePackagesByTaskIds(taskIds: string[]) {
+    if (!taskIds.length) return;
+    const placeholders = taskIds.map((_, index) => `:taskId${index}`).join(", ");
+    await this.execute(
+      `DELETE FROM delivery_packages WHERE task_id IN (${placeholders})`,
+      Object.fromEntries(taskIds.map((taskId, index) => [`taskId${index}`, taskId])),
+    );
+  }
+
   async findAssetsByIds(assetIds: string[]) {
     if (!assetIds.length) return [];
     const placeholders = assetIds.map((_, index) => `:assetId${index}`).join(", ");

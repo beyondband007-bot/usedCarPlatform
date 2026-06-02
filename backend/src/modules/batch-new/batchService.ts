@@ -380,7 +380,7 @@ class BatchService {
 
       if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
         const scene = resolveBatchScene(config.sceneOptionId, config.sceneIndex);
-        inputUrls.push(scene.referenceImageUrl);
+        inputUrls.push(config.sceneReferenceImageUrl ?? scene.referenceImageUrl);
       }
 
       if (item.itemKind === "exterior" && config.useRecentLogo) {

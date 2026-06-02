@@ -5,7 +5,7 @@ import {
   saveBatchPreset,
   type BatchVisualConfig,
 } from '@/api/visual-workbench'
-import { getBatchSceneOptionId } from '@/constants/workspace'
+import { getBatchSceneImageUrl, getBatchSceneOptionId } from '@/constants/workspace'
 import type { BatchVisualTemplate, BatchVisualTemplateInput } from '@/types/workspace'
 
 const NEW_PRESET_VALUE = '__new__'
@@ -19,6 +19,9 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     enableSceneChange: input.enableSceneChange,
     sceneOptionId: input.enableSceneChange
       ? getBatchSceneOptionId(input.sceneCategory, input.sceneIndex)
+      : undefined,
+    sceneReferenceImageUrl: input.enableSceneChange
+      ? getBatchSceneImageUrl(input.sceneCategory, input.sceneIndex)
       : undefined,
     sceneIndex: input.sceneIndex,
     sceneCategory: input.sceneCategory,

@@ -66,3 +66,10 @@ deliveryRoutes.delete(
     ok(res, await deliveryService.deleteAssets(req.body));
   }),
 );
+
+deliveryRoutes.delete(
+  "/tasks",
+  asyncHandler(async (req, res) => {
+    ok(res, await deliveryService.deleteTasks(req.body));
+  }),
+);

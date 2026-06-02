@@ -36,6 +36,7 @@ export type GenerationTaskStatus =
 export interface CreateGenerationTaskPayload {
   inputAssetId: string | null
   optionId?: string
+  sceneReferenceImageUrl?: string
   useLogo?: boolean
   logoAssetId?: string
   colorCode?: string
@@ -171,6 +172,7 @@ export interface CreatedCreativeGeneration extends CreatedGenerationTask {
 export interface BatchVisualConfig {
   enableSceneChange: boolean
   sceneOptionId?: string
+  sceneReferenceImageUrl?: string
   sceneIndex: number
   sceneCategory: string
   outputRatio: string
@@ -557,6 +559,14 @@ export async function deleteDeliveryAssets(assetIds: string[]) {
   const response = await request.delete<ApiResponse<{ deleted: string[]; failed: string[] }>>(
     '/modules/delivery/assets',
     { data: { assetIds } },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function deleteDeliveryTasks(taskIds: string[]) {
+  const response = await request.delete<ApiResponse<{ deleted: string[]; failed: string[] }>>(
+    '/modules/delivery/tasks',
+    { data: { taskIds } },
   )
   return unwrapApiResponse(response)
 }

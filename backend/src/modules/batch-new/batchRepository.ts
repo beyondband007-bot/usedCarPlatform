@@ -245,6 +245,34 @@ export class BatchRepository extends Repository {
       { batchId },
     );
   }
+
+  async listGenerationTaskIds(batchIds: string[]) {
+    if (!batchIds.length) return [];
+    const placeholders = batchIds.map((_, index) => `:batchId${index}`).join(", ");
+    const params = Object.fromEntries(
+      batchIds.map((batchId, index) => [`batchId${index}`, batchId]),
+    );
+    const rows = await this.query<Array<RowDataPacket & { generation_task_id: string }>>(
+      `SELECT DISTINCT generation_task_id
+       FROM batch_task_items
+       WHERE batch_id IN (${placeholders})`,
+      params,
+    );
+    return rows.map((row) => row.generation_task_id).filter(Boolean);
+  }
+
+  async deleteBatches(batchIds: string[]) {
+    if (!batchIds.length) return;
+    const placeholders = batchIds.map((_, index) => `:batchId${index}`).join(", ");
+    const params = Object.fromEntries(
+      batchIds.map((batchId, index) => [`batchId${index}`, batchId]),
+    );
+    await this.execute(
+      `DELETE FROM batch_task_items WHERE batch_id IN (${placeholders})`,
+      params,
+    );
+    await this.execute(`DELETE FROM batch_tasks WHERE id IN (${placeholders})`, params);
+  }
 }
 
 export const batchRepository = new BatchRepository();

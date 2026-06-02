@@ -1,29 +1,30 @@
+import path from "node:path";
+
+import { env } from "../../config/env";
 import type { SceneOption } from "../scene-common/sceneModuleFactory";
+
+const workspaceAsset = (...segments: string[]) => path.resolve(env.rootDir, "../src/assets/img", ...segments);
 
 export const skyStudioScenes: SceneOption[] = [
   {
-    optionId: "clear-sky",
-    title: "晴空蓝天",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1600&q=90",
+    optionId: "sky-mirror-field",
+    title: "天空镜场",
+    referenceImagePath: workspaceAsset("天空影棚", "天空影棚场景", "天空镜场场景.png"),
   },
   {
-    optionId: "sunset",
-    title: "落日金辉",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1501973801540-537f08ccae7b?auto=format&fit=crop&w=1600&q=90",
+    optionId: "sunset-drive",
+    title: "夕阳车镜",
+    referenceImagePath: workspaceAsset("天空影棚", "天空影棚场景", "夕阳车镜场景.png"),
   },
   {
-    optionId: "cloudy",
-    title: "柔云漫射",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=90",
+    optionId: "cloud-sea-stage",
+    title: "云海展台",
+    referenceImagePath: workspaceAsset("天空影棚", "天空影棚场景", "云海展台场景.png"),
   },
   {
-    optionId: "night-sky",
-    title: "夜幕星光",
-    referenceImageUrl:
-      "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1600&q=90",
+    optionId: "cloud-parking",
+    title: "云镜车场",
+    referenceImagePath: workspaceAsset("天空影棚", "天空影棚场景", "云镜车场场景.png"),
   },
 ];
 

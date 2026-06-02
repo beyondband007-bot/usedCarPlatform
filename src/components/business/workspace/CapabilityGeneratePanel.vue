@@ -5,11 +5,9 @@ import { NButton, NSelect, NSwitch, useMessage } from "naive-ui";
 
 import {
   createBatchTask,
-  createDeliveryPackage,
-  deleteDeliveryAssets,
+  deleteDeliveryTasks,
   getDeliveryTaskAssets,
   getDeliveryTasks,
-  pollDeliveryPackage,
   uploadAsset,
   type BatchVisualConfig,
   type DeliveryAsset,
@@ -24,6 +22,7 @@ import {
 } from "@/constants/output-ratio";
 import {
   batchSceneCategoryOptions,
+  getBatchSceneImageUrl,
   getBatchSceneOptionId,
   getBatchScenesByCategory,
   getBatchSceneTitle,
@@ -31,6 +30,7 @@ import {
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 import { formatDate } from "@/utils/dayjs";
+import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
@@ -92,7 +92,7 @@ const lightConsistency = ref(true);
 const paintRefresh = ref(false);
 const interiorEnhance = ref(false);
 const interiorCollage = ref(false);
-const projectName = ref("5月展厅批量上新");
+const projectName = ref("");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
 const presetInput = ref(visualTemplates.value[0]?.name ?? "");
@@ -115,6 +115,7 @@ const interiorCollageInputRef = ref<HTMLInputElement | null>(null);
 const MAX_BATCH_EXTERIOR_IMAGES = 5;
 const MIN_INTERIOR_COLLAGE_IMAGES = 2;
 const MAX_INTERIOR_COLLAGE_IMAGES = 10;
+const BATCH_DELIVERY_SNAPSHOT_STORAGE_KEY = "workspace:batch-delivery-snapshots";
 
 let previewObjectUrl: string | null = null;
 
@@ -131,7 +132,110 @@ type BatchExteriorUploadItem = {
 
 type InteriorCollageUploadItem = BatchExteriorUploadItem;
 
+interface BatchDeliverySnapshotAsset {
+  assetId: string;
+  url: string;
+  fileName: string;
+}
+
+interface BatchDeliverySnapshot {
+  batchId: string;
+  projectName: string;
+  outputRatio: string;
+  interiorEnabled: boolean;
+  interiorCollage: boolean;
+  exteriorAssets: BatchDeliverySnapshotAsset[];
+  interiorAssets: BatchDeliverySnapshotAsset[];
+  createdAt: string;
+}
+
 const interiorCollageUploads = ref<InteriorCollageUploadItem[]>([]);
+const batchDeliverySnapshots = ref<Record<string, BatchDeliverySnapshot>>(
+  loadBatchDeliverySnapshots(),
+);
+
+function loadBatchDeliverySnapshots() {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.sessionStorage.getItem(
+      BATCH_DELIVERY_SNAPSHOT_STORAGE_KEY,
+    );
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, BatchDeliverySnapshot>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistBatchDeliverySnapshots() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      BATCH_DELIVERY_SNAPSHOT_STORAGE_KEY,
+      JSON.stringify(batchDeliverySnapshots.value),
+    );
+  } catch {
+    // Session persistence is a display enhancement; ignore storage failures.
+  }
+}
+
+function toBatchDeliverySnapshotAsset(
+  asset: UploadedAsset,
+): BatchDeliverySnapshotAsset {
+  return {
+    assetId: asset.assetId,
+    url: asset.url,
+    fileName: asset.fileName,
+  };
+}
+
+function saveBatchDeliverySnapshot(snapshot: BatchDeliverySnapshot) {
+  batchDeliverySnapshots.value = {
+    ...batchDeliverySnapshots.value,
+    [snapshot.batchId]: snapshot,
+  };
+  persistBatchDeliverySnapshots();
+}
+
+function removeBatchDeliverySnapshots(taskIds: string[]) {
+  if (!taskIds.length) return;
+
+  const next = { ...batchDeliverySnapshots.value };
+  let changed = false;
+
+  for (const taskId of taskIds) {
+    if (!next[taskId]) continue;
+    delete next[taskId];
+    changed = true;
+  }
+
+  if (!changed) return;
+
+  batchDeliverySnapshots.value = next;
+  persistBatchDeliverySnapshots();
+}
+
+function getBatchDeliverySnapshot(taskId: string) {
+  return batchDeliverySnapshots.value[taskId];
+}
+
+function getSnapshotInteriorDisplayAssets(snapshot?: BatchDeliverySnapshot) {
+  if (!snapshot?.interiorEnabled || !snapshot.interiorAssets.length) return [];
+  return snapshot.interiorCollage
+    ? snapshot.interiorAssets.slice(0, 1)
+    : snapshot.interiorAssets;
+}
+
+function getSnapshotDisplayTotal(snapshot?: BatchDeliverySnapshot) {
+  if (!snapshot) return null;
+  return (
+    snapshot.exteriorAssets.length +
+    getSnapshotInteriorDisplayAssets(snapshot).length
+  );
+}
 
 function revokePreviewObjectUrl() {
   if (!previewObjectUrl) return;
@@ -165,8 +269,7 @@ function resetBatchCreateSection() {
   resetBatchExteriorUploads();
   resetInteriorCollageUploads();
   uploadInterior.value = false;
-  projectName.value =
-    getTemplateById(createTaskPresetId.value)?.name ?? "批量上新任务";
+  projectName.value = "";
 }
 
 function resetUploadedInterior() {
@@ -287,6 +390,9 @@ function mapBatchVisualConfigFromTemplate(
     enableSceneChange: template.enableSceneChange,
     sceneOptionId: template.enableSceneChange
       ? getBatchSceneOptionId(template.sceneCategory, template.sceneIndex)
+      : undefined,
+    sceneReferenceImageUrl: template.enableSceneChange
+      ? getBatchSceneImageUrl(template.sceneCategory, template.sceneIndex)
       : undefined,
     sceneIndex: template.sceneIndex,
     sceneCategory: template.sceneCategory,
@@ -745,6 +851,11 @@ function handleGenerate() {
     outputRatio: outputRatio.value,
     optionId:
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
+    sceneReferenceImageUrl:
+      props.capability.kind === "scene"
+        ? props.capability.options.find((item) => item.id === props.selectedOptionId)
+            ?.image
+        : undefined,
     useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
     logoAssetId:
       props.capability.kind === "scene" &&
@@ -788,33 +899,45 @@ async function handleCreateBatchTask() {
   isCreatingBatchTask.value = true;
 
   try {
+    const exteriorAssets = uploadedExteriorAssets.value;
+    const interiorAssets = uploadInterior.value
+      ? uploadedInteriorCollageAssets.value
+      : [];
     const interiorAssetIds = uploadInterior.value
-      ? uploadedInteriorCollageAssets.value.map((item) => item.assetId)
+      ? interiorAssets.map((item) => item.assetId)
       : [];
 
     const visualConfig = mapBatchVisualConfigFromTemplate(template);
+    const normalizedProjectName = projectName.value.trim() || "批量上新任务";
 
     const created = await createBatchTask({
-      projectName: projectName.value.trim() || "批量上新任务",
+      projectName: normalizedProjectName,
       presetId: createTaskPresetId.value,
       carGroups: [
         {
-          groupTitle: projectName.value.trim() || "车辆图组",
-          exteriorAssetIds: uploadedExteriorAssets.value.map(
-            (item) => item.assetId,
-          ),
+          groupTitle: normalizedProjectName || "车辆图组",
+          exteriorAssetIds: exteriorAssets.map((item) => item.assetId),
           interiorAssetIds,
         },
       ],
       visualConfig,
-      outputRatio: visualConfig.outputRatio,
     });
 
     lastCreatedBatchId.value = created.batchId;
+    saveBatchDeliverySnapshot({
+      batchId: created.batchId,
+      projectName: normalizedProjectName,
+      outputRatio: visualConfig.outputRatio,
+      interiorEnabled: uploadInterior.value,
+      interiorCollage: Boolean(visualConfig.enableInteriorCollage),
+      exteriorAssets: exteriorAssets.map(toBatchDeliverySnapshotAsset),
+      interiorAssets: interiorAssets.map(toBatchDeliverySnapshotAsset),
+      createdAt: created.createdAt,
+    });
     message.success("批量任务创建中");
     emit("batchCreated", {
       batchId: created.batchId,
-      projectName: projectName.value.trim() || "批量上新任务",
+      projectName: normalizedProjectName,
       previewUrl: batchExteriorFirstPreviewUrl.value,
       createdAt: created.createdAt,
       status: created.status,
@@ -868,20 +991,18 @@ async function refreshDeliveryTasks(options?: { silent?: boolean }) {
     );
     deliveryTasks.value = await Promise.all(
       result.items.map(async (item) => {
-        const metrics = buildDeliveryTaskMetrics(item);
-        const imageCount = item.assetCount;
-
-        const isComplete =
-          metrics.deliveryTotal > 0 &&
-          metrics.deliveryCompleted >= metrics.deliveryTotal;
+        const snapshot = getBatchDeliverySnapshot(item.taskId);
+        const metrics = buildDeliveryTaskMetrics(item, snapshot);
+        const imageCount = metrics.deliveryTotal;
 
         return {
           ...item,
           ...metrics,
           displayTitle: buildDeliveryDisplayTitle(item),
-          selected: Boolean(selectedByTaskId.get(item.taskId) && isComplete),
+          selected: Boolean(selectedByTaskId.get(item.taskId)),
           image: await resolveDeliveryTaskImage(item),
           imageCount,
+          deliverySnapshot: snapshot,
         };
       }),
     );
@@ -922,10 +1043,9 @@ async function loadDeliveryAssets(taskId: string) {
 }
 
 function getExpectedDeliveryAssetCount(task: {
-  imageCount: number;
   assetCount: number;
 }) {
-  return Math.max(task.imageCount, task.assetCount, 0);
+  return Math.max(task.assetCount, 0);
 }
 
 function isDeliveryAssetsCacheComplete(
@@ -978,13 +1098,6 @@ watch(
   { immediate: true },
 );
 
-watch(createTaskPresetId, (presetId) => {
-  const template = getTemplateById(presetId);
-  if (!template) return;
-
-  projectName.value = template.name;
-});
-
 watch(
   () => props.capability.code,
   (code) => {
@@ -1030,19 +1143,22 @@ async function pollActiveDeliveryPreviewAssets() {
   try {
     const assets = await loadDeliveryAssets(task.taskId);
     const nextCompleted = assets.length;
-    const prevCompleted = task.deliveryCompleted;
+    const prevCompleted = task.assetCount;
 
     if (nextCompleted !== prevCompleted) {
-      const metrics = buildDeliveryTaskMetrics({
-        ...task,
-        assetCount: nextCompleted,
-        total: task.deliveryTotal,
-      });
+      const metrics = buildDeliveryTaskMetrics(
+        {
+          ...task,
+          assetCount: nextCompleted,
+          total: task.deliveryTotal,
+        },
+        task.deliverySnapshot,
+      );
       const nextTask: DeliveryTask = {
         ...task,
         ...metrics,
         assetCount: nextCompleted,
-        imageCount: nextCompleted,
+        imageCount: metrics.deliveryTotal,
         image: assets[0]?.thumbnailUrl ?? assets[0]?.url ?? task.image,
       };
       deliveryTasks.value[taskIndex] = nextTask;
@@ -1105,6 +1221,7 @@ type DeliveryTask = DeliveryTaskItem & {
   deliveryCompleted: number;
   deliveryTotal: number;
   deliveryProgress: number;
+  deliverySnapshot?: BatchDeliverySnapshot;
 };
 
 function buildDeliveryDisplayTitle(item: DeliveryTaskItem) {
@@ -1118,9 +1235,34 @@ function formatDeliveryImageIndexTitle(projectName: string, index: number) {
   return `${projectName}图${index}`;
 }
 
-function buildDeliveryTaskMetrics(item: DeliveryTaskItem) {
-  const deliveryTotal = Math.max(item.total, 0);
-  const deliveryCompleted = Math.max(item.assetCount, 0);
+function getDeliveryPreviewSlotTitle(
+  projectName: string,
+  slotIndex: number,
+  snapshot?: BatchDeliverySnapshot,
+) {
+  const exteriorCount = snapshot?.exteriorAssets.length ?? 0;
+
+  if (snapshot?.interiorEnabled && slotIndex >= exteriorCount) {
+    const interiorIndex = slotIndex - exteriorCount;
+    if (snapshot.interiorCollage) {
+      return `${projectName}内饰拼接图`;
+    }
+    return `${projectName}内饰图${interiorIndex + 1}`;
+  }
+
+  return formatDeliveryImageIndexTitle(projectName, slotIndex + 1);
+}
+
+function buildDeliveryTaskMetrics(
+  item: DeliveryTaskItem,
+  snapshot?: BatchDeliverySnapshot,
+) {
+  const snapshotTotal = getSnapshotDisplayTotal(snapshot);
+  const deliveryTotal = Math.max(snapshotTotal ?? item.total, 0);
+  const deliveryCompleted = Math.min(
+    deliveryTotal,
+    Math.max(item.assetCount, 0),
+  );
   const deliveryProgress =
     deliveryTotal > 0
       ? Math.round((deliveryCompleted / deliveryTotal) * 100)
@@ -1169,7 +1311,11 @@ function buildDeliveryPreviewSlots(
   const totalCount = Math.max(task.deliveryTotal, assets.length);
   const readyAssets = assets.map((asset, index) => ({
     id: asset.assetId,
-    title: formatDeliveryImageIndexTitle(projectName, index + 1),
+    title: getDeliveryPreviewSlotTitle(
+      projectName,
+      index,
+      task.deliverySnapshot,
+    ),
     imageUrl: asset.url,
     thumbnailUrl: asset.thumbnailUrl ?? undefined,
     ratio: asset.ratio,
@@ -1178,21 +1324,29 @@ function buildDeliveryPreviewSlots(
     height: asset.height ?? undefined,
     status: "ready" as const,
   }));
+  const displayReadyAssets = readyAssets;
   const pendingLabel = getDeliveryPendingSlotLabel(task);
-  const defaultRatio = readyAssets[0]?.ratio ?? "4:3";
-  const pendingCount = Math.max(0, totalCount - readyAssets.length);
-  const pendingSlots = Array.from({ length: pendingCount }, (_, index) => ({
-    id: `pending-${task.taskId}-${index}`,
-    title: formatDeliveryImageIndexTitle(
-      projectName,
-      readyAssets.length + index + 1,
-    ),
-    ratio: defaultRatio,
-    status: "pending" as const,
-    pendingStatusText: pendingLabel,
-  }));
+  const defaultRatio =
+    displayReadyAssets[0]?.ratio ??
+    task.deliverySnapshot?.outputRatio ??
+    "4:3";
+  const pendingCount = Math.max(0, totalCount - displayReadyAssets.length);
+  const pendingSlots = Array.from({ length: pendingCount }, (_, index) => {
+    const slotIndex = displayReadyAssets.length + index;
+    return {
+      id: `pending-${task.taskId}-${slotIndex}`,
+      title: getDeliveryPreviewSlotTitle(
+        projectName,
+        slotIndex,
+        task.deliverySnapshot,
+      ),
+      ratio: defaultRatio,
+      status: "pending" as const,
+      pendingStatusText: pendingLabel,
+    };
+  });
 
-  return [...readyAssets, ...pendingSlots];
+  return [...displayReadyAssets, ...pendingSlots];
 }
 
 async function emitDeliveryTaskPreview(
@@ -1202,19 +1356,20 @@ async function emitDeliveryTaskPreview(
   const forceAssets =
     options?.forceAssets ?? !isDeliveryTaskComplete(task);
   const assets = await getDeliveryAssetsForTask(task, { force: forceAssets });
-  const firstAsset = assets[0];
+  const previewAssets = buildDeliveryPreviewSlots(task, assets);
+  const firstReadyAsset = previewAssets.find((asset) => asset.status === "ready");
 
   emit("previewDeliveryTask", {
     id: task.taskId,
     title: task.displayTitle,
     meta: formatDate(task.updatedAt),
-    image: firstAsset?.thumbnailUrl ?? firstAsset?.url ?? "",
-    previewImage: firstAsset?.url,
+    image: firstReadyAsset?.thumbnailUrl ?? firstReadyAsset?.imageUrl ?? "",
+    previewImage: firstReadyAsset?.imageUrl,
     progress: task.deliveryProgress,
-    imageCount: task.assetCount,
+    imageCount: task.imageCount,
     totalCount: task.deliveryTotal,
     completedCount: task.deliveryCompleted,
-    assets: buildDeliveryPreviewSlots(task, assets),
+    assets: previewAssets,
   });
 }
 
@@ -1299,10 +1454,6 @@ const deliverySelectedCount = computed(
   () => deliveryTasks.value.filter((task) => task.selected).length,
 );
 
-const deliverySelectableTasks = computed(() =>
-  deliveryTasks.value.filter((task) => isDeliveryTaskSelectable(task)),
-);
-
 const deliveryDownloadableCount = computed(
   () =>
     deliveryTasks.value.filter(
@@ -1320,22 +1471,20 @@ const deliverySelectedImages = computed(() =>
 
 const isAllDeliverySelected = computed(
   () =>
-    deliverySelectableTasks.value.length > 0 &&
-    deliverySelectableTasks.value.every((task) => task.selected),
+    deliveryTasks.value.length > 0 &&
+    deliveryTasks.value.every((task) => task.selected),
 );
 
 function toggleDeliveryTask(index: number) {
   const task = deliveryTasks.value[index];
-  if (!task || !isDeliveryTaskSelectable(task)) return;
+  if (!task) return;
   task.selected = !task.selected;
 }
 
 function toggleSelectAllDelivery() {
   const nextValue = !isAllDeliverySelected.value;
   deliveryTasks.value.forEach((task) => {
-    if (isDeliveryTaskSelectable(task)) {
-      task.selected = nextValue;
-    }
+    task.selected = nextValue;
   });
 }
 
@@ -1352,42 +1501,39 @@ async function handleDeliveryBatchDownload() {
   isDeliveryBatchDownloading.value = true;
 
   try {
-    const assetGroups = await Promise.all(
-      selectedTasks.map((task) => getDeliveryAssetsForTask(task)),
+    const fileGroups = await Promise.all(
+      selectedTasks.map(async (task) => {
+        const assets = await getDeliveryAssetsForTask(task);
+        return buildDeliveryPreviewSlots(task, assets)
+          .filter((asset) => asset.status === "ready" && asset.imageUrl)
+          .map((asset, index) => ({
+            url: asset.imageUrl!,
+            filename: `${sanitizeFilename(task.displayTitle)}-${String(index + 1).padStart(2, "0")}-${sanitizeFilename(asset.title)}.jpg`,
+          }));
+      }),
     );
-    const assetIds = assetGroups.flat().map((asset) => asset.assetId);
+    const files = fileGroups.flat();
 
-    if (!assetIds.length) {
+    if (!files.length) {
       message.warning("当前没有可下载素材");
       return;
     }
 
     const batchName = selectedTasks[0]?.displayTitle ?? "成片交付包";
-    const createdPackage = await createDeliveryPackage({
-      taskId: selectedTasks[0].taskId,
-      packageName: batchName,
-      assetIds,
-    });
+    const count = await downloadFilesAsZip(
+      files,
+      `${sanitizeFilename(batchName)}-成片交付.zip`,
+    );
 
-    const readyPackage = createdPackage.downloadUrl
-      ? createdPackage
-      : await pollDeliveryPackage(createdPackage.packageId);
-
-    if (readyPackage.downloadUrl) {
-      window.open(readyPackage.downloadUrl, "_blank", "noopener,noreferrer");
-    } else {
-      message.warning("下载包仍在生成，请稍后重试");
-    }
-
-    message.success(`下载包已生成，共 ${assetIds.length} 张图`);
+    message.success(`已开始下载 ${count} 张图`);
   } finally {
     isDeliveryBatchDownloading.value = false;
   }
 }
 
-async function handleDeleteDeliveryAssets() {
+async function handleDeleteDeliveryTasks() {
   const selectedTaskIds = deliveryTasks.value
-    .filter((task) => task.selected && isDeliveryTaskSelectable(task))
+    .filter((task) => task.selected)
     .map((task) => task.taskId);
 
   if (!selectedTaskIds.length) {
@@ -1395,30 +1541,33 @@ async function handleDeleteDeliveryAssets() {
     return;
   }
 
-  const selectedAssets = (
-    await Promise.all(
-      selectedTaskIds.map(async (taskId) => {
-        const task = deliveryTasks.value.find((item) => item.taskId === taskId);
-        if (!task) return [];
-
-        return getDeliveryAssetsForTask(task);
-      }),
-    )
-  ).flatMap((assets) => assets.map((asset) => asset.assetId));
-
-  if (!selectedAssets.length) {
-    message.warning("当前没有可删除素材");
-    return;
-  }
-
   isDeletingDeliveryAssets.value = true;
 
   try {
-    const result = await deleteDeliveryAssets(selectedAssets);
-    message.success(`已删除 ${result.deleted.length} 个素材`);
+    const result = await deleteDeliveryTasks(selectedTaskIds);
+    removeBatchDeliverySnapshots(result.deleted);
+
+    for (const taskId of result.deleted) {
+      delete deliveryTaskAssets.value[taskId];
+      delete deliveryTaskThumbUrl.value[taskId];
+    }
+
+    if (result.deleted.includes(activeDeliveryTaskId.value ?? "")) {
+      activeDeliveryTaskId.value = null;
+      emit("previewDeliveryTask", null);
+    }
+
+    if (result.deleted.length) {
+      message.success(`已删除 ${result.deleted.length} 个批量任务`);
+    }
+
+    if (result.failed.length) {
+      message.warning(`${result.failed.length} 个任务删除失败`);
+    }
+
     await refreshDeliveryTasks();
   } catch (error) {
-    const text = error instanceof Error ? error.message : "删除素材失败";
+    const text = error instanceof Error ? error.message : "删除任务失败";
     message.error(text);
   } finally {
     isDeletingDeliveryAssets.value = false;
@@ -1599,7 +1748,12 @@ const activeCreateRatioLabel = computed(() => {
 
             <section class="batch-card">
               <h3>项目名</h3>
-              <input v-model="projectName" class="plain-input" type="text" />
+              <input
+                v-model="projectName"
+                class="plain-input"
+                type="text"
+                placeholder="请输入项目名称"
+              />
             </section>
 
             <section class="batch-card batch-upload-card">
@@ -2135,15 +2289,10 @@ const activeCreateRatioLabel = computed(() => {
                 'is-loading': !isDeliveryTaskComplete(task),
               }"
             >
-              <label
-                class="delivery-check"
-                :class="{ 'is-disabled': !isDeliveryTaskSelectable(task) }"
-                @click.stop
-              >
+              <label class="delivery-check" @click.stop>
                 <input
                   type="checkbox"
                   :checked="task.selected"
-                  :disabled="!isDeliveryTaskSelectable(task)"
                   :aria-label="`选择${task.displayTitle}`"
                   @change="toggleDeliveryTask(index)"
                 />
@@ -2243,8 +2392,8 @@ const activeCreateRatioLabel = computed(() => {
               <button
                 type="button"
                 class="delivery-link-btn is-danger"
-                :disabled="deliverySelectedCount === 0"
-                @click="handleDeleteDeliveryAssets"
+                :disabled="deliverySelectedCount === 0 || isDeletingDeliveryAssets"
+                @click="handleDeleteDeliveryTasks"
               >
                 批量删除
               </button>
@@ -2668,6 +2817,11 @@ const activeCreateRatioLabel = computed(() => {
 
 .batch-card {
   padding: 16px;
+}
+
+.plain-input::placeholder {
+  color: var(--app-text-soft);
+  font-weight: 600;
 }
 
 .plain-input {

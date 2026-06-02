@@ -7,6 +7,7 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { batchRepository } from "../batch-new/batchRepository";
 import { batchService } from "../batch-new/batchService";
+import { tasksRepository } from "../tasks/tasksRepository";
 import { deliveryRepository, type DeliveryAssetRecord } from "./deliveryRepository";
 
 const execFileAsync = (file: string, args: string[]) =>
@@ -159,6 +160,31 @@ class DeliveryService {
     if (!assetIds.length) throw errors.invalidParameter("assetIds is required");
     const deleted = await deliveryRepository.softDeleteAssets(assetIds);
     return { deleted, failed: [] };
+  }
+
+  async deleteTasks(body: { taskIds?: string[] }) {
+    const taskIds = [...new Set(body.taskIds?.filter(Boolean) ?? [])];
+    if (!taskIds.length) throw errors.invalidParameter("taskIds is required");
+
+    const deleted: string[] = [];
+    const failed: string[] = [];
+
+    for (const taskId of taskIds) {
+      const batch = await batchRepository.findBatch(taskId);
+      if (!batch) {
+        failed.push(taskId);
+        continue;
+      }
+
+      const generationTaskIds = await batchRepository.listGenerationTaskIds([taskId]);
+      await deliveryRepository.deleteAssetsBySourceTaskIds([taskId]);
+      await deliveryRepository.deletePackagesByTaskIds([taskId]);
+      await tasksRepository.deleteByIds(generationTaskIds);
+      await batchRepository.deleteBatches([taskId]);
+      deleted.push(taskId);
+    }
+
+    return { deleted, failed };
   }
 }
 

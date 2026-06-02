@@ -7,14 +7,6 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
-import outdoorScene1 from '@/assets/img/户外场景/场景/图1.png'
-import outdoorScene2 from '@/assets/img/户外场景/场景/图2.png'
-import outdoorScene3 from '@/assets/img/户外场景/场景/图3.png'
-import outdoorScene4 from '@/assets/img/户外场景/场景/图4.png'
-import outdoorTutorial1 from '@/assets/img/户外场景/教程/教程1.png'
-import outdoorTutorial2 from '@/assets/img/户外场景/教程/教程2.png'
-import outdoorTutorial3 from '@/assets/img/户外场景/教程/教程3.png'
-import outdoorTutorial4 from '@/assets/img/户外场景/教程/教程4.png'
 import roadSceneBusinessPark from '@/assets/img/道路动态/场景选择/商务园区.png'
 import roadSceneCityDay from '@/assets/img/道路动态/场景选择/城市主干道.png'
 import roadSceneCoastal from '@/assets/img/道路动态/场景选择/海岸公路.png'
@@ -29,24 +21,36 @@ import roadTutorialBusinessPark from '@/assets/img/道路动态/教程背景图/
 import roadTutorialCityDay from '@/assets/img/道路动态/教程背景图/城市主干道.png'
 import roadTutorialHighwaySunset from '@/assets/img/道路动态/教程背景图/夕阳高速.png'
 import roadTutorialOverpassDusk from '@/assets/img/道路动态/教程背景图/傍晚高架.png'
-import showroomClassicWhite from '@/assets/img/展厅灯光/经典白棚.png'
-import showroomGlass from '@/assets/img/展厅灯光/玻璃展厅.png'
-import showroomLuxuryDark from '@/assets/img/展厅灯光/暗调奢华.png'
-import showroomSoftTop from '@/assets/img/展厅灯光/柔光灯顶.png'
-import showroomTutorialClassicWhite from '@/assets/img/展厅灯光/教程图片/经典白棚.png'
-import showroomTutorialGlass from '@/assets/img/展厅灯光/教程图片/玻璃展厅.png'
-import showroomTutorialLuxuryDark from '@/assets/img/展厅灯光/教程图片/暗调豪华.png'
-import showroomTutorialSoftTop from '@/assets/img/展厅灯光/教程图片/柔光灯顶.png'
-import showroomMinimal from '@/assets/img/展厅灯光/极简留白.png'
-import showroomWideAngle from '@/assets/img/展厅灯光/广角空间.png'
-import skyCloudParkingScene from '@/assets/img/天空影棚/天空影棚场景/云镜车场场景.png'
-import skyCloudSeaStageScene from '@/assets/img/天空影棚/天空影棚场景/云海展台场景.png'
-import skyMirrorFieldScene from '@/assets/img/天空影棚/天空影棚场景/天空镜场场景.png'
-import skySunsetDriveScene from '@/assets/img/天空影棚/天空影棚场景/夕阳车镜场景.png'
-import skyCloudParkingTutorial from '@/assets/img/天空影棚/天空影棚教程/云镜车场.png'
-import skyCloudSeaStageTutorial from '@/assets/img/天空影棚/天空影棚教程/云海展台.png'
-import skyMirrorFieldTutorial from '@/assets/img/天空影棚/天空影棚教程/天空镜场.png'
-import skySunsetDriveTutorial from '@/assets/img/天空影棚/天空影棚教程/夕阳车镜.png'
+const sceneImageUrls = {
+  outdoorTreePark:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
+  outdoorHarborCity:
+    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7xb5scpo6k88m3eDIYxBIJvAdixAvxzBIUzAIr=.png',
+  outdoorMountainLake:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyboa0qamynpnt1z8DIYxBIJvAdixAvxzBIUzAIr=.png',
+  outdoorCityBlock:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybo4mc19qipnsx41DIYxBIJvAdixAvxzBIUzAIr=.png',
+  skyCloudParking:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddybnoit1y2xpnlni5DIYxBIJvAdixAvxzBIUzAIr=.png',
+  skyCloudSeaStage:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybnnhxeyk0pnkuvcDIYxBIJvAdixAvxzBIUzAIr=.png',
+  skySunsetDrive:
+    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7wwfo8bmfk7z8blDIYxBIJvAdixAvxzBIUzAIr=.png',
+  skyMirrorField:
+    'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7wt7tz9adk7y9bsDIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomSoftTop:
+    'https://vip.123pan.cn/1849524247/ymjew503t0n000ddy7w8j8l064k7o12vDIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomClassicWhite:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmzldg3i4pn8kbxDIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomMinimal:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybmybi6j7tpn7u6lDIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomWideAngle:
+    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7w3h8c200k7nsa3DIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomGlass:
+    'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7w2k4md85k7mx2kDIYxBIJvAdixAvxzBIUzAIr=.png',
+  showroomLuxuryDark:
+    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmt5my1lmpn5lygDIYxBIJvAdixAvxzBIUzAIr=.png',
+}
 
 const tutorial = [
   {
@@ -73,19 +77,19 @@ const createOptions = (items: Array<[string, string, string]>): WorkspaceOption[
   items.map(([id, title, image]) => ({ id, title, image }))
 
 const showroomOptions = createOptions([
-  ['white-studio', '经典白棚', showroomClassicWhite],
-  ['glass-hall', '玻璃展厅', showroomGlass],
-  ['luxury-dark', '暗调奢华', showroomLuxuryDark],
-  ['soft-top-light', '柔光灯顶', showroomSoftTop],
-  ['minimal-space', '极简留白', showroomMinimal],
-  ['wide-angle', '广角空间', showroomWideAngle],
+  ['white-studio', '经典白棚', sceneImageUrls.showroomClassicWhite],
+  ['glass-hall', '玻璃展厅', sceneImageUrls.showroomGlass],
+  ['luxury-dark', '暗调奢华', sceneImageUrls.showroomLuxuryDark],
+  ['soft-top-light', '柔光灯顶', sceneImageUrls.showroomSoftTop],
+  ['minimal-space', '极简留白', sceneImageUrls.showroomMinimal],
+  ['wide-angle', '广角空间', sceneImageUrls.showroomWideAngle],
 ])
 
 const outdoorOptions = createOptions([
-  ['tree-park', '林荫公园', outdoorScene1],
-  ['mountain-lake', '山野湖畔', outdoorScene2],
-  ['city-block', '城市街区', outdoorScene3],
-  ['coast-daylight', '海边日光', outdoorScene4],
+  ['tree-park', '林荫公园', sceneImageUrls.outdoorTreePark],
+  ['mountain-lake', '山野湖畔', sceneImageUrls.outdoorMountainLake],
+  ['city-block', '城市街区', sceneImageUrls.outdoorCityBlock],
+  ['coast-daylight', '海滨城市', sceneImageUrls.outdoorHarborCity],
 ])
 
 const roadOptions = createOptions([
@@ -102,10 +106,10 @@ const roadOptions = createOptions([
 ])
 
 const skyOptions = createOptions([
-  ['sky-mirror-field', '天空镜场', skyMirrorFieldScene],
-  ['sunset-drive', '夕阳车镜', skySunsetDriveScene],
-  ['cloud-sea-stage', '云海展台', skyCloudSeaStageScene],
-  ['cloud-parking', '云镜车场', skyCloudParkingScene],
+  ['sky-mirror-field', '天空镜场', sceneImageUrls.skyMirrorField],
+  ['sunset-drive', '夕阳车镜', sceneImageUrls.skySunsetDrive],
+  ['cloud-sea-stage', '云海展台', sceneImageUrls.skyCloudSeaStage],
+  ['cloud-parking', '云镜车场', sceneImageUrls.skyCloudParking],
 ])
 
 export interface BatchSceneItem {
@@ -170,6 +174,11 @@ export function getBatchSceneOptionId(category: string, sceneIndex: number): str
 export function getBatchSceneTitle(category: string, sceneIndex: number): string {
   const scenes = getBatchScenesByCategory(category)
   return scenes[sceneIndex]?.title ?? scenes[0]?.title ?? ''
+}
+
+export function getBatchSceneImageUrl(category: string, sceneIndex: number): string | undefined {
+  const scenes = getBatchScenesByCategory(category)
+  return scenes[sceneIndex]?.image ?? scenes[0]?.image
 }
 
 const beautyOptions = createOptions([
@@ -537,25 +546,25 @@ const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
     title: '经典白棚',
     capabilityCode: 'showroom-light',
     optionId: 'white-studio',
-    image: showroomTutorialClassicWhite,
+    image: sceneImageUrls.showroomClassicWhite,
   },
   {
     title: '玻璃展厅',
     capabilityCode: 'showroom-light',
     optionId: 'glass-hall',
-    image: showroomTutorialGlass,
+    image: sceneImageUrls.showroomGlass,
   },
   {
     title: '暗调奢华',
     capabilityCode: 'showroom-light',
     optionId: 'luxury-dark',
-    image: showroomTutorialLuxuryDark,
+    image: sceneImageUrls.showroomLuxuryDark,
   },
   {
     title: '柔光灯顶',
     capabilityCode: 'showroom-light',
     optionId: 'soft-top-light',
-    image: showroomTutorialSoftTop,
+    image: sceneImageUrls.showroomSoftTop,
   },
 ]
 
@@ -564,25 +573,25 @@ const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
     title: '林荫公园',
     capabilityCode: 'outdoor-scene',
     optionId: 'tree-park',
-    image: outdoorTutorial1,
+    image: sceneImageUrls.outdoorTreePark,
   },
   {
     title: '山野湖畔',
     capabilityCode: 'outdoor-scene',
     optionId: 'mountain-lake',
-    image: outdoorTutorial2,
+    image: sceneImageUrls.outdoorMountainLake,
   },
   {
     title: '城市街区',
     capabilityCode: 'outdoor-scene',
     optionId: 'city-block',
-    image: outdoorTutorial3,
+    image: sceneImageUrls.outdoorCityBlock,
   },
   {
-    title: '海边日光',
+    title: '海滨城市',
     capabilityCode: 'outdoor-scene',
     optionId: 'coast-daylight',
-    image: outdoorTutorial4,
+    image: sceneImageUrls.outdoorHarborCity,
   },
 ]
 
@@ -591,25 +600,25 @@ const skyTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
     title: '天空镜场',
     capabilityCode: 'sky-studio',
     optionId: 'sky-mirror-field',
-    image: skyMirrorFieldTutorial,
+    image: sceneImageUrls.skyMirrorField,
   },
   {
     title: '夕阳车镜',
     capabilityCode: 'sky-studio',
     optionId: 'sunset-drive',
-    image: skySunsetDriveTutorial,
+    image: sceneImageUrls.skySunsetDrive,
   },
   {
     title: '云海展台',
     capabilityCode: 'sky-studio',
     optionId: 'cloud-sea-stage',
-    image: skyCloudSeaStageTutorial,
+    image: sceneImageUrls.skyCloudSeaStage,
   },
   {
     title: '云镜车场',
     capabilityCode: 'sky-studio',
     optionId: 'cloud-parking',
-    image: skyCloudParkingTutorial,
+    image: sceneImageUrls.skyCloudParking,
   },
 ]
 

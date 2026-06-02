@@ -16,7 +16,10 @@ import { formatOutputRatioLabel } from "@/constants/output-ratio";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
-import { getBatchItemKindLabel } from "@/utils/batch-task";
+import {
+  getBatchItemKindLabel,
+  isInteriorBatchItemKind,
+} from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
 import {
   recentStatusIconMap,
@@ -89,7 +92,7 @@ const templateDescriptionMap: Record<string, string> = {
   林荫公园: "自然绿意·日常外景",
   山野湖畔: "山野开阔·环境更自然",
   城市街区: "城市质感·适合门店传播",
-  海边日光: "明亮通透·度假氛围",
+  海滨城市: "明亮通透·度假氛围",
   道路动态1: "高速跟拍·突出速度感",
   道路动态2: "城市动感·增强行驶氛围",
   道路动态3: "夜景道路·强化光轨质感",
@@ -213,6 +216,7 @@ interface BatchDisplayCard {
   status: WorkspaceRecentItem["status"];
   thumbnail?: string;
   progress?: number;
+  isInteriorItem?: boolean;
 }
 
 const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
@@ -229,8 +233,13 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
           sceneLabel: getBatchItemKindLabel(item.itemKind),
           createdAt,
           status: item.status,
-          thumbnail: item.thumbnail || job.previewUrl || undefined,
+          thumbnail:
+            item.thumbnail ||
+            (isInteriorBatchItemKind(item.itemKind)
+              ? undefined
+              : job.previewUrl || undefined),
           progress: item.progress,
+          isInteriorItem: isInteriorBatchItemKind(item.itemKind),
         });
       }
       continue;
@@ -1113,6 +1122,15 @@ defineExpose({
                   fit="cover"
                   object-position="center"
                 />
+                <div
+                  v-else-if="item.isInteriorItem && item.status !== 'success'"
+                  class="delivery-group-pending recent-pending-slot"
+                  aria-hidden="true"
+                >
+                  <span class="delivery-group-pending-scan"></span>
+                  <Icon icon="mdi:image-sync-outline" />
+                  <strong>待生成</strong>
+                </div>
                 <div v-else class="recent-empty">
                   <Icon icon="mdi:image-outline" />
                 </div>
@@ -2632,6 +2650,11 @@ defineExpose({
   place-items: center;
   color: var(--assist-muted);
   font-size: 26px;
+}
+
+.recent-pending-slot {
+  position: absolute;
+  inset: 0;
 }
 
 .recent-foot {

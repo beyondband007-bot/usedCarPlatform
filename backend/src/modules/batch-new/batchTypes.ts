@@ -3,6 +3,7 @@ import type { OutputRatio, TaskStatus } from "../../shared/types";
 export interface BatchVisualConfig {
   enableSceneChange?: boolean;
   sceneOptionId?: string;
+  sceneReferenceImageUrl?: string;
   sceneIndex?: number;
   sceneCategory?: string;
   outputRatio?: OutputRatio;

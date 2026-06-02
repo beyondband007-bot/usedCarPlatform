@@ -11,3 +11,7 @@ const batchItemKindLabelMap: Record<WorkspaceBatchItemKind, string> = {
 export function getBatchItemKindLabel(itemKind: string) {
   return batchItemKindLabelMap[itemKind as WorkspaceBatchItemKind] ?? itemKind
 }
+
+export function isInteriorBatchItemKind(itemKind: string) {
+  return itemKind !== 'exterior'
+}

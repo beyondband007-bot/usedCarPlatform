@@ -14,6 +14,7 @@ export type Resolution = "1K" | "2K" | "4K";
 export interface CreateModuleTaskRequest {
   inputAssetId?: string;
   optionId?: string;
+  sceneReferenceImageUrl?: string;
   useLogo?: boolean;
   colorCode?: string;
   outputRatio?: OutputRatio;

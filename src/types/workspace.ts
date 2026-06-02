@@ -113,6 +113,7 @@ export interface WorkspaceGeneratePayload {
   outputRatio: string
   resolution?: string
   optionId?: string
+  sceneReferenceImageUrl?: string
   useLogo?: boolean
   logoAssetId?: string
   colorCode?: string

@@ -11,7 +11,8 @@ import { userLogoService } from "../user-logo/userLogoService";
 export interface SceneOption {
   optionId: string;
   title: string;
-  referenceImageUrl: string;
+  referenceImageUrl?: string;
+  referenceImagePath?: string;
 }
 
 export interface SceneModuleConfig {
@@ -89,12 +90,22 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
           asset.localPath,
           config.uploadPath,
         );
+        const uploadedScene =
+          !body.sceneReferenceImageUrl && scene.referenceImagePath
+            ? await kieClient.uploadLocalFileWithLease(lease, scene.referenceImagePath, `${config.uploadPath}/scene`)
+            : null;
         const uploadedLogo = logoAsset
           ? await kieClient.uploadLocalFileWithLease(lease, logoAsset.localPath, `${config.uploadPath}/logo`)
           : null;
+        const sceneReferenceImageUrl = body.sceneReferenceImageUrl ?? uploadedScene?.fileUrl ?? scene.referenceImageUrl;
+        if (!sceneReferenceImageUrl) {
+          throw errors.invalidParameter(`${config.moduleCode} scene reference image is missing`, {
+            optionId: scene.optionId,
+          });
+        }
         const inputUrls = [
           uploadedVehicle.fileUrl,
-          scene.referenceImageUrl,
+          sceneReferenceImageUrl,
           ...(uploadedLogo ? [uploadedLogo.fileUrl] : []),
         ];
         const kieTask = await kieClient.createImageToImageTaskWithLease(lease, {
@@ -115,7 +126,10 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
             inputUrls,
             aspectRatio: outputRatio,
             resolution,
-            scene,
+            scene: {
+              ...scene,
+              referenceImageUrl: sceneReferenceImageUrl,
+            },
             logoAssetId: logoAsset?.id ?? null,
           },
           responseJson: kieTask.raw,
@@ -129,7 +143,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
           kieTaskId: kieTask.kieTaskId,
           optionId: scene.optionId,
           sceneTitle: scene.title,
-          sceneReferenceImageUrl: scene.referenceImageUrl,
+          sceneReferenceImageUrl,
           logoAssetId: logoAsset?.id ?? null,
           inputImageCount: inputUrls.length,
           pollingUrl: `/api/v1/tasks/${taskId}`,

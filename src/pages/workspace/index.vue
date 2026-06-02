@@ -46,6 +46,7 @@ import type {
   WorkspaceImagePreview,
   WorkspaceRecentItem,
 } from "@/types/workspace";
+import { isInteriorBatchItemKind } from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
 import { useAppStore } from "@/stores/app";
 
@@ -249,7 +250,9 @@ function mapBatchDetailToJob(
       itemKind: item.itemKind,
       status: mapBatchStatus(item.status),
       progress: item.progress,
-      thumbnail: existing.previewUrl || undefined,
+      thumbnail: isInteriorBatchItemKind(item.itemKind)
+        ? undefined
+        : existing.previewUrl || undefined,
     })),
   };
 }
@@ -1139,6 +1142,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     const createPayload: CreateGenerationTaskPayload = {
       inputAssetId: payload.inputAssetId,
       optionId: payload.optionId,
+      sceneReferenceImageUrl: payload.sceneReferenceImageUrl,
       useLogo: payload.useLogo,
       logoAssetId: payload.logoAssetId,
       colorCode: payload.colorCode,

@@ -257,6 +257,19 @@ export class TasksRepository extends Repository {
       },
     );
   }
+
+  async deleteByIds(taskIds: string[]) {
+    if (!taskIds.length) return;
+    const placeholders = taskIds.map((_, index) => `:taskId${index}`).join(", ");
+    const params = Object.fromEntries(
+      taskIds.map((taskId, index) => [`taskId${index}`, taskId]),
+    );
+    await this.execute(
+      `DELETE FROM kie_task_records WHERE task_id IN (${placeholders})`,
+      params,
+    );
+    await this.execute(`DELETE FROM generation_tasks WHERE id IN (${placeholders})`, params);
+  }
 }
 
 export const tasksRepository = new TasksRepository();
