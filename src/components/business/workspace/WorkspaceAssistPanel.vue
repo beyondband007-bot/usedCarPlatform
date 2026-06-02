@@ -1238,13 +1238,13 @@ defineExpose({
             :class="{ 'is-compact-guide': !showTemplateRecommendations }"
           >
             <WorkspaceTutorialGuide
-              :animation-key="`${capability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
+              :animation-key="capability.code"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
             />
 
             <SceneTemplateRecommendations
               v-if="showTemplateRecommendations"
-              :key="`${capability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
+              :key="capability.code"
               :items="templateCards"
               :active-id="selectedOptionId"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"

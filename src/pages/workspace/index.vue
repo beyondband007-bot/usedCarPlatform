@@ -1859,7 +1859,7 @@ onUnmounted(() => {
           />
           <CapabilityGeneratePanel
             v-else
-            :key="`${activeCapability.code}-${appStore.isDarkMode ? 'dark' : 'light'}`"
+            :key="activeCapability.code"
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
             :is-generating="activeModuleGenerating"
@@ -1880,7 +1880,7 @@ onUnmounted(() => {
       >
         <WorkspaceAssistPanel
           ref="assistPanelRef"
-          :key="`${activeCapability.code}-${appStore.isDarkMode ? 'dark' : 'light'}-assist`"
+          :key="`${activeCapability.code}-assist`"
           :capability="activeCapability"
           :selected-option-id="selectedOptionId"
           :is-generating="activeModuleGenerating"
