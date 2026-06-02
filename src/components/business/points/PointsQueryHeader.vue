@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 
+import { useAppStore } from "@/stores/app";
 import type { PointsQueryViewConfig } from "@/types/points-query";
 
 defineProps<{
   config: PointsQueryViewConfig;
 }>();
+
+const appStore = useAppStore();
 </script>
 
 <template>
-  <header class="points-query-header">
+  <header
+    class="points-query-header"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+  >
     <div class="points-query-header__inner">
       <div class="points-query-brand">
         <div class="points-query-brand__icon" :class="config.iconClassName">
@@ -147,5 +153,35 @@ defineProps<{
   .points-query-user {
     flex-wrap: wrap;
   }
+}
+
+.points-query-header.theme-dark {
+  border-bottom-color: #263347;
+  background: #111827;
+}
+
+.points-query-header.theme-dark .points-query-brand h1 {
+  color: #f3f4f6;
+}
+
+.points-query-header.theme-dark .points-query-brand p,
+.points-query-header.theme-dark .points-query-team-label {
+  color: #9ca3af;
+}
+
+.points-query-header.theme-dark .points-query-badge.is-personal,
+.points-query-header.theme-dark .points-query-badge.is-team {
+  background: rgb(59 130 246 / 16%);
+  color: #3b82f6;
+}
+
+.points-query-header.theme-dark .points-query-badge.is-member {
+  background: #1a2436;
+  color: #9ca3af;
+}
+
+.points-query-header.theme-dark .points-query-badge.is-admin {
+  background: rgb(245 166 35 / 16%);
+  color: #f5a623;
 }
 </style>

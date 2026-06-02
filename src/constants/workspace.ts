@@ -107,13 +107,13 @@ const outdoorOptions = createOptions([
 const roadOptions = createOptions([
   ['city_day_road', '城市主干道', roadSceneCityDay],
   ['highway_sunset', '夕阳高速', roadSceneHighwaySunset],
+  ['overpass_dusk', '傍晚高架', roadSceneOverpassDusk],
+  ['business_park', '商务园区', roadSceneBusinessPark],
   ['rainy_night_city', '雨夜城市', roadSceneRainyNight],
   ['mountain_curve', '山路弯道', roadSceneMountainCurve],
   ['coastal_road', '海岸公路', roadSceneCoastal],
   ['forest_avenue', '林荫大道', roadSceneForest],
-  ['business_park', '商务园区', roadSceneBusinessPark],
   ['snow_road', '雪后公路', roadSceneSnow],
-  ['overpass_dusk', '傍晚高架', roadSceneOverpassDusk],
   ['tunnel_exit', '隧道出口', roadSceneTunnelExit],
 ])
 

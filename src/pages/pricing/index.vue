@@ -12,7 +12,7 @@ import {
 import { useAppStore } from "@/stores/app";
 
 import pricingHeroBgDark from "@/assets/img/pricing-hero-bg.png";
-import pricingHeroBgLight from "@/assets/img/pricing-hero-bg-light.png";
+import pricingHeroBgLight from "@/assets/img/日间企业套餐背景图.png";
 
 const copy = pricingPageCopy;
 const appStore = useAppStore();
@@ -58,10 +58,9 @@ function handlePlanConsult() {
 
       <div id="pricing-plans" class="pricing-plans-grid">
         <PricingPlanCard
-          v-for="(plan, index) in pricingPlans"
+          v-for="plan in pricingPlans"
           :key="plan.name"
           :plan="plan"
-          :index="index"
           :selected="selectedPlanName === plan.name"
           :pressing="pressingPlanName === plan.name"
           @select="handlePlanSelect(plan.name)"
