@@ -145,6 +145,18 @@ class KieKeyPool {
       { accountHash, cooldownSeconds },
     );
   }
+
+  async markTransientFailure(accountHash: string) {
+    if (!accountHash) return;
+    await pool.execute(
+      `UPDATE kie_accounts
+       SET failure_count = failure_count + 1,
+           current_concurrency = GREATEST(current_concurrency - 1, 0),
+           cooldown_until = NULL
+       WHERE account_hash = :accountHash`,
+      { accountHash },
+    );
+  }
 }
 
 export const kieKeyPool = new KieKeyPool();

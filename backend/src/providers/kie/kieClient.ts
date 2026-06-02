@@ -67,6 +67,8 @@ const mapKlingVideoMode = (resolution: CreateKieImageToVideoTaskInput["resolutio
   return "std";
 };
 
+const shouldCooldownKey = (status: number) => [401, 403, 429].includes(status);
+
 class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
     const lease = await kieKeyPool.acquire();
@@ -86,6 +88,20 @@ class KieClient {
       },
     };
 
+    let leaseSettled = false;
+    const markHttpFailure = async (status: number) => {
+      leaseSettled = true;
+      if (shouldCooldownKey(status)) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        return;
+      }
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+    const markTransientFailure = async () => {
+      leaseSettled = true;
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+
     try {
       const response = await fetch(env.kie.createTaskUrl, {
         method: "POST",
@@ -98,7 +114,7 @@ class KieClient {
 
       const raw = await response.json().catch(() => ({}));
       if (!response.ok) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markHttpFailure(response.status);
         throw errors.generationFailed("kie create text-to-image task failed", raw);
       }
 
@@ -106,7 +122,7 @@ class KieClient {
       const data = asRecord(rawRecord.data ?? rawRecord);
       const kieTaskId = data.taskId ?? data.task_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markTransientFailure();
         throw errors.generationFailed("kie text-to-image response missing taskId", raw);
       }
 
@@ -116,8 +132,8 @@ class KieClient {
         raw,
       };
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie create text-to-image task failed"))) {
-        await kieKeyPool.markFailure(lease.accountHash);
+      if (!leaseSettled) {
+        await markTransientFailure();
       }
       throw error;
     }
@@ -128,6 +144,20 @@ class KieClient {
     filePath: string,
     uploadPath = "used-car-platform",
   ): Promise<KieUploadedFile> {
+    let leaseSettled = false;
+    const markHttpFailure = async (status: number) => {
+      leaseSettled = true;
+      if (shouldCooldownKey(status)) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        return;
+      }
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+    const markTransientFailure = async () => {
+      leaseSettled = true;
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+
     try {
       const bytes = await fs.readFile(filePath);
       const formData = new FormData();
@@ -145,7 +175,7 @@ class KieClient {
 
       const raw = await response.json().catch(() => ({}));
       if (!response.ok) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markHttpFailure(response.status);
         throw errors.generationFailed("kie file upload failed", raw);
       }
 
@@ -153,7 +183,7 @@ class KieClient {
       const data = asRecord(rawRecord.data ?? rawRecord);
       const fileUrl = data.fileUrl ?? data.url ?? data.downloadUrl;
       if (typeof fileUrl !== "string" || !fileUrl) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markTransientFailure();
         throw errors.generationFailed("kie upload response missing fileUrl", raw);
       }
 
@@ -164,8 +194,8 @@ class KieClient {
         raw,
       };
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie file upload failed"))) {
-        await kieKeyPool.markFailure(lease.accountHash);
+      if (!leaseSettled) {
+        await markTransientFailure();
       }
       throw error;
     }
@@ -185,6 +215,20 @@ class KieClient {
       },
     };
 
+    let leaseSettled = false;
+    const markHttpFailure = async (status: number) => {
+      leaseSettled = true;
+      if (shouldCooldownKey(status)) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        return;
+      }
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+    const markTransientFailure = async () => {
+      leaseSettled = true;
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+
     try {
       const response = await fetch(env.kie.createTaskUrl, {
         method: "POST",
@@ -197,7 +241,7 @@ class KieClient {
 
       const raw = await response.json().catch(() => ({}));
       if (!response.ok) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markHttpFailure(response.status);
         throw errors.generationFailed("kie create task failed", raw);
       }
 
@@ -205,7 +249,7 @@ class KieClient {
       const data = asRecord(rawRecord.data ?? rawRecord);
       const kieTaskId = data.taskId ?? data.task_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markTransientFailure();
         throw errors.generationFailed("kie response missing taskId", raw);
       }
 
@@ -215,8 +259,8 @@ class KieClient {
         raw,
       };
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie create task failed"))) {
-        await kieKeyPool.markFailure(lease.accountHash);
+      if (!leaseSettled) {
+        await markTransientFailure();
       }
       throw error;
     }
@@ -239,6 +283,20 @@ class KieClient {
       },
     };
 
+    let leaseSettled = false;
+    const markHttpFailure = async (status: number) => {
+      leaseSettled = true;
+      if (shouldCooldownKey(status)) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        return;
+      }
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+    const markTransientFailure = async () => {
+      leaseSettled = true;
+      await kieKeyPool.markTransientFailure(lease.accountHash);
+    };
+
     try {
       const response = await fetch(env.kie.createTaskUrl, {
         method: "POST",
@@ -251,7 +309,7 @@ class KieClient {
 
       const raw = await response.json().catch(() => ({}));
       if (!response.ok) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markHttpFailure(response.status);
         throw errors.generationFailed("kie create video task failed", raw);
       }
 
@@ -259,7 +317,7 @@ class KieClient {
       const data = asRecord(rawRecord.data ?? rawRecord);
       const kieTaskId = data.taskId ?? data.task_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
-        await kieKeyPool.markFailure(lease.accountHash);
+        await markTransientFailure();
         throw errors.generationFailed("kie video response missing taskId", raw);
       }
 
@@ -269,8 +327,8 @@ class KieClient {
         raw,
       };
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie create video task failed"))) {
-        await kieKeyPool.markFailure(lease.accountHash);
+      if (!leaseSettled) {
+        await markTransientFailure();
       }
       throw error;
     }

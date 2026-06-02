@@ -453,6 +453,15 @@ class BatchService {
     const inputUrls: string[] = [];
     let billing: FrozenGenerationBilling | null = null;
     let lease: KieAccountLease | null = null;
+    let leaseReleasedByKieClient = false;
+    const runKieOperation = async <T>(operation: () => Promise<T>) => {
+      try {
+        return await operation();
+      } catch (error) {
+        leaseReleasedByKieClient = true;
+        throw error;
+      }
+    };
     try {
       lease = await kieKeyPool.acquire();
       billing = await freezeGenerationBilling({
@@ -464,10 +473,12 @@ class BatchService {
       });
 
       for (const asset of sourceAssets) {
-        const uploaded = await kieClient.uploadLocalFileWithLease(
-          lease,
-          asset.localPath,
-          `used-car-platform/batch-new/${item.itemKind}`,
+        const uploaded = await runKieOperation(() =>
+          kieClient.uploadLocalFileWithLease(
+            lease as KieAccountLease,
+            asset.localPath,
+            `used-car-platform/batch-new/${item.itemKind}`,
+          ),
         );
         inputUrls.push(uploaded.fileUrl);
       }
@@ -482,20 +493,24 @@ class BatchService {
           ? await assetsRepository.findById(config.logoAssetId)
           : await userLogoService.resolveLogoAsset();
         if (!logoAsset) throw errors.assetNotFound();
-        const uploadedLogo = await kieClient.uploadLocalFileWithLease(
-          lease,
-          logoAsset.localPath,
-          "used-car-platform/batch-new/logo",
+        const uploadedLogo = await runKieOperation(() =>
+          kieClient.uploadLocalFileWithLease(
+            lease as KieAccountLease,
+            logoAsset.localPath,
+            "used-car-platform/batch-new/logo",
+          ),
         );
         inputUrls.push(uploadedLogo.fileUrl);
       }
 
-      const kieTask = await kieClient.createImageToImageTaskWithLease(lease, {
-        prompt: task.prompt ?? "",
-        inputUrls,
-        aspectRatio: task.outputRatio,
-        resolution: task.resolution,
-      });
+      const kieTask = await runKieOperation(() =>
+        kieClient.createImageToImageTaskWithLease(lease as KieAccountLease, {
+          prompt: task.prompt ?? "",
+          inputUrls,
+          aspectRatio: task.outputRatio,
+          resolution: task.resolution,
+        }),
+      );
 
       await tasksRepository.markSubmitted({
         id: task.id,
@@ -521,7 +536,7 @@ class BatchService {
         resultCount: 0,
       });
     } catch (error) {
-      if (lease) await kieKeyPool.release(lease.accountHash);
+      if (lease && !leaseReleasedByKieClient) await kieKeyPool.release(lease.accountHash);
       try {
         await refundFrozenGenerationBilling(task.id, billing, batchItemBillingScope(item.itemId));
       } catch {
