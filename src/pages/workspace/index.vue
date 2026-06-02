@@ -530,6 +530,25 @@ function syncWorkspaceFromTask(
   }
 }
 
+function shouldSyncWorkspaceForTask(
+  task: Pick<GenerationTaskDetail, "moduleCode">,
+  options: { restored?: boolean } = {},
+) {
+  if (options.restored) return true;
+
+  const taskCapabilityCode = resolveCapabilityCodeFromModule(task.moduleCode);
+  if (!taskCapabilityCode) return false;
+
+  return activeCode.value === taskCapabilityCode;
+}
+
+function getCapabilityLabel(code: string) {
+  return (
+    workspaceCapabilities.find((capability) => capability.code === code)
+      ?.label ?? code
+  );
+}
+
 async function refreshTrackedRunningTasks() {
   if (isRefreshingRunningTasks)
     return Object.keys(trackedRunningTasks.value).length;
@@ -942,10 +961,15 @@ async function resolveGenerationTask(
 
   try {
     const initialTask = await getGenerationTask(taskId);
-    generatingCapabilityCode.value =
-      resolveCapabilityCodeFromModule(initialTask.moduleCode) ??
-      activeCode.value;
-    syncWorkspaceFromTask(initialTask);
+    const taskCapabilityCode = resolveCapabilityCodeFromModule(
+      initialTask.moduleCode,
+    );
+    generatingCapabilityCode.value = taskCapabilityCode ?? activeCode.value;
+    const shouldSyncWorkspace = shouldSyncWorkspaceForTask(initialTask, options);
+
+    if (shouldSyncWorkspace) {
+      syncWorkspaceFromTask(initialTask);
+    }
 
     const task = isTerminalGenerationStatus(initialTask)
       ? initialTask
@@ -956,7 +980,10 @@ async function resolveGenerationTask(
       return;
     }
 
-    syncWorkspaceFromTask(task);
+    const shouldSyncAfterPoll = shouldSyncWorkspaceForTask(task, options);
+    if (shouldSyncAfterPoll) {
+      syncWorkspaceFromTask(task);
+    }
 
     if (task.status !== "success") {
       message.error("查看图片失败");
@@ -969,9 +996,16 @@ async function resolveGenerationTask(
       return;
     }
 
-    generationResult.value = result;
-    if (!options.restored) {
-      message.success("生成完成");
+    if (shouldSyncAfterPoll) {
+      generationResult.value = result;
+      if (!options.restored) {
+        message.success("生成完成");
+      }
+    } else if (!options.restored) {
+      const label = taskCapabilityCode
+        ? getCapabilityLabel(taskCapabilityCode)
+        : "任务";
+      message.success(`${label}生成完成，可在「最近生成」中查看`);
     }
     if (
       task.moduleCode === "creative-image" &&
@@ -1282,7 +1316,8 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
   isGenerating.value = true;
   generationResult.value = null;
-  generatingCapabilityCode.value = activeCapability.value.code;
+  const startedOnCode = activeCapability.value.code;
+  generatingCapabilityCode.value = startedOnCode;
 
   try {
     const createPayload: CreateGenerationTaskPayload = {
