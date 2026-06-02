@@ -8,12 +8,10 @@ import {
   createCreativeImageGeneration,
   createInteriorCollageTask,
   createGenerationTask,
-  getBatchTasks,
   getBatchTaskDetail,
   getCreativeImageConversations,
   getCreativeImageMessages,
   getGenerationTask,
-  getRecentGenerationTasks,
   uploadCreativeImageReference,
   type BatchTaskDetail,
   type CreateGenerationTaskPayload,
@@ -21,7 +19,6 @@ import {
   type CreativeImageMessage,
   type GenerationTaskDetail,
   type GenerationTaskStatus,
-  type RecentGenerationTask,
   type UploadedAsset,
 } from "@/api/visual-workbench";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
@@ -36,6 +33,7 @@ import {
   workspaceCapabilities,
 } from "@/constants/workspace";
 import { usePointsStore } from "@/stores/points";
+import { useAuthStore } from "@/stores/auth";
 import { useSubscriptionStore } from "@/stores/subscription";
 import type {
   CreativeThreadTurn,
@@ -55,13 +53,16 @@ const route = useRoute();
 const router = useRouter();
 const message = useMessage();
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const pointsStore = usePointsStore();
 const subscriptionStore = useSubscriptionStore();
 const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
 const ACTIVE_GENERATION_TASK_KEY = "workspace-active-generation-task";
-const RECENT_GENERATION_SCAN_PAGE_SIZE = 50;
-const BATCH_GENERATION_SCAN_PAGE_SIZE = 50;
+const ACTIVE_CREATIVE_CONVERSATION_KEY =
+  "workspace-active-creative-conversation";
+const TRACKED_RUNNING_TASKS_KEY = "workspace-tracked-running-tasks";
+const BATCH_ACTIVE_JOBS_KEY = "workspace-batch-active-jobs";
 const visualPlanPoolCapabilityCodes = new Set([
   "showroom-light",
   "outdoor-scene",
@@ -71,18 +72,6 @@ const visualPlanPoolCapabilityCodes = new Set([
   "light-consistency",
   "interior-clean",
 ]);
-const runningGenerationStatuses = new Set([
-  "waiting",
-  "queued",
-  "queue",
-  "generating",
-]);
-const recentGenerationModuleCodes = workspaceCapabilities
-  .filter(
-    (capability) =>
-      capability.code !== "batch-new" && capability.code !== "delivery",
-  )
-  .map((capability) => resolveModuleCodeForCapability(capability.code));
 
 interface ActiveGenerationTaskSnapshot {
   taskId: string;
@@ -131,13 +120,23 @@ function resolveCapabilityCodeFromModule(moduleCode: string) {
   return matched?.code ?? null;
 }
 
-function resolveModuleCodeForCapability(code: string) {
-  if (code === INTERIOR_COLLAGE_CAPABILITY_CODE) return "interior-collage";
-  return code;
+const workspaceOwnerKey = computed(
+  () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
+);
+
+function scopedWorkspaceStorageKey(key: string) {
+  return `${key}:${workspaceOwnerKey.value}`;
+}
+
+function clearLegacyWorkspaceStorage() {
+  window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY);
+  window.localStorage.removeItem(ACTIVE_CREATIVE_CONVERSATION_KEY);
 }
 
 function readActiveGenerationTask() {
-  const raw = window.localStorage.getItem(ACTIVE_GENERATION_TASK_KEY);
+  const raw = window.localStorage.getItem(
+    scopedWorkspaceStorageKey(ACTIVE_GENERATION_TASK_KEY),
+  );
   if (!raw) return null;
 
   try {
@@ -150,35 +149,89 @@ function readActiveGenerationTask() {
 }
 
 function saveActiveGenerationTask(task: ActiveGenerationTaskSnapshot) {
-  window.localStorage.setItem(ACTIVE_GENERATION_TASK_KEY, JSON.stringify(task));
+  window.localStorage.setItem(
+    scopedWorkspaceStorageKey(ACTIVE_GENERATION_TASK_KEY),
+    JSON.stringify(task),
+  );
 }
 
-const ACTIVE_CREATIVE_CONVERSATION_KEY =
-  "workspace-active-creative-conversation";
-
 function readActiveCreativeConversationId() {
-  return window.localStorage.getItem(ACTIVE_CREATIVE_CONVERSATION_KEY);
+  return window.localStorage.getItem(
+    scopedWorkspaceStorageKey(ACTIVE_CREATIVE_CONVERSATION_KEY),
+  );
 }
 
 function saveActiveCreativeConversationId(conversationId: string | null) {
+  const key = scopedWorkspaceStorageKey(ACTIVE_CREATIVE_CONVERSATION_KEY);
   if (!conversationId) {
-    window.localStorage.removeItem(ACTIVE_CREATIVE_CONVERSATION_KEY);
+    window.localStorage.removeItem(key);
     return;
   }
 
-  window.localStorage.setItem(ACTIVE_CREATIVE_CONVERSATION_KEY, conversationId);
+  window.localStorage.setItem(key, conversationId);
 }
 
 function clearActiveGenerationTask(taskId?: string) {
+  const key = scopedWorkspaceStorageKey(ACTIVE_GENERATION_TASK_KEY);
   if (!taskId) {
-    window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY);
+    window.localStorage.removeItem(key);
     return;
   }
 
   const activeTask = readActiveGenerationTask();
   if (activeTask?.taskId === taskId) {
-    window.localStorage.removeItem(ACTIVE_GENERATION_TASK_KEY);
+    window.localStorage.removeItem(key);
   }
+}
+
+function readTrackedRunningTasks() {
+  const raw = window.localStorage.getItem(
+    scopedWorkspaceStorageKey(TRACKED_RUNNING_TASKS_KEY),
+  );
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeTrackedRunningTasks(next: Record<string, string>) {
+  const key = scopedWorkspaceStorageKey(TRACKED_RUNNING_TASKS_KEY);
+  if (Object.keys(next).length === 0) {
+    window.localStorage.removeItem(key);
+    return;
+  }
+  window.localStorage.setItem(key, JSON.stringify(next));
+}
+
+function readBatchActiveJobs() {
+  const raw = window.localStorage.getItem(
+    scopedWorkspaceStorageKey(BATCH_ACTIVE_JOBS_KEY),
+  );
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as WorkspaceBatchActiveJob[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeBatchActiveJobs(next: WorkspaceBatchActiveJob[]) {
+  const key = scopedWorkspaceStorageKey(BATCH_ACTIVE_JOBS_KEY);
+  if (!next.length) {
+    window.localStorage.removeItem(key);
+    return;
+  }
+  window.localStorage.setItem(key, JSON.stringify(next));
 }
 
 function isTerminalGenerationStatus(task: GenerationTaskDetail) {
@@ -200,15 +253,6 @@ function mapBatchStatus(
 ): WorkspaceRecentItem["status"] {
   if (status === "queued") return "queued";
   return status;
-}
-
-function normalizeRecentTaskStatus(task: RecentGenerationTask) {
-  const status = task.uiStatus ?? task.status;
-  return status === "queue" ? "queued" : status;
-}
-
-function isRunningGenerationStatus(status?: string | null) {
-  return Boolean(status && runningGenerationStatuses.has(status));
 }
 
 function isVisualPlanPoolModule(moduleCode: string) {
@@ -238,8 +282,16 @@ function syncRunningTaskSummaryCount() {
   pointsStore.setRunningTasks(countTotalRunningTasks());
 }
 
+function setBatchActiveJobs(next: WorkspaceBatchActiveJob[]) {
+  batchActiveJobs.value = next;
+  writeBatchActiveJobs(next);
+  syncRunningTaskSummaryCount();
+  startBatchPolling();
+}
+
 function setTrackedRunningTasks(next: Record<string, string>) {
   trackedRunningTasks.value = next;
+  writeTrackedRunningTasks(next);
   syncRunningTaskSummaryCount();
 
   if (Object.keys(next).length) {
@@ -375,11 +427,9 @@ async function refreshBatchJob(batchId: string) {
       (job) => job.batchId === batchId,
     );
     if (index < 0) return;
-    batchActiveJobs.value[index] = mapBatchDetailToJob(
-      detail,
-      batchActiveJobs.value[index],
-    );
-    syncRunningTaskSummaryCount();
+    const next = [...batchActiveJobs.value];
+    next[index] = mapBatchDetailToJob(detail, next[index]);
+    setBatchActiveJobs(next);
   } catch {
     // Keep placeholder card visible while polling retries.
   }
@@ -417,7 +467,9 @@ function startBatchPolling() {
 }
 
 function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
-  batchActiveJobs.value.push({
+  const next = [
+    ...batchActiveJobs.value,
+    {
     batchId: payload.batchId,
     projectName: payload.projectName,
     previewUrl: payload.previewUrl,
@@ -428,43 +480,14 @@ function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
     failed: payload.failed,
     progress: payload.progress,
     items: [],
-  });
-  syncRunningTaskSummaryCount();
+    },
+  ];
+  setBatchActiveJobs(next);
   void refreshBatchJob(payload.batchId);
-  startBatchPolling();
 }
 
 async function refreshRunningBatchJobs() {
-  const listed = await getBatchTasks({
-    status: "generating",
-    page: 1,
-    pageSize: BATCH_GENERATION_SCAN_PAGE_SIZE,
-  });
-  const next = [...batchActiveJobs.value];
-  const knownIds = new Set(next.map((job) => job.batchId));
-
-  for (const item of listed.items) {
-    if (knownIds.has(item.batchId) || isTerminalBatchStatus(item.status)) {
-      continue;
-    }
-
-    next.push({
-      batchId: item.batchId,
-      projectName: item.projectName,
-      previewUrl: "",
-      createdAt: item.createdAt,
-      status: mapBatchStatus(item.status),
-      total: item.total,
-      completed: item.completed,
-      failed: item.failed,
-      progress: item.progress,
-      items: [],
-    });
-  }
-
-  batchActiveJobs.value = next;
-  syncRunningTaskSummaryCount();
-  startBatchPolling();
+  setBatchActiveJobs(readBatchActiveJobs());
   return countRunningBatchJobs();
 }
 
@@ -502,33 +525,11 @@ async function refreshTrackedRunningTasks() {
   isRefreshingRunningTasks = true;
 
   try {
-    const next: Record<string, string> = {};
+    const next: Record<string, string> = readTrackedRunningTasks();
     const activeTask = readActiveGenerationTask();
 
     if (activeTask?.taskId) {
       next[activeTask.taskId] = activeTask.moduleCode;
-    }
-
-    const results = await Promise.allSettled(
-      recentGenerationModuleCodes.map((moduleCode) =>
-        getRecentGenerationTasks({
-          moduleCode,
-          page: 1,
-          pageSize: RECENT_GENERATION_SCAN_PAGE_SIZE,
-        }).then((result) => ({ moduleCode, items: result.items })),
-      ),
-    );
-
-    for (const result of results) {
-      if (result.status !== "fulfilled") continue;
-
-      for (const task of result.value.items) {
-        const status = normalizeRecentTaskStatus(task);
-        const taskId = task.taskId ?? task.id;
-        if (!taskId || !isRunningGenerationStatus(status)) continue;
-
-        next[taskId] = task.moduleCode ?? result.value.moduleCode;
-      }
     }
 
     setTrackedRunningTasks(next);
@@ -627,6 +628,31 @@ async function canStartBatchGeneration() {
   return true;
 }
 
+function loadWorkspaceOwnerState() {
+  setTrackedRunningTasks(readTrackedRunningTasks());
+  setBatchActiveJobs(readBatchActiveJobs());
+  activeCreativeConversationId.value = readActiveCreativeConversationId();
+}
+
+function resetWorkspaceViewStateForOwner() {
+  stopGlobalGenerationPolling();
+  stopBatchPolling();
+  generationResult.value = null;
+  creativeImageCaption.value = null;
+  creativeConversations.value = [];
+  creativeThreadTurns.value = [];
+  creativeReferenceAsset.value = null;
+  activeCreativeConversationId.value = null;
+  deliveryImagePreview.value = null;
+  deliveryTaskPreview.value = null;
+  previewedDeliveryTaskId.value = null;
+  isGenerating.value = false;
+  generatingCapabilityCode.value = null;
+  loadWorkspaceOwnerState();
+  void refreshCreativeConversations();
+  void refreshRunningTaskSummary();
+}
+
 watch(
   () => route.params.code,
   (code) => {
@@ -635,6 +661,11 @@ watch(
     void refreshRunningTaskSummary();
   },
 );
+
+watch(workspaceOwnerKey, (_next, previous) => {
+  if (!previous) return;
+  resetWorkspaceViewStateForOwner();
+});
 
 function handleSelectCapability(code: string) {
   activeCode.value = code;
@@ -1351,6 +1382,8 @@ function handlePickTemplate(payload: {
 }
 
 onMounted(() => {
+  clearLegacyWorkspaceStorage();
+  loadWorkspaceOwnerState();
   void refreshRunningTaskSummary();
   void refreshCreativeConversations();
 
