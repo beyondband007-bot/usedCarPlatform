@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue";
 import { computed, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 
@@ -13,7 +14,7 @@ const props = withDefaults(
   }>(),
   {
     showBack: true,
-    downloadLabel: "下载该图",
+    downloadLabel: "下载原图",
   },
 );
 
@@ -98,6 +99,7 @@ async function handleDownload() {
     <footer class="image-preview-foot">
       <p class="image-preview-ratio">{{ preview.ratioLabel }}</p>
       <button type="button" class="image-preview-download" @click="handleDownload">
+        <Icon icon="mdi:download-outline" class="image-preview-download-icon" />
         {{ downloadLabel }}
       </button>
     </footer>
@@ -196,27 +198,35 @@ async function handleDownload() {
 
 .image-preview-download {
   display: flex;
-  width: 100%;
-  height: 52px;
+  width: calc(100% - 48px);
+  max-width: 320px;
+  height: 48px;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 0 24px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #d6b36f, #c9a05e);
-  color: #1a1208;
+  background: linear-gradient(135deg, #F5C84C 0%, #FFD766 100%);
+  color: #1E293B;
   font-family: inherit;
-  font-size: 16px;
-  font-weight: 900;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 12px 28px rgba(201, 160, 94, 0.28);
+  box-shadow: 0 8px 20px rgba(245, 200, 76, 0.25);
   transition:
     transform 0.16s ease,
-    box-shadow 0.16s ease,
-    filter 0.16s ease;
+    box-shadow 0.16s ease;
+}
+
+.image-preview-download-icon {
+  flex-shrink: 0;
+  font-size: 18px;
 }
 
 .image-preview-download:hover {
-  filter: brightness(1.04);
-  box-shadow: 0 14px 32px rgba(201, 160, 94, 0.34);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(245, 200, 76, 0.35);
 }
 
 .image-preview-download:active {
