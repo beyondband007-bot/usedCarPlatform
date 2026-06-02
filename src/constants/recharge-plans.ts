@@ -1,6 +1,6 @@
-import planBasicBg from '@/img/充值积分/基础套餐.png'
-import planTeamBg from '@/img/充值积分/企业团队版.png'
-import planFlagshipBg from '@/img/充值积分/企业旗舰版.png'
+import planBasicBg from '@/img/home/suite-workbench-light.png'
+import planTeamBg from '@/img/home/suite-enterprise-light.png'
+import planFlagshipBg from '@/img/home/suite-enterprise.png'
 
 export type RechargePlanTone = 'blue' | 'purple' | 'gold'
 

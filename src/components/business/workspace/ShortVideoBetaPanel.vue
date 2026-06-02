@@ -15,15 +15,19 @@ const props = defineProps<{
   generationResult?: WorkspaceGenerateResult | null;
   recentItems?: WorkspaceRecentItem[];
   recentLoading?: boolean;
-  initialView?: "preview" | "recent";
+  initialView?: "guide" | "preview" | "generating" | "recent";
 }>();
+
+type ShortVideoView = "guide" | "preview" | "generating" | "recent";
 
 const emit = defineEmits<{
   pickRecent: [item: WorkspaceRecentItem];
 }>();
 
 const videoRef = ref<HTMLVideoElement | null>(null);
-const activeView = ref<"preview" | "recent">(props.initialView ?? "preview");
+const activeView = ref<ShortVideoView>(
+  props.initialView ?? (props.isGenerating ? "generating" : "guide"),
+);
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const statusLabelMap = recentStatusLabelMap;
 const statusIconMap = recentStatusIconMap;
@@ -59,8 +63,7 @@ watch(
 watch(
   () => props.generationResult?.previewVideo,
   (videoUrl) => {
-    if (!videoUrl) return;
-    activeView.value = "preview";
+    if (!videoUrl || activeView.value !== "preview") return;
     void playGeneratedVideo();
   },
 );
@@ -72,12 +75,36 @@ watch(
   },
 );
 
+watch(
+  () => props.isGenerating,
+  (generating) => {
+    if (generating) {
+      activeView.value = "generating";
+      return;
+    }
+
+    if (activeView.value === "generating") {
+      activeView.value = "guide";
+    }
+  },
+);
+
+function toggleRecentView() {
+  if (activeView.value === "recent") {
+    activeView.value = props.isGenerating ? "generating" : "guide";
+    return;
+  }
+
+  activeView.value = "recent";
+}
+
 function canOpenRecentVideo(item: WorkspaceRecentItem) {
   return Boolean(item.taskId) || (item.status === "success" && Boolean(item.downloadUrl));
 }
 
 function handleRecentPick(item: WorkspaceRecentItem) {
   if (!canOpenRecentVideo(item)) return;
+  activeView.value = "preview";
   emit("pickRecent", item);
 }
 </script>
@@ -94,11 +121,31 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
     <div class="short-video-tabs" role="tablist" aria-label="short video views">
       <button
+        v-if="props.isGenerating"
+        type="button"
+        role="tab"
+        :aria-selected="activeView === 'generating'"
+        :class="{ active: activeView === 'generating' }"
+        @click="activeView = 'generating'"
+      >
+        正在生成
+      </button>
+      <button
+        v-else
+        type="button"
+        role="tab"
+        :aria-selected="activeView === 'guide'"
+        :class="{ active: activeView === 'guide' }"
+        @click="activeView = 'guide'"
+      >
+        使用教程
+      </button>
+      <button
         type="button"
         role="tab"
         :aria-selected="activeView === 'recent'"
         :class="{ active: activeView === 'recent' }"
-        @click="activeView = activeView === 'recent' ? 'preview' : 'recent'"
+        @click="toggleRecentView"
       >
         最近生成
       </button>
@@ -142,7 +189,10 @@ function handleRecentPick(item: WorkspaceRecentItem) {
               <Icon icon="mdi:video-outline" />
             </div>
             <span class="short-video-recent-status" :class="`is-${item.status}`">
-              <Icon :icon="statusIconMap[item.status]" />
+              <Icon
+                :icon="statusIconMap[item.status]"
+                class="short-video-recent-status-icon"
+              />
               {{ statusLabelMap[item.status] }}
             </span>
             <span v-if="item.status === 'success'" class="short-video-play-badge">
@@ -150,18 +200,43 @@ function handleRecentPick(item: WorkspaceRecentItem) {
             </span>
           </div>
           <footer class="short-video-recent-foot">
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.ratioLabel || item.sceneLabel || '16:9 · 720p · 10秒' }}</span>
-            <small>
-              <Icon icon="mdi:clock-outline" />
-              {{ item.createdAt }}
-            </small>
+            <strong class="short-video-recent-name">{{ item.title }}</strong>
+            <p class="short-video-recent-scene">16:9 · 720p · 10秒</p>
+            <span class="short-video-recent-time">{{ item.createdAt }}</span>
           </footer>
         </article>
       </template>
     </section>
 
-    <div v-else-if="props.generationResult?.previewVideo" class="short-video-stage">
+    <section
+      v-else-if="activeView === 'generating'"
+      class="short-video-waiting"
+      aria-live="polite"
+    >
+      <div class="short-video-waiting-visual" aria-hidden="true">
+        <span class="short-video-waiting-scan"></span>
+        <span class="short-video-waiting-corner short-video-waiting-corner--tl"></span>
+        <span class="short-video-waiting-corner short-video-waiting-corner--tr"></span>
+        <span class="short-video-waiting-corner short-video-waiting-corner--bl"></span>
+        <span class="short-video-waiting-corner short-video-waiting-corner--br"></span>
+        <Icon icon="mdi:image-sync-outline" />
+      </div>
+
+      <div class="short-video-waiting-copy">
+        <p>视频待生成</p>
+        <h2>正在生成营销视频</h2>
+        <span>AI 正在分析车辆素材并生成 16:9、720p、10 秒短视频，请稍候。</span>
+      </div>
+
+      <div class="short-video-waiting-progress" aria-hidden="true">
+        <span></span>
+      </div>
+    </section>
+
+    <div
+      v-else-if="activeView === 'preview' && props.generationResult?.previewVideo"
+      class="short-video-stage"
+    >
       <video
         ref="videoRef"
         class="short-video-player"
@@ -174,34 +249,12 @@ function handleRecentPick(item: WorkspaceRecentItem) {
       </video>
     </div>
 
-    <template v-else>
-      <section v-if="props.isGenerating" class="short-video-waiting" aria-live="polite">
-        <div class="short-video-waiting-visual" aria-hidden="true">
-          <span class="short-video-waiting-scan"></span>
-          <span class="short-video-waiting-corner short-video-waiting-corner--tl"></span>
-          <span class="short-video-waiting-corner short-video-waiting-corner--tr"></span>
-          <span class="short-video-waiting-corner short-video-waiting-corner--bl"></span>
-          <span class="short-video-waiting-corner short-video-waiting-corner--br"></span>
-          <Icon icon="mdi:image-sync-outline" />
-        </div>
-
-        <div class="short-video-waiting-copy">
-          <p>视频待生成</p>
-          <h2>正在生成营销视频</h2>
-          <span>AI 正在分析车辆素材并生成 16:9、720p、10 秒短视频，请稍候。</span>
-        </div>
-
-        <div class="short-video-waiting-progress" aria-hidden="true">
-          <span></span>
-        </div>
-      </section>
-
-      <div v-else class="short-video-blank short-video-blank--preview">
+    <div v-else class="short-video-blank short-video-blank--preview">
         <div class="short-video-canvas">
           <div class="short-video-hero">
             <Icon icon="mdi:video-plus-outline" />
             <strong>短视频预览区</strong>
-            <span>这里会展示生成后的营销短视频播放器</span>
+            <span>这里会展示生成后的营销短视频结果</span>
           </div>
 
           <div class="short-video-preview-strip">
@@ -234,7 +287,6 @@ function handleRecentPick(item: WorkspaceRecentItem) {
           </div>
         </aside>
       </div>
-    </template>
   </section>
 </template>
 
@@ -320,8 +372,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 .short-video-stage,
-.short-video-blank,
-.short-video-recent {
+.short-video-blank {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -336,9 +387,12 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 .short-video-recent {
   display: grid;
+  min-height: 0;
+  flex: 1;
   align-content: start;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -371,13 +425,18 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 .short-video-recent-card {
   display: flex;
+  width: 100%;
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--assist-border);
-  border-radius: 12px;
-  background: var(--assist-card);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--assist-card) 92%, white);
   box-shadow: var(--assist-shadow);
+}
+
+.theme-light .short-video-recent-card {
+  background: #fff;
 }
 
 .short-video-recent-card.is-clickable {
@@ -397,7 +456,9 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 .short-video-recent-media {
   position: relative;
   aspect-ratio: 16 / 9;
+  flex-shrink: 0;
   overflow: hidden;
+  border-radius: 10px 10px 0 0;
   background: var(--assist-card-strong);
 }
 
@@ -417,33 +478,58 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 
 .short-video-recent-status {
   position: absolute;
-  left: 10px;
-  top: 10px;
+  left: 8px;
+  top: 8px;
+  z-index: 1;
   display: inline-flex;
+  max-width: calc(100% - 16px);
   align-items: center;
   gap: 4px;
-  border-radius: 999px;
-  background: rgba(120, 120, 120, 0.88);
-  color: #fff;
+  overflow: hidden;
   padding: 4px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.short-video-recent-status-icon {
+  flex-shrink: 0;
   font-size: 12px;
-  font-weight: 900;
+}
+
+.short-video-recent-status.is-generating {
+  background: rgba(255, 193, 7, 0.92);
+  color: #7a4f00;
 }
 
 .short-video-recent-status.is-success {
   background: rgba(39, 183, 125, 0.92);
+  color: #fff;
 }
 
-.short-video-recent-status.is-fail,
-.short-video-recent-status.is-canceled {
-  background: rgba(239, 99, 99, 0.92);
+.short-video-recent-status.is-waiting {
+  background: rgba(255, 214, 102, 0.94);
+  color: #7a5b00;
 }
 
-.short-video-recent-status.is-waiting,
 .short-video-recent-status.is-queued,
-.short-video-recent-status.is-queue,
-.short-video-recent-status.is-generating {
-  background: rgba(47, 107, 255, 0.9);
+.short-video-recent-status.is-queue {
+  background: rgba(255, 167, 64, 0.94);
+  color: #7a3b00;
+}
+
+.short-video-recent-status.is-fail {
+  background: rgba(239, 99, 99, 0.92);
+  color: #fff;
+}
+
+.short-video-recent-status.is-canceled {
+  background: rgba(120, 120, 120, 0.88);
+  color: #fff;
 }
 
 .short-video-play-badge {
@@ -461,36 +547,42 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 .short-video-recent-foot {
-  display: grid;
-  gap: 5px;
-  padding: 11px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 68px;
+  padding: 9px 10px 11px;
 }
 
-.short-video-recent-foot strong,
-.short-video-recent-foot span,
-.short-video-recent-foot small {
+.short-video-recent-name,
+.short-video-recent-scene,
+.short-video-recent-time {
+  margin: 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.4;
 }
 
-.short-video-recent-foot strong {
+.short-video-recent-name {
   color: var(--assist-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 950;
 }
 
-.short-video-recent-foot span,
-.short-video-recent-foot small {
+.short-video-recent-scene {
   color: var(--assist-muted);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.short-video-recent-foot small {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.short-video-recent-time {
+  margin-top: auto;
+  color: var(--assist-muted);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .short-video-waiting {
@@ -818,6 +910,10 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 @media (max-width: 1180px) {
+  .short-video-recent {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .short-video-blank {
     flex-direction: column;
   }
@@ -833,6 +929,10 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 @media (max-width: 860px) {
+  .short-video-recent {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .short-video-head {
     flex-direction: column;
   }

@@ -57,6 +57,14 @@ const appStore = useAppStore();
 const pointsStore = usePointsStore();
 const subscriptionStore = useSubscriptionStore();
 const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
+
+function isShortVideoModuleCode(moduleCode?: string) {
+  return moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
+}
+
+function getViewMediaFailureMessage(moduleCode?: string) {
+  return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
+}
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
 const ACTIVE_GENERATION_TASK_KEY = "workspace-active-generation-task";
 const RECENT_GENERATION_SCAN_PAGE_SIZE = 50;
@@ -813,9 +821,11 @@ async function resolveGenerationTask(
 ) {
   isGenerating.value = true;
   generationResult.value = null;
+  let taskModuleCode: string | undefined;
 
   try {
     const initialTask = await getGenerationTask(taskId);
+    taskModuleCode = initialTask.moduleCode;
     const taskCapabilityCode = resolveCapabilityCodeFromModule(
       initialTask.moduleCode,
     );
@@ -829,6 +839,7 @@ async function resolveGenerationTask(
     const task = isTerminalGenerationStatus(initialTask)
       ? initialTask
       : await pollGenerationTask(taskId);
+    taskModuleCode = task?.moduleCode ?? taskModuleCode;
 
     if (!task) {
       message.warning("任务仍在处理中，请稍后刷新查看");
@@ -841,13 +852,17 @@ async function resolveGenerationTask(
     }
 
     if (task.status !== "success") {
-      message.error("查看图片失败");
+      message.error(getViewMediaFailureMessage(task.moduleCode));
       return;
     }
 
     const result = buildResultFromTask(task);
     if (!result) {
-      message.warning("任务完成，但没有返回图片");
+      message.warning(
+        isShortVideoModuleCode(task.moduleCode)
+          ? "任务完成，但没有返回视频"
+          : "任务完成，但没有返回图片",
+      );
       return;
     }
 
@@ -871,7 +886,7 @@ async function resolveGenerationTask(
     await assistPanelRef.value?.refreshRecentItems();
   } catch (error) {
     clearActiveGenerationTask(taskId);
-    message.error("查看图片失败");
+    message.error(getViewMediaFailureMessage(taskModuleCode));
   } finally {
     clearActiveGenerationTask(taskId);
     isGenerating.value = false;
@@ -1221,13 +1236,13 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 function buildResultFromRecent(
   item: WorkspaceRecentItem,
 ): WorkspaceGenerateResult | null {
-  if (item.status !== "success" || !item.previewImage) return null;
+  const isShortVideo = isShortVideoModuleCode(item.moduleCode);
+  const mediaUrl = item.downloadUrl ?? item.previewImage;
 
-  const isShortVideo = item.moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
+  if (item.status !== "success" || !mediaUrl) return null;
   const sceneTitle = isShortVideo
     ? "短视频生成"
     : (item.sceneLabel ?? item.title);
-  const mediaUrl = item.downloadUrl ?? item.previewImage;
 
   return {
     createdAt: formatDate(item.createdAt),
@@ -1239,7 +1254,7 @@ function buildResultFromRecent(
       : (item.ratioLabel ??
         (item.outputRatio ? `${item.outputRatio} · 2K` : "主图")),
     mediaType: isShortVideo ? "video" : "image",
-    previewImage: isShortVideo ? "" : item.previewImage,
+    previewImage: isShortVideo ? "" : (item.previewImage ?? mediaUrl),
     previewVideo: isShortVideo ? mediaUrl : undefined,
     previewAlt: item.title,
     downloadUrl: mediaUrl,
@@ -1251,7 +1266,7 @@ function buildResultFromRecent(
 
 function handlePickRecent(item: WorkspaceRecentItem) {
   if (item.status === "fail" || item.status === "canceled") {
-    message.error("查看图片失败");
+    message.error(getViewMediaFailureMessage(item.moduleCode));
     return;
   }
 
@@ -1262,7 +1277,7 @@ function handlePickRecent(item: WorkspaceRecentItem) {
       return;
     }
 
-    message.error("查看图片失败");
+    message.error(getViewMediaFailureMessage(item.moduleCode));
     return;
   }
 

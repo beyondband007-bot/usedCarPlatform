@@ -67,6 +67,13 @@ const mapKlingVideoMode = (resolution: CreateKieImageToVideoTaskInput["resolutio
   return "std";
 };
 
+const isKnownKieVideoCreateFailure = (error: unknown) =>
+  error instanceof Error &&
+  [
+    "kie create video task failed",
+    "kie video response missing taskId",
+  ].some((message) => error.message.includes(message));
+
 class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
     const lease = await kieKeyPool.acquire();
@@ -104,7 +111,7 @@ class KieClient {
 
       const rawRecord = asRecord(raw);
       const data = asRecord(rawRecord.data ?? rawRecord);
-      const kieTaskId = data.taskId ?? data.task_id ?? data.id;
+      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
         await kieKeyPool.markFailure(lease.accountHash);
         throw errors.generationFailed("kie text-to-image response missing taskId", raw);
@@ -196,7 +203,7 @@ class KieClient {
 
       const rawRecord = asRecord(raw);
       const data = asRecord(rawRecord.data ?? rawRecord);
-      const kieTaskId = data.taskId ?? data.task_id ?? data.id;
+      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
         await kieKeyPool.markFailure(lease.accountHash);
         throw errors.generationFailed("kie response missing taskId", raw);
@@ -250,7 +257,7 @@ class KieClient {
 
       const rawRecord = asRecord(raw);
       const data = asRecord(rawRecord.data ?? rawRecord);
-      const kieTaskId = data.taskId ?? data.task_id ?? data.id;
+      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
       if (typeof kieTaskId !== "string" || !kieTaskId) {
         await kieKeyPool.markFailure(lease.accountHash);
         throw errors.generationFailed("kie video response missing taskId", raw);
@@ -262,7 +269,7 @@ class KieClient {
         raw,
       };
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie create video task failed"))) {
+      if (!isKnownKieVideoCreateFailure(error)) {
         await kieKeyPool.markFailure(lease.accountHash);
       }
       throw error;

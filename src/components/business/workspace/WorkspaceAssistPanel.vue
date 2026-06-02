@@ -202,7 +202,9 @@ const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">(
 const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
-const shortVideoInitialView = ref<"preview" | "recent">("preview");
+const shortVideoInitialView = ref<"guide" | "preview" | "generating" | "recent">(
+  "guide",
+);
 let recentRefreshTimer: number | null = null;
 
 const isBatchProcessingView = computed(
@@ -414,8 +416,9 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     inputAssetUrl: item.inputAssetUrl ?? undefined,
     progress: item.progress ?? undefined,
     resultCount: item.resultCount ?? undefined,
-    error:
-      typeof item.error === "string"
+    error: isShortVideo
+      ? undefined
+      : typeof item.error === "string"
         ? item.error
         : (item.error?.message ?? undefined),
   };
