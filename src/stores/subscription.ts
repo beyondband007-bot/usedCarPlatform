@@ -45,8 +45,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const giftPoints = computed(() => snapshot.value?.giftPoints ?? currentPlanConfig.value.giftPoints)
   const expireTime = computed(() => snapshot.value?.expireTime ?? '')
 
-  async function hydrate() {
-    if (initialized.value) return
+  async function hydrate(force = false) {
+    if (initialized.value && !force) {
+      const stored = readState()
+      if (stored) snapshot.value = stored
+      return
+    }
     initialized.value = true
     snapshot.value = await getSubscription()
     if (snapshot.value) writeState(snapshot.value)
@@ -60,6 +64,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
 
   function applySubscriptionSnapshot(next: SubscriptionStateSnapshot) {
     snapshot.value = next
+    initialized.value = true
     writeState(next)
   }
 

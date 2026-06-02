@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { getUserInfo, login as mockLogin, logout as mockLogout } from '@/mock/mock-auth'
 import { subscriptionPlans } from '@/mock/mock-subscription'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
+import { useSubscriptionStore } from '@/stores/subscription'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
 import type { SubscriptionPlanCode, SubscriptionStateSnapshot } from '@/types/subscription'
 
@@ -58,7 +59,7 @@ function buildSubscriptionSnapshot(planCode: SubscriptionPlanCode): Subscription
 
 function writePlanDemoState(username: string) {
   const planCode = planAccountMap[username]
-  if (!planCode) return
+  if (!planCode) return null
 
   const snapshot = buildSubscriptionSnapshot(planCode)
   writeMockStorage(SUBSCRIPTION_KEY, snapshot)
@@ -70,6 +71,7 @@ function writePlanDemoState(username: string) {
     totalRecharge: snapshot.giftPoints,
     currentRunningTasks: 0,
   })
+  return snapshot
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -101,7 +103,10 @@ export const useAuthStore = defineStore('auth', {
     async login(payload: LoginRequest) {
       const response = await mockLogin(payload)
       const userInfo = await getUserInfo(response.token)
-      writePlanDemoState(userInfo.username)
+      const subscriptionSnapshot = writePlanDemoState(userInfo.username)
+      if (subscriptionSnapshot) {
+        useSubscriptionStore().applySubscriptionSnapshot(subscriptionSnapshot)
+      }
 
       this.token = response.token
       this.userInfo = userInfo
