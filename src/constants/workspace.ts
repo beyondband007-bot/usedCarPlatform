@@ -21,6 +21,18 @@ import roadTutorialBusinessPark from '@/assets/img/道路动态/教程背景图/
 import roadTutorialCityDay from '@/assets/img/道路动态/教程背景图/城市主干道.png'
 import roadTutorialHighwaySunset from '@/assets/img/道路动态/教程背景图/夕阳高速.png'
 import roadTutorialOverpassDusk from '@/assets/img/道路动态/教程背景图/傍晚高架.png'
+import showroomTutorialClassicWhite from '@/assets/img/展厅灯光/教程图片/经典白棚.png'
+import showroomTutorialGlass from '@/assets/img/展厅灯光/教程图片/玻璃展厅.png'
+import showroomTutorialLuxuryDark from '@/assets/img/展厅灯光/教程图片/暗调豪华.png'
+import showroomTutorialSoftTop from '@/assets/img/展厅灯光/教程图片/柔光灯顶.png'
+import outdoorTutorialTreePark from '@/assets/img/户外场景/教程/林荫公园.png'
+import outdoorTutorialMountainLake from '@/assets/img/户外场景/教程/山野湖畔.png'
+import outdoorTutorialCityBlock from '@/assets/img/户外场景/教程/城市街区.png'
+import outdoorTutorialCoastDaylight from '@/assets/img/户外场景/教程/海滨城市.png'
+import skyTutorialMirrorField from '@/assets/img/天空影棚/天空影棚教程/天空镜场.png'
+import skyTutorialSunsetDrive from '@/assets/img/天空影棚/天空影棚教程/夕阳车镜.png'
+import skyTutorialCloudSeaStage from '@/assets/img/天空影棚/天空影棚教程/云海展台.png'
+import skyTutorialCloudParking from '@/assets/img/天空影棚/天空影棚教程/云镜车场.png'
 const sceneImageUrls = {
   outdoorTreePark:
     'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
@@ -541,86 +553,50 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
 
-const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
-  {
-    title: '经典白棚',
-    capabilityCode: 'showroom-light',
-    optionId: 'white-studio',
-    image: sceneImageUrls.showroomClassicWhite,
-  },
-  {
-    title: '玻璃展厅',
-    capabilityCode: 'showroom-light',
-    optionId: 'glass-hall',
-    image: sceneImageUrls.showroomGlass,
-  },
-  {
-    title: '暗调奢华',
-    capabilityCode: 'showroom-light',
-    optionId: 'luxury-dark',
-    image: sceneImageUrls.showroomLuxuryDark,
-  },
-  {
-    title: '柔光灯顶',
-    capabilityCode: 'showroom-light',
-    optionId: 'soft-top-light',
-    image: sceneImageUrls.showroomSoftTop,
-  },
-]
+const showroomTutorialImageByTitle: Record<string, string> = {
+  经典白棚: showroomTutorialClassicWhite,
+  玻璃展厅: showroomTutorialGlass,
+  暗调奢华: showroomTutorialLuxuryDark,
+  柔光灯顶: showroomTutorialSoftTop,
+}
 
-const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
-  {
-    title: '林荫公园',
-    capabilityCode: 'outdoor-scene',
-    optionId: 'tree-park',
-    image: sceneImageUrls.outdoorTreePark,
-  },
-  {
-    title: '山野湖畔',
-    capabilityCode: 'outdoor-scene',
-    optionId: 'mountain-lake',
-    image: sceneImageUrls.outdoorMountainLake,
-  },
-  {
-    title: '城市街区',
-    capabilityCode: 'outdoor-scene',
-    optionId: 'city-block',
-    image: sceneImageUrls.outdoorCityBlock,
-  },
-  {
-    title: '海滨城市',
-    capabilityCode: 'outdoor-scene',
-    optionId: 'coast-daylight',
-    image: sceneImageUrls.outdoorHarborCity,
-  },
-]
+const showroomTemplateRecommendations: WorkspaceTemplateRecommendation[] =
+  showroomOptions.slice(0, 4).map((option) => ({
+    title: option.title,
+    capabilityCode: 'showroom-light',
+    optionId: option.id,
+    image: showroomTutorialImageByTitle[option.title] ?? option.image,
+  }))
 
-const skyTemplateRecommendations: WorkspaceTemplateRecommendation[] = [
-  {
-    title: '天空镜场',
+const outdoorTutorialImageByTitle: Record<string, string> = {
+  林荫公园: outdoorTutorialTreePark,
+  山野湖畔: outdoorTutorialMountainLake,
+  城市街区: outdoorTutorialCityBlock,
+  海滨城市: outdoorTutorialCoastDaylight,
+}
+
+const outdoorTemplateRecommendations: WorkspaceTemplateRecommendation[] =
+  outdoorOptions.slice(0, 4).map((option) => ({
+    title: option.title,
+    capabilityCode: 'outdoor-scene',
+    optionId: option.id,
+    image: outdoorTutorialImageByTitle[option.title] ?? option.image,
+  }))
+
+const skyTutorialImageByTitle: Record<string, string> = {
+  天空镜场: skyTutorialMirrorField,
+  夕阳车镜: skyTutorialSunsetDrive,
+  云海展台: skyTutorialCloudSeaStage,
+  云镜车场: skyTutorialCloudParking,
+}
+
+const skyTemplateRecommendations: WorkspaceTemplateRecommendation[] =
+  skyOptions.slice(0, 4).map((option) => ({
+    title: option.title,
     capabilityCode: 'sky-studio',
-    optionId: 'sky-mirror-field',
-    image: sceneImageUrls.skyMirrorField,
-  },
-  {
-    title: '夕阳车镜',
-    capabilityCode: 'sky-studio',
-    optionId: 'sunset-drive',
-    image: sceneImageUrls.skySunsetDrive,
-  },
-  {
-    title: '云海展台',
-    capabilityCode: 'sky-studio',
-    optionId: 'cloud-sea-stage',
-    image: sceneImageUrls.skyCloudSeaStage,
-  },
-  {
-    title: '云镜车场',
-    capabilityCode: 'sky-studio',
-    optionId: 'cloud-parking',
-    image: sceneImageUrls.skyCloudParking,
-  },
-]
+    optionId: option.id,
+    image: skyTutorialImageByTitle[option.title] ?? option.image,
+  }))
 
 const roadTutorialImageByTitle: Record<string, string> = {
   城市主干道: roadTutorialCityDay,

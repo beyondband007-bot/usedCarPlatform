@@ -7,6 +7,10 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { downloadFile } from "../../shared/downloadFile";
 import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
+import {
+  formatBatchItemDisplayTitle,
+  getBatchItemKindDisplayLabel,
+} from "../batch-new/batchDisplayTitle";
 import { creativeImageRepository } from "../creative-image/creativeImageRepository";
 import {
   normalizeTaskResults,
@@ -174,7 +178,7 @@ class TasksService {
       previewImage,
       downloadUrl: results[0]?.url ?? null,
       ratioLabel: `主图 ${task.outputRatio}`,
-      sceneLabel: task.optionId,
+      sceneLabel: this.buildRecentSceneLabel(task),
       outputRatio: task.outputRatio,
       inputAssetId: task.inputAssetId,
       inputAssetUrl: task.inputAssetUrl,
@@ -189,7 +193,32 @@ class TasksService {
     };
   }
 
+  private buildRecentSceneLabel(task: RecentGenerationRecord) {
+    if (task.moduleCode === "batch-new" && task.batchItemKind) {
+      return getBatchItemKindDisplayLabel(task.batchItemKind);
+    }
+
+    return task.optionId ?? null;
+  }
+
   private buildRecentTitle(task: RecentGenerationRecord) {
+    if (
+      task.moduleCode === "batch-new" &&
+      task.batchProjectName &&
+      task.batchItemKind &&
+      task.batchSortOrder !== null &&
+      task.batchSortOrder !== undefined
+    ) {
+      return formatBatchItemDisplayTitle({
+        projectName: task.batchProjectName,
+        sortOrder: task.batchSortOrder,
+        itemKind: task.batchItemKind,
+        exteriorCount: task.batchExteriorCount ?? 0,
+        interiorCollage: task.batchInteriorCollage,
+        optionId: task.optionId,
+      });
+    }
+
     const labels: Record<string, string> = {
       "showroom-light": "展厅灯光生成任务",
       "outdoor-scene": "户外场景生成任务",
