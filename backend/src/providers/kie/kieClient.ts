@@ -128,40 +128,47 @@ class KieClient {
     filePath: string,
     uploadPath = "used-car-platform",
   ): Promise<KieUploadedFile> {
-    const bytes = await fs.readFile(filePath);
-    const formData = new FormData();
-    formData.append("file", new Blob([bytes]), path.basename(filePath));
-    formData.append("uploadPath", uploadPath);
-    formData.append("fileName", path.basename(filePath));
+    try {
+      const bytes = await fs.readFile(filePath);
+      const formData = new FormData();
+      formData.append("file", new Blob([bytes]), path.basename(filePath));
+      formData.append("uploadPath", uploadPath);
+      formData.append("fileName", path.basename(filePath));
 
-    const response = await fetch(`${env.kie.fileUploadBaseUrl}/api/file-stream-upload`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lease.apiKey}`,
-      },
-      body: formData,
-    });
+      const response = await fetch(`${env.kie.fileUploadBaseUrl}/api/file-stream-upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lease.apiKey}`,
+        },
+        body: formData,
+      });
 
-    const raw = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      await kieKeyPool.markFailure(lease.accountHash);
-      throw errors.generationFailed("kie file upload failed", raw);
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie file upload failed", raw);
+      }
+
+      const rawRecord = asRecord(raw);
+      const data = asRecord(rawRecord.data ?? rawRecord);
+      const fileUrl = data.fileUrl ?? data.url ?? data.downloadUrl;
+      if (typeof fileUrl !== "string" || !fileUrl) {
+        await kieKeyPool.markFailure(lease.accountHash);
+        throw errors.generationFailed("kie upload response missing fileUrl", raw);
+      }
+
+      return {
+        fileUrl,
+        fileId: typeof data.fileId === "string" ? data.fileId : undefined,
+        expiresAt: typeof data.expiresAt === "string" ? data.expiresAt : undefined,
+        raw,
+      };
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("kie file upload failed"))) {
+        await kieKeyPool.markFailure(lease.accountHash);
+      }
+      throw error;
     }
-
-    const rawRecord = asRecord(raw);
-    const data = asRecord(rawRecord.data ?? rawRecord);
-    const fileUrl = data.fileUrl ?? data.url ?? data.downloadUrl;
-    if (typeof fileUrl !== "string" || !fileUrl) {
-      await kieKeyPool.markFailure(lease.accountHash);
-      throw errors.generationFailed("kie upload response missing fileUrl", raw);
-    }
-
-    return {
-      fileUrl,
-      fileId: typeof data.fileId === "string" ? data.fileId : undefined,
-      expiresAt: typeof data.expiresAt === "string" ? data.expiresAt : undefined,
-      raw,
-    };
   }
 
   async createImageToImageTaskWithLease(
