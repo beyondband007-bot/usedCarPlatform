@@ -19,6 +19,14 @@ const username = ref("enterprise");
 const password = ref("123456");
 const submitting = ref(false);
 
+const demoAccounts = [
+  "basic / 123456：企业基础版",
+  "team / 123456：企业团队版",
+  "flagship / 123456：企业旗舰版",
+  "enterprise / 123456：普通企业用户",
+  "admin / 123456：管理员",
+];
+
 async function handleLogin() {
   submitting.value = true;
 
@@ -75,7 +83,7 @@ async function handleLogin() {
               v-model:value="username"
               class="login-input login-input--phone"
               size="large"
-              placeholder="11位手机号"
+              placeholder="basic / team / flagship / enterprise / admin"
             />
           </div>
         </label>
@@ -108,8 +116,8 @@ async function handleLogin() {
       </NButton>
 
       <p class="login-footer">
-        没有账号？
-        <button type="button" class="login-footer-link">去开通企业账户</button>
+        Demo 账号：
+        <span class="login-footer-link">{{ demoAccounts.join("，") }}</span>
       </p>
     </form>
   </motion.div>

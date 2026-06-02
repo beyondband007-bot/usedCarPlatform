@@ -1,11 +1,24 @@
 import { defineStore } from 'pinia'
 
 import { getUserInfo, login as mockLogin, logout as mockLogout } from '@/mock/mock-auth'
+import { subscriptionPlans } from '@/mock/mock-subscription'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
+import type { SubscriptionPlanCode, SubscriptionStateSnapshot } from '@/types/subscription'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
 const USER_KEY = 'ai-car-studio:user-info'
+const SUBSCRIPTION_KEY = 'ai-car-studio:subscription'
+const SUBSCRIPTION_STATE_KEY = 'ai-car-studio:subscription-state'
+const POINTS_SUMMARY_KEY = 'ai-car-studio:points-summary'
+
+const planAccountMap: Record<string, SubscriptionPlanCode> = {
+  basic: 'basic',
+  team: 'team',
+  enterprise: 'team',
+  flagship: 'flagship',
+  admin: 'flagship',
+}
 
 interface AuthState {
   token: string
@@ -28,6 +41,33 @@ function readPointsText() {
   } catch {
     return '55,000'
   }
+}
+
+function buildSubscriptionSnapshot(planCode: SubscriptionPlanCode): SubscriptionStateSnapshot {
+  const plan = subscriptionPlans[planCode]
+  return {
+    currentPlan: plan.plan,
+    accountLimit: plan.accountLimit,
+    concurrentTaskLimit: plan.concurrentTaskLimit,
+    giftPoints: plan.giftPoints,
+    expireTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
+function writePlanDemoState(username: string) {
+  const planCode = planAccountMap[username]
+  if (!planCode) return
+
+  const snapshot = buildSubscriptionSnapshot(planCode)
+  writeMockStorage(SUBSCRIPTION_KEY, snapshot)
+  writeMockStorage(SUBSCRIPTION_STATE_KEY, snapshot)
+  writeMockStorage(POINTS_SUMMARY_KEY, {
+    currentPoints: snapshot.giftPoints,
+    freezePoints: 0,
+    totalConsume: 0,
+    totalRecharge: snapshot.giftPoints,
+    currentRunningTasks: 0,
+  })
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -59,6 +99,7 @@ export const useAuthStore = defineStore('auth', {
     async login(payload: LoginRequest) {
       const response = await mockLogin(payload)
       const userInfo = await getUserInfo(response.token)
+      writePlanDemoState(userInfo.username)
 
       this.token = response.token
       this.userInfo = userInfo

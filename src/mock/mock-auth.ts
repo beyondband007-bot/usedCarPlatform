@@ -46,6 +46,39 @@ const mockUsers: Record<
       permissions: [...permissions.enterprise],
     },
   },
+  basic: {
+    password: '123456',
+    token: 'mock_basic_token',
+    userInfo: {
+      id: 'user_basic',
+      username: 'basic',
+      displayName: '基础版企业用户',
+      role: 'enterprise',
+      permissions: [...permissions.enterprise],
+    },
+  },
+  team: {
+    password: '123456',
+    token: 'mock_team_token',
+    userInfo: {
+      id: 'user_team',
+      username: 'team',
+      displayName: '团队版企业用户',
+      role: 'enterprise',
+      permissions: [...permissions.enterprise],
+    },
+  },
+  flagship: {
+    password: '123456',
+    token: 'mock_flagship_token',
+    userInfo: {
+      id: 'user_flagship',
+      username: 'flagship',
+      displayName: '旗舰版企业用户',
+      role: 'enterprise',
+      permissions: [...permissions.enterprise],
+    },
+  },
 }
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
