@@ -750,22 +750,66 @@ export interface CreditsAdminOverview {
   recentTransactions: CreditsTransaction[]
 }
 
+function extractCreditsList<T>(payload: unknown, keys: string[]) {
+  if (Array.isArray(payload)) return payload as T[]
+  if (!payload || typeof payload !== 'object') return []
+
+  const record = payload as Record<string, unknown>
+  for (const key of keys) {
+    if (Array.isArray(record[key])) return record[key] as T[]
+  }
+
+  return []
+}
+
+function normalizeRechargeProduct(
+  product: RechargeProduct & Record<string, unknown>,
+): RechargeProduct {
+  const amount = Number(product.amount ?? product.priceCents ?? 0)
+  const points = Number(product.points ?? product.giftPoints ?? 0)
+  const bonusPoints = Number(product.bonusPoints ?? 0)
+
+  return {
+    ...product,
+    code: product.code ?? String(product.id),
+    priceText:
+      product.priceText ??
+      (Number.isFinite(amount) && amount > 0
+        ? `¥${amount.toLocaleString('zh-CN')}`
+        : undefined),
+    giftPoints: product.giftPoints ?? points,
+    totalPoints: product.totalPoints ?? points + bonusPoints,
+    status: product.status ?? (product.enabled === false ? 'disabled' : 'active'),
+  }
+}
+
 export async function getCreditsAccounts() {
-  const response = await request.get<ApiResponse<{ items: CreditsAccount[] }> | ApiResponse<CreditsAccount[]>>(
+  const response = await request.get<
+    ApiResponse<
+      | { items?: CreditsAccount[]; accounts?: CreditsAccount[] }
+      | CreditsAccount[]
+    >
+  >(
     '/credits/accounts',
   )
   const payload = unwrapApiResponse(response as ApiResponse<unknown>)
-  if (Array.isArray(payload)) return payload as CreditsAccount[]
-  return (payload as { items: CreditsAccount[] }).items ?? []
+  return extractCreditsList<CreditsAccount>(payload, ['items', 'accounts'])
 }
 
 export async function getRechargeProducts() {
-  const response = await request.get<ApiResponse<{ items: RechargeProduct[] }> | ApiResponse<RechargeProduct[]>>(
+  const response = await request.get<
+    ApiResponse<
+      | { items?: RechargeProduct[]; products?: RechargeProduct[] }
+      | RechargeProduct[]
+    >
+  >(
     '/credits/recharge-products',
   )
   const payload = unwrapApiResponse(response as ApiResponse<unknown>)
-  if (Array.isArray(payload)) return payload as RechargeProduct[]
-  return (payload as { items: RechargeProduct[] }).items ?? []
+  return extractCreditsList<RechargeProduct & Record<string, unknown>>(
+    payload,
+    ['items', 'products'],
+  ).map(normalizeRechargeProduct)
 }
 
 export async function getCreditsTransactions(params?: {
@@ -776,13 +820,24 @@ export async function getCreditsTransactions(params?: {
   to?: string
 }) {
   const response = await request.get<
-    ApiResponse<{ items: CreditsTransaction[]; total?: number } | CreditsTransaction[]>
+    ApiResponse<
+      | {
+          items?: CreditsTransaction[]
+          transactions?: CreditsTransaction[]
+          total?: number
+        }
+      | CreditsTransaction[]
+    >
   >('/credits/transactions', { params })
   const payload = unwrapApiResponse(response)
   if (Array.isArray(payload)) return { items: payload, total: payload.length }
+  const items = extractCreditsList<CreditsTransaction>(payload, [
+    'items',
+    'transactions',
+  ])
   return {
-    items: payload.items ?? [],
-    total: payload.total ?? payload.items?.length ?? 0,
+    items,
+    total: payload.total ?? items.length,
   }
 }
 

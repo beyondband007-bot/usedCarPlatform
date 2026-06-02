@@ -34,6 +34,7 @@ import {
 } from "@/constants/workspace";
 import { usePointsStore } from "@/stores/points";
 import { useAuthStore } from "@/stores/auth";
+import { useCreditsStore } from "@/stores/credits";
 import { useSubscriptionStore } from "@/stores/subscription";
 import type {
   CreativeThreadTurn,
@@ -55,6 +56,7 @@ const message = useMessage();
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const pointsStore = usePointsStore();
+const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
 const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
@@ -262,6 +264,10 @@ function isVisualPlanPoolModule(moduleCode: string) {
   );
 }
 
+function refreshCreditsBalance() {
+  void creditsStore.hydrateAccounts(true);
+}
+
 function countVisualPlanPoolTasks() {
   return Object.values(trackedRunningTasks.value).filter((moduleCode) =>
     isVisualPlanPoolModule(moduleCode),
@@ -428,8 +434,13 @@ async function refreshBatchJob(batchId: string) {
     );
     if (index < 0) return;
     const next = [...batchActiveJobs.value];
+    const wasTerminal = isTerminalBatchStatus(next[index].status);
     next[index] = mapBatchDetailToJob(detail, next[index]);
+    const isNowTerminal = isTerminalBatchStatus(next[index].status);
     setBatchActiveJobs(next);
+    if (!wasTerminal && isNowTerminal) {
+      refreshCreditsBalance();
+    }
   } catch {
     // Keep placeholder card visible while polling retries.
   }
@@ -570,6 +581,7 @@ async function pollTrackedRunningTasks() {
   setTrackedRunningTasks(next);
 
   if (hasTerminalTask) {
+    refreshCreditsBalance();
     if (activeCode.value === "creative-image") {
       void refreshCreativeConversations();
     }
@@ -917,6 +929,7 @@ async function resolveInteriorCollageTasks(
 
   generationResult.value = result;
   clearActiveGenerationTask(result.taskId);
+  refreshCreditsBalance();
   await assistPanelRef.value?.refreshRecentItems();
 }
 
@@ -974,6 +987,7 @@ async function resolveGenerationTask(
     clearActiveGenerationTask(taskId);
     isGenerating.value = false;
     generatingCapabilityCode.value = null;
+    refreshCreditsBalance();
     void refreshRunningTaskSummary();
   }
 }
