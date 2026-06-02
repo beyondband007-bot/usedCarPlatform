@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
@@ -2418,8 +2418,47 @@ defineExpose({
   min-height: 0;
   flex-direction: column;
   gap: 12px;
-  overflow: hidden;
-  padding: 0 6px 0 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 20px 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
+}
+
+.guide-layout::-webkit-scrollbar {
+  width: 8px;
+}
+
+.guide-layout::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.guide-layout::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.guide-layout::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.assist-panel.theme-light .guide-layout {
+  scrollbar-color: #cbd5e1 #eef2f7;
+}
+
+.assist-panel.theme-light .guide-layout::-webkit-scrollbar-track {
+  background: #eef2f7;
+}
+
+.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .guide-layout.is-compact-guide {
@@ -2568,6 +2607,43 @@ defineExpose({
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 6px 20px 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
+}
+
+.recent-layout::-webkit-scrollbar {
+  width: 8px;
+}
+
+.recent-layout::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.recent-layout::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.recent-layout::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.assist-panel.theme-light .recent-layout {
+  scrollbar-color: #cbd5e1 #eef2f7;
+}
+
+.assist-panel.theme-light .recent-layout::-webkit-scrollbar-track {
+  background: #eef2f7;
+}
+
+.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 @container assist (max-width: 480px) {

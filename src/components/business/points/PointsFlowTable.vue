@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
+import { NSelect } from "naive-ui";
 import { computed } from "vue";
 
+import { useAppStore } from "@/stores/app";
 import type {
   PointsBizSource,
   PointsFlowRecord,
@@ -9,6 +11,8 @@ import type {
   PointsQueryViewConfig,
   PointsTxnType,
 } from "@/types/points-query";
+
+const appStore = useAppStore();
 
 const props = defineProps<{
   config: PointsQueryViewConfig;
@@ -42,14 +46,15 @@ const dateRangeOptions = [
   { value: "custom", label: "自定义" },
 ];
 
-const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> = [
-  { value: "", label: "全部" },
-  { value: "single", label: "单图生成" },
-  { value: "batch", label: "批量上新" },
-  { value: "package", label: "套餐赠送" },
-  { value: "purchase", label: "充值购买" },
-  { value: "fail", label: "失败退款" },
-];
+const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
+  [
+    { value: "", label: "全部" },
+    { value: "single", label: "单图生成" },
+    { value: "batch", label: "批量上新" },
+    { value: "package", label: "套餐赠送" },
+    { value: "purchase", label: "充值购买" },
+    { value: "fail", label: "失败退款" },
+  ];
 
 const memberOptions = [
   { value: "", label: "全部成员" },
@@ -67,7 +72,9 @@ const txnTypeLabelMap: Record<PointsTxnType, string> = {
   refund: "退款",
 };
 
-const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(props.total / props.pageSize)),
+);
 
 const pageItems = computed(() =>
   Array.from({ length: totalPages.value }, (_, index) => index + 1),
@@ -120,82 +127,114 @@ function setPage(page: number) {
 </script>
 
 <template>
-  <section class="card points-flow-card animate-fade-in">
+  <section
+    class="card points-flow-card animate-fade-in"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+  >
     <div class="points-filter-bar">
       <div class="points-filter-row">
         <template v-if="config.showCurrentMember">
           <span class="points-current-member-label">当前成员：</span>
-          <strong class="points-current-member-name">{{ config.currentMemberName }}</strong>
+          <strong class="points-current-member-name">{{
+            config.currentMemberName
+          }}</strong>
           <span class="points-separator">|</span>
         </template>
 
         <div v-if="config.showMemberFilter" class="points-filter-item">
           <label>成员账号</label>
-          <select
+          <NSelect
+            class="points-filter-select is-wide"
+            size="small"
             :value="filters.member"
-            class="form-select"
-            @change="patchFilters({ member: ($event.target as HTMLSelectElement).value })"
-          >
-            <option v-for="item in memberOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </option>
-          </select>
+            :options="memberOptions"
+            :consistent-menu-width="false"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="
+              (value) => patchFilters({ member: value ?? '' })
+            "
+          />
         </div>
 
         <div class="points-filter-item">
           <label>流水类型</label>
-          <select
+          <NSelect
+            class="points-filter-select"
+            size="small"
             :value="filters.txnType"
-            class="form-select"
-            @change="patchFilters({ txnType: ($event.target as HTMLSelectElement).value as PointsQueryFilters['txnType'] })"
-          >
-            <option v-for="item in txnTypeOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </option>
-          </select>
+            :options="txnTypeOptions"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="
+              (value) =>
+                patchFilters({
+                  txnType: (value ?? '') as PointsQueryFilters['txnType'],
+                })
+            "
+          />
         </div>
 
         <div class="points-filter-item">
           <label>时间范围</label>
-          <select
+          <NSelect
+            class="points-filter-select"
+            size="small"
             :value="filters.dateRange"
-            class="form-select"
-            @change="patchFilters({ dateRange: ($event.target as HTMLSelectElement).value as PointsQueryFilters['dateRange'] })"
-          >
-            <option v-for="item in dateRangeOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </option>
-          </select>
+            :options="dateRangeOptions"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="
+              (value) =>
+                patchFilters({
+                  dateRange: (value ??
+                    '') as PointsQueryFilters['dateRange'],
+                })
+            "
+          />
         </div>
 
-        <div v-if="showCustomDate" class="points-filter-item points-filter-date">
+        <div
+          v-if="showCustomDate"
+          class="points-filter-item points-filter-date"
+        >
           <label>日期</label>
           <input
             :value="filters.startDate"
             type="date"
             class="form-input"
-            @input="patchFilters({ startDate: ($event.target as HTMLInputElement).value })"
+            @input="
+              patchFilters({
+                startDate: ($event.target as HTMLInputElement).value,
+              })
+            "
           />
           <span>~</span>
           <input
             :value="filters.endDate"
             type="date"
             class="form-input"
-            @input="patchFilters({ endDate: ($event.target as HTMLInputElement).value })"
+            @input="
+              patchFilters({
+                endDate: ($event.target as HTMLInputElement).value,
+              })
+            "
           />
         </div>
 
         <div class="points-filter-item">
           <label>业务来源</label>
-          <select
+          <NSelect
+            class="points-filter-select is-wide"
+            size="small"
             :value="filters.bizSource"
-            class="form-select"
-            @change="patchFilters({ bizSource: ($event.target as HTMLSelectElement).value as PointsQueryFilters['bizSource'] })"
-          >
-            <option v-for="item in bizSourceOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </option>
-          </select>
+            :options="bizSourceOptions"
+            :consistent-menu-width="false"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="
+              (value) =>
+                patchFilters({
+                  bizSource: (value ?? '') as PointsQueryFilters['bizSource'],
+                })
+            "
+          />
         </div>
 
         <button
@@ -216,7 +255,11 @@ function setPage(page: number) {
         <h2>{{ config.tableTitle }}</h2>
         <span>{{ total }} 条</span>
       </div>
-      <button type="button" class="points-export-button" @click="emit('export')">
+      <button
+        type="button"
+        class="points-export-button"
+        @click="emit('export')"
+      >
         <Icon icon="mdi:download-outline" />
         导出
       </button>
@@ -251,7 +294,9 @@ function setPage(page: number) {
             class="points-flow-row"
           >
             <td>
-              <span class="font-mono text-xs text-slate-500">{{ record.id }}</span>
+              <span class="font-mono text-xs text-slate-500">{{
+                record.id
+              }}</span>
             </td>
             <td>
               <span class="tag" :class="`tag-${record.txnType}`">
@@ -261,13 +306,17 @@ function setPage(page: number) {
             <td>
               <span
                 class="font-mono"
-                :class="record.pointsChange > 0 ? 'num-positive' : 'num-negative'"
+                :class="
+                  record.pointsChange > 0 ? 'num-positive' : 'num-negative'
+                "
               >
                 {{ formatSignedNumber(record.pointsChange) }}
               </span>
             </td>
             <td>
-              <span class="font-mono text-slate-700">{{ formatNumber(record.balanceAfter) }}</span>
+              <span class="font-mono text-slate-700">{{
+                formatNumber(record.balanceAfter)
+              }}</span>
             </td>
             <td>
               <div class="points-scene-cell">
@@ -280,7 +329,10 @@ function setPage(page: number) {
             </td>
             <td v-if="config.showMemberColumns">
               <div class="points-member-cell">
-                <div class="points-avatar" :class="getAvatarClass(record.memberId)">
+                <div
+                  class="points-avatar"
+                  :class="getAvatarClass(record.memberId)"
+                >
                   {{ record.memberName?.charAt(0) }}
                 </div>
                 <span>{{ record.memberName }}</span>
@@ -312,7 +364,10 @@ function setPage(page: number) {
           v-for="page in pageItems"
           :key="page"
           type="button"
-          :class="{ active: page === currentPage, 'is-admin': config.adminTheme }"
+          :class="{
+            active: page === currentPage,
+            'is-admin': config.adminTheme,
+          }"
           @click="setPage(page)"
         >
           {{ page }}
@@ -390,14 +445,48 @@ function setPage(page: number) {
   white-space: nowrap;
 }
 
-.form-select,
+.points-filter-select {
+  width: 100px;
+  min-width: 100px;
+}
+
+.points-filter-select.is-wide {
+  width: 132px;
+  min-width: 132px;
+}
+
+.points-filter-select {
+  --n-height: 30px;
+  --n-border-radius: 8px;
+  --n-font-size: 12px;
+  --n-color: #ffffff;
+  --n-color-hover: #ffffff;
+  --n-color-focus: #ffffff;
+  --n-color-active: #ffffff;
+  --n-border: 1px solid #cbd5e1;
+  --n-border-hover: 1px solid #cbd5e1;
+  --n-border-focus: 1px solid #3b82f6;
+  --n-border-active: 1px solid #3b82f6;
+  --n-text-color: #334155;
+  --n-placeholder-color: #94a3b8;
+  --n-arrow-color: #94a3b8;
+  --n-box-shadow-focus: 0 0 0 3px rgb(59 130 246 / 10%);
+}
+
+.points-filter-select :deep(.n-base-selection-label),
+.points-filter-select :deep(.n-base-selection-placeholder) {
+  font-size: 12px;
+}
+
 .form-input {
   min-width: 100px;
+  height: 28px;
+  padding: 0 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background-color: #ffffff;
   color: #334155;
-  cursor: pointer;
+  cursor: text;
   font-family: inherit;
   font-size: 12px;
   transition:
@@ -405,23 +494,10 @@ function setPage(page: number) {
     box-shadow 0.15s ease;
 }
 
-.form-select {
-  height: 30px;
-  appearance: none;
-  padding: 0 32px 0 12px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-position: right 8px center;
-  background-repeat: no-repeat;
-}
-
-.form-input {
-  height: 28px;
+.points-filter-date .form-input {
   min-width: 138px;
-  padding: 0 12px;
-  cursor: text;
 }
 
-.form-select:focus,
 .form-input:focus {
   outline: none;
   border-color: #3b82f6;
@@ -797,5 +873,239 @@ function setPage(page: number) {
   .points-recharge-button {
     margin-left: 0;
   }
+}
+
+.points-flow-card.theme-dark.card {
+  border-color: #263347;
+  background: #111827;
+  box-shadow: none;
+}
+
+.points-flow-card.theme-dark.card:hover {
+  box-shadow: none;
+}
+
+.points-flow-card.theme-dark .points-filter-bar {
+  border-bottom-color: #263347;
+  background: #111827;
+}
+
+.points-flow-card.theme-dark .points-current-member-label,
+.points-flow-card.theme-dark .points-filter-item label,
+.points-flow-card.theme-dark .points-filter-date span {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-current-member-name {
+  color: #3b82f6;
+}
+
+.points-flow-card.theme-dark .points-separator {
+  color: #263347;
+}
+
+.points-flow-card.theme-dark {
+  color-scheme: dark;
+}
+
+.points-flow-card.theme-dark .points-filter-select,
+.points-flow-card.theme-dark .form-input {
+  --n-color: #1a2436;
+  --n-color-hover: #1a2436;
+  --n-color-focus: #1a2436;
+  --n-color-active: #1a2436;
+  --n-border: 1px solid #374151;
+  --n-border-hover: 1px solid #374151;
+  --n-border-focus: 1px solid #3b82f6;
+  --n-border-active: 1px solid #3b82f6;
+  --n-text-color: #f3f4f6;
+  --n-placeholder-color: #9ca3af;
+  --n-arrow-color: #9ca3af;
+  --n-box-shadow-focus: 0 0 0 3px rgb(59 130 246 / 16%);
+}
+
+.points-flow-card.theme-dark .form-input {
+  border-color: #374151;
+  background-color: #1a2436;
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .form-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 16%);
+}
+
+.points-flow-card.theme-dark .points-recharge-button {
+  background: #f5a623;
+  color: #111827;
+}
+
+.points-flow-card.theme-dark .points-recharge-button:hover {
+  background: #e09510;
+}
+
+.points-flow-card.theme-dark .points-table-head {
+  border-bottom-color: #263347;
+}
+
+.points-flow-card.theme-dark .points-table-title .iconify {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-table-title h2 {
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .points-table-title span {
+  background: #1a2436;
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-export-button {
+  border-color: #263347;
+  background: #1a2436;
+  color: #d1d5db;
+}
+
+.points-flow-card.theme-dark .points-export-button:hover {
+  border-color: #374151;
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .data-table th {
+  border-bottom-color: #263347;
+  background: #1a2436;
+  color: #d1d5db;
+}
+
+.points-flow-card.theme-dark .data-table td {
+  border-bottom-color: #263347;
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .data-table tbody tr:nth-child(even) td {
+  background: #151e2d;
+}
+
+.points-flow-card.theme-dark .data-table tr:hover td {
+  background: #1e293b;
+}
+
+.points-flow-card.theme-dark .row-mine td {
+  background: rgb(59 130 246 / 12%) !important;
+}
+
+.points-flow-card.theme-dark .tag-recharge {
+  background: rgb(16 185 129 / 16%);
+  color: #10b981;
+}
+
+.points-flow-card.theme-dark .tag-gift {
+  background: rgb(59 130 246 / 16%);
+  color: #3b82f6;
+}
+
+.points-flow-card.theme-dark .tag-consume {
+  background: rgb(239 68 68 / 16%);
+  color: #ef4444;
+}
+
+.points-flow-card.theme-dark .tag-refund {
+  background: rgb(245 166 35 / 16%);
+  color: #f5a623;
+}
+
+.points-flow-card.theme-dark .tag-owner {
+  background: rgb(245 166 35 / 16%);
+  color: #f5a623;
+}
+
+.points-flow-card.theme-dark .num-positive {
+  color: #10b981;
+}
+
+.points-flow-card.theme-dark .num-negative {
+  color: #ef4444;
+}
+
+.points-flow-card.theme-dark .text-slate-500 {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .text-slate-700 {
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .points-scene-cell span {
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark .points-scene-cell small,
+.points-flow-card.theme-dark .points-member-role,
+.points-flow-card.theme-dark .points-time {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .empty-state {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-pagination-bar {
+  border-top-color: #263347;
+}
+
+.points-flow-card.theme-dark .points-pagination-bar > span {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-pagination button {
+  border-color: #263347;
+  background: #1a2436;
+  color: #d1d5db;
+}
+
+.points-flow-card.theme-dark .points-pagination button.active,
+.points-flow-card.theme-dark .points-pagination button.active.is-admin {
+  border-color: #f5a623;
+  background: #f5a623;
+  color: #111827;
+}
+
+.points-flow-card.theme-dark .points-pagination button:disabled {
+  color: #4b5563;
+}
+
+.points-flow-card.theme-dark .points-pagination button:hover:not(:disabled, .active) {
+  border-color: #374151;
+  color: #f3f4f6;
+}
+</style>
+
+<style lang="scss">
+html[data-theme="dark"] .points-filter-select-menu {
+  background: #1a2436 !important;
+  border: 1px solid #374151 !important;
+}
+
+html[data-theme="dark"] .points-filter-select-menu .n-base-select-option {
+  color: #f3f4f6;
+}
+
+html[data-theme="dark"]
+  .points-filter-select-menu
+  .n-base-select-option--selected {
+  color: #f5a623;
+}
+
+html[data-theme="dark"]
+  .points-filter-select-menu
+  .n-base-select-option--pending::before {
+  background-color: #1e293b !important;
+}
+
+html[data-theme="dark"]
+  .points-filter-select-menu
+  .n-base-select-option:hover::before {
+  background-color: #1e293b !important;
 }
 </style>
