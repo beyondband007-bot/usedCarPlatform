@@ -215,11 +215,11 @@ const {
 
   --studio-chrome-nav-underline: #efc24c;
 
-  --studio-chrome-credit-bg: #efc24c;
+  --studio-chrome-credit-bg: #ffffff;
 
-  --studio-chrome-credit-text: #221700;
+  --studio-chrome-credit-text: #0f172a;
 
-  --studio-chrome-credit-hover: #f4d36a;
+  --studio-chrome-credit-hover: #f8fafc;
 
   --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
@@ -340,6 +340,10 @@ const {
 }
 
 
+
+.home-chrome:not(.home-chrome--light):not(.home-chrome--pricing-light) :deep(.credit-pill) {
+  border-color: rgba(15, 23, 42, 0.1);
+}
 
 @media (min-width: 1280px) {
 

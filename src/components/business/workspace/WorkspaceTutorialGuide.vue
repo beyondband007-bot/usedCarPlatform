@@ -213,16 +213,17 @@ const tutorialTemplatePreviewImages = [
   background: transparent;
 }
 
+.tutorial-step.is-step-3 .tutorial-placeholder {
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+}
+
 .tutorial-section.theme-light .tutorial-step.is-step-1 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-2 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-4 .tutorial-placeholder {
   background: #f8fafc;
-}
-
-.tutorial-step.is-step-3 .tutorial-placeholder {
-  align-items: center;
-  justify-content: center;
 }
 
 .tutorial-step.is-step-1 .tutorial-image,

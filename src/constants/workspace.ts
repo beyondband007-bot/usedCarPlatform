@@ -459,7 +459,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
   createCapability({
     code: 'watermark-remove',
     apiCode: 'marketing_watermark_remove',
-    kind: 'interior',
+    kind: 'beauty',
     groupTitle: '营销工具',
     icon: 'mdi:water-off-outline',
     label: '去水印',

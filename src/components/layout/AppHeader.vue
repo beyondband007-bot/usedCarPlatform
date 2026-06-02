@@ -437,6 +437,7 @@ const navItems = computed(() => {
   padding: clamp(8px, 0.65vw, 10px) clamp(14px, 1.2vw, 20px);
   color: var(--studio-chrome-credit-text, #ffffff);
   background: var(--studio-chrome-credit-bg, #d4a017);
+  border: 1px solid transparent;
   border-radius: 999px;
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   font-weight: 900;

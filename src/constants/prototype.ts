@@ -96,7 +96,7 @@ export const pricingPlans: PricingPlan[] = [
     tone: 'orange',
     benefits: [
       '赠送 100,000 积分',
-      '5 个企业账号',
+      '1 个企业账号',
       '每个账号同时上传 5 套外观图组',
       '每个账号同时上传 5 套内饰图组',
       '单张图片生成正常使用',

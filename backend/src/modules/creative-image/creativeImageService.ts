@@ -118,6 +118,11 @@ class CreativeImageService {
     const reference = await this.resolveReference(conversationId, body);
     const taskId = createId("task");
 
+    await creativeImageRepository.updateConversationSummary({
+      conversationId,
+      resetLastResultUrl: true,
+    });
+
     await creativeImageRepository.createMessage({
       conversationId,
       role: "user",
