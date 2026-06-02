@@ -71,7 +71,7 @@ function patchFilters(patch: Partial<PointsQueryFilters>) {
     </header>
 
     <div class="points-filter-grid">
-      <label v-if="version === 'enterprise'" class="points-filter-field">
+      <label v-if="version === 'admin'" class="points-filter-field">
         <span>成员账号</span>
         <select
           :value="filters.member"

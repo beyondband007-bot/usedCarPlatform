@@ -20,14 +20,25 @@ const props = defineProps<{
 
 type ShortVideoView = "guide" | "preview" | "generating" | "recent";
 
+const PENDING_RECENT_STATUSES = new Set([
+  "waiting",
+  "queued",
+  "queue",
+  "generating",
+]);
+
+function resolveShortVideoView(preferred?: ShortVideoView): ShortVideoView {
+  if (props.isGenerating) return "generating";
+  if (preferred === "recent" || preferred === "preview") return preferred;
+  return preferred ?? "guide";
+}
+
 const emit = defineEmits<{
   pickRecent: [item: WorkspaceRecentItem];
 }>();
 
 const videoRef = ref<HTMLVideoElement | null>(null);
-const activeView = ref<ShortVideoView>(
-  props.initialView ?? (props.isGenerating ? "generating" : "guide"),
-);
+const activeView = ref<ShortVideoView>(resolveShortVideoView(props.initialView));
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const statusLabelMap = recentStatusLabelMap;
 const statusIconMap = recentStatusIconMap;
@@ -71,7 +82,7 @@ watch(
 watch(
   () => props.initialView,
   (view) => {
-    if (view) activeView.value = view;
+    activeView.value = resolveShortVideoView(view);
   },
 );
 
@@ -87,6 +98,7 @@ watch(
       activeView.value = "guide";
     }
   },
+  { immediate: true },
 );
 
 function toggleRecentView() {
@@ -104,7 +116,13 @@ function canOpenRecentVideo(item: WorkspaceRecentItem) {
 
 function handleRecentPick(item: WorkspaceRecentItem) {
   if (!canOpenRecentVideo(item)) return;
-  activeView.value = "preview";
+
+  if (PENDING_RECENT_STATUSES.has(item.status)) {
+    activeView.value = "generating";
+  } else {
+    activeView.value = "preview";
+  }
+
   emit("pickRecent", item);
 }
 </script>

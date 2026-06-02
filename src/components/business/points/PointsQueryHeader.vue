@@ -1,53 +1,39 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 
-import type { PointsQueryVersion } from "@/types/points-query";
+import type { PointsQueryViewConfig } from "@/types/points-query";
 
 defineProps<{
-  version: PointsQueryVersion;
+  config: PointsQueryViewConfig;
 }>();
-
-const emit = defineEmits<{
-  "update:version": [value: PointsQueryVersion];
-}>();
-
-function setVersion(value: PointsQueryVersion) {
-  emit("update:version", value);
-}
 </script>
 
 <template>
   <header class="points-query-header">
     <div class="points-query-header__inner">
       <div class="points-query-brand">
-        <span class="points-query-brand__icon" aria-hidden="true">
-          <Icon icon="mdi:coins" />
-        </span>
-        <span>
-          <strong>积分查询</strong>
-          <small>积分流水筛选与查看</small>
-        </span>
+        <div class="points-query-brand__icon" :class="config.iconClassName">
+          <Icon :icon="config.icon" />
+        </div>
+        <div>
+          <h1>积分查询</h1>
+          <p>{{ config.subtitle }}</p>
+        </div>
       </div>
 
-      <div class="points-version-switch" aria-label="积分查询版本">
-        <button
-          type="button"
-          class="points-version-switch__button"
-          :class="{ active: version === 'personal' }"
-          @click="setVersion('personal')"
+      <div class="points-query-user">
+        <span v-if="config.teamLabel" class="points-query-team-label">
+          当前团队：
+        </span>
+        <div
+          v-for="badge in config.badges"
+          :key="badge.text"
+          class="points-query-badge"
+          :class="badge.className"
         >
-          <Icon icon="mdi:account-outline" />
-          个人版
-        </button>
-        <button
-          type="button"
-          class="points-version-switch__button"
-          :class="{ active: version === 'enterprise' }"
-          @click="setVersion('enterprise')"
-        >
-          <Icon icon="mdi:office-building-outline" />
-          企业版
-        </button>
+          <Icon :icon="badge.icon" />
+          {{ badge.text }}
+        </div>
       </div>
     </div>
   </header>
@@ -57,7 +43,7 @@ function setVersion(value: PointsQueryVersion) {
 .points-query-header {
   position: sticky;
   top: 0;
-  z-index: 8;
+  z-index: 40;
   border-bottom: 1px solid #e2e8f0;
   background: #ffffff;
 }
@@ -65,103 +51,101 @@ function setVersion(value: PointsQueryVersion) {
 .points-query-header__inner {
   display: flex;
   width: min(100%, 1440px);
-  min-height: 74px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   margin: 0 auto;
-  padding: 14px 24px;
+  padding: 16px 24px;
 }
 
 .points-query-brand {
-  display: inline-flex;
+  display: flex;
+  min-width: 0;
   align-items: center;
   gap: 12px;
-  min-width: 0;
 }
 
 .points-query-brand__icon {
-  display: grid;
-  flex: 0 0 36px;
+  display: flex;
   width: 36px;
   height: 36px;
-  place-items: center;
-  border-radius: 9px;
-  background: #2563eb;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
   color: #ffffff;
   font-size: 20px;
 }
 
-.points-query-brand strong,
-.points-query-brand small {
-  display: block;
-  line-height: 1.25;
+.points-query-brand__icon.is-blue {
+  background: #2563eb;
 }
 
-.points-query-brand strong {
+.points-query-brand__icon.is-violet {
+  background: #7c3aed;
+}
+
+.points-query-brand h1 {
+  margin: 0;
   color: #0f172a;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-.points-query-brand small {
-  margin-top: 3px;
+.points-query-brand p {
+  margin: 4px 0 0;
   color: #94a3b8;
   font-size: 12px;
+  line-height: 1.2;
+}
+
+.points-query-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.points-query-team-label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.points-query-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.2;
 }
 
-.points-version-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 9px;
+.points-query-badge.is-personal,
+.points-query-badge.is-team {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.points-query-badge.is-member {
   background: #f1f5f9;
+  color: #475569;
 }
 
-.points-version-switch__button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease;
+.points-query-badge.is-admin {
+  background: #f3e8ff;
+  color: #6b21a8;
+  font-weight: 700;
 }
 
-.points-version-switch__button:hover {
-  background: #eaf1fb;
-  color: #334155;
-}
-
-.points-version-switch__button.active {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .points-query-header__inner {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .points-version-switch {
-    width: 100%;
-  }
-
-  .points-version-switch__button {
-    flex: 1;
+  .points-query-user {
+    flex-wrap: wrap;
   }
 }
 </style>

@@ -67,7 +67,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
         <div class="plan-price-row">
           <strong>{{ plan.price }}</strong>
-          <span>/ 套餐</span>
+          <span>/ 套</span>
         </div>
 
         <span class="plan-divider" aria-hidden="true" />

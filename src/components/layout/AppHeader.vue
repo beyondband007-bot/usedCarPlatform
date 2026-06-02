@@ -4,6 +4,7 @@ import { NPopover } from "naive-ui";
 import { computed, inject, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { CREDITS_ROUTE } from "@/constants/app-flow";
 import { studioGuestNavigation, topNavigation } from "@/constants/prototype";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import { useStudioChrome } from "@/composables/useStudioChrome";
@@ -56,6 +57,11 @@ function handleNavClick(item: NavItem) {
   }
 
   router.push(item.path);
+}
+
+function handleOpenCredits() {
+  userMenuOpen.value = false;
+  router.push(CREDITS_ROUTE);
 }
 
 function handleLogout() {
@@ -186,11 +192,20 @@ const navItems = computed(() => {
           >
             <button
               type="button"
-              class="user-menu-logout"
+              class="user-menu-item"
+              role="menuitem"
+              @click="handleOpenCredits"
+            >
+              <Icon icon="mdi:diamond-stone" class="user-menu-item-icon" />
+              积分查询
+            </button>
+            <button
+              type="button"
+              class="user-menu-item"
               role="menuitem"
               @click="handleLogout"
             >
-              <Icon icon="mdi:logout" class="user-menu-logout-icon" />
+              <Icon icon="mdi:logout" class="user-menu-item-icon" />
               退出登录
             </button>
           </div>
@@ -303,11 +318,20 @@ const navItems = computed(() => {
           >
             <button
               type="button"
-              class="user-menu-logout"
+              class="user-menu-item"
+              role="menuitem"
+              @click="handleOpenCredits"
+            >
+              <Icon icon="mdi:diamond-stone" class="user-menu-item-icon" />
+              积分查询
+            </button>
+            <button
+              type="button"
+              class="user-menu-item"
               role="menuitem"
               @click="handleLogout"
             >
-              <Icon icon="mdi:logout" class="user-menu-logout-icon" />
+              <Icon icon="mdi:logout" class="user-menu-item-icon" />
               退出登录
             </button>
           </div>
@@ -611,7 +635,7 @@ const navItems = computed(() => {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
 
-.user-menu-logout {
+.user-menu-item {
   display: flex;
   width: 100%;
   align-items: center;
@@ -629,25 +653,25 @@ const navItems = computed(() => {
     color 0.2s ease;
 }
 
-.user-menu-panel.is-light .user-menu-logout {
+.user-menu-panel.is-light .user-menu-item {
   color: #0f172a;
 }
 
-.user-menu-panel.is-dark .user-menu-logout {
+.user-menu-panel.is-dark .user-menu-item {
   color: #f8fafc;
 }
 
-.user-menu-panel.is-light .user-menu-logout:hover {
+.user-menu-panel.is-light .user-menu-item:hover {
   background: #f8fafd;
   color: #2f6bff;
 }
 
-.user-menu-panel.is-dark .user-menu-logout:hover {
+.user-menu-panel.is-dark .user-menu-item:hover {
   background: #1f2937;
   color: #fb923c;
 }
 
-.user-menu-logout-icon {
+.user-menu-item-icon {
   font-size: 18px;
 }
 
