@@ -95,6 +95,7 @@ const isLoadingCreativeConversation = ref(false);
 const deliveryImagePreview = ref<WorkspaceImagePreview | null>(null);
 const deliveryTaskPreview = ref<WorkspaceDeliveryTaskPreview | null>(null);
 const previewedDeliveryTaskId = ref<string | null>(null);
+const isDeliveryListLoading = ref(false);
 const isGenerating = ref(false);
 const generatingCapabilityCode = ref<string | null>(null);
 const shortVideoPlayRequest = ref(0);
@@ -614,13 +615,18 @@ watch(activeCode, () => {
   deliveryImagePreview.value = null;
   deliveryTaskPreview.value = null;
   previewedDeliveryTaskId.value = null;
+  isDeliveryListLoading.value = false;
 });
 
-function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview) {
+function handlePreviewDeliveryTask(task: WorkspaceDeliveryTaskPreview | null) {
   deliveryTaskPreview.value = task;
   deliveryImagePreview.value = null;
   generationResult.value = null;
-  previewedDeliveryTaskId.value = task.id;
+  previewedDeliveryTaskId.value = task?.id ?? null;
+}
+
+function handleDeliveryListLoadingChange(loading: boolean) {
+  isDeliveryListLoading.value = loading;
 }
 
 function handleOpenDeliveryAssetResult(result: WorkspaceGenerateResult) {
@@ -1325,6 +1331,7 @@ onUnmounted(() => {
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
             @preview-delivery-task="handlePreviewDeliveryTask"
+            @delivery-list-loading-change="handleDeliveryListLoadingChange"
             @batch-created="handleBatchCreated"
           />
         </div>
@@ -1343,6 +1350,7 @@ onUnmounted(() => {
           :generation-result="generationResult"
           :delivery-task-preview="deliveryTaskPreview"
           :delivery-image-preview="deliveryImagePreview"
+          :delivery-list-loading="isDeliveryListLoading"
           :short-video-play-request="shortVideoPlayRequest"
           :batch-active-jobs="batchActiveJobs"
           @back-from-result="clearGenerationResult"

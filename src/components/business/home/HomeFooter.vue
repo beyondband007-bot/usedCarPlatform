@@ -20,7 +20,7 @@ import { homeFooterLinks } from '@/constants/home-page'
 
 <style scoped lang="scss">
 .footer {
-  padding: 112px 20px 62px;
+  padding: 56px 20px 36px;
   text-align: center;
   color: var(--home-text);
   border-top: 1px solid var(--home-line);
@@ -30,7 +30,7 @@ import { homeFooterLinks } from '@/constants/home-page'
 }
 
 .footer h2 {
-  margin: 0 0 38px;
+  margin: 0 0 22px;
   color: var(--home-text);
   font-size: clamp(34px, 4vw, 50px);
   letter-spacing: 0;
@@ -41,7 +41,7 @@ import { homeFooterLinks } from '@/constants/home-page'
   justify-content: center;
   gap: clamp(22px, 4vw, 72px);
   flex-wrap: wrap;
-  margin-bottom: 26px;
+  margin-bottom: 16px;
   color: var(--home-footer-nav);
   font-size: 14px;
   font-weight: 800;

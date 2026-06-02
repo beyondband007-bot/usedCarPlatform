@@ -3,13 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
 
-import {
-  getDeliveryTaskAssets,
-  getDeliveryTasks,
-  getRecentGenerationTasks,
-  type DeliveryAsset,
-  type RecentGenerationTask,
-} from "@/api/visual-workbench";
+import { getRecentGenerationTasks, type RecentGenerationTask } from "@/api/visual-workbench";
 import SceneTemplateRecommendations, {
   type SceneTemplateRecommendationItem,
 } from "@/components/business/workspace/SceneTemplateRecommendations.vue";
@@ -18,16 +12,10 @@ import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTut
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
-import {
-  formatDeliveryRatio,
-  type DeliveryResultItem,
-} from "@/constants/delivery-results";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
-import { downloadDeliveryGalleryAssets } from "@/utils/delivery-download";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import { getBatchItemKindLabel } from "@/utils/batch-task";
-import { buildImagePreviewFromDeliveryResult } from "@/utils/workspace-image-preview";
 import { formatDate } from "@/utils/dayjs";
 import {
   recentStatusIconMap,
@@ -54,6 +42,7 @@ const props = defineProps<{
   generationResult?: WorkspaceGenerateResult | null;
   deliveryTaskPreview?: WorkspaceDeliveryTaskPreview | null;
   deliveryImagePreview?: WorkspaceImagePreview | null;
+  deliveryListLoading?: boolean;
   shortVideoPlayRequest?: number;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
@@ -279,83 +268,23 @@ const requirementCards = computed(() =>
   })),
 );
 
-const deliveryGalleryAssets = ref<DeliveryResultItem[]>([]);
-const deliveryGalleryTitle = ref("成片结果");
-const deliveryGalleryLoading = ref(false);
-const deliveryResultCount = computed(() => deliveryGalleryAssets.value.length);
 const message = useMessage();
-const isDownloadingAllDelivery = ref(false);
 const isDownloadingDeliveryGroup = ref(false);
-
-async function loadDeliveryGallery() {
-  if (props.capability.kind !== "delivery") {
-    deliveryGalleryAssets.value = [];
-    return;
-  }
-
-  deliveryGalleryLoading.value = true;
-
-  try {
-    const tasks = await getDeliveryTasks({ page: 1, pageSize: 20 });
-    const taskWithAssets =
-      tasks.items.find((item) => item.assetCount > 0) ?? tasks.items[0];
-
-    if (!taskWithAssets) {
-      deliveryGalleryAssets.value = [];
-      deliveryGalleryTitle.value = "成片结果";
-      return;
-    }
-
-    deliveryGalleryTitle.value = taskWithAssets.title.replace(
-      / · 成片交付$/,
-      "",
-    );
-
-    const assets = await getDeliveryTaskAssets(taskWithAssets.taskId, {
-      page: 1,
-      pageSize: 200,
-    });
-
-    deliveryGalleryAssets.value = assets.items.map((asset) =>
-      mapDeliveryAssetToResultItem(asset),
-    );
-  } catch {
-    deliveryGalleryAssets.value = [];
-  } finally {
-    deliveryGalleryLoading.value = false;
-  }
-}
-
-function mapDeliveryAssetToResultItem(asset: DeliveryAsset): DeliveryResultItem {
-  return {
-    title: asset.title,
-    image: asset.thumbnailUrl ?? asset.url,
-    ratio: asset.ratio,
-  };
-}
 
 watch(
   () => props.capability.kind,
-  (kind) => {
+  () => {
     emit("closeDeliveryImagePreview");
-    if (kind === "delivery") {
-      void loadDeliveryGallery();
-    }
   },
 );
-
-function openDeliveryResultPreview(item: DeliveryResultItem) {
-  emit(
-    "openDeliveryImagePreview",
-    buildImagePreviewFromDeliveryResult(item, formatDeliveryRatio),
-  );
-}
 
 function openDeliveryGroupAssetPreview(
   asset: WorkspaceDeliveryTaskPreview["assets"][number],
 ) {
+  if (asset.status !== "ready" || !asset.imageUrl) return;
+
   emit("openDeliveryAssetResult", {
-    createdAt: asset.createdAt,
+    createdAt: asset.createdAt ?? "",
     statusText: `已完成 · ${asset.title} · 成片交付结果`,
     ratioLabel: asset.ratio,
     mediaType: "image",
@@ -371,9 +300,18 @@ function closeDeliveryImagePreview() {
   emit("closeDeliveryImagePreview");
 }
 
+const deliveryReadyAssetCount = computed(() =>
+  props.deliveryTaskPreview?.assets.filter((asset) => asset.status === "ready")
+    .length ?? 0,
+);
+
 async function handleDownloadDeliveryGroup() {
   const task = props.deliveryTaskPreview;
-  if (!task?.assets.length) {
+  const readyAssets =
+    task?.assets.filter((asset) => asset.status === "ready" && asset.imageUrl) ??
+    [];
+
+  if (!readyAssets.length) {
     message.warning("当前任务组没有可下载成片");
     return;
   }
@@ -381,37 +319,19 @@ async function handleDownloadDeliveryGroup() {
   isDownloadingDeliveryGroup.value = true;
 
   try {
-    const files = task.assets.map((asset, index) => ({
-      url: asset.imageUrl,
-      filename: `${sanitizeFilename(task.title)}-${String(index + 1).padStart(2, "0")}-${sanitizeFilename(asset.title)}.jpg`,
+    const files = readyAssets.map((asset, index) => ({
+      url: asset.imageUrl!,
+      filename: `${sanitizeFilename(task!.title)}-${String(index + 1).padStart(2, "0")}-${sanitizeFilename(asset.title)}.jpg`,
     }));
     const count = await downloadFilesAsZip(
       files,
-      `${sanitizeFilename(task.title)}-成片交付.zip`,
+      `${sanitizeFilename(task!.title)}-成片交付.zip`,
     );
     message.success(`已开始下载 ${count} 张成片`);
   } catch {
     message.error("批量下载失败，请稍后重试");
   } finally {
     isDownloadingDeliveryGroup.value = false;
-  }
-}
-
-async function handleDownloadAllDelivery() {
-  if (!deliveryGalleryAssets.value.length) {
-    message.warning("暂无可下载成片");
-    return;
-  }
-
-  isDownloadingAllDelivery.value = true;
-
-  try {
-    const count = await downloadDeliveryGalleryAssets(deliveryGalleryAssets.value);
-    message.success(`已开始下载 ${count} 张成片`);
-  } catch {
-    message.error("批量下载失败，请稍后重试");
-  } finally {
-    isDownloadingAllDelivery.value = false;
   }
 }
 
@@ -676,9 +596,6 @@ watch(
 
 onMounted(() => {
   void loadRecentItems();
-  if (props.capability.kind === "delivery") {
-    void loadDeliveryGallery();
-  }
 });
 
 onUnmounted(() => {
@@ -718,14 +635,16 @@ defineExpose({
           <p>成片交付</p>
           <h2>{{ deliveryTaskPreview.title }}</h2>
           <span>
-            {{ deliveryTaskPreview.meta }} · {{ deliveryTaskPreview.assets.length }} 张成片
+            {{ deliveryTaskPreview.meta }} ·
+            {{ deliveryTaskPreview.completedCount }}/{{ deliveryTaskPreview.totalCount }}
+            张成片
           </span>
         </div>
         <div class="delivery-group-actions">
           <button
             type="button"
             class="delivery-group-download-all"
-            :disabled="isDownloadingDeliveryGroup"
+            :disabled="isDownloadingDeliveryGroup || deliveryReadyAssetCount === 0"
             @click="handleDownloadDeliveryGroup"
           >
             <Icon icon="mdi:download-multiple" />
@@ -745,16 +664,31 @@ defineExpose({
         <article
           v-for="asset in deliveryTaskPreview.assets"
           :key="asset.id"
-          class="delivery-group-card is-clickable"
-          role="button"
-          tabindex="0"
-          :aria-label="`查看大图：${asset.title}`"
-          @click="openDeliveryGroupAssetPreview(asset)"
-          @keydown.enter.prevent="openDeliveryGroupAssetPreview(asset)"
-          @keydown.space.prevent="openDeliveryGroupAssetPreview(asset)"
+          class="delivery-group-card"
+          :class="{ 'is-clickable': asset.status === 'ready' }"
+          :role="asset.status === 'ready' ? 'button' : undefined"
+          :tabindex="asset.status === 'ready' ? 0 : undefined"
+          :aria-label="
+            asset.status === 'ready'
+              ? `查看大图：${asset.title}`
+              : `${asset.title}，${asset.status === 'pending' ? '生成中' : ''}`
+          "
+          @click="
+            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
+          "
+          @keydown.enter.prevent="
+            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
+          "
+          @keydown.space.prevent="
+            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
+          "
         >
-          <div class="delivery-group-media">
+          <div
+            class="delivery-group-media"
+            :class="{ 'is-pending': asset.status === 'pending' }"
+          >
             <PreloadImage
+              v-if="asset.status === 'ready'"
               class="delivery-group-image"
               :src="asset.thumbnailUrl || asset.imageUrl"
               :alt="asset.title"
@@ -764,13 +698,24 @@ defineExpose({
               fit="cover"
               object-position="center"
             />
+            <div v-else class="delivery-group-pending" aria-hidden="true">
+              <span class="delivery-group-pending-scan"></span>
+              <Icon icon="mdi:image-sync-outline" />
+              <strong>{{
+                asset.title.includes("待生成") ? "待生成" : "生成中"
+              }}</strong>
+            </div>
           </div>
           <footer class="delivery-group-foot">
             <div>
               <strong>{{ asset.title }}</strong>
               <span>{{ asset.ratio }}</span>
+              <span v-if="asset.createdAt" class="delivery-group-time">{{
+                asset.createdAt
+              }}</span>
             </div>
             <a
+              v-if="asset.status === 'ready' && asset.imageUrl"
               class="delivery-group-download"
               :href="asset.imageUrl"
               download
@@ -1050,73 +995,23 @@ defineExpose({
       @pick-recent="handleRecentPick"
     />
 
-    <template v-else-if="capability.kind === 'delivery'">
-      <div class="delivery-panel">
-        <header class="delivery-result-head">
-          <div>
-            <p>成片结果</p>
-            <h2>{{ deliveryGalleryTitle }}</h2>
-            <span
-              >已完成 {{ deliveryResultCount }} 张 ·
-              {{ deliveryGalleryLoading ? "加载中..." : "实时交付素材" }}</span
-            >
-          </div>
-          <button
-            type="button"
-            class="delivery-download-all"
-            :disabled="isDownloadingAllDelivery || !deliveryResultCount"
-            @click="handleDownloadAllDelivery"
-          >
-            {{ isDownloadingAllDelivery ? "下载中..." : "下载全部" }}
-          </button>
-        </header>
-
-        <section class="delivery-result-layout" aria-label="成片交付结果">
-          <div
-            v-if="deliveryGalleryLoading && !deliveryGalleryAssets.length"
-            class="recent-empty-state"
-          >
-            <Icon icon="mdi:loading" class="recent-loading-icon" />
-            <span>正在加载成片素材</span>
-          </div>
-          <div
-            v-else-if="!deliveryGalleryAssets.length"
-            class="recent-empty-state"
-          >
-            <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
-            <span>暂无成片素材</span>
-          </div>
-          <article
-            v-for="item in deliveryGalleryAssets"
-            :key="`${item.title}-${item.image}`"
-            class="delivery-result-card is-clickable"
-            role="button"
-            tabindex="0"
-            :aria-label="`查看大图：${item.title}`"
-            @click="openDeliveryResultPreview(item)"
-            @keydown.enter.prevent="openDeliveryResultPreview(item)"
-            @keydown.space.prevent="openDeliveryResultPreview(item)"
-          >
-            <div class="delivery-result-media">
-              <PreloadImage
-                class="delivery-result-image"
-                :src="item.image"
-                :alt="item.title"
-                loading="lazy"
-                decoding="async"
-                :draggable="false"
-              />
-            </div>
-            <footer class="delivery-result-foot">
-              <strong class="delivery-result-name">{{ item.title }}</strong>
-              <span class="delivery-result-ratio">{{
-                formatDeliveryRatio(item.ratio)
-              }}</span>
-            </footer>
-          </article>
-        </section>
+    <section
+      v-else-if="capability.kind === 'delivery'"
+      class="delivery-panel delivery-panel--placeholder"
+      aria-label="成片交付预览"
+    >
+      <div
+        v-if="props.deliveryListLoading"
+        class="recent-empty-state"
+      >
+        <Icon icon="mdi:loading" class="recent-loading-icon" />
+        <span>正在加载交付列表</span>
       </div>
-    </template>
+      <div v-else class="recent-empty-state">
+        <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
+        <span>暂无交付任务，请先在左侧创建批量任务</span>
+      </div>
+    </section>
 
     <template v-else>
       <div class="assist-shell">
@@ -1577,6 +1472,64 @@ defineExpose({
   background: var(--assist-card-strong);
 }
 
+.delivery-group-media.is-pending {
+  border-bottom: 1px dashed color-mix(in srgb, var(--assist-border) 88%, transparent);
+}
+
+.delivery-group-pending {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  color: var(--assist-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.delivery-group-pending svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.72;
+}
+
+.delivery-group-pending strong {
+  color: var(--assist-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.delivery-group-pending-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--assist-blue) 8%, transparent) 48%,
+    transparent 100%
+  );
+  animation: delivery-pending-scan 2.4s ease-in-out infinite;
+}
+
+@keyframes delivery-pending-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.delivery-group-time {
+  display: block;
+  margin-top: 4px;
+  color: var(--assist-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .delivery-group-image,
 .delivery-group-image :deep(.preload-image),
 .delivery-group-image :deep(.preload-image__img) {
@@ -1851,6 +1804,11 @@ defineExpose({
   flex: 1;
   flex-direction: column;
   gap: 0;
+}
+
+.delivery-panel--placeholder {
+  align-items: center;
+  justify-content: center;
 }
 
 .delivery-download-all {

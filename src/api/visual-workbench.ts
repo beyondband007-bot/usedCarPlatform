@@ -260,6 +260,9 @@ export interface DeliveryTaskItem {
   taskId: string
   taskType: 'batch'
   title: string
+  presetId?: string
+  presetName?: string
+  projectName?: string
   status: GenerationTaskStatus
   progress: number
   total: number

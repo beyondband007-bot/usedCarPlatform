@@ -78,6 +78,20 @@ export interface WorkspaceImagePreview {
   imageHeight?: number
 }
 
+export type WorkspaceDeliveryTaskPreviewAssetStatus = 'ready' | 'pending'
+
+export interface WorkspaceDeliveryTaskPreviewAsset {
+  id: string
+  title: string
+  ratio: string
+  status: WorkspaceDeliveryTaskPreviewAssetStatus
+  createdAt?: string
+  imageUrl?: string
+  thumbnailUrl?: string
+  width?: number
+  height?: number
+}
+
 export interface WorkspaceDeliveryTaskPreview {
   id: string
   title: string
@@ -86,16 +100,9 @@ export interface WorkspaceDeliveryTaskPreview {
   previewImage?: string
   progress: number
   imageCount: number
-  assets: Array<{
-    id: string
-    title: string
-    imageUrl: string
-    thumbnailUrl?: string
-    ratio: string
-    createdAt: string
-    width?: number
-    height?: number
-  }>
+  totalCount: number
+  completedCount: number
+  assets: WorkspaceDeliveryTaskPreviewAsset[]
 }
 
 export interface WorkspaceGeneratePayload {

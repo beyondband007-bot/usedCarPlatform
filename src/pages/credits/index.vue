@@ -210,18 +210,6 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 <style scoped lang="scss">
 .credits-page {
   --credit-page-pad: clamp(16px, 2vw, 30px);
-  --credit-panel: #101010;
-  --credit-panel-strong: #151515;
-  --credit-border: rgba(255, 255, 255, 0.1);
-  --credit-border-soft: rgba(255, 255, 255, 0.08);
-  --credit-text: #f4f1e9;
-  --credit-text-soft: #959083;
-  --credit-field: #0b0b0b;
-  --credit-head: #151515;
-  --credit-row-border: rgba(255, 255, 255, 0.08);
-  --credit-link: #efc24c;
-  --credit-blue: #efc24c;
-  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 
   min-width: 0;
   height: auto;
@@ -229,8 +217,65 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--credit-page-pad);
-  background: var(--app-bg);
+}
+
+.credits-page.theme-dark {
+  --credit-page-bg: var(--app-bg, #050505);
+  --credit-panel: var(--app-surface, #101010);
+  --credit-panel-strong: #151515;
+  --credit-border: var(--app-border, rgba(255, 255, 255, 0.1));
+  --credit-border-soft: rgba(255, 255, 255, 0.08);
+  --credit-text: var(--app-text, #f4f1e9);
+  --credit-text-soft: var(--app-text-soft, #959083);
+  --credit-text-secondary: var(--app-text-muted, #7a7568);
+  --credit-field: #0b0b0b;
+  --credit-head: #151515;
+  --credit-row-border: rgba(255, 255, 255, 0.08);
+  --credit-link: #efc24c;
+  --credit-accent: #efc24c;
+  --credit-accent-soft: rgba(239, 194, 76, 0.14);
+  --credit-table-head-text: var(--credit-text);
+  --credit-table-body-text: var(--credit-text-soft);
+  --credit-focus-ring: rgba(239, 194, 76, 0.16);
+  --credit-focus-border: rgba(239, 194, 76, 0.52);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+
+  background: var(--credit-page-bg);
   color: var(--credit-text);
+}
+
+.credits-page.theme-light {
+  --credit-page-bg: var(--app-bg, #f6f9fc);
+  --credit-panel: var(--app-surface, #ffffff);
+  --credit-panel-strong: var(--app-surface-soft, #f8fafd);
+  --credit-border: var(--app-border, #e6ecf5);
+  --credit-border-soft: #e6ecf5;
+  --credit-text: var(--app-text, #0f172a);
+  --credit-text-soft: var(--app-text-muted, #64748b);
+  --credit-text-secondary: var(--app-text-soft, #475569);
+  --credit-field: #ffffff;
+  --credit-head: #f8fafd;
+  --credit-row-border: #e6ecf5;
+  --credit-link: #2f6bff;
+  --credit-accent: #2f6bff;
+  --credit-accent-soft: rgba(47, 107, 255, 0.08);
+  --credit-table-head-text: #303a46;
+  --credit-table-body-text: #2f3a47;
+  --credit-focus-ring: rgba(47, 107, 255, 0.13);
+  --credit-focus-border: rgba(47, 107, 255, 0.52);
+  --panel-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
+
+  background:
+    radial-gradient(circle at 30% 0%, rgba(47, 107, 255, 0.06), transparent 28rem),
+    var(--credit-page-bg);
+  color: var(--credit-text);
+}
+
+.credits-page.theme-light .query-panel,
+.credits-page.theme-light .flow-panel {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.05), transparent 70%),
+    var(--credit-panel);
 }
 
 .credits-page,
@@ -251,42 +296,6 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   margin: 0 auto;
 }
 
-.credits-page.theme-light {
-  --credit-bg-a: #f6f9fc;
-  --credit-bg-b: #f6f9fc;
-  --credit-panel: #ffffff;
-  --credit-panel-strong: #ffffff;
-  --credit-border: #e6ecf5;
-  --credit-border-soft: #e6ecf5;
-  --credit-text: #0f172a;
-  --credit-text-soft: #64748b;
-  --credit-field: #ffffff;
-  --credit-head: #f8fafd;
-  --credit-row-border: #e6ecf5;
-  --credit-link: #2f6bff;
-  --panel-shadow: 0 18px 52px rgba(78, 111, 148, 0.09);
-
-  background:
-    radial-gradient(circle at 30% 0%, rgba(47, 107, 255, 0.06), transparent 28rem),
-    #f6f9fc;
-}
-
-.credits-page.theme-light .query-panel,
-.credits-page.theme-light .flow-panel {
-  border-color: #e6ecf5;
-  background: #ffffff;
-}
-
-.credits-page.theme-light .query-header,
-.credits-page.theme-light .filter-bar {
-  background: #f8fafd;
-}
-
-.credits-page.theme-light .flow-data-table {
-  --n-th-text-color: #303a46;
-  --n-td-text-color: #2f3a47;
-}
-
 .query-panel,
 .flow-panel {
   min-width: 0;
@@ -295,13 +304,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   border-radius: 20px;
   background: var(--credit-panel);
   box-shadow: var(--panel-shadow);
-}
-
-.credits-page.theme-light .query-panel,
-.credits-page.theme-light .flow-panel {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 70%),
-    var(--credit-panel);
+  color: var(--credit-text);
 }
 
 .query-panel {
@@ -464,12 +467,12 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   --n-color: var(--credit-field);
   --n-color-active: var(--credit-field);
   --n-color-focus: var(--credit-field);
-  --n-color-hover: color-mix(in srgb, var(--credit-field) 88%, var(--credit-blue));
-  --n-border: 1px solid transparent;
-  --n-border-active: 1px solid rgba(50, 130, 250, 0.72);
-  --n-border-focus: 1px solid rgba(50, 130, 250, 0.76);
-  --n-border-hover: 1px solid rgba(50, 130, 250, 0.52);
-  --n-box-shadow-focus: 0 0 0 2px rgba(50, 130, 250, 0.13);
+  --n-color-hover: color-mix(in srgb, var(--credit-field) 88%, var(--credit-accent));
+  --n-border: 1px solid var(--credit-border-soft);
+  --n-border-active: 1px solid var(--credit-focus-border);
+  --n-border-focus: 1px solid var(--credit-focus-border);
+  --n-border-hover: 1px solid color-mix(in srgb, var(--credit-accent) 42%, var(--credit-border-soft));
+  --n-box-shadow-focus: 0 0 0 2px var(--credit-focus-ring);
   --n-text-color: var(--credit-text);
   --n-placeholder-color: var(--credit-text-soft);
   --n-icon-color: var(--credit-text-soft);
@@ -505,18 +508,33 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 }
 
 .credits-page.theme-light .export-button {
-  --n-color: #ffffff;
-  --n-color-hover: #f8fafd;
+  --n-color: var(--credit-field);
+  --n-color-hover: var(--credit-panel-strong);
   --n-color-pressed: #f1f5f9;
-  --n-color-focus: #ffffff;
-  --n-border: 1px solid #d8e2f0;
-  --n-border-hover: 1px solid #d8e2f0;
-  --n-border-pressed: 1px solid #d8e2f0;
-  --n-border-focus: 1px solid #d8e2f0;
-  --n-text-color: #64748b;
-  --n-text-color-hover: #64748b;
-  --n-text-color-pressed: #64748b;
-  --n-text-color-focus: #64748b;
+  --n-color-focus: var(--credit-field);
+  --n-border: 1px solid var(--credit-border);
+  --n-border-hover: 1px solid var(--credit-border);
+  --n-border-pressed: 1px solid var(--credit-border);
+  --n-border-focus: 1px solid var(--credit-border);
+  --n-text-color: var(--credit-text-soft);
+  --n-text-color-hover: var(--credit-text-soft);
+  --n-text-color-pressed: var(--credit-text-soft);
+  --n-text-color-focus: var(--credit-text-soft);
+}
+
+.credits-page.theme-dark .export-button {
+  --n-color: var(--credit-accent-soft);
+  --n-color-hover: color-mix(in srgb, var(--credit-accent-soft) 80%, var(--credit-accent));
+  --n-color-pressed: color-mix(in srgb, var(--credit-accent-soft) 65%, var(--credit-accent));
+  --n-color-focus: var(--credit-accent-soft);
+  --n-border: 1px solid color-mix(in srgb, var(--credit-accent) 56%, transparent);
+  --n-border-hover: 1px solid var(--credit-accent);
+  --n-border-pressed: 1px solid var(--credit-accent);
+  --n-border-focus: 1px solid var(--credit-accent);
+  --n-text-color: var(--credit-link);
+  --n-text-color-hover: #ffd75a;
+  --n-text-color-pressed: #e5b54a;
+  --n-text-color-focus: var(--credit-link);
 }
 
 .stats-grid {
@@ -678,10 +696,10 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   --n-font-size: 15px;
   --n-th-color: var(--credit-head);
   --n-th-color-hover: var(--credit-head);
-  --n-th-text-color: var(--credit-text);
+  --n-th-text-color: var(--credit-table-head-text);
   --n-td-color: transparent;
-  --n-td-color-hover: color-mix(in srgb, var(--credit-blue) 8%, transparent);
-  --n-td-text-color: var(--credit-text);
+  --n-td-color-hover: var(--credit-accent-soft);
+  --n-td-text-color: var(--credit-table-body-text);
   --n-border-color: var(--credit-row-border);
   --n-border-radius: 8px;
   height: 100%;
@@ -756,11 +774,21 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 
 .detail-button {
   --n-text-color: var(--credit-link);
-  --n-text-color-hover: #4292ff;
-  --n-text-color-pressed: #2474db;
+  --n-text-color-hover: color-mix(in srgb, var(--credit-link) 82%, #ffffff);
+  --n-text-color-pressed: color-mix(in srgb, var(--credit-link) 72%, #000000);
   --n-text-color-focus: var(--credit-link);
   font-size: 14px;
   font-weight: 700;
+}
+
+.credits-page.theme-light .detail-button {
+  --n-text-color-hover: #4292ff;
+  --n-text-color-pressed: #2474db;
+}
+
+.credits-page.theme-dark .detail-button {
+  --n-text-color-hover: #ffd75a;
+  --n-text-color-pressed: #e5b54a;
 }
 
 .pager {
@@ -771,19 +799,19 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   --n-item-size: 30px;
   --n-item-border-radius: 4px;
   --n-item-color: var(--credit-field);
-  --n-item-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-blue));
+  --n-item-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-accent));
   --n-item-color-active: transparent;
-  --n-item-color-active-hover: color-mix(in srgb, var(--credit-field) 82%, var(--credit-blue));
+  --n-item-color-active-hover: color-mix(in srgb, var(--credit-field) 82%, var(--credit-accent));
   --n-item-border: 1px solid var(--credit-border);
-  --n-item-border-hover: 1px solid rgba(50, 130, 250, 0.5);
-  --n-item-border-active: 1px solid rgba(50, 130, 250, 0.7);
+  --n-item-border-hover: 1px solid var(--credit-focus-border);
+  --n-item-border-active: 1px solid var(--credit-focus-border);
   --n-item-text-color: var(--credit-text-soft);
   --n-item-text-color-hover: var(--credit-text);
   --n-item-text-color-active: var(--credit-text);
   --n-button-color: var(--credit-field);
-  --n-button-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-blue));
+  --n-button-color-hover: color-mix(in srgb, var(--credit-field) 84%, var(--credit-accent));
   --n-button-border: 1px solid var(--credit-border);
-  --n-button-border-hover: 1px solid rgba(50, 130, 250, 0.5);
+  --n-button-border-hover: 1px solid var(--credit-focus-border);
   --n-button-icon-color: var(--credit-text-soft);
   --n-button-icon-color-hover: var(--credit-text);
 }

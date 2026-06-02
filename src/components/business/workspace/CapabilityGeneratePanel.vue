@@ -52,7 +52,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectOption: [id: string];
   generate: [payload: WorkspaceGeneratePayload];
-  previewDeliveryTask: [task: WorkspaceDeliveryTaskPreview];
+  previewDeliveryTask: [task: WorkspaceDeliveryTaskPreview | null];
+  deliveryListLoadingChange: [loading: boolean];
   batchCreated: [payload: WorkspaceBatchCreatedPayload];
 }>();
 
@@ -96,6 +97,7 @@ const uploadedPreviewUrl = ref<string | null>(null);
 const isUploadingVehicle = ref(false);
 const isUploadingInterior = ref(false);
 const deliveryTaskAssets = ref<Record<string, DeliveryAsset[]>>({});
+const deliveryTaskThumbUrl = ref<Record<string, string>>({});
 const activeDeliveryTaskId = ref<string | null>(null);
 const isLoadingDeliveryTasks = ref(false);
 const isLoadingDeliveryAssets = ref(false);
@@ -808,7 +810,7 @@ async function handleCreateBatchTask() {
     });
 
     lastCreatedBatchId.value = created.batchId;
-    message.success(`批量任务已创建：${created.batchId}`);
+    message.success("批量任务创建中");
     emit("batchCreated", {
       batchId: created.batchId,
       projectName: projectName.value.trim() || "批量上新任务",
@@ -830,8 +832,33 @@ async function handleCreateBatchTask() {
   }
 }
 
-async function refreshDeliveryTasks() {
-  isLoadingDeliveryTasks.value = true;
+async function syncDeliveryTaskPreview() {
+  if (props.capability.kind !== "delivery") return;
+
+  const tasks = deliveryTasks.value;
+  if (!tasks.length) {
+    activeDeliveryTaskId.value = null;
+    emit("previewDeliveryTask", null);
+    return;
+  }
+
+  const activeId = activeDeliveryTaskId.value;
+  const target =
+    (activeId
+      ? tasks.find((task) => task.taskId === activeId)
+      : undefined) ?? tasks[0];
+
+  activeDeliveryTaskId.value = target.taskId;
+  await emitDeliveryTaskPreview(target);
+}
+
+async function refreshDeliveryTasks(options?: { silent?: boolean }) {
+  const silent = options?.silent ?? false;
+
+  if (!silent) {
+    isLoadingDeliveryTasks.value = true;
+    emit("deliveryListLoadingChange", true);
+  }
 
   try {
     const result = await getDeliveryTasks({ page: 1, pageSize: 20 });
@@ -839,40 +866,39 @@ async function refreshDeliveryTasks() {
       deliveryTasks.value.map((task) => [task.taskId, task.selected]),
     );
     deliveryTasks.value = await Promise.all(
-      result.items.map(async (item, index) => {
+      result.items.map(async (item) => {
+        const metrics = buildDeliveryTaskMetrics(item);
         const imageCount = item.assetCount;
-        const hasDeliveredAssets = imageCount > 0;
-        const progress = hasDeliveredAssets
-          ? Math.max(item.progress, 100)
-          : item.progress;
-        const completed = hasDeliveredAssets
-          ? Math.max(item.completed, imageCount)
-          : item.completed;
+
+        const isComplete =
+          metrics.deliveryTotal > 0 &&
+          metrics.deliveryCompleted >= metrics.deliveryTotal;
 
         return {
           ...item,
-          progress,
-          completed,
-          selected: selectedByTaskId.get(item.taskId) ?? index === 0,
-          meta: hasDeliveredAssets
-            ? `已完成 ${imageCount} 张 · ${formatDate(item.updatedAt)}`
-            : `${completed} / ${item.total} 套 · ${formatDate(item.updatedAt)}`,
-          image: await resolveDeliveryTaskImage({
-            ...item,
-            progress,
-            completed,
-          }),
+          ...metrics,
+          displayTitle: buildDeliveryDisplayTitle(item),
+          selected: Boolean(selectedByTaskId.get(item.taskId) && isComplete),
+          image: await resolveDeliveryTaskImage(item),
           imageCount,
         };
       }),
     );
     brokenDeliveryThumbs.value = new Set();
+    deliveryTaskThumbUrl.value = {};
+
+    if (props.capability.kind === "delivery") {
+      await syncDeliveryTaskPreview();
+    }
   } catch (error) {
     const text =
       error instanceof Error ? error.message : "成片交付列表加载失败";
     message.error(text);
   } finally {
-    isLoadingDeliveryTasks.value = false;
+    if (!silent) {
+      isLoadingDeliveryTasks.value = false;
+      emit("deliveryListLoadingChange", false);
+    }
   }
 }
 
@@ -892,6 +918,49 @@ async function loadDeliveryAssets(taskId: string) {
   } finally {
     isLoadingDeliveryAssets.value = false;
   }
+}
+
+function getExpectedDeliveryAssetCount(task: {
+  imageCount: number;
+  assetCount: number;
+}) {
+  return Math.max(task.imageCount, task.assetCount, 0);
+}
+
+function isDeliveryAssetsCacheComplete(
+  taskId: string,
+  expectedCount: number,
+) {
+  const cached = deliveryTaskAssets.value[taskId];
+  if (!cached?.length) return false;
+  if (expectedCount <= 0) return true;
+  return cached.length >= expectedCount;
+}
+
+async function getDeliveryAssetsForTask(
+  task: {
+    taskId: string;
+    imageCount: number;
+    assetCount: number;
+    deliveryTotal?: number;
+    deliveryCompleted?: number;
+  },
+  options?: { force?: boolean },
+) {
+  const expectedCount = getExpectedDeliveryAssetCount(task);
+  const isComplete =
+    (task.deliveryTotal ?? 0) > 0 &&
+    (task.deliveryCompleted ?? task.assetCount) >= (task.deliveryTotal ?? 0);
+
+  if (
+    !options?.force &&
+    isComplete &&
+    isDeliveryAssetsCacheComplete(task.taskId, expectedCount)
+  ) {
+    return deliveryTaskAssets.value[task.taskId] ?? [];
+  }
+
+  return loadDeliveryAssets(task.taskId);
 }
 
 watch(
@@ -927,6 +996,57 @@ watch(
 );
 
 let deliveryPollTimer: number | null = null;
+let deliveryPreviewPollTimer: number | null = null;
+
+function hasInProgressDeliveryTasks() {
+  return deliveryTasks.value.some(
+    (task) =>
+      task.status === "waiting" ||
+      task.status === "queued" ||
+      task.status === "generating" ||
+      (task.deliveryTotal > 0 && task.deliveryCompleted < task.deliveryTotal),
+  );
+}
+
+async function pollActiveDeliveryPreviewAssets() {
+  if (props.capability.kind !== "delivery") return;
+
+  const activeId = activeDeliveryTaskId.value;
+  if (!activeId) return;
+
+  const taskIndex = deliveryTasks.value.findIndex(
+    (task) => task.taskId === activeId,
+  );
+  if (taskIndex < 0) return;
+
+  const task = deliveryTasks.value[taskIndex];
+  if (isDeliveryTaskComplete(task)) return;
+
+  try {
+    const assets = await loadDeliveryAssets(task.taskId);
+    const nextCompleted = assets.length;
+    const prevCompleted = task.deliveryCompleted;
+
+    if (nextCompleted !== prevCompleted) {
+      const metrics = buildDeliveryTaskMetrics({
+        ...task,
+        assetCount: nextCompleted,
+        total: task.deliveryTotal,
+      });
+      const nextTask: DeliveryTask = {
+        ...task,
+        ...metrics,
+        assetCount: nextCompleted,
+        imageCount: nextCompleted,
+        image: assets[0]?.thumbnailUrl ?? assets[0]?.url ?? task.image,
+      };
+      deliveryTasks.value[taskIndex] = nextTask;
+      await emitDeliveryTaskPreview(nextTask, { forceAssets: false });
+    }
+  } catch {
+    // 预览轮询失败时忽略，等待下一次刷新
+  }
+}
 
 onUnmounted(() => {
   revokePreviewObjectUrl();
@@ -935,6 +1055,10 @@ onUnmounted(() => {
   if (deliveryPollTimer !== null) {
     window.clearInterval(deliveryPollTimer);
     deliveryPollTimer = null;
+  }
+  if (deliveryPreviewPollTimer !== null) {
+    window.clearInterval(deliveryPreviewPollTimer);
+    deliveryPreviewPollTimer = null;
   }
 });
 
@@ -972,27 +1096,167 @@ type DeliveryTask = DeliveryTaskItem & {
   meta: string;
   image: string;
   imageCount: number;
+  displayTitle: string;
+  deliveryCompleted: number;
+  deliveryTotal: number;
+  deliveryProgress: number;
 };
+
+function buildDeliveryDisplayTitle(item: DeliveryTaskItem) {
+  if (item.presetName && item.projectName) {
+    return `${item.presetName}-${item.projectName}`;
+  }
+
+  return item.title.replace(/\s*[·?]\s*成片交付\s*$/u, "").trim() || item.title;
+}
+
+function formatDeliveryAssetTitle(displayTitle: string, rawTitle: string) {
+  const parts = rawTitle.split(/\s*[·?]\s+/u);
+  const kind = parts.length > 1 ? parts[parts.length - 1]?.trim() : "";
+  const knownKinds = new Set([
+    "外观成片",
+    "内饰清洁",
+    "内饰拼图",
+    "内饰清洁拼图",
+  ]);
+
+  if (kind && knownKinds.has(kind)) {
+    return `${displayTitle} · ${kind}`;
+  }
+
+  return displayTitle;
+}
+
+function buildDeliveryTaskMetrics(item: DeliveryTaskItem) {
+  const deliveryTotal = Math.max(item.total, 0);
+  const deliveryCompleted = Math.max(item.assetCount, 0);
+  const deliveryProgress =
+    deliveryTotal > 0
+      ? Math.round((deliveryCompleted / deliveryTotal) * 100)
+      : Math.round(item.progress);
+
+  return {
+    deliveryTotal,
+    deliveryCompleted,
+    deliveryProgress,
+    meta: `${deliveryCompleted}/${deliveryTotal} · ${formatDate(item.updatedAt)}`,
+  };
+}
+
+function isDeliveryTaskComplete(
+  task: Pick<DeliveryTask, "deliveryCompleted" | "deliveryTotal">,
+) {
+  return task.deliveryTotal > 0 && task.deliveryCompleted >= task.deliveryTotal;
+}
+
+function isDeliveryTaskSelectable(task: DeliveryTask) {
+  return isDeliveryTaskComplete(task);
+}
+
+function isDeliveryTaskPreviewable(task: Pick<DeliveryTask, "deliveryTotal">) {
+  return task.deliveryTotal > 0;
+}
+
+function getDeliveryPendingSlotLabel(task: DeliveryTask) {
+  if (
+    task.deliveryCompleted > 0 ||
+    task.status === "generating" ||
+    task.status === "queued" ||
+    task.status === "waiting"
+  ) {
+    return "生成中";
+  }
+
+  return "待生成";
+}
+
+function buildDeliveryPreviewSlots(
+  task: DeliveryTask,
+  assets: Awaited<ReturnType<typeof getDeliveryAssetsForTask>>,
+): WorkspaceDeliveryTaskPreview["assets"] {
+  const totalCount = Math.max(task.deliveryTotal, assets.length);
+  const readyAssets = assets.map((asset) => ({
+    id: asset.assetId,
+    title: formatDeliveryAssetTitle(task.displayTitle, asset.title),
+    imageUrl: asset.url,
+    thumbnailUrl: asset.thumbnailUrl ?? undefined,
+    ratio: asset.ratio,
+    createdAt: formatDate(asset.createdAt),
+    width: asset.width ?? undefined,
+    height: asset.height ?? undefined,
+    status: "ready" as const,
+  }));
+  const pendingLabel = getDeliveryPendingSlotLabel(task);
+  const defaultRatio = readyAssets[0]?.ratio ?? "4:3";
+  const pendingCount = Math.max(0, totalCount - readyAssets.length);
+  const pendingSlots = Array.from({ length: pendingCount }, (_, index) => ({
+    id: `pending-${task.taskId}-${index}`,
+    title: `${task.displayTitle} · ${pendingLabel}`,
+    ratio: defaultRatio,
+    status: "pending" as const,
+  }));
+
+  return [...readyAssets, ...pendingSlots];
+}
+
+async function emitDeliveryTaskPreview(
+  task: DeliveryTask,
+  options?: { forceAssets?: boolean },
+) {
+  const forceAssets =
+    options?.forceAssets ?? !isDeliveryTaskComplete(task);
+  const assets = await getDeliveryAssetsForTask(task, { force: forceAssets });
+  const firstAsset = assets[0];
+
+  emit("previewDeliveryTask", {
+    id: task.taskId,
+    title: task.displayTitle,
+    meta: formatDate(task.updatedAt),
+    image: firstAsset?.thumbnailUrl ?? firstAsset?.url ?? "",
+    previewImage: firstAsset?.url,
+    progress: task.deliveryProgress,
+    imageCount: task.assetCount,
+    totalCount: task.deliveryTotal,
+    completedCount: task.deliveryCompleted,
+    assets: buildDeliveryPreviewSlots(task, assets),
+  });
+}
 
 const deliveryTasks = ref<DeliveryTask[]>([]);
 const brokenDeliveryThumbs = ref<Set<string>>(new Set());
 
+watch(
+  () => props.capability.kind,
+  (kind, previousKind) => {
+    if (kind !== "delivery" || previousKind === "delivery") return;
+
+    activeDeliveryTaskId.value = null;
+    void refreshDeliveryTasks();
+  },
+);
+
 onMounted(() => {
   void ensureLoaded();
-  void refreshDeliveryTasks();
+  if (props.capability.kind === "delivery") {
+    void refreshDeliveryTasks();
+  }
   deliveryPollTimer = window.setInterval(() => {
-    if (
-      props.capability.kind === "delivery" &&
-      deliveryTasks.value.some(
-        (task) =>
-          task.status === "waiting" ||
-          task.status === "queued" ||
-          task.status === "generating",
-      )
-    ) {
-      void refreshDeliveryTasks();
+    if (props.capability.kind === "delivery" && hasInProgressDeliveryTasks()) {
+      void refreshDeliveryTasks({ silent: true });
     }
-  }, 8000);
+  }, 4000);
+
+  deliveryPreviewPollTimer = window.setInterval(() => {
+    if (props.capability.kind !== "delivery") return;
+    if (!activeDeliveryTaskId.value) return;
+
+    const activeTask = deliveryTasks.value.find(
+      (task) => task.taskId === activeDeliveryTaskId.value,
+    );
+    if (!activeTask || isDeliveryTaskComplete(activeTask)) return;
+
+    void pollActiveDeliveryPreviewAssets();
+  }, 2000);
 });
 
 function hasDeliveryThumbnail(task: DeliveryTask) {
@@ -1008,9 +1272,12 @@ function handleDeliveryThumbError(taskId: string) {
 }
 
 async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
-  const cached = deliveryTaskAssets.value[task.taskId]?.[0];
-  const cachedUrl = cached?.thumbnailUrl ?? cached?.url ?? "";
-  if (cachedUrl) return cachedUrl;
+  const thumbCached = deliveryTaskThumbUrl.value[task.taskId];
+  if (thumbCached) return thumbCached;
+
+  const fullCached = deliveryTaskAssets.value[task.taskId]?.[0];
+  const fullCachedUrl = fullCached?.thumbnailUrl ?? fullCached?.url ?? "";
+  if (fullCachedUrl) return fullCachedUrl;
 
   if (task.progress < 100 && task.assetCount <= 0) return "";
 
@@ -1019,14 +1286,14 @@ async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
       page: 1,
       pageSize: 1,
     });
-    if (!result.items.length) return "";
+    const url = result.items[0]?.thumbnailUrl ?? result.items[0]?.url ?? "";
+    if (!url) return "";
 
-    deliveryTaskAssets.value = {
-      ...deliveryTaskAssets.value,
-      [task.taskId]: result.items,
+    deliveryTaskThumbUrl.value = {
+      ...deliveryTaskThumbUrl.value,
+      [task.taskId]: url,
     };
-
-    return result.items[0]?.thumbnailUrl ?? result.items[0]?.url ?? "";
+    return url;
   } catch {
     return "";
   }
@@ -1036,10 +1303,14 @@ const deliverySelectedCount = computed(
   () => deliveryTasks.value.filter((task) => task.selected).length,
 );
 
+const deliverySelectableTasks = computed(() =>
+  deliveryTasks.value.filter((task) => isDeliveryTaskSelectable(task)),
+);
+
 const deliveryDownloadableCount = computed(
   () =>
     deliveryTasks.value.filter(
-      (task) => task.selected && (task.progress >= 100 || task.assetCount > 0),
+      (task) => task.selected && isDeliveryTaskSelectable(task),
     ).length,
 );
 
@@ -1047,32 +1318,34 @@ const isDeliveryBatchDownloading = ref(false);
 
 const deliverySelectedImages = computed(() =>
   deliveryTasks.value
-    .filter((task) => task.selected)
+    .filter((task) => task.selected && isDeliveryTaskSelectable(task))
     .reduce((total, task) => total + task.imageCount, 0),
 );
 
 const isAllDeliverySelected = computed(
   () =>
-    deliveryTasks.value.length > 0 &&
-    deliveryTasks.value.every((task) => task.selected),
+    deliverySelectableTasks.value.length > 0 &&
+    deliverySelectableTasks.value.every((task) => task.selected),
 );
 
 function toggleDeliveryTask(index: number) {
   const task = deliveryTasks.value[index];
-  if (!task) return;
+  if (!task || !isDeliveryTaskSelectable(task)) return;
   task.selected = !task.selected;
 }
 
 function toggleSelectAllDelivery() {
   const nextValue = !isAllDeliverySelected.value;
   deliveryTasks.value.forEach((task) => {
-    task.selected = nextValue;
+    if (isDeliveryTaskSelectable(task)) {
+      task.selected = nextValue;
+    }
   });
 }
 
 async function handleDeliveryBatchDownload() {
   const selectedTasks = deliveryTasks.value.filter(
-    (task) => task.selected && (task.progress >= 100 || task.assetCount > 0),
+    (task) => task.selected && isDeliveryTaskSelectable(task),
   );
 
   if (!selectedTasks.length) {
@@ -1084,11 +1357,7 @@ async function handleDeliveryBatchDownload() {
 
   try {
     const assetGroups = await Promise.all(
-      selectedTasks.map((task) =>
-        deliveryTaskAssets.value[task.taskId]
-          ? Promise.resolve(deliveryTaskAssets.value[task.taskId])
-          : loadDeliveryAssets(task.taskId),
-      ),
+      selectedTasks.map((task) => getDeliveryAssetsForTask(task)),
     );
     const assetIds = assetGroups.flat().map((asset) => asset.assetId);
 
@@ -1097,7 +1366,7 @@ async function handleDeliveryBatchDownload() {
       return;
     }
 
-    const batchName = selectedTasks[0]?.title ?? "成片交付包";
+    const batchName = selectedTasks[0]?.displayTitle ?? "成片交付包";
     const createdPackage = await createDeliveryPackage({
       taskId: selectedTasks[0].taskId,
       packageName: batchName,
@@ -1122,7 +1391,7 @@ async function handleDeliveryBatchDownload() {
 
 async function handleDeleteDeliveryAssets() {
   const selectedTaskIds = deliveryTasks.value
-    .filter((task) => task.selected)
+    .filter((task) => task.selected && isDeliveryTaskSelectable(task))
     .map((task) => task.taskId);
 
   if (!selectedTaskIds.length) {
@@ -1133,11 +1402,10 @@ async function handleDeleteDeliveryAssets() {
   const selectedAssets = (
     await Promise.all(
       selectedTaskIds.map(async (taskId) => {
-        if (deliveryTaskAssets.value[taskId]?.length) {
-          return deliveryTaskAssets.value[taskId];
-        }
+        const task = deliveryTasks.value.find((item) => item.taskId === taskId);
+        if (!task) return [];
 
-        return loadDeliveryAssets(taskId);
+        return getDeliveryAssetsForTask(task);
       }),
     )
   ).flatMap((assets) => assets.map((asset) => asset.assetId));
@@ -1162,41 +1430,13 @@ async function handleDeleteDeliveryAssets() {
 }
 
 async function handlePreviewDeliveryTask(task: DeliveryTask) {
-  if (task.progress < 100 && task.assetCount <= 0) {
-    message.info("任务未完成，暂不可预览");
+  if (!isDeliveryTaskPreviewable(task)) {
+    message.info("任务尚未开始，暂不可预览");
     return;
   }
 
   activeDeliveryTaskId.value = task.taskId;
-  const assets =
-    deliveryTaskAssets.value[task.taskId] ??
-    (await loadDeliveryAssets(task.taskId));
-  const firstAsset = assets?.[0];
-
-  if (!firstAsset) {
-    message.warning("暂无可预览素材");
-    return;
-  }
-
-  emit("previewDeliveryTask", {
-    id: task.taskId,
-    title: task.title,
-    meta: formatDate(task.updatedAt),
-    image: firstAsset.thumbnailUrl ?? firstAsset.url,
-    previewImage: firstAsset.url,
-    progress: task.progress,
-    imageCount: task.assetCount,
-    assets: assets.map((asset) => ({
-      id: asset.assetId,
-      title: asset.title,
-      imageUrl: asset.url,
-      thumbnailUrl: asset.thumbnailUrl ?? undefined,
-      ratio: asset.ratio,
-      createdAt: formatDate(asset.createdAt),
-      width: asset.width ?? undefined,
-      height: asset.height ?? undefined,
-    })),
-  });
+  await emitDeliveryTaskPreview(task);
 }
 
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
@@ -1420,7 +1660,7 @@ const activeCreateRatioLabel = computed(() => {
                     type="button"
                     class="batch-upload-remove"
                     :aria-label="`删除${item.name}`"
-                    @click="handleBatchExteriorRemove(item.id)"
+                    @click.stop="handleBatchExteriorRemove(item.id)"
                   >
                     <Icon icon="mdi:close" />
                   </button>
@@ -1518,7 +1758,7 @@ const activeCreateRatioLabel = computed(() => {
                     type="button"
                     class="batch-upload-remove"
                     :aria-label="`删除${item.name}`"
-                    @click="handleInteriorCollageRemove(item.id)"
+                    @click.stop="handleInteriorCollageRemove(item.id)"
                   >
                     <Icon icon="mdi:close" />
                   </button>
@@ -1763,7 +2003,7 @@ const activeCreateRatioLabel = computed(() => {
                 type="button"
                 class="batch-upload-remove"
                 :aria-label="`删除${item.name}`"
-                @click="handleInteriorCollageRemove(item.id)"
+                @click.stop="handleInteriorCollageRemove(item.id)"
               >
                 <Icon icon="mdi:close" />
               </button>
@@ -1837,7 +2077,18 @@ const activeCreateRatioLabel = computed(() => {
         </section>
 
         <section class="delivery-board" aria-label="成片交付任务列表">
-          <div class="delivery-list">
+          <div
+            v-if="isLoadingDeliveryTasks && !deliveryTasks.length"
+            class="delivery-list-state"
+          >
+            <Icon icon="mdi:loading" class="delivery-list-state-icon" />
+            <span>正在加载交付列表</span>
+          </div>
+          <div v-else-if="!deliveryTasks.length" class="delivery-list-state">
+            <Icon icon="mdi:clipboard-text-outline" class="delivery-list-state-icon" />
+            <span>暂无交付任务</span>
+          </div>
+          <div v-else class="delivery-list">
             <article
               v-for="(task, index) in deliveryTasks"
               :key="task.taskId"
@@ -1845,14 +2096,19 @@ const activeCreateRatioLabel = computed(() => {
               :class="{
                 'is-checked': task.selected,
                 'is-previewing': props.previewedDeliveryTaskId === task.taskId,
-                'is-loading': task.progress < 100 && task.assetCount <= 0,
+                'is-loading': !isDeliveryTaskComplete(task),
               }"
             >
-              <label class="delivery-check" @click.stop>
+              <label
+                class="delivery-check"
+                :class="{ 'is-disabled': !isDeliveryTaskSelectable(task) }"
+                @click.stop
+              >
                 <input
                   type="checkbox"
                   :checked="task.selected"
-                  :aria-label="`选择${task.title}`"
+                  :disabled="!isDeliveryTaskSelectable(task)"
+                  :aria-label="`选择${task.displayTitle}`"
                   @change="toggleDeliveryTask(index)"
                 />
               </label>
@@ -1860,8 +2116,8 @@ const activeCreateRatioLabel = computed(() => {
               <button
                 type="button"
                 class="delivery-item-body"
-                :disabled="task.progress < 100 && task.assetCount <= 0"
-                :aria-label="`查看${task.title}大图`"
+                :disabled="!isDeliveryTaskPreviewable(task)"
+                :aria-label="`查看${task.displayTitle}大图`"
                 @click="handlePreviewDeliveryTask(task)"
               >
                 <div class="delivery-thumb-wrap">
@@ -1869,7 +2125,7 @@ const activeCreateRatioLabel = computed(() => {
                     v-if="hasDeliveryThumbnail(task)"
                     class="delivery-thumb"
                     :src="task.image"
-                    :alt="task.title"
+                    :alt="task.displayTitle"
                     loading="lazy"
                     decoding="async"
                     :draggable="false"
@@ -1878,7 +2134,7 @@ const activeCreateRatioLabel = computed(() => {
                   <div
                     v-else
                     class="delivery-thumb delivery-thumb--pending"
-                    :class="{ 'is-generating': task.progress < 100 }"
+                    :class="{ 'is-generating': task.deliveryProgress < 100 }"
                     aria-hidden="true"
                   >
                     <Icon
@@ -1890,12 +2146,17 @@ const activeCreateRatioLabel = computed(() => {
                 </div>
 
                 <div class="delivery-copy">
-                  <h3>{{ task.title }}</h3>
+                  <h3>{{ task.displayTitle }}</h3>
                   <p>{{ task.meta }}</p>
                 </div>
 
                 <div class="delivery-status">
-                  <template v-if="task.progress >= 100">
+                  <template
+                    v-if="
+                      task.deliveryTotal > 0 &&
+                      task.deliveryCompleted >= task.deliveryTotal
+                    "
+                  >
                     <span
                       class="delivery-status-ring"
                       aria-hidden="true"
@@ -1905,14 +2166,14 @@ const activeCreateRatioLabel = computed(() => {
                   <template v-else>
                     <span
                       class="delivery-status-progress"
-                      :style="{ '--progress': `${task.progress}%` }"
+                      :style="{ '--progress': `${task.deliveryProgress}%` }"
                       aria-hidden="true"
                     >
-                      <b>{{ task.progress }}%</b>
+                      <b>{{ task.deliveryProgress }}%</b>
                     </span>
-                    <strong class="delivery-status-meta"
-                      >{{ task.progress }}%</strong
-                    >
+                    <strong class="delivery-status-meta">
+                      {{ task.deliveryCompleted }}/{{ task.deliveryTotal }}
+                    </strong>
                   </template>
                 </div>
               </button>
@@ -2502,6 +2763,8 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .batch-upload-image {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
 }
@@ -2509,6 +2772,7 @@ const activeCreateRatioLabel = computed(() => {
 .batch-upload-status,
 .batch-upload-remove {
   position: absolute;
+  z-index: 2;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -2541,27 +2805,31 @@ const activeCreateRatioLabel = computed(() => {
 }
 
 .batch-upload-remove {
-  right: 8px;
-  top: 8px;
-  width: 28px;
-  height: 28px;
+  right: 6px;
+  top: 6px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  background: color-mix(
-    in srgb,
-    var(--workspace-panel-deep, #101010) 74%,
-    transparent
-  );
-  color: #fff;
-  font-size: 16px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(4px);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 18px;
   cursor: pointer;
+  opacity: 0.88;
   transition:
     background 0.2s ease,
+    opacity 0.2s ease,
     transform 0.2s ease;
 }
 
+.batch-upload-item:hover .batch-upload-remove,
+.batch-upload-remove:focus-visible {
+  opacity: 1;
+}
+
 .batch-upload-remove:hover {
-  background: rgba(220, 38, 38, 0.9);
-  transform: scale(1.04);
+  background: rgba(220, 38, 38, 0.82);
+  transform: scale(1.05);
 }
 
 @keyframes batch-upload-spin {
@@ -2753,6 +3021,23 @@ const activeCreateRatioLabel = computed(() => {
   background: var(--app-surface);
 }
 
+.delivery-list-state {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--app-text-soft);
+  font-size: 14px;
+}
+
+.delivery-list-state-icon {
+  font-size: 28px;
+  opacity: 0.72;
+}
+
 .delivery-list {
   --delivery-row-height: 88px;
   display: grid;
@@ -2843,6 +3128,11 @@ const activeCreateRatioLabel = computed(() => {
   margin: 0;
   accent-color: var(--workspace-accent, #efc24c);
   cursor: pointer;
+}
+
+.delivery-check.is-disabled input {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .delivery-item-body:focus-visible {
@@ -3301,6 +3591,19 @@ const activeCreateRatioLabel = computed(() => {
   background: var(--workspace-accent-bg, #f2f7ff);
   color: var(--workspace-accent, #2f6bff);
   font-weight: 700;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-remove {
+  background: rgba(15, 23, 42, 0.48);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-upload-remove:hover {
+  background: rgba(220, 38, 38, 0.78);
 }
 
 :global(.workspace-page.theme-light)
