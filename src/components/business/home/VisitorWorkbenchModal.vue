@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { NModal } from 'naive-ui'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
+import ContactSupportModal from '@/components/business/home/ContactSupportModal.vue'
 import { useAppStore } from '@/stores/app'
 
 defineProps<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
+const supportModalVisible = ref(false)
 
 const modalThemeClass = computed(() =>
   appStore.isDarkMode ? 'visitor-modal--dark' : 'visitor-modal--light',
@@ -24,6 +26,11 @@ const modalThemeClass = computed(() =>
 function close() {
   emit('update:show', false)
   emit('dismiss')
+}
+
+function openSupportModal() {
+  emit('update:show', false)
+  supportModalVisible.value = true
 }
 </script>
 
@@ -64,16 +71,18 @@ function close() {
         <button type="button" class="visitor-modal-login" @click="emit('login')">
           企业账号登录
         </button>
-        <a class="visitor-modal-support" href="mailto:hello@aicarstudio.example">
+        <button type="button" class="visitor-modal-support" @click="openSupportModal">
           <Icon icon="mdi:headset" />
           联系客服
-        </a>
+        </button>
         <button type="button" class="visitor-modal-dismiss" @click="close">
           稍后再说
         </button>
       </div>
     </div>
   </NModal>
+
+  <ContactSupportModal v-model:show="supportModalVisible" />
 </template>
 
 <style scoped lang="scss">
