@@ -32,22 +32,25 @@ const toAssetResponse = (asset: DeliveryAssetRecord) => ({
 });
 
 class DeliveryService {
-  async listTasks(input: { status?: string; page?: number; pageSize?: number }) {
+  async listTasks(input: { status?: string; page?: number; pageSize?: number; refresh?: boolean }) {
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
-    const listed = await batchRepository.listBatches({ status: input.status, page, pageSize });
+    let listed = await batchRepository.listBatches({ status: input.status, page, pageSize });
 
-    for (const batch of listed.items) {
-      if (!["success", "fail", "canceled"].includes(batch.status)) {
-        await batchService.advanceBatch(batch.id);
+    if (input.refresh) {
+      for (const batch of listed.items) {
+        if (!["success", "fail", "canceled"].includes(batch.status)) {
+          await batchService.advanceBatch(batch.id);
+        }
       }
+      listed = await batchRepository.listBatches({ status: input.status, page, pageSize });
     }
 
-    const refreshed = await batchRepository.listBatches({ status: input.status, page, pageSize });
     const items = [];
-    for (const batch of refreshed.items) {
+    for (const batch of listed.items) {
       const assetCount = await deliveryRepository.countAssets(batch.id);
       const packages = await deliveryRepository.listPackages(batch.id);
+      const inputCovers = await batchRepository.listItemInputCovers(batch.id);
       items.push({
         taskId: batch.id,
         taskType: "batch",
@@ -61,16 +64,22 @@ class DeliveryService {
         downloadableAssetCount: assetCount,
         downloadPackageStatus: packages[0]?.status ?? null,
         latestPackageId: packages[0]?.packageId ?? null,
+        firstInputCoverUrl: inputCovers[0]?.coverUrl ?? null,
         createdAt: batch.createdAt.toISOString(),
         updatedAt: batch.updatedAt.toISOString(),
       });
     }
 
-    return { items, page, pageSize, total: refreshed.total };
+    return { items, page, pageSize, total: listed.total };
   }
 
-  async listTaskAssets(taskId: string, input: { ratio?: string; page?: number; pageSize?: number }) {
-    await batchService.advanceBatch(taskId);
+  async listTaskAssets(
+    taskId: string,
+    input: { ratio?: string; page?: number; pageSize?: number; refresh?: boolean },
+  ) {
+    if (input.refresh) {
+      await batchService.advanceBatch(taskId);
+    }
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 50), 1), 200);
     const listed = await deliveryRepository.listAssets({
@@ -79,8 +88,10 @@ class DeliveryService {
       page,
       pageSize,
     });
+    const inputCovers = await batchRepository.listItemInputCovers(taskId);
     return {
       items: listed.items.map(toAssetResponse),
+      inputCovers,
       page,
       pageSize,
       total: listed.total,

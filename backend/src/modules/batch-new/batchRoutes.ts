@@ -20,6 +20,13 @@ batchRoutes.post(
   }),
 );
 
+batchRoutes.delete(
+  "/presets/:presetId",
+  asyncHandler(async (req, res) => {
+    ok(res, await batchService.deletePreset(String(req.params.presetId)));
+  }),
+);
+
 batchRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {

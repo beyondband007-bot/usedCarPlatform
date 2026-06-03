@@ -9,11 +9,17 @@ import type { WorkspaceCapability } from "@/types/workspace";
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [id: string];
 }>();
+
+function handleSelect(id: string) {
+  if (props.disabled) return;
+  emit("select", id);
+}
 
 const optionRows = computed(() => {
   const options = props.capability.options;
@@ -37,8 +43,12 @@ const optionRows = computed(() => {
     <section
       v-if="capability.options.length"
       class="option-selector-card"
-      :class="{ 'is-scene': capability.kind === 'scene' }"
+      :class="{
+        'is-scene': capability.kind === 'scene',
+        'is-disabled': disabled,
+      }"
       :aria-label="capability.selectorTitle"
+      :aria-disabled="disabled || undefined"
     >
       <header class="option-selector-head">
         <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
@@ -66,13 +76,14 @@ const optionRows = computed(() => {
                 v-for="option in row"
                 :key="option.id"
                 role="option"
-                tabindex="0"
+                :tabindex="disabled ? -1 : 0"
                 class="option-item"
                 :class="{ 'is-active': option.id === selectedOptionId }"
                 :aria-selected="option.id === selectedOptionId"
-                @click="emit('select', option.id)"
-                @keydown.enter="emit('select', option.id)"
-                @keydown.space.prevent="emit('select', option.id)"
+                :aria-disabled="disabled || undefined"
+                @click="handleSelect(option.id)"
+                @keydown.enter="handleSelect(option.id)"
+                @keydown.space.prevent="handleSelect(option.id)"
               >
                 <PreloadImage
                   class="option-item-cover"
@@ -165,6 +176,16 @@ const optionRows = computed(() => {
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
+}
+
+.option-selector-card.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+.option-selector-card.is-disabled .option-item {
+  cursor: not-allowed;
 }
 
 .option-scroll-shell {

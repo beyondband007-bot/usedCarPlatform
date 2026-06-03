@@ -53,12 +53,11 @@ export const useCreditsStore = defineStore('credits', () => {
     }
   }
 
-  async function loadTransactions(params?: { page?: number; pageSize?: number }) {
+  async function loadTransactions(params?: { limit?: number }) {
     isLoadingTransactions.value = true
     try {
       const result = await getCreditsTransactions({
-        page: params?.page ?? 1,
-        pageSize: params?.pageSize ?? 50,
+        limit: params?.limit ?? 50,
       })
       transactions.value = result.items
       transactionsLoaded.value = true

@@ -36,6 +36,7 @@ export interface GenerationTaskRecord {
 
 export interface RecentGenerationRecord extends GenerationTaskRecord {
   inputAssetUrl?: string | null;
+  inputAssetThumbnailUrl?: string | null;
   inputAssetFileName?: string | null;
   batchProjectName?: string | null;
   batchItemKind?: string | null;
@@ -75,6 +76,7 @@ interface GenerationTaskRow extends RowDataPacket {
 
 interface RecentGenerationRow extends GenerationTaskRow {
   input_asset_url: string | null;
+  input_asset_thumbnail_url: string | null;
   input_asset_file_name: string | null;
   batch_project_name: string | null;
   batch_item_kind: string | null;
@@ -132,6 +134,7 @@ const parseInteriorCollageFlag = (value: unknown) => {
 const mapRecentRow = (row: RecentGenerationRow): RecentGenerationRecord => ({
   ...mapRow(row),
   inputAssetUrl: row.input_asset_url,
+  inputAssetThumbnailUrl: row.input_asset_thumbnail_url,
   inputAssetFileName: row.input_asset_file_name,
   batchProjectName: row.batch_project_name,
   batchItemKind: row.batch_item_kind,
@@ -199,6 +202,7 @@ export class TasksRepository extends Repository {
       `SELECT
           gt.*,
           a.public_url AS input_asset_url,
+          a.thumbnail_url AS input_asset_thumbnail_url,
           a.file_name AS input_asset_file_name,
           bt.project_name AS batch_project_name,
           bti.item_kind AS batch_item_kind,

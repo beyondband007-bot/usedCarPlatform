@@ -15,6 +15,7 @@ deliveryRoutes.get(
         status: typeof req.query.status === "string" ? req.query.status : undefined,
         page: Number(req.query.page ?? 1),
         pageSize: Number(req.query.pageSize ?? 20),
+        refresh: req.query.refresh === "1" || req.query.refresh === "true",
       }),
     );
   }),
@@ -29,6 +30,7 @@ deliveryRoutes.get(
         ratio: typeof req.query.ratio === "string" ? req.query.ratio : undefined,
         page: Number(req.query.page ?? 1),
         pageSize: Number(req.query.pageSize ?? 50),
+        refresh: req.query.refresh === "1" || req.query.refresh === "true",
       }),
     );
   }),

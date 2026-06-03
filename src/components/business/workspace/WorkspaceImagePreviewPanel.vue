@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
 
 import type { WorkspaceImagePreview } from "@/types/workspace";
@@ -24,6 +24,8 @@ const emit = defineEmits<{
 
 const message = useMessage();
 const naturalSize = ref<{ width: number; height: number } | null>(null);
+const imageRef = ref<HTMLImageElement | null>(null);
+const isImageLoading = ref(true);
 
 const frameStyle = computed(() => {
   const width = naturalSize.value?.width ?? props.preview.imageWidth;
@@ -44,22 +46,46 @@ const frameStyle = computed(() => {
   };
 });
 
-watch(
-  () => props.preview.imageUrl,
-  () => {
-    naturalSize.value = null;
-  },
-);
-
-function handlePreviewLoad(event: Event) {
-  const image = event.target as HTMLImageElement;
-
+function syncNaturalSize(image: HTMLImageElement) {
   if (!image.naturalWidth || !image.naturalHeight) return;
 
   naturalSize.value = {
     width: image.naturalWidth,
     height: image.naturalHeight,
   };
+}
+
+function markImageLoaded(image: HTMLImageElement) {
+  syncNaturalSize(image);
+  isImageLoading.value = false;
+}
+
+async function syncImageLoadingState() {
+  isImageLoading.value = true;
+  naturalSize.value = null;
+
+  await nextTick();
+
+  const image = imageRef.value;
+  if (image?.complete && image.naturalWidth > 0) {
+    markImageLoaded(image);
+  }
+}
+
+watch(
+  () => props.preview.imageUrl,
+  () => {
+    void syncImageLoadingState();
+  },
+  { immediate: true },
+);
+
+function handlePreviewLoad(event: Event) {
+  markImageLoaded(event.target as HTMLImageElement);
+}
+
+function handlePreviewError() {
+  isImageLoading.value = false;
 }
 
 async function handleDownload() {
@@ -93,14 +119,32 @@ async function handleDownload() {
     </header>
 
     <div class="image-preview-body" aria-label="图片预览区域">
-      <div class="image-preview-frame" :style="frameStyle">
+      <div
+        class="image-preview-frame"
+        :class="{ 'is-loading': isImageLoading }"
+        :style="frameStyle"
+      >
+        <div
+          v-if="isImageLoading"
+          class="image-preview-loading"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <span class="image-preview-loading-spinner" aria-hidden="true"></span>
+          <p>图片已生成，加载中</p>
+        </div>
+
         <img
+          ref="imageRef"
           class="image-preview-image"
+          :class="{ 'is-visible': !isImageLoading }"
           :src="preview.imageUrl"
           :alt="preview.imageAlt"
           loading="eager"
           decoding="async"
           @load="handlePreviewLoad"
+          @error="handlePreviewError"
         />
       </div>
     </div>
@@ -192,6 +236,7 @@ async function handleDownload() {
 }
 
 .image-preview-frame {
+  position: relative;
   display: flex;
   height: 100%;
   width: auto;
@@ -199,6 +244,44 @@ async function handleDownload() {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  min-height: 240px;
+}
+
+.image-preview-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--assist-blue, #3b82f6) 8%, transparent),
+      transparent 52%
+    ),
+    color-mix(in srgb, var(--assist-card-strong, #0f172a) 88%, #111827);
+}
+
+.image-preview-loading-spinner {
+  width: 34px;
+  height: 34px;
+  border: 2px solid color-mix(in srgb, var(--assist-blue, #60a5fa) 24%, transparent);
+  border-top-color: var(--assist-blue, #60a5fa);
+  border-radius: 999px;
+  animation: image-preview-spin 0.8s linear infinite;
+}
+
+.image-preview-loading p {
+  margin: 0;
+  color: var(--assist-text, #e5e7eb);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .image-preview-image {
@@ -207,6 +290,26 @@ async function handleDownload() {
   height: 100%;
   object-fit: contain;
   background: transparent;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.image-preview-image.is-visible {
+  opacity: 1;
+}
+
+@keyframes image-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-preview-loading-spinner,
+  .image-preview-image {
+    animation: none;
+    transition: none;
+  }
 }
 
 .image-preview-foot {

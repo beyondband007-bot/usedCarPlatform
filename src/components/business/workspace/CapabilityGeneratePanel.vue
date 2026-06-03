@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NButton, NSelect, NSwitch, useMessage } from "naive-ui";
+import { NButton, NPopconfirm, NSelect, NSwitch, useMessage } from "naive-ui";
 
 import {
   createBatchTask,
@@ -11,6 +11,7 @@ import {
   uploadAsset,
   type BatchVisualConfig,
   type DeliveryAsset,
+  type DeliveryInputCover,
   type DeliveryTaskItem,
   type UploadedAsset,
 } from "@/api/visual-workbench";
@@ -71,6 +72,7 @@ const {
   getTemplateById,
   saveTemplate,
   updateTemplate,
+  deleteTemplate,
   ensureLoaded,
   isLoading: isLoadingVisualPresets,
 } = useBatchVisualTemplates();
@@ -104,12 +106,14 @@ const uploadedPreviewUrl = ref<string | null>(null);
 const isUploadingVehicle = ref(false);
 const isUploadingInterior = ref(false);
 const deliveryTaskAssets = ref<Record<string, DeliveryAsset[]>>({});
+const deliveryInputCovers = ref<Record<string, DeliveryInputCover[]>>({});
 const deliveryTaskThumbUrl = ref<Record<string, string>>({});
 const activeDeliveryTaskId = ref<string | null>(null);
 const isLoadingDeliveryTasks = ref(false);
 const isLoadingDeliveryAssets = ref(false);
 const isCreatingBatchTask = ref(false);
 const isDeletingDeliveryAssets = ref(false);
+const deletingPresetIds = ref<Set<string>>(new Set());
 const lastCreatedBatchId = ref<string | null>(null);
 const batchExteriorInputRef = ref<HTMLInputElement | null>(null);
 const interiorCollageInputRef = ref<HTMLInputElement | null>(null);
@@ -136,6 +140,7 @@ type InteriorCollageUploadItem = BatchExteriorUploadItem;
 interface BatchDeliverySnapshotAsset {
   assetId: string;
   url: string;
+  thumbnailUrl?: string;
   fileName: string;
 }
 
@@ -189,6 +194,7 @@ function toBatchDeliverySnapshotAsset(
   return {
     assetId: asset.assetId,
     url: asset.url,
+    thumbnailUrl: asset.thumbnailUrl ?? undefined,
     fileName: asset.fileName,
   };
 }
@@ -277,11 +283,22 @@ function resetUploadedInterior() {
   resetInteriorCollageUploads();
 }
 
-const visualPresetOptions = computed(() =>
-  visualTemplates.value.map((item) => ({
+type BatchPresetSelectOption = {
+  label: string;
+  value: string;
+  template: BatchVisualTemplate;
+};
+
+const toPresetSelectOption = (
+  item: BatchVisualTemplate,
+): BatchPresetSelectOption => ({
     label: item.name,
     value: item.id,
-  })),
+    template: item,
+  });
+
+const visualPresetOptions = computed(() =>
+  visualTemplates.value.map(toPresetSelectOption),
 );
 
 const selectedPresetKey = computed({
@@ -311,11 +328,113 @@ const selectedPresetKey = computed({
 });
 
 const createPresetOptions = computed(() =>
-  visualTemplates.value.map((item) => ({
-    label: item.name,
-    value: item.id,
-  })),
+  visualTemplates.value.map(toPresetSelectOption),
 );
+
+function setPresetDeleting(id: string, deleting: boolean) {
+  const next = new Set(deletingPresetIds.value);
+  if (deleting) {
+    next.add(id);
+  } else {
+    next.delete(id);
+  }
+  deletingPresetIds.value = next;
+}
+
+function syncSelectionAfterPresetDeleted(
+  deletedId: string,
+  remainingTemplates: BatchVisualTemplate[],
+) {
+  const fallbackId = remainingTemplates[0]?.id ?? "";
+
+  if (createTaskPresetId.value === deletedId) {
+    createTaskPresetId.value = fallbackId;
+  }
+
+  if (visualPreset.value === deletedId) {
+    if (fallbackId) {
+      const fallback = remainingTemplates[0];
+      visualPreset.value = fallback.id;
+      presetInput.value = fallback.name;
+      applyTemplate(fallback);
+    } else {
+      resetVisualConfigSelection();
+    }
+  }
+}
+
+async function handleDeletePreset(template: BatchVisualTemplate) {
+  if (deletingPresetIds.value.has(template.id)) return;
+
+  setPresetDeleting(template.id, true);
+  try {
+    const remainingTemplates = await deleteTemplate(template.id);
+    syncSelectionAfterPresetDeleted(template.id, remainingTemplates);
+    message.success("预设已删除");
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "预设删除失败，请重试";
+    message.error(text);
+  } finally {
+    setPresetDeleting(template.id, false);
+  }
+}
+
+function renderPresetOptionLabel(option: {
+  label?: string;
+  value?: string | number;
+  template?: BatchVisualTemplate;
+}) {
+  const template = option.template;
+  const label = String(option.label ?? "");
+
+  if (!template) {
+    return h("span", { class: "preset-select-option-name" }, label);
+  }
+
+  const isDeleting = deletingPresetIds.value.has(template.id);
+
+  return h("div", { class: "preset-select-option" }, [
+    h("span", { class: "preset-select-option-name" }, label),
+    h(
+      NPopconfirm,
+      {
+        positiveText: "删除",
+        negativeText: "取消",
+        placement: "right",
+        onPositiveClick: () => handleDeletePreset(template),
+      },
+      {
+        default: () => `删除预设「${template.name}」？删除后不可恢复。`,
+        trigger: () =>
+          h(
+            "button",
+            {
+              type: "button",
+              class: [
+                "preset-option-delete",
+                isDeleting ? "is-deleting" : "",
+              ],
+              disabled: isDeleting,
+              "aria-label": `删除预设${template.name}`,
+              title: "删除预设",
+              onMousedown: (event: MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              },
+              onClick: (event: MouseEvent) => {
+                event.stopPropagation();
+              },
+            },
+            [
+              h(Icon, {
+                icon: isDeleting ? "mdi:loading" : "mdi:trash-can-outline",
+              }),
+            ],
+          ),
+      },
+    ),
+  ]);
+}
 
 const activeCreateTemplate = computed(() =>
   createTaskPresetId.value
@@ -347,7 +466,10 @@ const batchExteriorRemainingCount = computed(() =>
 );
 
 const canAddBatchExteriorImages = computed(
-  () => batchExteriorRemainingCount.value > 0 && !isUploadingVehicle.value,
+  () =>
+    batchExteriorRemainingCount.value > 0 &&
+    !isUploadingVehicle.value &&
+    !props.isGenerating,
 );
 
 const uploadedInteriorCollageAssets = computed(() =>
@@ -367,7 +489,10 @@ const interiorCollageRemainingCount = computed(() =>
 );
 
 const canAddInteriorCollageImages = computed(
-  () => interiorCollageRemainingCount.value > 0 && !isUploadingInterior.value,
+  () =>
+    interiorCollageRemainingCount.value > 0 &&
+    !isUploadingInterior.value &&
+    !props.isGenerating,
 );
 
 const batchEstimatedCost = computed(() => {
@@ -530,6 +655,11 @@ function handleStickyAction() {
 }
 
 async function handleVehicleFileSelected(file: File) {
+  if (props.isGenerating) {
+    message.warning("当前任务生成中，请等待完成后再上传图片");
+    return;
+  }
+
   revokePreviewObjectUrl();
   previewObjectUrl = URL.createObjectURL(file);
   uploadedPreviewUrl.value = previewObjectUrl;
@@ -562,6 +692,11 @@ async function handleVehicleFileSelected(file: File) {
 }
 
 function handleVehicleImageRemove() {
+  if (props.isGenerating) {
+    message.warning("当前任务生成中，请等待完成后再更换图片");
+    return;
+  }
+
   resetUploadedVehicle();
   message.info("已删除车辆图片");
 }
@@ -605,6 +740,11 @@ function normalizeImageFiles(files: File[]) {
 }
 
 async function handleBatchExteriorFilesSelected(files: File[]) {
+  if (props.isGenerating) {
+    message.warning("当前任务生成中，请等待完成后再上传图片");
+    return;
+  }
+
   const imageFiles = normalizeImageFiles(files);
 
   if (!imageFiles.length) {
@@ -683,6 +823,8 @@ function handleBatchExteriorDrop(event: DragEvent) {
 }
 
 function handleBatchExteriorRemove(id: string) {
+  if (props.isGenerating) return;
+
   const target = batchExteriorUploads.value.find((item) => item.id === id);
   if (target) {
     revokeBatchExteriorObjectUrl(target);
@@ -714,6 +856,11 @@ function openInteriorCollagePicker() {
 }
 
 async function handleInteriorCollageFilesSelected(files: File[]) {
+  if (props.isGenerating) {
+    message.warning("当前任务生成中，请等待完成后再上传图片");
+    return;
+  }
+
   const imageFiles = normalizeImageFiles(files);
 
   if (!imageFiles.length) {
@@ -795,6 +942,8 @@ function handleInteriorCollageDrop(event: DragEvent) {
 }
 
 function handleInteriorCollageRemove(id: string) {
+  if (props.isGenerating) return;
+
   const target = interiorCollageUploads.value.find((item) => item.id === id);
   if (target) {
     revokeBatchExteriorObjectUrl(target);
@@ -806,6 +955,8 @@ function handleInteriorCollageRemove(id: string) {
 }
 
 function handleInteriorImageRemove() {
+  if (props.isGenerating) return;
+
   resetUploadedInterior();
   message.info("已清空内饰图");
 }
@@ -901,6 +1052,11 @@ async function handleCreateBatchTask() {
     return;
   }
 
+  if (!projectName.value.trim()) {
+    message.warning("请输入项目名称");
+    return;
+  }
+
   if (!createTaskPresetId.value) {
     message.warning("请先选择或保存视觉预设");
     return;
@@ -932,7 +1088,7 @@ async function handleCreateBatchTask() {
       : [];
 
     const visualConfig = mapBatchVisualConfigFromTemplate(template);
-    const normalizedProjectName = projectName.value.trim() || "批量上新任务";
+    const normalizedProjectName = projectName.value.trim();
 
     const created = await createBatchTask({
       projectName: normalizedProjectName,
@@ -971,7 +1127,6 @@ async function handleCreateBatchTask() {
       progress: created.progress,
     });
     resetBatchCreateSection();
-    await refreshDeliveryTasks();
   } catch (error) {
     const text = error instanceof Error ? error.message : "批量任务创建失败";
     message.error(text);
@@ -1009,7 +1164,13 @@ async function refreshDeliveryTasks(options?: { silent?: boolean }) {
   }
 
   try {
-    const result = await getDeliveryTasks({ page: 1, pageSize: 20 });
+    const shouldRefresh =
+      Boolean(options?.silent) && hasInProgressDeliveryTasks();
+    const result = await getDeliveryTasks({
+      page: 1,
+      pageSize: 20,
+      refresh: shouldRefresh,
+    });
     const selectedByTaskId = new Map(
       deliveryTasks.value.map((task) => [task.taskId, task.selected]),
     );
@@ -1024,14 +1185,16 @@ async function refreshDeliveryTasks(options?: { silent?: boolean }) {
           ...metrics,
           displayTitle: buildDeliveryDisplayTitle(item),
           selected: Boolean(selectedByTaskId.get(item.taskId)),
-          image: await resolveDeliveryTaskImage(item),
+          image: await resolveDeliveryTaskImage(item, snapshot),
           imageCount,
           deliverySnapshot: snapshot,
         };
       }),
     );
-    brokenDeliveryThumbs.value = new Set();
-    deliveryTaskThumbUrl.value = {};
+    if (!silent) {
+      brokenDeliveryThumbs.value = new Set();
+      deliveryTaskThumbUrl.value = {};
+    }
 
     if (props.capability.kind === "delivery") {
       await syncDeliveryTaskPreview();
@@ -1048,17 +1211,25 @@ async function refreshDeliveryTasks(options?: { silent?: boolean }) {
   }
 }
 
-async function loadDeliveryAssets(taskId: string) {
+async function loadDeliveryAssets(
+  taskId: string,
+  options?: { refresh?: boolean },
+) {
   isLoadingDeliveryAssets.value = true;
 
   try {
     const result = await getDeliveryTaskAssets(taskId, {
       page: 1,
       pageSize: 200,
+      refresh: options?.refresh ?? false,
     });
     deliveryTaskAssets.value = {
       ...deliveryTaskAssets.value,
       [taskId]: result.items,
+    };
+    deliveryInputCovers.value = {
+      ...deliveryInputCovers.value,
+      [taskId]: result.inputCovers ?? [],
     };
     return result.items;
   } finally {
@@ -1090,7 +1261,7 @@ async function getDeliveryAssetsForTask(
     deliveryTotal?: number;
     deliveryCompleted?: number;
   },
-  options?: { force?: boolean },
+  options?: { force?: boolean; refresh?: boolean },
 ) {
   const expectedCount = getExpectedDeliveryAssetCount(task);
   const isComplete =
@@ -1105,7 +1276,7 @@ async function getDeliveryAssetsForTask(
     return deliveryTaskAssets.value[task.taskId] ?? [];
   }
 
-  return loadDeliveryAssets(task.taskId);
+  return loadDeliveryAssets(task.taskId, { refresh: options?.refresh });
 }
 
 watch(
@@ -1146,7 +1317,7 @@ watch(
 );
 
 let deliveryPollTimer: number | null = null;
-let deliveryPreviewPollTimer: number | null = null;
+const DELIVERY_REFRESH_MS = 15000;
 
 function hasInProgressDeliveryTasks() {
   return deliveryTasks.value.some(
@@ -1158,49 +1329,6 @@ function hasInProgressDeliveryTasks() {
   );
 }
 
-async function pollActiveDeliveryPreviewAssets() {
-  if (props.capability.kind !== "delivery") return;
-
-  const activeId = activeDeliveryTaskId.value;
-  if (!activeId) return;
-
-  const taskIndex = deliveryTasks.value.findIndex(
-    (task) => task.taskId === activeId,
-  );
-  if (taskIndex < 0) return;
-
-  const task = deliveryTasks.value[taskIndex];
-  if (isDeliveryTaskComplete(task)) return;
-
-  try {
-    const assets = await loadDeliveryAssets(task.taskId);
-    const nextCompleted = assets.length;
-    const prevCompleted = task.assetCount;
-
-    if (nextCompleted !== prevCompleted) {
-      const metrics = buildDeliveryTaskMetrics(
-        {
-          ...task,
-          assetCount: nextCompleted,
-          total: task.deliveryTotal,
-        },
-        task.deliverySnapshot,
-      );
-      const nextTask: DeliveryTask = {
-        ...task,
-        ...metrics,
-        assetCount: nextCompleted,
-        imageCount: metrics.deliveryTotal,
-        image: assets[0]?.thumbnailUrl ?? assets[0]?.url ?? task.image,
-      };
-      deliveryTasks.value[taskIndex] = nextTask;
-      await emitDeliveryTaskPreview(nextTask, { forceAssets: false });
-    }
-  } catch {
-    // 预览轮询失败时忽略，等待下一次刷新
-  }
-}
-
 onUnmounted(() => {
   revokePreviewObjectUrl();
   resetBatchExteriorUploads();
@@ -1208,10 +1336,6 @@ onUnmounted(() => {
   if (deliveryPollTimer !== null) {
     window.clearInterval(deliveryPollTimer);
     deliveryPollTimer = null;
-  }
-  if (deliveryPreviewPollTimer !== null) {
-    window.clearInterval(deliveryPreviewPollTimer);
-    deliveryPreviewPollTimer = null;
   }
 });
 
@@ -1340,67 +1464,131 @@ function getDeliveryPendingSlotLabel(task: DeliveryTask) {
   return "待生成";
 }
 
+function getSnapshotCoverForSlot(
+  snapshot: BatchDeliverySnapshot | undefined,
+  slotIndex: number,
+) {
+  if (!snapshot) return undefined;
+
+  const exteriorCount = snapshot.exteriorAssets.length;
+  if (slotIndex < exteriorCount) {
+    const asset = snapshot.exteriorAssets[slotIndex];
+    return asset.thumbnailUrl ?? asset.url;
+  }
+
+  const interiorAssets = getSnapshotInteriorDisplayAssets(snapshot);
+  const interiorIndex = slotIndex - exteriorCount;
+  const asset = interiorAssets[interiorIndex];
+  return asset?.thumbnailUrl ?? asset?.url;
+}
+
+function resolveInputCoverForSlot(
+  snapshot: BatchDeliverySnapshot | undefined,
+  inputCovers: DeliveryInputCover[],
+  slotIndex: number,
+) {
+  const matched = inputCovers.find((cover) => cover.slotIndex === slotIndex);
+  if (matched?.coverUrl) return matched.coverUrl;
+
+  const fromApi = inputCovers[slotIndex]?.coverUrl;
+  if (fromApi) return fromApi;
+
+  return getSnapshotCoverForSlot(snapshot, slotIndex);
+}
+
 function buildDeliveryPreviewSlots(
   task: DeliveryTask,
   assets: Awaited<ReturnType<typeof getDeliveryAssetsForTask>>,
+  inputCovers: DeliveryInputCover[] = [],
 ): WorkspaceDeliveryTaskPreview["assets"] {
   const projectName = task.displayTitle;
-  const totalCount = Math.max(task.deliveryTotal, assets.length);
-  const readyAssets = assets.map((asset, index) => ({
-    id: asset.assetId,
-    title: getDeliveryPreviewSlotTitle(
-      projectName,
-      index,
-      task.deliverySnapshot,
-    ),
-    imageUrl: asset.url,
-    thumbnailUrl: asset.thumbnailUrl ?? undefined,
-    ratio: asset.ratio,
-    createdAt: formatDate(asset.createdAt),
-    width: asset.width ?? undefined,
-    height: asset.height ?? undefined,
-    status: "ready" as const,
-  }));
-  const displayReadyAssets = readyAssets;
+  const snapshot = task.deliverySnapshot;
+  const snapshotTotal = getSnapshotDisplayTotal(snapshot) ?? 0;
+  const maxInputSlot =
+    inputCovers.length > 0
+      ? Math.max(...inputCovers.map((cover) => cover.slotIndex + 1))
+      : 0;
+  const totalCount = Math.max(
+    task.deliveryTotal,
+    snapshotTotal,
+    assets.length,
+    maxInputSlot,
+  );
   const pendingLabel = getDeliveryPendingSlotLabel(task);
   const defaultRatio =
-    displayReadyAssets[0]?.ratio ??
-    task.deliverySnapshot?.outputRatio ??
-    "4:3";
-  const pendingCount = Math.max(0, totalCount - displayReadyAssets.length);
-  const pendingSlots = Array.from({ length: pendingCount }, (_, index) => {
-    const slotIndex = displayReadyAssets.length + index;
+    assets[0]?.ratio ?? snapshot?.outputRatio ?? "4:3";
+
+  return Array.from({ length: totalCount }, (_, slotIndex) => {
+    const title = getDeliveryPreviewSlotTitle(
+      projectName,
+      slotIndex,
+      snapshot,
+    );
+    const uploadCover = resolveInputCoverForSlot(snapshot, inputCovers, slotIndex);
+    const generated = assets[slotIndex];
+    const inputCoverMeta =
+      inputCovers.find((cover) => cover.slotIndex === slotIndex) ??
+      inputCovers[slotIndex];
+
+    if (generated) {
+      return {
+        id: generated.assetId,
+        title,
+        ratio: generated.ratio || defaultRatio,
+        createdAt: formatDate(generated.createdAt),
+        status: "ready" as const,
+        imageUrl: generated.url,
+        thumbnailUrl: uploadCover,
+        width: generated.width ?? undefined,
+        height: generated.height ?? undefined,
+      };
+    }
+
     return {
       id: `pending-${task.taskId}-${slotIndex}`,
-      title: getDeliveryPreviewSlotTitle(
-        projectName,
-        slotIndex,
-        task.deliverySnapshot,
-      ),
+      title,
       ratio: defaultRatio,
       status: "pending" as const,
       pendingStatusText: pendingLabel,
+      thumbnailUrl: uploadCover,
+      generationTaskId: inputCoverMeta?.generationTaskId,
     };
   });
-
-  return [...displayReadyAssets, ...pendingSlots];
 }
 
 async function emitDeliveryTaskPreview(
   task: DeliveryTask,
-  options?: { forceAssets?: boolean },
+  options?: { forceAssets?: boolean; refresh?: boolean },
 ) {
   const forceAssets =
     options?.forceAssets ?? !isDeliveryTaskComplete(task);
-  const assets = await getDeliveryAssetsForTask(task, { force: forceAssets });
-  const previewAssets = buildDeliveryPreviewSlots(task, assets);
+  const refresh = options?.refresh ?? forceAssets;
+  const assets = await getDeliveryAssetsForTask(task, {
+    force: forceAssets,
+    refresh,
+  });
+  const inputCovers =
+    deliveryInputCovers.value[task.taskId] ??
+    (await getDeliveryTaskAssets(task.taskId, {
+      page: 1,
+      pageSize: 1,
+      refresh: false,
+    }).then((result) => {
+      deliveryInputCovers.value = {
+        ...deliveryInputCovers.value,
+        [task.taskId]: result.inputCovers ?? [],
+      };
+      return result.inputCovers ?? [];
+    }).catch(() => []));
+  const previewAssets = buildDeliveryPreviewSlots(task, assets, inputCovers);
   const firstReadyAsset = previewAssets.find((asset) => asset.status === "ready");
+  const firstCoverAsset = previewAssets.find((asset) => asset.thumbnailUrl);
 
   emit("previewDeliveryTask", {
     id: task.taskId,
     title: task.displayTitle,
     meta: formatDate(task.updatedAt),
-    image: firstReadyAsset?.thumbnailUrl ?? firstReadyAsset?.imageUrl ?? "",
+    image: firstCoverAsset?.thumbnailUrl ?? "",
     previewImage: firstReadyAsset?.imageUrl,
     progress: task.deliveryProgress,
     imageCount: task.imageCount,
@@ -1432,23 +1620,10 @@ onMounted(() => {
     if (props.capability.kind === "delivery" && hasInProgressDeliveryTasks()) {
       void refreshDeliveryTasks({ silent: true });
     }
-  }, 4000);
-
-  deliveryPreviewPollTimer = window.setInterval(() => {
-    if (props.capability.kind !== "delivery") return;
-    if (!activeDeliveryTaskId.value) return;
-
-    const activeTask = deliveryTasks.value.find(
-      (task) => task.taskId === activeDeliveryTaskId.value,
-    );
-    if (!activeTask || isDeliveryTaskComplete(activeTask)) return;
-
-    void pollActiveDeliveryPreviewAssets();
-  }, 2000);
+  }, DELIVERY_REFRESH_MS);
 });
 
 function hasDeliveryThumbnail(task: DeliveryTask) {
-  if (task.progress < 100 && task.assetCount <= 0) return false;
   if (brokenDeliveryThumbs.value.has(task.taskId)) return false;
   return Boolean(task.image?.trim());
 }
@@ -1459,32 +1634,28 @@ function handleDeliveryThumbError(taskId: string) {
   brokenDeliveryThumbs.value = next;
 }
 
-async function resolveDeliveryTaskImage(task: DeliveryTaskItem) {
+async function resolveDeliveryTaskImage(
+  task: DeliveryTaskItem,
+  snapshot?: BatchDeliverySnapshot,
+) {
   const thumbCached = deliveryTaskThumbUrl.value[task.taskId];
   if (thumbCached) return thumbCached;
 
-  const fullCached = deliveryTaskAssets.value[task.taskId]?.[0];
-  const fullCachedUrl = fullCached?.thumbnailUrl ?? fullCached?.url ?? "";
-  if (fullCachedUrl) return fullCachedUrl;
+  const resolvedSnapshot = snapshot ?? getBatchDeliverySnapshot(task.taskId);
+  const snapshotCover =
+    resolvedSnapshot?.exteriorAssets[0]?.thumbnailUrl ??
+    resolvedSnapshot?.exteriorAssets[0]?.url;
+  if (snapshotCover) return snapshotCover;
 
-  if (task.progress < 100 && task.assetCount <= 0) return "";
+  if (task.firstInputCoverUrl) return task.firstInputCoverUrl;
 
-  try {
-    const result = await getDeliveryTaskAssets(task.taskId, {
-      page: 1,
-      pageSize: 1,
-    });
-    const url = result.items[0]?.thumbnailUrl ?? result.items[0]?.url ?? "";
-    if (!url) return "";
+  const cachedInputCovers = deliveryInputCovers.value[task.taskId];
+  const firstInputCover =
+    cachedInputCovers?.[0]?.coverUrl ??
+    cachedInputCovers?.find((cover) => cover.slotIndex === 0)?.coverUrl;
+  if (firstInputCover) return firstInputCover;
 
-    deliveryTaskThumbUrl.value = {
-      ...deliveryTaskThumbUrl.value,
-      [task.taskId]: url,
-    };
-    return url;
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 const deliverySelectedCount = computed(
@@ -1586,6 +1757,7 @@ async function handleDeleteDeliveryTasks() {
 
     for (const taskId of result.deleted) {
       delete deliveryTaskAssets.value[taskId];
+      delete deliveryInputCovers.value[taskId];
       delete deliveryTaskThumbUrl.value[taskId];
     }
 
@@ -1618,7 +1790,22 @@ async function handlePreviewDeliveryTask(task: DeliveryTask) {
   }
 
   activeDeliveryTaskId.value = task.taskId;
-  await emitDeliveryTaskPreview(task);
+  await emitDeliveryTaskPreview(task, { forceAssets: true, refresh: true });
+}
+
+async function refreshActiveDeliveryPreview(options?: { refresh?: boolean }) {
+  if (props.capability.kind !== "delivery") return;
+
+  const taskId = activeDeliveryTaskId.value;
+  if (!taskId) return;
+
+  const task = deliveryTasks.value.find((item) => item.taskId === taskId);
+  if (!task) return;
+
+  await emitDeliveryTaskPreview(task, {
+    forceAssets: true,
+    refresh: options?.refresh ?? true,
+  });
 }
 
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
@@ -1650,6 +1837,10 @@ const showOutputRatioForGenerate = computed(() => {
 const activeCreateRatioLabel = computed(() => {
   const ratio = activeCreateTemplate.value?.outputRatio;
   return getOutputRatioOptionLabel(ratio ?? DEFAULT_BATCH_OUTPUT_RATIO);
+});
+
+defineExpose({
+  refreshActiveDeliveryPreview,
 });
 </script>
 
@@ -1692,6 +1883,7 @@ const activeCreateRatioLabel = computed(() => {
               <NSelect
                 v-model:value="createTaskPresetId"
                 :options="createPresetOptions"
+                :render-label="renderPresetOptionLabel"
                 placeholder="请选择已保存的预设"
                 size="large"
               />
@@ -1781,11 +1973,16 @@ const activeCreateRatioLabel = computed(() => {
             </section>
 
             <section class="batch-card">
-              <h3>项目名</h3>
+              <h3 class="batch-field-label">
+                项目名
+                <span class="batch-field-required" aria-hidden="true">*</span>
+              </h3>
               <input
                 v-model="projectName"
                 class="plain-input"
                 type="text"
+                required
+                aria-required="true"
                 placeholder="请输入项目名称"
               />
             </section>
@@ -1864,6 +2061,7 @@ const activeCreateRatioLabel = computed(() => {
                   <button
                     type="button"
                     class="batch-upload-remove"
+                    :disabled="props.isGenerating"
                     :aria-label="`删除${item.name}`"
                     @click.stop="handleBatchExteriorRemove(item.id)"
                   >
@@ -1968,6 +2166,7 @@ const activeCreateRatioLabel = computed(() => {
                   <button
                     type="button"
                     class="batch-upload-remove"
+                    :disabled="props.isGenerating"
                     :aria-label="`删除${item.name}`"
                     @click.stop="handleInteriorCollageRemove(item.id)"
                   >
@@ -1980,6 +2179,7 @@ const activeCreateRatioLabel = computed(() => {
                 v-if="interiorCollageUploads.length"
                 type="button"
                 class="batch-upload-clear"
+                :disabled="props.isGenerating"
                 @click="handleInteriorImageRemove"
               >
                 清空内饰图
@@ -1995,6 +2195,7 @@ const activeCreateRatioLabel = computed(() => {
                   v-model:value="selectedPresetKey"
                   class="preset-combobox"
                   :options="visualPresetOptions"
+                  :render-label="renderPresetOptionLabel"
                   :loading="isLoadingVisualPresets"
                   size="large"
                   filterable
@@ -2064,6 +2265,7 @@ const activeCreateRatioLabel = computed(() => {
               <WorkspaceLogoPanel
                 v-model:enabled="useRecentLogo"
                 variant="batch"
+                :disabled="props.isGenerating"
               />
             </section>
 
@@ -2118,7 +2320,8 @@ const activeCreateRatioLabel = computed(() => {
             :loading="batchTab === 'create' && isCreatingBatchTask"
             :disabled="
               batchTab === 'create' &&
-              (!createTaskPresetId ||
+              (!projectName.trim() ||
+                !createTaskPresetId ||
                 !uploadedExteriorAssets.length ||
                 isUploadingVehicle ||
                 isUploadingInterior)
@@ -2216,6 +2419,7 @@ const activeCreateRatioLabel = computed(() => {
               <button
                 type="button"
                 class="batch-upload-remove"
+                :disabled="props.isGenerating"
                 :aria-label="`删除${item.name}`"
                 @click.stop="handleInteriorCollageRemove(item.id)"
               >
@@ -2229,6 +2433,7 @@ const activeCreateRatioLabel = computed(() => {
           v-if="hasBlock('selector')"
           :capability="props.capability"
           :selected-option-id="props.selectedOptionId"
+          :disabled="props.isGenerating"
           @select="emit('selectOption', $event)"
         />
 
@@ -2276,6 +2481,7 @@ const activeCreateRatioLabel = computed(() => {
           :capability="props.capability"
           :upload-preview-url="uploadedPreviewUrl"
           :is-uploading="isUploadingVehicle"
+          :upload-disabled="props.isGenerating"
           @select-file="handleVehicleFileSelected"
           @remove="handleVehicleImageRemove"
         />
@@ -2284,6 +2490,7 @@ const activeCreateRatioLabel = computed(() => {
           v-if="hasBlock('selector')"
           :capability="props.capability"
           :selected-option-id="props.selectedOptionId"
+          :disabled="props.isGenerating"
           @select="emit('selectOption', $event)"
         />
       </div>
@@ -2452,6 +2659,7 @@ const activeCreateRatioLabel = computed(() => {
           :capability="props.capability"
           :upload-preview-url="uploadedPreviewUrl"
           :is-uploading="isUploadingVehicle"
+          :upload-disabled="props.isGenerating"
           @select-file="handleVehicleFileSelected"
           @remove="handleVehicleImageRemove"
         />
@@ -2465,6 +2673,7 @@ const activeCreateRatioLabel = computed(() => {
           v-if="hasBlock('selector')"
           :capability="props.capability"
           :selected-option-id="props.selectedOptionId"
+          :disabled="props.isGenerating"
           @select="emit('selectOption', $event)"
         />
 
@@ -2490,7 +2699,10 @@ const activeCreateRatioLabel = computed(() => {
         <template
           v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
-          <WorkspaceLogoPanel v-model:enabled="useLogo" />
+          <WorkspaceLogoPanel
+            v-model:enabled="useLogo"
+            :disabled="props.isGenerating"
+          />
 
           <div
             class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
@@ -2693,6 +2905,87 @@ const activeCreateRatioLabel = computed(() => {
   min-width: 0;
 }
 
+.preset-combobox :deep(.n-base-selection),
+.inline-field :deep(.n-base-selection) {
+  position: relative;
+}
+
+.preset-combobox :deep(.n-base-selection-label),
+.inline-field :deep(.n-base-selection-label) {
+  padding-right: 40px;
+}
+
+.preset-combobox :deep(.n-base-suffix),
+.inline-field :deep(.n-base-suffix) {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+}
+
+:global(.preset-select-option) {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+:global(.preset-select-option-name) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.preset-option-delete) {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--app-text-soft) 82%, transparent);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(4px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    color 0.16s ease,
+    background 0.16s ease;
+}
+
+:global(.n-base-select-option:hover .preset-option-delete),
+:global(.n-base-select-option:focus-within .preset-option-delete),
+:global(.preset-option-delete.is-deleting) {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+:global(.preset-option-delete:hover:not(:disabled)) {
+  background: color-mix(in srgb, #e25555 14%, transparent);
+  color: #e25555;
+}
+
+:global(.preset-option-delete:disabled) {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+:global(.preset-option-delete.is-deleting .iconify) {
+  animation: preset-delete-spin 0.9s linear infinite;
+}
+
+@keyframes preset-delete-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .preset-summary {
   padding: 16px 18px;
   border: 1px solid
@@ -2856,6 +3149,18 @@ const activeCreateRatioLabel = computed(() => {
   color: var(--app-text);
   font-size: 18px;
   font-weight: 900;
+}
+
+.batch-field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batch-field-required {
+  color: #ef4444;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .batch-card {
@@ -3082,6 +3387,13 @@ const activeCreateRatioLabel = computed(() => {
 .batch-upload-remove:hover {
   background: rgba(220, 38, 38, 0.82);
   transform: scale(1.05);
+}
+
+.batch-upload-remove:disabled,
+.batch-upload-clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 @keyframes batch-upload-spin {

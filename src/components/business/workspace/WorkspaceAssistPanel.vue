@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
 
@@ -15,6 +15,11 @@ import WorkspaceImagePreviewPanel from "@/components/business/workspace/Workspac
 import { formatOutputRatioLabel } from "@/constants/output-ratio";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
+import { useRecentGenerateStore } from "@/stores/recentGenerate";
+import {
+  RECENT_GENERATE_STALE_MS,
+  resolveRecentGenerateCacheKey,
+} from "@/utils/recent-generate-cache";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import {
   resolveBatchRecentSceneLabel,
@@ -60,6 +65,9 @@ const emit = defineEmits<{
   closeDeliveryImagePreview: [];
   openDeliveryImagePreview: [preview: WorkspaceImagePreview];
   openDeliveryAssetResult: [result: WorkspaceGenerateResult];
+  openDeliveryPendingAsset: [
+    payload: { deliveryTaskId: string; generationTaskId: string },
+  ];
   pickTemplate: [payload: { capabilityCode: string; optionId: string }];
   pickRecent: [item: WorkspaceRecentItem];
 }>();
@@ -73,6 +81,8 @@ function canOpenRecent(item: WorkspaceRecentItem) {
 
 function handleRecentPick(item: WorkspaceRecentItem) {
   if (!canOpenRecent(item)) return;
+  saveRecentScrollPosition();
+  persistRecentCache();
   emit("pickRecent", item);
 }
 
@@ -197,21 +207,41 @@ function startFeatureCompareDrag(index: number, event: PointerEvent) {
 }
 
 const appStore = useAppStore();
+const recentGenerateStore = useRecentGenerateStore();
 const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">(
   "guide",
 );
 const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
+const recentLayoutRef = ref<HTMLElement | null>(null);
 const shortVideoInitialView = ref<"guide" | "preview" | "generating" | "recent">(
   "guide",
 );
 let recentRefreshTimer: number | null = null;
+const RECENT_REFRESH_MS = 15000;
+
+const isBatchCapability = computed(() => props.capability.kind === "batch");
+
+const isDeliveryCapability = computed(
+  () => props.capability.kind === "delivery",
+);
+
+function isTerminalBatchJobStatus(
+  status: WorkspaceRecentItem["status"],
+) {
+  return status === "success" || status === "fail" || status === "canceled";
+}
+
+const hasRunningBatchJobs = computed(
+  () =>
+    props.batchActiveJobs?.some(
+      (job) => !isTerminalBatchJobStatus(job.status),
+    ) ?? false,
+);
 
 const isBatchProcessingView = computed(
-  () =>
-    props.capability.kind === "batch" &&
-    (props.batchActiveJobs?.length ?? 0) > 0,
+  () => isDeliveryCapability.value && hasRunningBatchJobs.value,
 );
 
 interface BatchDisplayCard {
@@ -299,6 +329,8 @@ function openDeliveryGroupAssetPreview(
 ) {
   if (asset.status !== "ready" || !asset.imageUrl) return;
 
+  persistRecentCache();
+
   emit("openDeliveryAssetResult", {
     createdAt: asset.createdAt ?? "",
     statusText: `已完成 · ${asset.title} · 成片交付结果`,
@@ -310,6 +342,28 @@ function openDeliveryGroupAssetPreview(
     imageWidth: asset.width,
     imageHeight: asset.height,
   });
+}
+
+function openDeliveryGroupPendingAsset(
+  asset: WorkspaceDeliveryTaskPreview["assets"][number],
+) {
+  if (asset.status !== "pending" || !asset.generationTaskId) return;
+
+  emit("openDeliveryPendingAsset", {
+    deliveryTaskId: props.deliveryTaskPreview?.id ?? "",
+    generationTaskId: asset.generationTaskId,
+  });
+}
+
+function handleDeliveryGroupAssetPick(
+  asset: WorkspaceDeliveryTaskPreview["assets"][number],
+) {
+  if (asset.status === "ready") {
+    openDeliveryGroupAssetPreview(asset);
+    return;
+  }
+
+  openDeliveryGroupPendingAsset(asset);
 }
 
 function closeDeliveryImagePreview() {
@@ -364,10 +418,103 @@ const recentTaskModuleCodes = new Set([
   "interior-stitch",
   "watermark-remove",
   "short-video",
-  "batch-new",
 ]);
 
+function resolveRecentModuleCode() {
+  if (props.capability.code === "interior-stitch") {
+    return "interior-collage";
+  }
+  if (isDeliveryCapability.value) {
+    return "batch-new";
+  }
+  return props.capability.code;
+}
+
+function resolveRecentCacheKey() {
+  return resolveRecentGenerateCacheKey({
+    capabilityCode: props.capability.code,
+    capabilityKind: props.capability.kind,
+  });
+}
+
+function persistRecentCache(taskList = recentItems.value) {
+  if (isDeliveryCapability.value) return;
+  const key = resolveRecentCacheKey();
+  if (!key) return;
+  recentGenerateStore.patchTaskList(key, taskList, { touchFetchTime: false });
+}
+
+function saveRecentScrollPosition() {
+  const key = resolveRecentCacheKey();
+  const element = recentLayoutRef.value;
+  if (!key || !element) return;
+  recentGenerateStore.setScrollTop(key, element.scrollTop);
+}
+
+async function restoreRecentScrollPosition() {
+  const key = resolveRecentCacheKey();
+  const element = recentLayoutRef.value;
+  if (!key || !element) return;
+
+  const scrollTop = recentGenerateStore.getCache(key).scrollTop;
+  if (scrollTop <= 0) return;
+
+  await nextTick();
+  element.scrollTop = scrollTop;
+  requestAnimationFrame(() => {
+    element.scrollTop = scrollTop;
+  });
+}
+
+function applyCachedRecentList(key: ReturnType<typeof resolveRecentCacheKey>) {
+  if (!key) return false;
+  const cached = recentGenerateStore.getCache(key);
+  if (!cached.taskList.length) return false;
+  recentItems.value = cached.taskList;
+  recentLoaded.value = true;
+  return true;
+}
+
+function handleReturnToRecentList() {
+  if (isDeliveryCapability.value) return;
+
+  const key = resolveRecentCacheKey();
+  if (!key) return;
+
+  const returning = recentGenerateStore.consumeReturningFromDetail(key);
+  if (!returning) return;
+
+  if (isFeatureCompareCapability.value) {
+    featureCompareActiveView.value = "recent";
+  } else if (!isBatchCapability.value) {
+    activeTab.value = "recent";
+  }
+
+  applyCachedRecentList(key);
+  void nextTick(() => restoreRecentScrollPosition());
+
+  if (recentGenerateStore.isCacheStale(key, RECENT_GENERATE_STALE_MS)) {
+    void loadRecentItems({ silent: true, force: true });
+  } else {
+    startRecentAutoRefresh();
+  }
+}
+
+const showGenerationResultOverlay = computed(
+  () =>
+    Boolean(props.generationResult) && props.capability.code !== "short-video",
+);
+
+const showDeliveryImageOverlay = computed(
+  () => isDeliveryCapability.value && Boolean(props.deliveryImagePreview),
+);
+
+const isRecentListUnderDetail = computed(
+  () => showGenerationResultOverlay.value || showDeliveryImageOverlay.value,
+);
+
 function canLoadRecentTasks() {
+  if (isBatchCapability.value || isDeliveryCapability.value) return false;
   return recentTaskModuleCodes.has(props.capability.code);
 }
 
@@ -386,10 +533,11 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     item.sceneLabel,
   );
   const isShortVideo = item.moduleCode === "short-video";
-  const thumbnail = isShortVideo
-    ? (item.inputAssetUrl ?? item.thumbnail ?? undefined)
-    : (item.thumbnail ?? item.inputAssetUrl ?? undefined);
-  const previewImage = item.previewImage ?? item.inputAssetUrl ?? undefined;
+  const coverUrl =
+    item.inputAssetThumbnailUrl ??
+    item.thumbnail ??
+    item.inputAssetUrl ??
+    undefined;
 
   return {
     id: item.id || item.taskId,
@@ -401,9 +549,8 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     updatedAt: item.updatedAt
       ? formatDate(item.updatedAt, "YYYY-MM-DD HH:mm")
       : undefined,
-    thumbnail,
-    previewImage,
-    downloadUrl: item.downloadUrl ?? previewImage,
+    thumbnail: coverUrl,
+    previewImage: coverUrl,
     ratioLabel: isShortVideo
       ? "16:9 · 720p · 10秒"
       : (item.ratioLabel ?? formatOutputRatioLabel(item.outputRatio) ?? undefined),
@@ -414,7 +561,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
         : (sceneTitle ?? item.sceneLabel ?? undefined),
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
-    inputAssetUrl: item.inputAssetUrl ?? undefined,
+    inputAssetThumbnailUrl: item.inputAssetThumbnailUrl ?? undefined,
     progress: item.progress ?? undefined,
     resultCount: item.resultCount ?? undefined,
     error: isShortVideo
@@ -425,6 +572,23 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
   };
 }
 
+function mergeRecentItems(incoming: WorkspaceRecentItem[]) {
+  const previousById = new Map(
+    recentItems.value.map((item) => [item.id, item]),
+  );
+
+  return incoming.map((item) => {
+    const previous = previousById.get(item.id);
+    if (!previous) return item;
+
+    return {
+      ...item,
+      thumbnail: item.thumbnail ?? previous.thumbnail,
+      previewImage: item.previewImage ?? previous.previewImage,
+    };
+  });
+}
+
 function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
   return items.some((item) =>
     ["waiting", "queued", "queue", "generating"].includes(item.status),
@@ -432,7 +596,6 @@ function canAutoRefreshRecent(items: WorkspaceRecentItem[]) {
 }
 
 function shouldPollRecent() {
-  if (props.isGenerating) return true;
   if (props.capability.code === "short-video") {
     return canAutoRefreshRecent(recentItems.value);
   }
@@ -447,7 +610,12 @@ function shouldPollRecent() {
   return canAutoRefreshRecent(recentItems.value);
 }
 
-async function loadRecentItems() {
+type LoadRecentItemsOptions = {
+  force?: boolean;
+  silent?: boolean;
+};
+
+async function loadRecentItems(options: LoadRecentItemsOptions = {}) {
   if (!canLoadRecentTasks()) {
     recentItems.value = [];
     recentLoaded.value = true;
@@ -455,36 +623,62 @@ async function loadRecentItems() {
     return;
   }
 
-  recentLoading.value = true;
+  const cacheKey = resolveRecentCacheKey();
+
+  if (
+    !options.force &&
+    cacheKey &&
+    applyCachedRecentList(cacheKey) &&
+    !recentGenerateStore.isCacheStale(cacheKey, RECENT_GENERATE_STALE_MS)
+  ) {
+    return;
+  }
+
+  if (!options.silent) {
+    recentLoading.value = true;
+  }
 
   try {
     const result = await getRecentGenerationTasks({
-      moduleCode:
-        props.capability.code === "interior-stitch"
-          ? "interior-collage"
-          : props.capability.code,
+      moduleCode: resolveRecentModuleCode(),
       page: 1,
       pageSize: 20,
     });
-    recentItems.value = result.items.map(mapRecentItem);
+    recentItems.value = mergeRecentItems(result.items.map(mapRecentItem));
     recentLoaded.value = true;
+    if (cacheKey) {
+      recentGenerateStore.setTaskList(cacheKey, recentItems.value);
+    }
   } catch (error) {
-    if (!recentLoaded.value) {
+    if (!recentLoaded.value && !options.silent) {
       recentItems.value = [];
     }
-    const text = error instanceof Error ? error.message : "最近生成加载失败";
-    message.error(text);
+    if (!options.silent) {
+      const text = error instanceof Error ? error.message : "最近生成加载失败";
+      message.error(text);
+    }
   } finally {
-    recentLoading.value = false;
+    if (!options.silent) {
+      recentLoading.value = false;
+    }
   }
 }
 
 function handleResultBack() {
+  const cacheKey = resolveRecentCacheKey();
+  if (cacheKey) {
+    saveRecentScrollPosition();
+    persistRecentCache();
+    recentGenerateStore.markReturningFromDetail(cacheKey);
+  }
+
   if (
     props.capability.code === "short-video" &&
     props.generationResult?.mediaType === "video"
   ) {
     shortVideoInitialView.value = "recent";
+  } else if (!isBatchCapability.value) {
+    activeTab.value = "recent";
   }
 
   emit("backFromResult");
@@ -508,18 +702,9 @@ function startRecentAutoRefresh() {
       return;
     }
 
-    void loadRecentItems();
-  }, 4000);
+    void loadRecentItems({ silent: true, force: true });
+  }, RECENT_REFRESH_MS);
 }
-
-watch(
-  () => props.batchActiveJobs?.length ?? 0,
-  (length, previousLength) => {
-    if (props.capability.kind === "batch" && length > previousLength) {
-      activeTab.value = "batchProcessing";
-    }
-  },
-);
 
 function syncShortVideoInitialView() {
   if (props.capability.code !== "short-video") return;
@@ -544,17 +729,33 @@ function focusShortVideoPreviewView() {
   shortVideoInitialView.value = "preview";
 }
 
+function focusDeliveryBatchProcessingView() {
+  if (!isDeliveryCapability.value || !isBatchProcessingView.value) return;
+  activeTab.value = "batchProcessing";
+}
+
+watch(
+  () => [props.capability.code, isBatchProcessingView.value] as const,
+  ([code, isProcessing]) => {
+    if (code === "delivery" && isProcessing) {
+      activeTab.value = "batchProcessing";
+    }
+  },
+);
+
 watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
     if (generating) {
       if (isFeatureCompareCapability.value) {
         featureCompareActiveView.value = "generating";
-      } else {
+      } else if (!isBatchCapability.value) {
         activeTab.value = "generating";
       }
       syncShortVideoInitialView();
-      void loadRecentItems();
+      if (!isBatchCapability.value) {
+        void loadRecentItems({ force: true });
+      }
       return;
     }
 
@@ -562,12 +763,12 @@ watch(
       if (featureCompareActiveView.value === "generating") {
         featureCompareActiveView.value = "features";
       }
-    } else if (activeTab.value === "generating") {
+    } else if (!isBatchCapability.value && activeTab.value === "generating") {
       activeTab.value = "guide";
     }
 
-    if (wasGenerating) {
-      void loadRecentItems();
+    if (wasGenerating && !isBatchCapability.value) {
+      void loadRecentItems({ force: true });
     }
 
     if (props.capability.code === "short-video") {
@@ -586,19 +787,46 @@ watch(
 );
 
 watch(
+  () => [props.generationResult, props.deliveryImagePreview] as const,
+  ([generationResult, deliveryImagePreview], previous) => {
+    const wasViewingDetail = Boolean(previous?.[0] || previous?.[1]);
+    const isViewingDetail = Boolean(generationResult || deliveryImagePreview);
+    if (wasViewingDetail && !isViewingDetail) {
+      handleReturnToRecentList();
+    }
+  },
+);
+
+watch(
   () => props.capability.code,
   () => {
     stopRecentAutoRefresh();
-    recentItems.value = [];
-    recentLoaded.value = false;
+
+    if (isDeliveryCapability.value) {
+      recentItems.value = [];
+      recentLoaded.value = false;
+      activeTab.value = isBatchProcessingView.value ? "batchProcessing" : "guide";
+      return;
+    }
+
+    const cacheKey = resolveRecentCacheKey();
+    if (cacheKey && applyCachedRecentList(cacheKey)) {
+      recentLoaded.value = true;
+      if (recentGenerateStore.isCacheStale(cacheKey, RECENT_GENERATE_STALE_MS)) {
+        void loadRecentItems({ silent: true, force: true });
+      }
+    } else {
+      recentItems.value = [];
+      recentLoaded.value = false;
+    }
 
     if (isFeatureCompareCapability.value) {
       featureCompareActiveView.value = props.isGenerating
         ? "generating"
         : "features";
       featureCompareProgress.value = featureCompareCards.value.map(() => 50);
-    } else if (isBatchProcessingView.value) {
-      activeTab.value = "batchProcessing";
+    } else if (isBatchCapability.value) {
+      activeTab.value = "guide";
     } else if (props.capability.code === "short-video") {
       syncShortVideoInitialView();
     } else {
@@ -606,10 +834,11 @@ watch(
     }
 
     if (
-      props.isGenerating ||
-      activeTab.value === "recent" ||
-      isFeatureCompareCapability.value ||
-      props.capability.code === "short-video"
+      !isBatchCapability.value &&
+      (props.isGenerating ||
+        activeTab.value === "recent" ||
+        isFeatureCompareCapability.value ||
+        props.capability.code === "short-video")
     ) {
       void loadRecentItems();
     }
@@ -638,7 +867,7 @@ watch(
   () =>
     [activeTab.value, props.isGenerating, isBatchProcessingView.value] as const,
   ([tab]) => {
-    if (tab === "recent" || tab === "generating" || tab === "batchProcessing") {
+    if (tab === "recent") {
       if (!recentLoaded.value) {
         void loadRecentItems();
         return;
@@ -653,7 +882,9 @@ watch(
 );
 
 onMounted(() => {
-  void loadRecentItems();
+  if (canLoadRecentTasks()) {
+    void loadRecentItems();
+  }
 });
 
 onUnmounted(() => {
@@ -662,9 +893,10 @@ onUnmounted(() => {
 });
 
 defineExpose({
-  refreshRecentItems: loadRecentItems,
+  refreshRecentItems: () => loadRecentItems({ force: true }),
   focusShortVideoGeneratingView,
   focusShortVideoPreviewView,
+  focusDeliveryBatchProcessingView,
 });
 </script>
 
@@ -673,20 +905,30 @@ defineExpose({
     class="assist-panel h-full min-h-0"
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <WorkspaceGenerateResultPanel
-      v-if="generationResult && capability.code !== 'short-video'"
-      :result="generationResult"
-      @back="handleResultBack"
-    />
+    <div
+      v-show="showGenerationResultOverlay"
+      class="assist-detail-layer"
+    >
+      <WorkspaceGenerateResultPanel
+        v-if="generationResult && capability.code !== 'short-video'"
+        :result="generationResult"
+        @back="handleResultBack"
+      />
+    </div>
 
-    <WorkspaceImagePreviewPanel
-      v-else-if="deliveryImagePreview"
-      :preview="deliveryImagePreview"
-      @back="closeDeliveryImagePreview"
-    />
+    <div
+      v-show="showDeliveryImageOverlay"
+      class="assist-detail-layer"
+    >
+      <WorkspaceImagePreviewPanel
+        v-if="isDeliveryCapability && deliveryImagePreview"
+        :preview="deliveryImagePreview"
+        @back="closeDeliveryImagePreview"
+      />
+    </div>
 
     <section
-      v-else-if="deliveryTaskPreview"
+      v-if="isDeliveryCapability && deliveryTaskPreview && !deliveryImagePreview"
       class="delivery-group-preview"
       aria-label="成片图组预览"
     >
@@ -731,35 +973,40 @@ defineExpose({
           v-for="asset in deliveryTaskPreview.assets"
           :key="asset.id"
           class="delivery-group-card"
-          :class="{ 'is-clickable': asset.status === 'ready' }"
-          :role="asset.status === 'ready' ? 'button' : undefined"
-          :tabindex="asset.status === 'ready' ? 0 : undefined"
+          :class="{
+            'is-clickable': asset.status === 'ready' || Boolean(asset.generationTaskId),
+          }"
+          :role="
+            asset.status === 'ready' || asset.generationTaskId
+              ? 'button'
+              : undefined
+          "
+          :tabindex="
+            asset.status === 'ready' || asset.generationTaskId ? 0 : undefined
+          "
           :aria-label="
             asset.status === 'ready'
               ? `查看大图：${asset.title}`
-              : `${asset.title}，${asset.status === 'pending' ? '生成中' : ''}`
+              : asset.generationTaskId
+                ? `查看生成进度：${asset.title}`
+                : `${asset.title}，${asset.pendingStatusText ?? '生成中'}`
           "
-          @click="
-            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
-          "
-          @keydown.enter.prevent="
-            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
-          "
-          @keydown.space.prevent="
-            asset.status === 'ready' && openDeliveryGroupAssetPreview(asset)
-          "
+          @click="handleDeliveryGroupAssetPick(asset)"
+          @keydown.enter.prevent="handleDeliveryGroupAssetPick(asset)"
+          @keydown.space.prevent="handleDeliveryGroupAssetPick(asset)"
         >
           <div
             class="delivery-group-media"
             :class="{ 'is-pending': asset.status === 'pending' }"
           >
             <PreloadImage
-              v-if="asset.status === 'ready'"
+              v-if="asset.thumbnailUrl"
               class="delivery-group-image"
-              :src="asset.thumbnailUrl || asset.imageUrl"
+              :src="asset.thumbnailUrl"
               :alt="asset.title"
               loading="lazy"
               decoding="async"
+              fetchpriority="low"
               :draggable="false"
               fit="cover"
               object-position="center"
@@ -769,6 +1016,12 @@ defineExpose({
               <Icon icon="mdi:image-sync-outline" />
               <strong>{{ asset.pendingStatusText ?? "生成中" }}</strong>
             </div>
+            <span
+              v-if="asset.status === 'pending'"
+              class="delivery-slot-status"
+            >
+              {{ asset.pendingStatusText ?? "生成中" }}
+            </span>
           </div>
           <footer class="delivery-group-foot">
             <div>
@@ -801,7 +1054,10 @@ defineExpose({
     </section>
 
     <template v-else-if="isFeatureCompareCapability && featureCompareContent">
-      <div class="assist-shell">
+      <div
+        class="assist-shell"
+        :class="{ 'is-under-detail': isRecentListUnderDetail }"
+      >
         <header class="assist-tabs">
           <div
             class="tab-group"
@@ -989,7 +1245,12 @@ defineExpose({
             </section>
           </section>
 
-          <section v-else class="recent-layout" aria-label="最近生成">
+          <section
+            v-show="featureCompareActiveView === 'recent'"
+            ref="recentLayoutRef"
+            class="recent-layout"
+            aria-label="最近生成"
+          >
             <div
               v-if="recentLoading && !recentItems.length"
               class="recent-empty-state"
@@ -1023,6 +1284,7 @@ defineExpose({
                   :alt="item.title"
                   loading="lazy"
                   decoding="async"
+                  fetchpriority="low"
                   :draggable="false"
                   fit="cover"
                   object-position="center"
@@ -1066,7 +1328,7 @@ defineExpose({
     />
 
     <section
-      v-else-if="capability.kind === 'delivery'"
+      v-else-if="isDeliveryCapability && !isBatchProcessingView"
       class="delivery-panel delivery-panel--placeholder"
       aria-label="成片交付预览"
     >
@@ -1084,27 +1346,30 @@ defineExpose({
     </section>
 
     <template v-else>
-      <div class="assist-shell">
+      <div
+        class="assist-shell"
+        :class="{ 'is-under-detail': isRecentListUnderDetail }"
+      >
         <header class="assist-tabs">
           <div class="tab-group" role="tablist" aria-label="辅助面板">
-            <template v-if="isBatchProcessingView">
+            <template v-if="isBatchCapability">
               <button
                 type="button"
                 role="tab"
-                :aria-selected="activeTab === 'batchProcessing'"
-                :class="{ active: activeTab === 'batchProcessing' }"
-                @click="activeTab = 'batchProcessing'"
+                aria-selected="true"
+                class="active"
               >
-                正在处理
+                使用教程
               </button>
+            </template>
+            <template v-else-if="isBatchProcessingView">
               <button
                 type="button"
                 role="tab"
-                :aria-selected="activeTab === 'recent'"
-                :class="{ active: activeTab === 'recent' }"
-                @click="activeTab = 'recent'"
+                aria-selected="true"
+                class="active"
               >
-                最近生成
+                正在生成
               </button>
             </template>
             <template v-else-if="isGenerating">
@@ -1152,7 +1417,7 @@ defineExpose({
 
         <div class="assist-body">
           <section
-            v-if="isBatchProcessingView && activeTab === 'batchProcessing'"
+            v-if="isBatchProcessingView"
             class="recent-layout batch-processing-layout"
             aria-label="批量任务处理中"
           >
@@ -1232,7 +1497,8 @@ defineExpose({
 
           <section
             v-else-if="
-              !isGenerating && activeTab === 'guide' && !isBatchProcessingView
+              isBatchCapability ||
+              (!isGenerating && activeTab === 'guide' && !isBatchProcessingView)
             "
             class="guide-layout"
             :class="{ 'is-compact-guide': !showTemplateRecommendations }"
@@ -1271,7 +1537,12 @@ defineExpose({
             </section>
           </section>
 
-          <section v-else class="recent-layout" aria-label="最近生成">
+          <section
+            v-show="!isBatchCapability && activeTab === 'recent'"
+            ref="recentLayoutRef"
+            class="recent-layout"
+            aria-label="最近生成"
+          >
             <div
               v-if="recentLoading && !recentItems.length"
               class="recent-empty-state"
@@ -1305,6 +1576,7 @@ defineExpose({
                   :alt="item.title"
                   loading="lazy"
                   decoding="async"
+                  fetchpriority="low"
                   :draggable="false"
                   fit="cover"
                   object-position="center"
@@ -1351,6 +1623,7 @@ defineExpose({
   --assist-green: var(--workspace-accent-strong, #ffd75a);
   --assist-shadow: var(--workspace-shadow, 0 24px 60px rgba(0, 0, 0, 0.34));
 
+  position: relative;
   display: flex;
   container-type: inline-size;
   container-name: assist;
@@ -1597,6 +1870,24 @@ defineExpose({
   border-bottom: 1px dashed color-mix(in srgb, var(--assist-border) 88%, transparent);
 }
 
+.delivery-slot-status {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #111 72%, transparent);
+  color: #ffd75a;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(6px);
+}
+
 .delivery-group-pending {
   display: grid;
   place-items: center;
@@ -1718,12 +2009,33 @@ defineExpose({
   margin-bottom: 0;
 }
 
+.assist-detail-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: inherit;
+  background: var(--assist-bg);
+}
+
+.assist-detail-layer > :deep(*) {
+  flex: 1;
+  min-height: 0;
+}
+
 .assist-shell {
   display: flex;
   flex: 1;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+}
+
+.assist-shell.is-under-detail {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .assist-body {

@@ -64,6 +64,25 @@ export class AssetsRepository extends Repository {
     );
     return rows[0] ? mapRow(rows[0]) : null;
   }
+
+  async listWithoutThumbnail(limit: number) {
+    const rows = await this.query<AssetRow[]>(
+      `SELECT * FROM assets
+       WHERE thumbnail_url IS NULL
+         AND purpose IN ('car_exterior', 'car_interior')
+       ORDER BY created_at DESC
+       LIMIT :limit`,
+      { limit },
+    );
+    return rows.map(mapRow);
+  }
+
+  async updateThumbnail(id: string, thumbnailUrl: string) {
+    await this.execute(
+      `UPDATE assets SET thumbnail_url = :thumbnailUrl WHERE id = :id`,
+      { id, thumbnailUrl },
+    );
+  }
 }
 
 export const assetsRepository = new AssetsRepository();

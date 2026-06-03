@@ -1,8 +1,13 @@
 import path from "node:path";
 
 import { env } from "../../config/env";
+import { outdoorSceneScenes } from "../outdoor-scene/outdoorSceneScenes";
+import { roadMotionScenes } from "../road-motion/roadMotionScenes";
+import { showroomLightScenes } from "../showroom-light/showroomLightScenes";
+import { skyStudioScenes } from "../sky-studio/skyStudioScenes";
 
-const workspaceAsset = (...segments: string[]) => path.resolve(env.rootDir, "../src/assets/img", ...segments);
+const workspaceAsset = (...segments: string[]) =>
+  path.resolve(env.rootDir, "../src/assets/img", ...segments);
 
 export interface BatchScene {
   optionId: string;
@@ -11,50 +16,92 @@ export interface BatchScene {
   referenceImagePath?: string;
 }
 
+/** 与前端 `workspace.ts` 道路动态场景 optionId 一致 */
+const roadSceneReferenceByOptionId: Record<string, string> = {
+  city_day_road: workspaceAsset("道路动态", "场景选择", "城市主干道.png"),
+  highway_sunset: workspaceAsset("道路动态", "场景选择", "夕阳高速.png"),
+  overpass_dusk: workspaceAsset("道路动态", "场景选择", "傍晚高架.png"),
+  business_park: workspaceAsset("道路动态", "场景选择", "商务园区.png"),
+  rainy_night_city: workspaceAsset("道路动态", "场景选择", "雨夜城市.png"),
+  mountain_curve: workspaceAsset("道路动态", "场景选择", "山路弯道.png"),
+  coastal_road: workspaceAsset("道路动态", "场景选择", "海岸公路.png"),
+  forest_avenue: workspaceAsset("道路动态", "场景选择", "林荫大道.png"),
+  snow_road: workspaceAsset("道路动态", "场景选择", "雪后公路.png"),
+  tunnel_exit: workspaceAsset("道路动态", "场景选择", "隧道出口.png"),
+};
+
+const roadMotionBatchScenes: BatchScene[] = roadMotionScenes.map((scene) => ({
+  optionId: scene.optionId,
+  title: scene.title,
+  referenceImagePath: roadSceneReferenceByOptionId[scene.optionId],
+}));
+
+/** 与场景更换各模块及前端批量场景目录保持一致 */
 export const batchScenes: BatchScene[] = [
-  {
-    optionId: "white-studio",
-    title: "经典白棚",
-    referenceImagePath: workspaceAsset("展厅灯光", "教程图片", "经典白棚.png"),
-  },
-  {
-    optionId: "glass-hall",
-    title: "玻璃展厅",
-    referenceImagePath: workspaceAsset("展厅灯光", "教程图片", "玻璃展厅.png"),
-  },
-  {
-    optionId: "luxury-dark",
-    title: "暗调豪华",
-    referenceImagePath: workspaceAsset("展厅灯光", "教程图片", "暗调豪华.png"),
-  },
-  {
-    optionId: "soft-top-light",
-    title: "柔光灯顶",
-    referenceImagePath: workspaceAsset("展厅灯光", "教程图片", "柔光灯顶.png"),
-  },
-  {
-    optionId: "tree-park",
-    title: "林荫公园",
-    referenceImagePath: workspaceAsset("户外场景", "教程", "林荫公园.png"),
-  },
-  {
-    optionId: "mountain-lake",
-    title: "山野湖畔",
-    referenceImagePath: workspaceAsset("户外场景", "教程", "山野湖畔.png"),
-  },
-  {
-    optionId: "city-block",
-    title: "城市街区",
-    referenceImagePath: workspaceAsset("户外场景", "教程", "城市街区.png"),
-  },
-  {
-    optionId: "coast-daylight",
-    title: "海滨城市",
-    referenceImagePath: workspaceAsset("户外场景", "教程", "海滨城市.png"),
-  },
+  ...showroomLightScenes.map((scene) => ({ ...scene })),
+  ...outdoorSceneScenes.map((scene) => ({ ...scene })),
+  ...roadMotionBatchScenes,
+  ...skyStudioScenes.map((scene) => ({ ...scene })),
 ];
 
-export const resolveBatchScene = (optionId?: string | null, sceneIndex?: number | null) =>
-  batchScenes.find((scene) => scene.optionId === optionId) ??
-  (typeof sceneIndex === "number" ? batchScenes[sceneIndex] : undefined) ??
-  batchScenes[0];
+const findBatchSceneByOptionId = (optionId: string) =>
+  batchScenes.find((scene) => scene.optionId === optionId);
+
+const findRoadMotionBatchScene = (optionId: string): BatchScene | undefined => {
+  const roadScene = roadMotionScenes.find(
+    (scene) =>
+      scene.optionId === optionId ||
+      scene.legacyOptionIds?.includes(optionId),
+  );
+  if (!roadScene) return undefined;
+
+  return {
+    optionId: roadScene.optionId,
+    title: roadScene.title,
+    referenceImagePath: roadSceneReferenceByOptionId[roadScene.optionId],
+  };
+};
+
+export const resolveBatchScene = (
+  optionId?: string | null,
+  sceneReferenceImageUrl?: string | null,
+): BatchScene => {
+  if (optionId) {
+    const matched =
+      findBatchSceneByOptionId(optionId) ?? findRoadMotionBatchScene(optionId);
+    if (matched) return matched;
+  }
+
+  if (sceneReferenceImageUrl) {
+    return {
+      optionId: optionId ?? "custom-scene",
+      title: "",
+      referenceImageUrl: sceneReferenceImageUrl,
+    };
+  }
+
+  return batchScenes[0];
+};
+
+/** 与展厅棚拍等场景更换模块一致：优先使用前端传入的场景图 URL */
+export const resolveBatchSceneReferenceImageUrl = (input: {
+  sceneOptionId?: string | null;
+  sceneReferenceImageUrl?: string | null;
+  uploadedLocalFileUrl?: string | null;
+}) => {
+  const trimmedClientUrl = input.sceneReferenceImageUrl?.trim();
+  if (trimmedClientUrl) {
+    return trimmedClientUrl;
+  }
+
+  if (input.uploadedLocalFileUrl) {
+    return input.uploadedLocalFileUrl;
+  }
+
+  const scene = resolveBatchScene(input.sceneOptionId);
+  return scene.referenceImageUrl ?? null;
+};
+
+export const shouldUploadBatchSceneFromLocalPath = (
+  sceneReferenceImageUrl?: string | null,
+) => !sceneReferenceImageUrl?.trim();

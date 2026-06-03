@@ -20,6 +20,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:show": [value: boolean];
+  success: [];
 }>();
 
 const appStore = useAppStore();
@@ -117,6 +118,7 @@ async function handleGeneratePaymentCode() {
     recentOrders.value = [nextOrder, ...recentOrders.value].slice(0, 8);
 
     message.success("支付宝付款码已生成，请扫码完成支付");
+    emit("success");
   } catch (error) {
     const text = error instanceof Error ? error.message : "生成付款码失败";
     message.error(text);

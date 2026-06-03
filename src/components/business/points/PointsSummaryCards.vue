@@ -7,6 +7,7 @@ import type { PointsSummaryCard } from "@/types/points-query";
 defineProps<{
   cards: PointsSummaryCard[];
   adminTheme?: boolean;
+  loading?: boolean;
 }>();
 
 const appStore = useAppStore();
@@ -15,7 +16,10 @@ const appStore = useAppStore();
 <template>
   <section
     class="points-summary-section"
-    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    :class="[
+      appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      loading ? 'is-loading' : '',
+    ]"
   >
     <div
       class="points-summary-grid animate-fade-in"
@@ -377,5 +381,10 @@ const appStore = useAppStore();
 .points-summary-section.theme-dark .summary-unit,
 .points-summary-section.theme-dark .summary-note {
   color: #9ca3af;
+}
+
+.points-summary-section.is-loading {
+  opacity: 0.72;
+  pointer-events: none;
 }
 </style>

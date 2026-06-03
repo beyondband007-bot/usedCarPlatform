@@ -9,9 +9,11 @@ import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 const props = withDefaults(
   defineProps<{
     variant?: "scene" | "batch";
+    disabled?: boolean;
   }>(),
   {
     variant: "scene",
+    disabled: false,
   },
 );
 
@@ -72,10 +74,13 @@ watch(
 );
 
 function openUpload() {
+  if (props.disabled) return;
   fileInputRef.value?.click();
 }
 
 async function handleFileChange(event: Event) {
+  if (props.disabled) return;
+
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
 
@@ -93,6 +98,8 @@ async function handleFileChange(event: Event) {
 }
 
 function handleSelectRecent() {
+  if (props.disabled) return;
+
   if (!selectRecentLogo()) {
     message.info("请先上传 Logo");
     return;
@@ -105,7 +112,10 @@ function handleSelectRecent() {
 <template>
   <div
     class="workspace-logo-panel"
-    :class="{ 'workspace-logo-panel--batch': isBatch }"
+    :class="{
+      'workspace-logo-panel--batch': isBatch,
+      'is-disabled': disabled,
+    }"
   >
     <input
       ref="fileInputRef"
@@ -133,7 +143,7 @@ function handleSelectRecent() {
               {{ panelDescription }}
             </p>
           </div>
-          <NSwitch v-model:value="enabled" size="large" />
+          <NSwitch v-model:value="enabled" size="large" :disabled="disabled" />
         </div>
       </div>
 
@@ -142,7 +152,7 @@ function handleSelectRecent() {
           type="button"
           class="recent-logo-row"
           :class="{ 'is-active': useRecentLogo && recentLogo }"
-          :disabled="!recentLogo || isLoading"
+          :disabled="disabled || !recentLogo || isLoading"
           @click="handleSelectRecent"
         >
           <span class="logo-preview">
@@ -167,7 +177,7 @@ function handleSelectRecent() {
           v-if="isBatch || recentLogo"
           type="button"
           class="reupload-button"
-          :disabled="isUploading"
+          :disabled="disabled || isUploading"
           @click="openUpload"
         >
           {{ reuploadLabel }}
@@ -179,7 +189,7 @@ function handleSelectRecent() {
       v-if="enabled && !isBatch"
       type="button"
       class="logo-upload-drop"
-      :disabled="isUploading"
+      :disabled="disabled || isUploading"
       @click="openUpload"
     >
       <Icon icon="mdi:tag-heart-outline" />
@@ -429,5 +439,16 @@ function handleSelectRecent() {
   color: var(--workspace-muted, var(--app-text-soft));
   font-size: 14px;
   font-weight: 700;
+}
+
+.workspace-logo-panel.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+.workspace-logo-panel.is-disabled .logo-setting-card,
+.workspace-logo-panel.is-disabled .logo-upload-drop {
+  cursor: not-allowed;
 }
 </style>

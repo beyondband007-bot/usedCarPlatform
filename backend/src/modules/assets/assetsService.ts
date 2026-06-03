@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { env } from "../../config/env";
 import { getImageDimensions } from "../../shared/imageDimensions";
+import { generateUploadThumbnail } from "../../shared/imageThumbnail";
 import { createId } from "../../shared/ids";
 import type { AssetPurpose } from "../../shared/types";
 import { assetsRepository } from "./assetsRepository";
@@ -20,6 +21,7 @@ export class AssetsService {
     const relativeUrl = `/uploads/${path.basename(file.path)}`;
     const publicUrl = `${env.publicBaseUrl.replace(/\/$/, "")}${relativeUrl}`;
     const dimensions = await getImageDimensions(file.path).catch(() => null);
+    const thumbnail = await generateUploadThumbnail(file.path);
 
     return assetsRepository.create({
       id: assetId,
@@ -31,7 +33,7 @@ export class AssetsService {
       height: dimensions?.height ?? null,
       localPath: file.path,
       publicUrl,
-      thumbnailUrl: null,
+      thumbnailUrl: thumbnail?.publicUrl ?? null,
       createdAt: new Date(),
     });
   }

@@ -20,6 +20,7 @@ const props = defineProps<{
   capability: WorkspaceCapability;
   uploadPreviewUrl?: string | null;
   isUploading?: boolean;
+  uploadDisabled?: boolean;
   compact?: boolean;
   uploadTitle?: string;
   uploadHint?: string;
@@ -56,17 +57,26 @@ const isPreviewLoading = computed(
   () => Boolean(props.uploadPreviewUrl) && props.isUploading,
 );
 
+const isUploadBlocked = computed(
+  () => Boolean(props.isUploading || props.uploadDisabled),
+);
+
 function handleUploadChange(options: { file: UploadFileInfo }) {
+  if (isUploadBlocked.value) return;
+
   const file = options.file.file;
   if (!file) return;
   emit("selectFile", file);
 }
 
 function handleReupload() {
+  if (isUploadBlocked.value) return;
   replaceInputRef.value?.click();
 }
 
 function handleReplaceInputChange(event: Event) {
+  if (isUploadBlocked.value) return;
+
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
@@ -137,9 +147,10 @@ function openPreviewModal() {
             size="large"
             block
             class="upload-reupload-btn"
+            :disabled="isUploadBlocked"
             @click="handleReupload"
           >
-            重新生成
+            {{ uploadDisabled ? "生成中" : "重新生成" }}
           </NButton>
         </div>
 
@@ -162,15 +173,16 @@ function openPreviewModal() {
           :show-file-list="false"
           :accept="capability.accept"
           :default-upload="false"
-          :disabled="isUploading"
+          :disabled="isUploadBlocked"
           @change="handleUploadChange"
         >
           <NUploadDragger
-            :class="
+            :class="[
               compact
                 ? 'upload-compact-dragger'
-                : '!rounded-2xl !!bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10'
-            "
+                : '!rounded-2xl !!bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10',
+              { 'is-blocked': uploadDisabled },
+            ]"
           >
             <div
               :class="
@@ -200,7 +212,11 @@ function openPreviewModal() {
                     : 'mt-2 text-sm font-semibold text-[var(--workspace-muted,var(--app-text-soft))]'
                 "
               >
-                {{ displayUploadHint }}
+                {{
+                  uploadDisabled
+                    ? "当前任务生成中，请等待完成后再上传"
+                    : displayUploadHint
+                }}
               </span>
               <b v-if="compact">{{ displayRequiredLabel }}</b>
               <NTag v-else :bordered="false" round size="small" class="mt-4">
@@ -390,6 +406,12 @@ function openPreviewModal() {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
+}
+
+.upload-compact-dragger.is-blocked,
+:deep(.n-upload-dragger.is-blocked) {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 </style>
 

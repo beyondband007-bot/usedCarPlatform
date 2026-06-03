@@ -21,6 +21,7 @@ const props = defineProps<{
   total: number;
   currentPage: number;
   pageSize: number;
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -128,7 +129,10 @@ function setPage(page: number) {
 <template>
   <section
     class="card points-flow-card animate-fade-in"
-    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    :class="[
+      appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      loading ? 'is-loading' : '',
+    ]"
   >
     <div class="points-filter-bar">
       <div class="points-filter-row">
@@ -1075,6 +1079,11 @@ function setPage(page: number) {
   button:hover:not(:disabled, .active) {
   border-color: #374151;
   color: #f3f4f6;
+}
+
+.points-flow-card.is-loading {
+  opacity: 0.72;
+  pointer-events: none;
 }
 </style>
 

@@ -148,6 +148,14 @@ export class BatchRepository extends Repository {
     }));
   }
 
+  async deletePreset(input: { id: string; userId: string }) {
+    const result = await this.execute(
+      `DELETE FROM batch_visual_presets WHERE id = :id AND user_id = :userId`,
+      input,
+    );
+    return result.affectedRows > 0;
+  }
+
   async createBatch(input: {
     id: string;
     projectName: string;
@@ -226,6 +234,45 @@ export class BatchRepository extends Repository {
       { batchId },
     );
     return rows.map(mapItem);
+  }
+
+  async listItemInputCovers(batchId: string) {
+    const rows = await this.query<
+      Array<
+        RowDataPacket & {
+          sort_order: number;
+          item_kind: BatchItemKind;
+          generation_task_id: string;
+          status: TaskStatus;
+          input_asset_id: string;
+          thumbnail_url: string | null;
+          public_url: string | null;
+        }
+      >
+    >(
+      `SELECT
+          bti.sort_order,
+          bti.item_kind,
+          bti.generation_task_id,
+          bti.status,
+          bti.input_asset_id,
+          a.thumbnail_url,
+          a.public_url
+       FROM batch_task_items bti
+       LEFT JOIN assets a ON a.id = bti.input_asset_id
+       WHERE bti.batch_id = :batchId
+       ORDER BY bti.sort_order ASC, bti.created_at ASC`,
+      { batchId },
+    );
+
+    return rows.map((row, index) => ({
+      slotIndex: index,
+      itemKind: row.item_kind,
+      generationTaskId: row.generation_task_id,
+      status: row.status,
+      inputAssetId: row.input_asset_id,
+      coverUrl: row.thumbnail_url ?? row.public_url ?? null,
+    }));
   }
 
   async findItemByGenerationTaskId(generationTaskId: string): Promise<BatchItemTaskLink | null> {

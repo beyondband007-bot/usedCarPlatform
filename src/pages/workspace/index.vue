@@ -69,12 +69,19 @@ function isShortVideoModuleCode(moduleCode?: string) {
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
 }
+
+function isCreativeImageModuleCode(moduleCode?: string) {
+  return moduleCode === "creative-image";
+}
 const INTERIOR_COLLAGE_CAPABILITY_CODE = "interior-stitch";
 const ACTIVE_GENERATION_TASK_KEY = "workspace-active-generation-task";
 const ACTIVE_CREATIVE_CONVERSATION_KEY =
   "workspace-active-creative-conversation";
 const TRACKED_RUNNING_TASKS_KEY = "workspace-tracked-running-tasks";
 const BATCH_ACTIVE_JOBS_KEY = "workspace-batch-active-jobs";
+const GENERATION_TASK_POLL_MS = 25000;
+/** 单任务最长轮询时长，与间隔联动，避免 25s 间隔下轮询过久 */
+const GENERATION_TASK_POLL_MAX_MS = 20 * 60 * 1000;
 const visualPlanPoolCapabilityCodes = new Set([
   "showroom-light",
   "outdoor-scene",
@@ -123,11 +130,18 @@ const shortVideoSessionPreview = ref<WorkspaceGenerateResult | null>(null);
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(
   null,
 );
+const generatePanelRef = ref<InstanceType<typeof CapabilityGeneratePanel> | null>(
+  null,
+);
 const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([]);
 const trackedRunningTasks = ref<Record<string, string>>({});
 let batchPollTimer: number | null = null;
 let globalGenerationPollTimer: number | null = null;
 let isRefreshingRunningTasks = false;
+/** 正在由 resolve* 主动轮询的任务，全局轮询跳过以免重复打 KIE */
+const activelyResolvingTaskIds = new Set<string>();
+/** 已弹出过完成提示的任务，避免 resolve 与全局轮询重复 toast */
+const notifiedCompletionTaskIds = new Set<string>();
 
 function resolveCapabilityCodeFromModule(moduleCode: string) {
   const matched = workspaceCapabilities.find(
@@ -231,7 +245,8 @@ function readBatchActiveJobs() {
 
   try {
     const parsed = JSON.parse(raw) as WorkspaceBatchActiveJob[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((job) => !isTerminalBatchStatus(job.status));
   } catch {
     return [];
   }
@@ -324,6 +339,40 @@ function trackRunningTask(taskId: string, moduleCode: string) {
   });
 }
 
+function untrackRunningTask(taskId: string) {
+  if (!trackedRunningTasks.value[taskId]) return;
+  const next = { ...trackedRunningTasks.value };
+  delete next[taskId];
+  setTrackedRunningTasks(next);
+}
+
+function untrackRunningTasks(taskIds: string[]) {
+  const next = { ...trackedRunningTasks.value };
+  let changed = false;
+  for (const taskId of taskIds) {
+    if (!next[taskId]) continue;
+    delete next[taskId];
+    changed = true;
+  }
+  if (changed) setTrackedRunningTasks(next);
+}
+
+function beginActiveTaskResolve(taskId: string) {
+  activelyResolvingTaskIds.add(taskId);
+}
+
+function endActiveTaskResolve(taskId: string) {
+  activelyResolvingTaskIds.delete(taskId);
+}
+
+function beginActiveTaskResolves(taskIds: string[]) {
+  for (const taskId of taskIds) beginActiveTaskResolve(taskId);
+}
+
+function endActiveTaskResolves(taskIds: string[]) {
+  for (const taskId of taskIds) endActiveTaskResolve(taskId);
+}
+
 function setCreativeConversationGenerating(
   conversationId: string,
   taskId: string | null,
@@ -349,7 +398,7 @@ function startGlobalGenerationPolling() {
 
   globalGenerationPollTimer = window.setInterval(() => {
     void pollTrackedRunningTasks();
-  }, 4000);
+  }, GENERATION_TASK_POLL_MS);
 }
 
 function mapBatchDetailToJob(
@@ -514,7 +563,9 @@ async function refreshBatchJob(batchId: string) {
     const wasTerminal = isTerminalBatchStatus(next[index].status);
     next[index] = mapBatchDetailToJob(detail, next[index]);
     const isNowTerminal = isTerminalBatchStatus(next[index].status);
-    setBatchActiveJobs(next);
+    setBatchActiveJobs(
+      next.filter((job) => !isTerminalBatchStatus(job.status)),
+    );
     if (!wasTerminal && isNowTerminal) {
       refreshCreditsBalance();
     }
@@ -555,6 +606,10 @@ function startBatchPolling() {
 }
 
 function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
+  deliveryImagePreview.value = null;
+  deliveryTaskPreview.value = null;
+  previewedDeliveryTaskId.value = null;
+
   const next = [
     ...batchActiveJobs.value,
     {
@@ -579,29 +634,19 @@ async function refreshRunningBatchJobs() {
   return countRunningBatchJobs();
 }
 
-function syncWorkspaceFromTask(
+/** 仅在当前已处于对应能力页时同步场景选项，不切换侧边栏/路由 */
+function applyTaskOptionIfOnActivePage(
   task: Pick<GenerationTaskDetail, "moduleCode" | "optionId">,
 ) {
-  const matchedCapability = workspaceCapabilities.find(
-    (capability) =>
-      capability.code === task.moduleCode ||
-      capability.apiCode === task.moduleCode,
+  const taskCapabilityCode = resolveCapabilityCodeFromModule(task.moduleCode);
+  if (!taskCapabilityCode || activeCode.value !== taskCapabilityCode) return;
+
+  const capability = workspaceCapabilities.find(
+    (item) => item.code === taskCapabilityCode,
   );
-
-  if (!matchedCapability) return;
-
-  activeCode.value = matchedCapability.code;
-
-  if (route.params.code !== matchedCapability.code) {
-    router.replace({
-      name: "Workspace",
-      params: { code: matchedCapability.code },
-    });
-  }
-
   if (
     task.optionId &&
-    matchedCapability.options.some((item) => item.id === task.optionId)
+    capability?.options.some((item) => item.id === task.optionId)
   ) {
     selectedOptionId.value = task.optionId;
   }
@@ -609,10 +654,7 @@ function syncWorkspaceFromTask(
 
 function shouldSyncWorkspaceForTask(
   task: Pick<GenerationTaskDetail, "moduleCode">,
-  options: { restored?: boolean } = {},
 ) {
-  if (options.restored) return true;
-
   const taskCapabilityCode = resolveCapabilityCodeFromModule(task.moduleCode);
   if (!taskCapabilityCode) return false;
 
@@ -624,6 +666,31 @@ function getCapabilityLabel(code: string) {
     workspaceCapabilities.find((capability) => capability.code === code)
       ?.label ?? code
   );
+}
+
+function shouldNotifyGenerationSuccess(moduleCode?: string) {
+  return Boolean(moduleCode && !isCreativeImageModuleCode(moduleCode));
+}
+
+function getGenerationSuccessMessage(moduleCode?: string) {
+  if (!shouldNotifyGenerationSuccess(moduleCode)) return null;
+  if (isShortVideoModuleCode(moduleCode)) return "短视频生成成功";
+  const capabilityCode = resolveCapabilityCodeFromModule(moduleCode!);
+  const label = capabilityCode ? getCapabilityLabel(capabilityCode) : "图片";
+  return `${label}图片生成成功`;
+}
+
+function notifyGenerationSuccess(
+  task: Pick<GenerationTaskDetail, "moduleCode" | "status" | "taskId">,
+) {
+  if (task.status !== "success" || !task.taskId) return;
+  if (notifiedCompletionTaskIds.has(task.taskId)) return;
+
+  const text = getGenerationSuccessMessage(task.moduleCode);
+  if (!text) return;
+
+  notifiedCompletionTaskIds.add(task.taskId);
+  message.success(text);
 }
 
 async function refreshTrackedRunningTasks() {
@@ -647,11 +714,16 @@ async function refreshTrackedRunningTasks() {
 }
 
 async function pollTrackedRunningTasks() {
-  const entries = Object.entries(trackedRunningTasks.value);
-  if (!entries.length) {
+  const allEntries = Object.entries(trackedRunningTasks.value);
+  if (!allEntries.length) {
     stopGlobalGenerationPolling();
     return;
   }
+
+  const entries = allEntries.filter(
+    ([taskId]) => !activelyResolvingTaskIds.has(taskId),
+  );
+  if (!entries.length) return;
 
   const next: Record<string, string> = { ...trackedRunningTasks.value };
   let hasTerminalTask = false;
@@ -665,6 +737,7 @@ async function pollTrackedRunningTasks() {
 
     const task = result.value;
     if (isTerminalGenerationStatus(task)) {
+      notifyGenerationSuccess(task);
       delete next[task.taskId];
       clearActiveGenerationTask(task.taskId);
       hasTerminalTask = true;
@@ -781,11 +854,24 @@ function handleSelectCapability(code: string) {
   activeCode.value = code;
   void refreshRunningTaskSummary();
 
+  if (code === "batch-new") {
+    deliveryImagePreview.value = null;
+    deliveryTaskPreview.value = null;
+    previewedDeliveryTaskId.value = null;
+  }
+
   if (
     code === SHORT_VIDEO_CAPABILITY_CODE &&
     sidebarGeneratingCodes.value.includes(code)
   ) {
     assistPanelRef.value?.focusShortVideoGeneratingView?.();
+  }
+
+  if (
+    code === "delivery" &&
+    sidebarGeneratingCodes.value.includes("delivery")
+  ) {
+    assistPanelRef.value?.focusDeliveryBatchProcessingView?.();
   }
 
   if (route.params.code !== code) {
@@ -801,7 +887,7 @@ const sidebarGeneratingCodes = computed(() => {
   }
 
   if (batchActiveJobs.value.some((job) => !isTerminalBatchStatus(job.status))) {
-    codes.add("batch-new");
+    codes.add("delivery");
   }
 
   for (const moduleCode of Object.values(trackedRunningTasks.value)) {
@@ -970,6 +1056,34 @@ function handleOpenDeliveryAssetResult(result: WorkspaceGenerateResult) {
   deliveryImagePreview.value = null;
 }
 
+async function handleOpenDeliveryPendingAsset(payload: {
+  deliveryTaskId: string;
+  generationTaskId: string;
+}) {
+  try {
+    const task = await getGenerationTask(payload.generationTaskId);
+    if (task.status === "success") {
+      const result = buildResultFromTask(task);
+      if (result) {
+        handleOpenDeliveryAssetResult(result);
+        await generatePanelRef.value?.refreshActiveDeliveryPreview?.({
+          refresh: true,
+        });
+        return;
+      }
+    }
+
+    message.info("仍在生成中，请稍后再试");
+    await generatePanelRef.value?.refreshActiveDeliveryPreview?.({
+      refresh: true,
+    });
+  } catch (error) {
+    const text =
+      error instanceof Error ? error.message : "生成结果查询失败，请稍后重试";
+    message.error(text);
+  }
+}
+
 function handleOpenDeliveryImagePreview(preview: WorkspaceImagePreview) {
   deliveryImagePreview.value = preview;
   generationResult.value = null;
@@ -990,21 +1104,77 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function pollGenerationTask(taskId: string) {
-  let latest: GenerationTaskDetail | null = null;
+async function pollGenerationTask(
+  taskId: string,
+  options: { initialTask?: GenerationTaskDetail | null } = {},
+) {
+  const deadline = Date.now() + GENERATION_TASK_POLL_MAX_MS;
+  let latest = options.initialTask ?? null;
 
-  for (let index = 0; index < 90; index += 1) {
-    const task = await getGenerationTask(taskId);
-    latest = task;
+  beginActiveTaskResolve(taskId);
+  try {
+    while (Date.now() < deadline) {
+      if (!latest) {
+        latest = await getGenerationTask(taskId);
+      } else if (isTerminalGenerationStatus(latest)) {
+        return latest;
+      } else {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await sleep(Math.min(GENERATION_TASK_POLL_MS, remaining));
+        latest = await getGenerationTask(taskId);
+      }
 
-    if (isTerminalGenerationStatus(task)) {
-      return task;
+      if (latest && isTerminalGenerationStatus(latest)) {
+        return latest;
+      }
     }
-
-    await sleep(index === 0 ? 1500 : 4000);
+  } finally {
+    endActiveTaskResolve(taskId);
   }
 
   return latest;
+}
+
+async function pollMultipleGenerationTasks(taskIds: string[]) {
+  if (!taskIds.length) return [] as Array<GenerationTaskDetail | null>;
+
+  const deadline = Date.now() + GENERATION_TASK_POLL_MAX_MS;
+  const latest = new Map<string, GenerationTaskDetail | null>(
+    taskIds.map((taskId) => [taskId, null]),
+  );
+
+  beginActiveTaskResolves(taskIds);
+  try {
+    while (Date.now() < deadline) {
+      await Promise.allSettled(
+        taskIds.map(async (taskId) => {
+          const current = latest.get(taskId);
+          if (current && isTerminalGenerationStatus(current)) return;
+
+          try {
+            latest.set(taskId, await getGenerationTask(taskId));
+          } catch {
+            // 保留上一轮快照，下一轮继续
+          }
+        }),
+      );
+
+      const allTerminal = taskIds.every((taskId) => {
+        const task = latest.get(taskId);
+        return Boolean(task && isTerminalGenerationStatus(task));
+      });
+      if (allTerminal) break;
+
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await sleep(Math.min(GENERATION_TASK_POLL_MS, remaining));
+    }
+  } finally {
+    endActiveTaskResolves(taskIds);
+  }
+
+  return taskIds.map((taskId) => latest.get(taskId) ?? null);
 }
 
 function buildResultFromTask(
@@ -1080,43 +1250,45 @@ async function resolveInteriorCollageTasks(
   taskIds: string[],
   outputRatio: string,
   resolution: string,
+  options: { restored?: boolean } = {},
 ) {
-  const results = await Promise.allSettled(
-    taskIds.map((taskId) => pollGenerationTask(taskId)),
-  );
-  const finishedTasks = results
-    .filter(
-      (result): result is PromiseFulfilledResult<GenerationTaskDetail | null> =>
-        result.status === "fulfilled",
-    )
-    .map((result) => result.value)
-    .filter((task): task is GenerationTaskDetail => Boolean(task));
+  try {
+    const polled = await pollMultipleGenerationTasks(taskIds);
+    const finishedTasks = polled.filter(
+      (task): task is GenerationTaskDetail => Boolean(task),
+    );
 
-  const successTasks = finishedTasks.filter(
-    (task) => task.status === "success",
-  );
-  const failedCount = finishedTasks.filter(
-    (task) => task.status !== "success",
-  ).length;
+    const successTasks = finishedTasks.filter(
+      (task) => task.status === "success",
+    );
+    const failedCount = finishedTasks.filter(
+      (task) => task.status !== "success",
+    ).length;
 
-  if (failedCount > 0) {
-    message.warning(`${failedCount} 个内饰拼图任务生成失败，其它任务不受影响`);
+    if (failedCount > 0) {
+      message.warning(`${failedCount} 个内饰拼图任务生成失败，其它任务不受影响`);
+    }
+
+    const result = buildInteriorCollageResult(
+      successTasks,
+      outputRatio,
+      resolution,
+    );
+    if (!result) {
+      message.warning("任务完成，但没有返回内饰拼图结果");
+      return;
+    }
+
+    generationResult.value = result;
+    clearActiveGenerationTask(result.taskId);
+    if (!options.restored && successTasks[0]) {
+      notifyGenerationSuccess(successTasks[0]);
+    }
+    refreshCreditsBalance();
+    await assistPanelRef.value?.refreshRecentItems();
+  } finally {
+    untrackRunningTasks(taskIds);
   }
-
-  const result = buildInteriorCollageResult(
-    successTasks,
-    outputRatio,
-    resolution,
-  );
-  if (!result) {
-    message.warning("任务完成，但没有返回内饰拼图结果");
-    return;
-  }
-
-  generationResult.value = result;
-  clearActiveGenerationTask(result.taskId);
-  refreshCreditsBalance();
-  await assistPanelRef.value?.refreshRecentItems();
 }
 
 async function resolveGenerationTask(
@@ -1134,25 +1306,15 @@ async function resolveGenerationTask(
       initialTask.moduleCode,
     );
     generatingCapabilityCode.value = taskCapabilityCode ?? activeCode.value;
-    const shouldSyncWorkspace = shouldSyncWorkspaceForTask(initialTask, options);
-
-    if (shouldSyncWorkspace) {
-      syncWorkspaceFromTask(initialTask);
-    }
 
     const task = isTerminalGenerationStatus(initialTask)
       ? initialTask
-      : await pollGenerationTask(taskId);
+      : await pollGenerationTask(taskId, { initialTask });
     taskModuleCode = task?.moduleCode ?? taskModuleCode;
 
     if (!task) {
       message.warning("任务仍在处理中，请稍后刷新查看");
       return;
-    }
-
-    const shouldSyncAfterPoll = shouldSyncWorkspaceForTask(task, options);
-    if (shouldSyncAfterPoll) {
-      syncWorkspaceFromTask(task);
     }
 
     if (task.status !== "success") {
@@ -1170,26 +1332,23 @@ async function resolveGenerationTask(
       return;
     }
 
-    if (shouldSyncAfterPoll) {
+    if (!options.restored) {
+      notifyGenerationSuccess(task);
+    }
+
+    const shouldShowResultOnPage = shouldSyncWorkspaceForTask(task);
+    if (shouldShowResultOnPage) {
+      applyTaskOptionIfOnActivePage(task);
       if (isShortVideoModuleCode(task.moduleCode)) {
         generationResult.value = null;
         if (!options.restored) {
           shortVideoSessionPreview.value = result;
           shortVideoPlayRequest.value += 1;
           assistPanelRef.value?.focusShortVideoPreviewView?.();
-          message.success("生成完成");
         }
       } else {
         generationResult.value = result;
-        if (!options.restored) {
-          message.success("生成完成");
-        }
       }
-    } else if (!options.restored) {
-      const label = taskCapabilityCode
-        ? getCapabilityLabel(taskCapabilityCode)
-        : "任务";
-      message.success(`${label}生成完成，可在「最近生成」中查看`);
     }
     if (
       task.moduleCode === "creative-image" &&
@@ -1203,6 +1362,7 @@ async function resolveGenerationTask(
     message.error(getViewMediaFailureMessage(taskModuleCode));
   } finally {
     clearActiveGenerationTask(taskId);
+    untrackRunningTask(taskId);
     isGenerating.value = false;
     generatingCapabilityCode.value = null;
     refreshCreditsBalance();
@@ -1219,7 +1379,7 @@ async function resolveCreativeGenerationTask(
     const initialTask = await getGenerationTask(taskId);
     const task = isTerminalGenerationStatus(initialTask)
       ? initialTask
-      : await pollGenerationTask(taskId);
+      : await pollGenerationTask(taskId, { initialTask });
 
     if (!task) {
       if (!options.restored) {
@@ -1248,13 +1408,6 @@ async function resolveCreativeGenerationTask(
       activeCreativeConversationId.value === conversationId
     ) {
       generationResult.value = result;
-      if (!options.restored) {
-        message.success("生成完成");
-      }
-    } else {
-      if (!options.restored) {
-        message.success("创意生图生成完成，可在最近对话中查看");
-      }
     }
   } catch {
     if (!options.restored) {
@@ -1262,7 +1415,10 @@ async function resolveCreativeGenerationTask(
     }
   } finally {
     clearActiveGenerationTask(taskId);
+    untrackRunningTask(taskId);
     setCreativeConversationGenerating(conversationId, null);
+    isGenerating.value = false;
+    generatingCapabilityCode.value = null;
     await refreshRunningTaskSummary();
     await refreshCreativeConversations();
     if (activeCreativeConversationId.value === conversationId) {
@@ -1529,18 +1685,17 @@ async function handleCreativeGenerate(payload: {
       created.taskId,
     );
     await refreshCreativeConversations();
-    void resolveCreativeGenerationTask(created.taskId, conversationId);
+    await resolveCreativeGenerationTask(created.taskId, conversationId);
   } catch (error) {
     if (conversationId) {
       setCreativeConversationGenerating(conversationId, null);
     }
     clearActiveGenerationTask();
+    isGenerating.value = false;
+    generatingCapabilityCode.value = null;
     const text =
       error instanceof Error ? error.message : "创意生图任务创建失败";
     message.error(text);
-  } finally {
-    isGenerating.value = false;
-    generatingCapabilityCode.value = null;
   }
 }
 
@@ -1673,52 +1828,36 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
   }
 }
 
-function buildResultFromRecent(
-  item: WorkspaceRecentItem,
-): WorkspaceGenerateResult | null {
-  const isShortVideo = isShortVideoModuleCode(item.moduleCode);
-  const mediaUrl = item.downloadUrl ?? item.previewImage;
-
-  if (item.status !== "success" || !mediaUrl) return null;
-  const sceneTitle = isShortVideo
-    ? "短视频生成"
-    : (item.sceneLabel ?? item.title);
-
-  return {
-    createdAt: formatDate(item.createdAt),
-    statusText: isShortVideo
-      ? `已完成 · ${sceneTitle} · 营销视频`
-      : `已完成 · ${sceneTitle} · 单图生成结果`,
-    ratioLabel: isShortVideo
-      ? `${item.outputRatio ?? "16:9"} · 720p · 10秒`
-      : (item.ratioLabel ??
-        (item.outputRatio ? `${item.outputRatio} · 2K` : "主图")),
-    mediaType: isShortVideo ? "video" : "image",
-    previewImage: isShortVideo ? "" : (item.previewImage ?? mediaUrl),
-    previewVideo: isShortVideo ? mediaUrl : undefined,
-    previewAlt: item.title,
-    downloadUrl: mediaUrl,
-    taskId: item.taskId,
-    imageWidth: item.imageWidth,
-    imageHeight: item.imageHeight,
-  };
-}
-
-function handlePickRecent(item: WorkspaceRecentItem) {
+async function handlePickRecent(item: WorkspaceRecentItem) {
   if (item.status === "fail" || item.status === "canceled") {
     message.error(getViewMediaFailureMessage(item.moduleCode));
     return;
   }
 
+  if (!item.taskId) {
+    message.error(getViewMediaFailureMessage(item.moduleCode));
+    return;
+  }
+
   if (item.status === "success") {
-    const result = buildResultFromRecent(item);
-    if (result) {
-      if (isShortVideoModuleCode(item.moduleCode)) {
-        generationResult.value = result;
-        assistPanelRef.value?.focusShortVideoPreviewView?.();
-      } else {
-        generationResult.value = result;
+    try {
+      const task = await getGenerationTask(item.taskId);
+      const result = buildResultFromTask(task);
+      if (result) {
+        if (isShortVideoModuleCode(item.moduleCode)) {
+          generationResult.value = result;
+          assistPanelRef.value?.focusShortVideoPreviewView?.();
+        } else {
+          generationResult.value = result;
+        }
+        return;
       }
+    } catch (error) {
+      const text =
+        error instanceof Error
+          ? error.message
+          : getViewMediaFailureMessage(item.moduleCode);
+      message.error(text);
       return;
     }
 
@@ -1726,9 +1865,7 @@ function handlePickRecent(item: WorkspaceRecentItem) {
     return;
   }
 
-  if (item.taskId) {
-    void resolveGenerationTask(item.taskId, { restored: true });
-  }
+  void resolveGenerationTask(item.taskId, { restored: true });
 }
 
 function clearGenerationResult() {
@@ -1767,11 +1904,6 @@ onMounted(async () => {
     );
     return;
   }
-
-  syncWorkspaceFromTask({
-    moduleCode: activeTask.moduleCode,
-    optionId: activeTask.optionId,
-  });
 
   void resolveGenerationTask(activeTask.taskId, { restored: true });
 });
@@ -1841,6 +1973,7 @@ onUnmounted(() => {
           />
           <CapabilityGeneratePanel
             v-else
+            ref="generatePanelRef"
             :key="activeCapability.code"
             :capability="activeCapability"
             :selected-option-id="selectedOptionId"
@@ -1877,6 +2010,7 @@ onUnmounted(() => {
           @close-delivery-image-preview="clearDeliveryImagePreview"
           @open-delivery-image-preview="handleOpenDeliveryImagePreview"
           @open-delivery-asset-result="handleOpenDeliveryAssetResult"
+          @open-delivery-pending-asset="handleOpenDeliveryPendingAsset"
           @pick-template="handlePickTemplate"
           @pick-recent="handlePickRecent"
         />

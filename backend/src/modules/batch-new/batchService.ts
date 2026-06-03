@@ -31,7 +31,11 @@ import {
   resolveBatchExteriorPrompt,
 } from "./batchPrompts";
 import { batchRepository, type BatchTaskRecord } from "./batchRepository";
-import { resolveBatchScene } from "./batchScenes";
+import {
+  resolveBatchScene,
+  resolveBatchSceneReferenceImageUrl,
+  shouldUploadBatchSceneFromLocalPath,
+} from "./batchScenes";
 import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
 
 const DEFAULT_USER_ID = "default_user";
@@ -148,6 +152,15 @@ class BatchService {
       visualConfig: body.visualConfig,
     });
     return { presetId, name: body.name, visualConfig: body.visualConfig, updatedAt: new Date().toISOString() };
+  }
+
+  async deletePreset(presetId: string) {
+    if (!presetId) throw errors.invalidParameter("presetId is required");
+    const deleted = await batchRepository.deletePreset({
+      id: presetId,
+      userId: DEFAULT_USER_ID,
+    });
+    return { presetId, deleted };
   }
 
   async createBatchTask(body: CreateBatchTaskRequest, context?: BillingRequestContext) {
@@ -493,21 +506,30 @@ class BatchService {
       }
 
       if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
-        const scene = resolveBatchScene(config.sceneOptionId, config.sceneIndex);
-        const uploadedScene = scene.referenceImagePath
-          ? await runKieOperation(() =>
-              kieClient.uploadLocalFileWithLease(
-                lease as KieAccountLease,
-                scene.referenceImagePath as string,
-                "used-car-platform/batch-new/scene",
-              ),
-            )
-          : null;
-        const sceneReferenceImageUrl =
-          uploadedScene?.fileUrl ?? config.sceneReferenceImageUrl ?? scene.referenceImageUrl;
+        const scene = resolveBatchScene(
+          config.sceneOptionId,
+          config.sceneReferenceImageUrl,
+        );
+        const uploadedScene =
+          shouldUploadBatchSceneFromLocalPath(config.sceneReferenceImageUrl) &&
+          scene.referenceImagePath
+            ? await runKieOperation(() =>
+                kieClient.uploadLocalFileWithLease(
+                  lease as KieAccountLease,
+                  scene.referenceImagePath as string,
+                  "used-car-platform/batch-new/scene",
+                ),
+              )
+            : null;
+        const sceneReferenceImageUrl = resolveBatchSceneReferenceImageUrl({
+          sceneOptionId: config.sceneOptionId,
+          sceneReferenceImageUrl: config.sceneReferenceImageUrl,
+          uploadedLocalFileUrl: uploadedScene?.fileUrl,
+        });
         if (!sceneReferenceImageUrl) {
           throw errors.invalidParameter("batch-new scene reference image is missing", {
             optionId: scene.optionId,
+            sceneOptionId: config.sceneOptionId,
           });
         }
         inputUrls.push(sceneReferenceImageUrl);

@@ -11,6 +11,7 @@ export interface UploadedAsset {
   assetId: string
   purpose: string
   url: string
+  thumbnailUrl?: string | null
   fileName: string
   mimeType: string
   size: number
@@ -297,6 +298,7 @@ export interface DeliveryTaskItem {
   downloadableAssetCount: number
   downloadPackageStatus: GenerationTaskStatus | null
   latestPackageId: string | null
+  firstInputCoverUrl?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -319,6 +321,19 @@ export interface DeliveryAsset {
   height?: number | null
   localPath?: string | null
   createdAt: string
+}
+
+export interface DeliveryInputCover {
+  slotIndex: number
+  itemKind: string
+  generationTaskId: string
+  status: GenerationTaskStatus
+  inputAssetId?: string
+  coverUrl?: string | null
+}
+
+export interface DeliveryTaskAssetsResult extends PagedResult<DeliveryAsset> {
+  inputCovers?: DeliveryInputCover[]
 }
 
 export interface DeliveryPackage {
@@ -352,6 +367,7 @@ export interface RecentGenerationTask {
   sceneLabel?: string | null
   outputRatio?: string | null
   inputAssetId?: string | null
+  inputAssetThumbnailUrl?: string | null
   inputAssetUrl?: string | null
   resultCount?: number | null
   error?: string | { code?: string; message?: string } | null
@@ -536,6 +552,13 @@ export async function saveBatchPreset(payload: {
   return unwrapApiResponse(response)
 }
 
+export async function deleteBatchPreset(presetId: string) {
+  const response = await request.delete<ApiResponse<{ presetId: string; deleted: boolean }>>(
+    `/modules/batch-new/presets/${encodeURIComponent(presetId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function createBatchTask(payload: CreateBatchTaskPayload) {
   const response = await request.post<ApiResponse<CreatedBatchTask>>(
     '/modules/batch-new/tasks',
@@ -565,22 +588,37 @@ export async function getDeliveryTasks(params?: {
   status?: string
   page?: number
   pageSize?: number
+  refresh?: boolean
 }) {
   const response = await request.get<ApiResponse<PagedResult<DeliveryTaskItem>>>(
     '/modules/delivery/tasks',
-    { params },
+    {
+      params: {
+        ...params,
+        refresh: params?.refresh ? '1' : undefined,
+      },
+    },
   )
   return unwrapApiResponse(response)
 }
 
-export async function getDeliveryTaskAssets(taskId: string, params?: {
-  ratio?: string
-  page?: number
-  pageSize?: number
-}) {
-  const response = await request.get<ApiResponse<PagedResult<DeliveryAsset>>>(
+export async function getDeliveryTaskAssets(
+  taskId: string,
+  params?: {
+    ratio?: string
+    page?: number
+    pageSize?: number
+    refresh?: boolean
+  },
+) {
+  const response = await request.get<ApiResponse<DeliveryTaskAssetsResult>>(
     `/modules/delivery/tasks/${taskId}/assets`,
-    { params },
+    {
+      params: {
+        ...params,
+        refresh: params?.refresh ? '1' : undefined,
+      },
+    },
   )
   return unwrapApiResponse(response)
 }
@@ -685,6 +723,43 @@ export interface CreditsAccount {
   lockedBalance: number
   availableBalance: number
   status: CreditsAccountStatus
+}
+
+function parseCreditsNumber(value: unknown) {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function normalizeCreditsAccount(
+  account: CreditsAccount & Record<string, unknown>,
+): CreditsAccount {
+  return {
+    ...account,
+    totalBalance: parseCreditsNumber(account.totalBalance),
+    lockedBalance: parseCreditsNumber(account.lockedBalance),
+    availableBalance: parseCreditsNumber(account.availableBalance),
+  }
+}
+
+function normalizeCreditsTransaction(
+  transaction: CreditsTransaction & Record<string, unknown>,
+): CreditsTransaction {
+  return {
+    ...transaction,
+    points: parseCreditsNumber(transaction.points),
+    balanceBefore:
+      transaction.balanceBefore === undefined
+        ? undefined
+        : parseCreditsNumber(transaction.balanceBefore),
+    balanceAfter:
+      transaction.balanceAfter === undefined
+        ? undefined
+        : parseCreditsNumber(transaction.balanceAfter),
+    createdAt:
+      typeof transaction.createdAt === 'string'
+        ? transaction.createdAt
+        : new Date(String(transaction.createdAt)).toISOString(),
+  }
 }
 
 export interface RechargeProduct {
@@ -800,7 +875,10 @@ export async function getCreditsAccounts() {
     '/credits/accounts',
   )
   const payload = unwrapApiResponse(response as ApiResponse<unknown>)
-  return extractCreditsList<CreditsAccount>(payload, ['items', 'accounts'])
+  return extractCreditsList<CreditsAccount & Record<string, unknown>>(
+    payload,
+    ['items', 'accounts'],
+  ).map(normalizeCreditsAccount)
 }
 
 export async function getRechargeProducts() {
@@ -819,30 +897,62 @@ export async function getRechargeProducts() {
   ).map(normalizeRechargeProduct)
 }
 
-export async function getCreditsTransactions(params?: {
-  page?: number
-  pageSize?: number
+export type CreditsTransactionsQuery = {
+  accountId?: number
+  accountScope?: 'personal' | 'tenant'
+  tenantId?: number
+  limit?: number
   txnType?: CreditsTransactionType
   from?: string
   to?: string
-}) {
+}
+
+export type CreditsTransactionsResult = {
+  account: CreditsAccount | null
+  items: CreditsTransaction[]
+  total: number
+}
+
+export async function getCreditsTransactions(
+  params?: CreditsTransactionsQuery,
+): Promise<CreditsTransactionsResult> {
   const response = await request.get<
     ApiResponse<
       | {
+          account?: CreditsAccount & Record<string, unknown>
           items?: CreditsTransaction[]
           transactions?: CreditsTransaction[]
           total?: number
         }
       | CreditsTransaction[]
     >
-  >('/credits/transactions', { params })
+  >('/credits/transactions', {
+    params: {
+      accountId: params?.accountId,
+      accountScope: params?.accountScope,
+      tenantId: params?.tenantId,
+      limit: params?.limit,
+    },
+  })
   const payload = unwrapApiResponse(response)
-  if (Array.isArray(payload)) return { items: payload, total: payload.length }
-  const items = extractCreditsList<CreditsTransaction>(payload, [
-    'items',
-    'transactions',
-  ])
+  if (Array.isArray(payload)) {
+    const items = payload.map((item) =>
+      normalizeCreditsTransaction(item as CreditsTransaction & Record<string, unknown>),
+    )
+    return { account: null, items, total: items.length }
+  }
+
+  const items = extractCreditsList<CreditsTransaction & Record<string, unknown>>(
+    payload,
+    ['items', 'transactions'],
+  ).map(normalizeCreditsTransaction)
+
+  const account = payload.account
+    ? normalizeCreditsAccount(payload.account)
+    : null
+
   return {
+    account,
     items,
     total: payload.total ?? items.length,
   }

@@ -129,7 +129,7 @@ const tutorialTemplatePreviewImages = [
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   margin-top: 0;
 }
@@ -145,38 +145,39 @@ const tutorialTemplatePreviewImages = [
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: rgba(17, 17, 17, 0.72);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  background: rgba(17, 17, 17, 0.36);
+  box-shadow: none;
   transition:
     transform 0.25s ease,
-    box-shadow 0.25s ease;
+    background-color 0.25s ease;
 }
 
 .tutorial-step:hover {
-  transform: translateY(-2px);
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .tutorial-section.theme-light .tutorial-step {
-  border: 0;
-  background: #ffffff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  box-shadow: none;
 }
 
 .tutorial-section.theme-light .tutorial-step:hover {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.03);
 }
 
 .tutorial-step-arrow {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border: 1px solid rgba(212, 160, 23, 0.28);
   border-radius: 999px;
-  background: rgba(212, 160, 23, 0.12);
+  background: rgba(212, 160, 23, 0.08);
   color: #d4a017;
   pointer-events: none;
 }
@@ -208,7 +209,7 @@ const tutorialTemplatePreviewImages = [
 .tutorial-step.is-step-4 .tutorial-placeholder {
   align-items: flex-start;
   justify-content: center;
-  padding: 10px;
+  padding: 8px;
   box-sizing: border-box;
   background: transparent;
 }
@@ -216,14 +217,17 @@ const tutorialTemplatePreviewImages = [
 .tutorial-step.is-step-3 .tutorial-placeholder {
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  background: transparent;
 }
 
 .tutorial-section.theme-light .tutorial-step.is-step-1 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-2 .tutorial-placeholder,
-.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-placeholder,
 .tutorial-section.theme-light .tutorial-step.is-step-4 .tutorial-placeholder {
   background: #f8fafc;
+}
+
+.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-placeholder {
+  background: transparent;
 }
 
 .tutorial-step.is-step-1 .tutorial-image,
@@ -260,24 +264,35 @@ const tutorialTemplatePreviewImages = [
 
 .tutorial-step.is-step-3 .tutorial-logo-image {
   display: flex;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  max-width: 88%;
+  height: auto;
+  max-height: calc(100% - 16px);
   align-items: center;
   justify-content: center;
-  background: transparent;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-logo-image {
+  background: #f8fafc;
 }
 
 .tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image) {
   display: flex;
-  width: min(88%, 220px);
+  width: auto;
   height: auto;
+  max-width: 100%;
+  max-height: 100%;
   align-items: center;
   justify-content: center;
   background: transparent !important;
 }
 
 .tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image__img) {
-  width: 100%;
+  width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
@@ -332,23 +347,19 @@ const tutorialTemplatePreviewImages = [
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 52px;
-  padding: 0 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 58px;
+  padding: 12px;
+  border-top: 0;
   box-sizing: border-box;
-}
-
-.tutorial-section.theme-light .tutorial-step-foot {
-  border-top-color: #e5e7eb;
 }
 
 .tutorial-step-foot strong {
   min-width: 0;
   flex: 1 1 auto;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.35;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -362,7 +373,7 @@ const tutorialTemplatePreviewImages = [
 @media (max-width: 1500px) {
   .tutorial-flow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 8px;
   }
 }
 </style>

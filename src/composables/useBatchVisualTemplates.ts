@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 
 import {
+  deleteBatchPreset,
   getBatchPresets,
   saveBatchPreset,
   type BatchVisualConfig,
@@ -137,6 +138,16 @@ export function useBatchVisualTemplates() {
     return nextTemplate
   }
 
+  async function deleteTemplate(id: string) {
+    const result = await deleteBatchPreset(id)
+    if (!result.deleted) {
+      throw new Error('预设不存在或已被删除')
+    }
+
+    templates.value = templates.value.filter((item) => item.id !== id)
+    return templates.value
+  }
+
   function removeTemplate(id: string) {
     templates.value = templates.value.filter((item) => item.id !== id)
   }
@@ -152,6 +163,7 @@ export function useBatchVisualTemplates() {
     getTemplateById,
     saveTemplate,
     updateTemplate,
+    deleteTemplate,
     removeTemplate,
   }
 }

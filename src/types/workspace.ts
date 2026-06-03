@@ -31,6 +31,7 @@ export interface WorkspaceRecentItem {
   sceneLabel?: string
   outputRatio?: string
   inputAssetId?: string
+  inputAssetThumbnailUrl?: string
   inputAssetUrl?: string
   progress?: number
   resultCount?: number
@@ -90,6 +91,7 @@ export interface WorkspaceDeliveryTaskPreviewAsset {
   createdAt?: string
   imageUrl?: string
   thumbnailUrl?: string
+  generationTaskId?: string
   width?: number
   height?: number
 }

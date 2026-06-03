@@ -193,6 +193,16 @@ export function getBatchSceneImageUrl(category: string, sceneIndex: number): str
   return scenes[sceneIndex]?.image ?? scenes[0]?.image
 }
 
+/** 与展厅棚拍/户外实景等场景更换能力共用同一张场景参考图 */
+export function getWorkspaceSceneOptionImage(optionId: string): string | undefined {
+  for (const group of batchSceneCatalog) {
+    const matched = group.scenes.find((scene) => scene.optionId === optionId)
+    if (matched) return matched.image
+  }
+
+  return undefined
+}
+
 const beautyOptions = createOptions([
   [
     'balanced',

@@ -103,9 +103,6 @@ class TasksService {
   }
 
   private async reconcileRecentTasks(tasks: GenerationTaskRecord[]) {
-    const activeTasks = tasks.filter(
-      (task) => task.kieTaskId && !terminalStatuses.includes(task.status),
-    );
     const staleWaitingTasks = tasks.filter((task) => this.isStaleWaitingTask(task));
     let changed = false;
 
@@ -121,19 +118,6 @@ class TasksService {
         changed = true;
       } catch {
         // Recent-task lists should stay usable even if stale cleanup fails.
-      }
-    }
-
-    for (const task of activeTasks) {
-      try {
-        await this.refreshFromKie(task);
-        const refreshed = await tasksRepository.findById(task.id);
-        if (!refreshed) continue;
-        await this.syncCreativeConversationResult(refreshed);
-        await this.finalizeTaskBilling(refreshed, true);
-        changed = true;
-      } catch {
-        // Recent-task lists should not fail just because one upstream status check failed.
       }
     }
 
@@ -245,8 +229,9 @@ class TasksService {
   }
 
   private toRecentResponse(task: RecentGenerationRecord) {
-    const results = normalizeTaskResults(task.resultJson);
-    const previewImage = results[0]?.url ?? task.inputAssetUrl ?? null;
+    const coverUrl =
+      task.inputAssetThumbnailUrl ?? task.inputAssetUrl ?? null;
+
     return {
       id: task.id,
       taskId: task.id,
@@ -257,15 +242,15 @@ class TasksService {
       progress: task.progress,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
-      thumbnail: previewImage,
-      previewImage,
-      downloadUrl: results[0]?.url ?? null,
+      thumbnail: coverUrl,
+      previewImage: coverUrl,
+      downloadUrl: null,
       ratioLabel: `主图 ${task.outputRatio}`,
       sceneLabel: this.buildRecentSceneLabel(task),
       outputRatio: task.outputRatio,
       inputAssetId: task.inputAssetId,
-      inputAssetUrl: task.inputAssetUrl,
-      resultCount: results.length,
+      inputAssetThumbnailUrl: task.inputAssetThumbnailUrl ?? null,
+      resultCount: normalizeTaskResults(task.resultJson).length,
       billingTaskId: task.billingTaskId ?? null,
       billingStatus: task.billingStatus ?? null,
       estimatedPoints: task.estimatedPoints ?? null,
