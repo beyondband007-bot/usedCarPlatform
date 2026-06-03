@@ -265,12 +265,12 @@ const tutorialTemplatePreviewImages = [
 .tutorial-step.is-step-3 .tutorial-logo-image {
   display: flex;
   width: auto;
-  max-width: 88%;
-  height: auto;
-  max-height: calc(100% - 16px);
+  // max-width: 88%;
+  // height: auto;
+  // max-height: calc(100% - 16px);
   align-items: center;
   justify-content: center;
-  padding: 10px 14px;
+  // padding: 10px 14px;
   border-radius: 8px;
   box-sizing: border-box;
   background: #ffffff;
@@ -347,8 +347,8 @@ const tutorialTemplatePreviewImages = [
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 58px;
-  padding: 12px;
+  min-height: 40px;
+  padding: 0 12px;
   border-top: 0;
   box-sizing: border-box;
 }
