@@ -81,7 +81,7 @@ onMounted(() => {
   position: relative;
   z-index: 3;
   width: min(1660px, calc(100% - 40px));
-  margin: 126px auto 0;
+  margin: 88px auto 0;
   padding-bottom: 126px;
 }
 

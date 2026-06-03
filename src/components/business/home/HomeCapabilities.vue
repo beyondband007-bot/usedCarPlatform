@@ -228,10 +228,10 @@ onMounted(() => {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  min-height: 29px;
-  padding: 0 15px;
+  min-height: 41px;
+  padding: 0 20px;
   border-radius: 999px;
-  font-size: clamp(13px, 1.2vw, 18px);
+  font-size: clamp(25px, 2.4vw, 30px);
   font-weight: 800;
   white-space: nowrap;
   transition:
@@ -279,9 +279,9 @@ onMounted(() => {
 
 .badge-row span::before {
   display: inline-block;
-  width: 18px;
-  height: 18px;
-  margin-right: 9px;
+  width: 22px;
+  height: 22px;
+  margin-right: 11px;
   content: "";
   border-radius: 5px;
 }

@@ -130,7 +130,7 @@ export const homeCaseTabs: HomeCaseTab[] = [
     service: '适配各种车型的多角度外观图、内饰图、LOGO车牌处理',
     image: caseUsedImage,
     efficiencyTip: {
-      title: '效率提示',
+      title: '效率提升',
       copy: '每百张出海素材准备时间：8小时→15分钟',
     },
   },

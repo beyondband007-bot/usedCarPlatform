@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject } from "vue";
 
-import HomeBottomCta from '@/components/business/home/HomeBottomCta.vue'
-import HomeCapabilities from '@/components/business/home/HomeCapabilities.vue'
-import HomeCaseStudies from '@/components/business/home/HomeCaseStudies.vue'
-import HomeFooter from '@/components/business/home/HomeFooter.vue'
-import HomeHero from '@/components/business/home/HomeHero.vue'
-import HomeQuickAccess from '@/components/business/home/HomeQuickAccess.vue'
-import { WORKBENCH_ENTRY_KEY } from '@/composables/workbench-entry-key'
-import { useAppStore } from '@/stores/app'
+import HomeBottomCta from "@/components/business/home/HomeBottomCta.vue";
+import HomeCapabilities from "@/components/business/home/HomeCapabilities.vue";
+import HomeCaseStudies from "@/components/business/home/HomeCaseStudies.vue";
+import HomeFooter from "@/components/business/home/HomeFooter.vue";
+import HomeHero from "@/components/business/home/HomeHero.vue";
+import HomeQuickAccess from "@/components/business/home/HomeQuickAccess.vue";
+import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
+import { useAppStore } from "@/stores/app";
 
-const appStore = useAppStore()
-const workbenchEntry = inject(WORKBENCH_ENTRY_KEY)
+const appStore = useAppStore();
+const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 function openWorkbench() {
-  workbenchEntry?.openWorkbench()
+  workbenchEntry?.openWorkbench();
 }
 </script>
 
@@ -63,15 +63,31 @@ function openWorkbench() {
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
   --home-card-bg: linear-gradient(180deg, #151515, #0b0b0b);
-  --home-card-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
-  --home-media-overlay: linear-gradient(90deg, rgba(4, 4, 4, 0.88), rgba(4, 4, 4, 0.18));
-  --home-media-overlay-full: linear-gradient(90deg, rgba(4, 4, 4, 0.88) 0%, rgba(4, 4, 4, 0) 50%);
+  --home-card-overlay: linear-gradient(
+    90deg,
+    rgba(4, 4, 4, 0.88),
+    rgba(4, 4, 4, 0.18)
+  );
+  --home-media-overlay: linear-gradient(
+    90deg,
+    rgba(4, 4, 4, 0.88),
+    rgba(4, 4, 4, 0.18)
+  );
+  --home-media-overlay-full: linear-gradient(
+    90deg,
+    rgba(4, 4, 4, 0.88) 0%,
+    rgba(4, 4, 4, 0) 50%
+  );
   --home-media-title: #fff;
   --home-media-desc: #d5d5d5;
   --home-card-title: #f3f3f3;
   --home-card-desc: #d7d7d7;
   --home-card-muted: #8a8a8a;
-  --home-card-shine: linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  --home-card-shine: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.08),
+    transparent 42%
+  );
   --home-card-hover-border: rgba(244, 200, 64, 0.38);
   --home-card-shadow: 0 18px 52px rgba(0, 0, 0, 0.2);
   --home-badge-bg: #101010;
@@ -103,16 +119,36 @@ function openWorkbench() {
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
   --home-card-bg: linear-gradient(180deg, #ffffff, #f8fafd);
-  --home-card-overlay: linear-gradient(90deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.42));
-  --home-media-overlay: linear-gradient(90deg, rgba(24, 18, 10, 0.8), rgba(24, 18, 10, 0.18));
-  --home-media-overlay-full: linear-gradient(90deg, rgba(24, 18, 10, 0.8) 0%, rgba(24, 18, 10, 0) 50%);
+  --home-card-overlay: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.96),
+    rgba(255, 255, 255, 0.42)
+  );
+  --home-media-overlay: linear-gradient(
+    90deg,
+    rgba(24, 18, 10, 0.8),
+    rgba(24, 18, 10, 0.18)
+  );
+  --home-media-overlay-full: linear-gradient(
+    90deg,
+    rgba(24, 18, 10, 0.8) 0%,
+    rgba(24, 18, 10, 0) 50%
+  );
   --home-media-title: #fff;
   --home-media-desc: rgba(255, 255, 255, 0.84);
   --home-card-title: var(--color-text-primary);
   --home-card-desc: var(--color-text-secondary);
   --home-card-muted: var(--color-text-muted);
-  --home-card-shine: linear-gradient(110deg, rgba(47, 107, 255, 0.06), transparent 42%);
-  --home-card-hover-border: color-mix(in srgb, var(--color-accent-blue) 34%, transparent);
+  --home-card-shine: linear-gradient(
+    110deg,
+    rgba(47, 107, 255, 0.06),
+    transparent 42%
+  );
+  --home-card-hover-border: color-mix(
+    in srgb,
+    var(--color-accent-blue) 34%,
+    transparent
+  );
   --home-card-shadow: var(--shadow-panel);
   --home-badge-bg: #f8fafd;
   --home-badge-text: #334155;
@@ -133,7 +169,7 @@ function openWorkbench() {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  content: '';
+  content: "";
   background:
     linear-gradient(var(--home-grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--home-grid-line-alt) 1px, transparent 1px);

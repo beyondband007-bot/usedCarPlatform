@@ -281,20 +281,28 @@ onBeforeUnmount(() => {
           </div>
         </label>
 
-        <label v-if="loginMode === 'password'" class="login-field">
-          <span class="login-field-row">
+        <div v-if="loginMode === 'password'" class="login-field login-field--password">
+          <div class="login-field-header">
             <span class="login-field-label">密码</span>
-            <button type="button" class="login-forgot" @click="openResetModal">忘记密码?</button>
-          </span>
-          <NInput
-            v-model:value="password"
-            class="login-input"
-            size="large"
-            type="password"
-            show-password-on="click"
-            placeholder="请输入密码"
-          />
-        </label>
+            <button
+              type="button"
+              class="login-forgot"
+              @click.stop.prevent="openResetModal"
+            >
+              忘记密码?
+            </button>
+          </div>
+          <div class="login-password-input">
+            <NInput
+              v-model:value="password"
+              class="login-input"
+              size="large"
+              type="password"
+              show-password-on="mousedown"
+              placeholder="请输入密码"
+            />
+          </div>
+        </div>
 
         <label v-if="loginMode === 'code'" class="login-field">
           <span class="login-field-label">短信验证码</span>
@@ -333,13 +341,16 @@ onBeforeUnmount(() => {
     <NModal
       v-model:show="resetVisible"
       preset="card"
-      class="reset-modal"
+      :class="[
+        'login-reset-modal',
+        isDark ? 'login-reset-modal--dark' : 'login-reset-modal--light',
+      ]"
       title="忘记密码"
       :bordered="false"
       :mask-closable="!resetSubmitting"
     >
       <div class="reset-fields">
-        <label class="login-field">
+        <div class="login-field">
           <span class="login-field-label">手机号</span>
           <div class="login-phone-input">
             <NInput
@@ -349,9 +360,9 @@ onBeforeUnmount(() => {
               placeholder="请输入手机号"
             />
           </div>
-        </label>
+        </div>
 
-        <label class="login-field">
+        <div class="login-field">
           <span class="login-field-label">短信验证码</span>
           <div class="login-code-row">
             <NInput
@@ -369,31 +380,35 @@ onBeforeUnmount(() => {
               {{ resetCodeButtonText }}
             </NButton>
           </div>
-        </label>
+        </div>
 
-        <label class="login-field">
+        <div class="login-field">
           <span class="login-field-label">新密码</span>
-          <NInput
-            v-model:value="resetForm.password"
-            class="login-input"
-            size="large"
-            type="password"
-            show-password-on="click"
-            placeholder="请输入新密码"
-          />
-        </label>
+          <div class="login-password-input">
+            <NInput
+              v-model:value="resetForm.password"
+              class="login-input"
+              size="large"
+              type="password"
+              show-password-on="mousedown"
+              placeholder="请输入新密码"
+            />
+          </div>
+        </div>
 
-        <label class="login-field">
+        <div class="login-field">
           <span class="login-field-label">确认密码</span>
-          <NInput
-            v-model:value="resetForm.confirmPassword"
-            class="login-input"
-            size="large"
-            type="password"
-            show-password-on="click"
-            placeholder="请再次输入新密码"
-          />
-        </label>
+          <div class="login-password-input">
+            <NInput
+              v-model:value="resetForm.confirmPassword"
+              class="login-input"
+              size="large"
+              type="password"
+              show-password-on="mousedown"
+              placeholder="请再次输入新密码"
+            />
+          </div>
+        </div>
       </div>
 
       <template #footer>
@@ -531,6 +546,24 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
+.login-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.login-field--password {
+  gap: 8px;
+}
+
+.login-password-input {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
 .login-field-row {
   display: flex;
   align-items: center;
@@ -573,6 +606,49 @@ onBeforeUnmount(() => {
   --n-text-color: var(--panel-text) !important;
   --n-placeholder-color: var(--panel-muted) !important;
   --n-caret-color: var(--accent) !important;
+  --n-suffix-text-color: var(--panel-muted) !important;
+}
+
+.login-input :deep(.n-input-wrapper) {
+  background: var(--field-bg) !important;
+}
+
+.login-input :deep(.n-input__suffix) {
+  margin: 0;
+  background: transparent !important;
+}
+
+.login-input :deep(.n-input__eye) {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0 !important;
+  border-radius: 6px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--panel-muted);
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.login-input :deep(.n-input__eye:hover) {
+  background: color-mix(in srgb, var(--panel-text) 8%, transparent) !important;
+  color: var(--panel-text);
+}
+
+.login-input :deep(.n-input__eye .n-base-icon) {
+  font-size: 18px;
+}
+
+.login-input :deep(.n-input__input-el) {
+  font-family: inherit;
 }
 
 .login-input--phone {
@@ -596,6 +672,10 @@ onBeforeUnmount(() => {
 }
 
 .login-forgot {
+  position: relative;
+  z-index: 0;
+  flex-shrink: 0;
+  margin: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -604,6 +684,8 @@ onBeforeUnmount(() => {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
   transition: color 0.2s ease;
 }
 
@@ -640,15 +722,11 @@ onBeforeUnmount(() => {
   --n-color-focus: #2f7cff !important;
 }
 
-:deep(.reset-modal) {
-  width: min(92vw, 420px);
-  border-radius: 12px;
-}
-
 @media (max-width: 520px) {
-  .login-field-row {
+  .login-field-header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 4px;
   }
 
   .login-code-row {
@@ -658,5 +736,58 @@ onBeforeUnmount(() => {
   .login-code-button {
     width: 100%;
   }
+}
+</style>
+
+<style lang="scss">
+.login-reset-modal.n-modal {
+  width: min(92vw, 420px) !important;
+  max-width: 420px;
+}
+
+.login-reset-modal.n-modal .n-card {
+  width: 100%;
+  border-radius: 12px;
+}
+
+.login-reset-modal.n-modal .n-card-header {
+  padding-bottom: 8px;
+}
+
+.login-reset-modal.n-modal .n-card__content,
+.login-reset-modal.n-modal .n-card__footer {
+  padding-top: 0;
+}
+
+.login-reset-modal--light {
+  --panel-bg: rgba(255, 255, 255, 0.94);
+  --panel-border: rgba(15, 35, 60, 0.08);
+  --panel-text: #10233c;
+  --panel-muted: #5c708c;
+  --field-bg: #f4f7fb;
+  --field-border: #d5e0ed;
+  --field-border-focus: #2f7cff;
+  --field-focus-ring: rgba(47, 124, 255, 0.16);
+  --accent: #d4a017;
+  --accent-strong: #e5b85c;
+  --accent-pressed: #b88912;
+  --submit-text: #ffffff;
+  --submit-shadow: 0 14px 32px rgba(47, 124, 255, 0.24);
+}
+
+.login-reset-modal--dark {
+  --panel-bg: rgba(14, 14, 14, 0.78);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-text: #ffffff;
+  --panel-muted: rgba(255, 255, 255, 0.58);
+  --field-bg: rgba(255, 255, 255, 0.06);
+  --field-border: rgba(255, 255, 255, 0.12);
+  --field-border-focus: rgba(239, 194, 76, 0.72);
+  --field-focus-ring: rgba(239, 194, 76, 0.18);
+  --accent: #efc24c;
+  --accent-strong: #f4d36a;
+  --accent-pressed: #d4ad3f;
+  --submit-text: #1a1400;
+  --submit-shadow: 0 14px 32px rgba(239, 194, 76, 0.28);
 }
 </style>

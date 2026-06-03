@@ -123,8 +123,8 @@ const appStore = useAppStore();
           <ul class="nav-list">
             <li><span class="nav-item">关于我们</span></li>
             <li><span class="nav-item">帮助中心</span></li>
-            <li><span class="nav-item">商务合作：sales@lianpu.ai</span></li>
-            <li><span class="nav-item">媒体联系：media@lianpu.ai</span></li>
+            <li><span class="nav-item">商务合作：13718492350@163.com</span></li>
+            <li><span class="nav-item">媒体联系：13718492350@163.com</span></li>
           </ul>
         </div>
       </div>

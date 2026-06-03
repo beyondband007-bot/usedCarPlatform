@@ -56,6 +56,7 @@ const homeHeroImageSrc = computed(() =>
 .hero {
   position: relative;
   width: 100%;
+  margin-bottom: 24px;
 }
 
 .hero-visual {
@@ -70,6 +71,9 @@ const homeHeroImageSrc = computed(() =>
   width: 100%;
   overflow: hidden;
   line-height: 0;
+  --hero-text-top: max(18%, calc(var(--app-header-offset, 72px) + 16px));
+  --hero-car-top: 56%;
+  --hero-text-car-gap: 24px;
 }
 
 .hero-image {
@@ -101,10 +105,16 @@ const homeHeroImageSrc = computed(() =>
 .hero-copy {
   position: absolute;
   z-index: 2;
-  top: 13%;
+  top: var(--hero-text-top);
   right: 0;
   left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   width: min(900px, calc(100% - 40px));
+  max-height: calc(
+    var(--hero-car-top) - var(--hero-text-top) - var(--hero-text-car-gap)
+  );
   margin: 0 auto;
   padding: 0;
   line-height: normal;
@@ -114,10 +124,10 @@ const homeHeroImageSrc = computed(() =>
 }
 
 .hero h1 {
-  margin: 0 0 clamp(6px, 1.4cqh, 14px);
+  margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: clamp(14px, 6.8cqh, 55px);
-  line-height: 1.1;
+  font-size: clamp(22px, 2.2cqw, 46px);
+  line-height: 1.12;
   letter-spacing: 0;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
@@ -125,7 +135,7 @@ const homeHeroImageSrc = computed(() =>
 .subtitle {
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
-  font-size: clamp(10px, 3.6cqh, 25px);
+  font-size: clamp(14px, 0.92cqw, 20px);
   line-height: 1.35;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
@@ -152,19 +162,47 @@ const homeHeroImageSrc = computed(() =>
   }
 }
 
-@supports not (container-type: size) {
+@supports (width: 1cqw) {
   .hero h1 {
-    font-size: clamp(16px, 2.6vw, 55px);
+    font-size: clamp(22px, 4.8cqh, 46px);
   }
 
   .subtitle {
-    font-size: clamp(11px, 1.4vw, 25px);
+    font-size: clamp(14px, 1.85cqh, 20px);
+  }
+}
+
+@supports not (width: 1cqw) {
+  .hero h1 {
+    font-size: clamp(22px, 2.2vw, 46px);
+  }
+
+  .subtitle {
+    font-size: clamp(14px, 0.92vw, 20px);
   }
 }
 
 @media (max-width: 700px) {
   .hero-copy {
     width: min(100% - 28px, 900px);
+  }
+}
+
+@media (min-width: 1600px) {
+  .hero-media {
+    --hero-text-top: max(15%, calc(var(--app-header-offset, 72px) + 16px));
+    --hero-car-top: 50%;
+    --hero-text-car-gap: 48px;
+  }
+
+  .hero h1 {
+    margin-bottom: 24px;
+    font-size: clamp(27px, 4.8cqh, 54px);
+    font-weight: 800;
+  }
+
+  .subtitle {
+    font-size: clamp(19px, 1.85cqh, 25px);
   }
 }
 </style>
