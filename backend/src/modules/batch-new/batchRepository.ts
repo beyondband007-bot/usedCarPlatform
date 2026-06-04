@@ -6,6 +6,7 @@ import type { BatchItemKind, BatchItemSummary, BatchVisualConfig } from "./batch
 
 export interface BatchTaskRecord {
   id: string;
+  userId: string;
   projectName: string;
   presetId: string;
   status: TaskStatus;
@@ -31,6 +32,7 @@ export interface BatchItemTaskLink extends BatchItemSummary {
 
 interface BatchTaskRow extends RowDataPacket {
   id: string;
+  user_id: string;
   project_name: string;
   preset_id: string;
   status: TaskStatus;
@@ -89,6 +91,7 @@ const parseJson = <T>(value: unknown, fallback: T): T => {
 
 const mapBatch = (row: BatchTaskRow): BatchTaskRecord => ({
   id: row.id,
+  userId: row.user_id,
   projectName: row.project_name,
   presetId: row.preset_id,
   status: row.status,
@@ -162,6 +165,7 @@ export class BatchRepository extends Repository {
 
   async createBatch(input: {
     id: string;
+    userId: string;
     projectName: string;
     presetId: string;
     total: number;
@@ -174,10 +178,10 @@ export class BatchRepository extends Repository {
   }) {
     await this.execute(
       `INSERT INTO batch_tasks
-        (id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json,
+        (id, user_id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json,
          credits_user_id, credits_tenant_id, account_scope, subscription_user_key, subscription_plan_code)
        VALUES
-        (:id, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig,
+        (:id, :userId, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig,
          :creditsUserId, :creditsTenantId, :accountScope, :subscriptionUserKey, :subscriptionPlanCode)`,
       {
         ...input,
@@ -213,21 +217,38 @@ export class BatchRepository extends Repository {
     );
   }
 
-  async findBatch(id: string) {
-    const rows = await this.query<BatchTaskRow[]>(`SELECT * FROM batch_tasks WHERE id = :id LIMIT 1`, { id });
+  async findBatch(id: string, userId?: string) {
+    const clauses = ["id = :id"];
+    const params: Record<string, unknown> = { id };
+    if (userId) {
+      clauses.push("user_id = :userId");
+      params.userId = userId;
+    }
+    const rows = await this.query<BatchTaskRow[]>(
+      `SELECT * FROM batch_tasks WHERE ${clauses.join(" AND ")} LIMIT 1`,
+      params,
+    );
     return rows[0] ? mapBatch(rows[0]) : null;
   }
 
-  async listBatches(input: { status?: string; page: number; pageSize: number }) {
+  async listBatches(input: { userId: string; status?: string; page: number; pageSize: number }) {
     const offset = (input.page - 1) * input.pageSize;
-    const where = input.status ? "WHERE status = :status" : "";
+    const clauses = ["user_id = :userId"];
+    const params: Record<string, unknown> = {
+      userId: input.userId,
+      status: input.status,
+      limit: input.pageSize,
+      offset,
+    };
+    if (input.status) clauses.push("status = :status");
+    const where = `WHERE ${clauses.join(" AND ")}`;
     const rows = await this.query<BatchTaskRow[]>(
       `SELECT * FROM batch_tasks ${where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset`,
-      { status: input.status, limit: input.pageSize, offset },
+      params,
     );
     const totalRows = await this.query<Array<RowDataPacket & { total: number }>>(
       `SELECT COUNT(*) total FROM batch_tasks ${where}`,
-      { status: input.status },
+      params,
     );
     return { items: rows.map(mapBatch), total: Number(totalRows[0]?.total ?? 0) };
   }

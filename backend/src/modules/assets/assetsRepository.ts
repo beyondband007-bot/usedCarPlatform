@@ -5,6 +5,7 @@ import type { AssetPurpose } from "../../shared/types";
 
 export interface AssetRecord {
   id: string;
+  userId: string;
   purpose: AssetPurpose;
   fileName: string;
   mimeType: string;
@@ -19,6 +20,7 @@ export interface AssetRecord {
 
 interface AssetRow extends RowDataPacket {
   id: string;
+  user_id: string;
   purpose: AssetPurpose;
   file_name: string;
   mime_type: string;
@@ -33,6 +35,7 @@ interface AssetRow extends RowDataPacket {
 
 const mapRow = (row: AssetRow): AssetRecord => ({
   id: row.id,
+  userId: row.user_id,
   purpose: row.purpose,
   fileName: row.file_name,
   mimeType: row.mime_type,
@@ -49,18 +52,24 @@ export class AssetsRepository extends Repository {
   async create(asset: AssetRecord) {
     await this.execute(
       `INSERT INTO assets
-        (id, purpose, file_name, mime_type, size, width, height, local_path, public_url, thumbnail_url)
+        (id, user_id, purpose, file_name, mime_type, size, width, height, local_path, public_url, thumbnail_url)
        VALUES
-        (:id, :purpose, :fileName, :mimeType, :size, :width, :height, :localPath, :publicUrl, :thumbnailUrl)`,
+        (:id, :userId, :purpose, :fileName, :mimeType, :size, :width, :height, :localPath, :publicUrl, :thumbnailUrl)`,
       asset as unknown as Record<string, unknown>,
     );
     return asset;
   }
 
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
+    const clauses = ["id = :id"];
+    const params: Record<string, unknown> = { id };
+    if (userId) {
+      clauses.push("user_id = :userId");
+      params.userId = userId;
+    }
     const rows = await this.query<AssetRow[]>(
-      `SELECT * FROM assets WHERE id = :id LIMIT 1`,
-      { id },
+      `SELECT * FROM assets WHERE ${clauses.join(" AND ")} LIMIT 1`,
+      params,
     );
     return rows[0] ? mapRow(rows[0]) : null;
   }

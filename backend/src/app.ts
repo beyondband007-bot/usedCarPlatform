@@ -5,6 +5,7 @@ import express from "express";
 
 import { env } from "./config/env";
 import { assetsRoutes } from "./modules/assets/assetsRoutes";
+import { requireCurrentUser } from "./modules/auth/authMiddleware";
 import { authRoutes } from "./modules/auth/authRoutes";
 import { creditsRoutes } from "./modules/billing/creditsRoutes";
 import { moduleRoutes } from "./modules/moduleRoutes";
@@ -28,12 +29,12 @@ export const createApp = () => {
   });
 
   app.use("/api/v1/auth", authRoutes);
-  app.use("/api/v1/assets", assetsRoutes);
+  app.use("/api/v1/assets", requireCurrentUser, assetsRoutes);
   app.use("/api/v1/credits", creditsRoutes);
   app.use("/api/v1/platform", platformRoutes);
-  app.use("/api/v1/tasks", tasksRoutes);
-  app.use("/api/v1/modules", moduleRoutes);
-  app.use("/api/v1/user", userLogoRoutes);
+  app.use("/api/v1/tasks", requireCurrentUser, tasksRoutes);
+  app.use("/api/v1/modules", requireCurrentUser, moduleRoutes);
+  app.use("/api/v1/user", requireCurrentUser, userLogoRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

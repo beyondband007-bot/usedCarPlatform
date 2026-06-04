@@ -162,18 +162,24 @@ export class DeliveryRepository extends Repository {
     );
   }
 
-  async findAssetsByIds(assetIds: string[]) {
+  async findAssetsByIds(assetIds: string[], userId?: string) {
     if (!assetIds.length) return [];
     const placeholders = assetIds.map((_, index) => `:assetId${index}`).join(", ");
+    const userJoin = userId ? "JOIN batch_tasks bt ON bt.id = da.source_task_id" : "";
+    const userWhere = userId ? "AND bt.user_id = :userId" : "";
+    const params = Object.fromEntries(assetIds.map((assetId, index) => [`assetId${index}`, assetId]));
+    if (userId) params.userId = userId;
     const rows = await this.query<DeliveryAssetRow[]>(
       `SELECT da.*
        FROM delivery_assets da
+       ${userJoin}
        LEFT JOIN batch_task_items bti
          ON bti.batch_id = da.source_task_id
         AND da.id LIKE CONCAT('delivery_', bti.generation_task_id, '_%')
        WHERE da.id IN (${placeholders}) AND da.deleted_at IS NULL
+         ${userWhere}
        ORDER BY bti.sort_order ASC, da.created_at ASC`,
-      Object.fromEntries(assetIds.map((assetId, index) => [`assetId${index}`, assetId])),
+      params,
     );
     return rows.map(mapAsset);
   }
@@ -208,11 +214,39 @@ export class DeliveryRepository extends Repository {
     return rows[0] ? this.mapPackage(rows[0]) : null;
   }
 
+  async findPackageForUser(id: string, userId: string) {
+    const rows = await this.query<PackageRow[]>(
+      `SELECT dp.*
+       FROM delivery_packages dp
+       JOIN batch_tasks bt ON bt.id = dp.task_id
+       WHERE dp.id = :id
+         AND bt.user_id = :userId
+       LIMIT 1`,
+      { id, userId },
+    );
+    return rows[0] ? this.mapPackage(rows[0]) : null;
+  }
+
   async listPackages(taskId?: string | null) {
     const where = taskId ? "WHERE task_id = :taskId" : "";
     const rows = await this.query<PackageRow[]>(
       `SELECT * FROM delivery_packages ${where} ORDER BY created_at DESC LIMIT 50`,
       { taskId },
+    );
+    return rows.map((row) => this.mapPackage(row));
+  }
+
+  async listPackagesForUser(input: { userId: string; taskId?: string | null }) {
+    const taskFilter = input.taskId ? "AND dp.task_id = :taskId" : "";
+    const rows = await this.query<PackageRow[]>(
+      `SELECT dp.*
+       FROM delivery_packages dp
+       JOIN batch_tasks bt ON bt.id = dp.task_id
+       WHERE bt.user_id = :userId
+         ${taskFilter}
+       ORDER BY dp.created_at DESC
+       LIMIT 50`,
+      { userId: input.userId, taskId: input.taskId ?? null },
     );
     return rows.map((row) => this.mapPackage(row));
   }

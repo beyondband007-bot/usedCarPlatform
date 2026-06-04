@@ -63,7 +63,11 @@ class InteriorCollageService {
       throw errors.invalidParameter("assetIds must not contain duplicates", { assetId: duplicated });
     }
 
-    const assets = await Promise.all(assetIds.map((assetId) => assetsRepository.findById(assetId)));
+    const requestedSlots = groupSizes(assetIds.length).length;
+    const subscription = await assertCanStartGeneration(context, { requestedSlots });
+    const assets = await Promise.all(
+      assetIds.map((assetId) => assetsRepository.findById(assetId, subscription.userKey)),
+    );
     const missingIndex = assets.findIndex((asset) => !asset);
     if (missingIndex >= 0) throw errors.assetNotFound();
 
@@ -80,7 +84,6 @@ class InteriorCollageService {
     const resolution = body.resolution ?? "2K";
     const prompt = appendOutputRatioPrompt(interiorCollagePrompt, outputRatio);
     const groups = splitAssets(interiorAssets);
-    const subscription = await assertCanStartGeneration(context, { requestedSlots: groups.length });
     const taskEntries = [];
     const tasks = [];
 
@@ -91,6 +94,7 @@ class InteriorCollageService {
 
       await tasksRepository.createWaitingTask({
         id: taskId,
+        userId: subscription.userKey,
         moduleCode: "interior-collage",
         inputAssetId: group[0].id,
         optionId,

@@ -68,6 +68,7 @@ const extractKieTimeoutErrorCode = (error: unknown) => {
 
 class TasksService {
   async listRecentTasks(input: {
+    userId: string;
     moduleCode?: string;
     status?: string;
     page?: number;
@@ -83,6 +84,7 @@ class TasksService {
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
     const listed = await tasksRepository.listRecent({
+      userId: input.userId,
       moduleCode: input.moduleCode,
       status: input.status,
       page,
@@ -91,6 +93,7 @@ class TasksService {
     const shouldRelist = await this.reconcileRecentTasks(listed.items);
     const current = shouldRelist
       ? await tasksRepository.listRecent({
+          userId: input.userId,
           moduleCode: input.moduleCode,
           status: input.status,
           page,
@@ -106,14 +109,14 @@ class TasksService {
     };
   }
 
-  async getTaskDetail(taskId: string, options: { finalizeBilling?: boolean } = {}) {
+  async getTaskDetail(taskId: string, options: { finalizeBilling?: boolean; userId?: string } = {}) {
     const finalizeBilling = options.finalizeBilling ?? true;
-    const task = await tasksRepository.findById(taskId);
+    const task = await tasksRepository.findById(taskId, options.userId);
     if (!task) throw errors.taskNotFound();
 
     if (!terminalStatuses.includes(task.status) && this.isPastDeadline(task)) {
       await this.timeoutTask(task);
-      const timedOut = await tasksRepository.findById(taskId);
+      const timedOut = await tasksRepository.findById(taskId, options.userId);
       if (!timedOut) throw errors.taskNotFound();
       const finalized = await this.finalizeTaskBilling(timedOut, finalizeBilling);
       return this.toResponse(finalized);
@@ -126,7 +129,7 @@ class TasksService {
 
     if (shouldRefresh) {
       await this.refreshFromKie(task);
-      const refreshed = await tasksRepository.findById(taskId);
+      const refreshed = await tasksRepository.findById(taskId, options.userId);
       if (!refreshed) throw errors.taskNotFound();
       await this.syncCreativeConversationResult(refreshed);
       const finalized = await this.finalizeTaskBilling(refreshed, finalizeBilling);

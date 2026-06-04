@@ -30,7 +30,6 @@ import type {
   CreativeMessageRecord,
 } from "./creativeImageTypes";
 
-const defaultUserId = "default_user";
 const resultPublicPrefix = `${env.publicBaseUrl.replace(/\/$/, "")}/results/creative-image/`;
 
 const normalizeResolution = (value: Resolution | undefined): Resolution => value ?? "2K";
@@ -44,20 +43,20 @@ const assertPrompt = (prompt: string | undefined) => {
 const isImageAsset = (asset: AssetRecord) => asset.mimeType.startsWith("image/");
 
 class CreativeImageService {
-  async createConversation(body: CreateConversationRequest) {
+  async createConversation(body: CreateConversationRequest, userId: string) {
     const title = body.title?.trim() || "新的创意生图";
     const conversation = await creativeImageRepository.createConversation({
-      userId: defaultUserId,
+      userId,
       title,
     });
     return this.toConversationResponse(conversation);
   }
 
-  async listConversations(input: { page?: number; pageSize?: number }) {
+  async listConversations(input: { userId: string; page?: number; pageSize?: number }) {
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
     const listed = await creativeImageRepository.listConversations({
-      userId: defaultUserId,
+      userId: input.userId,
       page,
       pageSize,
     });
@@ -69,13 +68,13 @@ class CreativeImageService {
     };
   }
 
-  async getConversation(conversationId: string) {
-    const conversation = await this.requireConversation(conversationId);
+  async getConversation(conversationId: string, userId: string) {
+    const conversation = await this.requireConversation(conversationId, userId);
     return this.toConversationResponse(conversation);
   }
 
-  async deleteConversation(conversationId: string) {
-    const conversation = await this.requireConversation(conversationId);
+  async deleteConversation(conversationId: string, userId: string) {
+    const conversation = await this.requireConversation(conversationId, userId);
     await creativeImageRepository.markConversationDeleted({
       conversationId,
       userId: conversation.userId,
@@ -86,13 +85,13 @@ class CreativeImageService {
     };
   }
 
-  async listMessages(conversationId: string) {
-    await this.requireConversation(conversationId);
+  async listMessages(conversationId: string, userId: string) {
+    await this.requireConversation(conversationId, userId);
     const messages = await creativeImageRepository.listMessages(conversationId);
     const taskIds = Array.from(
       new Set(messages.map((message) => message.taskId).filter((id): id is string => Boolean(id))),
     );
-    const tasks = await tasksRepository.findByIds(taskIds);
+    const tasks = await tasksRepository.findByIds(taskIds, userId);
     const resultUrlByTaskId = new Map<string, string | null>();
     for (const task of tasks) {
       const results = normalizeTaskResults(task.resultJson);
@@ -108,8 +107,13 @@ class CreativeImageService {
     };
   }
 
-  async uploadAsset(conversationId: string, file: Express.Multer.File | undefined, purpose: string | undefined) {
-    await this.requireConversation(conversationId);
+  async uploadAsset(
+    conversationId: string,
+    file: Express.Multer.File | undefined,
+    purpose: string | undefined,
+    userId: string,
+  ) {
+    await this.requireConversation(conversationId, userId);
     if (purpose !== "car_exterior") {
       throw errors.invalidParameter("creative-image asset purpose must be car_exterior", { purpose });
     }
@@ -117,7 +121,7 @@ class CreativeImageService {
       throw errors.invalidParameter("file is required");
     }
 
-    const asset = await assetsService.saveUploadedFile(file, "car_exterior");
+    const asset = await assetsService.saveUploadedFile(file, "car_exterior", userId);
     const linked = await creativeImageRepository.addConversationAsset({
       conversationId,
       assetId: asset.id,
@@ -132,12 +136,17 @@ class CreativeImageService {
     };
   }
 
-  async createGeneration(conversationId: string, body: CreateGenerationRequest, context?: BillingRequestContext) {
-    await this.requireConversation(conversationId);
+  async createGeneration(
+    conversationId: string,
+    body: CreateGenerationRequest,
+    userId: string,
+    context?: BillingRequestContext,
+  ) {
+    await this.requireConversation(conversationId, userId);
     const prompt = assertPrompt(body.prompt);
     const outputRatio = resolveOutputRatio(body.outputRatio, "1:1");
     const resolution = normalizeResolution(body.resolution);
-    const reference = await this.resolveReference(conversationId, body);
+    const reference = await this.resolveReference(conversationId, body, userId);
     const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
@@ -163,6 +172,7 @@ class CreativeImageService {
 
     await tasksRepository.createWaitingTask({
       id: taskId,
+      userId: subscription.userKey,
       moduleCode: "creative-image",
       inputAssetId: reference.assetId,
       optionId: reference.mode,
@@ -320,6 +330,7 @@ class CreativeImageService {
   private async resolveReference(
     conversationId: string,
     body: CreateGenerationRequest,
+    userId: string,
   ): Promise<{
     mode: CreativeGenerationMode;
     assetId: string | null;
@@ -329,7 +340,7 @@ class CreativeImageService {
       if (!body.sourceTaskId || !body.sourceImageUrl) {
         throw errors.invalidParameter("sourceTaskId and sourceImageUrl are required together");
       }
-      const sourceTask = await tasksRepository.findById(body.sourceTaskId);
+      const sourceTask = await tasksRepository.findById(body.sourceTaskId, userId);
       if (!sourceTask) throw errors.taskNotFound();
       if (sourceTask.moduleCode !== "creative-image") {
         throw errors.invalidParameter("sourceTaskId must belong to creative-image");
@@ -343,7 +354,7 @@ class CreativeImageService {
     }
 
     if (body.referenceAssetId) {
-      const asset = await this.requireImageAsset(body.referenceAssetId);
+      const asset = await this.requireImageAsset(body.referenceAssetId, userId);
       return {
         mode: "image_to_image",
         assetId: asset.id,
@@ -356,7 +367,7 @@ class CreativeImageService {
       if (!lastReference) {
         throw errors.invalidParameter("no reference asset in this conversation");
       }
-      const asset = await this.requireImageAsset(lastReference.assetId);
+      const asset = await this.requireImageAsset(lastReference.assetId, userId);
       return {
         mode: "image_to_image",
         assetId: asset.id,
@@ -390,16 +401,16 @@ class CreativeImageService {
     return localPath;
   }
 
-  private async requireConversation(conversationId: string) {
+  private async requireConversation(conversationId: string, userId: string) {
     const conversation = await creativeImageRepository.findConversationById(conversationId);
-    if (!conversation) {
+    if (!conversation || conversation.userId !== userId) {
       throw errors.creativeConversationNotFound();
     }
     return conversation;
   }
 
-  private async requireImageAsset(assetId: string) {
-    const asset = await assetsRepository.findById(assetId);
+  private async requireImageAsset(assetId: string, userId: string) {
+    const asset = await assetsRepository.findById(assetId, userId);
     if (!asset) throw errors.assetNotFound();
     if (!isImageAsset(asset)) {
       throw errors.invalidParameter("reference asset must be an image", {

@@ -28,7 +28,8 @@ export const roadMotionService = {
       throw errors.invalidParameter("inputAssetId is required");
     }
 
-    const asset = await assetsRepository.findById(body.inputAssetId);
+    const subscription = await assertCanStartGeneration(context);
+    const asset = await assetsRepository.findById(body.inputAssetId, subscription.userKey);
     if (!asset) {
       throw errors.assetNotFound();
     }
@@ -44,7 +45,7 @@ export const roadMotionService = {
     let logoAsset: Awaited<ReturnType<typeof assetsRepository.findById>> = null;
 
     if (body.logoAssetId) {
-      logoAsset = await assetsRepository.findById(body.logoAssetId);
+      logoAsset = await assetsRepository.findById(body.logoAssetId, subscription.userKey);
       if (!logoAsset) {
         throw errors.assetNotFound();
       }
@@ -55,18 +56,18 @@ export const roadMotionService = {
         });
       }
     } else if (shouldUseLogo) {
-      logoAsset = await userLogoService.resolveLogoAsset();
+      logoAsset = await userLogoService.resolveLogoAsset(subscription.userKey);
     }
 
     const scene = resolveRoadMotionScene(body.optionId);
     const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
     const prompt = appendOutputRatioPrompt(logoAsset ? scene.logoPrompt : scene.prompt, outputRatio);
-    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
       id: taskId,
+      userId: subscription.userKey,
       moduleCode,
       inputAssetId: asset.id,
       optionId: scene.optionId,

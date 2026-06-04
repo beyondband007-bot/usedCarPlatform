@@ -3,6 +3,7 @@ import { Router } from "express";
 import { AppError } from "../shared/errors";
 import { asyncHandler } from "../shared/asyncHandler";
 import { ok } from "../shared/response";
+import { getRequiredCurrentUser } from "./auth/authMiddleware";
 import { batchRoutes } from "./batch-new/batchRoutes";
 import { creativeImageRoutes } from "./creative-image/creativeImageRoutes";
 import { deliveryRoutes } from "./delivery/deliveryRoutes";
@@ -39,7 +40,9 @@ moduleRoutes.use("/delivery", deliveryRoutes);
 moduleRoutes.get(
   "/:moduleCode/recent-tasks",
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     const tasks = await tasksService.listRecentTasks({
+      userId: current.user.id,
       moduleCode: String(req.params.moduleCode),
       status: typeof req.query.status === "string" ? req.query.status : undefined,
       page: Number(req.query.page ?? 1),

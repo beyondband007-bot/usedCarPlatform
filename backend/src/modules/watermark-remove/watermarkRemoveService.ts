@@ -24,7 +24,8 @@ class WatermarkRemoveService {
       throw errors.invalidParameter("inputAssetId is required");
     }
 
-    const asset = await assetsRepository.findById(body.inputAssetId);
+    const subscription = await assertCanStartGeneration(context);
+    const asset = await assetsRepository.findById(body.inputAssetId, subscription.userKey);
     if (!asset) {
       throw errors.assetNotFound();
     }
@@ -39,11 +40,11 @@ class WatermarkRemoveService {
     const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
     const prompt = appendOutputRatioPrompt(watermarkRemovePrompt, outputRatio);
-    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
       id: taskId,
+      userId: subscription.userKey,
       moduleCode: "watermark-remove",
       inputAssetId: asset.id,
       optionId: null,

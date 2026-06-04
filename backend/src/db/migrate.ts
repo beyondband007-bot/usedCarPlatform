@@ -8,6 +8,8 @@ import {
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
 
+const ADMIN_USER_ID = "user_admin";
+
 const columnExists = async (tableName: string, columnName: string) => {
   const [rows] = await pool.query<any[]>(
     `SELECT 1
@@ -68,6 +70,39 @@ const tableExists = async (tableName: string) => {
 
 const makeColumnNullable = async (tableName: string, columnName: string, definition: string) => {
   await pool.query(`ALTER TABLE ${tableName} MODIFY COLUMN ${columnName} ${definition}`);
+};
+
+const backfillGenerationOwnership = async () => {
+  await pool.query(
+    `UPDATE generation_tasks
+     SET user_id = :adminUserId
+     WHERE user_id IS NULL OR user_id = '' OR user_id = 'default_user'`,
+    { adminUserId: ADMIN_USER_ID },
+  );
+  await pool.query(
+    `UPDATE batch_tasks
+     SET user_id = :adminUserId
+     WHERE user_id IS NULL OR user_id = '' OR user_id = 'default_user'`,
+    { adminUserId: ADMIN_USER_ID },
+  );
+  await pool.query(
+    `UPDATE assets
+     SET user_id = :adminUserId
+     WHERE user_id IS NULL OR user_id = '' OR user_id = 'default_user'`,
+    { adminUserId: ADMIN_USER_ID },
+  );
+  await pool.query(
+    `UPDATE creative_conversations
+     SET user_id = :adminUserId
+     WHERE user_id IS NULL OR user_id = '' OR user_id = 'default_user'`,
+    { adminUserId: ADMIN_USER_ID },
+  );
+  await pool.query(
+    `UPDATE batch_visual_presets
+     SET user_id = :adminUserId
+     WHERE user_id IS NULL OR user_id = '' OR user_id = 'default_user'`,
+    { adminUserId: ADMIN_USER_ID },
+  );
 };
 
 const hashPassword = (password: string) => {
@@ -578,6 +613,21 @@ const run = async () => {
     await backfillBatchItemErrorCodes();
     await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
 
+    await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
+    await addIndexIfMissing("assets", "idx_assets_user_purpose_created", "(user_id, purpose, created_at)");
+
+    await addColumnIfMissing("generation_tasks", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
+    await addIndexIfMissing(
+      "generation_tasks",
+      "idx_generation_tasks_user_module_created",
+      "(user_id, module_code, created_at)",
+    );
+    await addIndexIfMissing(
+      "generation_tasks",
+      "idx_generation_tasks_user_status_created",
+      "(user_id, status, created_at)",
+    );
+
     await addColumnIfMissing("generation_tasks", "credits_user_id", "BIGINT NULL");
     await addColumnIfMissing("generation_tasks", "credits_tenant_id", "BIGINT NULL");
     await addColumnIfMissing("generation_tasks", "account_scope", "VARCHAR(16) NULL");
@@ -609,6 +659,9 @@ const run = async () => {
     );
     await addIndexIfMissing("generation_tasks", "idx_generation_tasks_billing_status", "(billing_status)");
 
+    await addColumnIfMissing("batch_tasks", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
+    await addIndexIfMissing("batch_tasks", "idx_batch_tasks_user_status_created", "(user_id, status, created_at)");
+
     await addColumnIfMissing("batch_tasks", "credits_user_id", "BIGINT NULL");
     await addColumnIfMissing("batch_tasks", "credits_tenant_id", "BIGINT NULL");
     await addColumnIfMissing("batch_tasks", "account_scope", "VARCHAR(16) NULL");
@@ -636,6 +689,7 @@ const run = async () => {
     await addColumnIfMissing("kie_task_records", "finished_at", "DATETIME(3) NULL");
     await dropIndexIfExists("kie_task_records", "uk_kie_task_records_task");
     await addUniqueIndexIfMissing("kie_task_records", "uk_kie_task_records_task_role", "(task_id, role)");
+    await backfillGenerationOwnership();
     await seedSubscriptionPlans();
     await seedAuthData();
     await migrateMockSubscriptions();

@@ -8,6 +8,7 @@ import { parseJsonValue } from "./taskJson";
 
 export interface GenerationTaskRecord {
   id: string;
+  userId: string;
   moduleCode: string;
   status: TaskStatus;
   progress: number;
@@ -74,6 +75,7 @@ export interface RecentGenerationRecord extends GenerationTaskRecord {
 
 interface GenerationTaskRow extends RowDataPacket {
   id: string;
+  user_id: string;
   module_code: string;
   status: TaskStatus;
   progress: number;
@@ -140,6 +142,7 @@ interface RecentGenerationRow extends GenerationTaskRow {
 
 const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   id: row.id,
+  userId: row.user_id,
   moduleCode: row.module_code,
   status: row.status,
   progress: row.progress,
@@ -250,15 +253,21 @@ const mapRecentRow = (row: RecentGenerationRow): RecentGenerationRecord => ({
 });
 
 export class TasksRepository extends Repository {
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
+    const clauses = ["id = :id"];
+    const params: Record<string, unknown> = { id };
+    if (userId) {
+      clauses.push("user_id = :userId");
+      params.userId = userId;
+    }
     const rows = await this.query<GenerationTaskRow[]>(
-      `SELECT * FROM generation_tasks WHERE id = :id LIMIT 1`,
-      { id },
+      `SELECT * FROM generation_tasks WHERE ${clauses.join(" AND ")} LIMIT 1`,
+      params,
     );
     return rows[0] ? mapRow(rows[0]) : null;
   }
 
-  async findByIds(ids: string[]) {
+  async findByIds(ids: string[], userId?: string) {
     if (!ids.length) return [] as GenerationTaskRecord[];
     const params: Record<string, unknown> = {};
     const placeholders = ids
@@ -268,21 +277,25 @@ export class TasksRepository extends Repository {
         return `:${key}`;
       })
       .join(",");
+    const userFilter = userId ? " AND user_id = :userId" : "";
+    if (userId) params.userId = userId;
     const rows = await this.query<GenerationTaskRow[]>(
-      `SELECT * FROM generation_tasks WHERE id IN (${placeholders})`,
+      `SELECT * FROM generation_tasks WHERE id IN (${placeholders})${userFilter}`,
       params,
     );
     return rows.map(mapRow);
   }
 
   async listRecent(input: {
+    userId: string;
     moduleCode?: string;
     status?: string;
     page: number;
     pageSize: number;
   }) {
-    const clauses = [];
+    const clauses = ["gt.user_id = :userId"];
     const params: Record<string, unknown> = {
+      userId: input.userId,
       limit: input.pageSize,
       offset: (input.page - 1) * input.pageSize,
     };
@@ -336,6 +349,7 @@ export class TasksRepository extends Repository {
 
   async createWaitingTask(input: {
     id: string;
+    userId: string;
     moduleCode: string;
     inputAssetId?: string | null;
     optionId?: string | null;
@@ -348,10 +362,10 @@ export class TasksRepository extends Repository {
   }) {
     await this.execute(
       `INSERT INTO generation_tasks
-        (id, module_code, status, progress, input_asset_id, option_id, output_ratio, resolution, logo_asset_id, prompt,
+        (id, user_id, module_code, status, progress, input_asset_id, option_id, output_ratio, resolution, logo_asset_id, prompt,
          subscription_user_key, subscription_plan_code)
        VALUES
-        (:id, :moduleCode, 'waiting', 0, :inputAssetId, :optionId, :outputRatio, :resolution, :logoAssetId, :prompt,
+        (:id, :userId, :moduleCode, 'waiting', 0, :inputAssetId, :optionId, :outputRatio, :resolution, :logoAssetId, :prompt,
          :subscriptionUserKey, :subscriptionPlanCode)`,
       {
         ...input,

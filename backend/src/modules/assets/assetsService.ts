@@ -16,7 +16,7 @@ export const allowedPurposes: AssetPurpose[] = [
 ];
 
 export class AssetsService {
-  async saveUploadedFile(file: Express.Multer.File, purpose: AssetPurpose) {
+  async saveUploadedFile(file: Express.Multer.File, purpose: AssetPurpose, userId: string) {
     const assetId = createId("asset");
     const relativeUrl = `/uploads/${path.basename(file.path)}`;
     const publicUrl = `${env.publicBaseUrl.replace(/\/$/, "")}${relativeUrl}`;
@@ -25,6 +25,7 @@ export class AssetsService {
 
     return assetsRepository.create({
       id: assetId,
+      userId,
       purpose,
       fileName: file.originalname,
       mimeType: file.mimetype,

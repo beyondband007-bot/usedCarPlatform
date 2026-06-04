@@ -38,7 +38,6 @@ import {
 } from "./batchScenes";
 import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
 
-const DEFAULT_USER_ID = "default_user";
 const terminalStatuses = ["success", "fail", "canceled"];
 
 const outputRatioOrDefault = (value?: string): OutputRatio => resolveOutputRatio(value, "1:1");
@@ -130,8 +129,8 @@ const submitErrorCode = (error: unknown) => {
 };
 
 class BatchService {
-  async listPresets() {
-    const items = await batchRepository.listPresets(DEFAULT_USER_ID);
+  async listPresets(userId: string) {
+    const items = await batchRepository.listPresets(userId);
     if (items.length) return { items };
 
     const visualConfig: BatchVisualConfig = {
@@ -151,7 +150,7 @@ class BatchService {
       items: [
         {
           presetId: "tpl-may-showroom",
-          userId: DEFAULT_USER_ID,
+          userId,
           name: "5月展厅批量上新",
           visualConfig,
           createdAt: new Date().toISOString(),
@@ -161,25 +160,25 @@ class BatchService {
     };
   }
 
-  async savePreset(body: { presetId?: string; name?: string; visualConfig?: BatchVisualConfig }) {
+  async savePreset(body: { presetId?: string; name?: string; visualConfig?: BatchVisualConfig }, userId: string) {
     if (!body.name) throw errors.invalidParameter("name is required");
     if (!body.visualConfig) throw errors.invalidParameter("visualConfig is required");
 
     const presetId = body.presetId || createId("preset");
     await batchRepository.upsertPreset({
       id: presetId,
-      userId: DEFAULT_USER_ID,
+      userId,
       name: body.name,
       visualConfig: body.visualConfig,
     });
     return { presetId, name: body.name, visualConfig: body.visualConfig, updatedAt: new Date().toISOString() };
   }
 
-  async deletePreset(presetId: string) {
+  async deletePreset(presetId: string, userId: string) {
     if (!presetId) throw errors.invalidParameter("presetId is required");
     const deleted = await batchRepository.deletePreset({
       id: presetId,
-      userId: DEFAULT_USER_ID,
+      userId,
     });
     return { presetId, deleted };
   }
@@ -204,17 +203,18 @@ class BatchService {
       if (!Array.isArray(group.exteriorAssetIds) || group.exteriorAssetIds.length === 0) {
         throw errors.invalidParameter("each car group requires exteriorAssetIds");
       }
-      await this.validateAssets(group.exteriorAssetIds, "car_exterior");
+      await this.validateAssets(group.exteriorAssetIds, "car_exterior", subscription.userKey);
       total += group.exteriorAssetIds.length;
       if (interiorClean || interiorCollage) {
         const interiorAssetIds = group.interiorAssetIds ?? [];
-        await this.validateAssets(interiorAssetIds, "car_interior");
+        await this.validateAssets(interiorAssetIds, "car_interior", subscription.userKey);
         total += interiorCollage ? splitInteriorAssetIds(interiorAssetIds).length : interiorAssetIds.length;
       }
     }
 
     await batchRepository.createBatch({
       id: batchId,
+      userId: subscription.userKey,
       projectName: body.projectName.trim(),
       presetId: body.presetId,
       total,
@@ -264,8 +264,8 @@ class BatchService {
       }
     }
 
-    await this.advanceBatch(batchId);
-    const detail = await this.getBatchDetail(batchId, false);
+    await this.advanceBatch(batchId, subscription.userKey);
+    const detail = await this.getBatchDetail(batchId, subscription.userKey, false);
     return {
       batchId,
       projectName: body.projectName.trim(),
@@ -283,9 +283,9 @@ class BatchService {
     };
   }
 
-  async getBatchDetail(batchId: string, shouldAdvance = true) {
-    if (shouldAdvance) await this.advanceBatch(batchId);
-    const batch = await batchRepository.findBatch(batchId);
+  async getBatchDetail(batchId: string, userId: string, shouldAdvance = true) {
+    if (shouldAdvance) await this.advanceBatch(batchId, userId);
+    const batch = await batchRepository.findBatch(batchId, userId);
     if (!batch) throw errors.batchNotFound();
     const items = await batchRepository.listItems(batchId);
     const assetCount = await deliveryRepository.countAssets(batchId);
@@ -311,16 +311,16 @@ class BatchService {
     };
   }
 
-  async listBatchTasks(input: { status?: string; page?: number; pageSize?: number }) {
+  async listBatchTasks(input: { userId: string; status?: string; page?: number; pageSize?: number }) {
     const page = Math.max(Number(input.page ?? 1), 1);
     const pageSize = Math.min(Math.max(Number(input.pageSize ?? 20), 1), 100);
-    const listed = await batchRepository.listBatches({ status: input.status, page, pageSize });
+    const listed = await batchRepository.listBatches({ userId: input.userId, status: input.status, page, pageSize });
     let shouldRelist = false;
 
     for (const item of listed.items) {
       if (item.status !== "generating") continue;
       try {
-        await this.refreshActiveBatch(item.id);
+        await this.refreshActiveBatch(item.id, item.userId);
         shouldRelist = true;
       } catch {
         // Keep the batch list usable even if one upstream status refresh fails.
@@ -328,7 +328,7 @@ class BatchService {
     }
 
     const current = shouldRelist
-      ? await batchRepository.listBatches({ status: input.status, page, pageSize })
+      ? await batchRepository.listBatches({ userId: input.userId, status: input.status, page, pageSize })
       : listed;
 
     return {
@@ -354,30 +354,30 @@ class BatchService {
     };
   }
 
-  private async refreshActiveBatch(batchId: string) {
+  private async refreshActiveBatch(batchId: string, userId: string) {
     const items = await batchRepository.listItems(batchId);
     for (const item of items) {
       if (item.status === "waiting") continue;
       if (!terminalStatuses.includes(item.status)) {
-        await this.refreshItem(batchId, item);
+        await this.refreshItem(batchId, item, userId);
       } else if (item.status === "success" && item.resultCount === 0) {
-        await this.persistDeliveryAssets(batchId, item);
+        await this.persistDeliveryAssets(batchId, item, userId);
       }
     }
     await batchRepository.recalcBatch(batchId);
     await batchRepository.recalcBatchBilling(batchId);
   }
 
-  async advanceBatch(batchId: string) {
-    const batch = await batchRepository.findBatch(batchId);
+  async advanceBatch(batchId: string, userId?: string) {
+    const batch = await batchRepository.findBatch(batchId, userId);
     if (!batch) throw errors.batchNotFound();
 
     const items = await batchRepository.listItems(batchId);
     for (const item of items) {
       if (!terminalStatuses.includes(item.status)) {
-        await this.refreshItem(batchId, item);
+        await this.refreshItem(batchId, item, batch.userId);
       } else if (item.status === "success" && item.resultCount === 0) {
-        await this.persistDeliveryAssets(batchId, item);
+        await this.persistDeliveryAssets(batchId, item, batch.userId);
       }
     }
 
@@ -412,7 +412,7 @@ class BatchService {
     subscription: SubscriptionIdentity;
     optionId?: string;
   }) {
-    const asset = await assetsRepository.findById(input.assetIds[0]);
+    const asset = await assetsRepository.findById(input.assetIds[0], input.subscription.userKey);
     if (!asset) throw errors.assetNotFound();
     const expectedPurpose = input.itemKind === "exterior" ? "car_exterior" : "car_interior";
     if (asset.purpose !== expectedPurpose) {
@@ -427,6 +427,7 @@ class BatchService {
       input.itemKind === "exterior" ? resolveBatchExteriorPrompt(input.config) : resolveInteriorPrompt(input.itemKind);
     await tasksRepository.createWaitingTask({
       id: taskId,
+      userId: input.subscription.userKey,
       moduleCode: "batch-new",
       inputAssetId: asset.id,
       optionId: input.optionId ?? input.itemKind,
@@ -449,9 +450,9 @@ class BatchService {
     });
   }
 
-  private async validateAssets(assetIds: string[], expectedPurpose: "car_exterior" | "car_interior") {
+  private async validateAssets(assetIds: string[], expectedPurpose: "car_exterior" | "car_interior", userId: string) {
     for (const assetId of assetIds) {
-      const asset = await assetsRepository.findById(assetId);
+      const asset = await assetsRepository.findById(assetId, userId);
       if (!asset) throw errors.assetNotFound();
       if (asset.purpose !== expectedPurpose) {
         throw errors.invalidParameter(`asset must be ${expectedPurpose}`, {
@@ -462,9 +463,12 @@ class BatchService {
     }
   }
 
-  private async refreshItem(batchId: string, item: BatchItemSummary) {
-    const task = await tasksService.getTaskDetail(item.generationTaskId, { finalizeBilling: false });
-    const refreshedTask = await tasksRepository.findById(item.generationTaskId);
+  private async refreshItem(batchId: string, item: BatchItemSummary, userId: string) {
+    const task = await tasksService.getTaskDetail(item.generationTaskId, {
+      finalizeBilling: false,
+      userId,
+    });
+    const refreshedTask = await tasksRepository.findById(item.generationTaskId, userId);
     if (refreshedTask && shouldFinalizeGenerationBilling(refreshedTask)) {
       await finalizeGenerationBilling(refreshedTask, batchItemBillingScope(item.itemId));
     }
@@ -478,19 +482,19 @@ class BatchService {
       errorMessage: task.error?.message ?? null,
     });
     if (task.status === "success") {
-      await this.persistDeliveryAssets(batchId, item);
+      await this.persistDeliveryAssets(batchId, item, userId);
     }
   }
 
   private async submitItem(batch: BatchTaskRecord, item: BatchItemSummary) {
     const config = batch.visualConfig;
-    const task = await tasksRepository.findById(item.generationTaskId);
+    const task = await tasksRepository.findById(item.generationTaskId, batch.userId);
     if (!task) throw errors.taskNotFound();
     if (!task.inputAssetId) throw errors.assetNotFound();
     const sourceAssetIds = item.sourceAssetIds?.length ? item.sourceAssetIds : [task.inputAssetId];
     const sourceAssets = [];
     for (const assetId of sourceAssetIds) {
-      const asset = await assetsRepository.findById(assetId);
+      const asset = await assetsRepository.findById(assetId, batch.userId);
       if (!asset) throw errors.assetNotFound();
       sourceAssets.push(asset);
     }
@@ -561,8 +565,8 @@ class BatchService {
 
       if (item.itemKind === "exterior" && config.useRecentLogo) {
         const logoAsset = config.logoAssetId
-          ? await assetsRepository.findById(config.logoAssetId)
-          : await userLogoService.resolveLogoAsset();
+          ? await assetsRepository.findById(config.logoAssetId, batch.userId)
+          : await userLogoService.resolveLogoAsset(batch.userId);
         if (!logoAsset) throw errors.assetNotFound();
         const uploadedLogo = await runKieOperation(() =>
           kieClient.uploadLocalFileWithLease(
@@ -639,9 +643,12 @@ class BatchService {
     }
   }
 
-  private async persistDeliveryAssets(batchId: string, item: BatchItemSummary) {
-    const task = await tasksService.getTaskDetail(item.generationTaskId, { finalizeBilling: false });
-    const refreshedTask = await tasksRepository.findById(item.generationTaskId);
+  private async persistDeliveryAssets(batchId: string, item: BatchItemSummary, userId: string) {
+    const task = await tasksService.getTaskDetail(item.generationTaskId, {
+      finalizeBilling: false,
+      userId,
+    });
+    const refreshedTask = await tasksRepository.findById(item.generationTaskId, userId);
     if (refreshedTask && shouldFinalizeGenerationBilling(refreshedTask)) {
       await finalizeGenerationBilling(refreshedTask, batchItemBillingScope(item.itemId));
     }

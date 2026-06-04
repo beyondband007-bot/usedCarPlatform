@@ -42,7 +42,8 @@ class ShortVideoService {
       throw errors.invalidParameter("inputAssetId is required");
     }
 
-    const asset = await assetsRepository.findById(body.inputAssetId);
+    const subscription = await assertCanStartGeneration(context);
+    const asset = await assetsRepository.findById(body.inputAssetId, subscription.userKey);
     if (!asset) {
       throw errors.assetNotFound();
     }
@@ -56,7 +57,6 @@ class ShortVideoService {
     const aspectRatio = normalizeRatio(body.outputRatio);
     const videoResolution = normalizeVideoResolution(body.extra?.videoResolution);
     const duration = 10;
-    const subscription = await assertCanStartGeneration(context);
     const taskId = createId("task");
 
     const lease = await kieKeyPool.acquire();
@@ -64,6 +64,7 @@ class ShortVideoService {
     try {
       await tasksRepository.createWaitingTask({
         id: taskId,
+        userId: subscription.userKey,
         moduleCode: "short-video",
         inputAssetId: asset.id,
         optionId: KIE_KLING_VIDEO_OPTION_ID,

@@ -10,6 +10,7 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
 import type { AssetPurpose } from "../../shared/types";
+import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { allowedPurposes, assetsService } from "./assetsService";
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -35,6 +36,7 @@ assetsRoutes.post(
   "/upload",
   upload.single("file"),
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     const purpose = req.body.purpose as AssetPurpose | undefined;
     if (!purpose || !allowedPurposes.includes(purpose)) {
       throw errors.invalidParameter("invalid asset purpose", { purpose });
@@ -44,7 +46,7 @@ assetsRoutes.post(
       throw errors.invalidParameter("file is required");
     }
 
-    const asset = await assetsService.saveUploadedFile(req.file, purpose);
+    const asset = await assetsService.saveUploadedFile(req.file, purpose, current.user.id);
     ok(res, assetsService.toResponse(asset));
   }),
 );

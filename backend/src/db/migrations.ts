@@ -1,6 +1,7 @@
 export const migrations = [
   `CREATE TABLE IF NOT EXISTS assets (
     id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
     purpose VARCHAR(40) NOT NULL,
     file_name VARCHAR(255) NOT NULL,
     mime_type VARCHAR(120) NOT NULL,
@@ -12,11 +13,13 @@ export const migrations = [
     thumbnail_url VARCHAR(1024) NULL,
     metadata_json JSON NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    INDEX idx_assets_purpose_created (purpose, created_at)
+    INDEX idx_assets_purpose_created (purpose, created_at),
+    INDEX idx_assets_user_purpose_created (user_id, purpose, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS generation_tasks (
     id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
     module_code VARCHAR(80) NOT NULL,
     status VARCHAR(24) NOT NULL,
     progress INT NOT NULL DEFAULT 0,
@@ -52,6 +55,8 @@ export const migrations = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_generation_tasks_module_created (module_code, created_at),
+    INDEX idx_generation_tasks_user_module_created (user_id, module_code, created_at),
+    INDEX idx_generation_tasks_user_status_created (user_id, status, created_at),
     INDEX idx_generation_tasks_status (status),
     INDEX idx_generation_tasks_kie_task (kie_task_id),
     INDEX idx_generation_tasks_billing_task (billing_task_id),
@@ -62,6 +67,7 @@ export const migrations = [
 
   `CREATE TABLE IF NOT EXISTS batch_tasks (
     id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
     project_name VARCHAR(255) NOT NULL,
     preset_id VARCHAR(120) NOT NULL,
     status VARCHAR(24) NOT NULL,
@@ -80,6 +86,7 @@ export const migrations = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_batch_tasks_status_created (status, created_at),
+    INDEX idx_batch_tasks_user_status_created (user_id, status, created_at),
     INDEX idx_batch_tasks_credits_user_created (credits_user_id, created_at),
     INDEX idx_batch_tasks_subscription_running (subscription_user_key, status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -449,7 +456,7 @@ export const migrations = [
 
   `CREATE TABLE IF NOT EXISTS batch_visual_presets (
     id VARCHAR(120) PRIMARY KEY,
-    user_id VARCHAR(64) NOT NULL DEFAULT 'default_user',
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
     name VARCHAR(255) NOT NULL,
     visual_config_json JSON NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -526,7 +533,7 @@ export const migrations = [
 
   `CREATE TABLE IF NOT EXISTS creative_conversations (
     id VARCHAR(64) PRIMARY KEY,
-    user_id VARCHAR(64) NOT NULL DEFAULT 'default_user',
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
     title VARCHAR(255) NOT NULL,
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     last_message TEXT NULL,

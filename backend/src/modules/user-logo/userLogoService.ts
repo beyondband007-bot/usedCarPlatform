@@ -3,11 +3,9 @@ import { assetsService } from "../assets/assetsService";
 import { errors } from "../../shared/errors";
 import { userLogoRepository } from "./userLogoRepository";
 
-export const DEFAULT_USER_ID = "default_user";
-
 class UserLogoService {
-  async replaceDefaultLogo(file: Express.Multer.File, userId = DEFAULT_USER_ID) {
-    const asset = await assetsService.saveUploadedFile(file, "logo");
+  async replaceDefaultLogo(file: Express.Multer.File, userId: string) {
+    const asset = await assetsService.saveUploadedFile(file, "logo", userId);
     await userLogoRepository.upsert(userId, asset.id);
 
     return {
@@ -18,11 +16,11 @@ class UserLogoService {
     };
   }
 
-  async getDefaultLogo(userId = DEFAULT_USER_ID) {
+  async getDefaultLogo(userId: string) {
     const setting = await userLogoRepository.findByUserId(userId);
     if (!setting) return null;
 
-    const asset = await assetsRepository.findById(setting.logoAssetId);
+    const asset = await assetsRepository.findById(setting.logoAssetId, userId);
     if (!asset) return null;
 
     return {
@@ -33,13 +31,13 @@ class UserLogoService {
     };
   }
 
-  async resolveLogoAsset(userId = DEFAULT_USER_ID) {
+  async resolveLogoAsset(userId: string) {
     const defaultLogo = await this.getDefaultLogo(userId);
     if (!defaultLogo) {
       throw errors.invalidParameter("default logo is not configured");
     }
 
-    const asset = await assetsRepository.findById(defaultLogo.logoAssetId);
+    const asset = await assetsRepository.findById(defaultLogo.logoAssetId, userId);
     if (!asset) {
       throw errors.assetNotFound();
     }

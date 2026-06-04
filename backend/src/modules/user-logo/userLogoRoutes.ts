@@ -9,6 +9,7 @@ import { asyncHandler } from "../../shared/asyncHandler";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
+import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { userLogoService } from "./userLogoService";
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -32,8 +33,9 @@ export const userLogoRoutes = Router();
 
 userLogoRoutes.get(
   "/logo",
-  asyncHandler(async (_req, res) => {
-    const logo = await userLogoService.getDefaultLogo();
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    const logo = await userLogoService.getDefaultLogo(current.user.id);
     ok(res, logo);
   }),
 );
@@ -42,11 +44,12 @@ userLogoRoutes.post(
   "/logo",
   upload.single("file"),
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     if (!req.file) {
       throw errors.invalidParameter("file is required");
     }
 
-    const result = await userLogoService.replaceDefaultLogo(req.file);
+    const result = await userLogoService.replaceDefaultLogo(req.file, current.user.id);
     ok(res, result);
   }),
 );

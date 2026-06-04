@@ -43,7 +43,8 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         throw errors.invalidParameter("inputAssetId is required");
       }
 
-      const asset = await assetsRepository.findById(body.inputAssetId);
+      const subscription = await assertCanStartGeneration(context);
+      const asset = await assetsRepository.findById(body.inputAssetId, subscription.userKey);
       if (!asset) {
         throw errors.assetNotFound();
       }
@@ -59,7 +60,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
       let logoAsset: Awaited<ReturnType<typeof assetsRepository.findById>> = null;
 
       if (body.logoAssetId) {
-        logoAsset = await assetsRepository.findById(body.logoAssetId);
+        logoAsset = await assetsRepository.findById(body.logoAssetId, subscription.userKey);
         if (!logoAsset) {
           throw errors.assetNotFound();
         }
@@ -70,7 +71,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
           });
         }
       } else if (shouldUseLogo) {
-        logoAsset = await userLogoService.resolveLogoAsset();
+        logoAsset = await userLogoService.resolveLogoAsset(subscription.userKey);
       }
 
       const outputRatio = resolveOutputRatio(body.outputRatio);
@@ -80,11 +81,11 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
         outputRatio,
       );
       const scene = getScene(body.optionId);
-      const subscription = await assertCanStartGeneration(context);
       const taskId = createId("task");
 
       await tasksRepository.createWaitingTask({
         id: taskId,
+        userId: subscription.userKey,
         moduleCode: config.moduleCode,
         inputAssetId: asset.id,
         optionId: scene.optionId,

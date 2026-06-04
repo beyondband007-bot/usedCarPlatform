@@ -8,6 +8,7 @@ import { env } from "../../config/env";
 import { asyncHandler } from "../../shared/asyncHandler";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
+import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { creativeImageService } from "./creativeImageService";
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -30,7 +31,8 @@ export const creativeImageRoutes = Router();
 creativeImageRoutes.post(
   "/conversations",
   asyncHandler(async (req, res) => {
-    const result = await creativeImageService.createConversation(req.body);
+    const current = getRequiredCurrentUser(req);
+    const result = await creativeImageService.createConversation(req.body, current.user.id);
     ok(res, result);
   }),
 );
@@ -38,7 +40,9 @@ creativeImageRoutes.post(
 creativeImageRoutes.get(
   "/conversations",
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     const result = await creativeImageService.listConversations({
+      userId: current.user.id,
       page: Number(req.query.page ?? 1),
       pageSize: Number(req.query.pageSize ?? 20),
     });
@@ -49,7 +53,11 @@ creativeImageRoutes.get(
 creativeImageRoutes.get(
   "/conversations/:conversationId",
   asyncHandler(async (req, res) => {
-    const result = await creativeImageService.getConversation(String(req.params.conversationId));
+    const current = getRequiredCurrentUser(req);
+    const result = await creativeImageService.getConversation(
+      String(req.params.conversationId),
+      current.user.id,
+    );
     ok(res, result);
   }),
 );
@@ -57,7 +65,11 @@ creativeImageRoutes.get(
 creativeImageRoutes.delete(
   "/conversations/:conversationId",
   asyncHandler(async (req, res) => {
-    const result = await creativeImageService.deleteConversation(String(req.params.conversationId));
+    const current = getRequiredCurrentUser(req);
+    const result = await creativeImageService.deleteConversation(
+      String(req.params.conversationId),
+      current.user.id,
+    );
     ok(res, result);
   }),
 );
@@ -65,7 +77,11 @@ creativeImageRoutes.delete(
 creativeImageRoutes.get(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {
-    const result = await creativeImageService.listMessages(String(req.params.conversationId));
+    const current = getRequiredCurrentUser(req);
+    const result = await creativeImageService.listMessages(
+      String(req.params.conversationId),
+      current.user.id,
+    );
     ok(res, result);
   }),
 );
@@ -74,10 +90,12 @@ creativeImageRoutes.post(
   "/conversations/:conversationId/assets",
   upload.single("file"),
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     const result = await creativeImageService.uploadAsset(
       String(req.params.conversationId),
       req.file,
       req.body.purpose,
+      current.user.id,
     );
     ok(res, result);
   }),
@@ -86,9 +104,11 @@ creativeImageRoutes.post(
 creativeImageRoutes.post(
   "/conversations/:conversationId/generations",
   asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
     const result = await creativeImageService.createGeneration(
       String(req.params.conversationId),
       req.body,
+      current.user.id,
       { headers: req.headers },
     );
     ok(res, result);
