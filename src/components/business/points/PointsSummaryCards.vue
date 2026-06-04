@@ -12,6 +12,10 @@ defineProps<{
 }>();
 
 const appStore = useAppStore();
+
+function isAssetIcon(icon: string) {
+  return !icon.startsWith("mdi:");
+}
 </script>
 
 <template>
@@ -37,7 +41,17 @@ const appStore = useAppStore();
         <div class="summary-card-content">
           <div class="summary-card-row">
             <div class="summary-icon" :class="card.tone">
-              <Icon :icon="card.icon" />
+              <img
+                v-if="isAssetIcon(card.icon)"
+                class="summary-icon-image"
+                :src="card.icon"
+                alt=""
+                width="24"
+                height="24"
+                decoding="async"
+                draggable="false"
+              />
+              <Icon v-else :icon="card.icon" />
             </div>
             <div>
               <p>{{ card.label }}</p>
@@ -202,6 +216,14 @@ const appStore = useAppStore();
   border-radius: 12px;
   box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
   font-size: 22px;
+}
+
+.summary-icon-image {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .summary-icon.blue {
@@ -438,6 +460,11 @@ const appStore = useAppStore();
   box-shadow: 0 8px 18px rgb(212 160 23 / 28%);
   color: #ffffff;
   font-size: 24px;
+}
+
+.points-summary-section.is-glass .summary-icon-image {
+  width: 24px;
+  height: 24px;
 }
 
 .points-summary-section.is-glass .summary-icon.blue,

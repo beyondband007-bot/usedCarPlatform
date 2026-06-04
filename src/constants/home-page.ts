@@ -1,18 +1,22 @@
-import caseUsedImage from '@/assets/media/home/home-case-used-car.png'
-import featureBatchImage from '@/assets/media/home/home-capability-batch.png'
-import featureOutdoorImage from '@/assets/media/home/home-capability-sky-studio.png'
-import featureRefineImage from '@/assets/media/home/home-capability-refine.png'
-import featureRoadImage from '@/assets/media/home/home-capability-road-motion.png'
-import featureSceneImage from '@/assets/media/home/home-capability-scene-bg.png'
-import featureShowroomImage from '@/assets/media/home/home-capability-showroom.png'
-import featureSkyImage from '@/assets/media/home/home-capability-outdoor.png'
-import featureMarketingVideo from '@/assets/video/营销短视频.mp4'
 import homeHeroImageDark from '@/assets/media/home/home-hero-bg-dark.png'
-import homeHeroImageLight from '@/assets/media/home/home-hero-bg-light.png'
-import suiteEnterpriseImageDark from '@/assets/media/home/home-entry-enterprise-dark.png'
-import suiteEnterpriseImageLight from '@/assets/media/home/home-entry-enterprise-light.png'
-import suiteWorkbenchImageDark from '@/assets/media/home/home-entry-workbench-dark.png'
-import suiteWorkbenchImageLight from '@/assets/media/home/home-entry-workbench-light.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const {
+  caseUsedCar: caseUsedImage,
+  capabilityBatch: featureBatchImage,
+  capabilitySkyStudio: featureOutdoorImage,
+  capabilityRefine: featureRefineImage,
+  capabilityRoadMotion: featureRoadImage,
+  capabilitySceneBg: featureSceneImage,
+  capabilityShowroom: featureShowroomImage,
+  capabilityOutdoor: featureSkyImage,
+  capabilityMarketingVideo: featureMarketingVideo,
+  heroBgLight: homeHeroImageLight,
+  entryEnterpriseDark: suiteEnterpriseImageDark,
+  entryEnterpriseLight: suiteEnterpriseImageLight,
+  entryWorkbenchDark: suiteWorkbenchImageDark,
+  entryWorkbenchLight: suiteWorkbenchImageLight,
+} = mediaUrls.home
 
 export interface HomeQuickEntry {
   title: string

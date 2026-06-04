@@ -1,6 +1,8 @@
-import planBasicBg from '@/assets/media/package/package-plan-basic-bg.png'
-import planTeamBg from '@/assets/media/package/package-plan-team-bg.png'
-import planFlagshipBg from '@/assets/media/package/package-plan-flagship-bg.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const planBasicBg = mediaUrls.package.planBasicBg
+const planTeamBg = mediaUrls.package.planTeamBg
+const planFlagshipBg = mediaUrls.package.planFlagshipBg
 
 export type RechargePlanTone = 'blue' | 'purple' | 'gold'
 

@@ -55,6 +55,7 @@ Copy-Mapped 'src\img\home\suite-workbench-light.png' 'package\package-plan-basic
 Copy-Mapped 'src\img\home\suite-enterprise-light.png' 'package\package-plan-team-bg.png'
 Copy-Mapped 'src\img\home\suite-enterprise.png' 'package\package-plan-flagship-bg.png'
 Copy-Mapped 'src\assets\img\footer-brand-logo.png' 'global\global-footer-brand-logo.png'
+Copy-Mapped 'src\assets\img\footer-brand-logo-light.png' 'global\global-footer-brand-logo-light.png'
 Copy-Mapped 'src\assets\img\contact-support-wechat-qr.png' 'global\global-contact-wechat-qr.png'
 Copy-Mapped 'src\assets\img\积分查询\积分查询背景白天.png' 'points\points-query-bg-light.png'
 Copy-Mapped 'src\assets\img\积分查询\积分查询背景黑夜.jpg' 'points\points-query-bg-dark.jpg'

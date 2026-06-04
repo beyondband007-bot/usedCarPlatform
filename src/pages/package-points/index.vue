@@ -16,9 +16,11 @@ import {
   type RechargeProduct,
 } from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
-import planBasicBg from "@/assets/media/package/package-plan-basic-bg.png";
-import planTeamBg from "@/assets/media/package/package-plan-team-bg.png";
-import planFlagshipBg from "@/assets/media/package/package-plan-flagship-bg.png";
+import { mediaUrls } from "@/constants/media-urls";
+
+const {
+  package: { planBasicBg, planTeamBg, planFlagshipBg },
+} = mediaUrls;
 import {
   rechargePlanToneMap,
   rechargePlans,

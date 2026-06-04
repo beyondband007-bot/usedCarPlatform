@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { inject } from "vue";
+import { computed, inject } from "vue";
 import { useRouter } from "vue-router";
 
-import contactSupportWechatQr from "@/assets/media/global/global-contact-wechat-qr.png";
-import footerBrandLogo from "@/assets/media/global/global-footer-brand-logo.png";
+import footerBrandLogoLight from "@/assets/media/global/global-footer-brand-logo-light.png";
+import { mediaUrls } from "@/constants/media-urls";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import {
   homeFooterContactItems,
@@ -13,6 +13,8 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 
+const contactSupportWechatQr = mediaUrls.global.contactWechatQr;
+const footerBrandLogo = mediaUrls.global.footerBrandLogo;
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const router = useRouter();
@@ -35,6 +37,10 @@ function handleFooterNavClick(item: HomeFooterNavItem) {
 function isNavItemClickable(item: HomeFooterNavItem) {
   return Boolean(item.workspaceCode) && !item.disabled;
 }
+
+const footerBrandLogoSrc = computed(() =>
+  appStore.isDarkMode ? footerBrandLogo : footerBrandLogoLight,
+);
 </script>
 
 <template>
@@ -47,7 +53,7 @@ function isNavItemClickable(item: HomeFooterNavItem) {
       <div class="footer-brand">
         <img
           class="brand-logo-image"
-          :src="footerBrandLogo"
+          :src="footerBrandLogoSrc"
           alt="Facemini 脸谱科技"
           width="168"
           height="40"

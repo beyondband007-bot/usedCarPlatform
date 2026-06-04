@@ -3,7 +3,9 @@ import { Icon } from "@iconify/vue";
 import { NModal } from "naive-ui";
 import { computed } from "vue";
 
-import contactSupportWechatQr from "@/assets/media/global/global-contact-wechat-qr.png";
+import { mediaUrls } from "@/constants/media-urls";
+
+const contactSupportWechatQr = mediaUrls.global.contactWechatQr;
 import { contactSupportInfo } from "@/constants/contact-support";
 import { useAppStore } from "@/stores/app";
 

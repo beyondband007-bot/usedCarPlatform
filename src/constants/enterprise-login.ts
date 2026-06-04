@@ -1,5 +1,7 @@
-import enterpriseLoginBgDark from '@/assets/media/auth/auth-enterprise-login-bg-dark.png'
-import enterpriseLoginBgLight from '@/assets/media/auth/auth-enterprise-login-bg-light.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const enterpriseLoginBgDark = mediaUrls.auth.enterpriseLoginBgDark
+const enterpriseLoginBgLight = mediaUrls.auth.enterpriseLoginBgLight
 import enterpriseLoginIcon1 from '@/assets/img/icon/登录1.svg'
 import enterpriseLoginIcon2 from '@/assets/img/icon/登录2.svg'
 import enterpriseLoginIcon3 from '@/assets/img/icon/登录3.svg'

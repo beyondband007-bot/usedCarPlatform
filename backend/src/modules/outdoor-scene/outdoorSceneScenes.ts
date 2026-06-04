@@ -1,30 +1,25 @@
-import path from "node:path";
-
-import { env } from "../../config/env";
 import type { SceneOption } from "../scene-common/sceneModuleFactory";
-
-const workspaceAsset = (...segments: string[]) => path.resolve(env.rootDir, "../src/assets/img", ...segments);
+import { sceneReferenceMediaUrls } from "../../shared/mediaUrls";
 
 export const outdoorSceneScenes: SceneOption[] = [
   {
     optionId: "tree-park",
     title: "林荫公园",
-    referenceImagePath: workspaceAsset("户外场景", "场景", "图1.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.outdoor.treePark,
   },
   {
     optionId: "mountain-lake",
     title: "山野湖畔",
-    referenceImagePath: workspaceAsset("户外场景", "场景", "图2.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.outdoor.mountainLake,
   },
   {
     optionId: "city-block",
     title: "城市街区",
-    referenceImagePath: workspaceAsset("户外场景", "场景", "图3.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.outdoor.cityBlock,
   },
   {
     optionId: "coast-daylight",
     title: "海滨城市",
-    referenceImagePath: workspaceAsset("户外场景", "场景", "图4.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.outdoor.coastDaylight,
   },
 ];
-

@@ -3,12 +3,18 @@ import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
-import tutorialUploadCarImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-upload.png";
-import tutorialShowroomTemplate1 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-01.png";
-import tutorialShowroomTemplate2 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-02.png";
-import tutorialShowroomTemplate3 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-03.png";
-import tutorialResultImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-result.png";
-import tutorialLogoImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-logo-sample.png";
+import { mediaUrls } from "@/constants/media-urls";
+
+const {
+  showroom: {
+    tutorialStepUpload: tutorialUploadCarImage,
+    tutorialStepTemplate01: tutorialShowroomTemplate1,
+    tutorialStepTemplate02: tutorialShowroomTemplate2,
+    tutorialStepTemplate03: tutorialShowroomTemplate3,
+    tutorialStepResult: tutorialResultImage,
+    tutorialLogoSample: tutorialLogoImage,
+  },
+} = mediaUrls.workspace;
 
 defineProps<{
   animationKey?: string;
@@ -74,7 +80,7 @@ const tutorialTemplatePreviewImages = [
                 :alt="step.title"
                 loading="lazy"
                 :draggable="false"
-                fit="contain"
+                fit="cover"
               />
             </div>
           </template>
@@ -95,7 +101,7 @@ const tutorialTemplatePreviewImages = [
             :alt="step.title"
             loading="lazy"
             :draggable="false"
-            fit="contain"
+            fit="cover"
           />
         </div>
         <footer class="tutorial-step-foot">
@@ -230,81 +236,107 @@ const tutorialTemplatePreviewImages = [
   background: transparent;
 }
 
-.tutorial-step.is-step-1 .tutorial-image,
-.tutorial-step.is-step-3 .tutorial-image,
-.tutorial-step.is-step-4 .tutorial-image {
-  display: flex;
+.tutorial-step.is-step-1 :deep(.tutorial-image),
+.tutorial-step.is-step-4 :deep(.tutorial-image) {
+  display: block;
   width: 100%;
   height: 100%;
-  align-items: flex-start;
-  justify-content: center;
-  background: transparent;
-}
-
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
-.tutorial-step.is-step-3 .tutorial-image :deep(.preload-image),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: flex-start;
-  justify-content: center;
+  min-height: 0;
   background: transparent !important;
 }
 
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
+.tutorial-step.is-step-1 :deep(.tutorial-image),
+.tutorial-step.is-step-4 :deep(.tutorial-image) {
   overflow: hidden;
   border-radius: 10px;
+  background: #f8fafc !important;
 }
 
-.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
-.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
+.tutorial-section.theme-dark .tutorial-step.is-step-1 :deep(.tutorial-image),
+.tutorial-section.theme-dark .tutorial-step.is-step-4 :deep(.tutorial-image) {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.tutorial-step.is-step-1 :deep(.tutorial-image .preload-image__img),
+.tutorial-step.is-step-4 :deep(.tutorial-image .preload-image__img) {
+  display: block;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: top center;
-  border-radius: 10px;
+  border-radius: 0;
 }
 
-.tutorial-step.is-step-3 .tutorial-logo-image {
-  display: flex;
-  width: auto;
-  // max-width: 88%;
-  // height: auto;
-  // max-height: calc(100% - 16px);
+.tutorial-step.is-step-3 .tutorial-placeholder {
   align-items: center;
   justify-content: center;
-  // padding: 10px 14px;
-  border-radius: 8px;
+}
+
+.tutorial-step.is-step-3 {
+  --tutorial-logo-surface: #ffffff;
+}
+
+.tutorial-step.is-step-3 :deep(.tutorial-logo-image) {
+  display: inline-flex;
+  overflow: hidden;
+  width: auto;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 10px;
   box-sizing: border-box;
-  background: #ffffff;
+  background: var(--tutorial-logo-surface) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
 }
 
-.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-logo-image {
-  background: #f8fafc;
-}
+.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image) {
+  --preload-image-surface: #ffffff;
+  --preload-image-line: rgb(15 23 42 / 12%);
 
-.tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image) {
   display: flex;
+  overflow: hidden;
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
   align-items: center;
   justify-content: center;
-  background: transparent !important;
+  border-radius: inherit;
+  background: var(--tutorial-logo-surface) !important;
 }
 
-.tutorial-step.is-step-3 .tutorial-logo-image :deep(.preload-image__img) {
+.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image__placeholder) {
+  background: var(--tutorial-logo-surface) !important;
+}
+
+.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image__img) {
+  display: block;
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   object-position: center;
+  border-radius: inherit;
+}
+
+.tutorial-section.theme-dark .tutorial-step.is-step-3 :deep(.tutorial-logo-image),
+.tutorial-section.theme-dark
+  .tutorial-step.is-step-3
+  :deep(.tutorial-logo-image .preload-image),
+.tutorial-section.theme-dark
+  .tutorial-step.is-step-3
+  :deep(.tutorial-logo-image .preload-image__placeholder),
+.tutorial-section.theme-light .tutorial-step.is-step-3 :deep(.tutorial-logo-image),
+.tutorial-section.theme-light
+  .tutorial-step.is-step-3
+  :deep(.tutorial-logo-image .preload-image),
+.tutorial-section.theme-light
+  .tutorial-step.is-step-3
+  :deep(.tutorial-logo-image .preload-image__placeholder) {
+  background: #ffffff !important;
 }
 
 .tutorial-mosaic {
@@ -330,20 +362,22 @@ const tutorialTemplatePreviewImages = [
   width: 100%;
   height: 100%;
   min-height: 0;
-  border-radius: 0;
+  border-radius: 8px;
   background: transparent;
 }
 
 .tutorial-mosaic-image :deep(.preload-image) {
+  overflow: hidden;
   width: 100%;
   height: 100%;
+  border-radius: inherit;
   background: transparent !important;
 }
 
 .tutorial-mosaic-image :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: top center;
 }
 

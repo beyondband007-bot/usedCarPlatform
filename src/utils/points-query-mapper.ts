@@ -1,4 +1,5 @@
 import type { CreditsTransaction } from '@/api/visual-workbench'
+import { pointsSummaryIcons } from '@/constants/points-page'
 import type {
   PointsBizSource,
   PointsFlowRecord,
@@ -137,10 +138,10 @@ export function buildPersonalSummaryCards(input: {
   return [
     {
       key: 'availableBalance',
-      label: '当前可用余额',
+      label: '当前可用积分',
       value: formatPoints(input.availableBalance),
       unit: '积分',
-      icon: 'mdi:wallet-outline',
+      icon: pointsSummaryIcons.available,
       tone: 'blue',
     },
     {
@@ -148,7 +149,7 @@ export function buildPersonalSummaryCards(input: {
       label: '累计获得',
       value: formatPoints(totalGained),
       unit: '积分',
-      icon: 'mdi:trending-up',
+      icon: pointsSummaryIcons.gained,
       tone: 'emerald',
     },
     {
@@ -156,7 +157,7 @@ export function buildPersonalSummaryCards(input: {
       label: '累计消费',
       value: formatPoints(totalConsumed),
       unit: '积分',
-      icon: 'mdi:shopping-bag-outline',
+      icon: pointsSummaryIcons.consumed,
       tone: 'rose',
     },
     {
@@ -164,7 +165,7 @@ export function buildPersonalSummaryCards(input: {
       label: '近30天净变动',
       value: `${recentPrefix}${formatPoints(recentNet)}`,
       unit: '积分',
-      icon: 'mdi:zap',
+      icon: pointsSummaryIcons.recentNet,
       tone: 'amber',
     },
   ]

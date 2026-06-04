@@ -1,6 +1,8 @@
-import banner01LightPollution from '@/assets/media/home/home-promo-light-pollution.png'
-import banner02AgentRecruitment from '@/assets/media/home/home-promo-agent-recruitment.png'
-import banner03CreativeTeam from '@/assets/media/home/home-promo-creative-team.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const banner01LightPollution = mediaUrls.home.promoLightPollution
+const banner02AgentRecruitment = mediaUrls.home.promoAgentRecruitment
+const banner03CreativeTeam = mediaUrls.home.promoCreativeTeam
 
 export interface HomePromoBannerSlide {
   id: string

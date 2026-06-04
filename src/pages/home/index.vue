@@ -34,6 +34,10 @@ function openWorkbench() {
 
 <style scoped lang="scss">
 .home-page {
+  --home-suite-card-height: 259px;
+  --home-suite-peek: calc(var(--home-suite-card-height) / 3);
+  --home-suite-top-gap: 24px;
+  --home-hero-bottom-gap: 24px;
   --home-gold: var(--color-brand-primary);
   --home-gold-strong: var(--color-brand-strong);
   --home-radius-card: 28px;
@@ -180,5 +184,11 @@ function openWorkbench() {
 .home-page > :deep(*) {
   position: relative;
   z-index: 1;
+}
+
+@media (max-width: 700px) {
+  .home-page {
+    --home-suite-card-height: 210px;
+  }
 }
 </style>

@@ -10,6 +10,8 @@ import { useRoute, useRouter } from "vue-router";
 import { CREDITS_ROUTE } from "@/constants/app-flow";
 import { studioGuestNavigation, topNavigation } from "@/constants/prototype";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
+import PointsRechargeModal from "@/components/business/points/PointsRechargeModal.vue";
+import { usePointsRechargeModal } from "@/composables/usePointsRechargeModal";
 import { useStudioChrome } from "@/composables/useStudioChrome";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
@@ -25,6 +27,8 @@ const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const userMenuOpen = ref(false);
 const { usesStudioChrome } = useStudioChrome();
+const { rechargeModalVisible, openRechargeModal, notifyRechargeSuccess } =
+  usePointsRechargeModal();
 
 const creditsBalanceText = computed(() => {
   if (creditsStore.accountsLoaded) {
@@ -65,6 +69,16 @@ function handleNavClick(item: NavItem) {
 function handleOpenCredits() {
   userMenuOpen.value = false;
   router.push(CREDITS_ROUTE);
+}
+
+function handleOpenRecharge() {
+  userMenuOpen.value = false;
+  openRechargeModal();
+}
+
+async function handleRechargeSuccess() {
+  notifyRechargeSuccess();
+  await creditsStore.hydrateAccounts();
 }
 
 function handleLogout() {
@@ -116,6 +130,12 @@ const navItems = computed(() => {
       )
     : topNavigation.filter(canShowNavItem);
 });
+
+const showHeaderRecharge = computed(
+  () =>
+    authStore.isLoggedIn &&
+    navItems.value.some((item) => item.path === "/credits"),
+);
 </script>
 
 <template>
@@ -136,16 +156,24 @@ const navItems = computed(() => {
         </div>
       </div>
       <nav class="nav-links" aria-label="主导航">
-        <button
-          v-for="item in navItems"
-          :key="item.path + item.label"
-          type="button"
-          class="nav-link"
-          :class="{ active: isNavItemActive(item) }"
-          @click="handleNavClick(item)"
-        >
-          {{ item.label }}
-        </button>
+        <template v-for="item in navItems" :key="item.path + item.label">
+          <button
+            type="button"
+            class="nav-link"
+            :class="{ active: isNavItemActive(item) }"
+            @click="handleNavClick(item)"
+          >
+            {{ item.label }}
+          </button>
+          <button
+            v-if="item.path === '/credits' && showHeaderRecharge"
+            type="button"
+            class="nav-recharge-btn"
+            @click="handleOpenRecharge"
+          >
+            充值
+          </button>
+        </template>
       </nav>
       <div class="site-header-actions">
         <RouterLink
@@ -226,6 +254,16 @@ const navItems = computed(() => {
               积分查询
             </button>
             <button
+              v-if="showHeaderRecharge"
+              type="button"
+              class="user-menu-item"
+              role="menuitem"
+              @click="handleOpenRecharge"
+            >
+              <Icon icon="mdi:wallet-plus-outline" class="user-menu-item-icon" />
+              充值
+            </button>
+            <button
               type="button"
               class="user-menu-item"
               role="menuitem"
@@ -270,28 +308,36 @@ const navItems = computed(() => {
         class="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto overflow-y-hidden xl:gap-2"
         aria-label="主导航"
       >
-        <button
-          v-for="item in navItems"
-          :key="item.path"
-          type="button"
-          class="inline-flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 xl:min-w-[80px] xl:px-4"
-          :class="
-            isNavItemActive(item)
-              ? 'text-[var(--app-header-nav-active)]'
-              : 'text-[var(--app-header-nav)] hover:text-[var(--app-header-nav-active)]'
-          "
-          @click="handleNavClick(item)"
-        >
-          <Icon
-            v-if="item.icon"
-            :icon="item.icon"
-            class="text-xl"
+        <template v-for="item in navItems" :key="item.path">
+          <button
+            type="button"
+            class="inline-flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 xl:min-w-[80px] xl:px-4"
             :class="
-              isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''
+              isNavItemActive(item)
+                ? 'text-[var(--app-header-nav-active)]'
+                : 'text-[var(--app-header-nav)] hover:text-[var(--app-header-nav-active)]'
             "
-          />
-          <span>{{ item.label }}</span>
-        </button>
+            @click="handleNavClick(item)"
+          >
+            <Icon
+              v-if="item.icon"
+              :icon="item.icon"
+              class="text-xl"
+              :class="
+                isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''
+              "
+            />
+            <span>{{ item.label }}</span>
+          </button>
+          <button
+            v-if="item.path === '/credits' && showHeaderRecharge"
+            type="button"
+            class="nav-recharge-btn nav-recharge-btn--admin"
+            @click="handleOpenRecharge"
+          >
+            充值
+          </button>
+        </template>
       </nav>
 
       <div class="ml-auto flex shrink-0 items-center gap-2 xl:gap-3">
@@ -356,6 +402,16 @@ const navItems = computed(() => {
               积分查询
             </button>
             <button
+              v-if="showHeaderRecharge"
+              type="button"
+              class="user-menu-item"
+              role="menuitem"
+              @click="handleOpenRecharge"
+            >
+              <Icon icon="mdi:wallet-plus-outline" class="user-menu-item-icon" />
+              充值
+            </button>
+            <button
               type="button"
               class="user-menu-item"
               role="menuitem"
@@ -368,6 +424,12 @@ const navItems = computed(() => {
         </NPopover>
       </div>
     </header>
+
+    <PointsRechargeModal
+      v-if="authStore.isLoggedIn"
+      v-model:show="rechargeModalVisible"
+      @success="handleRechargeSuccess"
+    />
   </div>
 </template>
 
@@ -502,6 +564,44 @@ const navItems = computed(() => {
 .nav-link.active {
   color: var(--studio-chrome-nav-active, #2f6bff);
   font-weight: 600;
+}
+
+.nav-recharge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: clamp(6px, 0.45vw, 8px);
+  padding: clamp(4px, 0.35vw, 6px) clamp(10px, 0.8vw, 14px);
+  border: 0;
+  border-radius: 999px;
+  background: var(--studio-chrome-credit-bg, #d4a017);
+  color: var(--studio-chrome-credit-text, #ffffff);
+  font-family: inherit;
+  font-size: calc(var(--studio-chrome-nav-size, 15px) * 0.82);
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.nav-recharge-btn:hover {
+  background: var(--studio-chrome-credit-hover, #e5b85c);
+}
+
+.nav-recharge-btn--admin {
+  align-self: center;
+  margin-bottom: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-brand-primary, #2f6bff);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nav-recharge-btn--admin:hover {
+  background: var(--color-action-primary-hover, #4f7fff);
 }
 
 .credit-pill {

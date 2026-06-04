@@ -191,7 +191,7 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .promo-banner {
   position: relative;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
   padding: 0;
   cursor: default;
 }
@@ -199,7 +199,7 @@ onUnmounted(() => {
 .promo-banner-track {
   position: relative;
   width: 100%;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
 }
 
 .promo-banner-slide {
@@ -208,7 +208,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
   padding: 0;
   border: 0;
   border-radius: var(--home-radius-card, 28px);
@@ -276,7 +276,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
   max-width: 58%;
   padding: 117px 35px 35px;
   text-align: left;
@@ -393,7 +393,7 @@ onUnmounted(() => {
   .promo-banner-track,
   .promo-banner-slide,
   .promo-banner-copy {
-    min-height: 210px;
+    min-height: var(--home-suite-card-height, 210px);
   }
 
   .promo-banner-copy {

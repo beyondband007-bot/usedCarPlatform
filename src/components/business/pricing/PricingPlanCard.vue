@@ -37,10 +37,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 </script>
 
 <template>
-  <div
-    class="pricing-plan-motion"
-    :class="{ 'is-plan-selected': selected }"
-  >
+  <div class="pricing-plan-motion" :class="{ 'is-plan-selected': selected }">
     <article
       :class="cardClass"
       role="button"
@@ -115,7 +112,8 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-action-hover-text: #ffffff;
   --plan-action-solid-bg: linear-gradient(180deg, #f5cf65, #f1c646);
   --plan-action-solid-text: #241700;
-  --plan-action-solid-shadow: 0 12px 28px color-mix(in srgb, var(--plan-accent) 28%, transparent);
+  --plan-action-solid-shadow: 0 12px 28px
+    color-mix(in srgb, var(--plan-accent) 28%, transparent);
   --plan-badge-bg: var(--plan-accent);
   --plan-badge-text: #241700;
 
@@ -163,8 +161,16 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   content: "";
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--plan-accent) 18%, transparent), transparent 28%),
-    radial-gradient(circle at 50% 104%, color-mix(in srgb, var(--plan-accent) 16%, transparent), transparent 34%);
+    radial-gradient(
+      circle at 50% 28%,
+      color-mix(in srgb, var(--plan-accent) 18%, transparent),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 50% 104%,
+      color-mix(in srgb, var(--plan-accent) 16%, transparent),
+      transparent 34%
+    );
   opacity: 1;
 }
 
@@ -178,7 +184,11 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   --plan-divider: #e2e8f0;
   --plan-action-border: #d8e2f0;
   --plan-action-text: #172033;
-  --plan-action-hover-border: color-mix(in srgb, var(--plan-accent) 42%, #d8e2f0);
+  --plan-action-hover-border: color-mix(
+    in srgb,
+    var(--plan-accent) 42%,
+    #d8e2f0
+  );
   --plan-action-hover-text: var(--plan-accent);
   --plan-action-solid-bg: #2f6bff;
   --plan-action-solid-text: #ffffff;
@@ -219,12 +229,11 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
 .pricing-plan-card.is-featured {
   border-color: rgba(255, 255, 255, 0.12);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--plan-accent) 4%, rgba(255, 255, 255, 0.03)),
-      rgba(255, 255, 255, 0.03)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--plan-accent) 4%, rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03)
+  );
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.22),
     0 0 22px color-mix(in srgb, var(--plan-accent) 8%, transparent);
@@ -279,12 +288,11 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 }
 
 .pricing-plan-card.theme-light::after {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--plan-accent) 5%, transparent),
-      transparent 42%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--plan-accent) 5%, transparent),
+    transparent 42%
+  );
 }
 
 .pricing-plan-card.is-pressing {

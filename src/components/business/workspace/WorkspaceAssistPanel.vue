@@ -1525,9 +1525,6 @@ defineExpose({
                   :key="item.title"
                   class="requirement-card"
                 >
-                  <span class="requirement-card-icon" aria-hidden="true">
-                    <Icon icon="mdi:check" />
-                  </span>
                   <div class="requirement-card-copy">
                     <strong>{{ item.title }}</strong>
                     <span>{{ item.desc }}</span>
@@ -2828,8 +2825,8 @@ defineExpose({
 .requirement-card {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
   min-height: 60px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2864,25 +2861,12 @@ defineExpose({
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
-.requirement-card-icon {
-  display: grid;
-  flex: 0 0 26px;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(212, 160, 23, 0.12);
-  color: var(--workspace-accent-strong, #d4a017);
-}
-
-.requirement-card-icon > .iconify {
-  font-size: 13px;
-}
-
 .requirement-card-copy {
   display: grid;
   gap: 4px;
+  width: 100%;
   min-width: 0;
+  text-align: center;
 }
 
 .requirement-card-copy strong {

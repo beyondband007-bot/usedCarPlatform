@@ -4,8 +4,8 @@ import { computed, ref, watch } from "vue";
 
 import { useAppStore } from "@/stores/app";
 import { usePointsQuery } from "@/composables/usePointsQuery";
+import { usePointsRechargeModal } from "@/composables/usePointsRechargeModal";
 import PointsFlowTable from "@/components/business/points/PointsFlowTable.vue";
-import PointsRechargeModal from "@/components/business/points/PointsRechargeModal.vue";
 import PointsSummaryCards from "@/components/business/points/PointsSummaryCards.vue";
 import {
   pointsQueryBackgroundDark,
@@ -58,7 +58,7 @@ const defaultFilters = (): PointsQueryFilters => ({
 
 const filters = ref<PointsQueryFilters>(defaultFilters());
 const currentPage = ref(1);
-const rechargeModalVisible = ref(false);
+const { rechargeSuccessTick, openRechargeModal } = usePointsRechargeModal();
 
 const viewConfigMap: Record<string, PointsQueryViewConfig> = {
   personal: {
@@ -394,14 +394,14 @@ function handleRecharge() {
     return;
   }
 
-  rechargeModalVisible.value = true;
+  openRechargeModal();
 }
 
-function handleRechargeSuccess() {
+watch(rechargeSuccessTick, () => {
   if (usesLiveApi.value) {
     void refresh();
   }
-}
+});
 
 watch(version, () => {
   filters.value = defaultFilters();
@@ -474,10 +474,6 @@ watch(filteredRecords, () => {
       </section>
     </div>
 
-    <PointsRechargeModal
-      v-model:show="rechargeModalVisible"
-      @success="handleRechargeSuccess"
-    />
   </main>
 </template>
 
@@ -575,9 +571,14 @@ watch(filteredRecords, () => {
 
 .points-query-hero {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.points-query-hero-copy {
+  width: 100%;
 }
 
 .points-query-hero-copy h1 {
@@ -590,7 +591,7 @@ watch(filteredRecords, () => {
 
 .points-query-hero-copy p {
   max-width: 720px;
-  margin: 10px 0 0;
+  margin: 10px auto 0;
   color: #64748b;
   font-size: 14px;
   line-height: 1.6;
@@ -608,7 +609,7 @@ watch(filteredRecords, () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -678,12 +679,8 @@ watch(filteredRecords, () => {
 }
 
 @media (max-width: 900px) {
-  .points-query-hero {
-    flex-direction: column;
-  }
-
   .points-query-hero-badges {
-    justify-content: flex-start;
+    justify-content: center;
   }
 }
 

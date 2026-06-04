@@ -10,16 +10,6 @@ import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
 
-/** 原图 1672×941，展示纵向 25%~90% 区间 */
-const HERO_IMAGE_WIDTH = 1672;
-const HERO_IMAGE_HEIGHT = 941;
-const HERO_CROP_TOP = 0.25;
-const HERO_CROP_BOTTOM = 0.9;
-const HERO_CROP_HEIGHT = HERO_CROP_BOTTOM - HERO_CROP_TOP;
-/** 相对设计稿展示高度 +10% */
-const HERO_HEIGHT_SCALE = 1.1;
-const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_CROP_HEIGHT * HERO_HEIGHT_SCALE}`;
-
 const homeHeroImageSrc = computed(() =>
   appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,
 );
@@ -28,18 +18,13 @@ const homeHeroImageSrc = computed(() =>
 <template>
   <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
     <div class="hero-visual">
-      <div
-        class="hero-media"
-        :style="{
-          '--hero-crop-top': `${HERO_CROP_TOP * 100}%`,
-          aspectRatio: HERO_VIEWPORT_ASPECT,
-        }"
-      >
+      <div class="hero-media">
         <PreloadImage
           class="hero-image"
           :src="homeHeroImageSrc"
           alt=""
-          fit="none"
+          fit="cover"
+          object-position="center 52%"
           loading="eager"
           fetchpriority="high"
           decoding="async"
@@ -58,10 +43,11 @@ const homeHeroImageSrc = computed(() =>
 .hero {
   position: relative;
   width: 100%;
-  margin-bottom: 24px;
+  margin-bottom: var(--home-hero-bottom-gap, 24px);
 }
 
 .hero-visual {
+  width: 100%;
   overflow: hidden;
   background: var(--home-hero-bg);
 }
@@ -71,7 +57,11 @@ const homeHeroImageSrc = computed(() =>
   container-name: hero-media;
   position: relative;
   width: 100%;
-  overflow: hidden;
+  height: calc(
+    100dvh - var(--app-header-offset, 72px) - var(--home-suite-peek, calc(259px / 3)) -
+      var(--home-hero-bottom-gap, 24px) - var(--home-suite-top-gap, 24px)
+  );
+  min-height: 420px;
   line-height: 0;
   --hero-text-top: max(18%, calc(var(--app-header-offset, 72px) + 16px));
   --hero-car-top: 56%;
@@ -80,28 +70,29 @@ const homeHeroImageSrc = computed(() =>
 
 .hero-image {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+  z-index: 0;
   display: block;
   width: 100%;
+  height: 100%;
 }
 
 .hero-image :deep(.preload-image) {
   display: block;
   width: 100%;
-  height: auto;
-  min-height: 0;
+  height: 100%;
+  min-height: 100%;
   background: transparent !important;
 }
 
 .hero-image :deep(.preload-image__img) {
   display: block;
   width: 100%;
-  height: auto;
-  object-fit: unset;
+  height: 100%;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center 52%;
   image-rendering: auto;
-  transform: translate3d(0, calc(-1 * var(--hero-crop-top, 25%)), 0);
-  backface-visibility: hidden;
 }
 
 .hero-copy {

@@ -1,12 +1,16 @@
-import interiorCleanAfter from '@/assets/media/workspace/beauty/interior/workspace-interior-clean-compare-after.png'
-import interiorCleanBefore from '@/assets/media/workspace/beauty/interior/workspace-interior-clean-compare-before.png'
-import interiorStitchResult from '@/assets/media/workspace/beauty/interior/workspace-interior-stitch-result.png'
-import lightConsistencyAfter from '@/assets/media/workspace/beauty/light-consistency/workspace-light-consistency-compare-after.png'
-import lightConsistencyBefore from '@/assets/media/workspace/beauty/light-consistency/workspace-light-consistency-compare-before.png'
-import paintRefreshAfter from '@/assets/media/workspace/beauty/paint-refresh/workspace-paint-refresh-compare-after.png'
-import paintRefreshBefore from '@/assets/media/workspace/beauty/paint-refresh/workspace-paint-refresh-compare-before.png'
-import watermarkAfterOne from '@/assets/media/workspace/beauty/watermark/workspace-watermark-compare-after.png'
-import watermarkBeforeOne from '@/assets/media/workspace/beauty/watermark/workspace-watermark-compare-before.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const {
+  watermarkBefore: watermarkBeforeOne,
+  watermarkAfter: watermarkAfterOne,
+  paintRefreshBefore,
+  paintRefreshAfter,
+  lightConsistencyBefore,
+  lightConsistencyAfter,
+  interiorCleanBefore,
+  interiorCleanAfter,
+  interiorStitchResult,
+} = mediaUrls.workspace.beauty
 
 export interface WorkspaceFeatureCompareCard {
   before: string

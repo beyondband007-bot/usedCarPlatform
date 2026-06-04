@@ -9,13 +9,13 @@ import {
   pricingPageCopy,
   pricingPlans,
 } from "@/constants/prototype";
+import { mediaUrls } from "@/constants/media-urls";
 import { useAppStore } from "@/stores/app";
-
-import pricingHeroBgDark from "@/assets/media/pricing/pricing-hero-bg-dark.png";
-import pricingHeroBgLight from "@/assets/media/pricing/pricing-hero-bg-light.png";
 
 const copy = pricingPageCopy;
 const appStore = useAppStore();
+const pricingHeroBgDark = mediaUrls.pricing.heroBgDark;
+const pricingHeroBgLight = mediaUrls.pricing.heroBgLight;
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const selectedPlanName = ref<string | null>(null);

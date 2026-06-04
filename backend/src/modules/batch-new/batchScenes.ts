@@ -1,13 +1,8 @@
-import path from "node:path";
-
-import { env } from "../../config/env";
 import { outdoorSceneScenes } from "../outdoor-scene/outdoorSceneScenes";
 import { roadMotionScenes } from "../road-motion/roadMotionScenes";
 import { showroomLightScenes } from "../showroom-light/showroomLightScenes";
 import { skyStudioScenes } from "../sky-studio/skyStudioScenes";
-
-const workspaceAsset = (...segments: string[]) =>
-  path.resolve(env.rootDir, "../src/assets/img", ...segments);
+import { sceneReferenceMediaUrls } from "../../shared/mediaUrls";
 
 export interface BatchScene {
   optionId: string;
@@ -18,22 +13,22 @@ export interface BatchScene {
 
 /** 与前端 `workspace.ts` 道路动态场景 optionId 一致 */
 const roadSceneReferenceByOptionId: Record<string, string> = {
-  city_day_road: workspaceAsset("道路动态", "场景选择", "城市主干道.png"),
-  highway_sunset: workspaceAsset("道路动态", "场景选择", "夕阳高速.png"),
-  overpass_dusk: workspaceAsset("道路动态", "场景选择", "傍晚高架.png"),
-  business_park: workspaceAsset("道路动态", "场景选择", "商务园区.png"),
-  rainy_night_city: workspaceAsset("道路动态", "场景选择", "雨夜城市.png"),
-  mountain_curve: workspaceAsset("道路动态", "场景选择", "山路弯道.png"),
-  coastal_road: workspaceAsset("道路动态", "场景选择", "海岸公路.png"),
-  forest_avenue: workspaceAsset("道路动态", "场景选择", "林荫大道.png"),
-  snow_road: workspaceAsset("道路动态", "场景选择", "雪后公路.png"),
-  tunnel_exit: workspaceAsset("道路动态", "场景选择", "隧道出口.png"),
+  city_day_road: sceneReferenceMediaUrls.road.cityDayRoad,
+  highway_sunset: sceneReferenceMediaUrls.road.highwaySunset,
+  overpass_dusk: sceneReferenceMediaUrls.road.overpassDusk,
+  business_park: sceneReferenceMediaUrls.road.businessPark,
+  rainy_night_city: sceneReferenceMediaUrls.road.rainyNightCity,
+  mountain_curve: sceneReferenceMediaUrls.road.mountainCurve,
+  coastal_road: sceneReferenceMediaUrls.road.coastalRoad,
+  forest_avenue: sceneReferenceMediaUrls.road.forestAvenue,
+  snow_road: sceneReferenceMediaUrls.road.snowRoad,
+  tunnel_exit: sceneReferenceMediaUrls.road.tunnelExit,
 };
 
 const roadMotionBatchScenes: BatchScene[] = roadMotionScenes.map((scene) => ({
   optionId: scene.optionId,
   title: scene.title,
-  referenceImagePath: roadSceneReferenceByOptionId[scene.optionId],
+  referenceImageUrl: roadSceneReferenceByOptionId[scene.optionId],
 }));
 
 /** 与场景更换各模块及前端批量场景目录保持一致 */
@@ -58,7 +53,7 @@ const findRoadMotionBatchScene = (optionId: string): BatchScene | undefined => {
   return {
     optionId: roadScene.optionId,
     title: roadScene.title,
-    referenceImagePath: roadSceneReferenceByOptionId[roadScene.optionId],
+    referenceImageUrl: roadSceneReferenceByOptionId[roadScene.optionId],
   };
 };
 

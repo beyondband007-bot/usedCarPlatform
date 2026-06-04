@@ -33,6 +33,7 @@ const mappings = [
   ['src/img/home/suite-enterprise-light.png', 'src/assets/media/package/package-plan-team-bg.png'],
   ['src/img/home/suite-enterprise.png', 'src/assets/media/package/package-plan-flagship-bg.png'],
   ['src/assets/img/footer-brand-logo.png', 'src/assets/media/global/global-footer-brand-logo.png'],
+  ['src/assets/img/footer-brand-logo-light.png', 'src/assets/media/global/global-footer-brand-logo-light.png'],
   ['src/assets/img/contact-support-wechat-qr.png', 'src/assets/media/global/global-contact-wechat-qr.png'],
   ['src/assets/img/积分查询/积分查询背景白天.png', 'src/assets/media/points/points-query-bg-light.png'],
   ['src/assets/img/积分查询/积分查询背景黑夜.jpg', 'src/assets/media/points/points-query-bg-dark.jpg'],

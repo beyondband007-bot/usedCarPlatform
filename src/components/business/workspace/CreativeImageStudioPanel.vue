@@ -1442,20 +1442,43 @@ function toggleSidebar() {
 }
 
 .creative-prompt-input :deep(.n-input-wrapper) {
+  align-items: flex-start;
   padding: 0 !important;
 }
 
-.creative-prompt-input :deep(.n-input__textarea-el) {
-  padding: 2px 0;
+.creative-prompt-input :deep(.n-input__textarea-el),
+.creative-prompt-input :deep(.n-input__input-el),
+.creative-prompt-input :deep(textarea) {
+  box-sizing: border-box;
+  min-height: calc(15px * 1.7 * 3 + 16px);
+  padding: 8px !important;
+  margin: 0;
   color: var(--creative-text);
   font: inherit;
   font-size: 15px;
   font-weight: 600;
   line-height: 1.7;
+  vertical-align: top;
+  resize: none;
 }
 
 .creative-prompt-input :deep(.n-input__placeholder) {
+  position: absolute;
+  top: 0 !important;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  height: auto;
+  padding: 8px !important;
+  transform: none !important;
   color: var(--creative-muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
 }
 
 .creative-composer-foot {

@@ -7,61 +7,57 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
-import roadSceneBusinessPark from '@/assets/media/workspace/road/scene/workspace-road-scene-business-park.png'
-import roadSceneCityDay from '@/assets/media/workspace/road/scene/workspace-road-scene-city-day.png'
-import roadSceneCoastal from '@/assets/media/workspace/road/scene/workspace-road-scene-coastal.png'
-import roadSceneForest from '@/assets/media/workspace/road/scene/workspace-road-scene-forest-avenue.png'
-import roadSceneHighwaySunset from '@/assets/media/workspace/road/scene/workspace-road-scene-highway-sunset.png'
-import roadSceneMountainCurve from '@/assets/media/workspace/road/scene/workspace-road-scene-mountain-curve.png'
-import roadSceneOverpassDusk from '@/assets/media/workspace/road/scene/workspace-road-scene-overpass-dusk.png'
-import roadSceneRainyNight from '@/assets/media/workspace/road/scene/workspace-road-scene-rainy-night.png'
-import roadSceneSnow from '@/assets/media/workspace/road/scene/workspace-road-scene-snow-road.png'
-import roadSceneTunnelExit from '@/assets/media/workspace/road/scene/workspace-road-scene-tunnel-exit.png'
-import roadTutorialBusinessPark from '@/assets/media/workspace/road/tutorial/workspace-road-tutorial-business-park.png'
-import roadTutorialCityDay from '@/assets/media/workspace/road/tutorial/workspace-road-tutorial-city-day.png'
-import roadTutorialHighwaySunset from '@/assets/media/workspace/road/tutorial/workspace-road-tutorial-highway-sunset.png'
-import roadTutorialOverpassDusk from '@/assets/media/workspace/road/tutorial/workspace-road-tutorial-overpass-dusk.png'
-import showroomTutorialClassicWhite from '@/assets/media/workspace/showroom/workspace-showroom-tutorial-classic-white.png'
-import showroomTutorialGlass from '@/assets/media/workspace/showroom/workspace-showroom-tutorial-glass-hall.png'
-import showroomTutorialLuxuryDark from '@/assets/media/workspace/showroom/workspace-showroom-tutorial-luxury-dark.png'
-import showroomTutorialSoftTop from '@/assets/media/workspace/showroom/workspace-showroom-tutorial-soft-top-light.png'
-import outdoorTutorialTreePark from '@/assets/media/workspace/outdoor/workspace-outdoor-tutorial-tree-park.png'
-import outdoorTutorialMountainLake from '@/assets/media/workspace/outdoor/workspace-outdoor-tutorial-mountain-lake.png'
-import outdoorTutorialCityBlock from '@/assets/media/workspace/outdoor/workspace-outdoor-tutorial-city-block.png'
-import outdoorTutorialCoastDaylight from '@/assets/media/workspace/outdoor/workspace-outdoor-tutorial-coast-city.png'
-import skyTutorialMirrorField from '@/assets/media/workspace/sky/workspace-sky-tutorial-mirror-field.png'
-import skyTutorialSunsetDrive from '@/assets/media/workspace/sky/workspace-sky-tutorial-sunset-drive.png'
-import skyTutorialCloudSeaStage from '@/assets/media/workspace/sky/workspace-sky-tutorial-cloud-sea-stage.png'
-import skyTutorialCloudParking from '@/assets/media/workspace/sky/workspace-sky-tutorial-cloud-parking.png'
+import { mediaUrls } from '@/constants/media-urls'
+
+const {
+  road: roadMedia,
+  showroom: showroomMedia,
+  outdoor: outdoorMedia,
+  sky: skyMedia,
+} = mediaUrls.workspace
+
+const roadSceneBusinessPark = roadMedia.sceneBusinessPark
+const roadSceneCityDay = roadMedia.sceneCityDay
+const roadSceneCoastal = roadMedia.sceneCoastal
+const roadSceneForest = roadMedia.sceneForestAvenue
+const roadSceneHighwaySunset = roadMedia.sceneHighwaySunset
+const roadSceneMountainCurve = roadMedia.sceneMountainCurve
+const roadSceneOverpassDusk = roadMedia.sceneOverpassDusk
+const roadSceneRainyNight = roadMedia.sceneRainyNight
+const roadSceneSnow = roadMedia.sceneSnowRoad
+const roadSceneTunnelExit = roadMedia.sceneTunnelExit
+const roadTutorialBusinessPark = roadMedia.tutorialBusinessPark
+const roadTutorialCityDay = roadMedia.tutorialCityDay
+const roadTutorialHighwaySunset = roadMedia.tutorialHighwaySunset
+const roadTutorialOverpassDusk = roadMedia.tutorialOverpassDusk
+const showroomTutorialClassicWhite = showroomMedia.tutorialClassicWhite
+const showroomTutorialGlass = showroomMedia.tutorialGlassHall
+const showroomTutorialLuxuryDark = showroomMedia.tutorialLuxuryDark
+const showroomTutorialSoftTop = showroomMedia.tutorialSoftTopLight
+const outdoorTutorialTreePark = outdoorMedia.tutorialTreePark
+const outdoorTutorialMountainLake = outdoorMedia.tutorialMountainLake
+const outdoorTutorialCityBlock = outdoorMedia.tutorialCityBlock
+const outdoorTutorialCoastDaylight = outdoorMedia.tutorialCoastCity
+const skyTutorialMirrorField = skyMedia.tutorialMirrorField
+const skyTutorialSunsetDrive = skyMedia.tutorialSunsetDrive
+const skyTutorialCloudSeaStage = skyMedia.tutorialCloudSeaStage
+const skyTutorialCloudParking = skyMedia.tutorialCloudParking
+
 const sceneImageUrls = {
-  outdoorTreePark:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
-  outdoorHarborCity:
-    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7xb5scpo6k88m3eDIYxBIJvAdixAvxzBIUzAIr=.png',
-  outdoorMountainLake:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyboa0qamynpnt1z8DIYxBIJvAdixAvxzBIUzAIr=.png',
-  outdoorCityBlock:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybo4mc19qipnsx41DIYxBIJvAdixAvxzBIUzAIr=.png',
-  skyCloudParking:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddybnoit1y2xpnlni5DIYxBIJvAdixAvxzBIUzAIr=.png',
-  skyCloudSeaStage:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybnnhxeyk0pnkuvcDIYxBIJvAdixAvxzBIUzAIr=.png',
-  skySunsetDrive:
-    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7wwfo8bmfk7z8blDIYxBIJvAdixAvxzBIUzAIr=.png',
-  skyMirrorField:
-    'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7wt7tz9adk7y9bsDIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomSoftTop:
-    'https://vip.123pan.cn/1849524247/ymjew503t0n000ddy7w8j8l064k7o12vDIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomClassicWhite:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmzldg3i4pn8kbxDIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomMinimal:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybmybi6j7tpn7u6lDIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomWideAngle:
-    'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7w3h8c200k7nsa3DIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomGlass:
-    'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7w2k4md85k7mx2kDIYxBIJvAdixAvxzBIUzAIr=.png',
-  showroomLuxuryDark:
-    'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmt5my1lmpn5lygDIYxBIJvAdixAvxzBIUzAIr=.png',
+  outdoorTreePark: outdoorMedia.tutorialTreePark,
+  outdoorHarborCity: outdoorMedia.tutorialCoastCity,
+  outdoorMountainLake: outdoorMedia.tutorialMountainLake,
+  outdoorCityBlock: outdoorMedia.tutorialCityBlock,
+  skyCloudParking: skyMedia.tutorialCloudParking,
+  skyCloudSeaStage: skyMedia.tutorialCloudSeaStage,
+  skySunsetDrive: skyMedia.tutorialSunsetDrive,
+  skyMirrorField: skyMedia.tutorialMirrorField,
+  showroomSoftTop: showroomMedia.tutorialSoftTopLight,
+  showroomClassicWhite: showroomMedia.tutorialClassicWhite,
+  showroomMinimal: showroomMedia.sceneMinimal,
+  showroomWideAngle: showroomMedia.sceneWideAngle,
+  showroomGlass: showroomMedia.tutorialGlassHall,
+  showroomLuxuryDark: showroomMedia.tutorialLuxuryDark,
 }
 
 const tutorial = [

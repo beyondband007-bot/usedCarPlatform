@@ -81,7 +81,7 @@ onMounted(() => {
   position: relative;
   z-index: 3;
   width: min(1660px, calc(100% - 40px));
-  margin: 88px auto 0;
+  margin: var(--home-suite-top-gap, 24px) auto 0;
   padding-bottom: 126px;
 }
 
@@ -97,7 +97,7 @@ onMounted(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
   overflow: hidden;
   border: 1px solid var(--home-line);
   border-radius: var(--home-radius-card, 28px);
@@ -118,7 +118,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  min-height: 259px;
+  min-height: var(--home-suite-card-height, 259px);
   max-width: 58%;
   padding: 48px 35px 28px;
   background: var(--home-media-overlay);
@@ -234,7 +234,7 @@ onMounted(() => {
   .suite-card,
   .suite-card div,
   .suite-card-copy {
-    min-height: 210px;
+    min-height: var(--home-suite-card-height, 210px);
   }
 
   .suite-card div,

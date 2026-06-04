@@ -1,6 +1,4 @@
-import path from "node:path";
-
-import { env } from "../../config/env";
+import { sceneReferenceMediaUrls } from "../../shared/mediaUrls";
 
 export interface ShowroomLightScene {
   optionId: string;
@@ -9,38 +7,36 @@ export interface ShowroomLightScene {
   referenceImagePath?: string;
 }
 
-const workspaceAsset = (...segments: string[]) => path.resolve(env.rootDir, "../src/assets/img", ...segments);
-
 export const showroomLightScenes: ShowroomLightScene[] = [
   {
     optionId: "white-studio",
     title: "经典白棚",
-    referenceImagePath: workspaceAsset("展厅灯光", "经典白棚.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.whiteStudio,
   },
   {
     optionId: "glass-hall",
     title: "玻璃展厅",
-    referenceImagePath: workspaceAsset("展厅灯光", "玻璃展厅.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.glassHall,
   },
   {
     optionId: "luxury-dark",
     title: "暗调奢华",
-    referenceImagePath: workspaceAsset("展厅灯光", "暗调奢华.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.luxuryDark,
   },
   {
     optionId: "soft-top-light",
     title: "柔光灯顶",
-    referenceImagePath: workspaceAsset("展厅灯光", "柔光灯顶.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.softTopLight,
   },
   {
     optionId: "minimal-space",
     title: "极简留白",
-    referenceImagePath: workspaceAsset("展厅灯光", "极简留白.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.minimalSpace,
   },
   {
     optionId: "wide-angle",
     title: "广角空间",
-    referenceImagePath: workspaceAsset("展厅灯光", "广角空间.png"),
+    referenceImageUrl: sceneReferenceMediaUrls.showroom.wideAngle,
   },
 ];
 
