@@ -9,6 +9,7 @@ import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import { getCreditsAdminOverview } from "./creditsAdminService";
 import { resolveBillingIdentity } from "./billingIdentity";
 import { creditsClient, type CreditAccountResponse } from "./creditsClient";
+import { resolveChildCreditsIdentity } from "../enterprise/enterpriseMembersService";
 
 type ProxyIdentityBody = {
   userId?: unknown;
@@ -48,7 +49,10 @@ const parsePayChannel = (value: unknown) => {
 const parseAccountScope = (value: unknown) =>
   value === "personal" || value === "tenant" ? value : null;
 
-const resolveProxyIdentity = async (body: ProxyIdentityBody, headers: Record<string, string | string[] | undefined>) => {
+const resolveProxyIdentity = async (
+  body: ProxyIdentityBody,
+  headers: Record<string, string | string[] | undefined>,
+) => {
   const identity = await resolveBillingIdentity(body, { headers }, { requireEnabled: false });
   if (!identity) {
     throw errors.invalidParameter("credits user id is required", {
@@ -58,6 +62,19 @@ const resolveProxyIdentity = async (body: ProxyIdentityBody, headers: Record<str
     });
   }
   return identity;
+};
+
+const resolveTransactionIdentity = async (
+  query: Record<string, unknown>,
+  headers: Record<string, string | string[] | undefined>,
+) => {
+  const targetCreditsUserId = parsePositiveInteger(query.targetCreditsUserId, "targetCreditsUserId");
+
+  if (targetCreditsUserId) {
+    return resolveChildCreditsIdentity(headers, targetCreditsUserId);
+  }
+
+  return resolveProxyIdentity(query, headers);
 };
 
 const selectTransactionAccount = (
@@ -117,7 +134,7 @@ creditsRoutes.get(
   "/transactions",
   asyncHandler(async (req, res) => {
     const query = req.query as Record<string, unknown>;
-    const identity = await resolveProxyIdentity(query, req.headers);
+    const identity = await resolveTransactionIdentity(query, req.headers);
     const accountId = parsePositiveInteger(query.accountId, "accountId");
     const limit = parseLimit(query.limit);
     const accountsResult = await creditsClient.listAccounts({ userId: identity.userId });

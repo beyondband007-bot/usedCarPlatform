@@ -35,6 +35,7 @@ export interface PointsFlowRecord {
   createdAt: string;
   memberId?: string;
   memberName?: string;
+  memberRole?: "owner" | "admin" | "member";
   isOwner?: boolean;
   isCurrentUser?: boolean;
   status?: PointsFlowStatus;
@@ -57,6 +58,15 @@ export interface PointsQueryUserBadge {
   className: string;
 }
 
+export interface PointsSubAccountOption {
+  id: string;
+  label: string;
+  username?: string;
+  creditsUserId: number;
+  memberRole?: "owner" | "admin" | "member";
+  isOwner?: boolean;
+}
+
 export interface PointsQueryViewConfig {
   version: PointsQueryVersion;
   icon: string;
@@ -70,4 +80,5 @@ export interface PointsQueryViewConfig {
   currentMemberName?: string;
   showMemberColumns: boolean;
   adminTheme: boolean;
+  showSubAccountScope?: boolean;
 }

@@ -4,12 +4,14 @@ import { NSelect } from "naive-ui";
 import { computed } from "vue";
 
 import { useAppStore } from "@/stores/app";
+import type { PointsAccountScopeMode } from "@/utils/points-query-access";
 import type {
   PointsBizSource,
   PointsFlowRecord,
   PointsFlowStatus,
   PointsQueryFilters,
   PointsQueryViewConfig,
+  PointsSubAccountOption,
   PointsTxnType,
 } from "@/types/points-query";
 
@@ -24,14 +26,28 @@ const props = defineProps<{
   pageSize: number;
   loading?: boolean;
   glass?: boolean;
+  accountScopeMode?: PointsAccountScopeMode;
+  childMembers?: PointsSubAccountOption[];
+  selectedChildId?: string | null;
 }>();
 
 const emit = defineEmits<{
   "update:filters": [value: PointsQueryFilters];
   "update:currentPage": [value: number];
+  "update:accountScopeMode": [value: PointsAccountScopeMode];
+  selectChildAccount: [childId: string];
   export: [];
   recharge: [];
 }>();
+
+const scopeMode = computed(() => props.accountScopeMode ?? "self");
+
+const showRechargeButton = computed(() => scopeMode.value !== "child");
+
+
+function selectChild(childId: string) {
+  emit("selectChildAccount", childId);
+}
 
 const txnTypeOptions: Array<{ value: "" | PointsTxnType; label: string }> = [
   { value: "", label: "全部" },
@@ -82,14 +98,31 @@ const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
     { value: "fail", label: "失败退款" },
   ];
 
-const memberOptions = [
-  { value: "", label: "全部成员" },
-  { value: "u001", label: "张小明（管理员）" },
-  { value: "u002", label: "李芳（普通成员）" },
-  { value: "u003", label: "王强（普通成员）" },
-  { value: "u004", label: "赵雪（普通成员）" },
-  { value: "u005", label: "孙磊（普通成员）" },
-];
+const memberOptions = computed(() => {
+  if (props.childMembers?.length) {
+    return [
+      { value: "", label: "????" },
+      ...props.childMembers.map((member) => ({
+        value: member.id,
+        label:
+          member.memberRole === "owner"
+            ? `${member.label}?????`
+            : member.memberRole === "admin"
+              ? `${member.label}?????`
+              : member.label,
+      })),
+    ];
+  }
+
+  return [
+    { value: "", label: "????" },
+    { value: "u001", label: "????????" },
+    { value: "u002", label: "????????" },
+    { value: "u003", label: "????????" },
+    { value: "u004", label: "????????" },
+    { value: "u005", label: "????????" },
+  ];
+});
 
 const txnTypeLabelMap: Record<PointsTxnType, string> = {
   recharge: "充值",
@@ -143,6 +176,19 @@ function getAvatarClass(memberId?: string) {
   };
 
   return memberId ? (map[memberId] ?? "avatar-default") : "avatar-default";
+}
+
+function getAvatarText(label?: string) {
+  return (label?.trim().charAt(0) || "?").toUpperCase();
+}
+
+function getMemberRoleText(record: {
+  memberRole?: "owner" | "admin" | "member";
+  isOwner?: boolean;
+}) {
+  if (record.isOwner || record.memberRole === "owner") return "???";
+  if (record.memberRole === "admin") return "???";
+  return "??";
 }
 
 function setPage(page: number) {
@@ -270,6 +316,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
       </div>
 
       <button
+        v-if="showRechargeButton"
         type="button"
         class="points-recharge-button"
         @click="emit('recharge')"
@@ -277,6 +324,38 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         <Icon icon="mdi:plus" />
         充值
       </button>
+    </div>
+
+    <div
+      v-if="config.showSubAccountScope"
+      class="points-subaccount-bar"
+      role="group"
+      aria-label="积分查看范围"
+    >
+      <div
+        v-if="childMembers?.length"
+        class="points-subaccount-list"
+        role="list"
+        aria-label="??????"
+      >
+        <button
+          v-for="member in childMembers"
+          :key="member.id"
+          type="button"
+          class="points-subaccount-chip"
+          :class="{ 'is-active': member.id === selectedChildId || filters.member === member.id }"
+          role="listitem"
+          @click="selectChild(member.id)"
+        >
+          <span class="points-subaccount-avatar" :class="getAvatarClass(member.id)">
+            {{ getAvatarText(member.label) }}
+          </span>
+          <span class="points-subaccount-copy">
+            <strong>{{ member.label }}</strong>
+            <span>{{ getMemberRoleText(member) }}</span>
+          </span>
+        </button>
+      </div>
     </div>
 
     <div class="points-section-title">
@@ -299,6 +378,18 @@ function resolveSourceUsage(record: PointsFlowRecord) {
       :class="{ 'is-empty': !records.length }"
     >
       <table class="data-table data-table--design points-table-layout">
+        <colgroup>
+          <col class="col-time" />
+          <col class="col-type" />
+          <col class="col-change" />
+          <col class="col-status" />
+          <col class="col-source" />
+          <col class="col-validity" />
+          <template v-if="config.showMemberColumns">
+            <col class="col-operator" />
+            <col class="col-role" />
+          </template>
+        </colgroup>
         <thead>
           <tr>
             <th>时间</th>
@@ -365,14 +456,14 @@ function resolveSourceUsage(record: PointsFlowRecord) {
                   class="points-avatar"
                   :class="getAvatarClass(record.memberId)"
                 >
-                  {{ record.memberName?.charAt(0) }}
+                  {{ getAvatarText(record.memberName) }}
                 </div>
                 <span>{{ record.memberName }}</span>
               </div>
             </td>
             <td v-if="config.showMemberColumns">
               <span v-if="record.isOwner" class="tag tag-owner">主账号</span>
-              <span v-else class="points-member-role">成员</span>
+              <span v-else class="points-member-role">{{ getMemberRoleText(record) }}</span>
             </td>
           </tr>
         </tbody>
@@ -529,6 +620,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         </div>
 
         <button
+          v-if="showRechargeButton"
           type="button"
           class="points-recharge-button"
           @click="emit('recharge')"
@@ -618,14 +710,14 @@ function resolveSourceUsage(record: PointsFlowRecord) {
                   class="points-avatar"
                   :class="getAvatarClass(record.memberId)"
                 >
-                  {{ record.memberName?.charAt(0) }}
+                  {{ getAvatarText(record.memberName) }}
                 </div>
                 <span>{{ record.memberName }}</span>
               </div>
             </td>
             <td v-if="config.showMemberColumns">
               <span v-if="record.isOwner" class="tag tag-owner">主账号</span>
-              <span v-else class="points-member-role">成员</span>
+              <span v-else class="points-member-role">{{ getMemberRoleText(record) }}</span>
             </td>
             <td>
               <span class="points-time">{{ record.createdAt }}</span>
@@ -1368,11 +1460,12 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design.is-glass {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  height: auto;
+  min-height: var(--points-flow-card-min-h, 360px);
+  flex: 0 1 auto;
   flex-direction: column;
-  overflow: hidden;
-  padding: 8px;
+  overflow: visible;
+  padding: clamp(10px, 1.2vw, 14px);
   border: 1px solid #e8edf3;
   border-radius: 14px;
   background: #ffffff;
@@ -1396,8 +1489,8 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .points-flow-card--design .points-toolbar-filters {
@@ -1410,17 +1503,17 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .points-toolbar-select {
-  width: 148px;
-  min-width: 132px;
+  width: clamp(120px, 11vw, 148px);
+  min-width: 120px;
 }
 
 .points-flow-card--design .points-toolbar-select.is-wide {
-  width: 168px;
-  min-width: 148px;
+  width: clamp(132px, 12vw, 168px);
+  min-width: 132px;
 }
 
 .points-flow-card--design .points-toolbar-select {
-  --n-height: 40px;
+  --n-height: 36px;
   --n-border-radius: 8px;
   --n-font-size: 14px;
   --n-color: #ffffff;
@@ -1451,13 +1544,13 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-toolbar-date .form-input {
   min-width: 148px;
-  height: 40px;
+  height: 36px;
   border-radius: 8px;
 }
 
 .points-flow-card--design .points-recharge-button {
   display: inline-flex;
-  height: 40px;
+  height: 36px;
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
@@ -1478,13 +1571,123 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   background: linear-gradient(180deg, #f7dc82 0%, #c89412 100%);
 }
 
+.points-flow-card--design .points-subaccount-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 4px;
+}
+
+.points-flow-card--design .points-subaccount-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 88%);
+}
+
+.points-flow-card--design .points-subaccount-switch-btn {
+  min-width: 88px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.points-flow-card--design .points-subaccount-switch-btn.is-active {
+  background: linear-gradient(180deg, #f6e3a8 0%, #e8c96a 100%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
+  color: #7a5a00;
+  font-weight: 700;
+}
+
+.points-flow-card--design .points-subaccount-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.points-flow-card--design .points-subaccount-chip {
+  display: inline-flex;
+  min-width: 150px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.points-flow-card--design .points-subaccount-chip.is-active {
+  border-color: #d4a017;
+  background: rgb(239 194 76 / 14%);
+  box-shadow: 0 8px 18px rgb(212 160 23 / 14%);
+  color: #9a6700;
+  font-weight: 700;
+  transform: translateY(-1px);
+}
+
+.points-flow-card--design .points-subaccount-avatar {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.points-flow-card--design .points-subaccount-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.points-flow-card--design .points-subaccount-copy strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.points-flow-card--design .points-subaccount-copy span {
+  color: #64748b;
+  font-size: 11px;
+}
+
 .points-flow-card--design .points-section-title {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .points-flow-card--design .points-section-title-main {
@@ -1533,10 +1736,10 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-table-panel {
   position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
+  display: block;
+  width: 100%;
+  min-height: var(--points-table-min-h, 400px);
+  flex: 0 1 auto;
   overflow: hidden;
   border: 0;
   border-radius: 0;
@@ -1544,19 +1747,66 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .points-table-panel:not(.is-empty) {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: var(
+    --points-table-scroll-max-h,
+    calc(var(--points-table-head-h, 46px) + var(--points-table-row-h, 46px) * 10)
+  );
+  -webkit-overflow-scrolling: touch;
+}
+
+.points-flow-card--design .points-table-panel.is-empty {
+  overflow: hidden;
 }
 
 .points-flow-card--design .points-table-layout {
   width: 100%;
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
 
+.points-flow-card--design .points-table-layout .col-time {
+  width: 17%;
+}
+
+.points-flow-card--design .points-table-layout .col-type {
+  width: 11%;
+}
+
+.points-flow-card--design .points-table-layout .col-change {
+  width: 11%;
+}
+
+.points-flow-card--design .points-table-layout .col-status {
+  width: 11%;
+}
+
+.points-flow-card--design .points-table-layout .col-source {
+  width: 34%;
+}
+
+.points-flow-card--design .points-table-layout .col-validity {
+  width: 16%;
+}
+
+.points-flow-card--design .points-table-layout .col-operator {
+  width: 14%;
+}
+
+.points-flow-card--design .points-table-layout .col-role {
+  width: 10%;
+}
+
+.points-flow-card--design .points-table-panel.is-empty .data-table--design th {
+  position: static;
+}
+
 .points-flow-card--design .points-table-panel.is-empty .points-table-empty {
   position: absolute;
-  top: 49px;
+  top: var(--points-table-head-h, 46px);
   right: 0;
   bottom: 0;
   left: 0;
@@ -1588,24 +1838,33 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .data-table--design th {
-  padding: 14px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--points-table-head-h, var(--points-table-row-h, 46px));
+  padding: var(--points-table-cell-py, 14px) var(--points-table-cell-px, 16px);
   border-bottom: 1px solid rgb(15 23 42 / 8%);
-  background: transparent;
+  background: #ffffff;
+  box-sizing: border-box;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: var(--points-table-font-size, 13px);
   font-weight: 500;
   letter-spacing: 0;
+  line-height: 1.45;
   text-align: left;
   text-transform: none;
   white-space: nowrap;
 }
 
 .points-flow-card--design .data-table--design td {
-  padding: 14px 16px;
+  height: var(--points-table-row-h, 46px);
+  box-sizing: border-box;
+  padding: var(--points-table-cell-py, 14px) var(--points-table-cell-px, 16px);
   border-bottom: 1px solid rgb(15 23 42 / 5%);
   background: transparent;
   color: #334155;
-  font-size: 12px;
+  font-size: var(--points-table-font-size, 13px);
+  line-height: 1.45;
   vertical-align: middle;
 }
 
@@ -1660,13 +1919,20 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   font-size: 12px;
 }
 
+.points-flow-card--design .points-source {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .points-flow-card--design .points-validity {
   color: #64748b;
 }
 
 .points-flow-card--design .points-pagination-bar {
   flex-shrink: 0;
-  padding-top: 14px;
+  padding-top: 10px;
   border-top: 0;
 }
 
@@ -1674,6 +1940,31 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-color: #d4a017;
   background: #d4a017;
   color: #ffffff;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-switch {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(15 23 42 / 55%);
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-switch-btn {
+  color: #94a3b8;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-switch-btn.is-active {
+  color: #fde68a;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(15 23 42 / 45%);
+  color: #cbd5e1;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip.is-active {
+  border-color: rgb(239 194 76 / 45%);
+  background: rgb(239 194 76 / 16%);
+  color: #fde68a;
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-section-title h2,
@@ -1685,7 +1976,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card.theme-dark.points-flow-card--design .data-table--design th {
   border-bottom-color: rgb(255 255 255 / 10%);
-  background: transparent;
+  background: rgb(27, 28, 29);
   color: #94a3b8;
 }
 
@@ -1717,6 +2008,144 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   tr:hover
   td {
   background: rgb(239 194 76 / 10%);
+}
+
+/* 1440+：筛选与充值同一行 */
+@media (min-width: 1440px) {
+  .points-flow-card--design .points-toolbar {
+    margin-bottom: 16px;
+  }
+}
+
+/* 1024–1439：筛选换行，充值靠右（1366×768 / 1440×900） */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .points-flow-card--design .points-toolbar {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .points-flow-card--design .points-toolbar-filters {
+    flex: 1 1 auto;
+    gap: 10px;
+  }
+
+  .points-flow-card--design .points-toolbar-select {
+    width: 128px;
+    min-width: 116px;
+  }
+
+  .points-flow-card--design .points-toolbar-select.is-wide {
+    width: 140px;
+    min-width: 128px;
+  }
+
+  .points-flow-card--design .points-recharge-button {
+    margin-left: auto;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .points-flow-card--design .points-table-layout .col-time {
+    width: 16%;
+  }
+
+  .points-flow-card--design .points-table-layout .col-source {
+    width: 30%;
+  }
+}
+
+/* 1023 以下：表格横向滚动，筛选纵向堆叠 */
+@media (max-width: 1023px) {
+  .points-flow-card--design.is-glass {
+    flex: none;
+    overflow: visible;
+  }
+
+  .points-flow-card--design .points-table-panel.is-empty {
+    overflow: hidden;
+  }
+
+  .points-flow-card--design .points-table-panel:not(.is-empty) {
+    max-height: none;
+    flex: none;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .points-flow-card--design .points-table-layout {
+    min-width: 720px;
+  }
+
+  .points-flow-card--design .points-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .points-flow-card--design .points-toolbar-filters {
+    flex: 1 1 100%;
+  }
+
+  .points-flow-card--design .points-recharge-button {
+    margin-left: auto;
+  }
+
+  .points-flow-card--design .points-pagination {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .points-flow-card--design .points-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .points-flow-card--design .points-toolbar-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .points-flow-card--design .points-toolbar-select,
+  .points-flow-card--design .points-toolbar-select.is-wide {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .points-flow-card--design .points-recharge-button {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+  }
+
+  .points-flow-card--design .points-section-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .points-flow-card--design .points-pagination-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 767px) {
+  .points-flow-card--design.is-glass {
+    padding: 12px;
+  }
+
+  .points-flow-card--design .points-table-layout {
+    min-width: 640px;
+  }
+
+  .points-flow-card--design .data-table--design th,
+  .points-flow-card--design .data-table--design td {
+    padding: var(--points-table-cell-py, 12px) 10px;
+  }
 }
 </style>
 
