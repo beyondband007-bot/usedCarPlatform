@@ -36,8 +36,9 @@ function openWorkbench() {
 .home-page {
   --home-suite-card-height: 259px;
   --home-suite-peek: calc(var(--home-suite-card-height) / 3);
-  --home-suite-top-gap: 24px;
-  --home-hero-bottom-gap: 24px;
+  --home-suite-top-gap: calc(24px * 0.9);
+  --home-hero-bottom-gap: calc(24px * 0.9);
+  --home-hero-height-scale: 0.9;
   --home-gold: var(--color-brand-primary);
   --home-gold-strong: var(--color-brand-strong);
   --home-radius-card: 28px;
@@ -139,7 +140,7 @@ function openWorkbench() {
     rgba(24, 18, 10, 0) 50%
   );
   --home-media-title: #fff;
-  --home-media-desc: rgba(255, 255, 255, 0.84);
+  --home-media-desc: #d5d5d5;
   --home-card-title: var(--color-text-primary);
   --home-card-desc: var(--color-text-secondary);
   --home-card-muted: var(--color-text-muted);

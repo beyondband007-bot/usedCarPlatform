@@ -329,23 +329,34 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .query-title h1 {
   overflow: hidden;
   margin: 0;
-  font-size: 27px;
+  font-size: 18px;
   line-height: 1.25;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.credits-page.theme-dark .query-title h1 {
+  color: #f3f4f6;
+}
+
 .query-title p {
   overflow: hidden;
   margin: 7px 0 0;
-  color: var(--credit-text-soft);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
-  font-weight: 500;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.credits-page.theme-light .query-title p {
+  color: #94a3b8;
+}
+
+.credits-page.theme-dark .query-title p {
+  color: #9ca3af;
 }
 
 .export-button,
@@ -386,7 +397,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   box-shadow: 0 12px 26px rgba(47, 107, 255, 0.22);
   color: #fff;
   font-family: inherit;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: background 160ms ease, box-shadow 160ms ease;
@@ -639,8 +650,8 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .stat-content span {
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .stat-content strong {
@@ -676,9 +687,9 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .flow-panel h2 {
   margin: 0 0 18px;
   color: var(--credit-text);
-  font-size: 25px;
+  font-size: 14px;
   line-height: 1.3;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -693,7 +704,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 }
 
 .flow-data-table {
-  --n-font-size: 15px;
+  --n-font-size: 12px;
   --n-th-color: var(--credit-head);
   --n-th-color-hover: var(--credit-head);
   --n-th-text-color: var(--credit-table-head-text);
@@ -714,8 +725,8 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 .flow-data-table :deep(.n-data-table-th) {
   height: 56px;
   padding: 0 16px;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -882,7 +893,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
   }
 
   .query-title h1 {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .query-button {
@@ -922,7 +933,7 @@ const flowColumns: DataTableColumns<CreditFlowRow> = [
 
   .flow-panel h2 {
     margin-bottom: 12px;
-    font-size: 22px;
+    font-size: 14px;
   }
 
   .flow-table-wrap {

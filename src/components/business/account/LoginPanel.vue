@@ -482,6 +482,7 @@ onBeforeUnmount(() => {
   font-size: clamp(24px, 2vw, 30px);
   line-height: 1.2;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .login-card > p {
@@ -490,6 +491,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
   line-height: 1.55;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .login-fields,
@@ -668,7 +670,8 @@ onBeforeUnmount(() => {
 .login-code-button {
   height: 48px !important;
   border-radius: 8px !important;
-  font-weight: 800 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
 }
 
 .login-forgot {

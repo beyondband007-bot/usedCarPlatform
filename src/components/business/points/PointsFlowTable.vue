@@ -1505,8 +1505,8 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 .points-flow-card--design .points-section-title h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -1574,7 +1574,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   display: block;
   margin: 0 0 12px;
   color: #cbd5e1;
-  font-size: 44px;
+  font-size: 40px;
 }
 
 .points-flow-card--design .points-table-empty p {
@@ -1592,7 +1592,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-bottom: 1px solid rgb(15 23 42 / 8%);
   background: transparent;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
   text-align: left;
@@ -1605,7 +1605,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-bottom: 1px solid rgb(15 23 42 / 5%);
   background: transparent;
   color: #334155;
-  font-size: 13px;
+  font-size: 12px;
   vertical-align: middle;
 }
 
@@ -1619,7 +1619,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-change {
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1636,7 +1636,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   align-items: center;
   gap: 6px;
   color: #334155;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .points-flow-card--design .status-dot {
@@ -1657,7 +1657,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 .points-flow-card--design .points-validity,
 .points-flow-card--design .points-time {
   color: #334155;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .points-flow-card--design .points-validity {

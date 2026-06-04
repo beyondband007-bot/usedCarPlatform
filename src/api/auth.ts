@@ -37,6 +37,18 @@ export interface LoginWithCodeRequest {
   remember?: boolean
 }
 
+export interface RegisterRequest {
+  username: string
+  password: string
+  displayName?: string
+  planCode?: 'basic' | 'team' | 'flagship'
+}
+
+export interface RegisterResponse {
+  userInfo: UserInfo
+  subscription: SubscriptionStateSnapshot
+}
+
 export async function sendLoginCode(payload: SendCodeRequest) {
   const response = await request.post<ApiResponse<SendCodeResponse>>('/auth/login-code', payload)
   return response.data
@@ -49,6 +61,11 @@ export async function sendResetPasswordCode(payload: SendCodeRequest) {
 
 export async function resetPassword(payload: ResetPasswordRequest) {
   const response = await request.post<ApiResponse<{ success: boolean }>>('/auth/reset-password', payload)
+  return response.data
+}
+
+export async function register(payload: RegisterRequest) {
+  const response = await request.post<ApiResponse<RegisterResponse>>('/auth/register', payload)
   return response.data
 }
 

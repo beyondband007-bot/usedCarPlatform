@@ -438,8 +438,8 @@ function isAssetIcon(icon: string) {
 
 .points-summary-section.is-glass .summary-card p {
   color: #64748b;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .points-summary-section.is-glass .summary-value-line {
@@ -448,7 +448,7 @@ function isAssetIcon(icon: string) {
 
 .points-summary-section.is-glass .summary-unit {
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .points-summary-section.is-glass .summary-icon {
@@ -478,7 +478,7 @@ function isAssetIcon(icon: string) {
 }
 
 .points-summary-section.is-glass .summary-value {
-  font-size: clamp(24px, 2vw, 30px);
+  font-size: 26px;
 }
 
 .points-summary-section.theme-dark.is-glass .card {

@@ -816,6 +816,8 @@ export interface CreditsTransaction {
   createdAt: string
 }
 
+export type CreditsPayChannel = 'alipay' | 'wechat' | 'card'
+
 export interface PaymentOrderResult {
   id: number | string
   orderNo: string
@@ -825,10 +827,12 @@ export interface PaymentOrderResult {
   amountText?: string
   giftPoints: number
   totalPoints?: number
-  status: 'pending' | 'paid' | 'failed' | 'canceled' | string
+  payChannel?: CreditsPayChannel
+  status: 'pending' | 'paid' | 'failed' | 'canceled' | 'refunded' | string
   payUrl?: string | null
   qrCodeUrl?: string | null
   createdAt: string
+  idempotentReplay?: boolean
 }
 
 export interface CreditsApplication {
@@ -1069,24 +1073,94 @@ function extractCreditsList<T>(payload: unknown, keys: string[]) {
   return []
 }
 
+function resolveRechargeAmountYuan(product: RechargeProduct & Record<string, unknown>) {
+  if (typeof product.amount === 'string' || typeof product.amount === 'number') {
+    const parsed = Number(product.amount)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+  }
+  if (typeof product.priceCents === 'number' && product.priceCents > 0) {
+    return product.priceCents / 100
+  }
+  return 0
+}
+
 function normalizeRechargeProduct(
   product: RechargeProduct & Record<string, unknown>,
 ): RechargeProduct {
-  const amount = Number(product.amount ?? product.priceCents ?? 0)
+  const amountYuan = resolveRechargeAmountYuan(product)
   const points = Number(product.points ?? product.giftPoints ?? 0)
   const bonusPoints = Number(product.bonusPoints ?? 0)
 
   return {
     ...product,
     code: product.code ?? String(product.id),
+    priceCents:
+      typeof product.priceCents === 'number' && product.priceCents > 0
+        ? product.priceCents
+        : amountYuan > 0
+          ? Math.round(amountYuan * 100)
+          : undefined,
     priceText:
       product.priceText ??
-      (Number.isFinite(amount) && amount > 0
-        ? `¥${amount.toLocaleString('zh-CN')}`
-        : undefined),
+      (amountYuan > 0 ? `¥${amountYuan.toLocaleString('zh-CN')}` : undefined),
     giftPoints: product.giftPoints ?? points,
     totalPoints: product.totalPoints ?? points + bonusPoints,
     status: product.status ?? (product.enabled === false ? 'disabled' : 'active'),
+  }
+}
+
+function normalizeCreditsApplicationFunction(
+  item: CreditsApplicationFunction & Record<string, unknown>,
+): CreditsApplicationFunction {
+  return {
+    ...item,
+    defaultPoints: parseCreditsNumber(item.defaultPoints),
+  }
+}
+
+function buildPaymentIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `payment_order:${crypto.randomUUID()}`
+  }
+  return `payment_order:${Date.now()}`
+}
+
+function normalizePaymentOrder(
+  order: PaymentOrderResult & Record<string, unknown>,
+): PaymentOrderResult {
+  const amountYuan = Number(order.amount ?? 0)
+  const amountCents =
+    typeof order.amountCents === 'number' && order.amountCents > 0
+      ? order.amountCents
+      : Number.isFinite(amountYuan) && amountYuan > 0
+        ? Math.round(amountYuan * 100)
+        : undefined
+  const giftPoints = parseCreditsNumber(order.points ?? order.giftPoints)
+  const bonusPoints = parseCreditsNumber(order.bonusPoints)
+
+  return {
+    id: order.id ?? order.paymentOrderId ?? '',
+    orderNo: String(order.orderNo ?? ''),
+    productId: order.productId ?? '',
+    productName: order.productName,
+    amountCents,
+    amountText:
+      order.amountText ??
+      (amountYuan > 0 ? `¥${amountYuan.toLocaleString('zh-CN')}` : undefined),
+    giftPoints,
+    totalPoints: order.totalPoints ?? giftPoints + bonusPoints,
+    payChannel:
+      order.payChannel === 'alipay' || order.payChannel === 'wechat' || order.payChannel === 'card'
+        ? order.payChannel
+        : undefined,
+    status: order.status ?? 'pending',
+    payUrl: order.payUrl ?? null,
+    qrCodeUrl: order.qrCodeUrl ?? null,
+    createdAt:
+      typeof order.createdAt === 'string'
+        ? order.createdAt
+        : new Date().toISOString(),
+    idempotentReplay: Boolean(order.idempotentReplay),
   }
 }
 
@@ -1185,14 +1259,18 @@ export async function getCreditsTransactions(
 
 export async function createRechargeOrder(payload: {
   productId: number | string
-  quantity?: number
-  remark?: string
+  payChannel: CreditsPayChannel
+  idempotencyKey?: string
 }) {
-  const response = await request.post<ApiResponse<PaymentOrderResult>>(
+  const response = await request.post<ApiResponse<PaymentOrderResult & Record<string, unknown>>>(
     '/credits/payment-orders',
-    payload,
+    {
+      productId: payload.productId,
+      payChannel: payload.payChannel,
+      idempotencyKey: payload.idempotencyKey?.trim() || buildPaymentIdempotencyKey(),
+    },
   )
-  return unwrapApiResponse(response)
+  return normalizePaymentOrder(unwrapApiResponse(response))
 }
 
 export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
@@ -1201,10 +1279,9 @@ export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
   )
   const payload = unwrapApiResponse(response)
   const applications = extractCreditsList<CreditsApplication>(payload, ['applications'])
-  const applicationFunctions = extractCreditsList<CreditsApplicationFunction>(
-    payload,
-    ['applicationFunctions', 'functions'],
-  )
+  const applicationFunctions = extractCreditsList<
+    CreditsApplicationFunction & Record<string, unknown>
+  >(payload, ['applicationFunctions', 'functions']).map(normalizeCreditsApplicationFunction)
   const creditAccounts = extractCreditsList<CreditsAccount & Record<string, unknown>>(
     payload,
     ['creditAccounts', 'accounts'],

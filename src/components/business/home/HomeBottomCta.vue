@@ -67,6 +67,7 @@ onMounted(() => {
   width: min(1520px, calc(100% - 40px));
   margin: 0 auto;
   padding: 0 20px 120px;
+  overflow-x: auto;
   text-align: center;
 }
 
@@ -74,12 +75,14 @@ onMounted(() => {
   margin: 0 0 14px;
   color: var(--home-text);
   font-size: clamp(28px, 3vw, 42px);
+  white-space: nowrap;
 }
 
 .final-cta p {
   margin: 0 0 28px;
   color: var(--home-muted);
   font-size: 16px;
+  white-space: nowrap;
 }
 
 .final-cta--authenticated p {

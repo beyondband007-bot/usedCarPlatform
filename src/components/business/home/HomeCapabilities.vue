@@ -98,8 +98,10 @@ onMounted(() => {
 }
 
 .section-title {
-  width: min(760px, 100%);
+  width: max-content;
+  max-width: 100%;
   margin: 0 auto 64px;
+  overflow-x: auto;
   text-align: center;
 }
 
@@ -108,6 +110,7 @@ onMounted(() => {
   color: var(--home-text);
   font-size: clamp(28px, 3.2vw, 42px);
   line-height: 1.12;
+  white-space: nowrap;
 }
 
 .section-title p {
@@ -115,6 +118,7 @@ onMounted(() => {
   color: var(--home-muted);
   font-size: 15px;
   line-height: 1.8;
+  white-space: nowrap;
 }
 
 .feature-grid {
@@ -317,11 +321,6 @@ onMounted(() => {
   .feature-grid {
     grid-template-columns: 1fr;
     gap: 18px;
-  }
-
-  .feature-card h3,
-  .feature-card p {
-    white-space: normal;
   }
 
   .badge-row {

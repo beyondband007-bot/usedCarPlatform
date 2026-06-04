@@ -105,7 +105,7 @@ function handlePlanConsult() {
   --pricing-footer-border: rgba(255, 255, 255, 0.08);
   --pricing-intro-color: rgb(12, 13, 13);
   --pricing-footer-title: #f8fafc;
-  --pricing-footer-sub: rgba(248, 250, 252, 0.72);
+  --pricing-footer-sub: rgba(248, 250, 252, 0.76);
   --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
   --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
   --pricing-bg-fallback: #020303;
@@ -137,7 +137,7 @@ function handlePlanConsult() {
   --pricing-footer-border: rgba(255, 255, 255, 0.08);
   --pricing-intro-color: rgb(12, 13, 13);
   --pricing-footer-title: #f8fafc;
-  --pricing-footer-sub: rgba(248, 250, 252, 0.7);
+  --pricing-footer-sub: rgba(248, 250, 252, 0.76);
   --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
   --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
   --pricing-bg-fallback: #f6f9fc;
@@ -204,6 +204,7 @@ function handlePlanConsult() {
   font-weight: 950;
   letter-spacing: 0.02em;
   line-height: 1.08;
+  white-space: nowrap;
 }
 
 .pricing-page.theme-dark .pricing-hero h1 {
@@ -211,12 +212,14 @@ function handlePlanConsult() {
 }
 
 .pricing-hero-intro {
-  max-width: min(720px, 100%);
+  max-width: none;
+  width: max-content;
   margin: clamp(12px, 1.5vh, 18px) auto 0;
-  color: var(--pricing-intro-color);
+  color: var(--pricing-hero-sub);
   font-size: clamp(15px, min(1.55vw, 2.2vh), 24px);
   font-weight: 500;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .pricing-plans-grid {
@@ -291,18 +294,18 @@ function handlePlanConsult() {
 
 .footer-feature p {
   margin: 4px 0 0;
-  color: var(--pricing-footer-sub);
+  color: var(--pricing-hero-sub);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 @media (max-height: 760px) {
   .pricing-hero-intro {
-    display: -webkit-box;
+    display: block;
     overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
+    text-overflow: ellipsis;
   }
 }
 

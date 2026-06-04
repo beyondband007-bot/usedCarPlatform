@@ -7,6 +7,7 @@ import {
   type CreditsAccount,
 } from '@/api/visual-workbench'
 import { useCreditsStore } from '@/stores/credits'
+import { getCreditsIdentity } from '@/utils/credits-identity'
 import {
   buildPersonalSummaryCards,
   mapCreditsTransactionToFlowRecord,
@@ -44,14 +45,23 @@ export function usePointsQuery() {
     loadError.value = null
 
     try {
+      const identity = getCreditsIdentity()
       const [accounts, transactionResult] = await Promise.all([
         getCreditsAccounts(),
-        getCreditsTransactions({ limit: 100 }),
+        getCreditsTransactions({
+          limit: 100,
+          accountScope: identity.accountScope,
+          tenantId: identity.tenantId ?? undefined,
+        }),
       ])
 
       activeAccount.value =
         transactionResult.account
-        ?? accounts.find((account) => account.accountScope === 'personal')
+        ?? accounts.find(
+          (account) =>
+            account.accountScope === identity.accountScope
+            && (identity.tenantId == null || String(account.tenantId) === String(identity.tenantId)),
+        )
         ?? accounts[0]
         ?? null
 

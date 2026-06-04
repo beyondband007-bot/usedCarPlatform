@@ -350,6 +350,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   font-size: clamp(20px, 5.2cqw, 34px);
   font-weight: 900;
   line-height: 1.18;
+  white-space: nowrap;
 }
 
 .plan-price-row {
@@ -401,6 +402,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   font-size: clamp(13px, 4.1cqw, 24px);
   font-weight: 600;
   line-height: 1.4;
+  white-space: nowrap;
 }
 
 .benefit-icon {
@@ -426,6 +428,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   font-family: inherit;
   font-size: clamp(14px, 4cqw, 24px);
   font-weight: 900;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background 160ms ease,

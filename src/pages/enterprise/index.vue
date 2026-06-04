@@ -38,10 +38,7 @@ const enterpriseLoginHeroImage = computed(() =>
 
     <div class="enterprise-login-shell">
       <section class="enterprise-login-copy" aria-label="企业登录介绍">
-        <h1 class="enterprise-login-title">
-          <span>每一辆车</span>
-          <span>都值得被精心呈现</span>
-        </h1>
+        <h1 class="enterprise-login-title">每一辆车，都值得被精心呈现</h1>
         <p class="enterprise-login-subtitle">AI驱动的汽车电商内容生产平台</p>
 
         <ul class="enterprise-login-features">
@@ -181,30 +178,28 @@ const enterpriseLoginHeroImage = computed(() =>
 }
 
 .enterprise-login-copy {
-  max-width: 620px;
+  width: max-content;
+  max-width: min(100%, 720px);
   color: var(--login-text);
 }
 
 .enterprise-login-title {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(6px, 1vh, 12px);
   margin: 0 0 clamp(6px, 1vh, 12px);
-  max-width: 560px;
   color: var(--home-hero-title, #f3f3f3);
   font-size: clamp(22px, 2.2vw, 46px);
   line-height: 1.12;
   letter-spacing: 0;
+  white-space: nowrap;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
 
 .enterprise-login-subtitle {
   margin: 0;
-  max-width: 520px;
   color: var(--home-hero-sub, #d5d5d5);
   font-size: clamp(14px, 0.92vw, 20px);
   line-height: 1.35;
   font-weight: 400;
+  white-space: nowrap;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 
@@ -256,12 +251,14 @@ const enterpriseLoginHeroImage = computed(() =>
   color: var(--login-text);
   font-size: 15px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .enterprise-login-feature-text small {
   color: var(--login-muted);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .enterprise-login-panel {
@@ -275,7 +272,9 @@ const enterpriseLoginHeroImage = computed(() =>
   }
 
   .enterprise-login-copy {
+    width: 100%;
     max-width: 100%;
+    overflow-x: auto;
   }
 
   .enterprise-login-features {
@@ -297,12 +296,7 @@ const enterpriseLoginHeroImage = computed(() =>
 @media (min-width: 1600px) {
   .enterprise-login-title {
     margin-bottom: 24px;
-    font-size: clamp(27px, 4.8vw, 54px);
     font-weight: 800;
-  }
-
-  .enterprise-login-subtitle {
-    font-size: clamp(19px, 1.85vw, 25px);
   }
 }
 </style>

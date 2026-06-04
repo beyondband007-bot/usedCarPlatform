@@ -289,6 +289,7 @@ onUnmounted(() => {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.3;
+  white-space: nowrap;
 }
 
 .promo-banner-copy p {
@@ -296,6 +297,7 @@ onUnmounted(() => {
   color: var(--home-media-desc);
   font-size: 15px;
   line-height: 1.5;
+  white-space: nowrap;
 }
 
 .promo-banner-copy p:last-of-type {

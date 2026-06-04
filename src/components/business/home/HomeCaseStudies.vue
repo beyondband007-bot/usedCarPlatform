@@ -101,8 +101,10 @@ onMounted(() => {
 }
 
 .section-title {
-  width: min(760px, 100%);
+  width: max-content;
+  max-width: 100%;
   margin: 0 auto 64px;
+  overflow-x: auto;
   text-align: center;
 }
 
@@ -111,6 +113,7 @@ onMounted(() => {
   color: var(--home-text);
   font-size: clamp(28px, 3.2vw, 42px);
   line-height: 1.12;
+  white-space: nowrap;
 }
 
 .section-title p {
@@ -118,6 +121,7 @@ onMounted(() => {
   color: var(--home-muted);
   font-size: 15px;
   line-height: 1.8;
+  white-space: nowrap;
 }
 
 .tabs {
@@ -239,6 +243,7 @@ onMounted(() => {
   font-weight: 800;
   line-height: 1.28;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .case-panel > div + div {
@@ -252,6 +257,7 @@ onMounted(() => {
   font-size: clamp(20px, 1.55vw, 24px);
   font-weight: 700;
   line-height: 1.45;
+  white-space: nowrap;
 }
 
 .case-panel p {

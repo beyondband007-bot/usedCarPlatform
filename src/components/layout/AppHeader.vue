@@ -460,14 +460,14 @@ const showHeaderRecharge = computed(
     --studio-chrome-header-bg,
     linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent)
   );
-  color: var(--studio-chrome-logo, #f3f3f3);
+  color: var(--studio-chrome-logo, #f7f1e4);
   font-family:
     "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
 .logo {
   flex-shrink: 0;
-  color: var(--studio-chrome-logo, #f3f3f3);
+  color: var(--studio-chrome-logo, #f7f1e4);
   font-family: inherit;
   font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
   font-weight: 900;
@@ -492,11 +492,11 @@ const showHeaderRecharge = computed(
   margin-right: 24px;
   padding: 0 6px;
   border-radius: 4px;
-  background: #fff;
+  background: #000;
 }
 
 .logo-cn-name {
-  color: #0f172a;
+  color: #fff;
   font-family: inherit;
   font-size: calc(
     var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2
@@ -508,11 +508,11 @@ const showHeaderRecharge = computed(
 }
 
 .site-header.is-light .logo-cn-badge {
-  background: #000;
+  background: #fff;
 }
 
 .site-header.is-light .logo-cn-name {
-  color: #fff;
+  color: #0f172a;
 }
 
 .nav-links {
@@ -520,21 +520,23 @@ const showHeaderRecharge = computed(
   min-width: 0;
   align-items: center;
   gap: var(--studio-chrome-nav-gap, clamp(20px, 2.8vw, 56px));
-  color: var(--studio-chrome-nav, #c9c9c9);
+  color: var(--studio-chrome-nav, #c8c1b3);
   font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
   font-weight: 700;
 }
 
 .nav-link {
   position: relative;
+  flex-shrink: 0;
   padding: 0 0 clamp(6px, 0.45vw, 8px);
   border: 0;
   background: transparent;
-  color: var(--studio-chrome-nav, #475569);
+  color: var(--studio-chrome-nav, #c8c1b3);
   font-family: inherit;
   font-size: inherit;
   font-weight: 600;
   line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.25s ease;
 }
@@ -577,7 +579,7 @@ const showHeaderRecharge = computed(
   background: var(--studio-chrome-credit-bg, #d4a017);
   color: var(--studio-chrome-credit-text, #ffffff);
   font-family: inherit;
-  font-size: calc(var(--studio-chrome-nav-size, 15px) * 0.82);
+  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   font-weight: 700;
   line-height: 1.2;
   cursor: pointer;
@@ -646,7 +648,7 @@ const showHeaderRecharge = computed(
   border: 1px solid var(--studio-chrome-theme-border, rgba(255, 255, 255, 0.14));
   border-radius: 999px;
   background: var(--studio-chrome-theme-bg, rgba(255, 255, 255, 0.08));
-  color: var(--studio-chrome-theme-text, #f3f3f3);
+  color: var(--studio-chrome-theme-text, #f7f1e4);
   font-family: inherit;
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   font-weight: 700;
@@ -682,7 +684,7 @@ const showHeaderRecharge = computed(
 .user-menu-trigger--studio {
   border-color: var(--studio-chrome-user-border, rgba(255, 255, 255, 0.14));
   background: var(--studio-chrome-user-bg, rgba(255, 255, 255, 0.08));
-  color: var(--studio-chrome-user-text, #f3f3f3);
+  color: var(--studio-chrome-user-text, #f7f1e4);
   font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
   font-weight: 700;
 }

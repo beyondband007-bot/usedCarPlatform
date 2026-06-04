@@ -58,10 +58,14 @@ const homeHeroImageSrc = computed(() =>
   position: relative;
   width: 100%;
   height: calc(
-    100dvh - var(--app-header-offset, 72px) - var(--home-suite-peek, calc(259px / 3)) -
-      var(--home-hero-bottom-gap, 24px) - var(--home-suite-top-gap, 24px)
+    (
+        100dvh - var(--app-header-offset, 72px) - var(
+            --home-suite-peek,
+            calc(259px / 3)
+          ) - var(--home-hero-bottom-gap, 21.6px) - var(--home-suite-top-gap, 21.6px)
+      ) * var(--home-hero-height-scale, 1)
   );
-  min-height: 420px;
+  min-height: calc(420px * var(--home-hero-height-scale, 1));
   line-height: 0;
   --hero-text-top: max(18%, calc(var(--app-header-offset, 72px) + 16px));
   --hero-car-top: 56%;
@@ -104,7 +108,9 @@ const homeHeroImageSrc = computed(() =>
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  width: min(900px, calc(100% - 40px));
+  align-items: center;
+  width: fit-content;
+  max-width: calc(100% - 40px);
   max-height: calc(
     var(--hero-car-top) - var(--hero-text-top) - var(--hero-text-car-gap)
   );
@@ -119,17 +125,19 @@ const homeHeroImageSrc = computed(() =>
 .hero h1 {
   margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: clamp(22px, 2.2cqw, 46px);
+  font-size: clamp(22px, 4.8cqh, 46px);
   line-height: 1.12;
   letter-spacing: 0;
+  white-space: nowrap;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
 
 .subtitle {
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
-  font-size: clamp(14px, 0.92cqw, 20px);
+  font-size: clamp(14px, 1.85cqh, 20px);
   line-height: 1.35;
+  white-space: nowrap;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 

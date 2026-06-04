@@ -96,6 +96,7 @@ const appStore = useAppStore();
   font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .points-query-brand p {
@@ -103,6 +104,7 @@ const appStore = useAppStore();
   color: #94a3b8;
   font-size: 12px;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .points-query-user {
@@ -114,6 +116,7 @@ const appStore = useAppStore();
 .points-query-team-label {
   color: #94a3b8;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .points-query-badge {
@@ -125,6 +128,7 @@ const appStore = useAppStore();
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .points-query-badge.is-personal,
