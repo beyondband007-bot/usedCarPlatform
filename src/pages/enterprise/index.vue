@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue";
 import { computed } from "vue";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
@@ -48,7 +47,15 @@ const enterpriseLoginHeroImage = computed(() =>
         <ul class="enterprise-login-features">
           <li v-for="item in enterpriseLoginFeatures" :key="item.title">
             <span class="enterprise-login-feature-icon" aria-hidden="true">
-              <Icon :icon="item.icon" />
+              <img
+                class="enterprise-login-feature-icon-image"
+                :src="item.icon"
+                alt=""
+                width="40"
+                height="40"
+                decoding="async"
+                draggable="false"
+              />
             </span>
             <span class="enterprise-login-feature-text">
               <b>{{ item.title }}</b>
@@ -83,14 +90,12 @@ const enterpriseLoginHeroImage = computed(() =>
   );
 
   position: relative;
-  display: flex;
   box-sizing: border-box;
   width: 100%;
-  min-height: calc(100dvh - 72px);
-  align-items: center;
-  justify-content: center;
+  height: 100%;
+  min-height: calc(100dvh - var(--app-header-offset, 72px));
   overflow: hidden;
-  padding: clamp(24px, 4vw, 48px) clamp(24px, 5.5vw, 88px);
+  padding: 0;
   background: #050505;
   transition:
     background 0.28s ease,
@@ -121,17 +126,34 @@ const enterpriseLoginHeroImage = computed(() =>
 }
 
 .enterprise-login-page.theme-light .enterprise-login-title {
-  text-shadow: 0 4px 18px rgba(255, 255, 255, 0.45);
+  color: #0f172a;
+  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.78);
+}
+
+.enterprise-login-page.theme-light .enterprise-login-subtitle {
+  color: #475569;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.65);
 }
 
 .enterprise-login-shell {
-  position: relative;
-  z-index: 1;
+  position: fixed;
+  z-index: 2;
+  left: 50%;
+  top: calc(
+    var(--app-header-offset, 72px) +
+      (100dvh - var(--app-header-offset, 72px)) * 0.5
+  );
   display: grid;
-  width: min(100%, 1120px);
+  width: min(calc(100vw - clamp(48px, 11vw, 176px)), 1120px);
+  max-height: calc(100dvh - var(--app-header-offset, 72px) - 24px);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
-  align-items: start;
+  align-items: center;
   gap: clamp(32px, 5vw, 80px);
+  transform: translate(-50%, -50%);
+  overscroll-behavior: contain;
 }
 
 .enterprise-login-bg,
@@ -166,24 +188,24 @@ const enterpriseLoginHeroImage = computed(() =>
 .enterprise-login-title {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin: 0;
+  gap: clamp(6px, 1vh, 12px);
+  margin: 0 0 clamp(6px, 1vh, 12px);
   max-width: 560px;
-  color: var(--login-text);
-  font-size: clamp(38px, 4.4vw, 64px);
-  line-height: 1.16;
-  font-weight: 950;
-  letter-spacing: -0.02em;
-  text-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  color: var(--home-hero-title, #f3f3f3);
+  font-size: clamp(22px, 2.2vw, 46px);
+  line-height: 1.12;
+  letter-spacing: 0;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
 
 .enterprise-login-subtitle {
-  margin: 22px 0 0;
+  margin: 0;
   max-width: 520px;
-  color: var(--login-muted);
-  font-size: clamp(16px, 1.45vw, 21px);
-  line-height: 1.6;
-  font-weight: 600;
+  color: var(--home-hero-sub, #d5d5d5);
+  font-size: clamp(14px, 0.92vw, 20px);
+  line-height: 1.35;
+  font-weight: 400;
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 
 .enterprise-login-features {
@@ -214,10 +236,15 @@ const enterpriseLoginHeroImage = computed(() =>
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: var(--login-feature-icon-bg);
-  color: var(--login-gold);
-  font-size: 22px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.enterprise-login-feature-icon-image {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
 }
 
 .enterprise-login-feature-text {
@@ -242,15 +269,8 @@ const enterpriseLoginHeroImage = computed(() =>
 }
 
 @media (max-width: 1100px) {
-  .enterprise-login-page {
-    overflow-y: auto;
-    padding-top: clamp(24px, 4vw, 40px);
-    padding-bottom: clamp(36px, 5vw, 56px);
-  }
-
   .enterprise-login-shell {
-    width: 100%;
-    max-width: 420px;
+    width: min(calc(100vw - 48px), 420px);
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -271,6 +291,18 @@ const enterpriseLoginHeroImage = computed(() =>
 
   .enterprise-login-features li {
     min-width: 0;
+  }
+}
+
+@media (min-width: 1600px) {
+  .enterprise-login-title {
+    margin-bottom: 24px;
+    font-size: clamp(27px, 4.8vw, 54px);
+    font-weight: 800;
+  }
+
+  .enterprise-login-subtitle {
+    font-size: clamp(19px, 1.85vw, 25px);
   }
 }
 </style>

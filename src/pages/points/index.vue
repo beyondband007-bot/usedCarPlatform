@@ -1,12 +1,17 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue";
 import { computed, ref, watch } from "vue";
 
 import { useAppStore } from "@/stores/app";
 import { usePointsQuery } from "@/composables/usePointsQuery";
 import PointsFlowTable from "@/components/business/points/PointsFlowTable.vue";
-import PointsQueryHeader from "@/components/business/points/PointsQueryHeader.vue";
 import PointsRechargeModal from "@/components/business/points/PointsRechargeModal.vue";
 import PointsSummaryCards from "@/components/business/points/PointsSummaryCards.vue";
+import {
+  pointsQueryBackgroundDark,
+  pointsQueryBackgroundLight,
+  pointsQueryHeroCopy,
+} from "@/constants/points-page";
 import type {
   PointsQueryFilters,
   PointsQueryViewConfig,
@@ -16,6 +21,20 @@ import type {
 
 const pageSize = 10;
 const appStore = useAppStore();
+
+const pageBackgroundStyle = computed(() => {
+  const backgroundImage = appStore.isDarkMode
+    ? pointsQueryBackgroundDark
+    : pointsQueryBackgroundLight;
+
+  return {
+    backgroundImage: `url(${backgroundImage})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center top",
+    backgroundRepeat: "no-repeat",
+    backgroundAttachment: "fixed",
+  };
+});
 
 const {
   version,
@@ -30,10 +49,11 @@ const {
 const defaultFilters = (): PointsQueryFilters => ({
   member: "",
   txnType: "",
-  dateRange: "",
+  dateRange: "90",
   startDate: "",
   endDate: "",
   bizSource: "",
+  status: "",
 });
 
 const filters = ref<PointsQueryFilters>(defaultFilters());
@@ -45,7 +65,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     version: "personal",
     icon: "mdi:coins",
     iconClassName: "is-blue",
-    subtitle: "个人积分流水筛选与查看",
+    subtitle: pointsQueryHeroCopy.subtitle,
     badges: [
       {
         icon: "mdi:account-outline",
@@ -227,6 +247,12 @@ const filteredRecords = computed(() => {
     if (active.txnType && record.txnType !== active.txnType) return false;
     if (active.bizSource && record.bizSource !== active.bizSource) return false;
 
+    if (active.status) {
+      const recordStatus =
+        record.status ?? (record.txnType === "gift" ? "pending" : "effective");
+      if (recordStatus !== active.status) return false;
+    }
+
     const recordDate = new Date(record.createdAt.replace(/-/g, "/")).getTime();
     if (Number.isNaN(recordDate)) return true;
 
@@ -396,30 +422,56 @@ watch(filteredRecords, () => {
     class="points-query-page"
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <PointsQueryHeader :config="viewConfig" />
+    <div class="points-query-bg" aria-hidden="true" :style="pageBackgroundStyle"></div>
 
     <div class="points-query-shell">
-      <p v-if="loadError" class="points-query-alert is-error" role="alert">
-        {{ loadError }}
-      </p>
+      <section class="points-query-glass" aria-label="积分查询">
+        <header class="points-query-hero">
+          <div class="points-query-hero-copy">
+            <h1>{{ pointsQueryHeroCopy.title }}</h1>
+            <p>{{ viewConfig.subtitle }}</p>
+          </div>
 
-      <PointsSummaryCards
-        :admin-theme="viewConfig.adminTheme"
-        :cards="summaryCards"
-        :loading="isLoading && usesLiveApi"
-      />
+          <div v-if="viewConfig.badges.length" class="points-query-hero-badges">
+            <span v-if="viewConfig.teamLabel" class="points-query-team-label">
+              当前团队：
+            </span>
+            <div
+              v-for="badge in viewConfig.badges"
+              :key="badge.text"
+              class="points-query-badge"
+              :class="badge.className"
+            >
+              <Icon :icon="badge.icon" />
+              {{ badge.text }}
+            </div>
+          </div>
+        </header>
 
-      <PointsFlowTable
-        v-model:current-page="currentPage"
-        v-model:filters="filters"
-        :config="viewConfig"
-        :loading="isLoading && usesLiveApi"
-        :page-size="pageSize"
-        :records="pagedRecords"
-        :total="filteredRecords.length"
-        @export="handleExport"
-        @recharge="handleRecharge"
-      />
+        <p v-if="loadError" class="points-query-alert is-error" role="alert">
+          {{ loadError }}
+        </p>
+
+        <PointsSummaryCards
+          glass
+          :admin-theme="viewConfig.adminTheme"
+          :cards="summaryCards"
+          :loading="isLoading && usesLiveApi"
+        />
+
+        <PointsFlowTable
+          v-model:current-page="currentPage"
+          v-model:filters="filters"
+          glass
+          :config="viewConfig"
+          :loading="isLoading && usesLiveApi"
+          :page-size="pageSize"
+          :records="pagedRecords"
+          :total="filteredRecords.length"
+          @export="handleExport"
+          @recharge="handleRecharge"
+        />
+      </section>
     </div>
 
     <PointsRechargeModal
@@ -431,8 +483,18 @@ watch(filteredRecords, () => {
 
 <style scoped lang="scss">
 .points-query-page {
-  min-height: calc(100dvh - var(--app-header-offset, 0px));
-  background: #f8fafc;
+  --points-gold: #d4a017;
+  --points-gold-strong: #e8b84a;
+  --points-viewport-h: calc(100dvh - var(--app-header-offset, 72px));
+  --points-content-top: calc(var(--points-viewport-h) * 0.15);
+  --points-content-height: calc(var(--points-viewport-h) * 0.7);
+  --points-content-bottom: calc(var(--points-viewport-h) * 0.15);
+
+  position: relative;
+  margin-top: calc(-1 * var(--app-header-offset, 72px));
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
   color: #0f172a;
   font-family:
     "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
@@ -440,9 +502,26 @@ watch(filteredRecords, () => {
 }
 
 .points-query-page.theme-dark {
-  background: #0b1220;
+  --points-gold: #efc24c;
+  --points-gold-strong: #ffd75a;
+
   color: #f3f4f6;
   color-scheme: dark;
+}
+
+.points-query-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #f8fafc;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+.points-query-page.theme-dark .points-query-bg {
+  background-color: #0b1220;
 }
 
 .points-query-page,
@@ -453,13 +532,136 @@ watch(filteredRecords, () => {
 }
 
 .points-query-shell {
-  width: min(100%, 1440px);
-  margin: 0 auto;
-  padding: 24px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 1500px);
+  height: var(--points-content-height);
+  flex-direction: column;
+  margin: calc(var(--app-header-offset, 72px) + var(--points-content-top)) auto
+    var(--points-content-bottom);
+  padding: 0 clamp(16px, 2vw, 28px);
+  min-height: 0;
+}
+
+.points-query-glass {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: clamp(12px, 1.4vw, 18px);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.points-query-glass > .points-query-hero,
+.points-query-glass > .points-query-alert,
+.points-query-glass > :deep(.points-summary-section) {
+  flex-shrink: 0;
+}
+
+.points-query-glass > :deep(.points-flow-card--design) {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.points-query-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.points-query-hero-copy h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(28px, 2.6vw, 36px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.points-query-hero-copy p {
+  max-width: 720px;
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.points-query-page.theme-dark .points-query-hero-copy h1 {
+  color: #f8fafc;
+}
+
+.points-query-page.theme-dark .points-query-hero-copy p {
+  color: #94a3b8;
+}
+
+.points-query-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.points-query-team-label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.points-query-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.points-query-badge.is-personal,
+.points-query-badge.is-team {
+  background: rgb(239 194 76 / 14%);
+  color: #b8860b;
+}
+
+.points-query-badge.is-member {
+  background: rgb(148 163 184 / 16%);
+  color: #475569;
+}
+
+.points-query-badge.is-admin {
+  background: rgb(212 160 23 / 18%);
+  color: #9a6700;
+  font-weight: 700;
+}
+
+.points-query-page.theme-dark .points-query-badge.is-personal,
+.points-query-page.theme-dark .points-query-badge.is-team {
+  background: rgb(239 194 76 / 16%);
+  color: var(--points-gold-strong);
+}
+
+.points-query-page.theme-dark .points-query-badge.is-member {
+  background: #1a2436;
+  color: #9ca3af;
+}
+
+.points-query-page.theme-dark .points-query-badge.is-admin {
+  background: rgb(245 166 35 / 16%);
+  color: var(--points-gold-strong);
 }
 
 .points-query-alert {
-  margin: 0 0 16px;
+  margin: 0;
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 14px;
@@ -475,9 +677,34 @@ watch(filteredRecords, () => {
   color: #fecaca;
 }
 
+@media (max-width: 900px) {
+  .points-query-hero {
+    flex-direction: column;
+  }
+
+  .points-query-hero-badges {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 640px) {
   .points-query-shell {
+    padding-inline: 12px;
+  }
+
+  .points-query-glass {
     padding: 16px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-height: 720px) {
+  .points-query-page {
+    --points-content-top: 12px;
+    --points-content-height: calc(100dvh - var(--app-header-offset, 72px) - 24px);
+    --points-content-bottom: 12px;
+
+    overflow-y: auto;
   }
 }
 </style>

@@ -16,9 +16,9 @@ import {
   type RechargeProduct,
 } from "@/api/visual-workbench";
 import RechargePlanCard from "@/components/business/package-points/RechargePlanCard.vue";
-import planBasicBg from "@/img/home/suite-workbench-light.png";
-import planTeamBg from "@/img/home/suite-enterprise-light.png";
-import planFlagshipBg from "@/img/home/suite-enterprise.png";
+import planBasicBg from "@/assets/media/package/package-plan-basic-bg.png";
+import planTeamBg from "@/assets/media/package/package-plan-team-bg.png";
+import planFlagshipBg from "@/assets/media/package/package-plan-flagship-bg.png";
 import {
   rechargePlanToneMap,
   rechargePlans,

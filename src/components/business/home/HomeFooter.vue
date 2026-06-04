@@ -1,9 +1,40 @@
 <script setup lang="ts">
-import contactSupportWechatQr from "@/assets/img/contact-support-wechat-qr.png";
-import footerBrandLogo from "@/assets/img/footer-brand-logo.png";
+import { inject } from "vue";
+import { useRouter } from "vue-router";
+
+import contactSupportWechatQr from "@/assets/media/global/global-contact-wechat-qr.png";
+import footerBrandLogo from "@/assets/media/global/global-footer-brand-logo.png";
+import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
+import {
+  homeFooterContactItems,
+  homeFooterNavColumns,
+  type HomeFooterNavItem,
+} from "@/constants/home-page";
+import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
+const router = useRouter();
+const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
+
+function handleFooterNavClick(item: HomeFooterNavItem) {
+  if (item.disabled || !item.workspaceCode) return;
+
+  if (!authStore.isLoggedIn) {
+    workbenchEntry?.openVisitorModal();
+    return;
+  }
+
+  void router.push({
+    name: "Workspace",
+    params: { code: item.workspaceCode },
+  });
+}
+
+function isNavItemClickable(item: HomeFooterNavItem) {
+  return Boolean(item.workspaceCode) && !item.disabled;
+}
 </script>
 
 <template>
@@ -55,65 +86,41 @@ const appStore = useAppStore();
       </div>
 
       <div class="footer-nav">
-        <div class="nav-column">
-          <h3 class="nav-title">场景更换</h3>
+        <div
+          v-for="column in homeFooterNavColumns"
+          :key="column.title"
+          class="nav-column"
+        >
+          <h3 class="nav-title">{{ column.title }}</h3>
           <ul class="nav-list">
-            <li><span class="nav-item">展厅棚拍</span></li>
-            <li><span class="nav-item">户外实景</span></li>
-            <li><span class="nav-item">行驶动效</span></li>
-            <li><span class="nav-item">天空影棚</span></li>
-          </ul>
-        </div>
-
-        <div class="nav-column">
-          <h3 class="nav-title">车辆美容</h3>
-          <ul class="nav-list">
-            <li><span class="nav-item">烤漆翻新</span></li>
-            <li><span class="nav-item">光污美化</span></li>
-            <li><span class="nav-item">内饰清洁</span></li>
-          </ul>
-        </div>
-
-        <div class="nav-column">
-          <h3 class="nav-title">智能交付</h3>
-          <ul class="nav-list">
-            <li><span class="nav-item">批量上新</span></li>
-            <li><span class="nav-item">成片交付</span></li>
-          </ul>
-        </div>
-
-        <div class="nav-column">
-          <h3 class="nav-title">营销工具</h3>
-          <ul class="nav-list">
-            <li>
-              <span class="nav-item"
-                >去水印<span class="tag tag-beta">Beta</span></span
+            <li v-for="item in column.items" :key="item.label">
+              <button
+                v-if="isNavItemClickable(item)"
+                type="button"
+                class="nav-item nav-item--clickable"
+                @click="handleFooterNavClick(item)"
               >
-            </li>
-            <li>
-              <span class="nav-item"
-                >创意生图<span class="tag tag-beta">Beta</span></span
+                {{ item.label }}
+                <span
+                  v-if="item.tag === 'beta'"
+                  class="tag tag-beta"
+                >Beta</span>
+              </button>
+              <span
+                v-else
+                class="nav-item"
+                :class="{ 'nav-item--disabled': item.disabled }"
               >
-            </li>
-            <li>
-              <span class="nav-item"
-                >主图套版<span class="tag tag-plan">开发中</span></span
-              >
-            </li>
-            <li>
-              <span class="nav-item"
-                >短视频生成<span class="tag tag-beta">Beta</span></span
-              >
-            </li>
-            <li>
-              <span class="nav-item"
-                >详情页物料<span class="tag tag-plan">开发中</span></span
-              >
-            </li>
-            <li>
-              <span class="nav-item"
-                >多平台分发<span class="tag tag-plan">开发中</span></span
-              >
+                {{ item.label }}
+                <span
+                  v-if="item.tag === 'beta'"
+                  class="tag tag-beta"
+                >Beta</span>
+                <span
+                  v-else-if="item.tag === 'plan'"
+                  class="tag tag-plan"
+                >开发中</span>
+              </span>
             </li>
           </ul>
         </div>
@@ -121,10 +128,9 @@ const appStore = useAppStore();
         <div class="nav-column">
           <h3 class="nav-title">联系我们</h3>
           <ul class="nav-list">
-            <li><span class="nav-item">关于我们</span></li>
-            <li><span class="nav-item">帮助中心</span></li>
-            <li><span class="nav-item">商务合作：13718492350@163.com</span></li>
-            <li><span class="nav-item">媒体联系：13718492350@163.com</span></li>
+            <li v-for="line in homeFooterContactItems" :key="line">
+              <span class="nav-item nav-item--static">{{ line }}</span>
+            </li>
           </ul>
         </div>
       </div>
@@ -303,13 +309,36 @@ const appStore = useAppStore();
   margin-bottom: 10px;
 }
 
-.nav-list .nav-item {
+.nav-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--footer-link);
+  font: inherit;
   font-size: 13px;
   line-height: 1.6;
+  text-align: left;
+  cursor: default;
+}
+
+.nav-item--clickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.nav-item--clickable:hover {
+  color: var(--footer-title);
+}
+
+.nav-item--disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.nav-item--static {
   cursor: default;
 }
 

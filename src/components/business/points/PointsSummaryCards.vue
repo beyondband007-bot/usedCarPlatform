@@ -8,6 +8,7 @@ defineProps<{
   cards: PointsSummaryCard[];
   adminTheme?: boolean;
   loading?: boolean;
+  glass?: boolean;
 }>();
 
 const appStore = useAppStore();
@@ -18,6 +19,7 @@ const appStore = useAppStore();
     class="points-summary-section"
     :class="[
       appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      glass ? 'is-glass' : '',
       loading ? 'is-loading' : '',
     ]"
   >
@@ -386,5 +388,85 @@ const appStore = useAppStore();
 .points-summary-section.is-loading {
   opacity: 0.72;
   pointer-events: none;
+}
+
+.points-summary-section.is-glass {
+  margin-bottom: 0;
+}
+
+.points-summary-section.is-glass .card {
+  border: 1px solid #e8edf3;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
+}
+
+.points-summary-section.is-glass .card:hover {
+  transform: none;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 6%);
+}
+
+.points-summary-section.is-glass .summary-card::before {
+  display: none;
+}
+
+.points-summary-section.is-glass .summary-orb {
+  display: none;
+}
+
+.points-summary-section.is-glass .summary-card p {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.points-summary-section.is-glass .summary-value-line {
+  margin-top: 4px;
+}
+
+.points-summary-section.is-glass .summary-unit {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.points-summary-section.is-glass .summary-icon {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4d36a 0%, #d4a017 100%);
+  box-shadow: 0 8px 18px rgb(212 160 23 / 28%);
+  color: #ffffff;
+  font-size: 24px;
+}
+
+.points-summary-section.is-glass .summary-icon.blue,
+.points-summary-section.is-glass .summary-icon.emerald,
+.points-summary-section.is-glass .summary-icon.rose,
+.points-summary-section.is-glass .summary-icon.amber,
+.points-summary-section.is-glass .summary-icon.violet,
+.points-summary-section.is-glass .summary-icon.cyan {
+  background: linear-gradient(180deg, #f4d36a 0%, #d4a017 100%);
+  color: #ffffff;
+}
+
+.points-summary-section.is-glass .summary-value {
+  font-size: clamp(24px, 2vw, 30px);
+}
+
+.points-summary-section.theme-dark.is-glass .card {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(27, 28, 29);
+  box-shadow: none;
+}
+
+.points-summary-section.theme-dark.is-glass .summary-card p,
+.points-summary-section.theme-dark.is-glass .summary-unit,
+.points-summary-section.theme-dark.is-glass .summary-note {
+  color: #9ca3af;
+}
+
+.points-summary-section.theme-dark.is-glass .summary-value {
+  color: #f8fafc;
 }
 </style>

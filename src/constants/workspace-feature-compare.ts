@@ -1,12 +1,12 @@
-import interiorCleanAfter from '@/assets/img/内饰清洁/清洁后.png'
-import interiorCleanBefore from '@/assets/img/内饰清洁/清洁前.png'
-import interiorStitchResult from '@/assets/img/内饰清洁/内饰拼接.png'
-import lightConsistencyAfter from '@/assets/img/光污一致化/修复后.png'
-import lightConsistencyBefore from '@/assets/img/光污一致化/修复前.png'
-import paintRefreshAfter from '@/assets/img/烤漆翻新/翻新后.png'
-import paintRefreshBefore from '@/assets/img/烤漆翻新/翻新前.png'
-import watermarkAfterOne from '@/assets/img/无水印图1.png'
-import watermarkBeforeOne from '@/assets/img/水印图1.png'
+import interiorCleanAfter from '@/assets/media/workspace/beauty/interior/workspace-interior-clean-compare-after.png'
+import interiorCleanBefore from '@/assets/media/workspace/beauty/interior/workspace-interior-clean-compare-before.png'
+import interiorStitchResult from '@/assets/media/workspace/beauty/interior/workspace-interior-stitch-result.png'
+import lightConsistencyAfter from '@/assets/media/workspace/beauty/light-consistency/workspace-light-consistency-compare-after.png'
+import lightConsistencyBefore from '@/assets/media/workspace/beauty/light-consistency/workspace-light-consistency-compare-before.png'
+import paintRefreshAfter from '@/assets/media/workspace/beauty/paint-refresh/workspace-paint-refresh-compare-after.png'
+import paintRefreshBefore from '@/assets/media/workspace/beauty/paint-refresh/workspace-paint-refresh-compare-before.png'
+import watermarkAfterOne from '@/assets/media/workspace/beauty/watermark/workspace-watermark-compare-after.png'
+import watermarkBeforeOne from '@/assets/media/workspace/beauty/watermark/workspace-watermark-compare-before.png'
 
 export interface WorkspaceFeatureCompareCard {
   before: string

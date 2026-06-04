@@ -1,6 +1,6 @@
-import banner01LightPollution from '@/img/home/promo-banners/banner-01-light-pollution.png'
-import banner02AgentRecruitment from '@/img/home/promo-banners/banner-02-agent-recruitment.png'
-import banner03CreativeTeam from '@/img/home/promo-banners/banner-03-creative-team.png'
+import banner01LightPollution from '@/assets/media/home/home-promo-light-pollution.png'
+import banner02AgentRecruitment from '@/assets/media/home/home-promo-agent-recruitment.png'
+import banner03CreativeTeam from '@/assets/media/home/home-promo-creative-team.png'
 
 export interface HomePromoBannerSlide {
   id: string

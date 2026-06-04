@@ -7,6 +7,7 @@ import { useAppStore } from "@/stores/app";
 import type {
   PointsBizSource,
   PointsFlowRecord,
+  PointsFlowStatus,
   PointsQueryFilters,
   PointsQueryViewConfig,
   PointsTxnType,
@@ -22,6 +23,7 @@ const props = defineProps<{
   currentPage: number;
   pageSize: number;
   loading?: boolean;
+  glass?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -39,12 +41,35 @@ const txnTypeOptions: Array<{ value: "" | PointsTxnType; label: string }> = [
   { value: "refund", label: "退款" },
 ];
 
+const designTxnTypeOptions: Array<{ value: "" | PointsTxnType; label: string }> =
+  [
+    { value: "", label: "全部积分类型" },
+    { value: "recharge", label: "充值" },
+    { value: "gift", label: "赠送" },
+    { value: "consume", label: "消费" },
+    { value: "refund", label: "退款" },
+  ];
+
 const dateRangeOptions = [
   { value: "", label: "全部时间" },
   { value: "7", label: "近7天" },
   { value: "30", label: "近30天" },
   { value: "90", label: "近90天" },
   { value: "custom", label: "自定义" },
+];
+
+const designDateRangeOptions = [
+  { value: "90", label: "近三个月" },
+  { value: "30", label: "近30天" },
+  { value: "7", label: "近7天" },
+  { value: "", label: "全部时间" },
+  { value: "custom", label: "自定义" },
+];
+
+const statusOptions: Array<{ value: "" | PointsFlowStatus; label: string }> = [
+  { value: "", label: "全部状态" },
+  { value: "effective", label: "已生效" },
+  { value: "pending", label: "待生效" },
 ];
 
 const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
@@ -124,10 +149,276 @@ function setPage(page: number) {
   if (page < 1 || page > totalPages.value || page === props.currentPage) return;
   emit("update:currentPage", page);
 }
+
+function resolveRecordStatus(record: PointsFlowRecord): PointsFlowStatus {
+  return record.status ?? (record.txnType === "gift" ? "pending" : "effective");
+}
+
+function resolveValidityPeriod(record: PointsFlowRecord) {
+  if (record.validityPeriod) return record.validityPeriod;
+  if (record.txnType === "gift" || record.txnType === "recharge") {
+    return "2026-12-31";
+  }
+  return "-";
+}
+
+function resolveSourceUsage(record: PointsFlowRecord) {
+  return record.title || record.functionName || record.remark || "-";
+}
+
 </script>
 
 <template>
   <section
+    v-if="glass"
+    class="points-flow-card points-flow-card--design animate-fade-in"
+    :class="[
+      appStore.isDarkMode ? 'theme-dark' : 'theme-light',
+      'is-glass',
+      loading ? 'is-loading' : '',
+    ]"
+  >
+    <div class="points-toolbar">
+      <div class="points-toolbar-filters">
+        <template v-if="config.showCurrentMember">
+          <span class="points-current-member-label">当前成员：</span>
+          <strong class="points-current-member-name">{{
+            config.currentMemberName
+          }}</strong>
+          <span class="points-separator">|</span>
+        </template>
+
+        <NSelect
+          v-if="config.showMemberFilter"
+          class="points-toolbar-select is-wide"
+          size="medium"
+          :value="filters.member"
+          :options="memberOptions"
+          :consistent-menu-width="false"
+          :menu-props="{ class: 'points-filter-select-menu' }"
+          @update:value="(value) => patchFilters({ member: value ?? '' })"
+        />
+
+        <NSelect
+          class="points-toolbar-select"
+          size="medium"
+          :value="filters.dateRange || '90'"
+          :options="designDateRangeOptions"
+          :menu-props="{ class: 'points-filter-select-menu' }"
+          @update:value="
+            (value) =>
+              patchFilters({
+                dateRange: (value ?? '90') as PointsQueryFilters['dateRange'],
+              })
+          "
+        />
+
+        <NSelect
+          class="points-toolbar-select is-wide"
+          size="medium"
+          :value="filters.txnType"
+          :options="designTxnTypeOptions"
+          :menu-props="{ class: 'points-filter-select-menu' }"
+          @update:value="
+            (value) =>
+              patchFilters({
+                txnType: (value ?? '') as PointsQueryFilters['txnType'],
+              })
+          "
+        />
+
+        <NSelect
+          class="points-toolbar-select"
+          size="medium"
+          :value="filters.status"
+          :options="statusOptions"
+          :menu-props="{ class: 'points-filter-select-menu' }"
+          @update:value="
+            (value) =>
+              patchFilters({
+                status: (value ?? '') as PointsQueryFilters['status'],
+              })
+          "
+        />
+
+        <div
+          v-if="showCustomDate"
+          class="points-toolbar-date"
+        >
+          <input
+            :value="filters.startDate"
+            type="date"
+            class="form-input"
+            @input="
+              patchFilters({
+                startDate: ($event.target as HTMLInputElement).value,
+              })
+            "
+          />
+          <span>~</span>
+          <input
+            :value="filters.endDate"
+            type="date"
+            class="form-input"
+            @input="
+              patchFilters({
+                endDate: ($event.target as HTMLInputElement).value,
+              })
+            "
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="points-recharge-button"
+        @click="emit('recharge')"
+      >
+        <Icon icon="mdi:plus" />
+        充值
+      </button>
+    </div>
+
+    <div class="points-section-title">
+      <div class="points-section-title-main">
+        <span class="points-table-accent" aria-hidden="true"></span>
+        <h2>{{ config.tableTitle }}</h2>
+      </div>
+      <button
+        type="button"
+        class="points-export-button"
+        @click="emit('export')"
+      >
+        <Icon icon="mdi:download-outline" />
+        导出
+      </button>
+    </div>
+
+    <div
+      class="points-table-panel"
+      :class="{ 'is-empty': !records.length }"
+    >
+      <table class="data-table data-table--design points-table-layout">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>积分类型</th>
+            <th>积分变动</th>
+            <th>状态</th>
+            <th>来源/用途</th>
+            <th>有效期</th>
+            <template v-if="config.showMemberColumns">
+              <th>操作人</th>
+              <th>身份</th>
+            </template>
+          </tr>
+        </thead>
+        <tbody v-if="records.length">
+          <tr
+            v-for="record in records"
+            :key="record.id"
+            :class="{ 'row-mine': record.isCurrentUser }"
+            class="points-flow-row"
+          >
+            <td>
+              <span class="points-time">{{ record.createdAt }}</span>
+            </td>
+            <td>
+              <span class="tag" :class="`tag-${record.txnType}`">
+                {{ txnTypeLabelMap[record.txnType] }}
+              </span>
+            </td>
+            <td>
+              <span
+                class="points-change"
+                :class="
+                  record.pointsChange > 0 ? 'is-positive' : 'is-negative'
+                "
+              >
+                {{ formatSignedNumber(record.pointsChange) }}
+              </span>
+            </td>
+            <td>
+              <span
+                class="status-pill"
+                :class="`is-${resolveRecordStatus(record)}`"
+              >
+                <span class="status-dot" aria-hidden="true"></span>
+                {{
+                  resolveRecordStatus(record) === "effective"
+                    ? "已生效"
+                    : "待生效"
+                }}
+              </span>
+            </td>
+            <td>
+              <span class="points-source">{{ resolveSourceUsage(record) }}</span>
+            </td>
+            <td>
+              <span class="points-validity">{{
+                resolveValidityPeriod(record)
+              }}</span>
+            </td>
+            <td v-if="config.showMemberColumns">
+              <div class="points-member-cell">
+                <div
+                  class="points-avatar"
+                  :class="getAvatarClass(record.memberId)"
+                >
+                  {{ record.memberName?.charAt(0) }}
+                </div>
+                <span>{{ record.memberName }}</span>
+              </div>
+            </td>
+            <td v-if="config.showMemberColumns">
+              <span v-if="record.isOwner" class="tag tag-owner">主账号</span>
+              <span v-else class="points-member-role">成员</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="!records.length" class="points-table-empty">
+        <Icon icon="mdi:inbox-outline" />
+        <p>暂无符合条件的流水记录</p>
+      </div>
+    </div>
+
+    <div class="points-pagination-bar">
+      <span>{{ rangeText }}</span>
+      <div class="points-pagination">
+        <button
+          type="button"
+          :disabled="currentPage === 1"
+          @click="setPage(currentPage - 1)"
+        >
+          <Icon icon="mdi:chevron-left" />
+        </button>
+        <button
+          v-for="page in pageItems"
+          :key="page"
+          type="button"
+          :class="{
+            active: page === currentPage,
+            'is-admin': config.adminTheme,
+          }"
+          @click="setPage(page)"
+        >
+          {{ page }}
+        </button>
+        <button
+          type="button"
+          :disabled="currentPage === totalPages"
+          @click="setPage(currentPage + 1)"
+        >
+          <Icon icon="mdi:chevron-right" />
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section
+    v-else
     class="card points-flow-card animate-fade-in"
     :class="[
       appStore.isDarkMode ? 'theme-dark' : 'theme-light',
@@ -250,7 +541,7 @@ function setPage(page: number) {
 
     <div class="points-table-head">
       <div class="points-table-title">
-        <Icon icon="mdi:format-list-bulleted" />
+        <span class="points-table-accent" aria-hidden="true"></span>
         <h2>{{ config.tableTitle }}</h2>
         <span>{{ total }} 条</span>
       </div>
@@ -1073,6 +1364,359 @@ function setPage(page: number) {
 .points-flow-card.is-loading {
   opacity: 0.72;
   pointer-events: none;
+}
+
+.points-flow-card--design.is-glass {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid #e8edf3;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
+  backdrop-filter: none;
+}
+
+.points-flow-card--design.is-glass:hover {
+  box-shadow: 0 6px 18px rgb(15 23 42 / 6%);
+  transform: none;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design.is-glass {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(27, 28, 29);
+  box-shadow: none;
+}
+
+.points-flow-card--design .points-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.points-flow-card--design .points-toolbar-filters {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.points-flow-card--design .points-toolbar-select {
+  width: 148px;
+  min-width: 132px;
+}
+
+.points-flow-card--design .points-toolbar-select.is-wide {
+  width: 168px;
+  min-width: 148px;
+}
+
+.points-flow-card--design .points-toolbar-select {
+  --n-height: 40px;
+  --n-border-radius: 8px;
+  --n-font-size: 14px;
+  --n-color: #ffffff;
+  --n-color-hover: #ffffff;
+  --n-color-focus: #ffffff;
+  --n-color-active: #ffffff;
+  --n-border: 1px solid #d7dee8;
+  --n-border-hover: 1px solid #cbd5e1;
+  --n-border-focus: 1px solid #d4a017;
+  --n-border-active: 1px solid #d4a017;
+  --n-text-color: #334155;
+  --n-placeholder-color: #64748b;
+  --n-arrow-color: #94a3b8;
+  --n-box-shadow-focus: 0 0 0 3px rgb(212 160 23 / 12%);
+}
+
+.points-flow-card--design .points-toolbar-select :deep(.n-base-selection-label),
+.points-flow-card--design .points-toolbar-select :deep(.n-base-selection-placeholder) {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.points-flow-card--design .points-toolbar-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.points-flow-card--design .points-toolbar-date .form-input {
+  min-width: 148px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.points-flow-card--design .points-recharge-button {
+  display: inline-flex;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f4d36a 0%, #d4a017 100%);
+  box-shadow: 0 10px 22px rgb(212 160 23 / 28%);
+  color: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.points-flow-card--design .points-recharge-button:hover {
+  background: linear-gradient(180deg, #f7dc82 0%, #c89412 100%);
+}
+
+.points-flow-card--design .points-section-title {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.points-flow-card--design .points-section-title-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.points-flow-card--design .points-table-accent {
+  width: 4px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4d36a 0%, #d4a017 100%);
+}
+
+.points-flow-card--design .points-section-title h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.points-flow-card--design .points-export-button {
+  display: inline-flex;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.points-flow-card--design .points-export-button:hover {
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.points-flow-card--design .points-table-panel {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.points-flow-card--design .points-table-panel:not(.is-empty) {
+  overflow: auto;
+}
+
+.points-flow-card--design .points-table-layout {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.points-flow-card--design .points-table-panel.is-empty .points-table-empty {
+  position: absolute;
+  top: 49px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: transparent;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.points-flow-card--design .points-table-empty .iconify {
+  display: block;
+  margin: 0 0 12px;
+  color: #cbd5e1;
+  font-size: 44px;
+}
+
+.points-flow-card--design .points-table-empty p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.points-flow-card--design .data-table--design {
+  width: 100%;
+}
+
+.points-flow-card--design .data-table--design th {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(15 23 42 / 8%);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.points-flow-card--design .data-table--design td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(15 23 42 / 5%);
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.points-flow-card--design .data-table--design tbody tr:nth-child(even) td {
+  background: transparent;
+}
+
+.points-flow-card--design .data-table--design tr:hover td {
+  background: rgb(212 160 23 / 8%);
+}
+
+.points-flow-card--design .points-change {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.points-flow-card--design .points-change.is-positive {
+  color: #0f172a;
+}
+
+.points-flow-card--design .points-change.is-negative {
+  color: #ef4444;
+}
+
+.points-flow-card--design .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.points-flow-card--design .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.points-flow-card--design .status-pill.is-effective .status-dot {
+  background: #22c55e;
+}
+
+.points-flow-card--design .status-pill.is-pending .status-dot {
+  background: #f59e0b;
+}
+
+.points-flow-card--design .points-source,
+.points-flow-card--design .points-validity,
+.points-flow-card--design .points-time {
+  color: #334155;
+  font-size: 13px;
+}
+
+.points-flow-card--design .points-validity {
+  color: #64748b;
+}
+
+.points-flow-card--design .points-pagination-bar {
+  flex-shrink: 0;
+  padding-top: 14px;
+  border-top: 0;
+}
+
+.points-flow-card--design .points-pagination button.active {
+  border-color: #d4a017;
+  background: #d4a017;
+  color: #ffffff;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-section-title h2,
+.points-flow-card.theme-dark.points-flow-card--design .points-source,
+.points-flow-card.theme-dark.points-flow-card--design .points-time,
+.points-flow-card.theme-dark.points-flow-card--design .status-pill {
+  color: #f3f4f6;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .data-table--design th {
+  border-bottom-color: rgb(255 255 255 / 10%);
+  background: transparent;
+  color: #94a3b8;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .data-table--design td {
+  border-bottom-color: rgb(255 255 255 / 6%);
+  background: transparent;
+  color: #e2e8f0;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-table-empty,
+.points-flow-card.theme-dark.points-flow-card--design .points-table-empty p {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-table-empty .iconify {
+  color: #64748b;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design
+  .data-table--design
+  tbody
+  tr:nth-child(even)
+  td {
+  background: transparent;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design
+  .data-table--design
+  tr:hover
+  td {
+  background: rgb(239 194 76 / 10%);
 }
 </style>
 

@@ -16,7 +16,9 @@ const HERO_IMAGE_HEIGHT = 941;
 const HERO_CROP_TOP = 0.25;
 const HERO_CROP_BOTTOM = 0.9;
 const HERO_CROP_HEIGHT = HERO_CROP_BOTTOM - HERO_CROP_TOP;
-const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_CROP_HEIGHT}`;
+/** 相对设计稿展示高度 +10% */
+const HERO_HEIGHT_SCALE = 1.1;
+const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_IMAGE_HEIGHT * HERO_CROP_HEIGHT * HERO_HEIGHT_SCALE}`;
 
 const homeHeroImageSrc = computed(() =>
   appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,

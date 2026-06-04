@@ -21,6 +21,8 @@ import {
   getOutputRatioOptionLabel,
   outputRatioSelectOptions,
 } from "@/constants/output-ratio";
+import { DELIVERY_REFRESH_MS } from "@/constants/workspace-polling";
+import { useSubscriptionStore } from "@/stores/subscription";
 import {
   batchSceneCategoryOptions,
   getBatchSceneImageUrl,
@@ -35,11 +37,13 @@ import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
+  WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
   WorkspaceCapability,
   WorkspaceCapabilityBlock,
   WorkspaceDeliveryTaskPreview,
   WorkspaceGeneratePayload,
+  WorkspaceRecentItem,
 } from "@/types/workspace";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
@@ -55,6 +59,7 @@ const props = defineProps<{
   isGenerating?: boolean;
   previewedDeliveryTaskId?: string | null;
   canCreateBatchTask?: () => boolean | Promise<boolean>;
+  batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
 
 const emit = defineEmits<{
@@ -66,6 +71,32 @@ const emit = defineEmits<{
 }>();
 
 const message = useMessage();
+const subscriptionStore = useSubscriptionStore();
+
+function isTerminalBatchJobStatus(status: WorkspaceRecentItem["status"]) {
+  return status === "success" || status === "fail" || status === "canceled";
+}
+
+const runningBatchJobCount = computed(
+  () =>
+    (props.batchActiveJobs ?? []).filter(
+      (job) => !isTerminalBatchJobStatus(job.status),
+    ).length,
+);
+
+const batchConcurrentLimit = computed(
+  () => subscriptionStore.batchConcurrentTaskLimit,
+);
+
+const remainingBatchUploadSlots = computed(() =>
+  Math.max(0, batchConcurrentLimit.value - runningBatchJobCount.value),
+);
+
+const batchQuotaNoticeText = computed(() => {
+  const planName = subscriptionStore.currentPlanName;
+  return `当前套餐：${planName} · 每账号图组并发 ${batchConcurrentLimit.value} 套 · 进行中 ${runningBatchJobCount.value} 套 · 可继续上传 ${remainingBatchUploadSlots.value} 套。单张生成仍可正常使用。`;
+});
+
 const {
   NEW_PRESET_VALUE,
   templates: visualTemplates,
@@ -1317,7 +1348,6 @@ watch(
 );
 
 let deliveryPollTimer: number | null = null;
-const DELIVERY_REFRESH_MS = 15000;
 
 function hasInProgressDeliveryTasks() {
   return deliveryTasks.value.some(
@@ -1496,6 +1526,26 @@ function resolveInputCoverForSlot(
   return getSnapshotCoverForSlot(snapshot, slotIndex);
 }
 
+function resolveInputCoverMetaForSlot(
+  inputCovers: DeliveryInputCover[],
+  slotIndex: number,
+) {
+  return (
+    inputCovers.find((cover) => cover.slotIndex === slotIndex) ??
+    inputCovers[slotIndex]
+  );
+}
+
+function findDeliveryAssetForGenerationTask(
+  assets: Awaited<ReturnType<typeof getDeliveryAssetsForTask>>,
+  generationTaskId?: string,
+) {
+  if (!generationTaskId) return undefined;
+
+  const prefix = `delivery_${generationTaskId}_`;
+  return assets.find((asset) => asset.assetId.startsWith(prefix));
+}
+
 function buildDeliveryPreviewSlots(
   task: DeliveryTask,
   assets: Awaited<ReturnType<typeof getDeliveryAssetsForTask>>,
@@ -1524,11 +1574,13 @@ function buildDeliveryPreviewSlots(
       slotIndex,
       snapshot,
     );
+    const inputCoverMeta = resolveInputCoverMetaForSlot(inputCovers, slotIndex);
     const uploadCover = resolveInputCoverForSlot(snapshot, inputCovers, slotIndex);
-    const generated = assets[slotIndex];
-    const inputCoverMeta =
-      inputCovers.find((cover) => cover.slotIndex === slotIndex) ??
-      inputCovers[slotIndex];
+    const generated =
+      findDeliveryAssetForGenerationTask(
+        assets,
+        inputCoverMeta?.generationTaskId,
+      ) ?? assets[slotIndex];
 
     if (generated) {
       return {
@@ -1613,6 +1665,9 @@ watch(
 
 onMounted(() => {
   void ensureLoaded();
+  if (props.capability.kind === "batch") {
+    void subscriptionStore.hydrate();
+  }
   if (props.capability.kind === "delivery") {
     void refreshDeliveryTasks();
   }
@@ -1872,8 +1927,7 @@ defineExpose({
         </div>
 
         <section class="batch-card batch-notice">
-          当前套餐：企业团队版 · 每账号图组并发 5 套 · 进行中 2 套 · 可继续上传
-          3 套。单张生成仍可正常使用。
+          {{ batchQuotaNoticeText }}
         </section>
 
         <div class="batch-panel-scroll">

@@ -93,6 +93,8 @@ export function mapCreditsTransactionToFlowRecord(
   const txnType = mapCreditsTxnType(String(transaction.txnType), pointsChange)
   const bizSource = mapCreditsBizSource(txnType, transaction.bizType)
 
+  const status = txnType === 'gift' ? 'pending' : 'effective'
+
   return {
     id: `TXN-${transaction.id}`,
     txnType,
@@ -103,6 +105,9 @@ export function mapCreditsTransactionToFlowRecord(
     functionName: resolveFunctionName(transaction.bizType, transaction.remark),
     remark: transaction.remark?.trim() || transaction.bizId || '-',
     createdAt: formatDateTime(transaction.createdAt),
+    status,
+    validityPeriod:
+      txnType === 'gift' || txnType === 'recharge' ? '2026-12-31' : '-',
   }
 }
 

@@ -424,4 +424,9 @@ const {
   overflow: hidden;
 }
 
+.app-layout--studio-chrome.app-layout--login .app-layout-main > :deep(*) {
+  height: 100%;
+  min-height: 0;
+}
+
 </style>

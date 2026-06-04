@@ -1,18 +1,18 @@
-import caseUsedImage from '@/img/home/case-used.png'
-import featureBatchImage from '@/img/home/feature-batch.png'
-import featureOutdoorImage from '@/img/home/feature-outdoor.png'
-import featureRefineImage from '@/img/home/feature-refine.png'
-import featureRoadImage from '@/img/home/feature-road.png'
-import featureSceneImage from '@/img/home/feature-scene.png'
-import featureShowroomImage from '@/img/home/feature-showroom.png'
-import featureSkyImage from '@/img/home/feature-sky.png'
+import caseUsedImage from '@/assets/media/home/home-case-used-car.png'
+import featureBatchImage from '@/assets/media/home/home-capability-batch.png'
+import featureOutdoorImage from '@/assets/media/home/home-capability-sky-studio.png'
+import featureRefineImage from '@/assets/media/home/home-capability-refine.png'
+import featureRoadImage from '@/assets/media/home/home-capability-road-motion.png'
+import featureSceneImage from '@/assets/media/home/home-capability-scene-bg.png'
+import featureShowroomImage from '@/assets/media/home/home-capability-showroom.png'
+import featureSkyImage from '@/assets/media/home/home-capability-outdoor.png'
 import featureMarketingVideo from '@/assets/video/营销短视频.mp4'
-import homeHeroImageDark from '@/assets/img/首页背景图/夜间hero背景图.png'
-import homeHeroImageLight from '@/assets/img/首页背景图/日间hero背景图.png'
-import suiteEnterpriseImageDark from '@/img/home/suite-enterprise.png'
-import suiteEnterpriseImageLight from '@/img/home/suite-enterprise-light.png'
-import suiteWorkbenchImageDark from '@/img/home/suite-workbench.png'
-import suiteWorkbenchImageLight from '@/img/home/suite-workbench-light.png'
+import homeHeroImageDark from '@/assets/media/home/home-hero-bg-dark.png'
+import homeHeroImageLight from '@/assets/media/home/home-hero-bg-light.png'
+import suiteEnterpriseImageDark from '@/assets/media/home/home-entry-enterprise-dark.png'
+import suiteEnterpriseImageLight from '@/assets/media/home/home-entry-enterprise-light.png'
+import suiteWorkbenchImageDark from '@/assets/media/home/home-entry-workbench-dark.png'
+import suiteWorkbenchImageLight from '@/assets/media/home/home-entry-workbench-light.png'
 
 export interface HomeQuickEntry {
   title: string
@@ -155,3 +155,61 @@ export const homeFooterLinks: Array<{ label: string; to?: string; href?: string 
   { label: '隐私政策', href: '#cases' },
   { label: '服务条款', href: '#footer' },
 ]
+
+export type HomeFooterNavTag = 'beta' | 'plan'
+
+export interface HomeFooterNavItem {
+  label: string
+  workspaceCode?: string
+  disabled?: boolean
+  tag?: HomeFooterNavTag
+}
+
+export interface HomeFooterNavColumn {
+  title: string
+  items: HomeFooterNavItem[]
+}
+
+/** 页脚能力导航，与视觉工作台左侧菜单一致 */
+export const homeFooterNavColumns: HomeFooterNavColumn[] = [
+  {
+    title: '场景更换',
+    items: [
+      { label: '展厅棚拍', workspaceCode: 'showroom-light' },
+      { label: '户外实景', workspaceCode: 'outdoor-scene' },
+      { label: '行驶动效', workspaceCode: 'road-motion' },
+      { label: '天空影棚', workspaceCode: 'sky-studio' },
+    ],
+  },
+  {
+    title: '车辆美容',
+    items: [
+      { label: '烤漆翻新', workspaceCode: 'paint-refresh' },
+      { label: '光污美化', workspaceCode: 'light-consistency' },
+      { label: '内饰清洁', workspaceCode: 'interior-clean' },
+    ],
+  },
+  {
+    title: '智能交付',
+    items: [
+      { label: '批量上新', workspaceCode: 'batch-new' },
+      { label: '成片交付', workspaceCode: 'delivery' },
+    ],
+  },
+  {
+    title: '营销工具',
+    items: [
+      { label: '去水印', workspaceCode: 'watermark-remove', tag: 'beta' },
+      { label: '创意生图', workspaceCode: 'creative-image', tag: 'beta' },
+      { label: '主图套版', disabled: true, tag: 'plan' },
+      { label: '短视频生成', workspaceCode: 'short-video', tag: 'beta' },
+      { label: '详情页物料', disabled: true, tag: 'plan' },
+      { label: '多平台分发', disabled: true, tag: 'plan' },
+    ],
+  },
+]
+
+export const homeFooterContactItems = [
+  '商务合作：13718492350@163.com',
+  '媒体联系：13718492350@163.com',
+] as const

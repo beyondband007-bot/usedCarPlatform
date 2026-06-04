@@ -2,6 +2,9 @@
 import { Icon } from "@iconify/vue";
 import { NPopover } from "naive-ui";
 import { computed, inject, ref, watch } from "vue";
+
+import themeIconMoon from "@/assets/img/icon/月亮.svg";
+import themeIconSun from "@/assets/img/icon/太阳.svg";
 import { useRoute, useRouter } from "vue-router";
 
 import { CREDITS_ROUTE } from "@/constants/app-flow";
@@ -88,6 +91,14 @@ function canShowNavItem(item: NavItem) {
   return !permission || authStore.permissions.includes(permission);
 }
 
+const themeToggleIcon = computed(() =>
+  appStore.isDarkMode ? themeIconSun : themeIconMoon,
+);
+
+const themeToggleAriaLabel = computed(() =>
+  appStore.isDarkMode ? "切换到日间模式" : "切换到夜间模式",
+);
+
 const navItems = computed(() => {
   if (usesStudioChrome.value) {
     if (!authStore.isLoggedIn) {
@@ -155,18 +166,23 @@ const navItems = computed(() => {
         <button
           type="button"
           class="theme-toggle"
+          :aria-label="themeToggleAriaLabel"
           @click="appStore.toggleTheme()"
         >
-          <Icon
-            :icon="
+          <img
+            :src="themeToggleIcon"
+            alt=""
+            class="theme-toggle-icon"
+            :class="
               appStore.isDarkMode
-                ? 'mdi:white-balance-sunny'
-                : 'mdi:moon-waning-crescent'
+                ? 'theme-toggle-icon--to-light'
+                : 'theme-toggle-icon--to-dark'
             "
+            width="22"
+            height="22"
+            decoding="async"
+            draggable="false"
           />
-          <span class="theme-toggle-label">
-            {{ appStore.isDarkMode ? "日间模式" : "夜间模式" }}
-          </span>
         </button>
         <NPopover
           v-if="authStore.isLoggedIn"
@@ -281,20 +297,24 @@ const navItems = computed(() => {
       <div class="ml-auto flex shrink-0 items-center gap-2 xl:gap-3">
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-full bg-[var(--app-header-chip-bg)] px-3 py-2 text-xs font-semibold text-[var(--app-header-chip-text)] transition hover:opacity-90"
+          class="theme-toggle theme-toggle--admin inline-flex items-center justify-center rounded-full bg-[var(--app-header-chip-bg)] p-2 text-[var(--app-header-chip-text)] transition hover:opacity-90"
+          :aria-label="themeToggleAriaLabel"
           @click="appStore.toggleTheme()"
         >
-          <Icon
-            :icon="
+          <img
+            :src="themeToggleIcon"
+            alt=""
+            class="theme-toggle-icon"
+            :class="
               appStore.isDarkMode
-                ? 'mdi:white-balance-sunny'
-                : 'mdi:moon-waning-crescent'
+                ? 'theme-toggle-icon--to-light'
+                : 'theme-toggle-icon--to-dark'
             "
-            class="text-base"
+            width="22"
+            height="22"
+            decoding="async"
+            draggable="false"
           />
-          <span class="hidden md:inline">
-            {{ appStore.isDarkMode ? "日间模式" : "夜间模式" }}
-          </span>
         </button>
 
         <NPopover
@@ -520,8 +540,9 @@ const navItems = computed(() => {
 .theme-toggle {
   display: inline-flex;
   align-items: center;
-  gap: clamp(5px, 0.45vw, 8px);
-  padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
+  justify-content: center;
+  gap: 0;
+  padding: clamp(8px, 0.55vw, 10px);
   border: 1px solid var(--studio-chrome-theme-border, rgba(255, 255, 255, 0.14));
   border-radius: 999px;
   background: var(--studio-chrome-theme-bg, rgba(255, 255, 255, 0.08));
@@ -543,12 +564,19 @@ const navItems = computed(() => {
   background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
 }
 
-.theme-toggle :deep(svg) {
-  font-size: clamp(15px, 1.1vw, 18px);
+.theme-toggle-icon {
+  display: block;
+  width: clamp(18px, 1.1vw, 22px);
+  height: clamp(18px, 1.1vw, 22px);
+  object-fit: contain;
 }
 
-.theme-toggle-label {
-  white-space: nowrap;
+.theme-toggle-icon--to-light {
+  filter: brightness(0) invert(1);
+}
+
+.theme-toggle-icon--to-dark {
+  filter: brightness(0);
 }
 
 .user-menu-trigger--studio {
@@ -597,9 +625,6 @@ const navItems = computed(() => {
     justify-self: end;
   }
 
-  .theme-toggle-label {
-    display: none;
-  }
 }
 
 .user-menu-trigger {

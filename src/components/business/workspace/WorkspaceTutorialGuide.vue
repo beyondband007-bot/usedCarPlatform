@@ -3,12 +3,12 @@ import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
-import tutorialUploadCarImage from "@/assets/img/展厅灯光/展厅模板/上传车图.png";
-import tutorialShowroomTemplate1 from "@/assets/img/展厅灯光/展厅模板/选择模板1.png";
-import tutorialShowroomTemplate2 from "@/assets/img/展厅灯光/展厅模板/选择模板2.png";
-import tutorialShowroomTemplate3 from "@/assets/img/展厅灯光/展厅模板/选择模板3.png";
-import tutorialResultImage from "@/assets/img/展厅灯光/展厅模板/生成效果.png";
-import tutorialLogoImage from "@/assets/img/展厅灯光/展厅模板/ai-car-studio-logo.png";
+import tutorialUploadCarImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-upload.png";
+import tutorialShowroomTemplate1 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-01.png";
+import tutorialShowroomTemplate2 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-02.png";
+import tutorialShowroomTemplate3 from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-template-03.png";
+import tutorialResultImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-step-result.png";
+import tutorialLogoImage from "@/assets/media/workspace/showroom/workspace-showroom-tutorial-logo-sample.png";
 
 defineProps<{
   animationKey?: string;
@@ -252,6 +252,12 @@ const tutorialTemplatePreviewImages = [
   background: transparent !important;
 }
 
+.tutorial-step.is-step-1 .tutorial-image :deep(.preload-image),
+.tutorial-step.is-step-4 .tutorial-image :deep(.preload-image) {
+  overflow: hidden;
+  border-radius: 10px;
+}
+
 .tutorial-step.is-step-1 .tutorial-image :deep(.preload-image__img),
 .tutorial-step.is-step-4 .tutorial-image :deep(.preload-image__img) {
   width: 100%;
@@ -260,6 +266,7 @@ const tutorialTemplatePreviewImages = [
   max-height: 100%;
   object-fit: contain;
   object-position: top center;
+  border-radius: 10px;
 }
 
 .tutorial-step.is-step-3 .tutorial-logo-image {

@@ -13,6 +13,7 @@ import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import { formatOutputRatioLabel } from "@/constants/output-ratio";
+import { RECENT_REFRESH_MS } from "@/constants/workspace-polling";
 import { workspaceTemplateRecommendations } from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { useRecentGenerateStore } from "@/stores/recentGenerate";
@@ -219,7 +220,6 @@ const shortVideoInitialView = ref<"guide" | "preview" | "generating" | "recent">
   "guide",
 );
 let recentRefreshTimer: number | null = null;
-const RECENT_REFRESH_MS = 15000;
 
 const isBatchCapability = computed(() => props.capability.kind === "batch");
 

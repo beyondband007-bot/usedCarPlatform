@@ -1,6 +1,6 @@
-import planBasicBg from '@/img/home/suite-workbench-light.png'
-import planTeamBg from '@/img/home/suite-enterprise-light.png'
-import planFlagshipBg from '@/img/home/suite-enterprise.png'
+import planBasicBg from '@/assets/media/package/package-plan-basic-bg.png'
+import planTeamBg from '@/assets/media/package/package-plan-team-bg.png'
+import planFlagshipBg from '@/assets/media/package/package-plan-flagship-bg.png'
 
 export type RechargePlanTone = 'blue' | 'purple' | 'gold'
 

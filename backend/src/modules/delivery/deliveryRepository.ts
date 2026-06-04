@@ -106,11 +106,15 @@ export class DeliveryRepository extends Repository {
 
   async listAssets(input: { sourceTaskId: string; ratio?: string; page: number; pageSize: number }) {
     const offset = (input.page - 1) * input.pageSize;
-    const ratioWhere = input.ratio ? "AND ratio = :ratio" : "";
+    const ratioWhere = input.ratio ? "AND da.ratio = :ratio" : "";
     const rows = await this.query<DeliveryAssetRow[]>(
-      `SELECT * FROM delivery_assets
-       WHERE source_task_id = :sourceTaskId AND deleted_at IS NULL ${ratioWhere}
-       ORDER BY created_at ASC
+      `SELECT da.*
+       FROM delivery_assets da
+       LEFT JOIN batch_task_items bti
+         ON bti.batch_id = da.source_task_id
+        AND da.id LIKE CONCAT('delivery_', bti.generation_task_id, '_%')
+       WHERE da.source_task_id = :sourceTaskId AND da.deleted_at IS NULL ${ratioWhere}
+       ORDER BY bti.sort_order ASC, da.created_at ASC
        LIMIT :limit OFFSET :offset`,
       { sourceTaskId: input.sourceTaskId, ratio: input.ratio, limit: input.pageSize, offset },
     );
@@ -162,9 +166,13 @@ export class DeliveryRepository extends Repository {
     if (!assetIds.length) return [];
     const placeholders = assetIds.map((_, index) => `:assetId${index}`).join(", ");
     const rows = await this.query<DeliveryAssetRow[]>(
-      `SELECT * FROM delivery_assets
-       WHERE id IN (${placeholders}) AND deleted_at IS NULL
-       ORDER BY created_at ASC`,
+      `SELECT da.*
+       FROM delivery_assets da
+       LEFT JOIN batch_task_items bti
+         ON bti.batch_id = da.source_task_id
+        AND da.id LIKE CONCAT('delivery_', bti.generation_task_id, '_%')
+       WHERE da.id IN (${placeholders}) AND da.deleted_at IS NULL
+       ORDER BY bti.sort_order ASC, da.created_at ASC`,
       Object.fromEntries(assetIds.map((assetId, index) => [`assetId${index}`, assetId])),
     );
     return rows.map(mapAsset);

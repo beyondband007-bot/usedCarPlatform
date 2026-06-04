@@ -3,7 +3,7 @@ import { Icon } from "@iconify/vue";
 import { NModal } from "naive-ui";
 import { computed } from "vue";
 
-import contactSupportWechatQr from "@/assets/img/contact-support-wechat-qr.png";
+import contactSupportWechatQr from "@/assets/media/global/global-contact-wechat-qr.png";
 import { contactSupportInfo } from "@/constants/contact-support";
 import { useAppStore } from "@/stores/app";
 

@@ -43,6 +43,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     () => snapshot.value?.batchConcurrentTaskLimit ?? currentPlanConfig.value.batchConcurrentTaskLimit,
   )
   const giftPoints = computed(() => snapshot.value?.giftPoints ?? currentPlanConfig.value.giftPoints)
+  const currentPlanName = computed(() => currentPlanConfig.value.name)
   const expireTime = computed(() => snapshot.value?.expireTime ?? '')
 
   async function hydrate(force = false) {
@@ -76,6 +77,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     concurrentTaskLimit,
     visualConcurrentTaskLimit,
     batchConcurrentTaskLimit,
+    currentPlanName,
     giftPoints,
     expireTime,
     hydrate,

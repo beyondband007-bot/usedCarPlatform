@@ -11,8 +11,8 @@ import {
 } from "@/constants/prototype";
 import { useAppStore } from "@/stores/app";
 
-import pricingHeroBgDark from "@/assets/img/pricing-hero-bg.png";
-import pricingHeroBgLight from "@/assets/img/日间企业套餐背景图.png";
+import pricingHeroBgDark from "@/assets/media/pricing/pricing-hero-bg-dark.png";
+import pricingHeroBgLight from "@/assets/media/pricing/pricing-hero-bg-light.png";
 
 const copy = pricingPageCopy;
 const appStore = useAppStore();
@@ -51,26 +51,30 @@ function handlePlanConsult() {
     <div class="pricing-bg" aria-hidden="true" />
 
     <section class="pricing-shell" aria-label="企业套餐">
-      <header class="pricing-hero">
-        <h1>{{ copy.title }}</h1>
-        <p>{{ copy.plansSubtitle }}</p>
-      </header>
+      <div class="pricing-top-content">
+        <header class="pricing-hero">
+          <h1>{{ copy.title }}</h1>
+          <p class="pricing-hero-intro">{{ copy.plansSubtitle }}</p>
+        </header>
 
-      <div id="pricing-plans" class="pricing-plans-grid">
-        <PricingPlanCard
-          v-for="plan in pricingPlans"
-          :key="plan.name"
-          :plan="plan"
-          :selected="selectedPlanName === plan.name"
-          :pressing="pressingPlanName === plan.name"
-          @select="handlePlanSelect(plan.name)"
-          @consult="handlePlanConsult"
-          @pointerdown="handlePlanPointerDown(plan.name)"
-          @pointerup="clearPlanPress"
-          @pointerleave="clearPlanPress"
-          @pointercancel="clearPlanPress"
-        />
+        <div id="pricing-plans" class="pricing-plans-grid">
+          <PricingPlanCard
+            v-for="plan in pricingPlans"
+            :key="plan.name"
+            :plan="plan"
+            :selected="selectedPlanName === plan.name"
+            :pressing="pressingPlanName === plan.name"
+            @select="handlePlanSelect(plan.name)"
+            @consult="handlePlanConsult"
+            @pointerdown="handlePlanPointerDown(plan.name)"
+            @pointerup="clearPlanPress"
+            @pointerleave="clearPlanPress"
+            @pointercancel="clearPlanPress"
+          />
+        </div>
       </div>
+
+      <div class="pricing-footer-spacer" aria-hidden="true" />
 
       <section class="pricing-footer-bar" aria-label="套餐服务承诺">
         <article
@@ -97,24 +101,25 @@ function handlePlanConsult() {
   --pricing-accent-strong: #f4c84a;
   --pricing-hero-text: #f8fafc;
   --pricing-hero-sub: rgba(248, 250, 252, 0.76);
-  --pricing-footer-bg: rgba(5, 6, 8, 0.64);
-  --pricing-footer-border: rgba(255, 255, 255, 0.18);
+  --pricing-footer-bg: rgba(11, 12, 13, 0.5);
+  --pricing-footer-border: rgba(255, 255, 255, 0.08);
+  --pricing-intro-color: rgb(12, 13, 13);
+  --pricing-footer-title: #f8fafc;
+  --pricing-footer-sub: rgba(248, 250, 252, 0.72);
   --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
   --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
   --pricing-bg-fallback: #020303;
-  --pricing-bg-overlay:
-    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.04), transparent 26%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.68) 100%);
 
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  height: auto;
+  height: 100%;
   min-height: 100%;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: clamp(34px, 5.2vh, 64px) clamp(14px, 4.9vw, 102px) clamp(20px, 3.4vh, 44px);
+  padding: clamp(34px, 5.2vh, 64px) clamp(14px, 4.9vw, 102px)
+    clamp(24px, 3.5vh, 48px);
   overflow: visible;
   background: var(--pricing-bg-fallback);
   color: #f8fafc;
@@ -128,19 +133,14 @@ function handlePlanConsult() {
   --pricing-primary-soft: #edf4ff;
   --pricing-hero-text: #0f172a;
   --pricing-hero-sub: #64748b;
-  --pricing-footer-bg: rgba(255, 255, 255, 0.9);
-  --pricing-footer-border: #e2e8f0;
-  --pricing-footer-icon-bg: rgba(47, 107, 255, 0.08);
-  --pricing-footer-icon-border: rgba(47, 107, 255, 0.2);
+  --pricing-footer-bg: rgba(11, 12, 13, 0.8);
+  --pricing-footer-border: rgba(255, 255, 255, 0.08);
+  --pricing-intro-color: rgb(12, 13, 13);
+  --pricing-footer-title: #f8fafc;
+  --pricing-footer-sub: rgba(248, 250, 252, 0.7);
+  --pricing-footer-icon-bg: rgba(244, 200, 74, 0.11);
+  --pricing-footer-icon-border: rgba(244, 200, 74, 0.24);
   --pricing-bg-fallback: #f6f9fc;
-  --pricing-bg-overlay:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.78), transparent 52%),
-    linear-gradient(
-      180deg,
-      rgba(246, 249, 252, 0.84) 0%,
-      rgba(246, 249, 252, 0.52) 46%,
-      rgba(246, 249, 252, 0.9) 100%
-    );
 
   color: var(--pricing-hero-text);
 }
@@ -157,27 +157,24 @@ function handlePlanConsult() {
   background-size: cover;
 }
 
-.pricing-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--pricing-bg-overlay);
-}
-
 .pricing-shell {
   /* 在默认尺寸基础上累计缩小：先 10%，再 15% → 0.9 × 0.85 */
   --pricing-content-scale: 0.765;
+  /* 与套餐卡片 border-radius: clamp(22px, 7.2cqw, 44px) 对齐（卡片约为 shell 宽 1/3） */
+  --pricing-card-radius: clamp(22px, calc(7.2cqw / 3), 44px);
 
+  container-type: inline-size;
   position: relative;
   z-index: 1;
   display: flex;
   width: min(calc(100vw - 56px), calc((100dvh - 72px) * 1.65));
-  height: auto;
+  height: 100%;
   min-width: 0;
-  min-height: 0;
+  min-height: 100%;
   flex-direction: column;
   gap: 0;
   align-items: center;
+  flex: 1;
   zoom: var(--pricing-content-scale);
 }
 
@@ -186,6 +183,12 @@ function handlePlanConsult() {
     transform: scale(var(--pricing-content-scale));
     transform-origin: top center;
   }
+}
+
+.pricing-top-content {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .pricing-hero {
@@ -201,25 +204,19 @@ function handlePlanConsult() {
   font-weight: 950;
   letter-spacing: 0.02em;
   line-height: 1.08;
-  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.72);
 }
 
 .pricing-page.theme-dark .pricing-hero h1 {
-  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.42);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
 }
 
-.pricing-hero p {
+.pricing-hero-intro {
   max-width: min(720px, 100%);
   margin: clamp(12px, 1.5vh, 18px) auto 0;
-  color: var(--pricing-hero-sub);
+  color: var(--pricing-intro-color);
   font-size: clamp(15px, min(1.55vw, 2.2vh), 24px);
   font-weight: 500;
   line-height: 1.35;
-  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.65);
-}
-
-.pricing-page.theme-dark .pricing-hero p {
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.58);
 }
 
 .pricing-plans-grid {
@@ -229,31 +226,32 @@ function handlePlanConsult() {
   align-items: center;
   width: 100%;
   min-width: 0;
-  margin-bottom: clamp(24px, 3.5vh, 54px);
+  margin-bottom: 0;
+}
+
+.pricing-footer-spacer {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100px;
+  min-height: 100px;
 }
 
 .pricing-footer-bar {
   display: grid;
   flex: 0 0 auto;
+  box-sizing: border-box;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(16px, 3.2vw, 58px);
   width: 100%;
   min-width: 0;
+  margin: 0;
   min-height: clamp(120px, 12vh, 148px);
   padding: clamp(24px, 2.8vh, 32px) clamp(26px, 4.8vw, 84px);
   border: 1px solid var(--pricing-footer-border);
-  border-radius: 28px;
+  border-radius: var(--pricing-card-radius);
   background: var(--pricing-footer-bg);
-  backdrop-filter: blur(18px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 12px 40px rgba(15, 23, 42, 0.08);
-}
-
-.pricing-page.theme-dark .pricing-footer-bar {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 20px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
+  overflow: hidden;
 }
 
 .footer-feature {
@@ -284,7 +282,7 @@ function handlePlanConsult() {
 
 .footer-feature h3 {
   margin: 0;
-  color: var(--pricing-hero-text);
+  color: var(--pricing-footer-title);
   font-size: 32px;
   font-weight: 900;
   line-height: 1.3;
@@ -293,14 +291,14 @@ function handlePlanConsult() {
 
 .footer-feature p {
   margin: 4px 0 0;
-  color: var(--pricing-hero-sub);
+  color: var(--pricing-footer-sub);
   font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
 }
 
 @media (max-height: 760px) {
-  .pricing-hero p {
+  .pricing-hero-intro {
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -311,18 +309,13 @@ function handlePlanConsult() {
 @media (max-height: 820px) {
   .pricing-page {
     padding-top: clamp(26px, 4.2vh, 36px);
-    padding-bottom: clamp(12px, 2vh, 18px);
-  }
-
-  .pricing-plans-grid {
-    margin-bottom: clamp(14px, 2.1vh, 22px);
   }
 
   .pricing-hero h1 {
     font-size: clamp(26px, 4.3vh, 34px);
   }
 
-  .pricing-hero p {
+  .pricing-hero-intro {
     margin-top: 8px;
     font-size: clamp(13px, 2vh, 16px);
   }
@@ -335,16 +328,12 @@ function handlePlanConsult() {
 
 @media (max-width: 900px) {
   .pricing-page {
-    padding: 28px 14px 18px;
+    padding: 28px 14px clamp(20px, 3vh, 32px);
     overflow-x: auto;
   }
 
   .pricing-shell {
     width: min(980px, calc(100vw - 28px), calc((100dvh - 72px) * 1.65));
-  }
-
-  .pricing-plans-grid {
-    margin-bottom: 18px;
   }
 
   .pricing-footer-bar {

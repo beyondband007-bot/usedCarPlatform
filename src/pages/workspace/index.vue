@@ -33,6 +33,11 @@ import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,
 } from "@/constants/workspace";
+import {
+  BATCH_TASK_POLL_MS,
+  GENERATION_TASK_POLL_MAX_MS,
+  GENERATION_TASK_POLL_MS,
+} from "@/constants/workspace-polling";
 import { usePointsStore } from "@/stores/points";
 import { useAuthStore } from "@/stores/auth";
 import { useCreditsStore } from "@/stores/credits";
@@ -79,9 +84,6 @@ const ACTIVE_CREATIVE_CONVERSATION_KEY =
   "workspace-active-creative-conversation";
 const TRACKED_RUNNING_TASKS_KEY = "workspace-tracked-running-tasks";
 const BATCH_ACTIVE_JOBS_KEY = "workspace-batch-active-jobs";
-const GENERATION_TASK_POLL_MS = 25000;
-/** 单任务最长轮询时长，与间隔联动，避免 25s 间隔下轮询过久 */
-const GENERATION_TASK_POLL_MAX_MS = 20 * 60 * 1000;
 const visualPlanPoolCapabilityCodes = new Set([
   "showroom-light",
   "outdoor-scene",
@@ -602,7 +604,7 @@ function startBatchPolling() {
         void refreshBatchJob(job.batchId);
       }
     }
-  }, 5000);
+  }, BATCH_TASK_POLL_MS);
 }
 
 function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
@@ -1980,6 +1982,7 @@ onUnmounted(() => {
             :is-generating="activeModuleGenerating"
             :previewed-delivery-task-id="previewedDeliveryTaskId"
             :can-create-batch-task="canStartBatchGeneration"
+            :batch-active-jobs="batchActiveJobs"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"
             @preview-delivery-task="handlePreviewDeliveryTask"

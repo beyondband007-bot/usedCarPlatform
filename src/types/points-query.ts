@@ -11,6 +11,8 @@ export type PointsBizSource =
 
 export type PointsDateRange = "" | "7" | "30" | "90" | "custom";
 
+export type PointsFlowStatus = "effective" | "pending";
+
 export interface PointsQueryFilters {
   member: string;
   txnType: "" | PointsTxnType;
@@ -18,6 +20,7 @@ export interface PointsQueryFilters {
   startDate: string;
   endDate: string;
   bizSource: "" | PointsBizSource;
+  status: "" | PointsFlowStatus;
 }
 
 export interface PointsFlowRecord {
@@ -34,6 +37,8 @@ export interface PointsFlowRecord {
   memberName?: string;
   isOwner?: boolean;
   isCurrentUser?: boolean;
+  status?: PointsFlowStatus;
+  validityPeriod?: string;
 }
 
 export interface PointsSummaryCard {
