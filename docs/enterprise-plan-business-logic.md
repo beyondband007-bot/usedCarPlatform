@@ -43,6 +43,15 @@ First-release visibility rule:
 - each child account is shown as a separate account in the credits page
 - regular/basic/team plans do not get child-account visibility
 
+Frontend account hierarchy contract:
+
+- `subscription.currentPlan === 'flagship'` means the user is on the Flagship plan, but it does not identify mother vs child by itself.
+- `userInfo.enterpriseAccountRole === 'mother'` identifies the Flagship mother account.
+- `userInfo.enterpriseAccountRole === 'child'` identifies a Flagship child account.
+- `userInfo.enterpriseAccountRole === 'standalone'` means no mother/child hierarchy applies.
+- `userInfo.canViewEnterpriseChildren === true` is the direct signal for showing child-account transactions.
+- `userInfo.enterpriseTenantId`, `enterpriseMemberRole`, `enterpriseOwnerUserId`, and `enterpriseSubscriptionUserId` are supporting fields for labels, filtering, and backend requests.
+
 Canonical usedCar frontend source:
 
 ```text

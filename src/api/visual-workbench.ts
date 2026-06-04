@@ -814,19 +814,24 @@ export interface PaymentOrderResult {
   createdAt: string
 }
 
+export interface CreditsApplication {
+  id: number | string
+  code: string
+  name: string
+  status: string
+}
+
+export interface CreditsApplicationFunction {
+  code: string
+  name: string
+  defaultPoints: number
+  status: string
+}
+
 export interface CreditsAdminOverview {
-  application: {
-    id: number | string
-    code: string
-    name: string
-    status: string
-  } | null
-  applicationFunctions: Array<{
-    code: string
-    name: string
-    defaultPoints: number
-    status: string
-  }>
+  application: CreditsApplication | null
+  applications: CreditsApplication[]
+  applicationFunctions: CreditsApplicationFunction[]
   creditAccounts: CreditsAccount[]
   rechargeProducts: RechargeProduct[]
   recentTransactions: CreditsTransaction[]
@@ -970,9 +975,35 @@ export async function createRechargeOrder(payload: {
   return unwrapApiResponse(response)
 }
 
-export async function getCreditsAdminOverview() {
-  const response = await request.get<ApiResponse<CreditsAdminOverview>>(
+export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
+  const response = await request.get<ApiResponse<CreditsAdminOverview & Record<string, unknown>>>(
     '/credits/admin/overview',
   )
-  return unwrapApiResponse(response)
+  const payload = unwrapApiResponse(response)
+  const applications = extractCreditsList<CreditsApplication>(payload, ['applications'])
+  const applicationFunctions = extractCreditsList<CreditsApplicationFunction>(
+    payload,
+    ['applicationFunctions', 'functions'],
+  )
+  const creditAccounts = extractCreditsList<CreditsAccount & Record<string, unknown>>(
+    payload,
+    ['creditAccounts', 'accounts'],
+  ).map(normalizeCreditsAccount)
+  const rechargeProducts = extractCreditsList<RechargeProduct & Record<string, unknown>>(
+    payload,
+    ['rechargeProducts', 'products'],
+  ).map(normalizeRechargeProduct)
+  const recentTransactions = extractCreditsList<CreditsTransaction & Record<string, unknown>>(
+    payload,
+    ['recentTransactions', 'transactions'],
+  ).map(normalizeCreditsTransaction)
+
+  return {
+    application: payload.application ?? applications[0] ?? null,
+    applications,
+    applicationFunctions,
+    creditAccounts,
+    rechargeProducts,
+    recentTransactions,
+  }
 }

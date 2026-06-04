@@ -1,72 +1,105 @@
-# First Release Account Creation Policy
+# Account Creation Policy
 
-Status: implemented in the back-office UI
-Date: 2026-06-01
-Commit: `5aa2c73`
+Status: Phase 3 first backend RBAC slice implemented
+Date: 2026-06-04
 
 ## Decision
 
-For the first release, every user/customer account must be created by platform owner roles:
+The Reusable Credits Platform console supports account creation from all three back-office roles:
 
-- developer
-- company admin
+- Developer can create Admins, Agents, and Users.
+- Admin can create Agents and Users.
+- Agent can create Users.
 
-Agents cannot create client login accounts in the first release.
+Developer can turn Admin creation of Agents/Users on/off. Developer can also turn Agent creation of Users on/off as the top-level Agent gate.
 
-This keeps the first launch operationally safer while real authentication, tenant membership validation, approval history, and audit trails are still being finalized.
+Admin can turn Agent creation of Users on/off as the subordinate Agent gate. Admin can also turn User-to-Agent promotion on/off. Agent User creation is effectively enabled only when both Developer and Admin allow it.
+
+Developer creation of Admins, Agents, and Users remains always enabled.
+
+This moves account provisioning out of usedCarPlatform-specific rules and into reusable platform policy. Phase 2 adds backend policy tables and a policy decision service. Phase 3 starts session-backed RBAC by protecting the console overview endpoint; production work must still connect policy decisions to authenticated write APIs and audit every account creation.
 
 ## Regular User To Agent Login
 
-A regular product user can become an agent login only through the Three-Role Credits Back Office.
+A regular product user cannot log in through this console while they remain a regular User. A regular User can become an Agent only through a back-office role/category change. After promotion, that person logs in as Agent and can enter the Reusable Credits Platform console.
 
 Allowed operator roles:
 
 - developer
 - company admin
+- agent, for creating Users only, if Developer and Admin both enable agent-side User creation
 
 Not allowed:
 
 - regular users cannot self-upgrade from the front-office login
-- agents cannot create or promote agent/client login accounts in the first release
+- regular users cannot log in to the console unless/until they become Agents
+- disabled Admin/Agent creation policy must block account creation server-side
+- Agent account creation must be blocked if either Developer's Agent gate or Admin's Agent gate is off
 
 In the current mock/demo setup, `enterprise` represents a regular product user and `agent` represents an already-opened agent login. Production should implement this as an audited role/category change, not as a front-office registration shortcut.
 
 ## Current Implementation
 
-The policy is represented in the usedCarPlatform frontend through:
+The policy is represented in the frontend through:
 
 - `src/policies/accountProvisioning.ts`
 - `src/pages/credits-admin/index.vue`
 - `src/mock/mock-auth.ts`
 
-The mock admin account has the platform account creation permission:
+The backend Phase 2 policy foundation is represented through:
+
+- `backend/src/db/migrations.ts`
+- `backend/src/db/migrate.ts`
+- `backend/src/modules/platform/accountCreationPolicyDefaults.ts`
+- `backend/src/modules/platform/accountCreationPolicyService.ts`
+- `backend/src/modules/platform/accountCreationPolicyDefaults.test.ts`
+
+The demo permissions are:
 
 ```text
-account:create:platform
+developer: account:create:admin, account:create:agent, account:create:user, policy:account-creation:manage
+admin: account:create:agent, account:create:user, policy:agent-user-creation:manage, policy:user-agent-promotion:manage
+agent: account:create:user
 ```
 
 In `/credits-admin`:
 
-- developer and company admin views show user/customer account creation as a platform-owner responsibility
-- developer and company admin views show that regular users can be opened as agents from agent management
-- agent views show client account creation as a disabled future action
-- disabled agent actions explain that first release account creation belongs to platform developer/admin users
+- developer view shows Developer creation of Admin/Agent/User and toggles for Admin Agent/User creation plus Agent User creation
+- admin view shows Admin creation of Agent/User and toggles for Agent User creation plus User-to-Agent promotion
+- agent view shows User creation as enabled only when both Developer and Admin gates are on
 
-The current account creation buttons remain non-mutating because production user/account creation APIs are not implemented in usedCarPlatform yet.
+The current account creation surfaces remain non-mutating because production user/account creation APIs are not implemented yet.
 
-## Why Agents Are Disabled In First Release
+Backend default-policy verification:
 
-Agent-side client account creation needs more than a UI button. Before it is safe to enable, the system should know and store:
+```bash
+npm run phase2:policy-test
+npm run phase3:rbac-test
+```
 
-- which agent created the account
+## Why Creation Uses A Hierarchy
+
+Admin and Agent account creation needs more than a UI button. The hierarchy should be persisted and audited:
+
+- Developer always can create users.
+- Developer always can create Admins, Agents, and Users.
+- Developer controls whether Admin can create Agents and Users.
+- Developer controls whether Agent can create Users.
+- Admin can create Agents and Users while Developer allows it.
+- Admin controls whether Agents under the Admin/operation scope can create Users.
+- Admin controls whether a User can become an Agent.
+- Effective Agent permission is Developer Agent gate AND Admin Agent gate.
+
+Before it is safe to enforce in production, the system should know and store:
+
+- which role created the account
+- which operator created the account
 - which tenant/customer owns the account
 - whether the agent is approved and active
 - whether the created client account needs platform approval
 - who approved or rejected the request
 - the audit reason and timestamp
 - the resulting credit account scope and ownership
-
-Until those backend and audit rules exist, agents should submit customer information or leads, and platform owner roles should create the actual login accounts.
 
 For regular-user-to-agent conversion, production should record:
 
@@ -77,16 +110,18 @@ For regular-user-to-agent conversion, production should record:
 - agent level, commission ratio, settlement profile, and effective date
 - audit reason and timestamp
 
-## Future Agent-Created Account Flow
+## Production Account-Creation Flow
 
-A later release can allow agents to create client accounts through a controlled approval workflow:
+Production should create accounts through a controlled workflow:
 
-1. Agent submits client account request.
-2. System stores the request as pending.
-3. Developer/admin reviews the request.
-4. Approved request creates the user, tenant/member relation, credit account, and agent relation.
-5. Rejected request stores rejection reason.
-6. All changes are audit logged.
+1. Developer configures Admin Agent/User creation and Agent User creation top-level policy.
+2. Developer/Admin/Agent submits account creation.
+3. Admin configures Agent User creation and User-to-Agent promotion policy.
+4. Backend checks role, hierarchy policy, tenant/application scope, and agent status.
+5. Optional approval stores the request as pending.
+6. Approved or immediate creation creates the user, tenant/member relation, credit account, application link, and agent relation when applicable.
+7. Rejected request stores rejection reason.
+8. All changes are audit logged.
 
 Suggested future database/API concepts:
 
@@ -105,7 +140,7 @@ Suggested future database/API concepts:
 2. Open `/credits-admin`.
 3. Switch to `开发者` and confirm account creation actions are visible.
 4. Switch to `公司管理员` and confirm account creation actions are visible.
-5. Switch to `代理商` and confirm client account creation is disabled and marked as future.
+5. Switch to `代理商` and confirm client account creation is shown as Developer + Admin controlled.
 
 Local login:
 

@@ -38,7 +38,7 @@ export const secondaryNavigation: NavItem[] = [
   { path: '/workspace', label: '视觉工作台' },
   { path: '/pricing', label: '企业套餐' },
   { path: '/credits', label: '积分查询' },
-  { path: '/credits-admin', label: '积分后台' },
+  { path: '/credits-admin', label: '积分平台控制台' },
 ]
 
 export const homeFeatures: FeatureEntry[] = [

@@ -237,13 +237,16 @@ password: 123456
 
 `/credits-admin` 内部的角色切换器目前用于原型/演示评审。真实的开发者/管理员/代理商登录与权限隔离属于后续生产认证与权限阶段。
 
-首发版本账号创建策略：
+账号创建层级：
 
-- 用户/客户账号必须由平台所有者角色创建：开发者或公司管理员
-- 普通用户只有在开发者/管理员通过后台开通后，才能成为代理商登录
-- 代理商暂时不能创建客户登录账号
-- 代理商视图中会展示客户账号创建入口，但该入口处于禁用状态，用于表示后续规划
-- 后续如果开放代理商创建客户账号，应走审批和审计流程
+- Developer 可以创建 Admin、Agent、User。
+- Developer 开关控制 Admin 是否可以创建 Agent 和 User。
+- Developer 开关控制 Agent 是否可以创建 User。
+- Admin 在 Developer 允许时可以创建 Agent 和 User。
+- Admin 开关控制 Agent 是否可以创建 User。
+- Admin 开关控制 User 是否可以成为 Agent。
+- Agent 在 Developer 和 Admin 的 Agent 开关都开启时可以创建 User。
+- User 在未成为 Agent 之前，不能登录该控制台。
 
 ## 6. 自动化验证
 

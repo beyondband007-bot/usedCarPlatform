@@ -33,23 +33,53 @@ const userSelectSql = `
     u.credits_tenant_id,
     u.account_scope,
     COALESCE(MIN(aur.role_code), 'enterprise') role_code,
-    GROUP_CONCAT(DISTINCT arp.permission_code ORDER BY arp.permission_code SEPARATOR ',') permissions_csv
+    GROUP_CONCAT(DISTINCT arp.permission_code ORDER BY arp.permission_code SEPARATOR ',') permissions_csv,
+    MAX(em.tenant_id) enterprise_tenant_id,
+    MAX(et.name) enterprise_tenant_name,
+    MAX(em.member_role) enterprise_member_role,
+    MAX(et.owner_user_id) enterprise_owner_user_id,
+    MAX(et.subscription_user_id) enterprise_subscription_user_id
   FROM app_users u
   LEFT JOIN app_user_roles aur ON aur.user_id = u.id
   LEFT JOIN app_role_permissions arp ON arp.role_code = aur.role_code
+  LEFT JOIN enterprise_members em
+    ON em.user_id = u.id
+   AND em.status = 'active'
+  LEFT JOIN enterprise_tenants et
+    ON et.id = em.tenant_id
+   AND et.status = 'active'
 `;
 
-const mapUser = (row: AuthUserRow): AuthenticatedUser => ({
-  id: row.id,
-  username: row.username,
-  phone: row.phone,
-  displayName: row.display_name,
-  role: row.role_code ?? "enterprise",
-  permissions: row.permissions_csv ? row.permissions_csv.split(",").filter(Boolean) : [],
-  creditsUserId: row.credits_user_id,
-  creditsTenantId: row.credits_tenant_id,
-  accountScope: row.account_scope === "tenant" ? "tenant" : "personal",
-});
+const resolveEnterpriseAccountRole = (row: AuthUserRow) => {
+  if (!row.enterprise_tenant_id) return "standalone";
+  if (row.id === row.enterprise_owner_user_id || row.id === row.enterprise_subscription_user_id) {
+    return "mother";
+  }
+  return "child";
+};
+
+const mapUser = (row: AuthUserRow): AuthenticatedUser => {
+  const enterpriseAccountRole = resolveEnterpriseAccountRole(row);
+
+  return {
+    id: row.id,
+    username: row.username,
+    phone: row.phone,
+    displayName: row.display_name,
+    role: row.role_code ?? "enterprise",
+    permissions: row.permissions_csv ? row.permissions_csv.split(",").filter(Boolean) : [],
+    creditsUserId: row.credits_user_id,
+    creditsTenantId: row.credits_tenant_id,
+    accountScope: row.account_scope === "tenant" ? "tenant" : "personal",
+    enterpriseTenantId: row.enterprise_tenant_id,
+    enterpriseTenantName: row.enterprise_tenant_name,
+    enterpriseMemberRole: row.enterprise_member_role,
+    enterpriseOwnerUserId: row.enterprise_owner_user_id,
+    enterpriseSubscriptionUserId: row.enterprise_subscription_user_id,
+    enterpriseAccountRole,
+    canViewEnterpriseChildren: enterpriseAccountRole === "mother",
+  };
+};
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -227,14 +257,25 @@ export const getCurrentUserByToken = async (token: string) => {
        u.display_name,
        u.status,
        u.credits_user_id,
-       u.credits_tenant_id,
-       u.account_scope,
-       COALESCE(MIN(aur.role_code), 'enterprise') role_code,
-       GROUP_CONCAT(DISTINCT arp.permission_code ORDER BY arp.permission_code SEPARATOR ',') permissions_csv
+      u.credits_tenant_id,
+      u.account_scope,
+      COALESCE(MIN(aur.role_code), 'enterprise') role_code,
+       GROUP_CONCAT(DISTINCT arp.permission_code ORDER BY arp.permission_code SEPARATOR ',') permissions_csv,
+       MAX(em.tenant_id) enterprise_tenant_id,
+       MAX(et.name) enterprise_tenant_name,
+       MAX(em.member_role) enterprise_member_role,
+       MAX(et.owner_user_id) enterprise_owner_user_id,
+       MAX(et.subscription_user_id) enterprise_subscription_user_id
      FROM auth_sessions s
      JOIN app_users u ON u.id = s.user_id
      LEFT JOIN app_user_roles aur ON aur.user_id = u.id
      LEFT JOIN app_role_permissions arp ON arp.role_code = aur.role_code
+     LEFT JOIN enterprise_members em
+       ON em.user_id = u.id
+      AND em.status = 'active'
+     LEFT JOIN enterprise_tenants et
+       ON et.id = em.tenant_id
+      AND et.status = 'active'
      WHERE s.token_hash = :tokenHash
        AND s.revoked_at IS NULL
        AND s.expires_at > CURRENT_TIMESTAMP(3)

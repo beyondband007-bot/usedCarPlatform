@@ -1,6 +1,8 @@
 import type { SubscriptionStateSnapshot } from './subscription'
 
-export type UserRole = 'admin' | 'enterprise'
+export type UserRole = 'developer' | 'admin' | 'agent' | 'enterprise'
+export type EnterpriseMemberRole = 'owner' | 'admin' | 'member'
+export type EnterpriseAccountRole = 'standalone' | 'mother' | 'child'
 
 export interface UserInfo {
   id: string
@@ -12,6 +14,13 @@ export interface UserInfo {
   creditsUserId?: number | null
   creditsTenantId?: number | null
   accountScope?: 'personal' | 'tenant'
+  enterpriseTenantId?: string | null
+  enterpriseTenantName?: string | null
+  enterpriseMemberRole?: EnterpriseMemberRole | null
+  enterpriseOwnerUserId?: string | null
+  enterpriseSubscriptionUserId?: string | null
+  enterpriseAccountRole?: EnterpriseAccountRole
+  canViewEnterpriseChildren?: boolean
 }
 
 export interface LoginRequest {

@@ -101,10 +101,10 @@ export const routes: RouteRecordRaw[] = [
       },
       {
         path: 'credits-admin',
-        name: 'CreditsAdmin',
+        name: 'ReusableCreditsConsole',
         component: () => import('@/pages/credits-admin/index.vue'),
         meta: {
-          title: '积分后台',
+          title: '积分平台控制台',
           requiresAuth: true,
           permission: 'menu:admin',
         },

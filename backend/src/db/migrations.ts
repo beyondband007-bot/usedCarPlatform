@@ -106,6 +106,39 @@ export const migrations = [
       ON DELETE CASCADE ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS back_office_roles (
+    code VARCHAR(32) PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    description VARCHAR(255) NULL,
+    hierarchy_rank INT NOT NULL,
+    can_login TINYINT(1) NOT NULL DEFAULT 1,
+    can_create_accounts TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_back_office_roles_rank (hierarchy_rank)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS back_office_permission_policies (
+    policy_code VARCHAR(80) PRIMARY KEY,
+    name VARCHAR(160) NOT NULL,
+    controller_role_code VARCHAR(32) NULL,
+    subject_role_code VARCHAR(32) NOT NULL,
+    action_code VARCHAR(80) NOT NULL,
+    target_role_code VARCHAR(32) NOT NULL,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    is_disableable TINYINT(1) NOT NULL DEFAULT 1,
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_back_office_policies_controller (controller_role_code),
+    INDEX idx_back_office_policies_subject_action (subject_role_code, action_code),
+    INDEX idx_back_office_policies_target (target_role_code),
+    CONSTRAINT back_office_policies_controller_fk FOREIGN KEY (controller_role_code) REFERENCES back_office_roles (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT back_office_policies_subject_fk FOREIGN KEY (subject_role_code) REFERENCES back_office_roles (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS app_users (
     id VARCHAR(64) PRIMARY KEY,
     username VARCHAR(64) NOT NULL,
@@ -131,6 +164,51 @@ export const migrations = [
     CONSTRAINT app_user_roles_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
       ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT app_user_roles_role_fk FOREIGN KEY (role_code) REFERENCES app_roles (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS back_office_role_assignments (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    role_code VARCHAR(32) NOT NULL,
+    assigned_by_user_id VARCHAR(64) NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    scope_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_back_office_role_assignments_user_role (user_id, role_code),
+    INDEX idx_back_office_role_assignments_user_status (user_id, status),
+    INDEX idx_back_office_role_assignments_role_status (role_code, status),
+    INDEX idx_back_office_role_assignments_assigned_by (assigned_by_user_id),
+    CONSTRAINT back_office_assignments_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT back_office_assignments_role_fk FOREIGN KEY (role_code) REFERENCES back_office_roles (code)
+      ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT back_office_assignments_assigned_by_fk FOREIGN KEY (assigned_by_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS account_creation_audit_logs (
+    id VARCHAR(64) PRIMARY KEY,
+    operator_user_id VARCHAR(64) NOT NULL,
+    operator_role_code VARCHAR(32) NOT NULL,
+    target_user_id VARCHAR(64) NULL,
+    target_role_code VARCHAR(32) NOT NULL,
+    application_code VARCHAR(80) NULL,
+    action_code VARCHAR(80) NOT NULL,
+    policy_snapshot_json JSON NOT NULL,
+    decision VARCHAR(24) NOT NULL,
+    reason VARCHAR(255) NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_account_creation_audit_operator (operator_user_id, created_at),
+    INDEX idx_account_creation_audit_target (target_user_id, created_at),
+    INDEX idx_account_creation_audit_decision (decision, created_at),
+    CONSTRAINT account_creation_audit_operator_fk FOREIGN KEY (operator_user_id) REFERENCES app_users (id)
+      ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT account_creation_audit_target_fk FOREIGN KEY (target_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT account_creation_audit_operator_role_fk FOREIGN KEY (operator_role_code) REFERENCES back_office_roles (code)
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 

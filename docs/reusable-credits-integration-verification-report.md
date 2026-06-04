@@ -237,13 +237,16 @@ Use `developer` to review all back-office role views. Use `agent` to verify that
 
 The role switcher inside `/credits-admin` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
 
-First release account creation policy:
+Account creation hierarchy:
 
-- user/customer accounts must be created by platform owner roles: developer or company admin
-- regular users can become agent logins only after developer/admin opens them through the back office
-- agents cannot create client login accounts yet
-- the agent view shows client account creation as a disabled future action
-- later agent-created client accounts should go through an approval/audit flow
+- Developer can create Admins, Agents, and Users.
+- Developer toggle controls whether Admin can create Agents and Users.
+- Developer toggle controls whether Agent can create Users.
+- Admin can create Agents and Users while Developer allows it.
+- Admin toggle controls whether Agent can create Users.
+- Admin toggle controls whether User becomes Agent.
+- Agent can create Users while both Agent gates are enabled.
+- Users without becoming Agent cannot log in through this console.
 
 ## 6. Automated Verification
 

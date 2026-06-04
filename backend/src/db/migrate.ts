@@ -2,6 +2,10 @@ import { pbkdf2Sync, randomBytes } from "node:crypto";
 
 import { pool } from "./mysql";
 import { migrations } from "./migrations";
+import {
+  defaultBackOfficePermissionPolicies,
+  defaultBackOfficeRoles,
+} from "../modules/platform/accountCreationPolicyDefaults";
 
 const columnExists = async (tableName: string, columnName: string) => {
   const [rows] = await pool.query<any[]>(
@@ -92,7 +96,9 @@ const seedAuthData = async () => {
   await pool.query(
     `INSERT INTO app_roles (code, name, description)
      VALUES
-      ('admin', '管理员', '平台管理与企业功能权限'),
+      ('developer', '开发者', 'Reusable Credits Platform 全局开发者权限'),
+      ('admin', '管理员', 'Reusable Credits Platform 运营管理权限'),
+      ('agent', '代理商', '代理商客户、线索、佣金与结算权限'),
       ('enterprise', '企业用户', '企业内容生产功能权限')
      ON DUPLICATE KEY UPDATE
       name = VALUES(name),
@@ -102,12 +108,31 @@ const seedAuthData = async () => {
   await pool.query(
     `INSERT INTO app_role_permissions (role_code, permission_code)
      VALUES
+      ('developer', 'menu:home'),
+      ('developer', 'menu:workspace'),
+      ('developer', 'menu:pricing'),
+      ('developer', 'menu:points'),
+      ('developer', 'menu:recharge'),
+      ('developer', 'menu:admin'),
+      ('developer', 'account:create:admin'),
+      ('developer', 'account:create:agent'),
+      ('developer', 'account:create:user'),
+      ('developer', 'policy:account-creation:manage'),
       ('admin', 'menu:home'),
       ('admin', 'menu:workspace'),
       ('admin', 'menu:pricing'),
       ('admin', 'menu:points'),
       ('admin', 'menu:recharge'),
       ('admin', 'menu:admin'),
+      ('admin', 'account:create:agent'),
+      ('admin', 'account:create:user'),
+      ('admin', 'policy:agent-user-creation:manage'),
+      ('admin', 'policy:user-agent-promotion:manage'),
+      ('agent', 'menu:home'),
+      ('agent', 'menu:points'),
+      ('agent', 'menu:recharge'),
+      ('agent', 'menu:admin'),
+      ('agent', 'account:create:user'),
       ('enterprise', 'menu:home'),
       ('enterprise', 'menu:workspace'),
       ('enterprise', 'menu:pricing'),
@@ -117,7 +142,56 @@ const seedAuthData = async () => {
       permission_code = VALUES(permission_code)`,
   );
 
+  for (const role of defaultBackOfficeRoles) {
+    await pool.query(
+      `INSERT INTO back_office_roles
+        (code, name, description, hierarchy_rank, can_login, can_create_accounts)
+       VALUES
+        (:code, :name, :description, :hierarchyRank, :canLogin, :canCreateAccounts)
+       ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        description = VALUES(description),
+        hierarchy_rank = VALUES(hierarchy_rank),
+        can_login = VALUES(can_login),
+        can_create_accounts = VALUES(can_create_accounts)`,
+      role,
+    );
+  }
+
+  for (const policy of defaultBackOfficePermissionPolicies) {
+    await pool.query(
+      `INSERT INTO back_office_permission_policies
+        (policy_code, name, controller_role_code, subject_role_code, action_code,
+         target_role_code, is_enabled, is_disableable, metadata_json)
+       VALUES
+        (:policyCode, :name, :controllerRoleCode, :subjectRoleCode, :actionCode,
+         :targetRoleCode, :isEnabled, :isDisableable, :metadataJson)
+       ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        controller_role_code = VALUES(controller_role_code),
+        subject_role_code = VALUES(subject_role_code),
+        action_code = VALUES(action_code),
+        target_role_code = VALUES(target_role_code),
+        is_enabled = IF(VALUES(is_disableable) = 0, VALUES(is_enabled), is_enabled),
+        is_disableable = VALUES(is_disableable),
+        metadata_json = VALUES(metadata_json)`,
+      {
+        ...policy,
+        metadataJson: JSON.stringify({ description: policy.description }),
+      },
+    );
+  }
+
   const users = [
+    {
+      id: "user_developer",
+      username: "developer",
+      phone: "13800000000",
+      displayName: "开发者",
+      role: "developer",
+      plan: "flagship",
+      creditsUserId: 6,
+    },
     {
       id: "user_admin",
       username: "admin",
@@ -126,6 +200,15 @@ const seedAuthData = async () => {
       role: "admin",
       plan: "flagship",
       creditsUserId: 1,
+    },
+    {
+      id: "user_agent",
+      username: "agent",
+      phone: "13800000009",
+      displayName: "代理商",
+      role: "agent",
+      plan: "team",
+      creditsUserId: 7,
     },
     {
       id: "user_enterprise",
@@ -187,6 +270,25 @@ const seedAuthData = async () => {
        ON DUPLICATE KEY UPDATE role_code = VALUES(role_code)`,
       { userId: user.id, roleCode: user.role },
     );
+
+    if (user.role === "developer" || user.role === "admin" || user.role === "agent") {
+      await pool.query(
+        `INSERT INTO back_office_role_assignments
+          (id, user_id, role_code, assigned_by_user_id, status, scope_json)
+         VALUES
+          (:id, :userId, :roleCode, NULL, 'active', :scopeJson)
+         ON DUPLICATE KEY UPDATE
+          role_code = VALUES(role_code),
+          status = VALUES(status),
+          scope_json = VALUES(scope_json)`,
+        {
+          id: `boa_${user.id}_${user.role}`,
+          userId: user.id,
+          roleCode: user.role,
+          scopeJson: JSON.stringify({ platform: "reusable-credits" }),
+        },
+      );
+    }
 
     await pool.query(
       `INSERT INTO user_subscriptions (user_id, plan_code, status)

@@ -1,14 +1,18 @@
-# Three-Role Credits Back Office
+# Reusable Credits Platform Console
 
-Status: UI/prototype complete; production workflows pending
-Date: 2026-06-01
+Status: Phase 3 first backend RBAC slice implemented; write workflows pending
+Date: 2026-06-04
 Route: `/credits-admin`
 
 ## Purpose
 
-The shared static prototype `积分后台-三角色静态原型.html` has been ported into the usedCarPlatform Vue frontend as a full three-role credits back office.
+The shared static prototype `积分后台-三角色静态原型.html` has been ported into the usedCarPlatform Vue frontend and is now being moved into the Reusable Credits Platform console.
 
-This page is intended for team review and local integration testing while the production auth/session and agent APIs are still being designed.
+This page is intended for team review and local integration testing while production auth/session, RBAC, account-creation write APIs, and agent APIs are still being designed.
+
+usedCarPlatform is one integrated application in this console. Future applications such as `clothing_ai` should register functions like `model_generate`, `try_on_generate`, and `lifestyle_photo` through the same Reusable Credits Platform.
+
+Executable migration plan: [Reusable Credits Platform Console Executable Plan](../external/reusable-credits-platform/docs/reusable-credits-console-executable-plan.md).
 
 ## Progress Snapshot
 
@@ -24,17 +28,22 @@ Completed in this branch:
 - live read-only credit data through the usedCar backend proxy
 - non-mutating action buttons that show intended workflows
 - documentation for account creation and agent onboarding policy
+- Phase 1 Reusable Credits Platform console language and multi-application catalog foundation
+- hierarchical account-creation policy model for Developer/Admin/Agent
+- Phase 2 backend policy tables, default policy seeding, and backend policy decision service
+- Phase 3 session-backed RBAC middleware and protected console overview endpoint
 
 Not production-complete yet:
 
-- real backend login/session and server-side RBAC
+- server-side RBAC coverage for future back-office write APIs
 - audited regular-user-to-agent promotion API
 - agent onboarding database/API
 - production CRUD for tenants, users, agents, tickets, settlement, materials, and commissions
-- approval workflow and audit logs for role changes and account creation
+- approval workflow implementation for role changes and account creation
 - real write actions from the console
+- API endpoints to update persisted Developer/Admin account-creation toggles from the console
 
-Decision for now: leave the current back-office implementation as-is for the first release. The remaining production workflow work should be planned as a later release after the team agrees on auth, role audit, and agent-management APIs.
+Decision for now: keep the current console writes non-mutating until Phase 3 and Phase 4 connect production session identity, RBAC, account creation, role promotion, and audit writes.
 
 ## Roles
 
@@ -46,9 +55,9 @@ The console has a role switcher with three operational views:
 | Company Admin | 公司管理员后台 | Operations view for agents, customers, recharge orders, transactions, and tickets without direct high-risk ledger writes. |
 | Agent | 代理商后台 | Own customers, leads, consumption, commission, settlement, materials, and support tickets. |
 
-The role switcher is inside the page for prototype/demo purposes. Production should derive role and menu access from real usedCar session data.
+The role switcher is inside the page for prototype/demo purposes. Production should derive role and menu access from real Reusable Credits Platform back-office session data.
 
-Regular product users are not part of the Three-Role Credits Back Office. They can use the front-office product pages only. If a regular user should become an agent, a developer or company admin must open that user as an agent from the back office.
+Regular product users are not back-office operators while their role remains regular. They can use the front-office product pages only. If a regular user becomes an Agent through a back-office role/category change, that same person can then log in to the Reusable Credits Platform console as an Agent.
 
 ## Implemented Pages
 
@@ -87,7 +96,7 @@ Agent:
 
 The page still respects the usedCar backend proxy boundary. The frontend does not call Reusable Credits Platform directly.
 
-Live data currently comes from:
+Live data currently comes from the compatibility usedCar proxy:
 
 ```http
 GET /api/v1/credits/admin/overview
@@ -95,7 +104,7 @@ GET /api/v1/credits/admin/overview
 
 The live sections include:
 
-- usedCar credits application/functions
+- registered credits applications/functions
 - credit accounts
 - recharge products
 - recent credit transactions
@@ -173,15 +182,20 @@ This implementation finishes the three-role back-office UI and reviewable workfl
 
 High-risk financial operations remain intentionally non-mutating from this console. Future backend work should use append-only ledger events, idempotency keys, operator identity, and audit reasons rather than direct balance or transaction edits.
 
-## First Release Account Creation Policy
+## Account Creation Policy
 
-For the first release, all user/customer accounts must be created by platform owner roles:
+The account hierarchy is:
 
-- developer
-- company admin
+- Developer can create Admins, Agents, and Users.
+- Developer toggle controls whether Admin can create Agents and Users.
+- Developer toggle controls whether Agent can create Users.
+- Admin can create Agents and Users while Developer allows it.
+- Admin toggle controls whether Agent can create Users.
+- Admin toggle controls whether User becomes Agent.
+- Agent can create Users while both Developer and Admin allow it.
 
-Agents cannot create client login accounts in the first release. In the three-role console, agent-side customer account creation is shown as a disabled future action so reviewers can see the intended later workflow without assuming it is already available.
+Users without becoming Agent do not have the right to log in through this console.
 
-Developer and company admin users may open a regular product user as an agent login from the back office. This is a platform-owner operation and should be audited. Regular users cannot self-upgrade from the front office.
+Developer and company admin users may open a regular product user as an agent login from the back office. Agent-side User creation must respect the Developer + Admin hierarchy. Regular users cannot self-upgrade from the front office.
 
-Later, agents may be allowed to create client accounts through a controlled approval flow. That future flow should still record creator role, creator id, tenant/customer ownership, agent relation, approval status, and audit history.
+Production account creation should record creator role, creator id, tenant/customer ownership, application ownership, agent relation, policy decision, approval status, and audit history.

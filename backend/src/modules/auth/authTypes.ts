@@ -1,7 +1,9 @@
 import type { RowDataPacket } from "mysql2";
 
-export type UserRole = "admin" | "enterprise";
+export type UserRole = "developer" | "admin" | "agent" | "enterprise";
 export type SubscriptionPlanCode = "basic" | "team" | "flagship";
+export type EnterpriseMemberRole = "owner" | "admin" | "member";
+export type EnterpriseAccountRole = "standalone" | "mother" | "child";
 
 export type AuthenticatedUser = {
   id: string;
@@ -13,6 +15,13 @@ export type AuthenticatedUser = {
   creditsUserId: number | null;
   creditsTenantId: number | null;
   accountScope: "personal" | "tenant";
+  enterpriseTenantId: string | null;
+  enterpriseTenantName: string | null;
+  enterpriseMemberRole: EnterpriseMemberRole | null;
+  enterpriseOwnerUserId: string | null;
+  enterpriseSubscriptionUserId: string | null;
+  enterpriseAccountRole: EnterpriseAccountRole;
+  canViewEnterpriseChildren: boolean;
 };
 
 export type SubscriptionSnapshot = {
@@ -37,6 +46,11 @@ export type AuthUserRow = RowDataPacket & {
   account_scope: "personal" | "tenant";
   role_code: UserRole | null;
   permissions_csv: string | null;
+  enterprise_tenant_id: string | null;
+  enterprise_tenant_name: string | null;
+  enterprise_member_role: EnterpriseMemberRole | null;
+  enterprise_owner_user_id: string | null;
+  enterprise_subscription_user_id: string | null;
 };
 
 export type SessionUserRow = AuthUserRow & {

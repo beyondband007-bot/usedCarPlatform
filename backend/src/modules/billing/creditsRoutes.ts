@@ -4,6 +4,8 @@ import { asyncHandler } from "../../shared/asyncHandler";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
+import { getRequiredCurrentUser, requirePermission } from "../auth/authMiddleware";
+import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import { getCreditsAdminOverview } from "./creditsAdminService";
 import { resolveBillingIdentity } from "./billingIdentity";
 import { creditsClient, type CreditAccountResponse } from "./creditsClient";
@@ -85,8 +87,20 @@ export const creditsRoutes = Router();
 
 creditsRoutes.get(
   "/admin/overview",
+  requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
-    const identity = await resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
+    const current = getRequiredCurrentUser(req);
+    if (!current.user.creditsUserId) {
+      throw errors.invalidParameter("current user is not linked to a credits account", {
+        userId: current.user.id,
+      });
+    }
+
+    const identity = {
+      userId: current.user.creditsUserId,
+      accountScope: current.user.accountScope,
+      tenantId: current.user.accountScope === "tenant" ? current.user.creditsTenantId ?? undefined : undefined,
+    };
     ok(res, await getCreditsAdminOverview(identity));
   }),
 );

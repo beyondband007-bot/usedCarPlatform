@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref, watchEffect } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   NButton,
   NDataTable,
   NEmpty,
   NSpin,
+  NSwitch,
   NTag,
   useMessage,
 } from 'naive-ui'
@@ -18,38 +19,68 @@ import {
   type CreditsTransaction,
   type RechargeProduct,
 } from '@/api/visual-workbench'
+import {
+  accountCreationPolicies,
+  defaultAccountCreationPolicyState,
+  resolveAccountCreationPolicy,
+  reusableCreditsApplicationCatalog,
+  type BackOfficeRole,
+} from '@/policies/accountProvisioning'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
-type RoleTab = 'developer' | 'admin' | 'agent'
+type RoleTab = BackOfficeRole
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const message = useMessage()
 
 const overview = ref<CreditsAdminOverview | null>(null)
 const isLoading = ref(false)
 const lastError = ref<string | null>(null)
 const activeRole = ref<RoleTab>('developer')
+const accountCreationPolicyState = reactive({ ...defaultAccountCreationPolicyState })
 
 const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon: string }> = [
   {
     value: 'developer',
     label: '开发者',
-    description: '查看应用注册、功能计费配置与积分账户',
+    description: '全平台应用、功能、策略与账号权限',
     icon: 'mdi:code-tags',
   },
   {
     value: 'admin',
     label: '公司管理员',
-    description: '关注积分账户、充值产品与近期流水',
+    description: '运营账号、充值、流水、客户与代理',
     icon: 'mdi:shield-account-outline',
   },
   {
     value: 'agent',
     label: '代理商',
-    description: '线索、客户、消费返佣等运营视图（原型）',
+    description: '自有客户、消费、返佣与结算',
     icon: 'mdi:handshake-outline',
   },
 ]
+
+const roleAccess: Record<RoleTab, RoleTab[]> = {
+  developer: ['developer', 'admin', 'agent'],
+  admin: ['admin', 'agent'],
+  agent: ['agent'],
+}
+
+const visibleRoleTabs = computed(() => {
+  const role = authStore.role
+  if (role === 'developer' || role === 'admin' || role === 'agent') {
+    return roleTabs.filter((tab) => roleAccess[role].includes(tab.value))
+  }
+  return []
+})
+
+watchEffect(() => {
+  if (!visibleRoleTabs.value.some((tab) => tab.value === activeRole.value)) {
+    activeRole.value = visibleRoleTabs.value[0]?.value ?? 'agent'
+  }
+})
 
 async function refreshOverview() {
   isLoading.value = true
@@ -57,7 +88,7 @@ async function refreshOverview() {
     overview.value = await getCreditsAdminOverview()
     lastError.value = null
   } catch (error) {
-    const text = error instanceof Error ? error.message : '加载积分后台概览失败'
+    const text = error instanceof Error ? error.message : '加载积分平台控制台概览失败'
     lastError.value = text
     message.error(text)
   } finally {
@@ -70,10 +101,67 @@ onMounted(() => {
 })
 
 const application = computed(() => overview.value?.application ?? null)
+const applications = computed(() => overview.value?.applications ?? [])
 const applicationFunctions = computed(() => overview.value?.applicationFunctions ?? [])
 const creditAccounts = computed(() => overview.value?.creditAccounts ?? [])
 const rechargeProducts = computed(() => overview.value?.rechargeProducts ?? [])
 const recentTransactions = computed(() => overview.value?.recentTransactions ?? [])
+
+const registeredApplicationCodes = computed(
+  () => new Set(applications.value.map((item) => item.code)),
+)
+
+const applicationCatalog = computed(() =>
+  reusableCreditsApplicationCatalog.map((item) => ({
+    ...item,
+    statusText: registeredApplicationCodes.value.has(item.code)
+      ? '已注册'
+      : item.status === 'planned'
+        ? '规划中'
+        : item.status,
+  })),
+)
+
+const effectiveAccountCreationPolicy = computed(() =>
+  resolveAccountCreationPolicy(accountCreationPolicyState),
+)
+
+const accountCreationPolicyRows = computed(() =>
+  accountCreationPolicies.map((policy) => {
+    const enabled =
+      policy.role === 'developer'
+        ? effectiveAccountCreationPolicy.value.developerCanCreateAdmins &&
+          effectiveAccountCreationPolicy.value.developerCanCreateAgents &&
+          effectiveAccountCreationPolicy.value.developerCanCreateUsers
+        : policy.role === 'admin'
+          ? effectiveAccountCreationPolicy.value.adminCanCreateAgents &&
+            effectiveAccountCreationPolicy.value.adminCanCreateUsers
+          : effectiveAccountCreationPolicy.value.agentCanCreateUsers
+
+    return {
+      ...policy,
+      enabled,
+      controllerText: policy.controlledBy.length
+        ? policy.controlledBy.map((role) => roleTabs.find((tab) => tab.value === role)?.label ?? role).join(' + ')
+        : '始终开启',
+    }
+  }),
+)
+
+const agentCreationGateText = computed(() => {
+  if (!accountCreationPolicyState.developerAllowsAgentCreateUsers) {
+    return '开发者已关闭代理商创建 User'
+  }
+  if (!accountCreationPolicyState.adminAllowsAgentCreateUsers) {
+    return '公司管理员已关闭代理商创建 User'
+  }
+  return '代理商创建 User 已开启'
+})
+
+function policyTagType(enabled: boolean, controlled: boolean) {
+  if (!enabled) return 'error'
+  return controlled ? 'warning' : 'success'
+}
 
 const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]> = [
   { title: '功能编码', key: 'code', width: 220 },
@@ -252,12 +340,13 @@ const transactionColumns: DataTableColumns<CreditsTransaction> = [
 ]
 
 const developerPlaceholder = [
-  { label: 'CRUD 审批流程', status: '规划中' },
+  { label: '跨应用 CRUD 审批流程', status: '规划中' },
   { label: '应用密钥管理', status: '规划中' },
-  { label: '功能上下架', status: '规划中' },
+  { label: '功能上下架与计费策略', status: '规划中' },
 ]
 
 const agentSections = [
+  { title: 'User 创建', desc: '代理商可以创建自有 User；是否开放由开发者与公司管理员共同控制' },
   { title: '线索/商机报备', desc: '展示代理商录入的线索，后续接入 CRM 流程' },
   { title: '客户与消费', desc: '客户消费与剩余积分明细，等待生产 API' },
   { title: '返佣记录', desc: '按月度展示佣金计算，依赖结算 API' },
@@ -272,10 +361,10 @@ const agentSections = [
     <section class="admin-shell">
       <header class="admin-hero">
         <div class="admin-hero-copy">
-          <p class="admin-hero-kicker">积分后台 · Reusable Credits Platform 集成视图</p>
-          <h1>三角色后台</h1>
+          <p class="admin-hero-kicker">Reusable Credits Platform Console</p>
+          <h1>三角色积分平台控制台</h1>
           <p class="admin-hero-sub">
-            实时数据由 usedCar 后端代理 <code>/api/v1/credits/admin/overview</code> 拉取；写操作仍处于原型阶段，待生产 API。
+            当前路由保留 <code>/credits-admin</code> 作为兼容入口；控制台面向所有接入应用，usedCarPlatform 只是其中一个应用。
           </p>
         </div>
         <div class="admin-hero-actions">
@@ -290,7 +379,7 @@ const agentSections = [
 
       <nav class="admin-tabs" aria-label="角色切换">
         <button
-          v-for="tab in roleTabs"
+          v-for="tab in visibleRoleTabs"
           :key="tab.value"
           type="button"
           class="admin-tab"
@@ -306,21 +395,21 @@ const agentSections = [
       <NSpin :show="isLoading">
         <p v-if="lastError" class="admin-error">{{ lastError }}</p>
 
-        <section v-if="application" class="admin-summary" aria-label="应用概览">
+        <section class="admin-summary" aria-label="平台概览">
           <article class="admin-summary-card">
-            <p>应用</p>
-            <strong>{{ application.name }}</strong>
-            <span>code: {{ application.code }} · status: {{ application.status }}</span>
+            <p>当前应用</p>
+            <strong>{{ application?.name ?? 'Reusable Credits' }}</strong>
+            <span>{{ application ? `code: ${application.code}` : '跨应用平台视图' }}</span>
+          </article>
+          <article class="admin-summary-card">
+            <p>已注册应用</p>
+            <strong>{{ applications.length }}</strong>
+            <span>个应用</span>
           </article>
           <article class="admin-summary-card">
             <p>积分账户</p>
             <strong>{{ creditAccounts.length }}</strong>
-            <span>个账户</span>
-          </article>
-          <article class="admin-summary-card">
-            <p>充值产品</p>
-            <strong>{{ rechargeProducts.length }}</strong>
-            <span>个产品</span>
+            <span>当前身份可见账户</span>
           </article>
           <article class="admin-summary-card">
             <p>近期流水</p>
@@ -329,9 +418,33 @@ const agentSections = [
           </article>
         </section>
 
+        <section class="admin-section">
+          <h2>应用接入目录</h2>
+          <div class="admin-app-grid">
+            <article
+              v-for="item in applicationCatalog"
+              :key="item.code"
+              class="admin-app-card"
+            >
+              <div>
+                <h3>{{ item.name }}</h3>
+                <p>{{ item.code }}</p>
+              </div>
+              <NTag
+                round
+                :bordered="false"
+                :type="item.statusText === '已注册' ? 'success' : 'info'"
+              >
+                {{ item.statusText }}
+              </NTag>
+              <span>{{ item.functions.join(' / ') }}</span>
+            </article>
+          </div>
+        </section>
+
         <template v-if="activeRole === 'developer'">
           <section class="admin-section">
-            <h2>应用功能计费配置</h2>
+            <h2>跨应用功能计费配置</h2>
             <NDataTable
               v-if="applicationFunctions.length"
               :columns="functionColumns"
@@ -341,6 +454,56 @@ const agentSections = [
               :pagination="false"
             />
             <NEmpty v-else description="暂无功能计费配置" />
+          </section>
+
+          <section class="admin-section">
+            <h2>账号创建权限层级</h2>
+            <p class="admin-section-note">
+              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent/User，也控制代理商创建 User 的顶层权限。
+            </p>
+            <div class="admin-toggle-grid">
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>开发者创建 Admin / Agent / User</h3>
+                  <p>最高层级权限，始终开启。</p>
+                </div>
+                <NSwitch :value="true" disabled />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许公司管理员创建 Agent / User</h3>
+                  <p>关闭后，公司管理员不能创建 Agent 或 User，也不能让 User 成为 Agent。</p>
+                </div>
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers" />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许代理商创建 User</h3>
+                  <p>开发者顶层开关；代理商仍需公司管理员开关同时开启。</p>
+                </div>
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAgentCreateUsers" />
+              </article>
+            </div>
+            <div class="admin-policy-grid">
+              <article
+                v-for="policy in accountCreationPolicyRows"
+                :key="policy.role"
+                class="admin-policy-card"
+              >
+                <div>
+                  <h3>{{ policy.label }}</h3>
+                  <p>{{ policy.scope }}</p>
+                  <p>{{ policy.capabilities.join(' / ') }}</p>
+                </div>
+                <NTag
+                  round
+                  :bordered="false"
+                  :type="policyTagType(policy.enabled, policy.controlledBy.length > 0)"
+                >
+                  {{ policy.enabled ? '可执行' : '已关闭' }} · {{ policy.controllerText }}
+                </NTag>
+              </article>
+            </div>
           </section>
 
           <section class="admin-section">
@@ -355,6 +518,42 @@ const agentSections = [
         </template>
 
         <template v-else-if="activeRole === 'admin'">
+          <section class="admin-section">
+            <h2>账号创建权限</h2>
+            <p class="admin-section-note">
+              公司管理员可创建 Agent 和 User；该权限由开发者开启或关闭。公司管理员还可以控制代理商创建 User，以及 User 是否能成为 Agent。
+            </p>
+            <div class="admin-toggle-grid">
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>公司管理员创建 Agent / User</h3>
+                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
+                </div>
+                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许代理商创建 User</h3>
+                  <p>公司管理员开关；若开发者关闭代理商权限，此开关不会生效。</p>
+                </div>
+                <NSwitch
+                  v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
+                  :disabled="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
+                />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许 User 成为 Agent</h3>
+                  <p>公司管理员开关；若开发者关闭公司管理员创建 Agent/User，此开关不会生效。</p>
+                </div>
+                <NSwitch
+                  v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
+                  :disabled="!accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers"
+                />
+              </article>
+            </div>
+          </section>
+
           <section class="admin-section">
             <h2>积分账户</h2>
             <NDataTable
@@ -397,9 +596,9 @@ const agentSections = [
 
         <template v-else>
           <section class="admin-section">
-            <h2>代理商运营视图（原型）</h2>
+            <h2>代理商运营视图</h2>
             <p class="admin-section-note">
-              下列模块当前仅展示静态原型，等待生产 API 接入后再点亮。详见文档第 3 节"尚未完成内容"。
+              代理商可创建 User；有效权限需要开发者与公司管理员两个开关同时开启。当前状态：{{ agentCreationGateText }}。写入 API 将在后续阶段接入。
             </p>
             <div class="admin-agent-grid">
               <article v-for="item in agentSections" :key="item.title" class="admin-agent-card">
@@ -555,6 +754,74 @@ const agentSections = [
   color: var(--app-text-soft);
   font-size: 12px;
   font-weight: 600;
+}
+
+.admin-app-grid,
+.admin-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.admin-app-card,
+.admin-policy-card {
+  display: grid;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface-soft);
+}
+
+.admin-app-card h3,
+.admin-policy-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.admin-app-card p,
+.admin-policy-card p,
+.admin-app-card span {
+  margin: 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.admin-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 92px;
+  padding: 16px 18px;
+  border: 1px dashed var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface-soft);
+}
+
+.admin-toggle-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.admin-toggle-card p {
+  margin: 6px 0 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
 }
 
 .admin-section {

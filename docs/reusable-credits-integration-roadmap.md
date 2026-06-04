@@ -41,7 +41,7 @@ Both services now use MySQL, but they should remain separate service databases f
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 | Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
 | Three-role back office | UI/prototype done; production workflows later | Current branch | Expands `/credits-admin` into the developer, company-admin, and agent back-office surface from the shared prototype. Real write APIs, audited role changes, and operational CRUD remain future work. |
-| First-release account creation policy | Done | `5aa2c73` | Restricts user/customer account creation to platform owner roles and marks agent-created client accounts as a future workflow. |
+| Account creation hierarchy | Updated | Current branch | Developer can create Admin/Agent/User, Admin can create Agent/User, Agent can create User, with Developer and Admin toggles controlling downstream creation and User-to-Agent promotion. |
 
 Detailed phase notes:
 
@@ -60,7 +60,7 @@ Detailed phase notes:
 - [Three-role credits back office](./reusable-credits-three-role-back-office.md)
 - [Enterprise plan business logic](./enterprise-plan-business-logic.md)
 - [Frontend balance and transaction API](./frontend-balance-transaction-api.md)
-- [First release account creation policy](./first-release-account-creation-policy.md)
+- [Account creation policy](./first-release-account-creation-policy.md)
 - [Auth login demo accounts](./auth-login-demo-accounts.md)
 
 ## Important Implementation Notes
@@ -87,7 +87,7 @@ During development, usedCarPlatform resolves credits identity in this order:
 
 The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
 
-For the first release, every user/customer account must be created by platform owner roles: developer or company admin. Agent-created client accounts are intentionally disabled in the back-office UI and documented as a future approval/audit workflow.
+Account creation now follows the Reusable Credits Platform console hierarchy: Developer can create Admins, Agents, and Users; Developer controls whether Admin can create Agents/Users and whether Agent can create Users; Admin can create Agents/Users while enabled; Admin controls whether Agent can create Users and whether a User can become Agent; Agent can create Users while both Agent gates are enabled.
 
 The current frontend mock login keeps exactly three Three-Role Credits Back Office roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as the regular product-user login from the existing frontend, but it is not a back-office role and cannot access `/credits-admin`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
