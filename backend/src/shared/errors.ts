@@ -16,6 +16,8 @@ export const errors = {
     new AppError(401, 40100, message, details),
   forbidden: (message = "forbidden", details?: unknown) =>
     new AppError(403, 40300, message, details),
+  conflict: (message = "conflict", details?: unknown) =>
+    new AppError(409, 40900, message, details),
   invalidParameter: (message = "invalid parameter", details?: unknown) =>
     new AppError(400, 40003, message, details),
   fileTypeUnsupported: (details?: unknown) =>

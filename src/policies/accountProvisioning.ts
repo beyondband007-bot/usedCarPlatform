@@ -7,6 +7,7 @@ export interface AccountCreationPolicy {
   label: string
   capabilities: string[]
   controlledBy: BackOfficeRole[]
+  controllerText?: string
   scope: string
 }
 
@@ -55,23 +56,38 @@ export const accountCreationPolicies: AccountCreationPolicy[] = [
   {
     role: 'developer',
     label: '开发者',
-    capabilities: ['创建 Admin', '创建 Agent', '创建 User'],
+    capabilities: [
+      '创建 Admin / Agent / User',
+      '读取全部流水与余额',
+      '增减积分',
+      '删除 Admin / Agent / User',
+    ],
     controlledBy: [],
     scope: '全平台、全应用、全客户',
   },
   {
     role: 'admin',
     label: '公司管理员',
-    capabilities: ['创建 Agent', '创建 User', '控制 User 成为 Agent'],
+    capabilities: [
+      '创建 Agent / User',
+      '读取全部流水与余额',
+      '增减积分',
+      '删除 Agent / User',
+      '控制 User 成为 Agent',
+    ],
     controlledBy: ['developer'],
     scope: '平台运营范围内的客户与代理商',
   },
   {
     role: 'agent',
     label: '代理商',
-    capabilities: ['创建 User'],
+    capabilities: [
+      '创建 User',
+      '读取本人创建 User 的流水与余额',
+    ],
     controlledBy: ['developer', 'admin'],
-    scope: '本人名下客户与线索转化账号',
+    controllerText: '公司管理员控制；开发者可禁用',
+    scope: '本人名下客户与线索转化账号；公司管理员控制，开发者可禁用',
   },
 ]
 

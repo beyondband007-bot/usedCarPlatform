@@ -41,7 +41,7 @@ Both services now use MySQL, but they should remain separate service databases f
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 | Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
 | Three-role back office | UI/prototype done; production workflows later | Current branch | Expands `/credits-admin` into the developer, company-admin, and agent back-office surface from the shared prototype. Real write APIs, audited role changes, and operational CRUD remain future work. |
-| Account creation hierarchy | Updated | Current branch | Developer can create Admin/Agent/User, Admin can create Agent/User, Agent can create User, with Developer and Admin toggles controlling downstream creation and User-to-Agent promotion. |
+| Account creation hierarchy | Updated | Current branch | Developer can create Admin/Agent/User, Admin can create Agent/User, Agent can create User when Admin allows it unless Developer disables it, with Developer/Admin toggles controlling downstream creation and User-to-Agent promotion. |
 
 Detailed phase notes:
 
@@ -87,7 +87,9 @@ During development, usedCarPlatform resolves credits identity in this order:
 
 The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
 
-Account creation now follows the Reusable Credits Platform console hierarchy: Developer can create Admins, Agents, and Users; Developer controls whether Admin can create Agents/Users and whether Agent can create Users; Admin can create Agents/Users while enabled; Admin controls whether Agent can create Users and whether a User can become Agent; Agent can create Users while both Agent gates are enabled.
+Account creation now follows the Reusable Credits Platform console hierarchy: Developer can create Admins, Agents, and Users; Developer controls whether Admin can create Agents/Users and can disable Agent-created Users; Admin can create Agents/Users while enabled; Admin controls whether Agent can create Users and whether a User can become Agent; Agent can create Users when Admin allows it unless Developer disables it.
+
+Role capabilities are explicit: Developer can create/delete Admins, Agents, and Users, read all balances/transactions, and add/minus points; Admin can create/delete Agents and Users, read all balances/transactions, and add/minus points; Agent can create Users and read only the balances/transactions of Users it creates.
 
 The current frontend mock login keeps exactly three Three-Role Credits Back Office roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as the regular product-user login from the existing frontend, but it is not a back-office role and cannot access `/credits-admin`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
@@ -161,7 +163,7 @@ Expected deliverable:
 
 - admin console is connected to live APIs
 - team members can inspect credit and billing state while testing usedCar flows
-- team members can review the full three-role back-office scope before backend CRUD/workflow implementation
+- team members can review the full three-role back-office scope before audited CRUD/workflow endpoints are fully implemented
 
 ### Phase 10: Identity And Mock Login
 

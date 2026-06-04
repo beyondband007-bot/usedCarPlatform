@@ -4,6 +4,7 @@ import { pool } from "./mysql";
 import { migrations } from "./migrations";
 import {
   defaultBackOfficePermissionPolicies,
+  defaultBackOfficeRolePermissions,
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
 
@@ -105,42 +106,16 @@ const seedAuthData = async () => {
       description = VALUES(description)`,
   );
 
-  await pool.query(
-    `INSERT INTO app_role_permissions (role_code, permission_code)
-     VALUES
-      ('developer', 'menu:home'),
-      ('developer', 'menu:workspace'),
-      ('developer', 'menu:pricing'),
-      ('developer', 'menu:points'),
-      ('developer', 'menu:recharge'),
-      ('developer', 'menu:admin'),
-      ('developer', 'account:create:admin'),
-      ('developer', 'account:create:agent'),
-      ('developer', 'account:create:user'),
-      ('developer', 'policy:account-creation:manage'),
-      ('admin', 'menu:home'),
-      ('admin', 'menu:workspace'),
-      ('admin', 'menu:pricing'),
-      ('admin', 'menu:points'),
-      ('admin', 'menu:recharge'),
-      ('admin', 'menu:admin'),
-      ('admin', 'account:create:agent'),
-      ('admin', 'account:create:user'),
-      ('admin', 'policy:agent-user-creation:manage'),
-      ('admin', 'policy:user-agent-promotion:manage'),
-      ('agent', 'menu:home'),
-      ('agent', 'menu:points'),
-      ('agent', 'menu:recharge'),
-      ('agent', 'menu:admin'),
-      ('agent', 'account:create:user'),
-      ('enterprise', 'menu:home'),
-      ('enterprise', 'menu:workspace'),
-      ('enterprise', 'menu:pricing'),
-      ('enterprise', 'menu:points'),
-      ('enterprise', 'menu:recharge')
-     ON DUPLICATE KEY UPDATE
-      permission_code = VALUES(permission_code)`,
-  );
+  for (const [roleCode, permissions] of Object.entries(defaultBackOfficeRolePermissions)) {
+    for (const permissionCode of permissions) {
+      await pool.query(
+        `INSERT INTO app_role_permissions (role_code, permission_code)
+         VALUES (:roleCode, :permissionCode)
+         ON DUPLICATE KEY UPDATE permission_code = VALUES(permission_code)`,
+        { roleCode, permissionCode },
+      );
+    }
+  }
 
   for (const role of defaultBackOfficeRoles) {
     await pool.query(
@@ -398,6 +373,173 @@ const seedFlagshipEnterpriseTenant = async () => {
   }
 };
 
+const seedAgentOperationsData = async () => {
+  await pool.query(
+    `INSERT INTO application_customer_links
+      (id, application_code, user_id, credits_user_id, account_scope,
+       credits_tenant_id, created_by_user_id, created_by_role_code, status, metadata_json)
+     VALUES
+      ('acl_seed_agent_enterprise', 'used-car-platform', 'user_enterprise', 2, 'personal',
+       NULL, 'user_agent', 'agent', 'active', :metadataJson)
+     ON DUPLICATE KEY UPDATE
+      credits_user_id = VALUES(credits_user_id),
+      account_scope = VALUES(account_scope),
+      created_by_user_id = VALUES(created_by_user_id),
+      created_by_role_code = VALUES(created_by_role_code),
+      status = VALUES(status),
+      metadata_json = VALUES(metadata_json)`,
+    {
+      metadataJson: JSON.stringify({
+        seededFor: "phase-6-agent-operations",
+        applicationName: "usedCarPlatform",
+      }),
+    },
+  );
+
+  await pool.query(
+    `INSERT INTO agent_customer_relations
+      (id, agent_user_id, customer_user_id, customer_credits_user_id,
+       application_code, relation_type, status, metadata_json)
+     VALUES
+      ('acr_seed_agent_enterprise', 'user_agent', 'user_enterprise', 2,
+       'used-car-platform', 'direct', 'active', :metadataJson)
+     ON DUPLICATE KEY UPDATE
+      customer_credits_user_id = VALUES(customer_credits_user_id),
+      relation_type = VALUES(relation_type),
+      status = VALUES(status),
+      metadata_json = VALUES(metadata_json)`,
+    {
+      metadataJson: JSON.stringify({
+        source: "demo-seed",
+        approvalMode: "auto",
+      }),
+    },
+  );
+
+  const leads = [
+    {
+      id: "lead_agent_001",
+      applicationCode: "used-car-platform",
+      customerName: "华东二手车展厅",
+      phone: "13900001111",
+      source: "agent_referral",
+      stage: "demo_scheduled",
+      expectedPoints: 120000,
+      note: "已约视觉工作台批量上新演示",
+    },
+    {
+      id: "lead_agent_002",
+      applicationCode: "clothing_ai",
+      customerName: "新锐服装工作室",
+      phone: "13900002222",
+      source: "offline_event",
+      stage: "new",
+      expectedPoints: 80000,
+      note: "关注 model_generate 与 try_on_generate",
+    },
+  ];
+
+  for (const lead of leads) {
+    await pool.query(
+      `INSERT INTO agent_leads
+        (id, agent_user_id, application_code, customer_name, phone, source,
+         stage, expected_points, note, status)
+       VALUES
+        (:id, 'user_agent', :applicationCode, :customerName, :phone, :source,
+         :stage, :expectedPoints, :note, 'active')
+       ON DUPLICATE KEY UPDATE
+        application_code = VALUES(application_code),
+        customer_name = VALUES(customer_name),
+        phone = VALUES(phone),
+        source = VALUES(source),
+        stage = VALUES(stage),
+        expected_points = VALUES(expected_points),
+        note = VALUES(note),
+        status = VALUES(status)`,
+      lead,
+    );
+  }
+
+  await pool.query(
+    `INSERT INTO agent_settlement_bills
+      (id, agent_user_id, period, total_commission_points, status)
+     VALUES
+      ('asb_agent_2026_06', 'user_agent', '2026-06', 2160.0000, 'draft')
+     ON DUPLICATE KEY UPDATE
+      total_commission_points = VALUES(total_commission_points),
+      status = VALUES(status)`,
+  );
+
+  await pool.query(
+    `INSERT INTO agent_commission_previews
+      (id, agent_user_id, customer_user_id, application_code, period,
+       consumed_points, commission_rate, commission_points, status, settlement_id)
+     VALUES
+      ('acp_agent_enterprise_2026_06', 'user_agent', 'user_enterprise',
+       'used-car-platform', '2026-06', 18000.0000, 0.1200, 2160.0000,
+       'preview', 'asb_agent_2026_06')
+     ON DUPLICATE KEY UPDATE
+      customer_user_id = VALUES(customer_user_id),
+      application_code = VALUES(application_code),
+      period = VALUES(period),
+      consumed_points = VALUES(consumed_points),
+      commission_rate = VALUES(commission_rate),
+      commission_points = VALUES(commission_points),
+      status = VALUES(status),
+      settlement_id = VALUES(settlement_id)`,
+  );
+
+  const materials = [
+    {
+      id: "mat_agent_used_car_quickstart",
+      title: "usedCarPlatform 快速演示话术",
+      category: "training",
+      applicationCode: "used-car-platform",
+      url: "/docs/reusable-credits-three-role-back-office.md",
+      sortOrder: 10,
+    },
+    {
+      id: "mat_agent_clothing_ai_waitlist",
+      title: "clothing_ai 预约客户说明",
+      category: "sales",
+      applicationCode: "clothing_ai",
+      url: "/docs/first-release-account-creation-policy.md",
+      sortOrder: 20,
+    },
+  ];
+
+  for (const material of materials) {
+    await pool.query(
+      `INSERT INTO agent_materials
+        (id, title, category, application_code, url, status, sort_order)
+       VALUES
+        (:id, :title, :category, :applicationCode, :url, 'active', :sortOrder)
+       ON DUPLICATE KEY UPDATE
+        title = VALUES(title),
+        category = VALUES(category),
+        application_code = VALUES(application_code),
+        url = VALUES(url),
+        status = VALUES(status),
+        sort_order = VALUES(sort_order)`,
+      material,
+    );
+  }
+
+  await pool.query(
+    `INSERT INTO agent_support_tickets
+      (id, agent_user_id, subject, category, priority, status, last_message)
+     VALUES
+      ('ast_agent_001', 'user_agent', '客户充值后积分到账确认', 'billing',
+       'normal', 'open', '需要核对客户充值订单与积分流水。')
+     ON DUPLICATE KEY UPDATE
+      subject = VALUES(subject),
+      category = VALUES(category),
+      priority = VALUES(priority),
+      status = VALUES(status),
+      last_message = VALUES(last_message)`,
+  );
+};
+
 const run = async () => {
   const connection = await pool.getConnection();
   try {
@@ -449,10 +591,18 @@ const run = async () => {
       "idx_batch_tasks_subscription_running",
       "(subscription_user_key, status, created_at)",
     );
+    await addColumnIfMissing("account_creation_audit_logs", "idempotency_key", "VARCHAR(160) NULL");
+    await addColumnIfMissing("account_creation_audit_logs", "request_hash", "CHAR(64) NULL");
+    await addIndexIfMissing(
+      "account_creation_audit_logs",
+      "idx_account_creation_audit_idempotency",
+      "(operator_user_id, idempotency_key)",
+    );
     await seedSubscriptionPlans();
     await seedAuthData();
     await migrateMockSubscriptions();
     await seedFlagshipEnterpriseTenant();
+    await seedAgentOperationsData();
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();

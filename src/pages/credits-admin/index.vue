@@ -13,9 +13,18 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 
 import {
+  getAgentOperationsOverview,
   getCreditsAdminOverview,
+  type AgentOperationsCommissionPreview,
+  type AgentOperationsCustomer,
+  type AgentOperationsLead,
+  type AgentOperationsMaterial,
+  type AgentOperationsOverview,
+  type AgentOperationsSettlementBill,
+  type AgentOperationsTicket,
   type CreditsAccount,
   type CreditsAdminOverview,
+  type CreditsCustomerProfile,
   type CreditsTransaction,
   type RechargeProduct,
 } from '@/api/visual-workbench'
@@ -36,28 +45,30 @@ const authStore = useAuthStore()
 const message = useMessage()
 
 const overview = ref<CreditsAdminOverview | null>(null)
+const agentOverview = ref<AgentOperationsOverview | null>(null)
 const isLoading = ref(false)
 const lastError = ref<string | null>(null)
 const activeRole = ref<RoleTab>('developer')
+const selectedApplicationCode = ref('all')
 const accountCreationPolicyState = reactive({ ...defaultAccountCreationPolicyState })
 
 const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon: string }> = [
   {
     value: 'developer',
     label: '开发者',
-    description: '全平台应用、功能、策略与账号权限',
+    description: '全局 CRUD、全部流水余额、积分增减',
     icon: 'mdi:code-tags',
   },
   {
     value: 'admin',
     label: '公司管理员',
-    description: '运营账号、充值、流水、客户与代理',
+    description: 'Agent/User CRUD、全部流水余额、积分增减',
     icon: 'mdi:shield-account-outline',
   },
   {
     value: 'agent',
     label: '代理商',
-    description: '自有客户、消费、返佣与结算',
+    description: '创建 User，读取自建 User 流水余额',
     icon: 'mdi:handshake-outline',
   },
 ]
@@ -85,7 +96,12 @@ watchEffect(() => {
 async function refreshOverview() {
   isLoading.value = true
   try {
-    overview.value = await getCreditsAdminOverview()
+    const [creditsOverview, operationsOverview] = await Promise.all([
+      getCreditsAdminOverview(),
+      getAgentOperationsOverview().catch(() => null),
+    ])
+    overview.value = creditsOverview
+    agentOverview.value = operationsOverview
     lastError.value = null
   } catch (error) {
     const text = error instanceof Error ? error.message : '加载积分平台控制台概览失败'
@@ -100,26 +116,81 @@ onMounted(() => {
   void refreshOverview()
 })
 
-const application = computed(() => overview.value?.application ?? null)
 const applications = computed(() => overview.value?.applications ?? [])
 const applicationFunctions = computed(() => overview.value?.applicationFunctions ?? [])
 const creditAccounts = computed(() => overview.value?.creditAccounts ?? [])
 const rechargeProducts = computed(() => overview.value?.rechargeProducts ?? [])
 const recentTransactions = computed(() => overview.value?.recentTransactions ?? [])
+const customerProfiles = computed(() => overview.value?.customerProfiles ?? [])
+const agentCustomers = computed(() => agentOverview.value?.customers ?? [])
+const agentLeads = computed(() => agentOverview.value?.leads ?? [])
+const agentCommissions = computed(() => agentOverview.value?.commissionPreviews ?? [])
+const agentSettlements = computed(() => agentOverview.value?.settlementBills ?? [])
+const agentMaterials = computed(() => agentOverview.value?.materials ?? [])
+const agentTickets = computed(() => agentOverview.value?.tickets ?? [])
 
-const registeredApplicationCodes = computed(
-  () => new Set(applications.value.map((item) => item.code)),
+const registeredApplicationsByCode = computed(
+  () => new Map(applications.value.map((item) => [item.code, item])),
 )
 
 const applicationCatalog = computed(() =>
-  reusableCreditsApplicationCatalog.map((item) => ({
-    ...item,
-    statusText: registeredApplicationCodes.value.has(item.code)
-      ? '已注册'
-      : item.status === 'planned'
-        ? '规划中'
-        : item.status,
+  reusableCreditsApplicationCatalog.map((item) => {
+    const registered = registeredApplicationsByCode.value.get(item.code)
+    return {
+      ...item,
+      statusText: registered && registered.status !== 'planned'
+        ? '已注册'
+        : item.status === 'planned' || registered?.status === 'planned'
+          ? '规划中'
+          : item.status,
+    }
+  }),
+)
+
+const applicationFilterOptions = computed(() => [
+  { code: 'all', name: '全部应用', statusText: '平台视图' },
+  ...applicationCatalog.value.map((item) => ({
+    code: item.code,
+    name: item.name,
+    statusText: item.statusText,
   })),
+])
+
+const selectedApplicationLabel = computed(() =>
+  applicationFilterOptions.value.find((item) => item.code === selectedApplicationCode.value)?.name ??
+  '全部应用',
+)
+
+function matchesSelectedApplication(applicationCode?: string | null) {
+  return selectedApplicationCode.value === 'all' || applicationCode === selectedApplicationCode.value
+}
+
+const filteredApplicationFunctions = computed(() =>
+  applicationFunctions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredRecentTransactions = computed(() =>
+  recentTransactions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredCustomerProfiles = computed(() =>
+  customerProfiles.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredAgentCustomers = computed(() =>
+  agentCustomers.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredAgentLeads = computed(() =>
+  agentLeads.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredAgentCommissions = computed(() =>
+  agentCommissions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredAgentMaterials = computed(() =>
+  agentMaterials.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
 )
 
 const effectiveAccountCreationPolicy = computed(() =>
@@ -141,7 +212,9 @@ const accountCreationPolicyRows = computed(() =>
     return {
       ...policy,
       enabled,
-      controllerText: policy.controlledBy.length
+      controllerText: policy.controllerText
+        ? policy.controllerText
+        : policy.controlledBy.length
         ? policy.controlledBy.map((role) => roleTabs.find((tab) => tab.value === role)?.label ?? role).join(' + ')
         : '始终开启',
     }
@@ -150,12 +223,12 @@ const accountCreationPolicyRows = computed(() =>
 
 const agentCreationGateText = computed(() => {
   if (!accountCreationPolicyState.developerAllowsAgentCreateUsers) {
-    return '开发者已关闭代理商创建 User'
+    return '开发者已禁用代理商创建 User'
   }
   if (!accountCreationPolicyState.adminAllowsAgentCreateUsers) {
-    return '公司管理员已关闭代理商创建 User'
+    return '公司管理员未允许代理商创建 User'
   }
-  return '代理商创建 User 已开启'
+  return '公司管理员已允许，开发者未禁用'
 })
 
 function policyTagType(enabled: boolean, controlled: boolean) {
@@ -164,8 +237,17 @@ function policyTagType(enabled: boolean, controlled: boolean) {
 }
 
 const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]> = [
+  {
+    title: '应用',
+    key: 'applicationCode',
+    width: 160,
+    render(row) {
+      return row.applicationName ?? row.applicationCode ?? '-'
+    },
+  },
   { title: '功能编码', key: 'code', width: 220 },
   { title: '功能名称', key: 'name', width: 200 },
+  { title: '计费模式', key: 'chargeMode', width: 140, render(row) { return row.chargeMode ?? '-' } },
   {
     title: '默认积分',
     key: 'defaultPoints',
@@ -284,6 +366,22 @@ const transactionColumns: DataTableColumns<CreditsTransaction> = [
     },
   },
   {
+    title: '应用',
+    key: 'applicationCode',
+    width: 150,
+    render(row) {
+      return row.applicationName ?? row.applicationCode ?? '-'
+    },
+  },
+  {
+    title: '功能',
+    key: 'functionCode',
+    width: 170,
+    render(row) {
+      return row.functionName ?? row.functionCode ?? '-'
+    },
+  },
+  {
     title: '类型',
     key: 'txnType',
     width: 120,
@@ -339,20 +437,160 @@ const transactionColumns: DataTableColumns<CreditsTransaction> = [
   },
 ]
 
+const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
+  {
+    title: '应用',
+    key: 'applicationCode',
+    width: 150,
+  },
+  {
+    title: '客户',
+    key: 'displayName',
+    minWidth: 180,
+    render(row) {
+      return `${row.displayName} (${row.username})`
+    },
+  },
+  { title: '角色', key: 'role', width: 110 },
+  { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  { title: 'Credits User', key: 'creditsUserId', width: 130 },
+  { title: '创建角色', key: 'createdByRole', width: 120 },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: row.status === 'active' ? 'success' : 'default',
+        },
+        { default: () => row.status },
+      )
+    },
+  },
+]
+
+const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
+  { title: '应用', key: 'applicationCode', width: 150 },
+  {
+    title: '客户',
+    key: 'customerDisplayName',
+    minWidth: 190,
+    render(row) {
+      return `${row.customerDisplayName} (${row.customerUsername})`
+    },
+  },
+  { title: '手机号', key: 'customerPhone', width: 140, render(row) { return row.customerPhone ?? '-' } },
+  { title: 'Credits User', key: 'customerCreditsUserId', width: 130 },
+  { title: '关系', key: 'relationType', width: 100 },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: row.status === 'active' ? 'success' : 'default',
+        },
+        { default: () => row.status },
+      )
+    },
+  },
+]
+
+const agentLeadColumns: DataTableColumns<AgentOperationsLead> = [
+  { title: '应用', key: 'applicationCode', width: 150 },
+  { title: '线索客户', key: 'customerName', minWidth: 180 },
+  { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  { title: '来源', key: 'source', width: 130, render(row) { return row.source ?? '-' } },
+  { title: '阶段', key: 'stage', width: 140 },
+  {
+    title: '预计积分',
+    key: 'expectedPoints',
+    width: 130,
+    render(row) {
+      return Number(row.expectedPoints ?? 0).toLocaleString('zh-CN')
+    },
+  },
+]
+
+const agentCommissionColumns: DataTableColumns<AgentOperationsCommissionPreview> = [
+  { title: '周期', key: 'period', width: 110 },
+  { title: '应用', key: 'applicationCode', width: 150 },
+  {
+    title: '客户',
+    key: 'customerDisplayName',
+    minWidth: 160,
+    render(row) {
+      return row.customerDisplayName ?? row.customerUsername ?? '-'
+    },
+  },
+  {
+    title: '消耗积分',
+    key: 'consumedPoints',
+    width: 130,
+    render(row) {
+      return Number(row.consumedPoints ?? 0).toLocaleString('zh-CN')
+    },
+  },
+  {
+    title: '返佣比例',
+    key: 'commissionRate',
+    width: 110,
+    render(row) {
+      return `${(Number(row.commissionRate ?? 0) * 100).toFixed(1)}%`
+    },
+  },
+  {
+    title: '预计返佣',
+    key: 'commissionPoints',
+    width: 130,
+    render(row) {
+      return Number(row.commissionPoints ?? 0).toLocaleString('zh-CN')
+    },
+  },
+  { title: '状态', key: 'status', width: 100 },
+]
+
+const agentSettlementColumns: DataTableColumns<AgentOperationsSettlementBill> = [
+  { title: '周期', key: 'period', width: 110 },
+  {
+    title: '返佣积分',
+    key: 'totalCommissionPoints',
+    width: 140,
+    render(row) {
+      return Number(row.totalCommissionPoints ?? 0).toLocaleString('zh-CN')
+    },
+  },
+  { title: '状态', key: 'status', width: 120 },
+  { title: '确认时间', key: 'confirmedAt', minWidth: 180, render(row) { return row.confirmedAt ?? '-' } },
+]
+
+const agentMaterialColumns: DataTableColumns<AgentOperationsMaterial> = [
+  { title: '标题', key: 'title', minWidth: 220 },
+  { title: '类别', key: 'category', width: 120 },
+  { title: '应用', key: 'applicationCode', width: 150, render(row) { return row.applicationCode ?? '全部应用' } },
+  { title: '地址', key: 'url', minWidth: 260, ellipsis: { tooltip: true } },
+]
+
+const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
+  { title: '主题', key: 'subject', minWidth: 220 },
+  { title: '类别', key: 'category', width: 120 },
+  { title: '优先级', key: 'priority', width: 100 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '最近消息', key: 'lastMessage', minWidth: 220, ellipsis: { tooltip: true }, render(row) { return row.lastMessage ?? '-' } },
+]
+
 const developerPlaceholder = [
   { label: '跨应用 CRUD 审批流程', status: '规划中' },
   { label: '应用密钥管理', status: '规划中' },
   { label: '功能上下架与计费策略', status: '规划中' },
-]
-
-const agentSections = [
-  { title: 'User 创建', desc: '代理商可以创建自有 User；是否开放由开发者与公司管理员共同控制' },
-  { title: '线索/商机报备', desc: '展示代理商录入的线索，后续接入 CRM 流程' },
-  { title: '客户与消费', desc: '客户消费与剩余积分明细，等待生产 API' },
-  { title: '返佣记录', desc: '按月度展示佣金计算，依赖结算 API' },
-  { title: '结算账单', desc: '账单生成与确认，规划中' },
-  { title: '营销物料', desc: '素材、海报与培训材料，规划中' },
-  { title: '工单支持', desc: '工单创建与跟进，规划中' },
 ]
 </script>
 
@@ -397,9 +635,9 @@ const agentSections = [
 
         <section class="admin-summary" aria-label="平台概览">
           <article class="admin-summary-card">
-            <p>当前应用</p>
-            <strong>{{ application?.name ?? 'Reusable Credits' }}</strong>
-            <span>{{ application ? `code: ${application.code}` : '跨应用平台视图' }}</span>
+            <p>当前筛选</p>
+            <strong>{{ selectedApplicationLabel }}</strong>
+            <span>{{ selectedApplicationCode === 'all' ? '跨应用平台视图' : `code: ${selectedApplicationCode}` }}</span>
           </article>
           <article class="admin-summary-card">
             <p>已注册应用</p>
@@ -413,9 +651,23 @@ const agentSections = [
           </article>
           <article class="admin-summary-card">
             <p>近期流水</p>
-            <strong>{{ recentTransactions.length }}</strong>
+            <strong>{{ filteredRecentTransactions.length }}</strong>
             <span>条记录</span>
           </article>
+        </section>
+
+        <section class="admin-filter-band" aria-label="应用筛选">
+          <button
+            v-for="item in applicationFilterOptions"
+            :key="item.code"
+            type="button"
+            class="admin-filter-chip"
+            :class="{ active: selectedApplicationCode === item.code }"
+            @click="selectedApplicationCode = item.code"
+          >
+            <span>{{ item.name }}</span>
+            <small>{{ item.statusText }}</small>
+          </button>
         </section>
 
         <section class="admin-section">
@@ -446,9 +698,9 @@ const agentSections = [
           <section class="admin-section">
             <h2>跨应用功能计费配置</h2>
             <NDataTable
-              v-if="applicationFunctions.length"
+              v-if="filteredApplicationFunctions.length"
               :columns="functionColumns"
-              :data="applicationFunctions"
+              :data="filteredApplicationFunctions"
               :bordered="false"
               :single-line="false"
               :pagination="false"
@@ -459,7 +711,7 @@ const agentSections = [
           <section class="admin-section">
             <h2>账号创建权限层级</h2>
             <p class="admin-section-note">
-              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent/User，也控制代理商创建 User 的顶层权限。
+              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent/User，也可禁用代理商创建 User。
             </p>
             <div class="admin-toggle-grid">
               <article class="admin-toggle-card">
@@ -478,10 +730,13 @@ const agentSections = [
               </article>
               <article class="admin-toggle-card">
                 <div>
-                  <h3>允许代理商创建 User</h3>
-                  <p>开发者顶层开关；代理商仍需公司管理员开关同时开启。</p>
+                  <h3>禁用代理商创建 User</h3>
+                  <p>开发者覆盖开关；公司管理员通常控制代理商是否可创建 User。</p>
                 </div>
-                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAgentCreateUsers" />
+                <NSwitch
+                  :value="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
+                  @update:value="accountCreationPolicyState.developerAllowsAgentCreateUsers = !$event"
+                />
               </article>
             </div>
             <div class="admin-policy-grid">
@@ -504,6 +759,19 @@ const agentSections = [
                 </NTag>
               </article>
             </div>
+          </section>
+
+          <section class="admin-section">
+            <h2>跨应用客户档案</h2>
+            <NDataTable
+              v-if="filteredCustomerProfiles.length"
+              :columns="customerColumns"
+              :data="filteredCustomerProfiles"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无客户档案" />
           </section>
 
           <section class="admin-section">
@@ -534,7 +802,7 @@ const agentSections = [
               <article class="admin-toggle-card">
                 <div>
                   <h3>允许代理商创建 User</h3>
-                  <p>公司管理员开关；若开发者关闭代理商权限，此开关不会生效。</p>
+                  <p>公司管理员主开关；若开发者禁用代理商权限，此开关不会生效。</p>
                 </div>
                 <NSwitch
                   v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
@@ -583,9 +851,9 @@ const agentSections = [
           <section class="admin-section">
             <h2>近期积分流水</h2>
             <NDataTable
-              v-if="recentTransactions.length"
+              v-if="filteredRecentTransactions.length"
               :columns="transactionColumns"
-              :data="recentTransactions"
+              :data="filteredRecentTransactions"
               :bordered="false"
               :single-line="false"
               :pagination="false"
@@ -598,15 +866,115 @@ const agentSections = [
           <section class="admin-section">
             <h2>代理商运营视图</h2>
             <p class="admin-section-note">
-              代理商可创建 User；有效权限需要开发者与公司管理员两个开关同时开启。当前状态：{{ agentCreationGateText }}。写入 API 将在后续阶段接入。
+              代理商可创建 User 取决于公司管理员开关；开发者可以禁用该能力。当前状态：{{ agentCreationGateText }}。
+              当前代理：{{ agentOverview?.agent.displayName ?? '未加载' }}。
             </p>
-            <div class="admin-agent-grid">
-              <article v-for="item in agentSections" :key="item.title" class="admin-agent-card">
-                <h3>{{ item.title }}</h3>
-                <p>{{ item.desc }}</p>
-                <NTag round :bordered="false" type="warning">规划中</NTag>
+            <div class="admin-agent-grid" v-if="agentOverview">
+              <article class="admin-agent-card">
+                <h3>自有客户</h3>
+                <strong>{{ agentOverview.metrics.customerCount }}</strong>
+                <p>来自 agent_customer_relations</p>
+              </article>
+              <article class="admin-agent-card">
+                <h3>活跃线索</h3>
+                <strong>{{ agentOverview.metrics.activeLeadCount }}</strong>
+                <p>CRM 报备与跟进</p>
+              </article>
+              <article class="admin-agent-card">
+                <h3>预计返佣</h3>
+                <strong>{{ Number(agentOverview.metrics.previewCommissionPoints).toLocaleString('zh-CN') }}</strong>
+                <p>预览中佣金积分</p>
+              </article>
+              <article class="admin-agent-card">
+                <h3>待确认账单</h3>
+                <strong>{{ agentOverview.metrics.draftSettlementCount }}</strong>
+                <p>结算账单草稿</p>
+              </article>
+              <article class="admin-agent-card">
+                <h3>开放工单</h3>
+                <strong>{{ agentOverview.metrics.openTicketCount }}</strong>
+                <p>支持处理中</p>
               </article>
             </div>
+            <NEmpty v-else description="暂无代理商运营数据" />
+          </section>
+
+          <section class="admin-section">
+            <h2>代理商客户</h2>
+            <NDataTable
+              v-if="filteredAgentCustomers.length"
+              :columns="agentCustomerColumns"
+              :data="filteredAgentCustomers"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无代理商客户" />
+          </section>
+
+          <section class="admin-section">
+            <h2>线索 / 商机报备</h2>
+            <NDataTable
+              v-if="filteredAgentLeads.length"
+              :columns="agentLeadColumns"
+              :data="filteredAgentLeads"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无线索" />
+          </section>
+
+          <section class="admin-section">
+            <h2>返佣预览</h2>
+            <NDataTable
+              v-if="filteredAgentCommissions.length"
+              :columns="agentCommissionColumns"
+              :data="filteredAgentCommissions"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无返佣预览" />
+          </section>
+
+          <section class="admin-section">
+            <h2>结算账单</h2>
+            <NDataTable
+              v-if="agentSettlements.length"
+              :columns="agentSettlementColumns"
+              :data="agentSettlements"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无结算账单" />
+          </section>
+
+          <section class="admin-section">
+            <h2>营销物料 / 培训资料</h2>
+            <NDataTable
+              v-if="filteredAgentMaterials.length"
+              :columns="agentMaterialColumns"
+              :data="filteredAgentMaterials"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无资料" />
+          </section>
+
+          <section class="admin-section">
+            <h2>工单支持</h2>
+            <NDataTable
+              v-if="agentTickets.length"
+              :columns="agentTicketColumns"
+              :data="agentTickets"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无工单" />
           </section>
         </template>
       </NSpin>
@@ -756,6 +1124,46 @@ const agentSections = [
   font-weight: 600;
 }
 
+.admin-filter-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface);
+}
+
+.admin-filter-chip {
+  display: grid;
+  gap: 2px;
+  min-width: 160px;
+  padding: 10px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.admin-filter-chip span {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.admin-filter-chip small {
+  color: var(--app-text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-filter-chip.active {
+  border-color: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 64%, var(--app-border));
+  background: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 8%, var(--app-surface));
+}
+
 .admin-app-grid,
 .admin-policy-grid {
   display: grid;
@@ -886,6 +1294,11 @@ const agentSections = [
 .admin-agent-card h3 {
   margin: 0;
   font-size: 15px;
+  font-weight: 900;
+}
+
+.admin-agent-card strong {
+  font-size: 26px;
   font-weight: 900;
 }
 

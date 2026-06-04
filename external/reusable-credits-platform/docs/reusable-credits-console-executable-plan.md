@@ -1,6 +1,6 @@
 # Reusable Credits Platform Console Executable Plan
 
-Status: Phase 3 first backend RBAC slice implemented locally
+Status: Phase 6 agent operations foundation implemented locally
 Date: 2026-06-04
 Route compatibility: `/credits-admin`
 
@@ -23,17 +23,25 @@ Developer can create Admins, Agents, and Users.
 
 Developer can turn Admin creation of Agents and Users on/off.
 
-Developer can turn Agent creation of Users on/off as the top-level Agent gate.
+Developer can disable Agent creation of Users as a top-level override.
 
 Admin can create Agents and Users while Developer allows it.
 
-Admin can turn Agent creation of Users on/off as the subordinate Agent gate.
+Admin normally controls whether Agent can create Users.
 
 Admin can turn User-to-Agent promotion on/off.
 
-Agent can create Users only when both Developer and Admin Agent gates are on. Users without becoming Agent cannot log in through the console.
+Agent can create Users when Admin allows it, unless Developer disables that ability. Users without becoming Agent cannot log in through the console.
 
-This policy now has a backend schema, policy service foundation, and the first session-backed RBAC gate for the console overview endpoint. Phase 3 still needs to apply the same operator identity pattern to future write APIs as they are added.
+Role capability matrix:
+
+| Role | Create | Read | Update | Delete |
+| --- | --- | --- | --- | --- |
+| Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
+| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Agent | Users | Transactions and balances of Users it creates | None | None |
+
+This policy now has a backend schema, policy service foundation, session-backed RBAC gate, first unified user creation API, multi-application console data, and the first Agent operations API/UI foundation. Future phases still need frontend write forms for all writes, production tenant account creation, and full approval workflows.
 
 ## Phase 1: Console Foundation
 
@@ -77,7 +85,7 @@ Default policies:
 
 - Developer create Admins/Agents/Users: enabled, not disableable.
 - Admin create Agents/Users: enabled when Developer allows it.
-- Agent create Users: enabled only when Developer Agent gate and Admin Agent gate are both enabled.
+- Agent create Users: enabled when Admin allows it, unless Developer disables it.
 - User becomes Agent: enabled only when Admin allows it and Developer allows Admin Agent/User creation.
 
 Implementation status:
@@ -126,6 +134,39 @@ Required behavior:
 - Write audit log.
 - Use idempotency key for retries.
 
+Implementation status:
+
+- Added `POST /api/v1/platform/users`.
+- Requires a logged-in back-office operator with `menu:admin`.
+- Requires `idempotencyKey`, `targetRole`, `username`, and `password`.
+- Validates Developer/Admin/Agent creation policy before writing.
+- Creates an app user and role assignment.
+- Ensures a personal credits user/account through the existing credits account linker.
+- Writes `application_customer_links`.
+- Writes `agent_customer_relations` when an Agent creates a User.
+- Writes allowed and denied account-creation audit rows.
+- Stores idempotent completed responses for same-key replay and rejects same-key request-hash conflicts.
+- `npm run phase4:user-api-test` verifies the request contract and hash behavior.
+
+Example request:
+
+```http
+POST /api/v1/platform/users
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+```json
+{
+  "idempotencyKey": "create-user-demo-001",
+  "targetRole": "user",
+  "username": "demo_customer",
+  "password": "123456",
+  "displayName": "Demo Customer",
+  "applicationCode": "used-car-platform"
+}
+```
+
 ## Phase 5: Multi-Application Console Data
 
 Goal: replace usedCar-only overview with platform-wide views.
@@ -136,6 +177,15 @@ Deliverables:
 - Function pricing management per application.
 - Account, transaction, recharge, and billing views by application.
 - Cross-application customer profile.
+
+Implementation status:
+
+- `GET /api/v1/credits/admin/overview` now returns a platform application list, all available function pricing rows across registered applications, and planned `clothing_ai` function placeholders.
+- Transactions are enriched with `applicationCode`, `applicationName`, `functionCode`, and `functionName` when the credits platform supplies application/function ids.
+- The console has an application filter for All, usedCarPlatform, and clothing_ai.
+- Developer function pricing and Admin transaction tables filter by selected application.
+- Developer view now includes a cross-application customer profile table sourced from `application_customer_links`.
+- `clothing_ai` appears as planned, not registered, until the reusable credits platform actually registers it.
 
 ## Phase 6: Agent Operations
 
@@ -149,6 +199,15 @@ Deliverables:
 - Materials/training library.
 - Support tickets.
 
+Implementation status:
+
+- Added local operational tables: `agent_leads`, `agent_commission_previews`, `agent_settlement_bills`, `agent_materials`, and `agent_support_tickets`.
+- Seeded demo Agent operations data for the existing `agent` login, including a customer relation, two leads, a commission preview, a settlement draft, material rows, and an open ticket.
+- Added `GET /api/v1/platform/agent/overview` for the Agent dashboard, CRM customers, leads, commission previews, settlement bills, materials, and tickets.
+- Added first write endpoints: `POST /api/v1/platform/agent/leads`, `POST /api/v1/platform/agent/tickets`, and `POST /api/v1/platform/agent/settlements/:settlementId/confirm`.
+- Agent users can only see/write their own Agent operations data. Developer/Admin users can inspect an Agent view, defaulting to the first active Agent assignment for demo review.
+- Replaced the Agent tab placeholders with live operational tables filtered by All, usedCarPlatform, or clothing_ai.
+
 ## Phase 7: Application Integration SDK/Contract
 
 Goal: make future applications easy to add.
@@ -160,3 +219,13 @@ Deliverables:
 - Billing lifecycle examples.
 - Seed script pattern for `clothing_ai`.
 - Integration tests using usedCarPlatform and clothing_ai fixtures.
+
+Implementation status:
+
+- Added an executable application integration contract module for `used-car-platform` and planned `clothing_ai`.
+- Added contract review endpoints under `GET /api/v1/platform/integration-contract`.
+- Added seed payload and billing lifecycle example builders for future application onboarding.
+- Updated credits function registration to accept an explicit `applicationCode`, while preserving the existing usedCarPlatform default.
+- Added `npm run phase7:integration-contract-test` to verify application/function codes, lifecycle steps, seed payloads, and idempotency key patterns.
+- Added `npm run print:application-contract-seed -- clothing_ai` to print the planned `clothing_ai` seed payload and billing example.
+- Documented the app onboarding checklist and function registration contract in `docs/reusable-credits-application-integration-contract.md`.

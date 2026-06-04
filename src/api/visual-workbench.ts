@@ -787,6 +787,12 @@ export type CreditsTransactionType =
 
 export interface CreditsTransaction {
   id: number | string
+  applicationId?: number | string | null
+  applicationCode?: string | null
+  applicationName?: string | null
+  functionId?: number | string | null
+  functionCode?: string | null
+  functionName?: string | null
   txnType: CreditsTransactionType
   points: number
   balanceBefore?: number
@@ -818,14 +824,38 @@ export interface CreditsApplication {
   id: number | string
   code: string
   name: string
+  description?: string | null
   status: string
 }
 
 export interface CreditsApplicationFunction {
+  id?: number | string
+  applicationId?: number | string
+  applicationCode?: string
+  applicationName?: string
   code: string
   name: string
+  chargeMode?: 'fixed' | 'dynamic' | 'estimate_required' | string
+  description?: string | null
   defaultPoints: number
   status: string
+}
+
+export interface CreditsCustomerProfile {
+  id: string
+  applicationCode: string
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  role: string
+  creditsUserId: number | string
+  accountScope: 'personal' | 'tenant' | string
+  creditsTenantId?: number | string | null
+  createdByUserId: string
+  createdByRole: string
+  status: string
+  createdAt: string
 }
 
 export interface CreditsAdminOverview {
@@ -835,6 +865,101 @@ export interface CreditsAdminOverview {
   creditAccounts: CreditsAccount[]
   rechargeProducts: RechargeProduct[]
   recentTransactions: CreditsTransaction[]
+  customerProfiles: CreditsCustomerProfile[]
+}
+
+export interface AgentOperationsCustomer {
+  id: string
+  applicationCode: string
+  relationType: string
+  status: string
+  createdAt: string
+  customerUserId: string
+  customerUsername: string
+  customerDisplayName: string
+  customerPhone?: string | null
+  customerCreditsUserId: number | string
+}
+
+export interface AgentOperationsLead {
+  id: string
+  applicationCode: string
+  customerName: string
+  phone?: string | null
+  source?: string | null
+  stage: string
+  expectedPoints: number
+  note?: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AgentOperationsCommissionPreview {
+  id: string
+  applicationCode: string
+  period: string
+  consumedPoints: number
+  commissionRate: number
+  commissionPoints: number
+  status: string
+  settlementId?: string | null
+  customerUserId?: string | null
+  customerUsername?: string | null
+  customerDisplayName?: string | null
+  createdAt: string
+}
+
+export interface AgentOperationsSettlementBill {
+  id: string
+  period: string
+  totalCommissionPoints: number
+  status: string
+  confirmedAt?: string | null
+  paidAt?: string | null
+  createdAt: string
+}
+
+export interface AgentOperationsMaterial {
+  id: string
+  title: string
+  category: string
+  applicationCode?: string | null
+  url: string
+  status: string
+  sortOrder: number
+}
+
+export interface AgentOperationsTicket {
+  id: string
+  subject: string
+  category: string
+  priority: string
+  status: string
+  lastMessage?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AgentOperationsOverview {
+  agent: {
+    userId: string
+    username: string
+    displayName: string
+  }
+  metrics: {
+    customerCount: number
+    activeLeadCount: number
+    previewCommissionPoints: number
+    draftSettlementCount: number
+    openTicketCount: number
+  }
+  customers: AgentOperationsCustomer[]
+  leads: AgentOperationsLead[]
+  commissionPreviews: AgentOperationsCommissionPreview[]
+  settlementBills: AgentOperationsSettlementBill[]
+  materials: AgentOperationsMaterial[]
+  tickets: AgentOperationsTicket[]
 }
 
 function extractCreditsList<T>(payload: unknown, keys: string[]) {
@@ -997,6 +1122,10 @@ export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
     payload,
     ['recentTransactions', 'transactions'],
   ).map(normalizeCreditsTransaction)
+  const customerProfiles = extractCreditsList<CreditsCustomerProfile>(
+    payload,
+    ['customerProfiles', 'customers'],
+  )
 
   return {
     application: payload.application ?? applications[0] ?? null,
@@ -1005,5 +1134,16 @@ export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
     creditAccounts,
     rechargeProducts,
     recentTransactions,
+    customerProfiles,
   }
+}
+
+export async function getAgentOperationsOverview(params?: {
+  agentUserId?: string
+}): Promise<AgentOperationsOverview> {
+  const response = await request.get<ApiResponse<AgentOperationsOverview>>(
+    '/platform/agent/overview',
+    { params },
+  )
+  return unwrapApiResponse(response)
 }

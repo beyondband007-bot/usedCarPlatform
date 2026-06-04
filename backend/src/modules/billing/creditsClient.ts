@@ -59,6 +59,13 @@ export interface CreditTransactionResponse {
   createdAt: string;
 }
 
+export type CreditTransactionWithApplicationResponse = CreditTransactionResponse & {
+  applicationCode: string | null;
+  applicationName: string | null;
+  functionCode: string | null;
+  functionName: string | null;
+};
+
 export interface RechargeProductResponse {
   id: number;
   name: string;
@@ -99,6 +106,7 @@ export interface CreditsFunctionResponse {
   id: number;
   applicationId: number;
   applicationCode?: string;
+  applicationName?: string;
   code: string;
   name: string;
   description: string | null;
@@ -157,9 +165,10 @@ class CreditsClient {
     );
   }
 
-  async registerFunction(input: CreditFunctionCatalogItem) {
+  async registerFunction(input: CreditFunctionCatalogItem & { applicationCode?: string }) {
+    const applicationCode = input.applicationCode ?? env.credits.applicationCode;
     return this.post<CreditsFunctionResponse>(
-      `/integration/applications/${encodeURIComponent(env.credits.applicationCode)}/functions`,
+      `/integration/applications/${encodeURIComponent(applicationCode)}/functions`,
       {
         code: input.code,
         name: input.name,

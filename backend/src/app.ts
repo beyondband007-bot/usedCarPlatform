@@ -8,6 +8,7 @@ import { assetsRoutes } from "./modules/assets/assetsRoutes";
 import { authRoutes } from "./modules/auth/authRoutes";
 import { creditsRoutes } from "./modules/billing/creditsRoutes";
 import { moduleRoutes } from "./modules/moduleRoutes";
+import { platformRoutes } from "./modules/platform/platformRoutes";
 import { tasksRoutes } from "./modules/tasks/tasksRoutes";
 import { userLogoRoutes } from "./modules/user-logo/userLogoRoutes";
 import { errorHandler, notFoundHandler, requestIdMiddleware } from "./shared/response";
@@ -29,6 +30,7 @@ export const createApp = () => {
   app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1/assets", assetsRoutes);
   app.use("/api/v1/credits", creditsRoutes);
+  app.use("/api/v1/platform", platformRoutes);
   app.use("/api/v1/tasks", tasksRoutes);
   app.use("/api/v1/modules", moduleRoutes);
   app.use("/api/v1/user", userLogoRoutes);

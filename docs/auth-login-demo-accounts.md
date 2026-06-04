@@ -19,7 +19,7 @@ If a regular user should become an agent, the account must be opened or promoted
 | --- | --- | --- | --- | --- |
 | `developer` | `123456` | Platform developer | `/credits-admin` | Can create Admins, Agents, and Users. Can toggle Admin and Agent creation permissions. |
 | `admin` | `123456` | Company admin | `/credits-admin` | Can create Agents and Users while Developer allows it. Can toggle Agent user creation and User-to-Agent promotion. |
-| `agent` | `123456` | Agent | `/credits-admin` | Agent back-office view only. Can create own customer accounts when both Developer and Admin leave that policy enabled. |
+| `agent` | `123456` | Agent | `/credits-admin` | Agent back-office view only. Can create own customer accounts when Admin allows it unless Developer disables that policy. |
 | `enterprise` | `123456` | Regular product user | `/workspace` | Normal workspace, credits, and recharge pages. No back-office access. |
 | `flagship` | `123456` | Flagship mother account | `/workspace` | Normal product access. `enterpriseAccountRole` is `mother`; can view child transactions. |
 | `flagship_sub_sales` | `123456` | Flagship child account | `/workspace` | Normal product access. `enterpriseAccountRole` is `child`; cannot view sibling/child transactions. |
@@ -49,27 +49,35 @@ Inside `/credits-admin`, the available role switcher views are derived from the 
 
 The Phase 1 account creation policy is reflected in demo permissions:
 
-- `developer` has `account:create:admin`, `account:create:agent`, `account:create:user`, and `policy:account-creation:manage`
-- `admin` has `account:create:agent`, `account:create:user`, `policy:agent-user-creation:manage`, and `policy:user-agent-promotion:manage`
-- `agent` has `account:create:user`
+- `developer` has full Admin/Agent/User creation and deletion, all balance/transaction read, point adjustment, and account-policy management permissions
+- `admin` has Agent/User creation and deletion, all balance/transaction read, point adjustment, Agent user-creation policy, and User-to-Agent promotion policy permissions
+- `agent` has User creation plus balance/transaction read for Users it creates
 - `enterprise` is a regular product user and does not have account creation permission
+
+Role capability matrix:
+
+| Role | Create | Read | Update | Delete |
+| --- | --- | --- | --- | --- |
+| Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
+| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Agent | Users | Transactions and balances of Users it creates | None | None |
 
 Account creation follows a two-level hierarchy:
 
 - Developer can create Admins, Agents, and Users.
 - Developer can turn Admin creation of Agents/Users on/off.
-- Developer can turn Agent creation of Users on/off as the top-level Agent gate.
+- Developer can disable Agent creation of Users as the top-level override.
 - Admin can create Agents and Users while Developer allows it.
-- Admin can turn Agent creation of Users on/off as the subordinate Agent gate.
+- Admin normally controls whether Agent can create Users.
 - Admin can turn User-to-Agent promotion on/off.
-- Agent can create Users only when both Developer and Admin Agent gates are on.
+- Agent can create Users when Admin allows it, unless Developer disables it.
 
 Agent login creation is different from agent-created client accounts:
 
 - `developer` may configure account-creation policy and create Admin/Agent/User accounts
 - `admin` may create Agent/User accounts while enabled
 - `admin` may configure the subordinate Agent user-creation gate and User-to-Agent promotion gate
-- `agent` may create User accounts while both Agent gates are enabled
+- `agent` may create User accounts when Admin allows it and Developer has not disabled it
 - `enterprise` remains a normal front-office user until a back-office operator changes its account category to Agent
 
 ## Production Gap

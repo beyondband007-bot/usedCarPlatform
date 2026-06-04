@@ -212,6 +212,147 @@ export const migrations = [
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS platform_user_creation_idempotency (
+    id VARCHAR(64) PRIMARY KEY,
+    operator_user_id VARCHAR(64) NOT NULL,
+    idempotency_key VARCHAR(160) NOT NULL,
+    request_hash CHAR(64) NOT NULL,
+    response_json JSON NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'pending',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_platform_user_creation_idempotency_operator_key (operator_user_id, idempotency_key),
+    INDEX idx_platform_user_creation_idempotency_status (status, created_at),
+    CONSTRAINT platform_user_creation_idempotency_operator_fk FOREIGN KEY (operator_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS application_customer_links (
+    id VARCHAR(64) PRIMARY KEY,
+    application_code VARCHAR(80) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    credits_user_id BIGINT NOT NULL,
+    account_scope VARCHAR(16) NOT NULL DEFAULT 'personal',
+    credits_tenant_id BIGINT NULL,
+    created_by_user_id VARCHAR(64) NOT NULL,
+    created_by_role_code VARCHAR(32) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_application_customer_links_app_user (application_code, user_id),
+    INDEX idx_application_customer_links_credits_user (credits_user_id),
+    INDEX idx_application_customer_links_creator (created_by_user_id, created_at),
+    CONSTRAINT application_customer_links_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT application_customer_links_creator_fk FOREIGN KEY (created_by_user_id) REFERENCES app_users (id)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_customer_relations (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    customer_user_id VARCHAR(64) NOT NULL,
+    customer_credits_user_id BIGINT NOT NULL,
+    application_code VARCHAR(80) NOT NULL,
+    relation_type VARCHAR(24) NOT NULL DEFAULT 'direct',
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_customer_relations_agent_customer_app (agent_user_id, customer_user_id, application_code),
+    INDEX idx_agent_customer_relations_customer (customer_user_id, created_at),
+    CONSTRAINT agent_customer_relations_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT agent_customer_relations_customer_fk FOREIGN KEY (customer_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_leads (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    application_code VARCHAR(80) NOT NULL,
+    customer_name VARCHAR(120) NOT NULL,
+    phone VARCHAR(32) NULL,
+    source VARCHAR(80) NULL,
+    stage VARCHAR(32) NOT NULL DEFAULT 'new',
+    expected_points DECIMAL(18, 4) NOT NULL DEFAULT 0,
+    note VARCHAR(500) NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_leads_agent_stage (agent_user_id, stage, created_at),
+    INDEX idx_agent_leads_application (application_code, created_at),
+    CONSTRAINT agent_leads_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_commission_previews (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    customer_user_id VARCHAR(64) NULL,
+    application_code VARCHAR(80) NOT NULL,
+    period VARCHAR(16) NOT NULL,
+    consumed_points DECIMAL(18, 4) NOT NULL DEFAULT 0,
+    commission_rate DECIMAL(8, 4) NOT NULL DEFAULT 0,
+    commission_points DECIMAL(18, 4) NOT NULL DEFAULT 0,
+    status VARCHAR(24) NOT NULL DEFAULT 'preview',
+    settlement_id VARCHAR(64) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_commission_agent_period (agent_user_id, period),
+    INDEX idx_agent_commission_customer (customer_user_id, created_at),
+    CONSTRAINT agent_commission_previews_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT agent_commission_previews_customer_fk FOREIGN KEY (customer_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_settlement_bills (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    period VARCHAR(16) NOT NULL,
+    total_commission_points DECIMAL(18, 4) NOT NULL DEFAULT 0,
+    status VARCHAR(24) NOT NULL DEFAULT 'draft',
+    confirmed_at DATETIME(3) NULL,
+    paid_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_settlement_agent_period (agent_user_id, period),
+    INDEX idx_agent_settlement_status (status, created_at),
+    CONSTRAINT agent_settlement_bills_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_materials (
+    id VARCHAR(64) PRIMARY KEY,
+    title VARCHAR(160) NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    application_code VARCHAR(80) NULL,
+    url VARCHAR(1024) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_materials_category_status (category, status, sort_order),
+    INDEX idx_agent_materials_application (application_code, status, sort_order)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_support_tickets (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    subject VARCHAR(160) NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    priority VARCHAR(24) NOT NULL DEFAULT 'normal',
+    status VARCHAR(24) NOT NULL DEFAULT 'open',
+    last_message VARCHAR(500) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_tickets_agent_status (agent_user_id, status, updated_at),
+    CONSTRAINT agent_support_tickets_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS user_subscriptions (
     user_id VARCHAR(64) PRIMARY KEY,
     plan_code VARCHAR(32) NOT NULL,

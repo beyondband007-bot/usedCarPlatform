@@ -34,6 +34,60 @@ export type BackOfficePermissionPolicySeed = {
   description: string;
 };
 
+export const defaultBackOfficeRolePermissions = {
+  developer: [
+    "menu:home",
+    "menu:workspace",
+    "menu:pricing",
+    "menu:points",
+    "menu:recharge",
+    "menu:admin",
+    "account:create:admin",
+    "account:create:agent",
+    "account:create:user",
+    "account:delete:admin",
+    "account:delete:agent",
+    "account:delete:user",
+    "credits:balance:read:all",
+    "credits:transaction:read:all",
+    "credits:points:adjust",
+    "policy:account-creation:manage",
+  ],
+  admin: [
+    "menu:home",
+    "menu:workspace",
+    "menu:pricing",
+    "menu:points",
+    "menu:recharge",
+    "menu:admin",
+    "account:create:agent",
+    "account:create:user",
+    "account:delete:agent",
+    "account:delete:user",
+    "credits:balance:read:all",
+    "credits:transaction:read:all",
+    "credits:points:adjust",
+    "policy:agent-user-creation:manage",
+    "policy:user-agent-promotion:manage",
+  ],
+  agent: [
+    "menu:home",
+    "menu:points",
+    "menu:recharge",
+    "menu:admin",
+    "account:create:user",
+    "credits:balance:read:created-users",
+    "credits:transaction:read:created-users",
+  ],
+  enterprise: [
+    "menu:home",
+    "menu:workspace",
+    "menu:pricing",
+    "menu:points",
+    "menu:recharge",
+  ],
+} as const;
+
 export type AccountCreationDecision = {
   allowed: boolean;
   reason: string;
@@ -113,25 +167,25 @@ export const defaultBackOfficePermissionPolicies: BackOfficePermissionPolicySeed
   },
   {
     policyCode: "developer_allows_agent_create_users",
-    name: "开发者允许 Agent 创建 User",
+    name: "开发者可禁用 Agent 创建 User",
     controllerRoleCode: "developer",
     subjectRoleCode: "agent",
     actionCode: "policy:allow",
     targetRoleCode: "user",
     isEnabled: true,
     isDisableable: true,
-    description: "Developer top-level gate for Agent-created User accounts.",
+    description: "Developer override that can disable Agent-created User accounts.",
   },
   {
     policyCode: "admin_allows_agent_create_users",
-    name: "Admin 允许 Agent 创建 User",
+    name: "Admin 控制 Agent 创建 User",
     controllerRoleCode: "admin",
     subjectRoleCode: "agent",
     actionCode: "policy:allow",
     targetRoleCode: "user",
     isEnabled: true,
     isDisableable: true,
-    description: "Admin subordinate gate for Agent-created User accounts.",
+    description: "Admin gate for Agent-created User accounts unless Developer disables it.",
   },
   {
     policyCode: "admin_allows_user_become_agent",
@@ -207,12 +261,12 @@ export function canCreateAccountFromSnapshot(
     if (targetRole === "user" && effective.agentCanCreateUsers) {
       return {
         allowed: true,
-        reason: "developer and admin both allow agent user creation",
+        reason: "admin allows agent user creation and developer has not disabled it",
       };
     }
     return {
       allowed: false,
-      reason: "developer or admin has disabled agent user creation",
+      reason: "admin has not allowed agent user creation or developer has disabled it",
     };
   }
 

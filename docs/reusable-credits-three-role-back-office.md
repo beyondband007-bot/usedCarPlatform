@@ -1,6 +1,6 @@
 # Reusable Credits Platform Console
 
-Status: Phase 3 first backend RBAC slice implemented; write workflows pending
+Status: Phase 6 agent operations foundation implemented; frontend write forms pending
 Date: 2026-06-04
 Route: `/credits-admin`
 
@@ -8,7 +8,7 @@ Route: `/credits-admin`
 
 The shared static prototype `积分后台-三角色静态原型.html` has been ported into the usedCarPlatform Vue frontend and is now being moved into the Reusable Credits Platform console.
 
-This page is intended for team review and local integration testing while production auth/session, RBAC, account-creation write APIs, and agent APIs are still being designed.
+This page is intended for team review and local integration testing while frontend write forms, account-creation approval workflows, and deeper production workflows are still being designed.
 
 usedCarPlatform is one integrated application in this console. Future applications such as `clothing_ai` should register functions like `model_generate`, `try_on_generate`, and `lifestyle_photo` through the same Reusable Credits Platform.
 
@@ -32,18 +32,23 @@ Completed in this branch:
 - hierarchical account-creation policy model for Developer/Admin/Agent
 - Phase 2 backend policy tables, default policy seeding, and backend policy decision service
 - Phase 3 session-backed RBAC middleware and protected console overview endpoint
+- Phase 4 `POST /api/v1/platform/users` for policy-checked, audited, idempotent account creation
+- Phase 5 multi-application filter, cross-application function pricing rows, enriched transactions, and customer profile table
+- Phase 6 Agent operations overview API, Agent CRM seed data, commission preview, settlement draft, material library, and support-ticket foundation
+- Phase 7 application integration contract, back-office review API, and executable fixtures for usedCarPlatform plus planned `clothing_ai`
 
 Not production-complete yet:
 
 - server-side RBAC coverage for future back-office write APIs
 - audited regular-user-to-agent promotion API
 - agent onboarding database/API
-- production CRUD for tenants, users, agents, tickets, settlement, materials, and commissions
+- production CRUD for tenants, users, agents, and full lifecycle settlement/material/commission administration
 - approval workflow implementation for role changes and account creation
-- real write actions from the console
+- frontend forms wired to the new user creation write API
+- production registration and billing rows for future applications such as `clothing_ai`
 - API endpoints to update persisted Developer/Admin account-creation toggles from the console
 
-Decision for now: keep the current console writes non-mutating until Phase 3 and Phase 4 connect production session identity, RBAC, account creation, role promotion, and audit writes.
+Decision for now: keep the current console buttons non-mutating until frontend write forms are wired to the Phase 4 API and the remaining role-promotion/approval workflows are implemented.
 
 ## Roles
 
@@ -100,14 +105,20 @@ Live data currently comes from the compatibility usedCar proxy:
 
 ```http
 GET /api/v1/credits/admin/overview
+GET /api/v1/platform/agent/overview
+GET /api/v1/platform/integration-contract
 ```
 
 The live sections include:
 
 - registered credits applications/functions
+- planned future application placeholders, currently `clothing_ai`
 - credit accounts
 - recharge products
 - recent credit transactions
+- cross-application customer profiles from local application-customer links
+- agent customers, leads, commission previews, settlement bills, materials, and support tickets
+- application integration contract fixtures, seed payloads, and billing lifecycle examples
 - balance, frozen balance, active functions, and enabled products
 
 ## Mock Workflow Coverage
@@ -116,13 +127,8 @@ The following back-office workflow rows are currently local UI data because used
 
 - tenant/customer operations beyond credit account inspection
 - agent onboarding and agent profile management
-- lead/opportunity reporting
-- commission records
-- settlement bills
-- marketing materials/training
-- ticket support
 
-These mock sections are intentional. They define the expected product surface and permission boundaries before backend schema/API work starts.
+Agent lead/opportunity reporting, commission records, settlement bills, marketing materials/training, and ticket support now have a first backend schema/API foundation for local integration review. Full write forms, approval states, and production settlement rules still need follow-up phases.
 
 Agent management now explicitly includes regular-user-to-agent onboarding. The `enterprise` demo user remains a regular front-office user unless a platform owner opens a separate agent login/category for that user through back-office agent management.
 
@@ -174,13 +180,13 @@ password: 123456
 5. Confirm developer pages show live account, function, product, and transaction data after clicking `刷新实时数据`.
 6. Confirm search and status filters work inside table views.
 7. Confirm action buttons update the `当前操作` line and do not perform real writes yet.
-8. Confirm the agent pages expose leads, customers, consumption, commission, settlement, materials, and tickets as the next backend API targets.
+8. Confirm the agent pages show live seeded leads, customers, commission preview, settlement, materials, and tickets.
 
 ## Current Limits
 
-This implementation finishes the three-role back-office UI and reviewable workflow surface. It does not yet implement production writes for agent, settlement, ticket, material, or admin CRUD operations.
+This implementation finishes the three-role back-office UI and the first Agent operations API surface. It does not yet implement all production writes for agent onboarding, settlement payout, material management, or admin CRUD operations.
 
-High-risk financial operations remain intentionally non-mutating from this console. Future backend work should use append-only ledger events, idempotency keys, operator identity, and audit reasons rather than direct balance or transaction edits.
+High-risk financial operations now have role permissions modeled, including Developer/Admin point adjustment. Future backend write endpoints should use append-only ledger events, idempotency keys, operator identity, and audit reasons rather than direct balance or transaction edits.
 
 ## Account Creation Policy
 
@@ -188,14 +194,28 @@ The account hierarchy is:
 
 - Developer can create Admins, Agents, and Users.
 - Developer toggle controls whether Admin can create Agents and Users.
-- Developer toggle controls whether Agent can create Users.
+- Developer can disable Agent creation of Users.
 - Admin can create Agents and Users while Developer allows it.
 - Admin toggle controls whether Agent can create Users.
 - Admin toggle controls whether User becomes Agent.
-- Agent can create Users while both Developer and Admin allow it.
+- Agent can create Users when Admin allows it, unless Developer disables it.
 
 Users without becoming Agent do not have the right to log in through this console.
 
-Developer and company admin users may open a regular product user as an agent login from the back office. Agent-side User creation must respect the Developer + Admin hierarchy. Regular users cannot self-upgrade from the front office.
+Developer and company admin users may open a regular product user as an agent login from the back office. Agent-side User creation must respect the Admin gate plus Developer override hierarchy. Regular users cannot self-upgrade from the front office.
+
+Role capability matrix:
+
+| Role | Create | Read | Update | Delete |
+| --- | --- | --- | --- | --- |
+| Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
+| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Agent | Users | Transactions and balances of Users it creates | None | None |
 
 Production account creation should record creator role, creator id, tenant/customer ownership, application ownership, agent relation, policy decision, approval status, and audit history.
+
+## Application Integration Contract
+
+Future applications should follow the Phase 7 contract documented in [Reusable Credits Application Integration Contract](./reusable-credits-application-integration-contract.md).
+
+The first fixtures are `used-car-platform` and planned `clothing_ai`. The contract defines application/function registration payloads, billing lifecycle idempotency patterns, and seed examples.

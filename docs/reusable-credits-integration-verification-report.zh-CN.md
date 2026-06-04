@@ -241,12 +241,20 @@ password: 123456
 
 - Developer 可以创建 Admin、Agent、User。
 - Developer 开关控制 Admin 是否可以创建 Agent 和 User。
-- Developer 开关控制 Agent 是否可以创建 User。
+- Developer 可以禁用 Agent 创建 User。
 - Admin 在 Developer 允许时可以创建 Agent 和 User。
 - Admin 开关控制 Agent 是否可以创建 User。
 - Admin 开关控制 User 是否可以成为 Agent。
-- Agent 在 Developer 和 Admin 的 Agent 开关都开启时可以创建 User。
+- Agent 在 Admin 允许且 Developer 未禁用时可以创建 User。
 - User 在未成为 Agent 之前，不能登录该控制台。
+
+角色能力矩阵：
+
+| 角色 | Create | Read | Update | Delete |
+| --- | --- | --- | --- | --- |
+| Developer | Admin、Agent、User | 全部流水与余额 | 增减积分 | Admin、Agent、User |
+| Admin | Agent、User | 全部流水与余额 | 增减积分 | Agent、User |
+| Agent | User | 自己创建的 User 的流水与余额 | 无 | 无 |
 
 ## 6. 自动化验证
 
@@ -626,4 +634,4 @@ Reusable Credits Platform 是用户、租户、积分账户、充值产品、支
 - 租户成员校验还不是最终版本。
 - 支付 provider callback 和实际付款到账结算在 Reusable Credits Platform 侧覆盖；usedCar 当前通过代理创建 pending 支付订单。
 - Phase 11 smoke runner 不调用真实 KIE。
-- 三角色后台的写操作目前不真正落库，需等角色权限、审计 API 和工作流接口完成后再开放。
+- 三角色后台的高风险写操作需通过角色权限、审计 API 和工作流接口开放；积分增减必须走追加式审计流水，不能直接改余额。

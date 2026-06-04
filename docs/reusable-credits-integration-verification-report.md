@@ -241,12 +241,20 @@ Account creation hierarchy:
 
 - Developer can create Admins, Agents, and Users.
 - Developer toggle controls whether Admin can create Agents and Users.
-- Developer toggle controls whether Agent can create Users.
+- Developer can disable Agent creation of Users.
 - Admin can create Agents and Users while Developer allows it.
 - Admin toggle controls whether Agent can create Users.
 - Admin toggle controls whether User becomes Agent.
-- Agent can create Users while both Agent gates are enabled.
+- Agent can create Users when Admin allows it, unless Developer disables it.
 - Users without becoming Agent cannot log in through this console.
+
+Role capability matrix:
+
+| Role | Create | Read | Update | Delete |
+| --- | --- | --- | --- | --- |
+| Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
+| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Agent | Users | Transactions and balances of Users it creates | None | None |
 
 ## 6. Automated Verification
 
@@ -626,4 +634,4 @@ The full three-role back-office UI is also implemented for review, but some oper
 - Tenant membership validation is not final.
 - Payment provider callback and paid recharge settlement are covered in the Reusable Credits Platform side, while usedCar currently creates pending payment orders through the proxy.
 - The Phase 11 smoke runner does not call real KIE.
-- Three-role back-office write actions are non-mutating until role permissions, audit APIs, and workflow endpoints are implemented.
+- Three-role back-office high-risk write actions need audited APIs and workflow endpoints before they are enabled in production.
