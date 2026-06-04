@@ -273,6 +273,7 @@ function setPage(page: number) {
             <th>变动积分</th>
             <th>变动后余额</th>
             <th>使用场景</th>
+            <th>备注</th>
             <th v-if="config.showMemberColumns">操作人</th>
             <th v-if="config.showMemberColumns">身份</th>
             <th>发生时间</th>
@@ -280,7 +281,7 @@ function setPage(page: number) {
         </thead>
         <tbody>
           <tr v-if="!records.length">
-            <td :colspan="config.showMemberColumns ? 8 : 6" class="empty-state">
+            <td :colspan="config.showMemberColumns ? 9 : 7" class="empty-state">
               <Icon icon="mdi:inbox-outline" />
               <p>暂无符合条件的流水记录</p>
             </td>
@@ -319,7 +320,11 @@ function setPage(page: number) {
             <td>
               <div class="points-scene-cell">
                 <span>{{ record.title }}</span>
+                <small>{{ record.functionName }}</small>
               </div>
+            </td>
+            <td>
+              <span class="text-slate-500">{{ record.remark || "-" }}</span>
             </td>
             <td v-if="config.showMemberColumns">
               <div class="points-member-cell">
@@ -703,6 +708,11 @@ function setPage(page: number) {
   font-weight: 500;
 }
 
+.points-scene-cell small {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .points-member-cell {
   display: flex;
   align-items: center;
@@ -1029,6 +1039,7 @@ function setPage(page: number) {
   color: #f3f4f6;
 }
 
+.points-flow-card.theme-dark .points-scene-cell small,
 .points-flow-card.theme-dark .points-member-role,
 .points-flow-card.theme-dark .points-time {
   color: #9ca3af;
