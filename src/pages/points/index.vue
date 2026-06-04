@@ -11,6 +11,7 @@ import type {
   PointsQueryFilters,
   PointsQueryViewConfig,
   PointsSummaryCard,
+  PointsTxnType,
 } from "@/types/points-query";
 
 const pageSize = 10;
@@ -253,9 +254,60 @@ const pagedRecords = computed(() => {
   return filteredRecords.value.slice(start, start + pageSize);
 });
 
-function escapeCsv(value: string | number | boolean | undefined) {
-  const text = String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
+const txnTypeExportNameMap: Record<"" | PointsTxnType, string> = {
+  "": "全部",
+  recharge: "充值",
+  gift: "赠送",
+  consume: "消费",
+  refund: "退款",
+};
+
+const txnTypeExcelLabelMap: Record<PointsTxnType, string> = {
+  recharge: "充值",
+  gift: "赠送",
+  consume: "消费",
+  refund: "退款",
+};
+
+function escapeExcelCell(value: string | number | boolean | undefined) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildExcelTable(
+  headers: string[],
+  rows: Array<Array<string | number | boolean | undefined>>,
+) {
+  const head = headers
+    .map((header) => `<th>${escapeExcelCell(header)}</th>`)
+    .join("");
+  const body = rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map(
+            (cell) =>
+              `<td style="mso-number-format:'\\@';">${escapeExcelCell(cell)}</td>`,
+          )
+          .join("")}</tr>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <table border="1">
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  </body>
+</html>`;
 }
 
 function handleExport() {
@@ -266,8 +318,6 @@ function handleExport() {
         "变动积分",
         "变动后余额",
         "使用场景",
-        "功能",
-        "备注",
         "操作人",
         "身份",
         "发生时间",
@@ -278,20 +328,16 @@ function handleExport() {
         "变动积分",
         "变动后余额",
         "使用场景",
-        "功能",
-        "备注",
         "发生时间",
       ];
 
   const rows = filteredRecords.value.map((record) => {
     const base: Array<string | number | boolean | undefined> = [
       record.id,
-      record.txnType,
+      txnTypeExcelLabelMap[record.txnType],
       record.pointsChange,
       record.balanceAfter,
       record.title,
-      record.functionName,
-      record.remark,
     ];
 
     if (viewConfig.value.showMemberColumns) {
@@ -299,15 +345,17 @@ function handleExport() {
     }
 
     base.push(record.createdAt);
-    return base.map(escapeCsv).join(",");
+    return base;
   });
 
-  const csv = [headers.map(escapeCsv).join(","), ...rows].join("\n");
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const excel = buildExcelTable(headers, rows);
+  const blob = new Blob([excel], {
+    type: "application/vnd.ms-excel;charset=utf-8",
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `points-flow-${version.value}.csv`;
+  link.download = `${txnTypeExportNameMap[filters.value.txnType]}积分查询.xls`;
   document.body.append(link);
   link.click();
   link.remove();
