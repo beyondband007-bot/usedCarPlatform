@@ -49,6 +49,26 @@ class KieKeyPool {
   }
 
   async acquire(): Promise<KieAccountLease> {
+    const deadline = Date.now() + env.kie.acquireWaitTimeoutMs;
+    let lastError: unknown = null;
+
+    do {
+      try {
+        return await this.tryAcquire();
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof Error && error.message.includes("no available kie api key"))) {
+          throw error;
+        }
+        if (Date.now() >= deadline) break;
+        await new Promise((resolve) => setTimeout(resolve, env.kie.acquireRetryIntervalMs));
+      }
+    } while (Date.now() < deadline);
+
+    throw lastError ?? errors.kieKeyUnavailable();
+  }
+
+  private async tryAcquire(): Promise<KieAccountLease> {
     await this.syncAccounts();
 
     const entries = accountEntries();
@@ -131,6 +151,37 @@ class KieKeyPool {
        SET current_concurrency = GREATEST(current_concurrency - 1, 0)
        WHERE account_hash = :accountHash`,
       { accountHash },
+    );
+  }
+
+  async reconcileConcurrency() {
+    await this.syncAccounts();
+    await pool.execute(
+      `UPDATE kie_task_records ktr
+       JOIN generation_tasks gt ON gt.id = ktr.task_id
+       SET ktr.status = CASE
+             WHEN gt.status = 'fail' THEN 'fail'
+             ELSE 'canceled'
+           END,
+           ktr.response_json = JSON_OBJECT(
+             'closedByBusinessTaskStatus', gt.status,
+             'previousKieRecordStatus', ktr.status
+           ),
+           ktr.finished_at = CURRENT_TIMESTAMP(3)
+       WHERE ktr.status NOT IN ('success', 'fail', 'canceled')
+         AND gt.status IN ('success', 'fail', 'canceled')`,
+    );
+    await pool.execute(
+      `UPDATE kie_accounts ka
+       LEFT JOIN (
+         SELECT ktr.kie_account_hash, COUNT(*) AS active_count
+         FROM kie_task_records ktr
+         JOIN generation_tasks gt ON gt.id = ktr.task_id
+         WHERE ktr.status NOT IN ('success', 'fail', 'canceled')
+           AND gt.status NOT IN ('success', 'fail', 'canceled')
+         GROUP BY ktr.kie_account_hash
+       ) active_records ON active_records.kie_account_hash = ka.account_hash
+       SET ka.current_concurrency = COALESCE(active_records.active_count, 0)`,
     );
   }
 

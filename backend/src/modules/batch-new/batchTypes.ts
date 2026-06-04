@@ -49,7 +49,7 @@ export interface BatchItemSummary {
   status: TaskStatus;
   progress: number;
   resultCount: number;
-  error: { message?: string | null } | null;
+  error: { code?: string | null; message?: string | null } | null;
 }
 
 export type BatchItemKind =

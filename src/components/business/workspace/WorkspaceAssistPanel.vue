@@ -253,6 +253,8 @@ interface BatchDisplayCard {
   thumbnail?: string;
   progress?: number;
   isInteriorItem?: boolean;
+  errorCode?: string;
+  error?: string;
 }
 
 const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
@@ -276,6 +278,8 @@ const batchDisplayCards = computed<BatchDisplayCard[]>(() => {
               : job.previewUrl || undefined),
           progress: item.progress,
           isInteriorItem: isInteriorBatchItemKind(item.itemKind),
+          errorCode: item.errorCode,
+          error: item.error,
         });
       }
       continue;
@@ -407,6 +411,31 @@ async function handleDownloadDeliveryGroup() {
 
 const statusLabelMap = recentStatusLabelMap;
 const statusIconMap = recentStatusIconMap;
+
+const generationFailureMessageMap: Record<string, string> = {
+  KIE_UPLOAD_TIMEOUT: "图片上传超时，请重试",
+  KIE_CREATE_TIMEOUT: "生成服务连接超时，请重试",
+  KIE_DETAIL_TIMEOUT: "生成状态查询超时，请稍后刷新",
+  KIE_REQUEST_TIMEOUT: "生成服务网络超时，请重试",
+  KIE_NETWORK_TIMEOUT: "生成服务网络异常，请重试",
+  KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
+};
+
+function getRecentStatusLabel(item: WorkspaceRecentItem) {
+  if (item.status === "fail" && item.errorCode === "KIE_TASK_TIMEOUT") {
+    return "生成超时";
+  }
+  return statusLabelMap[item.status];
+}
+
+function getBatchFailureReason(item: BatchDisplayCard) {
+  if (item.status !== "fail") return "";
+  if (item.errorCode === "KIE_TASK_TIMEOUT") return "生成超时，请重试";
+  if (item.errorCode && generationFailureMessageMap[item.errorCode]) {
+    return generationFailureMessageMap[item.errorCode];
+  }
+  return item.error || item.errorCode || "生成失败，请重试";
+}
 const recentTaskModuleCodes = new Set([
   "showroom-light",
   "outdoor-scene",
@@ -564,6 +593,12 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     inputAssetThumbnailUrl: item.inputAssetThumbnailUrl ?? undefined,
     progress: item.progress ?? undefined,
     resultCount: item.resultCount ?? undefined,
+    activeModel: item.activeModel ?? undefined,
+    fallbackStarted: item.fallbackStarted ?? false,
+    deadlineAt: item.deadlineAt ?? undefined,
+    softTimeoutAt: item.softTimeoutAt ?? undefined,
+    winningModel: item.winningModel ?? undefined,
+    errorCode: typeof item.error === "string" ? undefined : (item.error?.code ?? undefined),
     error: isShortVideo
       ? undefined
       : typeof item.error === "string"
@@ -1297,13 +1332,16 @@ defineExpose({
                     :icon="statusIconMap[item.status]"
                     class="recent-status-icon"
                   />
-                  {{ statusLabelMap[item.status] }}
+                  {{ getRecentStatusLabel(item) }}
                 </span>
               </div>
               <footer class="recent-foot">
                 <strong class="recent-name">{{ item.title }}</strong>
                 <p v-if="item.sceneLabel" class="recent-scene">
                   {{ item.sceneLabel }}
+                </p>
+                <p v-if="getBatchFailureReason(item)" class="recent-scene">
+                  {{ getBatchFailureReason(item) }}
                 </p>
                 <span class="recent-time">
                   <Icon icon="mdi:clock-outline" class="recent-time-icon" />
@@ -1455,7 +1493,7 @@ defineExpose({
                     :icon="statusIconMap[item.status]"
                     class="recent-status-icon"
                   />
-                  {{ statusLabelMap[item.status] }}
+                  {{ getRecentStatusLabel(item) }}
                 </span>
               </div>
               <footer class="recent-foot">
@@ -1586,7 +1624,7 @@ defineExpose({
                     :icon="statusIconMap[item.status]"
                     class="recent-status-icon"
                   />
-                  {{ statusLabelMap[item.status] }}
+                  {{ getRecentStatusLabel(item) }}
                 </span>
               </div>
               <footer class="recent-foot">

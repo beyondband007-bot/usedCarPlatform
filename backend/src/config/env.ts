@@ -52,13 +52,30 @@ export const env = {
   kie: {
     apiKeys: toList(process.env.KIE_API_KEYS),
     balanceStrategy: process.env.KIE_BALANCE_STRATEGY ?? "round_robin",
-    maxConcurrentPerKey: toNumber(process.env.KIE_MAX_CONCURRENT_PER_KEY, 2),
+    maxConcurrentPerKey: toNumber(process.env.KIE_MAX_CONCURRENT_PER_KEY, 100),
+    maxUploadConcurrent: toNumber(process.env.KIE_MAX_UPLOAD_CONCURRENT, 5),
+    acquireWaitTimeoutMs: toNumber(process.env.KIE_ACQUIRE_WAIT_TIMEOUT_MS, 15_000),
+    acquireRetryIntervalMs: toNumber(process.env.KIE_ACQUIRE_RETRY_INTERVAL_MS, 500),
     createTaskUrl:
       process.env.KIE_CREATE_TASK_URL ?? "https://api.kie.ai/api/v1/jobs/createTask",
     taskDetailUrl:
       process.env.KIE_TASK_DETAIL_URL ?? "https://api.kie.ai/api/v1/jobs/recordInfo",
     fileUploadBaseUrl: process.env.KIE_FILE_UPLOAD_BASE_URL ?? "https://kieai.redpandaai.co",
-    model: "gpt-image-2-image-to-image",
+    model: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
+    primaryImageModel: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
+    fallbackImageModel: process.env.KIE_FALLBACK_IMAGE_MODEL ?? "nano-banana-2",
+    fallbackOutputFormat: process.env.KIE_FALLBACK_OUTPUT_FORMAT ?? "jpg",
+    fallbackEnabled: toBoolean(process.env.KIE_FALLBACK_ENABLED, true),
+    uploadTimeoutMs: toNumber(process.env.KIE_UPLOAD_TIMEOUT_MS, 30_000),
+    createTimeoutMs: toNumber(process.env.KIE_CREATE_TIMEOUT_MS, 20_000),
+    detailTimeoutMs: toNumber(process.env.KIE_DETAIL_TIMEOUT_MS, 10_000),
+    downloadTimeoutMs: toNumber(process.env.KIE_DOWNLOAD_TIMEOUT_MS, 60_000),
+    networkRetryLimit: toNumber(process.env.KIE_NETWORK_RETRY_LIMIT, 2),
+    networkRetryBaseMs: toNumber(process.env.KIE_NETWORK_RETRY_BASE_MS, 1_000),
+    networkRetryMaxMs: toNumber(process.env.KIE_NETWORK_RETRY_MAX_MS, 4_000),
+    imageDeadlineMs: toNumber(process.env.KIE_IMAGE_DEADLINE_MS, 480_000),
+    imageSoftTimeoutMs: toNumber(process.env.KIE_IMAGE_SOFT_TIMEOUT_MS, 180_000),
+    pollFailureLimit: toNumber(process.env.KIE_POLL_FAILURE_LIMIT, 3),
   },
 
   credits: {

@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2";
 
+import { env } from "../../config/env";
 import { Repository } from "../../db/repository";
 import { createId } from "../../shared/ids";
 import type { OutputRatio, Resolution, TaskStatus } from "../../shared/types";
@@ -30,6 +31,32 @@ export interface GenerationTaskRecord {
   settledPoints?: string | null;
   subscriptionUserKey?: string | null;
   subscriptionPlanCode?: string | null;
+  deadlineAt?: Date | null;
+  softTimeoutAt?: Date | null;
+  fallbackStartedAt?: Date | null;
+  activeModel?: string | null;
+  winningModel?: string | null;
+  attemptCount: number;
+  pollFailureCount: number;
+  lastKiePollAt?: Date | null;
+  lastErrorCode?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KieTaskRecord {
+  id: string;
+  taskId: string;
+  kieTaskId: string;
+  kieAccountHash: string;
+  status: TaskStatus;
+  requestJson?: unknown;
+  responseJson?: unknown;
+  attemptNo: number;
+  model?: string | null;
+  role: "primary" | "fallback";
+  isWinner: boolean;
+  finishedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +97,32 @@ interface GenerationTaskRow extends RowDataPacket {
   settled_points: string | null;
   subscription_user_key: string | null;
   subscription_plan_code: string | null;
+  deadline_at: Date | null;
+  soft_timeout_at: Date | null;
+  fallback_started_at: Date | null;
+  active_model: string | null;
+  winning_model: string | null;
+  attempt_count: number;
+  poll_failure_count: number;
+  last_kie_poll_at: Date | null;
+  last_error_code: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface KieTaskRecordRow extends RowDataPacket {
+  id: string;
+  task_id: string;
+  kie_task_id: string;
+  kie_account_hash: string;
+  status: TaskStatus;
+  request_json: unknown;
+  response_json: unknown;
+  attempt_no: number;
+  model: string | null;
+  role: "primary" | "fallback";
+  is_winner: number;
+  finished_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -110,9 +163,56 @@ const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
   settledPoints: row.settled_points,
   subscriptionUserKey: row.subscription_user_key,
   subscriptionPlanCode: row.subscription_plan_code,
+  deadlineAt: row.deadline_at,
+  softTimeoutAt: row.soft_timeout_at,
+  fallbackStartedAt: row.fallback_started_at,
+  activeModel: row.active_model,
+  winningModel: row.winning_model,
+  attemptCount: Number(row.attempt_count ?? 0),
+  pollFailureCount: Number(row.poll_failure_count ?? 0),
+  lastKiePollAt: row.last_kie_poll_at,
+  lastErrorCode: row.last_error_code,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
+
+const mapKieRecordRow = (row: KieTaskRecordRow): KieTaskRecord => ({
+  id: row.id,
+  taskId: row.task_id,
+  kieTaskId: row.kie_task_id,
+  kieAccountHash: row.kie_account_hash,
+  status: row.status,
+  requestJson: parseJsonValue(row.request_json, null),
+  responseJson: parseJsonValue(row.response_json, null),
+  attemptNo: Number(row.attempt_no ?? 1),
+  model: row.model,
+  role: row.role,
+  isWinner: row.is_winner === 1,
+  finishedAt: row.finished_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const getKieMeta = (responseJson: unknown) => {
+  const parsed = parseJsonValue<Record<string, unknown>>(responseJson, {});
+  const meta = parsed._usedCarPlatform;
+  return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : {};
+};
+
+const imageTaskDeadline = (moduleCode: string) => {
+  if (moduleCode === "short-video") {
+    return {
+      deadlineAt: null,
+      softTimeoutAt: null,
+    };
+  }
+
+  const now = Date.now();
+  return {
+    deadlineAt: new Date(now + env.kie.imageDeadlineMs),
+    softTimeoutAt: new Date(now + env.kie.imageSoftTimeoutMs),
+  };
+};
 
 const parseInteriorCollageFlag = (value: unknown) => {
   if (!value) return false;
@@ -296,22 +396,59 @@ export class TasksRepository extends Repository {
     kieAccountHash: string;
     requestJson: unknown;
     responseJson: unknown;
+    model?: string | null;
+    role?: "primary" | "fallback";
+    attemptNo?: number;
   }) {
+    const meta = getKieMeta(input.responseJson);
+    const model =
+      input.model ??
+      (typeof meta.model === "string" ? meta.model : null) ??
+      parseJsonValue<Record<string, unknown>>(input.requestJson, {}).model?.toString() ??
+      env.kie.primaryImageModel;
+    const role =
+      input.role ??
+      (meta.role === "fallback" ? "fallback" : "primary");
+    const attemptNo = input.attemptNo ?? (typeof meta.attemptNo === "number" ? meta.attemptNo : role === "fallback" ? 2 : 1);
+    const deadlines = imageTaskDeadline(
+      (await this.findById(input.id))?.moduleCode ?? "",
+    );
+
     await this.execute(
       `UPDATE generation_tasks
        SET status = 'queued',
            progress = 5,
            kie_task_id = :kieTaskId,
-           kie_account_hash = :kieAccountHash
+           kie_account_hash = :kieAccountHash,
+           active_model = :model,
+           attempt_count = GREATEST(attempt_count, :attemptNo),
+           poll_failure_count = 0,
+           last_error_code = NULL,
+           deadline_at = COALESCE(deadline_at, :deadlineAt),
+           soft_timeout_at = COALESCE(soft_timeout_at, :softTimeoutAt)
        WHERE id = :id`,
-      input as unknown as Record<string, unknown>,
+      {
+        ...input,
+        model,
+        attemptNo,
+        ...deadlines,
+      } as unknown as Record<string, unknown>,
     );
 
     await this.execute(
       `INSERT INTO kie_task_records
-        (id, task_id, kie_task_id, kie_account_hash, status, request_json, response_json)
+        (id, task_id, kie_task_id, kie_account_hash, status, request_json, response_json, attempt_no, model, role)
        VALUES
-        (:id, :taskId, :kieTaskId, :kieAccountHash, 'queued', :requestJson, :responseJson)`,
+        (:id, :taskId, :kieTaskId, :kieAccountHash, 'queued', :requestJson, :responseJson, :attemptNo, :model, :role)
+       ON DUPLICATE KEY UPDATE
+        kie_task_id = VALUES(kie_task_id),
+        kie_account_hash = VALUES(kie_account_hash),
+        status = VALUES(status),
+        request_json = VALUES(request_json),
+        response_json = VALUES(response_json),
+        attempt_no = VALUES(attempt_no),
+        model = VALUES(model),
+        updated_at = CURRENT_TIMESTAMP(3)`,
       {
         id: createId("kie_record"),
         taskId: input.id,
@@ -319,6 +456,9 @@ export class TasksRepository extends Repository {
         kieAccountHash: input.kieAccountHash,
         requestJson: JSON.stringify(input.requestJson),
         responseJson: JSON.stringify(input.responseJson),
+        attemptNo,
+        model,
+        role,
       },
     );
   }
@@ -329,7 +469,8 @@ export class TasksRepository extends Repository {
        SET status = 'fail',
            progress = 100,
            error_code = :errorCode,
-           error_message = :errorMessage
+           error_message = :errorMessage,
+           last_error_code = :errorCode
        WHERE id = :id`,
       { id, errorCode, errorMessage },
     );
@@ -341,8 +482,23 @@ export class TasksRepository extends Repository {
        SET status = 'canceled',
            progress = 100,
            error_code = :errorCode,
-           error_message = :errorMessage
+           error_message = :errorMessage,
+           last_error_code = :errorCode
        WHERE id = :id`,
+      { id, errorCode, errorMessage },
+    );
+  }
+
+  async markTimedOut(id: string, errorCode: string, errorMessage: string) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET status = 'fail',
+           progress = 100,
+           error_code = :errorCode,
+           error_message = :errorMessage,
+           last_error_code = :errorCode
+       WHERE id = :id
+         AND status NOT IN ('success', 'fail', 'canceled')`,
       { id, errorCode, errorMessage },
     );
   }
@@ -363,7 +519,8 @@ export class TasksRepository extends Repository {
            progress = :progress,
            result_json = :resultJson,
            error_code = :errorCode,
-           error_message = :errorMessage
+           error_message = :errorMessage,
+           last_error_code = :errorCode
        WHERE id = :id`,
       {
         id,
@@ -378,12 +535,139 @@ export class TasksRepository extends Repository {
     await this.execute(
       `UPDATE kie_task_records
        SET status = :status,
-           response_json = :responseJson
-       WHERE task_id = :id`,
+           response_json = :responseJson,
+           finished_at = CASE WHEN :isTerminal THEN CURRENT_TIMESTAMP(3) ELSE finished_at END
+       WHERE task_id = :id
+         AND is_winner = 1`,
       {
         id,
         status: patch.status,
         responseJson: patch.resultJson ? JSON.stringify(patch.resultJson) : null,
+        isTerminal: ["success", "fail", "canceled"].includes(patch.status),
+      },
+    );
+  }
+
+  async listKieTaskRecords(taskId: string) {
+    const rows = await this.query<KieTaskRecordRow[]>(
+      `SELECT * FROM kie_task_records WHERE task_id = :taskId ORDER BY attempt_no ASC, created_at ASC`,
+      { taskId },
+    );
+    return rows.map(mapKieRecordRow);
+  }
+
+  async recordFallbackStarted(input: {
+    taskId: string;
+    kieTaskId: string;
+    kieAccountHash: string;
+    model: string;
+    requestJson: unknown;
+    responseJson: unknown;
+  }) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET status = 'generating',
+           active_model = :model,
+           fallback_started_at = COALESCE(fallback_started_at, CURRENT_TIMESTAMP(3)),
+           attempt_count = GREATEST(attempt_count, 2),
+           poll_failure_count = 0,
+           last_error_code = NULL
+       WHERE id = :taskId
+         AND status NOT IN ('success', 'fail', 'canceled')`,
+      input as unknown as Record<string, unknown>,
+    );
+
+    await this.execute(
+      `INSERT INTO kie_task_records
+        (id, task_id, kie_task_id, kie_account_hash, status, request_json, response_json, attempt_no, model, role)
+       VALUES
+        (:id, :taskId, :kieTaskId, :kieAccountHash, 'queued', :requestJson, :responseJson, 2, :model, 'fallback')
+       ON DUPLICATE KEY UPDATE
+        kie_task_id = VALUES(kie_task_id),
+        kie_account_hash = VALUES(kie_account_hash),
+        status = VALUES(status),
+        request_json = VALUES(request_json),
+        response_json = VALUES(response_json),
+        model = VALUES(model),
+        updated_at = CURRENT_TIMESTAMP(3)`,
+      {
+        id: createId("kie_record"),
+        ...input,
+        requestJson: JSON.stringify(input.requestJson),
+        responseJson: JSON.stringify(input.responseJson),
+      },
+    );
+  }
+
+  async markPollFailure(id: string, errorCode: string) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET poll_failure_count = poll_failure_count + 1,
+           last_kie_poll_at = CURRENT_TIMESTAMP(3),
+           last_error_code = :errorCode
+       WHERE id = :id
+         AND status NOT IN ('success', 'fail', 'canceled')`,
+      { id, errorCode },
+    );
+  }
+
+  async markPollSuccess(id: string) {
+    await this.execute(
+      `UPDATE generation_tasks
+       SET poll_failure_count = 0,
+           last_kie_poll_at = CURRENT_TIMESTAMP(3),
+           last_error_code = NULL
+       WHERE id = :id
+         AND status NOT IN ('success', 'fail', 'canceled')`,
+      { id },
+    );
+  }
+
+  async updateKieRecord(input: {
+    taskId: string;
+    role: "primary" | "fallback";
+    status: TaskStatus;
+    responseJson?: unknown;
+    isWinner?: boolean;
+  }) {
+    await this.execute(
+      `UPDATE kie_task_records
+       SET status = :status,
+           response_json = :responseJson,
+           is_winner = CASE WHEN :isWinner THEN 1 ELSE is_winner END,
+           finished_at = CASE WHEN :isTerminal THEN CURRENT_TIMESTAMP(3) ELSE finished_at END
+       WHERE task_id = :taskId
+         AND role = :role`,
+      {
+        ...input,
+        responseJson: input.responseJson ? JSON.stringify(input.responseJson) : null,
+        isWinner: input.isWinner === true,
+        isTerminal: ["success", "fail", "canceled"].includes(input.status),
+      },
+    );
+  }
+
+  async markWinner(input: {
+    taskId: string;
+    role: "primary" | "fallback";
+    model?: string | null;
+  }) {
+    await this.execute(
+      `UPDATE kie_task_records
+       SET is_winner = CASE WHEN role = :role THEN 1 ELSE 0 END
+       WHERE task_id = :taskId`,
+      input as unknown as Record<string, unknown>,
+    );
+    await this.execute(
+      `UPDATE generation_tasks
+       SET winning_model = :model,
+           active_model = :model,
+           poll_failure_count = 0,
+           last_error_code = NULL
+       WHERE id = :taskId`,
+      {
+        taskId: input.taskId,
+        model: input.model ?? null,
       },
     );
   }

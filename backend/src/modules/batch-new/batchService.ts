@@ -108,6 +108,27 @@ const batchBillingBody = (batch: BatchTaskRecord) => ({
   accountScope: batch.accountScope,
 });
 
+const kieTimeoutErrorCodes = [
+  "KIE_UPLOAD_TIMEOUT",
+  "KIE_CREATE_TIMEOUT",
+  "KIE_DETAIL_TIMEOUT",
+  "KIE_REQUEST_TIMEOUT",
+] as const;
+
+const extractKieTimeoutErrorCode = (error: unknown) => {
+  if (!(error instanceof Error)) return null;
+  return kieTimeoutErrorCodes.find((code) => error.message.includes(code)) ?? null;
+};
+
+const submitErrorCode = (error: unknown) => {
+  const timeoutCode = extractKieTimeoutErrorCode(error);
+  if (timeoutCode) return timeoutCode;
+  if (error instanceof Error && error.message.includes("no available kie api key")) {
+    return "KIE_KEY_UNAVAILABLE";
+  }
+  return "BATCH_ITEM_SUBMIT_FAILED";
+};
+
 class BatchService {
   async listPresets() {
     const items = await batchRepository.listPresets(DEFAULT_USER_ID);
@@ -371,6 +392,7 @@ class BatchService {
           status: "fail",
           progress: 100,
           resultCount: 0,
+          errorCode: submitErrorCode(error),
           errorMessage: error instanceof Error ? error.message : "submit failed",
         });
       }
@@ -452,6 +474,7 @@ class BatchService {
       status: task.status,
       progress: task.progress,
       resultCount,
+      errorCode: task.error?.code ?? null,
       errorMessage: task.error?.message ?? null,
     });
     if (task.status === "success") {
@@ -476,6 +499,7 @@ class BatchService {
     let billing: FrozenGenerationBilling | null = null;
     let lease: KieAccountLease | null = null;
     let leaseReleasedByKieClient = false;
+    let submittedToKie = false;
     const runKieOperation = async <T>(operation: () => Promise<T>) => {
       try {
         return await operation();
@@ -564,7 +588,7 @@ class BatchService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: "gpt-image-2-image-to-image",
+          model: kieTask.model ?? "gpt-image-2-image-to-image",
           moduleCode: "batch-new",
           itemKind: item.itemKind,
           prompt: task.prompt,
@@ -576,15 +600,29 @@ class BatchService {
         },
         responseJson: kieTask.raw,
       });
+      submittedToKie = true;
       await batchRepository.updateItemFromTask({
         itemId: item.itemId,
         status: "queued",
         progress: 5,
         resultCount: 0,
+        errorCode: null,
+        errorMessage: null,
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes("no available kie api key")) {
         throw error;
+      }
+      if (submittedToKie) {
+        await batchRepository.updateItemFromTask({
+          itemId: item.itemId,
+          status: "queued",
+          progress: 5,
+          resultCount: 0,
+          errorCode: null,
+          errorMessage: null,
+        });
+        return;
       }
       if (lease && !leaseReleasedByKieClient) await kieKeyPool.release(lease.accountHash);
       try {
@@ -594,7 +632,7 @@ class BatchService {
       }
       await tasksRepository.markFailed(
         task.id,
-        "BATCH_ITEM_SUBMIT_FAILED",
+        submitErrorCode(error),
         error instanceof Error ? error.message : "batch item submit failed",
       );
       throw error;
@@ -625,6 +663,8 @@ class BatchService {
       status: "success",
       progress: 100,
       resultCount: task.resultImages.length,
+      errorCode: null,
+      errorMessage: null,
     });
   }
 }

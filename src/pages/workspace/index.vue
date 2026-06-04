@@ -75,6 +75,23 @@ function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
 }
 
+const generationFailureMessageMap: Record<string, string> = {
+  KIE_TASK_TIMEOUT: "生成超时，请重试",
+  KIE_UPLOAD_TIMEOUT: "图片上传超时，请重试",
+  KIE_CREATE_TIMEOUT: "生成服务连接超时，请重试",
+  KIE_DETAIL_TIMEOUT: "生成状态查询超时，请稍后刷新",
+  KIE_REQUEST_TIMEOUT: "生成服务网络超时，请重试",
+  KIE_NETWORK_TIMEOUT: "生成服务网络异常，请重试",
+  KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
+};
+
+function getGenerationFailureMessage(item: Pick<WorkspaceRecentItem, "errorCode" | "moduleCode">) {
+  if (item.errorCode && generationFailureMessageMap[item.errorCode]) {
+    return generationFailureMessageMap[item.errorCode];
+  }
+  return getViewMediaFailureMessage(item.moduleCode);
+}
+
 function isCreativeImageModuleCode(moduleCode?: string) {
   return moduleCode === "creative-image";
 }
@@ -423,6 +440,8 @@ function mapBatchDetailToJob(
       thumbnail: isInteriorBatchItemKind(item.itemKind)
         ? undefined
         : existing.previewUrl || undefined,
+      errorCode: item.error?.code ?? undefined,
+      error: item.error?.message ?? undefined,
     })),
   };
 }
@@ -1832,7 +1851,11 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
 async function handlePickRecent(item: WorkspaceRecentItem) {
   if (item.status === "fail" || item.status === "canceled") {
-    message.error(getViewMediaFailureMessage(item.moduleCode));
+    if (item.errorCode === "KIE_TASK_TIMEOUT") {
+      message.error("生成超时，请重试");
+      return;
+    }
+    message.error(getGenerationFailureMessage(item));
     return;
   }
 

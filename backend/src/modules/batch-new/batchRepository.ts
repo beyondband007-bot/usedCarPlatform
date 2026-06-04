@@ -62,6 +62,7 @@ interface BatchItemRow extends RowDataPacket {
   status: TaskStatus;
   progress: number;
   result_count: number;
+  error_code: string | null;
   error_message: string | null;
   created_at: Date;
   updated_at: Date;
@@ -117,7 +118,10 @@ const mapItem = (row: BatchItemRow): BatchItemSummary => ({
   status: row.status,
   progress: row.progress,
   resultCount: row.result_count,
-  error: row.error_message ? { message: row.error_message } : null,
+  error:
+    row.error_code || row.error_message
+      ? { code: row.error_code, message: row.error_message }
+      : null,
 });
 
 export class BatchRepository extends Repository {
@@ -304,6 +308,7 @@ export class BatchRepository extends Repository {
     status: TaskStatus;
     progress: number;
     resultCount: number;
+    errorCode?: string | null;
     errorMessage?: string | null;
   }) {
     await this.execute(
@@ -311,9 +316,10 @@ export class BatchRepository extends Repository {
        SET status = :status,
            progress = :progress,
            result_count = :resultCount,
+           error_code = :errorCode,
            error_message = :errorMessage
        WHERE id = :itemId`,
-      { ...input, errorMessage: input.errorMessage ?? null },
+      { ...input, errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null },
     );
   }
 

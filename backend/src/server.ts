@@ -7,6 +7,7 @@ import { kieKeyPool } from "./providers/kie/kieKeyPool";
 const start = async () => {
   await checkMysqlConnection();
   await kieKeyPool.syncAccounts();
+  await kieKeyPool.reconcileConcurrency();
   await syncCreditFunctionCatalog();
 
   const app = createApp();

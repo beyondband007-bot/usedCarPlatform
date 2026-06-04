@@ -41,6 +41,7 @@ export const syncBatchItemFromGenerationTask = async (task: GenerationTaskRecord
     status: currentTask.status,
     progress: currentTask.progress,
     resultCount: results.length,
+    errorCode: currentTask.errorCode ?? null,
     errorMessage: currentTask.errorMessage ?? null,
   });
 

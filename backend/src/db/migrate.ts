@@ -49,6 +49,11 @@ const addUniqueIndexIfMissing = async (tableName: string, indexName: string, def
   await pool.query(`ALTER TABLE ${tableName} ADD UNIQUE KEY ${indexName} ${definition}`);
 };
 
+const dropIndexIfExists = async (tableName: string, indexName: string) => {
+  if (!(await indexExists(tableName, indexName))) return;
+  await pool.query(`ALTER TABLE ${tableName} DROP INDEX ${indexName}`);
+};
+
 const tableExists = async (tableName: string) => {
   const [rows] = await pool.query<any[]>(
     `SELECT 1
@@ -288,6 +293,21 @@ const migrateMockSubscriptions = async () => {
       plan_code = VALUES(plan_code),
       status = VALUES(status),
       expires_at = VALUES(expires_at)`,
+  );
+};
+
+const backfillBatchItemErrorCodes = async () => {
+  if (!(await tableExists("batch_task_items"))) return;
+  await pool.query(
+    `UPDATE batch_task_items bti
+     LEFT JOIN generation_tasks gt ON gt.id = bti.generation_task_id
+     SET bti.error_code = CASE
+       WHEN bti.error_message = 'KIE_REQUEST_TIMEOUT' THEN 'KIE_REQUEST_TIMEOUT'
+       WHEN bti.error_message IS NOT NULL THEN COALESCE(gt.error_code, gt.last_error_code, 'BATCH_ITEM_SUBMIT_FAILED')
+       ELSE COALESCE(gt.error_code, gt.last_error_code)
+     END
+     WHERE bti.error_code IS NULL
+       AND (bti.status = 'fail' OR bti.error_message IS NOT NULL)`,
   );
 };
 
@@ -554,6 +574,8 @@ const run = async () => {
     await addColumnIfMissing("delivery_packages", "package_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_packages", "expires_at", "DATETIME(3) NULL");
     await addColumnIfMissing("batch_task_items", "source_asset_ids_json", "JSON NULL");
+    await addColumnIfMissing("batch_task_items", "error_code", "VARCHAR(120) NULL");
+    await backfillBatchItemErrorCodes();
     await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
 
     await addColumnIfMissing("generation_tasks", "credits_user_id", "BIGINT NULL");
@@ -565,6 +587,15 @@ const run = async () => {
     await addColumnIfMissing("generation_tasks", "billing_status", "VARCHAR(24) NULL");
     await addColumnIfMissing("generation_tasks", "estimated_points", "DECIMAL(18, 4) NULL");
     await addColumnIfMissing("generation_tasks", "settled_points", "DECIMAL(18, 4) NULL");
+    await addColumnIfMissing("generation_tasks", "deadline_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("generation_tasks", "soft_timeout_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("generation_tasks", "fallback_started_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("generation_tasks", "active_model", "VARCHAR(80) NULL");
+    await addColumnIfMissing("generation_tasks", "winning_model", "VARCHAR(80) NULL");
+    await addColumnIfMissing("generation_tasks", "attempt_count", "INT NOT NULL DEFAULT 0");
+    await addColumnIfMissing("generation_tasks", "poll_failure_count", "INT NOT NULL DEFAULT 0");
+    await addColumnIfMissing("generation_tasks", "last_kie_poll_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("generation_tasks", "last_error_code", "VARCHAR(120) NULL");
     await addIndexIfMissing("generation_tasks", "idx_generation_tasks_billing_task", "(billing_task_id)");
     await addIndexIfMissing(
       "generation_tasks",
@@ -598,6 +629,13 @@ const run = async () => {
       "idx_account_creation_audit_idempotency",
       "(operator_user_id, idempotency_key)",
     );
+    await addColumnIfMissing("kie_task_records", "attempt_no", "INT NOT NULL DEFAULT 1");
+    await addColumnIfMissing("kie_task_records", "model", "VARCHAR(80) NULL");
+    await addColumnIfMissing("kie_task_records", "role", "VARCHAR(24) NOT NULL DEFAULT 'primary'");
+    await addColumnIfMissing("kie_task_records", "is_winner", "TINYINT(1) NOT NULL DEFAULT 0");
+    await addColumnIfMissing("kie_task_records", "finished_at", "DATETIME(3) NULL");
+    await dropIndexIfExists("kie_task_records", "uk_kie_task_records_task");
+    await addUniqueIndexIfMissing("kie_task_records", "uk_kie_task_records_task_role", "(task_id, role)");
     await seedSubscriptionPlans();
     await seedAuthData();
     await migrateMockSubscriptions();

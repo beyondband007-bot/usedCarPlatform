@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { env } from "../config/env";
 import { createId } from "./ids";
 
 const extensionFromContentType = (contentType: string | null) => {
@@ -18,7 +19,20 @@ const extensionFromContentType = (contentType: string | null) => {
 export const downloadFile = async (url: string, directory: string, prefix: string) => {
   await fs.mkdir(directory, { recursive: true });
 
-  const response = await fetch(url);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), env.kie.downloadTimeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("KIE_RESULT_DOWNLOAD_TIMEOUT");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+
   if (!response.ok) {
     throw new Error(`download failed: ${response.status} ${response.statusText}`);
   }

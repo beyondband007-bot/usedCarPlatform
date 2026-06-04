@@ -36,6 +36,12 @@ export interface WorkspaceRecentItem {
   progress?: number
   resultCount?: number
   error?: string
+  errorCode?: string
+  activeModel?: string | null
+  fallbackStarted?: boolean
+  deadlineAt?: string | null
+  softTimeoutAt?: string | null
+  winningModel?: string | null
   imageWidth?: number
   imageHeight?: number
 }
@@ -136,6 +142,8 @@ export interface WorkspaceBatchActiveItem {
   status: WorkspaceRecentItem['status']
   progress: number
   thumbnail?: string
+  errorCode?: string
+  error?: string
 }
 
 export interface WorkspaceBatchActiveJob {

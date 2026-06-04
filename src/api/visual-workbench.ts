@@ -113,6 +113,11 @@ export interface GenerationTaskDetail {
   videoUrl?: string
   previewVideo?: string
   downloadUrl?: string
+  activeModel?: string | null
+  fallbackStarted?: boolean
+  deadlineAt?: string | null
+  softTimeoutAt?: string | null
+  winningModel?: string | null
   error: {
     code?: string
     message?: string
@@ -264,7 +269,7 @@ export interface BatchTaskDetailItem {
   status: GenerationTaskStatus
   progress: number
   resultCount: number
-  error?: { message?: string | null } | null
+  error?: { code?: string | null; message?: string | null } | null
 }
 
 export interface BatchTaskDetail {
@@ -370,6 +375,11 @@ export interface RecentGenerationTask {
   inputAssetThumbnailUrl?: string | null
   inputAssetUrl?: string | null
   resultCount?: number | null
+  activeModel?: string | null
+  fallbackStarted?: boolean
+  deadlineAt?: string | null
+  softTimeoutAt?: string | null
+  winningModel?: string | null
   error?: string | { code?: string; message?: string } | null
 }
 
