@@ -21,6 +21,20 @@ export function normalizeApiErrorMessage(message: string) {
     return '短视频服务创建任务失败，请稍后重试'
   }
 
+  if (
+    normalized.includes('kie file upload failed') ||
+    normalized.includes('kie upload response missing fileurl')
+  ) {
+    return '生成服务上传暂时失败，请稍后重试'
+  }
+
+  if (
+    normalized.includes('kie create task failed') ||
+    normalized.includes('kie create text-to-image task failed')
+  ) {
+    return '生成服务创建任务失败，请稍后重试'
+  }
+
   if (normalized.includes('short-video task creation failed')) {
     return '短视频任务创建失败，请稍后重试'
   }

@@ -16,6 +16,7 @@
     "phase4:user-api-test": "tsx src/modules/platform/platformUserCreation.test.ts",
     "phase7:integration-contract-test": "tsx src/modules/platform/applicationIntegrationContract.test.ts",
     "user-isolation-test": "tsx src/modules/tasks/userIsolation.test.ts",
+    "kie-failure-policy-test": "tsx src/providers/kie/kieFailurePolicy.test.ts",
     "print:application-contract-seed": "tsx scripts/print-application-contract-seed.ts",
     "phase11:smoke": "node scripts/phase11-e2e-smoke.mjs"
   },

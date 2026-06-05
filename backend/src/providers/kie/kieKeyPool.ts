@@ -65,6 +65,16 @@ class KieKeyPool {
       }
     } while (Date.now() < deadline);
 
+    await this.reconcileConcurrency();
+    try {
+      return await this.tryAcquire();
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof Error && error.message.includes("no available kie api key"))) {
+        throw error;
+      }
+    }
+
     throw lastError ?? errors.kieKeyUnavailable();
   }
 
@@ -185,7 +195,7 @@ class KieKeyPool {
     );
   }
 
-  async markFailure(accountHash: string, cooldownSeconds = 60) {
+  async markFailure(accountHash: string, cooldownSeconds = 10) {
     if (!accountHash) return;
     await pool.execute(
       `UPDATE kie_accounts

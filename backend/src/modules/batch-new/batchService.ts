@@ -3,7 +3,6 @@ import { createId } from "../../shared/ids";
 import { assetsRepository } from "../assets/assetsRepository";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { tasksService } from "../tasks/tasksService";
-import { userLogoService } from "../user-logo/userLogoService";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import type { KieAccountLease } from "../../providers/kie/kieTypes";
@@ -79,6 +78,23 @@ const resolveInteriorPrompt = (itemKind: BatchItemKind) => {
   if (itemKind === "interior_clean_collage") return batchInteriorCleanCollagePrompt;
   if (itemKind === "interior_collage") return batchInteriorCollagePrompt;
   return batchInteriorPrompt;
+};
+
+const requireBatchLogoAsset = async (config: BatchVisualConfig, userId: string) => {
+  if (!config.useRecentLogo) return null;
+  if (!config.logoAssetId) {
+    throw errors.invalidParameter("logoAssetId is required when useRecentLogo is enabled");
+  }
+
+  const asset = await assetsRepository.findById(config.logoAssetId, userId);
+  if (!asset) throw errors.assetNotFound();
+  if (asset.purpose !== "logo") {
+    throw errors.invalidParameter("logoAssetId must point to a logo asset", {
+      assetId: asset.id,
+      purpose: asset.purpose,
+    });
+  }
+  return asset;
 };
 
 const deliveryTitleByKind: Record<BatchItemKind, string> = {
@@ -198,6 +214,8 @@ class BatchService {
     const interiorClean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
     const interiorCollage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
     let total = 0;
+
+    await requireBatchLogoAsset(config, subscription.userKey);
 
     for (const group of body.carGroups) {
       if (!Array.isArray(group.exteriorAssetIds) || group.exteriorAssetIds.length === 0) {
@@ -564,9 +582,7 @@ class BatchService {
       }
 
       if (item.itemKind === "exterior" && config.useRecentLogo) {
-        const logoAsset = config.logoAssetId
-          ? await assetsRepository.findById(config.logoAssetId, batch.userId)
-          : await userLogoService.resolveLogoAsset(batch.userId);
+        const logoAsset = await requireBatchLogoAsset(config, batch.userId);
         if (!logoAsset) throw errors.assetNotFound();
         const uploadedLogo = await runKieOperation(() =>
           kieClient.uploadLocalFileWithLease(

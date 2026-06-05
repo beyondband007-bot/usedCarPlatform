@@ -567,6 +567,10 @@ function mapBatchVisualConfigFromTemplate(
     sceneCategory: template.sceneCategory,
     outputRatio: template.outputRatio,
     useRecentLogo: template.useRecentLogo,
+    logoAssetId:
+      template.useRecentLogo && recentLogo.value?.assetId
+        ? recentLogo.value.assetId
+        : null,
     enableLightConsistency: template.lightConsistency,
     enablePaintRefresh: template.paintRefresh,
     colorCode: template.paintRefresh ? template.colorCode?.trim() || null : null,
@@ -1103,6 +1107,11 @@ async function handleCreateBatchTask() {
     return;
   }
 
+  if (template.useRecentLogo && !recentLogo.value?.assetId) {
+    message.warning("已勾选使用 Logo，请先上传 Logo 后再提交任务");
+    return;
+  }
+
   if (props.canCreateBatchTask && !(await props.canCreateBatchTask())) {
     return;
   }
@@ -1355,7 +1364,9 @@ function hasInProgressDeliveryTasks() {
       task.status === "waiting" ||
       task.status === "queued" ||
       task.status === "generating" ||
-      (task.deliveryTotal > 0 && task.deliveryCompleted < task.deliveryTotal),
+      (!isDeliveryTaskComplete(task) &&
+        task.deliveryTotal > 0 &&
+        task.deliveryCompleted < task.deliveryTotal),
   );
 }
 
@@ -1450,26 +1461,31 @@ function buildDeliveryTaskMetrics(
 ) {
   const snapshotTotal = getSnapshotDisplayTotal(snapshot);
   const deliveryTotal = Math.max(snapshotTotal ?? item.total, 0);
-  const deliveryCompleted = Math.min(
-    deliveryTotal,
-    Math.max(item.assetCount, 0),
-  );
+  const deliveryCompleted =
+    item.status === "fail" || item.status === "canceled"
+      ? Math.min(deliveryTotal, Math.max(item.completed + item.failed, item.total))
+      : Math.min(deliveryTotal, Math.max(item.assetCount, 0));
   const deliveryProgress =
     deliveryTotal > 0
       ? Math.round((deliveryCompleted / deliveryTotal) * 100)
       : Math.round(item.progress);
+  const failedText = item.failed > 0 ? `，失败 ${item.failed}` : "";
 
   return {
     deliveryTotal,
     deliveryCompleted,
     deliveryProgress,
-    meta: `${deliveryCompleted}/${deliveryTotal} · ${formatDate(item.updatedAt)}`,
+    meta:
+      item.status === "fail"
+        ? `失败 ${item.failed}/${deliveryTotal} · ${formatDate(item.updatedAt)}`
+        : `${deliveryCompleted}/${deliveryTotal}${failedText} · ${formatDate(item.updatedAt)}`,
   };
 }
 
 function isDeliveryTaskComplete(
-  task: Pick<DeliveryTask, "deliveryCompleted" | "deliveryTotal">,
+  task: Pick<DeliveryTask, "status" | "deliveryCompleted" | "deliveryTotal">,
 ) {
+  if (task.status === "fail" || task.status === "canceled") return true;
   return task.deliveryTotal > 0 && task.deliveryCompleted >= task.deliveryTotal;
 }
 
@@ -1482,6 +1498,10 @@ function isDeliveryTaskPreviewable(task: Pick<DeliveryTask, "deliveryTotal">) {
 }
 
 function getDeliveryPendingSlotLabel(task: DeliveryTask) {
+  if (task.status === "fail" || task.status === "canceled") {
+    return "生成失败";
+  }
+
   if (
     task.deliveryCompleted > 0 ||
     task.status === "generating" ||
@@ -2641,7 +2661,16 @@ defineExpose({
 
                 <div class="delivery-status">
                   <template
-                    v-if="
+                    v-if="task.status === 'fail' || task.status === 'canceled'"
+                  >
+                    <span
+                      class="delivery-status-ring is-fail"
+                      aria-hidden="true"
+                    ></span>
+                    <strong class="is-fail">生成失败</strong>
+                  </template>
+                  <template
+                    v-else-if="
                       task.deliveryTotal > 0 &&
                       task.deliveryCompleted >= task.deliveryTotal
                     "
@@ -3866,6 +3895,10 @@ defineExpose({
   line-height: 1.2;
 }
 
+.delivery-status strong.is-fail {
+  color: #ef4444;
+}
+
 .delivery-item.is-loading .delivery-status strong {
   color: var(--workspace-accent-strong, #a86d00);
 }
@@ -3880,6 +3913,11 @@ defineExpose({
     var(--workspace-accent, #efc24c) 8%,
     transparent
   );
+}
+
+.delivery-status-ring.is-fail {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .delivery-status-progress {

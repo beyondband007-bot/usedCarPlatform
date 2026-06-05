@@ -183,6 +183,7 @@ export interface BatchVisualConfig {
   sceneCategory: string
   outputRatio: string
   useRecentLogo: boolean
+  logoAssetId?: string | null
   enableLightConsistency: boolean
   enablePaintRefresh: boolean
   colorCode?: string | null
