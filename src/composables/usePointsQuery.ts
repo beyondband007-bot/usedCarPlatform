@@ -149,6 +149,24 @@ export function usePointsQuery() {
     return selectedChild.value?.creditsUserId ?? null
   })
 
+  async function ensureEnterpriseIdentityReady() {
+    const user = authStore.userInfo
+    if (!user || user.role !== 'enterprise' || !authStore.token) return
+
+    const hasEnterpriseTenant = Boolean(user.enterpriseTenantId)
+    const hasRoleMetadata =
+      user.canViewEnterpriseChildren !== undefined
+      && Boolean(user.enterpriseMemberRole || user.enterpriseAccountRole)
+
+    if (hasEnterpriseTenant && hasRoleMetadata) return
+
+    try {
+      await authStore.refreshUserInfo()
+    } catch {
+      // Keep the page resilient even if the identity refresh fails.
+    }
+  }
+
   async function loadChildMembers() {
     if (!showSubAccountScope.value) {
       childMembers.value = []
@@ -370,6 +388,8 @@ export function usePointsQuery() {
   )
 
   onMounted(async () => {
+    await ensureEnterpriseIdentityReady()
+
     if (showSubAccountScope.value) {
       await loadChildMembers()
     }
