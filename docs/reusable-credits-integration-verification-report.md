@@ -78,7 +78,7 @@ The current integration supports:
 The shared static prototype `积分后台-三角色静态原型.html` has been ported into usedCarPlatform as:
 
 ```text
-/credits-admin
+/reusable-credits-console
 ```
 
 The route includes:
@@ -227,15 +227,15 @@ Use `enterprise` to test normal product-user pages:
 - `/credits`
 - `/package-points`
 
-The `enterprise` user must not be able to enter `/credits-admin`.
+The `enterprise` user must not be able to enter `/reusable-credits-console`.
 
 Use `admin` to test:
 
-- `/credits-admin`
+- `/reusable-credits-console`
 
 Use `developer` to review all back-office role views. Use `agent` to verify that the login can only see the agent back-office view.
 
-The role switcher inside `/credits-admin` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
+The role switcher inside `/reusable-credits-console` is currently for prototype/demo review. Real developer/admin/agent login separation is a future production auth and permission phase.
 
 Account creation hierarchy:
 
@@ -573,7 +573,7 @@ password: 123456
 3. Open:
 
 ```text
-http://127.0.0.1:5173/credits-admin
+http://127.0.0.1:5173/reusable-credits-console
 ```
 
 4. Click `刷新实时数据`.

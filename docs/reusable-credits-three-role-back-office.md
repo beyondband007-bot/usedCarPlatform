@@ -1,12 +1,12 @@
 # Reusable Credits Platform Console
 
-Status: Phase 6 agent operations foundation implemented; frontend write forms pending
-Date: 2026-06-04
-Route: `/credits-admin`
+Status: Latest PRD Phase 0/1 started
+Date: 2026-06-05
+Route: `/back-office`
 
 ## Purpose
 
-The shared static prototype `积分后台-三角色静态原型.html` has been ported into the usedCarPlatform Vue frontend and is now being moved into the Reusable Credits Platform console.
+The shared static prototype `积分后台-三角色静态原型.html` has been ported into the Vue frontend and is now being separated from the usedCarPlatform product shell as the Reusable Credits Platform console.
 
 This page is intended for team review and local integration testing while frontend write forms, account-creation approval workflows, and deeper production workflows are still being designed.
 
@@ -20,13 +20,16 @@ The Three-Role Credits Back Office should be treated as complete for the current
 
 Completed in this branch:
 
-- Vue route `/credits-admin`
+- Vue route `/back-office`
+- standalone back-office login `/back-office/login`
 - three reviewable back-office views: developer, company admin, and agent
 - role-limited local mock access for `developer`, `admin`, and `agent`
 - regular user exclusion from back-office access
 - regular-user-to-agent onboarding shown as a developer/admin back-office action
-- live read-only credit data through the usedCar backend proxy
-- non-mutating action buttons that show intended workflows
+- live credit data through the usedCar backend proxy
+- role-aware account creation buttons and shared form wired to the platform write API
+- Developer-only point adjustment per latest PRD
+- Developer account deletion for Admin/Agent/User and Admin deletion/disable for Agent only
 - documentation for account creation and agent onboarding policy
 - Phase 1 Reusable Credits Platform console language and multi-application catalog foundation
 - hierarchical account-creation policy model for Developer/Admin/Agent
@@ -39,20 +42,19 @@ Completed in this branch:
 
 Not production-complete yet:
 
-- server-side RBAC coverage for future back-office write APIs
+- server-side RBAC coverage for future back-office write APIs beyond account creation, allowed deletion, and Developer point adjustment
 - audited regular-user-to-agent promotion API
 - agent onboarding database/API
 - production CRUD for tenants, users, agents, and full lifecycle settlement/material/commission administration
 - approval workflow implementation for role changes and account creation
-- frontend forms wired to the new user creation write API
 - production registration and billing rows for future applications such as `clothing_ai`
 - API endpoints to update persisted Developer/Admin account-creation toggles from the console
 
-Decision for now: keep the current console buttons non-mutating until frontend write forms are wired to the Phase 4 API and the remaining role-promotion/approval workflows are implemented.
+Decision for now: account creation writes are enabled only inside `/back-office`; the remaining role-promotion/approval workflows still need follow-up APIs.
 
 ## Roles
 
-The console has a role switcher with three operational views:
+The console has three role-derived operational views:
 
 | Role | Local view | Scope |
 | --- | --- | --- |
@@ -60,7 +62,7 @@ The console has a role switcher with three operational views:
 | Company Admin | 公司管理员后台 | Operations view for agents, customers, recharge orders, transactions, and tickets without direct high-risk ledger writes. |
 | Agent | 代理商后台 | Own customers, leads, consumption, commission, settlement, materials, and support tickets. |
 
-The role switcher is inside the page for prototype/demo purposes. Production should derive role and menu access from real Reusable Credits Platform back-office session data.
+The active view now follows the logged-in back-office role. Production should continue deriving role and menu access from real Reusable Credits Platform back-office session data.
 
 Regular product users are not back-office operators while their role remains regular. They can use the front-office product pages only. If a regular user becomes an Agent through a back-office role/category change, that same person can then log in to the Reusable Credits Platform console as an Agent.
 
@@ -161,7 +163,7 @@ npm run dev
 Open:
 
 ```text
-http://127.0.0.1:5173/credits-admin
+http://127.0.0.1:5173/back-office
 ```
 
 Use the local mock admin login:
@@ -174,28 +176,28 @@ password: 123456
 ## Review Checklist
 
 1. Log in as `admin`.
-2. Open `/credits-admin`.
+2. Open `/back-office`.
 3. Switch between 开发者, 公司管理员, and 代理商.
 4. Confirm the left menu changes by role.
 5. Confirm developer pages show live account, function, product, and transaction data after clicking `刷新实时数据`.
 6. Confirm search and status filters work inside table views.
-7. Confirm action buttons update the `当前操作` line and do not perform real writes yet.
+7. Confirm account creation buttons open the shared form and successful submissions refresh customer/account data.
 8. Confirm the agent pages show live seeded leads, customers, commission preview, settlement, materials, and tickets.
 
 ## Current Limits
 
-This implementation finishes the three-role back-office UI and the first Agent operations API surface. It does not yet implement all production writes for agent onboarding, settlement payout, material management, or admin CRUD operations.
+This implementation starts the latest-PRD back-office shape with independent login/shell, the first Agent operations API surface, account creation, allowed account deletion, and Developer point adjustment. It does not yet implement all production writes for agent onboarding, settlement payout, material management, or tenant/product administration.
 
-High-risk financial operations now have role permissions modeled, including Developer/Admin point adjustment. Future backend write endpoints should use append-only ledger events, idempotency keys, operator identity, and audit reasons rather than direct balance or transaction edits.
+Developer point adjustment now writes a Reusable Credits Platform `adjustment` transaction row and records operator/target metadata plus the audit reason in the remark. Future high-risk financial endpoints should keep the same append-only ledger and operator-identity pattern. Company Admin cannot adjust points per the latest PRD.
 
 ## Account Creation Policy
 
 The account hierarchy is:
 
 - Developer can create Admins, Agents, and Users.
-- Developer toggle controls whether Admin can create Agents and Users.
+- Developer toggle controls whether Admin can create Agents.
 - Developer can disable Agent creation of Users.
-- Admin can create Agents and Users while Developer allows it.
+- Admin can create Agents while Developer allows it.
 - Admin toggle controls whether Agent can create Users.
 - Admin toggle controls whether User becomes Agent.
 - Agent can create Users when Admin allows it, unless Developer disables it.
@@ -209,10 +211,16 @@ Role capability matrix:
 | Role | Create | Read | Update | Delete |
 | --- | --- | --- | --- | --- |
 | Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
-| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Admin | Agents | All transactions and balances | Agent basic operations only | Agents |
 | Agent | Users | Transactions and balances of Users it creates | None | None |
 
 Production account creation should record creator role, creator id, tenant/customer ownership, application ownership, agent relation, policy decision, approval status, and audit history.
+
+Implemented matrix actions in `/back-office`:
+
+- Developer can create, adjust points, and delete Admin/Agent/User accounts.
+- Admin can create and delete/disable Agent accounts. User list is read-only.
+- Agent can create User accounts and read its own customer operations; Agent does not get point adjustment or delete buttons.
 
 ## Application Integration Contract
 

@@ -147,6 +147,13 @@ const seedAuthData = async () => {
   );
 
   for (const [roleCode, permissions] of Object.entries(defaultBackOfficeRolePermissions)) {
+    await pool.query(
+      `DELETE FROM app_role_permissions
+       WHERE role_code = :roleCode
+         AND permission_code NOT IN (:permissions)`,
+      { roleCode, permissions: [...permissions] },
+    );
+
     for (const permissionCode of permissions) {
       await pool.query(
         `INSERT INTO app_role_permissions (role_code, permission_code)

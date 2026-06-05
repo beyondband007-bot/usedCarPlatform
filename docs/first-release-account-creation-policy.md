@@ -1,17 +1,17 @@
 # Account Creation Policy
 
-Status: Phase 7 application integration contract implemented
-Date: 2026-06-04
+Status: Latest PRD reconciliation started
+Date: 2026-06-05
 
 ## Decision
 
 The Reusable Credits Platform console supports account creation from all three back-office roles:
 
 - Developer can create Admins, Agents, and Users.
-- Admin can create Agents and Users.
+- Admin can create Agents.
 - Agent can create Users.
 
-Developer can turn Admin creation of Agents/Users on/off. Developer can also disable Agent creation of Users as a top-level override.
+Developer can turn Admin creation of Agents on/off. Developer can also disable Agent creation of Users as a top-level override.
 
 Admin normally controls whether Agent can create Users. Admin can also turn User-to-Agent promotion on/off. Agent User creation is enabled when Admin allows it, unless Developer disables it.
 
@@ -26,7 +26,7 @@ A regular product user cannot log in through this console while they remain a re
 Allowed operator roles:
 
 - developer
-- company admin
+- company admin, for creating/managing Agents only
 - agent, for creating Users only, if Admin enables agent-side User creation and Developer has not disabled it
 
 Not allowed:
@@ -61,33 +61,32 @@ developer: account:create:admin, account:create:agent, account:create:user,
   account:delete:admin, account:delete:agent, account:delete:user,
   credits:balance:read:all, credits:transaction:read:all,
   credits:points:adjust, policy:account-creation:manage
-admin: account:create:agent, account:create:user,
-  account:delete:agent, account:delete:user,
+admin: account:create:agent,
+  account:delete:agent,
   credits:balance:read:all, credits:transaction:read:all,
-  credits:points:adjust, policy:agent-user-creation:manage,
-  policy:user-agent-promotion:manage
+  policy:agent-user-creation:manage, policy:user-agent-promotion:manage
 agent: account:create:user,
   credits:balance:read:created-users,
   credits:transaction:read:created-users
 ```
 
-In `/credits-admin`:
+In `/reusable-credits-console`:
 
-- developer view shows Developer creation of Admin/Agent/User and toggles for Admin Agent/User creation plus Agent User creation
-- admin view shows Admin creation of Agent/User and toggles for Agent User creation plus User-to-Agent promotion
-- agent view shows User creation as enabled when Admin allows it, unless Developer disables it
+- developer view shows Create Admin/Agent/User buttons and toggles for Admin Agent/User creation plus Agent User creation
+- admin view shows Create Agent buttons and toggles for Agent User creation plus User-to-Agent promotion
+- agent view shows Create User when Admin allows it, unless Developer disables it
 
 ## Role Capability Matrix
 
 | Role | Create | Read | Update | Delete |
 | --- | --- | --- | --- | --- |
 | Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
-| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Admin | Agents | All transactions and balances | Agent basic operations only | Agents |
 | Agent | Users | Transactions and balances of Users it creates | None | None |
 
-Point adjustment is represented as `credits:points:adjust`. Production point adjustment endpoints should write append-only audited ledger adjustment events rather than directly editing balances.
+Point adjustment is represented as `credits:points:adjust`. Latest PRD allows this permission only for Developer. Developer point changes are executed through `/api/v1/platform/credits/adjustments`, which updates the target credit account and writes an `adjustment` ledger row. Account deletion is executed through `/api/v1/platform/users/:userId` and soft-disables the app user, back-office assignment, application links, and agent relations.
 
-The current frontend account creation surfaces remain non-mutating, but the backend now exposes the first production write foundation:
+The current console account creation buttons open a shared form and call the platform write API:
 
 ```http
 POST /api/v1/platform/users
@@ -110,6 +109,15 @@ Optional fields:
 - `initialPoints`
 
 The endpoint validates the current authenticated back-office operator, checks persisted account-creation policy, creates/links a personal credits account, records the application customer link, writes agent-customer relation when an Agent creates a User, and writes audit rows for both allowed and denied policy decisions.
+
+Additional matrix APIs:
+
+```http
+POST /api/v1/platform/credits/adjustments
+DELETE /api/v1/platform/users/:userId
+```
+
+Developer can adjust/delete Admin, Agent, and User accounts. Admin can delete/disable Agent accounts only. Agent has no adjust/delete capability.
 
 Phase 5 console visibility:
 
@@ -143,9 +151,9 @@ Admin and Agent account creation needs more than a UI button. The hierarchy shou
 
 - Developer always can create users.
 - Developer always can create Admins, Agents, and Users.
-- Developer controls whether Admin can create Agents and Users.
+- Developer controls whether Admin can create Agents.
 - Developer can disable Agent creation of Users.
-- Admin can create Agents and Users while Developer allows it.
+- Admin can create Agents while Developer allows it.
 - Admin controls whether Agents under the Admin/operation scope can create Users.
 - Admin controls whether a User can become an Agent.
 - Effective Agent permission is Admin allows Agent User creation AND Developer has not disabled it.
@@ -197,7 +205,7 @@ Suggested future database/API concepts:
 ## How To Review
 
 1. Log in as `admin`.
-2. Open `/credits-admin`.
+2. Open `/reusable-credits-console`.
 3. Switch to `开发者` and confirm account creation actions are visible.
 4. Switch to `公司管理员` and confirm account creation actions are visible.
 5. Switch to `代理商` and confirm client account creation is shown as Admin controlled with a Developer disable override.

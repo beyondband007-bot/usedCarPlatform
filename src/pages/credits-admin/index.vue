@@ -5,6 +5,12 @@ import {
   NButton,
   NDataTable,
   NEmpty,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NModal,
+  NSelect,
   NSpin,
   NSwitch,
   NTag,
@@ -13,6 +19,9 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 
 import {
+  adjustPlatformCredits,
+  createPlatformUser,
+  deletePlatformUser,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
   type AgentOperationsCommissionPreview,
@@ -26,6 +35,8 @@ import {
   type CreditsAdminOverview,
   type CreditsCustomerProfile,
   type CreditsTransaction,
+  type PlatformUserPlanCode,
+  type PlatformUserTargetRole,
   type RechargeProduct,
 } from '@/api/visual-workbench'
 import {
@@ -51,6 +62,31 @@ const lastError = ref<string | null>(null)
 const activeRole = ref<RoleTab>('developer')
 const selectedApplicationCode = ref('all')
 const accountCreationPolicyState = reactive({ ...defaultAccountCreationPolicyState })
+const isCreateAccountModalOpen = ref(false)
+const isCreatingAccount = ref(false)
+const isAdjustCreditsModalOpen = ref(false)
+const isAdjustingCredits = ref(false)
+const isDeleteAccountModalOpen = ref(false)
+const isDeletingAccount = ref(false)
+const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
+const createAccountForm = reactive({
+  targetRole: 'user' as PlatformUserTargetRole,
+  username: '',
+  password: '123456',
+  displayName: '',
+  phone: '',
+  email: '',
+  applicationCode: 'used-car-platform',
+  planCode: 'basic' as PlatformUserPlanCode,
+  initialPoints: 0 as number | null,
+})
+const adjustCreditsForm = reactive({
+  points: 0 as number | null,
+  reason: '',
+})
+const deleteAccountForm = reactive({
+  reason: '',
+})
 
 const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon: string }> = [
   {
@@ -62,7 +98,7 @@ const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon
   {
     value: 'admin',
     label: '公司管理员',
-    description: 'Agent/User CRUD、全部流水余额、积分增减',
+    description: '销售运营、代理商管理、全平台只读',
     icon: 'mdi:shield-account-outline',
   },
   {
@@ -73,16 +109,10 @@ const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon
   },
 ]
 
-const roleAccess: Record<RoleTab, RoleTab[]> = {
-  developer: ['developer', 'admin', 'agent'],
-  admin: ['admin', 'agent'],
-  agent: ['agent'],
-}
-
 const visibleRoleTabs = computed(() => {
   const role = authStore.role
   if (role === 'developer' || role === 'admin' || role === 'agent') {
-    return roleTabs.filter((tab) => roleAccess[role].includes(tab.value))
+    return roleTabs.filter((tab) => tab.value === role)
   }
   return []
 })
@@ -156,6 +186,47 @@ const applicationFilterOptions = computed(() => [
   })),
 ])
 
+const applicationSelectOptions = computed(() =>
+  applicationCatalog.value.map((item) => ({
+    label: `${item.name} (${item.code})`,
+    value: item.code,
+  })),
+)
+
+const planOptions: Array<{ label: string; value: PlatformUserPlanCode }> = [
+  { label: 'Basic / 普通用户默认', value: 'basic' },
+  { label: 'Team / 代理商默认', value: 'team' },
+  { label: 'Flagship / 管理员默认', value: 'flagship' },
+]
+
+const createTargetOptions = computed(() => {
+  if (activeRole.value === 'developer') {
+    return [
+      { label: 'Admin / 公司管理员', value: 'admin' },
+      { label: 'Agent / 代理商', value: 'agent' },
+      { label: 'User / 普通用户', value: 'user' },
+    ]
+  }
+
+  if (activeRole.value === 'admin') {
+    return [
+      {
+        label: 'Agent / 代理商',
+        value: 'agent',
+        disabled: !effectiveAccountCreationPolicy.value.adminCanCreateAgents,
+      },
+    ]
+  }
+
+  return [
+    {
+      label: 'User / 普通用户',
+      value: 'user',
+      disabled: !effectiveAccountCreationPolicy.value.agentCanCreateUsers,
+    },
+  ]
+})
+
 const selectedApplicationLabel = computed(() =>
   applicationFilterOptions.value.find((item) => item.code === selectedApplicationCode.value)?.name ??
   '全部应用',
@@ -205,8 +276,7 @@ const accountCreationPolicyRows = computed(() =>
           effectiveAccountCreationPolicy.value.developerCanCreateAgents &&
           effectiveAccountCreationPolicy.value.developerCanCreateUsers
         : policy.role === 'admin'
-          ? effectiveAccountCreationPolicy.value.adminCanCreateAgents &&
-            effectiveAccountCreationPolicy.value.adminCanCreateUsers
+          ? effectiveAccountCreationPolicy.value.adminCanCreateAgents
           : effectiveAccountCreationPolicy.value.agentCanCreateUsers
 
     return {
@@ -230,6 +300,240 @@ const agentCreationGateText = computed(() => {
   }
   return '公司管理员已允许，开发者未禁用'
 })
+
+function defaultPlanForRole(role: PlatformUserTargetRole): PlatformUserPlanCode {
+  if (role === 'admin') return 'flagship'
+  if (role === 'agent') return 'team'
+  return 'basic'
+}
+
+function targetRoleLabel(role: PlatformUserTargetRole) {
+  if (role === 'admin') return 'Admin'
+  if (role === 'agent') return 'Agent'
+  return 'User'
+}
+
+function matrixTargetRole(role?: string | null): PlatformUserTargetRole | 'developer' | null {
+  if (role === 'developer' || role === 'admin' || role === 'agent') return role
+  if (role === 'enterprise' || role === 'user') return 'user'
+  return null
+}
+
+function canMutateCustomer(row: CreditsCustomerProfile) {
+  const targetRole = matrixTargetRole(row.role)
+  if (!targetRole || targetRole === 'developer' || authStore.userInfo?.id === row.userId) {
+    return false
+  }
+
+  if (activeRole.value === 'developer') {
+    return targetRole === 'admin' || targetRole === 'agent' || targetRole === 'user'
+  }
+
+  if (activeRole.value === 'admin') {
+    return targetRole === 'agent' || targetRole === 'user'
+  }
+
+  return false
+}
+
+function canAdjustCustomer(row: CreditsCustomerProfile) {
+  return (
+    activeRole.value === 'developer' &&
+    canMutateCustomer(row) &&
+    authStore.permissions.includes('credits:points:adjust')
+  )
+}
+
+function canDeleteCustomer(row: CreditsCustomerProfile) {
+  const targetRole = matrixTargetRole(row.role)
+  if (activeRole.value === 'admin' && targetRole !== 'agent') return false
+  return (
+    canMutateCustomer(row) &&
+    !!targetRole &&
+    targetRole !== 'developer' &&
+    authStore.permissions.includes(`account:delete:${targetRole}`)
+  )
+}
+
+function canCreateTargetRole(role: PlatformUserTargetRole) {
+  if (activeRole.value === 'developer') {
+    return true
+  }
+
+  if (activeRole.value === 'admin') {
+    return role === 'agent'
+      ? effectiveAccountCreationPolicy.value.adminCanCreateAgents
+      : role === 'user' && effectiveAccountCreationPolicy.value.adminCanCreateUsers
+  }
+
+  return role === 'user' && effectiveAccountCreationPolicy.value.agentCanCreateUsers
+}
+
+function defaultApplicationCode() {
+  if (selectedApplicationCode.value !== 'all') return selectedApplicationCode.value
+  return applicationCatalog.value[0]?.code ?? 'used-car-platform'
+}
+
+function resetCreateAccountForm(role: PlatformUserTargetRole) {
+  createAccountForm.targetRole = role
+  createAccountForm.username = ''
+  createAccountForm.password = '123456'
+  createAccountForm.displayName = ''
+  createAccountForm.phone = ''
+  createAccountForm.email = ''
+  createAccountForm.applicationCode = defaultApplicationCode()
+  createAccountForm.planCode = defaultPlanForRole(role)
+  createAccountForm.initialPoints = 0
+}
+
+function openCreateAccountModal(role: PlatformUserTargetRole) {
+  if (!canCreateTargetRole(role)) {
+    message.warning('当前账号创建权限已被上级开关关闭')
+    return
+  }
+
+  resetCreateAccountForm(role)
+  isCreateAccountModalOpen.value = true
+}
+
+async function handleCreateAccount() {
+  const username = createAccountForm.username.trim().toLowerCase()
+  const password = createAccountForm.password
+
+  if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+    message.error('用户名需为 3-32 位小写字母、数字或下划线')
+    return
+  }
+
+  if (password.length < 6) {
+    message.error('初始密码至少 6 位')
+    return
+  }
+
+  if (!canCreateTargetRole(createAccountForm.targetRole)) {
+    message.error('当前账号创建权限已被上级开关关闭')
+    return
+  }
+
+  isCreatingAccount.value = true
+  try {
+    const idempotencyKey = [
+      'reusable-credits-console',
+      authStore.userInfo?.id ?? 'operator',
+      createAccountForm.targetRole,
+      Date.now(),
+      Math.random().toString(36).slice(2, 10),
+    ].join(':')
+
+    const result = await createPlatformUser({
+      idempotencyKey,
+      targetRole: createAccountForm.targetRole,
+      username,
+      password,
+      displayName: createAccountForm.displayName.trim() || username,
+      phone: createAccountForm.phone.trim() || undefined,
+      email: createAccountForm.email.trim() || undefined,
+      applicationCode: createAccountForm.applicationCode,
+      accountScope: 'personal',
+      planCode: createAccountForm.planCode,
+      initialPoints: Number(createAccountForm.initialPoints ?? 0),
+    })
+
+    message.success(`已创建 ${targetRoleLabel(createAccountForm.targetRole)}：${result.user.username}`)
+    isCreateAccountModalOpen.value = false
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '创建账号失败')
+  } finally {
+    isCreatingAccount.value = false
+  }
+}
+
+function openAdjustCreditsModal(row: CreditsCustomerProfile) {
+  if (!canAdjustCustomer(row)) {
+    message.warning('当前角色不能为该账号增减积分')
+    return
+  }
+  selectedCapabilityUser.value = row
+  adjustCreditsForm.points = 0
+  adjustCreditsForm.reason = ''
+  isAdjustCreditsModalOpen.value = true
+}
+
+async function handleAdjustCredits() {
+  const target = selectedCapabilityUser.value
+  const points = Number(adjustCreditsForm.points ?? 0)
+  if (!target) return
+  if (!Number.isFinite(points) || points === 0) {
+    message.error('积分变动必须是非 0 数字')
+    return
+  }
+  if (!canAdjustCustomer(target)) {
+    message.error('当前角色不能为该账号增减积分')
+    return
+  }
+
+  isAdjustingCredits.value = true
+  try {
+    const result = await adjustPlatformCredits({
+      idempotencyKey: [
+        'reusable-credits-console-adjust',
+        authStore.userInfo?.id ?? 'operator',
+        target.userId,
+        Date.now(),
+        Math.random().toString(36).slice(2, 10),
+      ].join(':'),
+      targetUserId: target.userId,
+      points,
+      reason: adjustCreditsForm.reason.trim() || undefined,
+    })
+
+    message.success(
+      `已调整 ${target.username}：${points > 0 ? '+' : ''}${points.toLocaleString('zh-CN')}，余额 ${result.adjustment.balanceAfter}`,
+    )
+    isAdjustCreditsModalOpen.value = false
+    selectedCapabilityUser.value = null
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '积分调整失败')
+  } finally {
+    isAdjustingCredits.value = false
+  }
+}
+
+function openDeleteAccountModal(row: CreditsCustomerProfile) {
+  if (!canDeleteCustomer(row)) {
+    message.warning('当前角色不能删除该账号')
+    return
+  }
+  selectedCapabilityUser.value = row
+  deleteAccountForm.reason = ''
+  isDeleteAccountModalOpen.value = true
+}
+
+async function handleDeleteAccount() {
+  const target = selectedCapabilityUser.value
+  if (!target) return
+  if (!canDeleteCustomer(target)) {
+    message.error('当前角色不能删除该账号')
+    return
+  }
+
+  isDeletingAccount.value = true
+  try {
+    await deletePlatformUser(target.userId, {
+      reason: deleteAccountForm.reason.trim() || undefined,
+    })
+    message.success(`已删除账号：${target.username}`)
+    isDeleteAccountModalOpen.value = false
+    selectedCapabilityUser.value = null
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '删除账号失败')
+  } finally {
+    isDeletingAccount.value = false
+  }
+}
 
 function policyTagType(enabled: boolean, controlled: boolean) {
   if (!enabled) return 'error'
@@ -392,6 +696,8 @@ const transactionColumns: DataTableColumns<CreditsTransaction> = [
         freeze: 'warning',
         refund: 'success',
         estimate: 'default',
+        adjustment: 'warning',
+        adjust: 'warning',
       }
       return h(
         NTag,
@@ -468,6 +774,50 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
           type: row.status === 'active' ? 'success' : 'default',
         },
         { default: () => row.status },
+      )
+    },
+  },
+  {
+    title: '能力操作',
+    key: 'actions',
+    width: 210,
+    render(row) {
+      const canAdjust = canAdjustCustomer(row)
+      const canDelete = canDeleteCustomer(row)
+      if (!canAdjust && !canDelete) return '-'
+
+      return h(
+        'div',
+        { class: 'admin-table-actions' },
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              disabled: !canAdjust,
+              onClick: () => openAdjustCreditsModal(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:plus-minus-variant' }),
+              default: () => '增减积分',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'error',
+              secondary: true,
+              disabled: !canDelete,
+              onClick: () => openDeleteAccountModal(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:trash-can-outline' }),
+              default: () => '删除',
+            },
+          ),
+        ],
       )
     },
   },
@@ -602,7 +952,7 @@ const developerPlaceholder = [
           <p class="admin-hero-kicker">Reusable Credits Platform Console</p>
           <h1>三角色积分平台控制台</h1>
           <p class="admin-hero-sub">
-            当前路由保留 <code>/credits-admin</code> 作为兼容入口；控制台面向所有接入应用，usedCarPlatform 只是其中一个应用。
+            当前主入口为 <code>/reusable-credits-console</code>；<code>/credits-admin</code> 仅作为历史兼容入口。控制台面向所有接入应用，usedCarPlatform 只是其中一个应用。
           </p>
         </div>
         <div class="admin-hero-actions">
@@ -615,7 +965,7 @@ const developerPlaceholder = [
         </div>
       </header>
 
-      <nav class="admin-tabs" aria-label="角色切换">
+      <nav v-if="visibleRoleTabs.length > 1" class="admin-tabs" aria-label="角色切换">
         <button
           v-for="tab in visibleRoleTabs"
           :key="tab.value"
@@ -711,8 +1061,28 @@ const developerPlaceholder = [
           <section class="admin-section">
             <h2>账号创建权限层级</h2>
             <p class="admin-section-note">
-              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent/User，也可禁用代理商创建 User。
+              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent，也可禁用代理商创建 User。
             </p>
+            <div class="admin-action-row" aria-label="开发者创建账号">
+              <NButton type="primary" @click="openCreateAccountModal('admin')">
+                <template #icon>
+                  <Icon icon="mdi:account-tie-outline" />
+                </template>
+                创建 Admin
+              </NButton>
+              <NButton @click="openCreateAccountModal('agent')">
+                <template #icon>
+                  <Icon icon="mdi:handshake-outline" />
+                </template>
+                创建 Agent
+              </NButton>
+              <NButton @click="openCreateAccountModal('user')">
+                <template #icon>
+                  <Icon icon="mdi:account-plus-outline" />
+                </template>
+                创建 User
+              </NButton>
+            </div>
             <div class="admin-toggle-grid">
               <article class="admin-toggle-card">
                 <div>
@@ -723,8 +1093,8 @@ const developerPlaceholder = [
               </article>
               <article class="admin-toggle-card">
                 <div>
-                  <h3>允许公司管理员创建 Agent / User</h3>
-                  <p>关闭后，公司管理员不能创建 Agent 或 User，也不能让 User 成为 Agent。</p>
+                  <h3>允许公司管理员创建 Agent</h3>
+                  <p>关闭后，公司管理员不能创建 Agent，也不能让 User 成为 Agent。</p>
                 </div>
                 <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers" />
               </article>
@@ -789,15 +1159,27 @@ const developerPlaceholder = [
           <section class="admin-section">
             <h2>账号创建权限</h2>
             <p class="admin-section-note">
-              公司管理员可创建 Agent 和 User；该权限由开发者开启或关闭。公司管理员还可以控制代理商创建 User，以及 User 是否能成为 Agent。
+              公司管理员可创建和管理 Agent；普通 User 清单只读。公司管理员还可以控制代理商创建 User，以及 User 是否能成为 Agent。
             </p>
+            <div class="admin-action-row" aria-label="公司管理员创建账号">
+              <NButton
+                type="primary"
+                :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
+                @click="openCreateAccountModal('agent')"
+              >
+                <template #icon>
+                  <Icon icon="mdi:handshake-outline" />
+                </template>
+                创建 Agent
+              </NButton>
+            </div>
             <div class="admin-toggle-grid">
               <article class="admin-toggle-card">
                 <div>
-                  <h3>公司管理员创建 Agent / User</h3>
-                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
+                  <h3>公司管理员创建 Agent</h3>
+                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateAgents ? '开发者已开启' : '开发者已关闭' }}</p>
                 </div>
-                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
+                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateAgents" disabled />
               </article>
               <article class="admin-toggle-card">
                 <div>
@@ -812,7 +1194,7 @@ const developerPlaceholder = [
               <article class="admin-toggle-card">
                 <div>
                   <h3>允许 User 成为 Agent</h3>
-                  <p>公司管理员开关；若开发者关闭公司管理员创建 Agent/User，此开关不会生效。</p>
+                  <p>公司管理员开关；若开发者关闭公司管理员创建 Agent，此开关不会生效。</p>
                 </div>
                 <NSwitch
                   v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
@@ -820,6 +1202,22 @@ const developerPlaceholder = [
                 />
               </article>
             </div>
+          </section>
+
+          <section class="admin-section">
+            <h2>账号与积分能力</h2>
+            <p class="admin-section-note">
+              公司管理员可读取全部客户余额/流水；用户清单只读，不能直接调账、禁用或启用普通用户。代理商管理动作在代理商页面执行。
+            </p>
+            <NDataTable
+              v-if="filteredCustomerProfiles.length"
+              :columns="customerColumns"
+              :data="filteredCustomerProfiles"
+              :bordered="false"
+              :single-line="false"
+              :pagination="false"
+            />
+            <NEmpty v-else description="暂无客户档案" />
           </section>
 
           <section class="admin-section">
@@ -869,6 +1267,18 @@ const developerPlaceholder = [
               代理商可创建 User 取决于公司管理员开关；开发者可以禁用该能力。当前状态：{{ agentCreationGateText }}。
               当前代理：{{ agentOverview?.agent.displayName ?? '未加载' }}。
             </p>
+            <div class="admin-action-row" aria-label="代理商创建账号">
+              <NButton
+                type="primary"
+                :disabled="!effectiveAccountCreationPolicy.agentCanCreateUsers"
+                @click="openCreateAccountModal('user')"
+              >
+                <template #icon>
+                  <Icon icon="mdi:account-plus-outline" />
+                </template>
+                创建 User
+              </NButton>
+            </div>
             <div class="admin-agent-grid" v-if="agentOverview">
               <article class="admin-agent-card">
                 <h3>自有客户</h3>
@@ -978,6 +1388,168 @@ const developerPlaceholder = [
           </section>
         </template>
       </NSpin>
+
+      <NModal
+        v-model:show="isCreateAccountModalOpen"
+        preset="card"
+        class="admin-create-modal"
+        :title="`创建 ${targetRoleLabel(createAccountForm.targetRole)}`"
+        :mask-closable="!isCreatingAccount"
+      >
+        <NForm label-placement="top" class="admin-create-form">
+          <NFormItem label="账号类型">
+            <NSelect
+              v-model:value="createAccountForm.targetRole"
+              :options="createTargetOptions"
+              @update:value="(value) => { createAccountForm.planCode = defaultPlanForRole(value as PlatformUserTargetRole) }"
+            />
+          </NFormItem>
+          <div class="admin-create-form-grid">
+            <NFormItem label="用户名">
+              <NInput
+                v-model:value="createAccountForm.username"
+                placeholder="lowercase_name"
+                maxlength="32"
+              />
+            </NFormItem>
+            <NFormItem label="初始密码">
+              <NInput
+                v-model:value="createAccountForm.password"
+                type="password"
+                show-password-on="click"
+                maxlength="64"
+              />
+            </NFormItem>
+          </div>
+          <div class="admin-create-form-grid">
+            <NFormItem label="显示名称">
+              <NInput v-model:value="createAccountForm.displayName" placeholder="默认使用用户名" />
+            </NFormItem>
+            <NFormItem label="手机号">
+              <NInput v-model:value="createAccountForm.phone" placeholder="可选" />
+            </NFormItem>
+          </div>
+          <NFormItem label="邮箱">
+            <NInput v-model:value="createAccountForm.email" placeholder="可选，未填时后端生成本地邮箱" />
+          </NFormItem>
+          <div class="admin-create-form-grid">
+            <NFormItem label="接入应用">
+              <NSelect
+                v-model:value="createAccountForm.applicationCode"
+                :options="applicationSelectOptions"
+              />
+            </NFormItem>
+            <NFormItem label="订阅计划">
+              <NSelect v-model:value="createAccountForm.planCode" :options="planOptions" />
+            </NFormItem>
+          </div>
+          <NFormItem label="初始积分">
+            <NInputNumber
+              v-model:value="createAccountForm.initialPoints"
+              :min="0"
+              :precision="0"
+              :show-button="true"
+              class="admin-create-number"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isCreatingAccount" @click="isCreateAccountModalOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isCreatingAccount" @click="handleCreateAccount">
+              <template #icon>
+                <Icon icon="mdi:check" />
+              </template>
+              创建账号
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isAdjustCreditsModalOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="增减积分"
+        :mask-closable="!isAdjustingCredits"
+      >
+        <div class="admin-modal-context" v-if="selectedCapabilityUser">
+          <strong>{{ selectedCapabilityUser.displayName }}</strong>
+          <span>{{ selectedCapabilityUser.username }} · {{ matrixTargetRole(selectedCapabilityUser.role) }}</span>
+        </div>
+        <NForm label-placement="top" class="admin-create-form">
+          <NFormItem label="积分变动">
+            <NInputNumber
+              v-model:value="adjustCreditsForm.points"
+              :precision="0"
+              :show-button="true"
+              class="admin-create-number"
+              placeholder="正数增加，负数扣减"
+            />
+          </NFormItem>
+          <NFormItem label="原因">
+            <NInput
+              v-model:value="adjustCreditsForm.reason"
+              type="textarea"
+              placeholder="例如：人工补偿、活动赠送、误扣修正"
+              maxlength="240"
+              show-count
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isAdjustingCredits" @click="isAdjustCreditsModalOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isAdjustingCredits" @click="handleAdjustCredits">
+              <template #icon>
+                <Icon icon="mdi:plus-minus-variant" />
+              </template>
+              确认调整
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isDeleteAccountModalOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="删除账号"
+        :mask-closable="!isDeletingAccount"
+      >
+        <div class="admin-modal-context" v-if="selectedCapabilityUser">
+          <strong>{{ selectedCapabilityUser.displayName }}</strong>
+          <span>{{ selectedCapabilityUser.username }} · {{ matrixTargetRole(selectedCapabilityUser.role) }}</span>
+        </div>
+        <NForm label-placement="top" class="admin-create-form">
+          <NFormItem label="删除原因">
+            <NInput
+              v-model:value="deleteAccountForm.reason"
+              type="textarea"
+              placeholder="记录删除原因，便于后续审计"
+              maxlength="240"
+              show-count
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isDeletingAccount" @click="isDeleteAccountModalOpen = false">
+              取消
+            </NButton>
+            <NButton type="error" :loading="isDeletingAccount" @click="handleDeleteAccount">
+              <template #icon>
+                <Icon icon="mdi:trash-can-outline" />
+              </template>
+              删除账号
+            </NButton>
+          </div>
+        </template>
+      </NModal>
     </section>
   </main>
 </template>
@@ -1232,6 +1804,13 @@ const developerPlaceholder = [
   line-height: 1.55;
 }
 
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
 .admin-section {
   padding: 20px clamp(18px, 1.8vw, 26px);
   border: 1px solid var(--app-border);
@@ -1321,6 +1900,58 @@ const developerPlaceholder = [
   font-weight: 700;
 }
 
+.admin-create-form {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-create-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-create-number {
+  width: 100%;
+}
+
+.admin-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-modal-context {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface-soft);
+}
+
+.admin-modal-context strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.admin-modal-context span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+:deep(.admin-table-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:deep(.admin-create-modal.n-modal) {
+  width: min(720px, calc(100vw - 32px));
+}
+
 :deep(.admin-delta.is-up) {
   color: #18b77d;
   font-weight: 800;
@@ -1334,6 +1965,10 @@ const developerPlaceholder = [
 @media (max-width: 1024px) {
   .admin-tabs,
   .admin-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-create-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

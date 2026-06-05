@@ -9,6 +9,8 @@ import { useAuthStore } from '@/stores/auth'
 
 import { routes } from './routes'
 
+const BACK_OFFICE_LOGIN_ROUTE = '/back-office/login'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
@@ -41,6 +43,7 @@ router.beforeEach((to) => {
 
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const guestOnly = to.matched.some((record) => record.meta.guestOnly)
+  const isBackOfficeRoute = to.matched.some((record) => record.meta.backOffice)
   const requiredPermission = to.matched
     .map((record) => record.meta.permission)
     .find((permission): permission is string => typeof permission === 'string')
@@ -51,10 +54,21 @@ router.beforeEach((to) => {
     }
 
     if (guestOnly) {
+      if (isBackOfficeRoute) {
+        return authStore.permissions.includes('menu:admin') ? '/back-office' : true
+      }
       return resolveAuthenticatedRedirectPath(to.query.redirect, '/workspace')
     }
 
     if (requiredPermission && !authStore.permissions.includes(requiredPermission)) {
+      if (isBackOfficeRoute) {
+        return {
+          path: BACK_OFFICE_LOGIN_ROUTE,
+          query: {
+            redirect: to.fullPath,
+          },
+        }
+      }
       return '/home'
     }
 
@@ -64,6 +78,15 @@ router.beforeEach((to) => {
   resetIntroVideoOnHardReload()
 
   if (requiresAuth) {
+    if (isBackOfficeRoute) {
+      return {
+        path: BACK_OFFICE_LOGIN_ROUTE,
+        query: {
+          redirect: to.fullPath,
+        },
+      }
+    }
+
     return {
       path: AUTH_ROUTE,
       query: {

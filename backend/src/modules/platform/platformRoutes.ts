@@ -17,6 +17,10 @@ import {
   getApplicationIntegrationContract,
   getApplicationIntegrationContracts,
 } from "./applicationIntegrationContract";
+import {
+  adjustPlatformUserCredits,
+  deletePlatformUserByCapability,
+} from "./platformAccountCapabilities";
 import { createPlatformUser } from "./platformUserCreation";
 
 export const platformRoutes = Router();
@@ -26,6 +30,23 @@ platformRoutes.post(
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await createPlatformUser(req, req.body));
+  }),
+);
+
+platformRoutes.post(
+  "/credits/adjustments",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await adjustPlatformUserCredits(req, req.body));
+  }),
+);
+
+platformRoutes.delete(
+  "/users/:userId",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await deletePlatformUserByCapability(req, userId, req.body ?? {}));
   }),
 );
 

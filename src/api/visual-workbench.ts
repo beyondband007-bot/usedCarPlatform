@@ -793,6 +793,7 @@ export type CreditsTransactionType =
   | 'refund'
   | 'recharge'
   | 'adjust'
+  | 'adjustment'
   | string
 
 export interface CreditsTransaction {
@@ -970,6 +971,90 @@ export interface AgentOperationsOverview {
   settlementBills: AgentOperationsSettlementBill[]
   materials: AgentOperationsMaterial[]
   tickets: AgentOperationsTicket[]
+}
+
+export type PlatformUserTargetRole = 'admin' | 'agent' | 'user'
+export type PlatformUserPlanCode = 'basic' | 'team' | 'flagship'
+
+export interface CreatePlatformUserPayload {
+  idempotencyKey: string
+  targetRole: PlatformUserTargetRole
+  username: string
+  password: string
+  displayName?: string
+  phone?: string
+  email?: string
+  applicationCode?: string
+  accountScope?: 'personal'
+  planCode?: PlatformUserPlanCode
+  initialPoints?: number
+}
+
+export interface PlatformUserCreationResult {
+  idempotentReplay?: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    phone: string | null
+    role: string
+    creditsUserId: number | string
+    accountScope: string
+  }
+  creditsAccount: {
+    userId: number | string
+    accountId: number | string
+    totalBalance: string
+    availableBalance: string
+  }
+  applicationLink: {
+    id: string
+    applicationCode: string
+    userId: string
+  }
+  agentRelation: {
+    id: string
+    agentUserId: string
+    customerUserId: string
+  } | null
+  policyDecision: {
+    allowed: boolean
+    reason: string
+  }
+}
+
+export interface AdjustPlatformCreditsPayload {
+  idempotencyKey: string
+  targetUserId: string
+  points: number
+  reason?: string
+}
+
+export interface PlatformCreditsAdjustmentResult {
+  targetUser: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+    creditsUserId: number | string
+  }
+  adjustment: {
+    transactionId: number | string
+    points: number
+    balanceBefore: string
+    balanceAfter: string
+    reason: string
+  }
+}
+
+export interface DeletePlatformUserResult {
+  deleted: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+  }
 }
 
 function extractCreditsList<T>(payload: unknown, keys: string[]) {
@@ -1154,6 +1239,37 @@ export async function getAgentOperationsOverview(params?: {
   const response = await request.get<ApiResponse<AgentOperationsOverview>>(
     '/platform/agent/overview',
     { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function createPlatformUser(
+  payload: CreatePlatformUserPayload,
+): Promise<PlatformUserCreationResult> {
+  const response = await request.post<ApiResponse<PlatformUserCreationResult>>(
+    '/platform/users',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function adjustPlatformCredits(
+  payload: AdjustPlatformCreditsPayload,
+): Promise<PlatformCreditsAdjustmentResult> {
+  const response = await request.post<ApiResponse<PlatformCreditsAdjustmentResult>>(
+    '/platform/credits/adjustments',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function deletePlatformUser(
+  userId: string,
+  payload: { reason?: string },
+): Promise<DeletePlatformUserResult> {
+  const response = await request.delete<ApiResponse<DeletePlatformUserResult>>(
+    `/platform/users/${encodeURIComponent(userId)}`,
+    { data: payload },
   )
   return unwrapApiResponse(response)
 }

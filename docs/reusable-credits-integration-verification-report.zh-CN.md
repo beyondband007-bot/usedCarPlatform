@@ -78,7 +78,7 @@ usedCarPlatform 的 MySQL 保存本地业务任务数据以及计费追踪字段
 同事提供的静态原型 `积分后台-三角色静态原型.html` 已经迁移到 usedCarPlatform 的 Vue 路由：
 
 ```text
-/credits-admin
+/reusable-credits-console
 ```
 
 该路由包含：
@@ -227,15 +227,15 @@ password: 123456
 - `/credits`
 - `/package-points`
 
-`enterprise` 用户不应该能够进入 `/credits-admin`。
+`enterprise` 用户不应该能够进入 `/reusable-credits-console`。
 
 使用 `admin` 测试：
 
-- `/credits-admin`
+- `/reusable-credits-console`
 
 使用 `developer` 可以评审所有后台角色视图。使用 `agent` 可以验证该登录只能看到代理商后台视图。
 
-`/credits-admin` 内部的角色切换器目前用于原型/演示评审。真实的开发者/管理员/代理商登录与权限隔离属于后续生产认证与权限阶段。
+`/reusable-credits-console` 内部的角色切换器目前用于原型/演示评审。真实的开发者/管理员/代理商登录与权限隔离属于后续生产认证与权限阶段。
 
 账号创建层级：
 
@@ -573,7 +573,7 @@ password: 123456
 3. 打开：
 
 ```text
-http://127.0.0.1:5173/credits-admin
+http://127.0.0.1:5173/reusable-credits-console
 ```
 
 4. 点击 `刷新实时数据`。

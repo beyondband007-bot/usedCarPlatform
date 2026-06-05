@@ -61,12 +61,9 @@ export const defaultBackOfficeRolePermissions = {
     "menu:recharge",
     "menu:admin",
     "account:create:agent",
-    "account:create:user",
     "account:delete:agent",
-    "account:delete:user",
     "credits:balance:read:all",
     "credits:transaction:read:all",
-    "credits:points:adjust",
     "policy:agent-user-creation:manage",
     "policy:user-agent-promotion:manage",
   ],
@@ -216,7 +213,7 @@ export function resolveAccountCreationPolicy(
     developerCanCreateAgents: snapshot.developer_create_agent,
     developerCanCreateUsers: snapshot.developer_create_user,
     adminCanCreateAgents: snapshot.developer_allows_admin_create_agents_users,
-    adminCanCreateUsers: snapshot.developer_allows_admin_create_agents_users,
+    adminCanCreateUsers: false,
     adminCanPromoteUserToAgent:
       snapshot.developer_allows_admin_create_agents_users &&
       snapshot.admin_allows_user_become_agent,
@@ -248,12 +245,11 @@ export function canCreateAccountFromSnapshot(
     if (targetRole === "agent" && effective.adminCanCreateAgents) {
       return { allowed: true, reason: "developer allows admin to create agents" };
     }
-    if (targetRole === "user" && effective.adminCanCreateUsers) {
-      return { allowed: true, reason: "developer allows admin to create users" };
-    }
     return {
       allowed: false,
-      reason: "developer has disabled admin account creation",
+      reason: targetRole === "user"
+        ? "latest PRD makes admin user list read-only"
+        : "developer has disabled admin account creation",
     };
   }
 
