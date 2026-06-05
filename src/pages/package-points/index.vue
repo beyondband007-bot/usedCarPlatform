@@ -167,7 +167,10 @@ async function handlePlanSelect(name: string) {
   if (isCreatingOrder.value) return;
   isCreatingOrder.value = true;
   try {
-    const order = await createRechargeOrder({ productId: product.id });
+    const order = await createRechargeOrder({
+      productId: product.id,
+      payChannel: "card",
+    });
     message.success(`充值订单已创建（${order.orderNo}），等待支付`);
   } catch (error) {
     const text = error instanceof Error ? error.message : "创建充值订单失败";
@@ -544,6 +547,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   gap: 10px;
   font-size: 20px;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .section-title::before {
@@ -558,6 +562,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
 .recharge-hero h1 {
   font-size: 26px;
   line-height: 1.25;
+  white-space: nowrap;
 }
 
 .recharge-hero p {
@@ -565,6 +570,7 @@ const recordsColumns: DataTableColumns<RechargeRecord> = [
   color: var(--recharge-muted);
   font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .hero-visual {

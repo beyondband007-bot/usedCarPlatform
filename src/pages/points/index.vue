@@ -3,6 +3,7 @@ import { Icon } from "@iconify/vue";
 import { computed, ref, watch } from "vue";
 
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
 import { usePointsQuery } from "@/composables/usePointsQuery";
 import { usePointsRechargeModal } from "@/composables/usePointsRechargeModal";
 import PointsFlowTable from "@/components/business/points/PointsFlowTable.vue";
@@ -21,6 +22,7 @@ import type {
 
 const pageSize = 10;
 const appStore = useAppStore();
+const authStore = useAuthStore();
 
 const pageBackgroundStyle = computed(() => {
   const backgroundImage = appStore.isDarkMode
@@ -32,7 +34,6 @@ const pageBackgroundStyle = computed(() => {
     backgroundSize: "cover",
     backgroundPosition: "center top",
     backgroundRepeat: "no-repeat",
-    backgroundAttachment: "fixed",
   };
 });
 
@@ -43,7 +44,16 @@ const {
   isLoading,
   loadError,
   usesLiveApi,
+  usesTeamDashboard,
   refresh,
+  showSubAccountScope,
+  accountScopeMode,
+  selectedChildId,
+  selectedChild,
+  childMembers,
+  teamName,
+  setAccountScopeMode,
+  selectChildAccount,
 } = usePointsQuery();
 
 const defaultFilters = (): PointsQueryFilters => ({
@@ -60,30 +70,29 @@ const filters = ref<PointsQueryFilters>(defaultFilters());
 const currentPage = ref(1);
 const { rechargeSuccessTick, openRechargeModal } = usePointsRechargeModal();
 
+const canRecharge = computed(
+  () => authStore.userInfo?.enterpriseAccountRole !== "child",
+);
+
 const viewConfigMap: Record<string, PointsQueryViewConfig> = {
   personal: {
     version: "personal",
     icon: "mdi:coins",
     iconClassName: "is-blue",
     subtitle: pointsQueryHeroCopy.subtitle,
-    badges: [
-      {
-        icon: "mdi:account-outline",
-        text: "个人账户",
-        className: "is-personal",
-      },
-    ],
+    badges: [],
     tableTitle: "我的积分流水",
     showMemberFilter: false,
     showCurrentMember: false,
     showMemberColumns: false,
     adminTheme: false,
+    canRecharge: true,
   },
   member: {
     version: "member",
     icon: "mdi:coins",
     iconClassName: "is-blue",
-    subtitle: "成员积分流水筛选与查看",
+    subtitle: "子账号积分流水筛选与查看",
     teamLabel: "XX创意团队",
     badges: [
       {
@@ -93,7 +102,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
       },
       {
         icon: "mdi:account-outline",
-        text: "李芳（成员）",
+        text: "李芳（子账号）",
         className: "is-member",
       },
     ],
@@ -103,6 +112,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     currentMemberName: "李芳",
     showMemberColumns: false,
     adminTheme: false,
+    canRecharge: true,
   },
   admin: {
     version: "admin",
@@ -118,7 +128,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
       },
       {
         icon: "mdi:shield-check-outline",
-        text: "张小明（管理员）",
+        text: "张小明（子账号）",
         className: "is-admin",
       },
     ],
@@ -127,11 +137,70 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     showCurrentMember: false,
     showMemberColumns: true,
     adminTheme: true,
+    canRecharge: true,
   },
 };
 
-const viewConfig = computed(() => viewConfigMap[version.value]);
+const viewConfig = computed(() => {
+  if (usesTeamDashboard.value) {
+    const currentRole = authStore.userInfo?.canViewEnterpriseChildren
+      ? "主账号"
+      : "子账号";
 
+    return {
+      version: "admin",
+      icon: "mdi:office-building-outline",
+      iconClassName: "is-violet",
+      subtitle: "",
+      teamLabel: teamName.value || authStore.userInfo?.enterpriseTenantName || "",
+      badges: [
+        {
+          icon: "mdi:office-building-outline",
+          text: teamName.value || authStore.userInfo?.enterpriseTenantName || "",
+          className: "is-team",
+        },
+        {
+          icon: "mdi:account-circle-outline",
+          text:
+            authStore.userInfo?.displayName
+              ? `${authStore.userInfo.displayName}（${currentRole}）`
+              : currentRole,
+          className: authStore.userInfo?.canViewEnterpriseChildren
+            ? "is-admin"
+            : "is-member",
+        },
+        {
+          icon: "mdi:account-group-outline",
+          text: `团队人数 ${childMembers.value.length} 人`,
+          className: "is-team",
+        },
+      ],
+      tableTitle:
+        filters.value.member && selectedChild.value
+          ? `${selectedChild.value.label}的积分流水`
+          : "团队积分流水",
+      showMemberFilter: true,
+      showCurrentMember: false,
+      showMemberColumns: true,
+      adminTheme: true,
+      showSubAccountScope: true,
+      canRecharge: canRecharge.value,
+    } satisfies PointsQueryViewConfig;
+  }
+
+  const base = viewConfigMap[version.value];
+  const tableTitle =
+    showSubAccountScope.value && accountScopeMode.value === "child" && selectedChild.value
+      ? `${selectedChild.value.label}的积分流水`
+      : base.tableTitle;
+
+  return {
+    ...base,
+    tableTitle,
+    showSubAccountScope: showSubAccountScope.value,
+    canRecharge: canRecharge.value,
+  };
+});
 const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
   if (version.value === "admin") {
     return [
@@ -160,16 +229,8 @@ const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
         tone: "rose",
       },
       {
-        key: "memberCount",
-        label: "成员总数",
-        value: "5",
-        unit: "人",
-        icon: "mdi:account-group-outline",
-        tone: "violet",
-      },
-      {
         key: "activeMemberCount",
-        label: "活跃成员数",
+        label: "活跃账号数",
         value: "4",
         unit: "人",
         note: "（近30天）",
@@ -227,20 +288,22 @@ const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
   return [];
 });
 
-const summaryCards = computed(() =>
-  usesLiveApi.value ? apiSummaryCards.value : mockSummaryCards.value,
-);
+const summaryCards = computed(() => {
+  const cards = usesTeamDashboard.value
+    ? apiSummaryCards.value
+    : usesLiveApi.value
+      ? apiSummaryCards.value
+      : mockSummaryCards.value;
+
+  return cards.filter((card) => card.key !== "memberCount");
+});
 
 const filteredRecords = computed(() => {
   const active = filters.value;
   const now = Date.now();
 
   return sourceRecords.value.filter((record) => {
-    if (
-      version.value === "admin" &&
-      active.member &&
-      record.memberId !== active.member
-    ) {
+    if (active.member && record.memberId !== active.member) {
       return false;
     }
 
@@ -367,7 +430,7 @@ function handleExport() {
     ];
 
     if (viewConfig.value.showMemberColumns) {
-      base.push(record.memberName, record.isOwner ? "主账号" : "成员");
+      base.push(record.memberName, record.isOwner ? "主账号" : "子账号");
     }
 
     base.push(record.createdAt);
@@ -389,16 +452,11 @@ function handleExport() {
 }
 
 function handleRecharge() {
-  if (version.value === "admin" && !filters.value.member) {
-    window.alert("请先选择成员账号");
-    return;
-  }
-
   openRechargeModal();
 }
 
 watch(rechargeSuccessTick, () => {
-  if (usesLiveApi.value) {
+  if (usesLiveApi.value || usesTeamDashboard.value) {
     void refresh();
   }
 });
@@ -407,6 +465,24 @@ watch(version, () => {
   filters.value = defaultFilters();
   currentPage.value = 1;
 });
+
+watch(selectedChildId, (value) => {
+  if (!usesTeamDashboard.value) return;
+  filters.value = {
+    ...filters.value,
+    member: value ?? "",
+  };
+  currentPage.value = 1;
+});
+
+watch(
+  () => filters.value.member,
+  (value) => {
+    if (!usesTeamDashboard.value) return;
+    if ((value || null) === selectedChildId.value) return;
+    selectedChildId.value = value || null;
+  },
+);
 
 watch(filteredRecords, () => {
   const maxPage = Math.max(
@@ -463,6 +539,9 @@ watch(filteredRecords, () => {
           v-model:current-page="currentPage"
           v-model:filters="filters"
           glass
+          :account-scope-mode="accountScopeMode"
+          :child-members="childMembers"
+          :selected-child-id="selectedChildId"
           :config="viewConfig"
           :loading="isLoading && usesLiveApi"
           :page-size="pageSize"
@@ -470,6 +549,8 @@ watch(filteredRecords, () => {
           :total="filteredRecords.length"
           @export="handleExport"
           @recharge="handleRecharge"
+          @select-child-account="selectChildAccount"
+          @update:account-scope-mode="setAccountScopeMode"
         />
       </section>
     </div>
@@ -481,16 +562,43 @@ watch(filteredRecords, () => {
 .points-query-page {
   --points-gold: #d4a017;
   --points-gold-strong: #e8b84a;
-  --points-viewport-h: calc(100dvh - var(--app-header-offset, 72px));
-  --points-content-top: calc(var(--points-viewport-h) * 0.15);
-  --points-content-height: calc(var(--points-viewport-h) * 0.7);
-  --points-content-bottom: calc(var(--points-viewport-h) * 0.15);
+  --points-content-max: 1260px;
+  --points-design-w: 1260px;
+  --points-shell-x: clamp(14px, 2vw, 32px);
+  --points-section-gap: clamp(10px, min(1.2vw, 1.6vh), 16px);
+  --points-summary-gap: clamp(10px, min(1vw, 1.4vh), 14px);
+  --points-safe-gap: clamp(40px, 5.5vh, 56px);
+  --points-offset-y: 0px;
+  --points-flow-card-min-h: 360px;
+  --points-table-min-h: 400px;
+  --points-table-cell-py: clamp(13px, 1.35vh, 16px);
+  --points-table-cell-px: clamp(14px, 1.2vw, 18px);
+  --points-table-font-size: clamp(12px, min(0.85vw, 1.35vh), 13px);
+  --points-table-row-h: calc(
+    2 * var(--points-table-cell-py) + var(--points-table-font-size) * 1.45 + 1px
+  );
+  --points-table-head-h: var(--points-table-row-h);
+  --points-table-scroll-max-h: calc(
+    var(--points-table-head-h) + var(--points-table-row-h) * 10
+  );
+  --points-scale-w: calc(
+    (100vw - 2 * var(--points-shell-x)) / var(--points-design-w)
+  );
+  --points-content-scale: min(1, var(--points-scale-w));
 
+  box-sizing: border-box;
   position: relative;
-  margin-top: calc(-1 * var(--app-header-offset, 72px));
-  height: 100dvh;
-  min-height: 100dvh;
-  overflow: hidden;
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: clamp(16px, 2.8vh, 28px) var(--points-shell-x)
+    clamp(12px, 2vh, 24px);
+  overflow-x: hidden;
+  overflow-y: visible;
   color: #0f172a;
   font-family:
     "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
@@ -514,6 +622,13 @@ watch(filteredRecords, () => {
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
+  background-attachment: scroll;
+}
+
+@media (min-width: 1281px) {
+  .points-query-bg {
+    background-attachment: fixed;
+  }
 }
 
 .points-query-page.theme-dark .points-query-bg {
@@ -528,25 +643,40 @@ watch(filteredRecords, () => {
 }
 
 .points-query-shell {
+  container-type: inline-size;
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(100%, 1500px);
-  height: var(--points-content-height);
+  width: min(
+    calc(100vw - 2 * var(--points-shell-x)),
+    var(--points-content-max),
+    calc((100dvh - var(--app-header-offset, 72px)) * 1.42)
+  );
+  min-width: 0;
+  flex: 0 0 auto;
   flex-direction: column;
-  margin: calc(var(--app-header-offset, 72px) + var(--points-content-top)) auto
-    var(--points-content-bottom);
-  padding: 0 clamp(16px, 2vw, 28px);
-  min-height: 0;
+  align-items: center;
+  margin-inline: auto;
+  translate: 0 var(--points-offset-y);
+  zoom: var(--points-content-scale);
+}
+
+@supports not (zoom: 1) {
+  .points-query-shell {
+    translate: none;
+    transform: scale(var(--points-content-scale))
+      translateY(var(--points-offset-y));
+    transform-origin: top center;
+  }
 }
 
 .points-query-glass {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: clamp(12px, 1.4vw, 18px);
-  overflow: hidden;
+  gap: var(--points-section-gap);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -555,46 +685,49 @@ watch(filteredRecords, () => {
   backdrop-filter: none;
 }
 
+.points-query-glass > :deep(.points-summary-section),
 .points-query-glass > .points-query-hero,
-.points-query-glass > .points-query-alert,
-.points-query-glass > :deep(.points-summary-section) {
+.points-query-glass > .points-query-alert {
   flex-shrink: 0;
 }
 
 .points-query-glass > :deep(.points-flow-card--design) {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  height: auto;
+  min-height: var(--points-flow-card-min-h, 360px);
+  flex: 0 1 auto;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .points-query-hero {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: clamp(4px, 0.8vh, 10px);
+  text-align: left;
 }
 
 .points-query-hero-copy {
   width: 100%;
+  max-width: 720px;
 }
 
 .points-query-hero-copy h1 {
   margin: 0;
   color: #0f172a;
-  font-size: clamp(28px, 2.6vw, 36px);
+  font-size: clamp(22px, min(2vw, 3.2vh), 30px);
   font-weight: 800;
   line-height: 1.2;
 }
 
 .points-query-hero-copy p {
-  max-width: 720px;
-  margin: 10px auto 0;
+  margin: clamp(6px, 1vh, 10px) 0 0;
   color: #64748b;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: clamp(12px, min(1.1vw, 1.8vh), 14px);
+  line-height: 1.55;
 }
 
 .points-query-page.theme-dark .points-query-hero-copy h1 {
@@ -605,17 +738,25 @@ watch(filteredRecords, () => {
   color: #94a3b8;
 }
 
+.points-query-page.theme-dark .points-query-team-label {
+  color: #ffffff;
+}
+
 .points-query-hero-badges {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
 }
 
 .points-query-team-label {
   color: #94a3b8;
   font-size: 12px;
+}
+
+.points-query-page.theme-light .points-query-team-label {
+  color: #000000;
 }
 
 .points-query-badge {
@@ -643,6 +784,24 @@ watch(filteredRecords, () => {
   background: rgb(212 160 23 / 18%);
   color: #9a6700;
   font-weight: 700;
+}
+
+.points-query-page.theme-light .points-query-badge {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.points-query-page.theme-light .points-query-badge.is-personal,
+.points-query-page.theme-light .points-query-badge.is-team {
+  color: #b8860b;
+}
+
+.points-query-page.theme-light .points-query-badge.is-member {
+  color: #475569;
+}
+
+.points-query-page.theme-light .points-query-badge.is-admin {
+  color: #9a6700;
 }
 
 .points-query-page.theme-dark .points-query-badge.is-personal,
@@ -678,30 +837,60 @@ watch(filteredRecords, () => {
   color: #fecaca;
 }
 
-@media (max-width: 900px) {
-  .points-query-hero-badges {
-    justify-content: center;
+@media (max-height: 820px) {
+  .points-query-page {
+    --points-safe-gap: clamp(32px, 4.5vh, 44px);
+    --points-table-cell-py: clamp(11px, 1.2vh, 14px);
+  }
+}
+
+/* 14.5–15.4 寸笔记本（约 1366–1680 × 860–1060） */
+@media (min-width: 1280px) and (max-width: 1680px) and (min-height: 860px) and (max-height: 1060px) {
+  .points-query-page {
+    --points-content-max: 1220px;
+    --points-design-w: 1220px;
+    --points-table-cell-py: clamp(14px, 1.45vh, 17px);
+    --points-offset-y: 4px;
+    padding-top: clamp(18px, 2.6vh, 26px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .points-query-shell {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 1023px) {
+  .points-query-page {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding: clamp(12px, 2vh, 20px) var(--points-shell-x);
+  }
+
+  .points-query-shell {
+    width: min(calc(100vw - 2 * var(--points-shell-x)), var(--points-content-max));
+    flex: none;
+    margin-block: 0 auto;
+    translate: 0 0;
+  }
+
+  .points-query-glass {
+    flex: none;
+  }
+
+  .points-query-glass > :deep(.points-flow-card--design) {
+    flex: none;
+    overflow: visible;
   }
 }
 
 @media (max-width: 640px) {
-  .points-query-shell {
-    padding-inline: 12px;
-  }
-
-  .points-query-glass {
-    padding: 16px;
-    border-radius: 18px;
-  }
-}
-
-@media (max-height: 720px) {
   .points-query-page {
-    --points-content-top: 12px;
-    --points-content-height: calc(100dvh - var(--app-header-offset, 72px) - 24px);
-    --points-content-bottom: 12px;
-
-    overflow-y: auto;
+    --points-shell-x: 12px;
   }
 }
 </style>

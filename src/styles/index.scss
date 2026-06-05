@@ -114,6 +114,22 @@ $theme-vars: (
   --radius-control: 10px;
   --motion-fast: 160ms ease;
   --motion-normal: 240ms ease;
+
+  --breakpoint-xs: 360px;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1440px;
+  --breakpoint-3xl: 1920px;
+
+  --layout-content-max: 1440px;
+  --layout-workbench-max: 1680px;
+  --space-page-x: clamp(16px, 2vw, 32px);
+  --space-page-y: clamp(16px, 2vw, 28px);
+  --grid-gap-sm: 12px;
+  --grid-gap-md: 16px;
+  --grid-gap-lg: 24px;
 }
 
 [data-theme="light"] {

@@ -3,16 +3,15 @@ import { computed, ref } from "vue";
 import { Icon } from "@iconify/vue";
 import {
   NButton,
-  NCard,
   NModal,
   NSpin,
-  NTag,
   NUpload,
   NUploadDragger,
   type UploadFileInfo,
 } from "naive-ui";
 import { motion } from "motion-v";
 
+import uploadIconSrc from "@/assets/img/icon/上传.svg";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceCapability } from "@/types/workspace";
 
@@ -40,6 +39,27 @@ const displayRequiredLabel = computed(
 const displayUploadIcon = computed(
   () => props.uploadIcon ?? "mdi:camera",
 );
+
+const displayUploadActionText = computed(() => {
+  const title = displayUploadTitle.value.trim();
+  if (/^点击/.test(title)) return title;
+
+  const subject = title.startsWith("上传") ? title.slice(2) : title;
+  return `点击或拖拽上传${subject}`;
+});
+
+const displayUploadFormatText = computed(() => {
+  const hint = displayUploadHint.value.trim();
+  if (/^支持/.test(hint)) return hint;
+
+  const stripped = hint
+    .replace(/^点击[/／]拖拽上传\s*[·•]\s*/i, "")
+    .replace(/^[·•]\s*/g, "")
+    .trim();
+
+  if (!stripped) return hint;
+  return `支持 ${stripped.replace(/\s*[·•]\s*/g, " ")}`;
+});
 
 const emit = defineEmits<{
   selectFile: [file: File];
@@ -99,28 +119,16 @@ function openPreviewModal() {
     :transition="{ duration: 0.42 }"
     :class="{ 'upload-task-card--compact': compact }"
   >
-    <component
-      :is="compact ? 'div' : NCard"
-      :bordered="false"
-      :class="
-        compact
-          ? 'upload-compact-shell'
-          : 'bg-[var(--workspace-panel,var(--app-surface))] shadow-[var(--workspace-shadow,0_18px_60px_rgba(0,0,0,0.14))] backdrop-blur-xl'
-      "
-      :content-class="compact ? undefined : '!p-0'"
+    <section
+      :class="compact ? 'upload-compact-shell' : 'upload-task-card'"
     >
-      <template v-if="!compact" #header>
-        <div>
-          <h1 class="text-2xl font-black text-[var(--app-text)]">
-            {{ capability.title }}
-          </h1>
-          <p
-            class="mt-2 text-base font-semibold leading-7 text-[var(--workspace-muted,var(--app-text-soft))]"
-          >
-            {{ capability.description }}
-          </p>
+      <header v-if="!compact" class="upload-task-card__header">
+        <div class="upload-task-card__title-row">
+          <h1 class="upload-task-card__title">{{ capability.title }}</h1>
+          <span class="upload-task-card__badge">{{ displayRequiredLabel }}</span>
         </div>
-      </template>
+        <p class="upload-task-card__desc">{{ capability.description }}</p>
+      </header>
 
       <div :class="compact ? 'upload-compact-panel' : 'upload-panel'">
         <div v-if="hasUploadedImage" class="upload-preview">
@@ -150,7 +158,7 @@ function openPreviewModal() {
             :disabled="isUploadBlocked"
             @click="handleReupload"
           >
-            {{ uploadDisabled ? "生成中" : "重新生成" }}
+            {{ uploadDisabled ? "生成中" : "重新上传" }}
           </NButton>
         </div>
 
@@ -178,9 +186,7 @@ function openPreviewModal() {
         >
           <NUploadDragger
             :class="[
-              compact
-                ? 'upload-compact-dragger'
-                : '!rounded-2xl !!bg-[var(--workspace-panel-soft,var(--app-surface-soft))] !py-10',
+              compact ? 'upload-compact-dragger' : 'upload-dragger',
               { 'is-blocked': uploadDisabled },
             ]"
           >
@@ -188,40 +194,37 @@ function openPreviewModal() {
               :class="
                 compact
                   ? 'upload-compact-trigger'
-                  : 'flex flex-col items-center text-center'
+                  : 'upload-trigger'
               "
             >
+              <img
+                v-if="!compact"
+                :src="uploadIconSrc"
+                alt=""
+                class="upload-trigger-icon"
+                draggable="false"
+              />
               <Icon
-                v-if="compact"
+                v-else
                 :icon="displayUploadIcon"
                 class="upload-compact-icon"
                 :class="{ 'is-interior': uploadIcon === 'mdi:seat-passenger' }"
               />
-              <span v-else class="text-4xl">📷</span>
-              <strong
-                :class="
-                  compact ? undefined : 'mt-4 text-xl text-[var(--app-text)]'
-                "
-              >
-                {{ displayUploadTitle }}
-              </strong>
-              <span
-                :class="
-                  compact
-                    ? undefined
-                    : 'mt-2 text-sm font-semibold text-[var(--workspace-muted,var(--app-text-soft))]'
-                "
-              >
+              <strong class="upload-trigger-title">
                 {{
-                  uploadDisabled
-                    ? "当前任务生成中，请等待完成后再上传"
-                    : displayUploadHint
+                  compact
+                    ? displayUploadTitle
+                    : uploadDisabled
+                      ? "当前任务生成中，请等待完成后再上传"
+                      : displayUploadActionText
                 }}
+              </strong>
+              <span v-if="!uploadDisabled || compact" class="upload-trigger-hint">
+                {{ compact ? displayUploadHint : displayUploadFormatText }}
               </span>
-              <b v-if="compact">{{ displayRequiredLabel }}</b>
-              <NTag v-else :bordered="false" round size="small" class="mt-4">
+              <b v-if="compact" class="upload-compact-required">
                 {{ displayRequiredLabel }}
-              </NTag>
+              </b>
             </div>
           </NUploadDragger>
         </NUpload>
@@ -234,7 +237,7 @@ function openPreviewModal() {
           @change="handleReplaceInputChange"
         />
       </div>
-    </component>
+    </section>
 
     <NModal
       v-model:show="previewModalVisible"
@@ -256,7 +259,139 @@ function openPreviewModal() {
   </motion.div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+.upload-task-card {
+  --upload-accent-border: var(--workspace-accent, #efc24c);
+  --upload-accent-badge-bg: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 18%,
+    #1a1508
+  );
+  --upload-accent-badge-text: var(--workspace-accent-strong, #ffd75a);
+  --upload-surface: var(--workspace-panel-soft, #151515);
+  --upload-shadow: var(
+    --workspace-shadow,
+    0 18px 42px rgba(0, 0, 0, 0.24)
+  );
+
+  border-radius: 12px;
+  background: var(--workspace-panel, var(--app-surface));
+  box-shadow: var(--upload-shadow);
+}
+
+:global(.workspace-page.theme-light) .upload-task-card {
+  --upload-accent-border: var(--workspace-commercial-strong, #d4a017);
+  --upload-accent-badge-bg: var(--workspace-commercial-bg, #fff8e8);
+  --upload-accent-badge-text: var(--workspace-commercial-strong, #d4a017);
+  --upload-surface: var(--workspace-panel-soft, #f7fafd);
+  --upload-shadow: var(
+    --workspace-shadow,
+    0 0 0 1px rgba(174, 191, 213, 0.2),
+    0 18px 42px rgba(78, 111, 148, 0.11)
+  );
+}
+
+.upload-task-card__header {
+  padding: 24px 24px 0;
+}
+
+.upload-task-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-task-card__title {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.upload-task-card__badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--upload-accent-badge-bg);
+  color: var(--upload-accent-badge-text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.upload-task-card__desc {
+  margin: 10px 0 0;
+  color: var(--workspace-muted, var(--app-text-soft));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.65;
+}
+
+.upload-panel {
+  padding: 18px 24px 24px;
+}
+
+.upload-dragger {
+  min-height: 220px !important;
+  padding: 36px 24px !important;
+  border: 1px solid var(--upload-accent-border) !important;
+  border-style: solid !important;
+  border-radius: 16px !important;
+  background: var(--upload-surface) !important;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.upload-dragger:hover:not(.is-blocked) {
+  border-color: color-mix(
+    in srgb,
+    var(--upload-accent-border) 82%,
+    #ffffff
+  ) !important;
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--upload-accent-border) 24%, transparent);
+}
+
+:global(.workspace-page.theme-light) .upload-dragger:hover:not(.is-blocked) {
+  border-color: var(--workspace-commercial, #d89a00) !important;
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--upload-accent-border) 16%, transparent);
+}
+
+.upload-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+}
+
+.upload-trigger-icon {
+  display: block;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
+.upload-trigger-title {
+  margin-top: 18px;
+  color: var(--app-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.upload-trigger-hint {
+  margin-top: 8px;
+  color: var(--workspace-muted, var(--app-text-soft));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
 .upload-compact-shell {
   display: block;
 }
@@ -268,8 +403,10 @@ function openPreviewModal() {
 .upload-compact-dragger {
   min-height: 178px !important;
   padding: 0 !important;
+  border: 1px solid var(--upload-accent-border, var(--workspace-accent, #efc24c)) !important;
+  border-style: solid !important;
   border-radius: 12px !important;
-  background: color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%) !important;
+  background: var(--upload-surface, color-mix(in srgb, var(--app-surface) 92%, var(--workspace-accent, #efc24c) 8%)) !important;
 }
 
 .upload-compact-trigger {
@@ -290,20 +427,17 @@ function openPreviewModal() {
   color: #a56966;
 }
 
-.upload-compact-trigger strong {
+.upload-compact-trigger .upload-trigger-title {
   margin-top: 8px;
   font-size: 17px;
-  font-weight: 900;
 }
 
-.upload-compact-trigger span {
+.upload-compact-trigger .upload-trigger-hint {
   margin-top: 6px;
-  color: var(--app-text-soft);
   font-size: 13px;
-  font-weight: 700;
 }
 
-.upload-compact-trigger b {
+.upload-compact-required {
   margin-top: 10px;
   padding: 4px 9px;
   border-radius: 999px;
@@ -311,14 +445,6 @@ function openPreviewModal() {
   color: var(--app-text-soft);
   font-size: 12px;
   font-weight: 700;
-}
-
-.n-card {
-  border-radius: 12px;
-}
-
-.upload-panel {
-  margin: 24px;
 }
 
 .upload-preview {
@@ -379,8 +505,9 @@ function openPreviewModal() {
   place-items: center;
   gap: 12px;
   overflow: hidden;
+  border: 1px solid var(--upload-accent-border, var(--workspace-accent, #efc24c));
   border-radius: 16px;
-  background: var(--workspace-panel-soft, var(--app-surface-soft));
+  background: var(--upload-surface, var(--workspace-panel-soft, var(--app-surface-soft)));
   padding: 28px;
 }
 
@@ -409,6 +536,7 @@ function openPreviewModal() {
 }
 
 .upload-compact-dragger.is-blocked,
+.upload-dragger.is-blocked,
 :deep(.n-upload-dragger.is-blocked) {
   cursor: not-allowed;
   opacity: 0.72;
@@ -427,6 +555,10 @@ function openPreviewModal() {
   height: min(72vh, 720px);
   margin: 0 auto;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--workspace-panel-soft, var(--app-surface-soft)) 88%, #0f172a);
+  background: color-mix(
+    in srgb,
+    var(--workspace-panel-soft, var(--app-surface-soft)) 88%,
+    #0f172a
+  );
 }
 </style>

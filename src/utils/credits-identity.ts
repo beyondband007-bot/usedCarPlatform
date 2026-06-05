@@ -1,8 +1,8 @@
 /**
- * Mock credits identity provider.
+ * Credits identity headers for usedCar proxy routes.
  *
- * 文档 8 节示例：x-credits-user-id: 4 / x-credits-account-scope: personal
- * 真实生产应由 usedCar session 解析得到，这里先 mock 给前端调试。
+ * Logged-in users sync from `/auth/me` via `useAuthStore`.
+ * Unauthenticated dev calls may fall back to `VITE_CREDITS_DEFAULT_USER_ID`.
  */
 
 export type CreditsAccountScope = 'personal' | 'tenant'
@@ -10,13 +10,19 @@ export type CreditsAccountScope = 'personal' | 'tenant'
 export interface CreditsIdentity {
   userId: number
   accountScope: CreditsAccountScope
-  tenantId?: number | null
+  tenantId?: number | string | null
 }
 
 const STORAGE_KEY = 'ai-car-studio:credits-identity'
 
+function readDefaultUserId() {
+  const raw = import.meta.env.VITE_CREDITS_DEFAULT_USER_ID
+  const parsed = Number(raw)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 4
+}
+
 const defaultIdentity: CreditsIdentity = {
-  userId: 4,
+  userId: readDefaultUserId(),
   accountScope: 'personal',
   tenantId: null,
 }

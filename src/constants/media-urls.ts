@@ -22,6 +22,7 @@ export const mediaUrls = {
       'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjw2u9qqs2tuva0yDIYxBIJvAdixAvxzBIUzAIr=.png',
     caseUsedCar:
       'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjvypctraituuvavDIYxBIJvAdixAvxzBIUzAIr=.png',
+    /** 场景背景能力卡；图床直链当前可能 403，首页回退本地 home-capability-scene-bg.png */
     capabilitySceneBg:
       'https://vip.123pan.cn/1849524247/ymjew503t0m000ddygtuee6kkoof9lk6DIYxBIJvAdixAvxzBIUzAIr=.png',
     capabilityRefine:
@@ -30,8 +31,9 @@ export const mediaUrls = {
       'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjvqfihx49tupdcaDIYxBIJvAdixAvxzBIUzAIr=.png',
     capabilityShowroom:
       'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjvv0z4wjztuswviDIYxBIJvAdixAvxzBIUzAIr=.png',
+    /** 户外自然实景能力卡 */
     capabilityOutdoor:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjvqw1w55rtuqc6nDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjvqw1w55rtuqc6nDIYxBIJvAdixAvxzBIUzAIr=.png',
     capabilityRoadMotion:
       'https://vip.123pan.cn/1849524247/ymjew503t0m000ddygtt0qpiucof88hjDIYxBIJvAdixAvxzBIUzAIr=.png',
     capabilitySkyStudio:
@@ -49,7 +51,7 @@ export const mediaUrls = {
     heroBgLight:
       'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjwti29rnltv6f8gDIYxBIJvAdixAvxzBIUzAIr=.png',
     heroBgDark:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjws4fk7e4tv59hpDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjws4fk7e4tv59hpDIYxBIJvAdixAvxzBIUzAIr=.png',
   },
   package: {
     planBasicBg:

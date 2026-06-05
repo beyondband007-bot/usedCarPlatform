@@ -289,6 +289,7 @@ onUnmounted(() => {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.3;
+  white-space: nowrap;
 }
 
 .promo-banner-copy p {
@@ -296,6 +297,7 @@ onUnmounted(() => {
   color: var(--home-media-desc);
   font-size: 15px;
   line-height: 1.5;
+  white-space: nowrap;
 }
 
 .promo-banner-copy p:last-of-type {
@@ -306,7 +308,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 44px;
   margin-top: 14px;
   padding: 0 20px;
   border: 0;
@@ -388,14 +390,17 @@ onUnmounted(() => {
   background: linear-gradient(180deg, var(--home-gold-strong, #ffd94d), var(--home-gold, #f4c840));
 }
 
-@media (max-width: 700px) {
-  .promo-banner,
-  .promo-banner-track,
-  .promo-banner-slide,
+@media (max-width: 1023px) {
   .promo-banner-copy {
-    min-height: var(--home-suite-card-height, 210px);
+    padding: 96px 28px 28px;
   }
 
+  .promo-banner-copy.is-elevated {
+    padding: 40px 28px 24px;
+  }
+}
+
+@media (max-width: 767px) {
   .promo-banner-copy {
     max-width: 72%;
     padding: 95px 20px 24px;
@@ -407,10 +412,22 @@ onUnmounted(() => {
 
   .promo-banner-copy h2 {
     font-size: 22px;
+    white-space: normal;
   }
 
   .promo-banner-copy p {
     font-size: 14px;
+    white-space: normal;
+  }
+
+  .promo-banner-dots {
+    right: 16px;
+    bottom: 14px;
+  }
+
+  .promo-banner-dot {
+    width: 10px;
+    height: 10px;
   }
 }
 

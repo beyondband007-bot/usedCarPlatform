@@ -43,7 +43,7 @@ export function resolveAccountCreationPolicy(
     developerCanCreateAgents: true,
     developerCanCreateUsers: true,
     adminCanCreateAgents: state.developerAllowsAdminCreateAgentsAndUsers,
-    adminCanCreateUsers: state.developerAllowsAdminCreateAgentsAndUsers,
+    adminCanCreateUsers: false,
     adminCanPromoteUserToAgent:
       state.developerAllowsAdminCreateAgentsAndUsers &&
       state.adminAllowsUserBecomeAgent,
@@ -69,10 +69,9 @@ export const accountCreationPolicies: AccountCreationPolicy[] = [
     role: 'admin',
     label: '公司管理员',
     capabilities: [
-      '创建 Agent / User',
+      '创建 Agent',
       '读取全部流水与余额',
-      '增减积分',
-      '删除 Agent / User',
+      '代理商基础信息管理',
       '控制 User 成为 Agent',
     ],
     controlledBy: ['developer'],

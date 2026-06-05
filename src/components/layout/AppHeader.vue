@@ -101,6 +101,12 @@ function resolveNavPermission(path: string) {
 function canShowNavItem(item: NavItem) {
   if (!authStore.isLoggedIn)
     return item.path !== "/credits" && item.path !== "/points";
+  if (
+    authStore.userInfo?.enterpriseAccountRole === "child" &&
+    (item.path === "/recharge" || item.path === "/package-points")
+  ) {
+    return false;
+  }
   const permission = resolveNavPermission(item.path);
   return !permission || authStore.permissions.includes(permission);
 }
@@ -131,9 +137,14 @@ const navItems = computed(() => {
     : topNavigation.filter(canShowNavItem);
 });
 
+const canShowRechargeEntry = computed(
+  () => authStore.userInfo?.enterpriseAccountRole !== "child",
+);
+
 const showHeaderRecharge = computed(
   () =>
     authStore.isLoggedIn &&
+    canShowRechargeEntry.value &&
     navItems.value.some((item) => item.path === "/credits"),
 );
 </script>
@@ -168,7 +179,7 @@ const showHeaderRecharge = computed(
           <button
             v-if="item.path === '/credits' && showHeaderRecharge"
             type="button"
-            class="nav-recharge-btn"
+            class="nav-link nav-link--action"
             @click="handleOpenRecharge"
           >
             充值
@@ -178,7 +189,7 @@ const showHeaderRecharge = computed(
       <div class="site-header-actions">
         <RouterLink
           v-if="authStore.isLoggedIn"
-          class="credit-pill"
+          class="header-action-pill credit-pill"
           to="/credits"
           aria-label="查看积分余额与流水"
         >
@@ -186,32 +197,11 @@ const showHeaderRecharge = computed(
         </RouterLink>
         <RouterLink
           v-else-if="route.path !== '/login'"
-          class="credit-pill site-login-fallback"
+          class="header-action-pill credit-pill site-login-fallback"
           to="/login"
         >
           企业账号登录
         </RouterLink>
-        <button
-          type="button"
-          class="theme-toggle"
-          :aria-label="themeToggleAriaLabel"
-          @click="appStore.toggleTheme()"
-        >
-          <img
-            :src="themeToggleIcon"
-            alt=""
-            class="theme-toggle-icon"
-            :class="
-              appStore.isDarkMode
-                ? 'theme-toggle-icon--to-light'
-                : 'theme-toggle-icon--to-dark'
-            "
-            width="22"
-            height="22"
-            decoding="async"
-            draggable="false"
-          />
-        </button>
         <NPopover
           v-if="authStore.isLoggedIn"
           v-model:show="userMenuOpen"
@@ -224,16 +214,10 @@ const showHeaderRecharge = computed(
           <template #trigger>
             <button
               type="button"
-              class="user-menu-trigger user-menu-trigger--studio"
+              class="header-action-pill user-menu-trigger user-menu-trigger--studio"
               :aria-expanded="userMenuOpen"
               aria-haspopup="menu"
             >
-              <span
-                class="user-menu-avatar user-menu-avatar--studio"
-                aria-hidden="true"
-              >
-                <Icon icon="mdi:account-circle-outline" />
-              </span>
               <span class="user-menu-name">{{ authStore.userName }}</span>
               <Icon icon="mdi:chevron-down" class="user-menu-chevron" />
             </button>
@@ -274,6 +258,27 @@ const showHeaderRecharge = computed(
             </button>
           </div>
         </NPopover>
+        <button
+          type="button"
+          class="theme-toggle"
+          :aria-label="themeToggleAriaLabel"
+          @click="appStore.toggleTheme()"
+        >
+          <img
+            :src="themeToggleIcon"
+            alt=""
+            class="theme-toggle-icon"
+            :class="
+              appStore.isDarkMode
+                ? 'theme-toggle-icon--to-light'
+                : 'theme-toggle-icon--to-dark'
+            "
+            width="22"
+            height="22"
+            decoding="async"
+            draggable="false"
+          />
+        </button>
       </div>
     </header>
 
@@ -332,7 +337,7 @@ const showHeaderRecharge = computed(
           <button
             v-if="item.path === '/credits' && showHeaderRecharge"
             type="button"
-            class="nav-recharge-btn nav-recharge-btn--admin"
+            class="inline-flex min-w-[72px] shrink-0 items-center rounded-xl px-3 py-2 text-xs font-semibold text-[var(--app-header-nav)] transition duration-200 hover:text-[var(--app-header-nav-active)] xl:min-w-[80px] xl:px-4"
             @click="handleOpenRecharge"
           >
             充值
@@ -449,27 +454,29 @@ const showHeaderRecharge = computed(
 .site-header {
   display: flex;
   align-items: center;
-  gap: clamp(20px, 2.8vw, 48px);
+  gap: clamp(18px, 2vw, 34px);
   width: 100%;
   max-width: none;
   box-sizing: border-box;
-  min-height: var(--studio-chrome-header-height, 72px);
-  padding: 12px var(--studio-chrome-pad-x, 24px);
+  min-height: var(--studio-chrome-header-height, 64px);
+  padding: 10px var(--studio-chrome-pad-x, 24px);
   margin: 0;
   background: var(
     --studio-chrome-header-bg,
-    linear-gradient(to bottom, rgba(2, 2, 2, 0.72), transparent)
+    linear-gradient(180deg, rgba(248, 251, 255, 0.96) 0%, rgba(241, 247, 253, 0.92) 100%)
   );
-  color: var(--studio-chrome-logo, #f3f3f3);
+  color: var(--studio-chrome-logo, #121826);
   font-family:
     "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
 }
 
 .logo {
   flex-shrink: 0;
-  color: var(--studio-chrome-logo, #f3f3f3);
+  color: var(--studio-chrome-logo, #121826);
   font-family: inherit;
-  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
+  font-size: var(--studio-chrome-logo-size, clamp(18px, 1.45vw, 24px));
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -489,14 +496,14 @@ const showHeaderRecharge = computed(
   align-items: center;
   justify-content: center;
   height: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) - 2px);
-  margin-right: 24px;
+  margin-right: 18px;
   padding: 0 6px;
   border-radius: 4px;
-  background: #fff;
+  background: #000;
 }
 
 .logo-cn-name {
-  color: #0f172a;
+  color: #fff;
   font-family: inherit;
   font-size: calc(
     var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2
@@ -508,39 +515,41 @@ const showHeaderRecharge = computed(
 }
 
 .site-header.is-light .logo-cn-badge {
-  background: #000;
+  background: #fff;
 }
 
 .site-header.is-light .logo-cn-name {
-  color: #fff;
+  color: #0f172a;
 }
 
 .nav-links {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--studio-chrome-nav-gap, clamp(20px, 2.8vw, 56px));
-  color: var(--studio-chrome-nav, #c9c9c9);
-  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  gap: var(--studio-chrome-nav-gap, clamp(18px, 2.2vw, 42px));
+  color: var(--studio-chrome-nav, #6b7280);
+  font-size: var(--studio-chrome-nav-size, clamp(13px, 0.95vw, 15px));
   font-weight: 700;
 }
 
 .nav-link {
   position: relative;
+  flex-shrink: 0;
   padding: 0 0 clamp(6px, 0.45vw, 8px);
   border: 0;
   background: transparent;
-  color: var(--studio-chrome-nav, #475569);
+  color: var(--studio-chrome-nav, #6b7280);
   font-family: inherit;
   font-size: inherit;
   font-weight: 600;
   line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.25s ease;
 }
 
 .nav-link:hover {
-  color: var(--studio-chrome-nav-hover, #2f6bff);
+  color: var(--studio-chrome-nav-hover, #111827);
 }
 
 .nav-link::after {
@@ -551,79 +560,66 @@ const showHeaderRecharge = computed(
   height: 2px;
   content: "";
   border-radius: 2px;
-  background: var(--studio-chrome-nav-underline, #2f6bff);
+  background: var(--studio-chrome-nav-underline, #111827);
   transform: translateX(-50%);
-  transition: width 0.25s ease;
+  transition:
+    width 0.25s ease,
+    background 0.25s ease;
 }
 
-.nav-link:hover::after,
+.nav-link:hover::after {
+  width: 100%;
+  background: var(--studio-chrome-nav-underline-hover, #111827);
+}
+
 .nav-link.active::after {
   width: 100%;
+  background: var(
+    --studio-chrome-nav-underline-active,
+    var(--studio-chrome-nav-underline, #111827)
+  );
 }
 
 .nav-link.active {
-  color: var(--studio-chrome-nav-active, #2f6bff);
+  color: var(--studio-chrome-nav-active, #111827);
+  font-weight: 700;
+}
+
+.nav-link--action {
   font-weight: 600;
 }
 
-.nav-recharge-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: clamp(6px, 0.45vw, 8px);
-  padding: clamp(4px, 0.35vw, 6px) clamp(10px, 0.8vw, 14px);
-  border: 0;
-  border-radius: 999px;
-  background: var(--studio-chrome-credit-bg, #d4a017);
-  color: var(--studio-chrome-credit-text, #ffffff);
-  font-family: inherit;
-  font-size: calc(var(--studio-chrome-nav-size, 15px) * 0.82);
-  font-weight: 700;
-  line-height: 1.2;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.2s ease;
-}
-
-.nav-recharge-btn:hover {
-  background: var(--studio-chrome-credit-hover, #e5b85c);
-}
-
-.nav-recharge-btn--admin {
-  align-self: center;
-  margin-bottom: 0;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--color-brand-primary, #2f6bff);
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.nav-recharge-btn--admin:hover {
-  background: var(--color-action-primary-hover, #4f7fff);
-}
-
+.header-action-pill,
 .credit-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
-  border: 1px solid transparent;
+  gap: 6px;
+  min-height: clamp(36px, 2.4vw, 40px);
+  padding: clamp(6px, 0.55vw, 8px) clamp(12px, 1vw, 16px);
+  border: 1px solid var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
   border-radius: 999px;
-  background: var(--studio-chrome-credit-bg, #d4a017);
-  color: var(--studio-chrome-credit-text, #ffffff);
+  background: var(--studio-chrome-credit-bg, #ffffff);
+  color: var(--studio-chrome-credit-text, #111827);
+  font-family: inherit;
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
-  text-decoration: none;
   white-space: nowrap;
-  transition: background 0.2s ease;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
+.credit-pill {
+  text-decoration: none;
+}
+
+.header-action-pill:hover,
 .credit-pill:hover {
-  background: var(--studio-chrome-credit-hover, #e5b85c);
+  background: var(--studio-chrome-credit-hover, #f8fafc);
 }
 
 .site-login-fallback {
@@ -634,34 +630,37 @@ const showHeaderRecharge = computed(
   display: inline-flex;
   align-items: center;
   margin-left: auto;
-  gap: 10px;
+  gap: clamp(8px, 0.75vw, 12px);
 }
 
 .theme-toggle {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   gap: 0;
-  padding: clamp(8px, 0.55vw, 10px);
-  border: 1px solid var(--studio-chrome-theme-border, rgba(255, 255, 255, 0.14));
-  border-radius: 999px;
-  background: var(--studio-chrome-theme-bg, rgba(255, 255, 255, 0.08));
-  color: var(--studio-chrome-theme-text, #f3f3f3);
+  width: clamp(36px, 2.4vw, 40px);
+  height: clamp(36px, 2.4vw, 40px);
+  padding: 0;
+  border: 1px solid var(--studio-chrome-theme-border, rgba(15, 23, 42, 0.1));
+  border-radius: 50%;
+  background: var(--studio-chrome-theme-bg, #0f1115);
+  color: var(--studio-chrome-theme-text, #ffffff);
   font-family: inherit;
-  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 700;
   cursor: pointer;
   transition:
     background 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .theme-toggle:hover {
   border-color: var(
     --studio-chrome-user-hover-border,
-    rgba(239, 194, 76, 0.42)
+    rgba(15, 23, 42, 0.16)
   );
-  background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
+  background: var(--studio-chrome-theme-bg-hover, var(--studio-chrome-user-hover-bg, #171a20));
+  opacity: 0.92;
 }
 
 .theme-toggle-icon {
@@ -671,34 +670,34 @@ const showHeaderRecharge = computed(
   object-fit: contain;
 }
 
-.theme-toggle-icon--to-light {
+.theme-toggle-icon--to-light,
+.theme-toggle-icon--to-dark {
   filter: brightness(0) invert(1);
 }
 
-.theme-toggle-icon--to-dark {
-  filter: brightness(0);
+.site-header .header-action-pill.user-menu-trigger--studio {
+  max-width: min(100%, 240px);
+  border: 1px solid var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
+  background: var(--studio-chrome-credit-bg, transparent);
+  color: var(--studio-chrome-credit-text, #111827);
+  box-shadow: none;
 }
 
-.user-menu-trigger--studio {
-  border-color: var(--studio-chrome-user-border, rgba(255, 255, 255, 0.14));
-  background: var(--studio-chrome-user-bg, rgba(255, 255, 255, 0.08));
-  color: var(--studio-chrome-user-text, #f3f3f3);
-  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
-  font-weight: 700;
+.site-header .header-action-pill.user-menu-trigger--studio:hover {
+  border-color: var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
+  background: var(--studio-chrome-credit-hover, rgba(15, 23, 42, 0.04));
+  box-shadow: none;
 }
 
-.user-menu-trigger--studio:hover {
-  border-color: var(
-    --studio-chrome-user-hover-border,
-    rgba(239, 194, 76, 0.42)
-  );
-  background: var(--studio-chrome-user-hover-bg, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 4px 14px rgba(239, 194, 76, 0.12);
+.user-menu-trigger--studio .user-menu-chevron {
+  flex-shrink: 0;
+  font-size: 16px;
+  color: currentColor;
+  opacity: 1;
 }
 
-.user-menu-avatar--studio {
-  background: var(--studio-chrome-avatar-bg, rgba(239, 194, 76, 0.16));
-  color: var(--studio-chrome-avatar-text, #efc24c);
+.site-header.is-light .theme-toggle:hover {
+  background: #1e293b;
 }
 
 @media (max-width: 1100px) {
@@ -727,7 +726,7 @@ const showHeaderRecharge = computed(
 
 }
 
-.user-menu-trigger {
+.user-menu-trigger:not(.user-menu-trigger--studio) {
   display: inline-flex;
   max-width: min(100%, 200px);
   align-items: center;
@@ -747,7 +746,7 @@ const showHeaderRecharge = computed(
     box-shadow 0.2s ease;
 }
 
-.user-menu-trigger:hover {
+.user-menu-trigger:not(.user-menu-trigger--studio):hover {
   border-color: color-mix(
     in srgb,
     var(--color-accent-blue, #2f6bff) 32%,
@@ -792,7 +791,7 @@ const showHeaderRecharge = computed(
     display: none;
   }
 
-  .user-menu-trigger {
+  .user-menu-trigger:not(.user-menu-trigger--studio) {
     padding-inline: 6px;
   }
 }

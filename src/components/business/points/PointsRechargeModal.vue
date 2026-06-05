@@ -107,7 +107,10 @@ async function handleGeneratePaymentCode() {
     let orderNo = "";
 
     if (productId) {
-      const order = await createRechargeOrder({ productId });
+      const order = await createRechargeOrder({
+        productId,
+        payChannel: "alipay",
+      });
       orderNo = order.orderNo;
     } else {
       orderNo = createLocalRechargeOrder(amount).orderNo;
@@ -303,7 +306,12 @@ async function handleGeneratePaymentCode() {
   font-size: 18px;
 }
 
-.points-recharge-modal__head h2,
+.points-recharge-modal__head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .points-recharge-modal__head h3 {
   margin: 0;
   font-size: 16px;

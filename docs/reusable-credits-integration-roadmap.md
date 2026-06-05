@@ -40,8 +40,8 @@ Both services now use MySQL, but they should remain separate service databases f
 | Phase 10: Identity and mock login | Done | `phase-10-mock-identity-20260601` | Adds an explicit frontend mock credits identity selector and sends that identity through request headers. |
 | Phase 11: End-to-end testing | Done | `phase-11-e2e-testing-20260601` | Adds a local smoke runner and documents the repeatable integration checklist and known limits. |
 | Phase 12: Team handoff and PR | Done | `phase-12-team-handoff-20260601` | Adds the team handoff document, syncs with upstream `master`, and prepares the review PR. |
-| Three-role back office | UI/prototype done; production workflows later | Current branch | Expands `/credits-admin` into the developer, company-admin, and agent back-office surface from the shared prototype. Real write APIs, audited role changes, and operational CRUD remain future work. |
-| Account creation hierarchy | Updated | Current branch | Developer can create Admin/Agent/User, Admin can create Agent/User, Agent can create User when Admin allows it unless Developer disables it, with Developer/Admin toggles controlling downstream creation and User-to-Agent promotion. |
+| Three-role back office | Independent shell started | Current branch | Adds `/back-office/login` and `/back-office` so the Reusable Credits Platform Console no longer uses the usedCarPlatform product shell. Developer point adjustment and account creation remain backend-backed; latest PRD makes Admin user lists read-only. |
+| Account creation hierarchy | Updated from latest PRD | Current branch | Developer can create Admin/Agent/User, Admin can create Agent, Agent can create User when Admin allows it unless Developer disables it. Admin cannot adjust points or create/delete regular Users. |
 
 Detailed phase notes:
 
@@ -87,11 +87,11 @@ During development, usedCarPlatform resolves credits identity in this order:
 
 The environment fallback is for direct local backend smoke tests only. It should not become the normal browser testing path or the production identity model.
 
-Account creation now follows the Reusable Credits Platform console hierarchy: Developer can create Admins, Agents, and Users; Developer controls whether Admin can create Agents/Users and can disable Agent-created Users; Admin can create Agents/Users while enabled; Admin controls whether Agent can create Users and whether a User can become Agent; Agent can create Users when Admin allows it unless Developer disables it.
+Account creation now follows the latest Reusable Credits Platform console PRD: Developer can create Admins, Agents, and Users; Developer controls whether Admin can create Agents and can disable Agent-created Users; Admin can create Agents while enabled; Admin controls whether Agent can create Users and whether a User can become Agent; Agent can create Users when Admin allows it unless Developer disables it.
 
-Role capabilities are explicit: Developer can create/delete Admins, Agents, and Users, read all balances/transactions, and add/minus points; Admin can create/delete Agents and Users, read all balances/transactions, and add/minus points; Agent can create Users and read only the balances/transactions of Users it creates.
+Role capabilities are explicit per the latest PRD: Developer can create/delete Admins, Agents, and Users, read all balances/transactions, and add/minus points; Admin can create/delete Agents and read all balances/transactions, but cannot adjust points or disable/enable regular Users; Agent can create Users/customers and read only the transactions and balances of Users it creates.
 
-The current frontend mock login keeps exactly three Three-Role Credits Back Office roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as the regular product-user login from the existing frontend, but it is not a back-office role and cannot access `/credits-admin`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
+The current frontend mock login keeps exactly three Three-Role Credits Back Office roles: `developer`, `admin`, and `agent`. The `enterprise` username remains available as the regular product-user login from the existing frontend, but it is not a back-office role and cannot access `/reusable-credits-console`. This completes local role-based login testing, but production still needs backend sessions and server-side permission checks.
 
 First-release enterprise plan business logic is centralized in `src/domain/enterprise-plans.ts`. Flagship mother/child account visibility is separated in `src/domain/enterprise-account-hierarchy.ts`: the flagship mother account can view its three child accounts' points and transactions, while lower plans do not get child-account visibility.
 
@@ -157,7 +157,7 @@ Initial scope was read-only operational visibility:
 - transactions
 - payment orders
 
-The current route now includes the complete developer, company-admin, and agent menu surface from the shared prototype. Management buttons are present for review, but remain non-mutating until backend role, audit, and workflow APIs are added.
+The current route now includes the complete developer, company-admin, and agent menu surface from the shared prototype under an independent back-office shell. Account creation, Developer point adjustment, and allowed account deletion are mutating console actions; remaining workflow buttons should still be treated as review surfaces until their backend role, audit, and workflow APIs are added.
 
 Expected deliverable:
 

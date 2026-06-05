@@ -1,8 +1,9 @@
 # Reusable Credits Platform Console Executable Plan
 
-Status: Phase 6 agent operations foundation implemented locally
-Date: 2026-06-04
-Route compatibility: `/credits-admin`
+Status: Latest PRD Phase 0/1 started locally
+Date: 2026-06-05
+Primary route: `/back-office`
+Compatibility routes: `/reusable-credits-console`, `/credits-admin`
 
 ## Target
 
@@ -21,11 +22,11 @@ Initial application catalog:
 
 Developer can create Admins, Agents, and Users.
 
-Developer can turn Admin creation of Agents and Users on/off.
+Developer can turn Admin creation of Agents on/off.
 
 Developer can disable Agent creation of Users as a top-level override.
 
-Admin can create Agents and Users while Developer allows it.
+Admin can create Agents while Developer allows it.
 
 Admin normally controls whether Agent can create Users.
 
@@ -38,10 +39,10 @@ Role capability matrix:
 | Role | Create | Read | Update | Delete |
 | --- | --- | --- | --- | --- |
 | Developer | Admins, Agents, Users | All transactions and balances | Add/minus points | Admins, Agents, Users |
-| Admin | Agents, Users | All transactions and balances | Add/minus points | Agents, Users |
+| Admin | Agents | All transactions and balances | Agent basic operations only | Agents |
 | Agent | Users | Transactions and balances of Users it creates | None | None |
 
-This policy now has a backend schema, policy service foundation, session-backed RBAC gate, first unified user creation API, multi-application console data, and the first Agent operations API/UI foundation. Future phases still need frontend write forms for all writes, production tenant account creation, and full approval workflows.
+This policy now has a backend schema, policy service foundation, session-backed RBAC gate, independent back-office login/shell, first unified user creation API, console account creation buttons/forms, Developer-only point adjustment, allowed account deletion, multi-application console data, and the first Agent operations API/UI foundation. Future phases still need production tenant account creation and full approval workflows.
 
 ## Phase 1: Console Foundation
 
@@ -49,12 +50,14 @@ Goal: rename and restructure the existing console foundation so the product dire
 
 Deliverables:
 
-- Keep `/credits-admin` as a compatibility route.
+- Keep `/credits-admin` as a compatibility redirect.
+- Make `/back-office` the primary console route.
+- Add `/back-office/login` as the independent console login.
 - Change visible UI language from usedCar admin to Reusable Credits Platform console.
 - Add a multi-application catalog foundation.
 - Add `clothing_ai` as a planned application with initial function examples.
 - Add account-creation policy constants for Developer/Admin/Agent.
-- Model the hierarchy: Developer -> Admin create Agent/User, Developer -> Agent create User, Admin -> Agent create User, Admin -> User becomes Agent.
+- Model the hierarchy: Developer -> Admin create Agent, Developer -> Agent create User, Admin -> Agent create User, Admin -> User becomes Agent.
 - Update demo roles and permissions for Developer/Admin/Agent account creation.
 - Seed backend app roles for `developer`, `admin`, and `agent`.
 - Update account-creation docs to reflect Developer-controlled Admin/Agent permissions.
@@ -63,10 +66,11 @@ Exit check:
 
 - Frontend typecheck passes.
 - Backend typecheck passes.
-- `/credits-admin` still loads through the existing route.
-- Developer can see all role tabs.
-- Admin can see Admin and Agent tabs.
-- Agent can see only Agent.
+- `/back-office/login` loads without the usedCarPlatform product shell.
+- `/back-office` loads as the primary console route.
+- `/reusable-credits-console` redirects to `/back-office`.
+- `/credits-admin` redirects to `/back-office`.
+- Console view is derived from the logged-in role.
 
 ## Phase 2: Backend Policy Schema
 
@@ -84,7 +88,7 @@ Deliverables:
 Default policies:
 
 - Developer create Admins/Agents/Users: enabled, not disableable.
-- Admin create Agents/Users: enabled when Developer allows it.
+- Admin create Agents: enabled when Developer allows it.
 - Agent create Users: enabled when Admin allows it, unless Developer disables it.
 - User becomes Agent: enabled only when Admin allows it and Developer allows Admin Agent/User creation.
 
@@ -146,6 +150,7 @@ Implementation status:
 - Writes `agent_customer_relations` when an Agent creates a User.
 - Writes allowed and denied account-creation audit rows.
 - Stores idempotent completed responses for same-key replay and rejects same-key request-hash conflicts.
+- `/reusable-credits-console` now exposes role-aware Create Admin/Agent/User buttons and a shared account creation form wired to this endpoint.
 - `npm run phase4:user-api-test` verifies the request contract and hash behavior.
 
 Example request:

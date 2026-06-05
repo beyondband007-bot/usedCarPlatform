@@ -759,6 +759,29 @@ function focusShortVideoGeneratingView() {
   shortVideoInitialView.value = "generating";
 }
 
+function focusGeneratingView() {
+  if (!props.isGenerating) return;
+
+  if (isFeatureCompareCapability.value) {
+    featureCompareActiveView.value = "generating";
+    return;
+  }
+
+  if (isBatchProcessingView.value) {
+    activeTab.value = "batchProcessing";
+    return;
+  }
+
+  if (props.capability.code === "short-video") {
+    syncShortVideoInitialView();
+    return;
+  }
+
+  if (!isBatchCapability.value) {
+    activeTab.value = "generating";
+  }
+}
+
 function focusShortVideoPreviewView() {
   if (props.capability.code !== "short-video") return;
   shortVideoInitialView.value = "preview";
@@ -782,12 +805,7 @@ watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
     if (generating) {
-      if (isFeatureCompareCapability.value) {
-        featureCompareActiveView.value = "generating";
-      } else if (!isBatchCapability.value) {
-        activeTab.value = "generating";
-      }
-      syncShortVideoInitialView();
+      focusGeneratingView();
       if (!isBatchCapability.value) {
         void loadRecentItems({ force: true });
       }
@@ -810,6 +828,7 @@ watch(
       syncShortVideoInitialView();
     }
   },
+  { immediate: true },
 );
 
 watch(
@@ -929,6 +948,7 @@ onUnmounted(() => {
 
 defineExpose({
   refreshRecentItems: () => loadRecentItems({ force: true }),
+  focusGeneratingView,
   focusShortVideoGeneratingView,
   focusShortVideoPreviewView,
   focusDeliveryBatchProcessingView,

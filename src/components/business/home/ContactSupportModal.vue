@@ -165,7 +165,7 @@ function close() {
 .support-modal-title {
   margin: 0;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.35;
   color: var(--support-text);
 }
@@ -188,7 +188,7 @@ function close() {
   border-radius: 8px;
   background: var(--support-info-bg);
   color: var(--support-text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.45;
   cursor: default;
@@ -243,7 +243,7 @@ function close() {
 }
 
 .support-modal-channel-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.35;
   color: var(--support-text);

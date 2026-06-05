@@ -25,6 +25,7 @@ const permissionMap: Record<string, string> = {
   '/credits': 'menu:points',
   '/recharge': 'menu:recharge',
   '/package-points': 'menu:recharge',
+  '/reusable-credits-console': 'menu:admin',
   '/credits-admin': 'menu:admin',
 }
 

@@ -1,3 +1,4 @@
+import type { EnterpriseCreditsTransaction } from '@/api/enterprise'
 import type { CreditsTransaction } from '@/api/visual-workbench'
 import { pointsSummaryIcons } from '@/constants/points-page'
 import type {
@@ -112,9 +113,38 @@ export function mapCreditsTransactionToFlowRecord(
   }
 }
 
+export function mapEnterpriseCreditsTransactionToFlowRecord(
+  transaction: EnterpriseCreditsTransaction,
+  currentUserId?: string | null,
+): PointsFlowRecord {
+  const base = mapCreditsTransactionToFlowRecord({
+    id: transaction.id,
+    txnType: transaction.txnType,
+    points: Number(transaction.points ?? 0),
+    balanceBefore: Number(transaction.balanceBefore ?? 0),
+    balanceAfter: Number(transaction.balanceAfter ?? 0),
+    billingTaskId: null,
+    paymentOrderId: null,
+    bizType: transaction.bizType,
+    bizId: transaction.bizId,
+    remark: transaction.remark,
+    createdAt: transaction.createdAt,
+  })
+
+  return {
+    ...base,
+    memberId: transaction.operatorUserId,
+    memberName: transaction.operatorName,
+    memberRole: transaction.operatorRole,
+    isOwner: transaction.isOwner,
+    isCurrentUser: currentUserId ? transaction.operatorUserId === currentUserId : false,
+  }
+}
+
 export function buildPersonalSummaryCards(input: {
   availableBalance: number
   records: PointsFlowRecord[]
+  availableBalanceLabel?: string
 }): PointsSummaryCard[] {
   const now = Date.now()
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
@@ -138,7 +168,7 @@ export function buildPersonalSummaryCards(input: {
   return [
     {
       key: 'availableBalance',
-      label: '当前可用积分',
+      label: input.availableBalanceLabel ?? '当前可用积分',
       value: formatPoints(input.availableBalance),
       unit: '积分',
       icon: pointsSummaryIcons.available,
@@ -167,6 +197,43 @@ export function buildPersonalSummaryCards(input: {
       unit: '积分',
       icon: pointsSummaryIcons.recentNet,
       tone: 'amber',
+    },
+  ]
+}
+
+export function buildTeamSummaryCards(input: {
+  availableBalance: number
+  records: PointsFlowRecord[]
+}): PointsSummaryCard[] {
+  const personalCards = buildPersonalSummaryCards({
+    availableBalance: input.availableBalance,
+    records: input.records,
+  })
+
+  return [
+    {
+      key: 'teamAvailableBalance',
+      label: '团队可用总余额',
+      value: personalCards[0]?.value ?? '0',
+      unit: '积分',
+      icon: 'mdi:bank-outline',
+      tone: 'blue',
+    },
+    {
+      key: 'totalGained',
+      label: '累计获得',
+      value: personalCards[1]?.value ?? '0',
+      unit: '积分',
+      icon: 'mdi:trending-up',
+      tone: 'emerald',
+    },
+    {
+      key: 'totalConsumed',
+      label: '累计消费',
+      value: personalCards[2]?.value ?? '0',
+      unit: '积分',
+      icon: 'mdi:shopping-outline',
+      tone: 'rose',
     },
   ]
 }

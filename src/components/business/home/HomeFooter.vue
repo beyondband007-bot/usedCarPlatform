@@ -2,7 +2,7 @@
 import { computed, inject } from "vue";
 import { useRouter } from "vue-router";
 
-import footerBrandLogoLight from "@/assets/media/global/global-footer-brand-logo-light.png";
+import footerBrandLogoLight from "@/assets/img/icon/logo/日间模式logo.png";
 import { mediaUrls } from "@/constants/media-urls";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import {
@@ -199,11 +199,12 @@ const footerBrandLogoSrc = computed(() =>
 
 .footer-container {
   display: flex;
-  width: min(100%, 1440px);
-  max-width: 1440px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--layout-content-max, 1440px);
   margin: 0 auto;
-  padding: 0 40px;
-  gap: 128px;
+  padding: 0 var(--space-page-x, clamp(16px, 2vw, 32px));
+  gap: clamp(40px, 8vw, 128px);
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -370,12 +371,13 @@ const footerBrandLogoSrc = computed(() =>
 
 .footer-bottom {
   display: flex;
-  width: min(100%, 1440px);
-  max-width: 1440px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--layout-content-max, 1440px);
   align-items: center;
   justify-content: space-between;
   margin: 40px auto 0;
-  padding: 20px 40px 0;
+  padding: 20px var(--space-page-x, clamp(16px, 2vw, 32px)) 0;
   border-top: 1px solid var(--footer-border);
 }
 
@@ -396,7 +398,7 @@ const footerBrandLogoSrc = computed(() =>
   cursor: default;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1023px) {
   .footer-container {
     flex-direction: column;
     gap: 40px;
@@ -415,13 +417,7 @@ const footerBrandLogoSrc = computed(() =>
   }
 }
 
-@media (max-width: 640px) {
-  .footer-container,
-  .footer-bottom {
-    padding-right: 20px;
-    padding-left: 20px;
-  }
-
+@media (max-width: 767px) {
   .brand-body {
     flex-direction: column;
   }
@@ -433,6 +429,11 @@ const footerBrandLogoSrc = computed(() =>
 
   .nav-column {
     width: 100%;
+  }
+
+  .nav-item--clickable {
+    min-height: 44px;
+    align-items: center;
   }
 
   .footer-bottom {

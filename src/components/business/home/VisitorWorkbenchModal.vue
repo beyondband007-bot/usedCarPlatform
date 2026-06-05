@@ -87,7 +87,7 @@ function openSupportModal() {
 
 <style scoped lang="scss">
 .visitor-modal-card {
-  --visitor-scale: 1.4286;
+  --visitor-scale: 1;
   --visitor-pad: 34px;
 
   position: relative;
@@ -199,7 +199,7 @@ function openSupportModal() {
   border-radius: calc(10px * var(--visitor-scale));
   font-family: inherit;
   font-size: calc(14px * var(--visitor-scale));
-  font-weight: 900;
+  font-weight: 800;
   text-decoration: none;
   cursor: pointer;
   transition:

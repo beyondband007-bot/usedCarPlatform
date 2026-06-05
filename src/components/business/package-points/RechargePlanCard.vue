@@ -340,6 +340,7 @@ const cardClass = computed(() => [
   font-size: clamp(18px, 1.45vw, 20px);
   font-weight: 900;
   line-height: 1.25;
+  white-space: nowrap;
 }
 
 .plan-price-row {
@@ -426,6 +427,7 @@ const cardClass = computed(() => [
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
+  white-space: nowrap;
 }
 
 .benefit-icon {
@@ -437,7 +439,7 @@ const cardClass = computed(() => [
 
 .plan-benefits li span {
   min-width: 0;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .plan-action {
@@ -456,7 +458,7 @@ const cardClass = computed(() => [
     var(--color-bg-card-strong);
   color: var(--color-text-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   cursor: pointer;
   pointer-events: auto;

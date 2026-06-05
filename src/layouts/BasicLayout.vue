@@ -49,6 +49,9 @@ const useFixedAppFrame = computed(
 
 const isHomePage = computed(() => route.path === '/home')
 const isPricingPage = computed(() => route.path === '/pricing')
+const isPointsPage = computed(
+  () => route.path === '/credits' || route.path === '/points',
+)
 const isLoginPage = computed(() => route.path === '/login')
 
 
@@ -80,6 +83,8 @@ const {
       'app-layout--home': isHomePage,
 
       'app-layout--pricing': isPricingPage,
+
+      'app-layout--points': isPointsPage,
 
       'app-layout--login': isLoginPage,
 
@@ -215,11 +220,17 @@ const {
 
   --studio-chrome-nav-underline: #efc24c;
 
-  --studio-chrome-credit-bg: #ffffff;
+  --studio-chrome-nav-underline-hover: #fff;
 
-  --studio-chrome-credit-text: #0f172a;
+  --studio-chrome-nav-underline-active: #efc24c;
 
-  --studio-chrome-credit-hover: #f8fafc;
+  --studio-chrome-credit-bg: transparent;
+
+  --studio-chrome-credit-text: #f7f1e4;
+
+  --studio-chrome-credit-border: rgba(255, 255, 255, 0.32);
+
+  --studio-chrome-credit-hover: rgba(255, 255, 255, 0.06);
 
   --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
@@ -227,15 +238,15 @@ const {
 
   --studio-chrome-theme-border: rgba(239, 194, 76, 0.18);
 
-  --studio-chrome-user-border: rgba(239, 194, 76, 0.18);
+  --studio-chrome-user-border: var(--studio-chrome-credit-border);
 
-  --studio-chrome-user-bg: rgba(255, 255, 255, 0.05);
+  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
 
-  --studio-chrome-user-text: #f7f1e4;
+  --studio-chrome-user-text: var(--studio-chrome-credit-text);
 
-  --studio-chrome-user-hover-border: rgba(239, 194, 76, 0.42);
+  --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
 
-  --studio-chrome-user-hover-bg: rgba(239, 194, 76, 0.08);
+  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
 
   --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
 
@@ -265,30 +276,31 @@ const {
 
 
 .home-chrome--light {
-  --studio-chrome-bg: #f8fafd;
-  --studio-chrome-header-bg: #f8fafd;
+  --studio-chrome-bg: rgb(224, 234, 242);
+  --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
-  --studio-chrome-nav: #475569;
-  --studio-chrome-nav-hover: #2f6bff;
-  --studio-chrome-nav-active: #2f6bff;
-  --studio-chrome-nav-underline: #2f6bff;
-  --studio-chrome-credit-bg: #d4a017;
-  --studio-chrome-credit-text: #ffffff;
-  --studio-chrome-credit-hover: #e5b85c;
-  --studio-chrome-theme-bg: #ffffff;
-  --studio-chrome-theme-text: #64748b;
-  --studio-chrome-theme-border: #e6ecf5;
-  --studio-chrome-user-border: #e6ecf5;
-  --studio-chrome-user-bg: #ffffff;
-  --studio-chrome-user-text: #0f172a;
-  --studio-chrome-user-hover-border: #cfe0ff;
-  --studio-chrome-user-hover-bg: #f8fafd;
-  --studio-chrome-avatar-bg: #f2f7ff;
-  --studio-chrome-avatar-text: #2f6bff;
-  --studio-chrome-subnav-bg: #f8fafd;
-  --studio-chrome-subnav-border: #e6ecf5;
+  --studio-chrome-nav: #64748b;
+  --studio-chrome-nav-hover: #475569;
+  --studio-chrome-nav-active: #0f172a;
+  --studio-chrome-nav-underline: #0f172a;
+  --studio-chrome-nav-underline-hover: #0f172a;
+  --studio-chrome-nav-underline-active: #0f172a;
+  --studio-chrome-credit-bg: transparent;
+  --studio-chrome-credit-text: #0f172a;
+  --studio-chrome-credit-border: #0f172a;
+  --studio-chrome-credit-hover: rgba(15, 23, 42, 0.04);
+  --studio-chrome-theme-bg: #0f172a;
+  --studio-chrome-theme-text: #ffffff;
+  --studio-chrome-theme-border: transparent;
+  --studio-chrome-user-border: var(--studio-chrome-credit-border);
+  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
+  --studio-chrome-user-text: var(--studio-chrome-credit-text);
+  --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
+  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
+  --studio-chrome-subnav-bg: rgb(224, 234, 242);
+  --studio-chrome-subnav-border: #d5e0ea;
 
-  border-bottom: 1px solid #e6ecf5;
+  border-bottom: 1px solid #d5e0ea;
 }
 
 .home-chrome--pricing {
@@ -314,35 +326,45 @@ const {
 }
 
 .home-chrome--pricing.home-chrome--pricing-light {
-  --studio-chrome-bg: rgba(248, 250, 253, 0.92);
-  --studio-chrome-header-bg: rgba(248, 250, 253, 0.92);
+  --studio-chrome-bg: rgb(224, 234, 242);
+  --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
-  --studio-chrome-nav: #475569;
-  --studio-chrome-nav-hover: #2f6bff;
-  --studio-chrome-nav-active: #2f6bff;
-  --studio-chrome-nav-underline: #2f6bff;
-  --studio-chrome-credit-bg: #d4a017;
-  --studio-chrome-credit-text: #ffffff;
-  --studio-chrome-credit-hover: #e5b85c;
-  --studio-chrome-theme-bg: #ffffff;
-  --studio-chrome-theme-text: #64748b;
-  --studio-chrome-theme-border: #e6ecf5;
-  --studio-chrome-user-border: #e6ecf5;
-  --studio-chrome-user-bg: #ffffff;
-  --studio-chrome-user-text: #0f172a;
-  --studio-chrome-user-hover-border: #cfe0ff;
-  --studio-chrome-user-hover-bg: #f8fafd;
-  --studio-chrome-avatar-bg: #f2f7ff;
-  --studio-chrome-avatar-text: #2f6bff;
+  --studio-chrome-nav: #64748b;
+  --studio-chrome-nav-hover: #475569;
+  --studio-chrome-nav-active: #0f172a;
+  --studio-chrome-nav-underline: #0f172a;
+  --studio-chrome-nav-underline-hover: #0f172a;
+  --studio-chrome-nav-underline-active: #0f172a;
+  --studio-chrome-credit-bg: transparent;
+  --studio-chrome-credit-text: #0f172a;
+  --studio-chrome-credit-border: #0f172a;
+  --studio-chrome-credit-hover: rgba(15, 23, 42, 0.04);
+  --studio-chrome-theme-bg: #0f172a;
+  --studio-chrome-theme-text: #ffffff;
+  --studio-chrome-theme-border: transparent;
+  --studio-chrome-user-border: var(--studio-chrome-credit-border);
+  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
+  --studio-chrome-user-text: var(--studio-chrome-credit-text);
+  --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
+  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
+  --studio-chrome-subnav-bg: rgb(224, 234, 242);
+  --studio-chrome-subnav-border: #d5e0ea;
 
-  border-bottom: 1px solid rgba(230, 236, 245, 0.95);
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid #d5e0ea;
+  backdrop-filter: none;
 }
 
 
 
 .home-chrome:not(.home-chrome--light):not(.home-chrome--pricing-light) :deep(.credit-pill) {
-  border-color: rgba(15, 23, 42, 0.1);
+  border: 1px solid var(--studio-chrome-credit-border, rgba(255, 255, 255, 0.32));
+  background: var(--studio-chrome-credit-bg, transparent);
+  color: var(--studio-chrome-credit-text, #f7f1e4);
+}
+
+.home-chrome:not(.home-chrome--light):not(.home-chrome--pricing-light)
+  :deep(.credit-pill:hover) {
+  background: var(--studio-chrome-credit-hover, rgba(255, 255, 255, 0.06));
 }
 
 @media (min-width: 1280px) {
@@ -407,6 +429,41 @@ const {
   height: calc(100dvh - var(--app-header-offset));
   max-height: calc(100dvh - var(--app-header-offset));
   overflow: hidden;
+}
+
+.app-layout--studio-chrome.app-layout--points {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.app-layout--studio-chrome.app-layout--points .app-layout-main {
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-top: var(--app-header-offset);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-layout--studio-chrome.app-layout--points .app-layout-main > :deep(*) {
+  min-height: 100%;
+  height: auto;
+}
+
+.app-layout--points:not(.app-layout--studio-chrome) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-layout--points:not(.app-layout--studio-chrome) .app-layout-main {
+  box-sizing: border-box;
+  height: calc(100dvh - var(--app-header-offset));
+  max-height: calc(100dvh - var(--app-header-offset));
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .app-layout--studio-chrome.app-layout--login {
