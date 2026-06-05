@@ -617,7 +617,6 @@ const run = async () => {
     await addColumnIfMissing("delivery_packages", "expires_at", "DATETIME(3) NULL");
     await addColumnIfMissing("batch_task_items", "source_asset_ids_json", "JSON NULL");
     await addColumnIfMissing("batch_task_items", "error_code", "VARCHAR(120) NULL");
-    await backfillBatchItemErrorCodes();
     await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
 
     await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
@@ -653,6 +652,7 @@ const run = async () => {
     await addColumnIfMissing("generation_tasks", "poll_failure_count", "INT NOT NULL DEFAULT 0");
     await addColumnIfMissing("generation_tasks", "last_kie_poll_at", "DATETIME(3) NULL");
     await addColumnIfMissing("generation_tasks", "last_error_code", "VARCHAR(120) NULL");
+    await backfillBatchItemErrorCodes();
     await addIndexIfMissing("generation_tasks", "idx_generation_tasks_billing_task", "(billing_task_id)");
     await addIndexIfMissing(
       "generation_tasks",

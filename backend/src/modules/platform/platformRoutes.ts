@@ -21,6 +21,7 @@ import {
   adjustPlatformUserCredits,
   deletePlatformUserByCapability,
 } from "./platformAccountCapabilities";
+import { getPlatformDashboard } from "./platformDashboardService";
 import { createPlatformUser } from "./platformUserCreation";
 
 export const platformRoutes = Router();
@@ -47,6 +48,14 @@ platformRoutes.delete(
   asyncHandler(async (req, res) => {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     ok(res, await deletePlatformUserByCapability(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.get(
+  "/dashboard",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await getPlatformDashboard(req));
   }),
 );
 
