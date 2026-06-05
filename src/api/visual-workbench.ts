@@ -1199,7 +1199,8 @@ export async function getRechargeProducts() {
 export type CreditsTransactionsQuery = {
   accountId?: number
   accountScope?: 'personal' | 'tenant'
-  tenantId?: number
+  tenantId?: number | string
+  targetCreditsUserId?: number
   limit?: number
   txnType?: CreditsTransactionType
   from?: string
@@ -1230,6 +1231,7 @@ export async function getCreditsTransactions(
       accountId: params?.accountId,
       accountScope: params?.accountScope,
       tenantId: params?.tenantId,
+      targetCreditsUserId: params?.targetCreditsUserId,
       limit: params?.limit,
     },
   })

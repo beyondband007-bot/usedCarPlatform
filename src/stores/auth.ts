@@ -56,16 +56,30 @@ function removeToken() {
 
 function syncCreditsIdentity(userInfo: UserInfo) {
   if (!userInfo.creditsUserId) return
+
+  const inferredTenantId =
+    userInfo.creditsTenantId
+    ?? userInfo.enterpriseTenantId
+    ?? null
+  const inferredAccountScope =
+    userInfo.accountScope
+    ?? (inferredTenantId || userInfo.role === 'enterprise' ? 'tenant' : 'personal')
+
   setCreditsIdentity({
     userId: userInfo.creditsUserId,
-    accountScope: userInfo.accountScope === 'tenant' ? 'tenant' : 'personal',
-    tenantId: userInfo.creditsTenantId ?? null,
+    accountScope: inferredAccountScope === 'tenant' ? 'tenant' : 'personal',
+    tenantId: inferredAccountScope === 'tenant' ? inferredTenantId : null,
   })
 }
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => {
     const userInfo = readMockStorage<UserInfo | null>(USER_KEY, null)
+    if (userInfo?.creditsUserId) {
+      syncCreditsIdentity(userInfo)
+    } else {
+      resetCreditsIdentity()
+    }
 
     return {
       token: readToken(),

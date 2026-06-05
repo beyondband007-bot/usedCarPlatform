@@ -95,9 +95,11 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .section-block {
-  width: min(1660px, calc(100% - 40px));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--home-shell-max, 1440px);
   margin: 0 auto;
-  padding-bottom: 130px;
+  padding: 0 var(--home-space-x, 24px) var(--home-section-pb, 130px);
 }
 
 .section-title {
@@ -127,37 +129,37 @@ onMounted(() => {
 .tabs {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   width: fit-content;
   max-width: 100%;
-  padding: 8px;
+  padding: 4px;
   margin: -28px auto 72px;
-  background: var(--home-tabs-bg);
-  border: 1px solid var(--home-line);
+  background: var(--home-tabs-bg, #1a1a1a);
+  border: 0;
   border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: none;
 }
 
 .tab {
-  min-height: 42px;
-  padding: 0 22px;
+  min-height: 40px;
+  padding: 0 24px;
   white-space: nowrap;
-  color: var(--home-tab-text);
+  color: var(--home-tab-text, #ffffff);
   background: transparent;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 600;
   transition:
     color var(--home-motion-fast, 160ms ease),
-    background var(--home-motion-fast, 160ms ease),
-    transform var(--home-motion-fast, 160ms ease);
+    background var(--home-motion-fast, 160ms ease);
 }
 
-.tab:hover {
-  color: var(--home-text);
+.tab:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .tab:focus-visible {
@@ -166,15 +168,15 @@ onMounted(() => {
 }
 
 .tab.active {
-  color: var(--home-tab-active-text);
-  background: var(--home-tab-active-bg);
-  transform: translateY(-1px);
+  color: var(--home-tab-active-text, #0f172a);
+  background: var(--home-tab-active-bg, #ffffff);
+  font-weight: 700;
 }
 
 .case-layout {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 24px;
+  gap: var(--home-grid-gap, 24px);
   align-items: stretch;
   width: 100%;
   margin: 0 auto;
@@ -222,23 +224,18 @@ onMounted(() => {
   flex-direction: column;
   justify-content: center;
   padding: clamp(36px, 4.5vw, 56px);
-  background: var(--home-case-panel-bg);
-  box-shadow: var(--home-card-shadow);
-  transition:
-    border-color var(--home-motion-normal, 240ms ease),
-    box-shadow var(--home-motion-normal, 240ms ease);
+  background: var(--home-case-panel-bg, rgb(49, 49, 49));
+  box-shadow: none;
+  transition: border-color var(--home-motion-normal, 240ms ease);
 }
 
 .case-panel:hover {
   border-color: var(--home-card-hover-border);
-  box-shadow:
-    var(--home-card-shadow),
-    0 0 0 1px color-mix(in srgb, var(--home-gold) 14%, transparent);
 }
 
 .case-panel h3 {
   margin: 0 0 40px;
-  color: var(--home-card-title);
+  color: var(--home-case-panel-title, #ffffff);
   font-size: clamp(32px, 3.2vw, 46px);
   font-weight: 800;
   line-height: 1.28;
@@ -253,7 +250,7 @@ onMounted(() => {
 .case-panel strong {
   display: block;
   margin-bottom: 14px;
-  color: var(--home-card-title);
+  color: var(--home-case-panel-label, #f3f3f3);
   font-size: clamp(20px, 1.55vw, 24px);
   font-weight: 700;
   line-height: 1.45;
@@ -262,7 +259,7 @@ onMounted(() => {
 
 .case-panel p {
   margin: 0 0 34px;
-  color: var(--home-card-desc);
+  color: var(--home-case-panel-desc, rgba(255, 255, 255, 0.82));
   font-size: clamp(18px, 1.4vw, 21px);
   font-weight: 500;
   line-height: 1.82;
@@ -272,7 +269,7 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1023px) {
   .case-layout {
     grid-template-columns: 1fr;
   }
@@ -281,24 +278,64 @@ onMounted(() => {
   .case-panel {
     min-height: 380px;
   }
+
+  .tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-right: auto;
+    margin-left: auto;
+    margin-bottom: 48px;
+  }
 }
 
-@media (max-width: 700px) {
-  .section-block {
-    width: min(100% - 28px, 1660px);
-    padding-bottom: 86px;
+@media (max-width: 767px) {
+  .section-title {
+    width: 100%;
+  }
+
+  .section-title h2,
+  .section-title p {
+    white-space: normal;
+  }
+
+  .section-title h2 {
+    font-size: clamp(22px, 6vw, 28px);
   }
 
   .tabs {
+    width: fit-content;
+    max-width: 100%;
+    margin-right: auto;
+    margin-left: auto;
     margin-bottom: 38px;
+    overflow-x: auto;
+    justify-content: center;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .case-layout {
-    gap: 20px;
+  .tab {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .case-image,
+  .case-panel {
+    min-height: 280px;
   }
 
   .case-panel {
     padding: 28px;
+  }
+
+  .case-panel h3,
+  .case-panel strong,
+  .case-panel p {
+    white-space: normal;
+  }
+
+  .case-panel h3 {
+    margin-bottom: 28px;
+    font-size: clamp(24px, 6vw, 32px);
   }
 }
 </style>

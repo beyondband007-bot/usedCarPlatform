@@ -23,8 +23,10 @@ function openWorkbench() {
     class="home-page"
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <HomeHero />
-    <HomeQuickAccess />
+    <div class="home-first-view">
+      <HomeHero />
+      <HomeQuickAccess />
+    </div>
     <HomeCapabilities />
     <HomeCaseStudies />
     <HomeBottomCta @enter-workbench="openWorkbench" />
@@ -34,11 +36,15 @@ function openWorkbench() {
 
 <style scoped lang="scss">
 .home-page {
+  --home-shell-max: var(--layout-content-max, 1440px);
+  --home-space-x: var(--space-page-x, clamp(16px, 2vw, 32px));
+  --home-space-y: var(--space-page-y, clamp(16px, 2vw, 28px));
+  --home-grid-gap: var(--grid-gap-lg, 24px);
+  --home-section-pb: 130px;
   --home-suite-card-height: 259px;
-  --home-suite-peek: calc(var(--home-suite-card-height) / 3);
-  --home-suite-top-gap: calc(24px * 0.9);
-  --home-hero-bottom-gap: calc(24px * 0.9);
-  --home-hero-height-scale: 0.9;
+  --home-suite-shell-pb: 0px;
+  --home-suite-margin-top: 48px;
+  --home-engine-top-gap: 56px;
   --home-gold: var(--color-brand-primary);
   --home-gold-strong: var(--color-brand-strong);
   --home-radius-card: 28px;
@@ -53,6 +59,59 @@ function openWorkbench() {
     radial-gradient(circle at 50% 4%, var(--home-glow), transparent 24rem),
     var(--home-bg);
   scroll-behavior: smooth;
+}
+
+@media (max-width: 1439px) {
+  .home-page {
+    --home-grid-gap: var(--grid-gap-md, 16px);
+  }
+}
+
+@media (max-width: 1279px) {
+  .home-page {
+    --home-suite-card-height: 240px;
+    --home-section-pb: 112px;
+    --home-suite-margin-top: 24px;
+    --home-engine-top-gap: 48px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .home-page {
+    --home-suite-card-height: 228px;
+    --home-section-pb: 100px;
+    --home-suite-shell-pb: 32px;
+    --home-suite-margin-top: 20px;
+    --home-engine-top-gap: 40px;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-page {
+    --home-space-x: 16px;
+    --home-grid-gap: var(--grid-gap-sm, 12px);
+    --home-suite-card-height: 210px;
+    --home-section-pb: 86px;
+    --home-suite-shell-pb: 24px;
+    --home-suite-margin-top: 16px;
+    --home-engine-top-gap: 32px;
+    --home-radius-card: 20px;
+    --home-radius-media: 16px;
+  }
+}
+
+.home-first-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-page :deep(.suite-shell) {
+  flex-shrink: 0;
+  margin-top: var(--home-suite-margin-top, 0px);
+}
+
+.home-page :deep(#engine.section-block) {
+  margin-top: var(--home-engine-top-gap, 48px);
 }
 
 .home-page.theme-dark {
@@ -96,13 +155,17 @@ function openWorkbench() {
   --home-card-hover-border: rgba(244, 200, 64, 0.38);
   --home-card-shadow: 0 18px 52px rgba(0, 0, 0, 0.2);
   --home-badge-bg: #101010;
+  --home-badge-bg-hover: #1f1f1f;
   --home-badge-text: #d5d5d5;
   --home-badge-border: rgba(255, 255, 255, 0.1);
-  --home-tabs-bg: #101010;
-  --home-tab-text: #8a8a8a;
-  --home-tab-active-text: #f3f3f3;
-  --home-tab-active-bg: #151515;
-  --home-case-panel-bg: linear-gradient(145deg, #151515, #0b0b0b);
+  --home-tabs-bg: #1a1a1a;
+  --home-tab-text: #ffffff;
+  --home-tab-active-text: #0f172a;
+  --home-tab-active-bg: #ffffff;
+  --home-case-panel-bg: rgb(49, 49, 49);
+  --home-case-panel-title: #ffffff;
+  --home-case-panel-desc: rgba(255, 255, 255, 0.82);
+  --home-case-panel-label: #f3f3f3;
   --home-metric-bg: #101010;
   --home-footer-bg: #080808;
   --home-footer-nav: #8a8a8a;
@@ -155,14 +218,18 @@ function openWorkbench() {
     transparent
   );
   --home-card-shadow: var(--shadow-panel);
-  --home-badge-bg: #f8fafd;
-  --home-badge-text: #334155;
-  --home-badge-border: #e6ecf5;
-  --home-tabs-bg: #f8fafd;
-  --home-tab-text: #64748b;
-  --home-tab-active-text: #2f6bff;
-  --home-tab-active-bg: #f2f7ff;
-  --home-case-panel-bg: linear-gradient(145deg, #ffffff, #f8fafd);
+  --home-badge-bg: rgb(71, 71, 73);
+  --home-badge-bg-hover: rgb(82, 82, 84);
+  --home-badge-text: #f8fafc;
+  --home-badge-border: rgba(255, 255, 255, 0.08);
+  --home-tabs-bg: #1a1a1a;
+  --home-tab-text: #ffffff;
+  --home-tab-active-text: #0f172a;
+  --home-tab-active-bg: #ffffff;
+  --home-case-panel-bg: rgb(49, 49, 49);
+  --home-case-panel-title: #ffffff;
+  --home-case-panel-desc: rgba(255, 255, 255, 0.82);
+  --home-case-panel-label: #f3f3f3;
   --home-metric-bg: #f8fafd;
   --home-footer-bg: #f8fafd;
   --home-footer-nav: #64748b;
@@ -185,11 +252,5 @@ function openWorkbench() {
 .home-page > :deep(*) {
   position: relative;
   z-index: 1;
-}
-
-@media (max-width: 700px) {
-  .home-page {
-    --home-suite-card-height: 210px;
-  }
 }
 </style>

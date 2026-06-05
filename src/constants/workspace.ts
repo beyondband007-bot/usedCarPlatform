@@ -299,7 +299,7 @@ type CapabilityInput = Omit<
 const createCapability = (capability: CapabilityInput): WorkspaceCapability => ({
   ...capability,
   accept: 'image/jpeg,image/png,image/webp',
-  requiredLabel: '必填',
+  requiredLabel: '必选',
   balance: 1250,
   cost: capability.cost ?? 30,
   tutorial,

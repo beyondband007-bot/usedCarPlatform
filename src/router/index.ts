@@ -33,9 +33,9 @@ function resolveAuthenticatedRedirectPath(redirect: unknown, fallback: string) {
   return path
 }
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
-  authStore.hydrate()
+  await authStore.hydrate()
 
   if (to.path === '/' || to.matched.length === 0) {
     return '/home'

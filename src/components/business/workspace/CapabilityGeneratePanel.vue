@@ -2981,12 +2981,12 @@ defineExpose({
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   width: 100%;
 }
 
 :global(.preset-select-option-name) {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2998,6 +2998,7 @@ defineExpose({
   width: 26px;
   height: 26px;
   flex: 0 0 26px;
+  margin-left: auto;
   place-items: center;
   border: 0;
   border-radius: 8px;

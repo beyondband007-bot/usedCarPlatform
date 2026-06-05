@@ -22,9 +22,12 @@ const props = withDefaults(
     draggable?: boolean;
     fit?: "cover" | "contain" | "fill" | "none" | "scale-down";
     objectPosition?: string;
+    imgStyle?: CSSProperties;
     fetchpriority?: "high" | "low" | "auto";
     referrerpolicy?: ImageReferrerPolicy;
     crossorigin?: "anonymous" | "use-credentials" | "";
+    /** 主图加载失败时尝试的备用地址 */
+    fallbackSrc?: string | null;
   }>(),
   {
     src: "",
@@ -34,6 +37,7 @@ const props = withDefaults(
     draggable: false,
     fit: "cover",
     objectPosition: "center",
+    imgStyle: undefined,
     fetchpriority: undefined,
     referrerpolicy: undefined,
     crossorigin: undefined,
@@ -47,8 +51,10 @@ const emit = defineEmits<{
 
 const isLoaded = ref(false);
 const hasError = ref(false);
+const activeSrc = ref("");
 
 const normalizedSrc = computed(() => props.src?.trim() ?? "");
+const normalizedFallbackSrc = computed(() => props.fallbackSrc?.trim() ?? "");
 
 const imageStyle = computed(
   () =>
@@ -59,10 +65,11 @@ const imageStyle = computed(
 );
 
 watch(
-  normalizedSrc,
-  (src) => {
+  [normalizedSrc, normalizedFallbackSrc],
+  ([src]) => {
     isLoaded.value = false;
     hasError.value = !src;
+    activeSrc.value = src;
   },
   { immediate: true },
 );
@@ -74,6 +81,14 @@ function handleLoad(event: Event) {
 }
 
 function handleError(event: Event) {
+  const fallback = normalizedFallbackSrc.value;
+  if (fallback && activeSrc.value !== fallback) {
+    isLoaded.value = false;
+    hasError.value = false;
+    activeSrc.value = fallback;
+    return;
+  }
+
   isLoaded.value = false;
   hasError.value = true;
   emit("error", event);
@@ -91,14 +106,14 @@ function handleError(event: Event) {
       class="preload-image__placeholder"
       aria-hidden="true"
     >
-      <span v-if="!hasError && normalizedSrc" class="preload-image__spinner"></span>
+      <span v-if="!hasError && activeSrc" class="preload-image__spinner"></span>
       <span v-else class="preload-image__fallback"></span>
     </span>
 
     <img
-      v-if="normalizedSrc && !hasError"
+      v-if="activeSrc && !hasError"
       class="preload-image__img"
-      :src="normalizedSrc"
+      :src="activeSrc"
       :alt="alt"
       :loading="loading"
       :decoding="decoding"
@@ -106,6 +121,7 @@ function handleError(event: Event) {
       :fetchpriority="fetchpriority"
       :referrerpolicy="referrerpolicy"
       :crossorigin="crossorigin"
+      :style="imgStyle"
       @load="handleLoad"
       @error="handleError"
     />

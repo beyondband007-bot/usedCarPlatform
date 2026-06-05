@@ -168,9 +168,12 @@ const appStore = useAppStore();
   color: #f3f4f6;
 }
 
-.points-query-header.theme-dark .points-query-brand p,
-.points-query-header.theme-dark .points-query-team-label {
+.points-query-header.theme-dark .points-query-brand p {
   color: #9ca3af;
+}
+
+.points-query-header.theme-dark .points-query-team-label {
+  color: #ffffff;
 }
 
 .points-query-header.theme-dark .points-query-badge.is-personal,

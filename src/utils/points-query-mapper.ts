@@ -144,6 +144,7 @@ export function mapEnterpriseCreditsTransactionToFlowRecord(
 export function buildPersonalSummaryCards(input: {
   availableBalance: number
   records: PointsFlowRecord[]
+  availableBalanceLabel?: string
 }): PointsSummaryCard[] {
   const now = Date.now()
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
@@ -167,7 +168,7 @@ export function buildPersonalSummaryCards(input: {
   return [
     {
       key: 'availableBalance',
-      label: '当前可用积分',
+      label: input.availableBalanceLabel ?? '当前可用积分',
       value: formatPoints(input.availableBalance),
       unit: '积分',
       icon: pointsSummaryIcons.available,
@@ -203,7 +204,6 @@ export function buildPersonalSummaryCards(input: {
 export function buildTeamSummaryCards(input: {
   availableBalance: number
   records: PointsFlowRecord[]
-  memberCount?: number
 }): PointsSummaryCard[] {
   const personalCards = buildPersonalSummaryCards({
     availableBalance: input.availableBalance,
@@ -234,14 +234,6 @@ export function buildTeamSummaryCards(input: {
       unit: '积分',
       icon: 'mdi:shopping-outline',
       tone: 'rose',
-    },
-    {
-      key: 'memberCount',
-      label: '团队人数',
-      value: formatPoints(input.memberCount ?? 0),
-      unit: '人',
-      icon: 'mdi:account-group-outline',
-      tone: 'violet',
     },
   ]
 }

@@ -66,15 +66,22 @@ export const freezeGenerationBilling = async (input: {
   const identity = await resolveBillingIdentity(input.body, input.context);
   if (!identity) return null;
   const scope = resolveBillingScope(input.taskId, input.scope);
+  const estimateKey = billingIdempotencyKey("estimate", scope);
+  const freezeKey = billingIdempotencyKey("freeze", scope);
 
-  const estimate = await creditsClient.estimate({
-    ...identity,
-    functionCode: input.functionCode,
-    estimatedPoints: input.estimatedPoints,
-    bizType: scope.bizType,
-    bizId: scope.bizId,
-    idempotencyKey: billingIdempotencyKey("estimate", scope),
-  });
+  let estimate;
+  try {
+    estimate = await creditsClient.estimate({
+      ...identity,
+      functionCode: input.functionCode,
+      estimatedPoints: input.estimatedPoints,
+      bizType: scope.bizType,
+      bizId: scope.bizId,
+      idempotencyKey: estimateKey,
+    });
+  } catch (error) {
+    throw error;
+  }
 
   const estimatedBilling = {
     identity,
@@ -82,11 +89,16 @@ export const freezeGenerationBilling = async (input: {
   };
   await snapshotTaskBilling(input.taskId, estimatedBilling, estimate.status);
 
-  const frozen = await creditsClient.freeze({
-    userId: identity.userId,
-    billingTaskId: estimate.billingTaskId,
-    idempotencyKey: billingIdempotencyKey("freeze", scope),
-  });
+  let frozen;
+  try {
+    frozen = await creditsClient.freeze({
+      userId: identity.userId,
+      billingTaskId: estimate.billingTaskId,
+      idempotencyKey: freezeKey,
+    });
+  } catch (error) {
+    throw error;
+  }
 
   const frozenBilling = {
     identity,

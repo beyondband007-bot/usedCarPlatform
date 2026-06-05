@@ -430,6 +430,8 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 .login-panel {
   width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 .login-panel--light {
@@ -468,6 +470,8 @@ onBeforeUnmount(() => {
 
 .login-card {
   width: 100%;
+  height: auto;
+  overflow: visible;
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   background: var(--panel-bg);
@@ -581,6 +585,7 @@ onBeforeUnmount(() => {
 
 .login-phone-input {
   display: flex;
+  max-height: 48px;
   align-items: stretch;
   overflow: hidden;
   border: 1px solid var(--field-border);
@@ -609,6 +614,13 @@ onBeforeUnmount(() => {
   --n-placeholder-color: var(--panel-muted) !important;
   --n-caret-color: var(--accent) !important;
   --n-suffix-text-color: var(--panel-muted) !important;
+  max-height: 48px;
+}
+
+.login-input :deep(.n-input),
+.login-input :deep(.n-input-wrapper) {
+  max-height: 48px;
+  min-height: 48px;
 }
 
 .login-input :deep(.n-input-wrapper) {
@@ -668,6 +680,7 @@ onBeforeUnmount(() => {
 }
 
 .login-code-button {
+  max-height: 48px;
   height: 48px !important;
   border-radius: 8px !important;
   font-size: 14px !important;

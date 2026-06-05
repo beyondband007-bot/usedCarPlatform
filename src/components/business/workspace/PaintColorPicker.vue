@@ -84,13 +84,14 @@ function handleColorUpdate(value: string | null) {
 <style scoped lang="scss">
 .paint-color-card {
   padding: 16px 18px 18px;
+  border: 1px solid var(--workspace-line, var(--app-border));
   border-radius: 12px;
   background: var(--workspace-panel, var(--app-surface));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
+  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(15, 23, 42, 0.08));
 }
 
 :global([data-theme="dark"]) .paint-color-card {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
 }
 
 .paint-color-head {
@@ -163,7 +164,9 @@ function handleColorUpdate(value: string | null) {
 .paint-color-picker :deep(.n-color-picker-trigger) {
   width: 100%;
   min-height: 34px;
+  border: 1px solid var(--workspace-line, var(--app-border));
   border-radius: 4px;
+  overflow: hidden;
 }
 
 .paint-color-picker

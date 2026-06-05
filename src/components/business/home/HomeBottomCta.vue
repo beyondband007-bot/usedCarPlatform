@@ -64,10 +64,11 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .final-cta {
-  width: min(1520px, calc(100% - 40px));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--home-shell-max, 1440px);
   margin: 0 auto;
-  padding: 0 20px 120px;
-  overflow-x: auto;
+  padding: 0 var(--home-space-x, 24px) var(--home-section-pb, 120px);
   text-align: center;
 }
 
@@ -121,14 +122,19 @@ onMounted(() => {
     0 12px 34px rgba(244, 200, 64, 0.18);
 }
 
-@media (max-width: 700px) {
-  .final-cta {
-    width: min(100% - 28px, 1520px);
+@media (max-width: 767px) {
+  .final-cta h2,
+  .final-cta p {
+    white-space: normal;
+  }
+
+  .final-cta h2 {
+    font-size: clamp(22px, 6vw, 28px);
   }
 
   .button {
     width: 100%;
-    min-height: 52px;
+    min-height: 44px;
     padding: 0 32px;
     font-size: 15px;
   }

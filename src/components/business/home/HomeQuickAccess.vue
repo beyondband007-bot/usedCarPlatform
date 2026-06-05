@@ -80,15 +80,17 @@ onMounted(() => {
 .suite-shell {
   position: relative;
   z-index: 3;
-  width: min(1660px, calc(100% - 40px));
-  margin: var(--home-suite-top-gap, 24px) auto 0;
-  padding-bottom: 126px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--home-shell-max, 1440px);
+  margin: var(--home-suite-margin-top, 0) auto 0;
+  padding: 0 var(--home-space-x, 24px) var(--home-suite-shell-pb, 0px);
 }
 
 .suite-grid {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) minmax(0, 4fr);
-  gap: 40px;
+  gap: var(--home-grid-gap, 24px);
   width: 100%;
   margin: 0 auto;
 }
@@ -211,7 +213,7 @@ onMounted(() => {
   color: #475569;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1023px) {
   .suite-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -219,24 +221,20 @@ onMounted(() => {
   .suite-grid :deep(.promo-banner) {
     grid-column: 1 / -1;
   }
-}
 
-@media (max-width: 700px) {
-  .suite-shell {
-    width: min(100% - 28px, 1660px);
-    margin-top: 80px;
-    padding-bottom: 80px;
-  }
-
-  .suite-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .suite-card,
   .suite-card div,
   .suite-card-copy {
-    min-height: var(--home-suite-card-height, 210px);
+    padding: 40px 28px 24px;
+  }
+
+  .suite-card h2 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 767px) {
+  .suite-grid {
+    grid-template-columns: 1fr;
   }
 
   .suite-card div,
@@ -247,10 +245,12 @@ onMounted(() => {
 
   .suite-card h2 {
     font-size: 22px;
+    white-space: normal;
   }
 
   .suite-card p {
     font-size: 14px;
+    white-space: normal;
   }
 }
 </style>

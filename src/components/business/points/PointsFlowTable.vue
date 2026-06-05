@@ -42,7 +42,9 @@ const emit = defineEmits<{
 
 const scopeMode = computed(() => props.accountScopeMode ?? "self");
 
-const showRechargeButton = computed(() => scopeMode.value !== "child");
+const showRechargeButton = computed(
+  () => (props.config.canRecharge ?? true) && scopeMode.value !== "child",
+);
 
 
 function selectChild(childId: string) {
@@ -101,26 +103,24 @@ const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
 const memberOptions = computed(() => {
   if (props.childMembers?.length) {
     return [
-      { value: "", label: "????" },
+      { value: "", label: "全部账号" },
       ...props.childMembers.map((member) => ({
         value: member.id,
         label:
           member.memberRole === "owner"
-            ? `${member.label}?????`
-            : member.memberRole === "admin"
-              ? `${member.label}?????`
-              : member.label,
+            ? `${member.label}（主账号）`
+            : `${member.label}（子账号）`,
       })),
     ];
   }
 
   return [
-    { value: "", label: "????" },
-    { value: "u001", label: "????????" },
-    { value: "u002", label: "????????" },
-    { value: "u003", label: "????????" },
-    { value: "u004", label: "????????" },
-    { value: "u005", label: "????????" },
+    { value: "", label: "全部账号" },
+    { value: "u001", label: "张小明（主账号）" },
+    { value: "u002", label: "李芳（子账号）" },
+    { value: "u003", label: "王强（子账号）" },
+    { value: "u004", label: "赵雪（子账号）" },
+    { value: "u005", label: "孙磊（子账号）" },
   ];
 });
 
@@ -186,9 +186,8 @@ function getMemberRoleText(record: {
   memberRole?: "owner" | "admin" | "member";
   isOwner?: boolean;
 }) {
-  if (record.isOwner || record.memberRole === "owner") return "???";
-  if (record.memberRole === "admin") return "???";
-  return "??";
+  if (record.isOwner || record.memberRole === "owner") return "主账号";
+  return "子账号";
 }
 
 function setPage(page: number) {
@@ -198,14 +197,6 @@ function setPage(page: number) {
 
 function resolveRecordStatus(record: PointsFlowRecord): PointsFlowStatus {
   return record.status ?? (record.txnType === "gift" ? "pending" : "effective");
-}
-
-function resolveValidityPeriod(record: PointsFlowRecord) {
-  if (record.validityPeriod) return record.validityPeriod;
-  if (record.txnType === "gift" || record.txnType === "recharge") {
-    return "2026-12-31";
-  }
-  return "-";
 }
 
 function resolveSourceUsage(record: PointsFlowRecord) {
@@ -227,7 +218,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     <div class="points-toolbar">
       <div class="points-toolbar-filters">
         <template v-if="config.showCurrentMember">
-          <span class="points-current-member-label">当前成员：</span>
+          <span class="points-current-member-label">当前账号：</span>
           <strong class="points-current-member-name">{{
             config.currentMemberName
           }}</strong>
@@ -336,7 +327,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         v-if="childMembers?.length"
         class="points-subaccount-list"
         role="list"
-        aria-label="??????"
+        aria-label="子账号列表"
       >
         <button
           v-for="member in childMembers"
@@ -377,14 +368,19 @@ function resolveSourceUsage(record: PointsFlowRecord) {
       class="points-table-panel"
       :class="{ 'is-empty': !records.length }"
     >
-      <table class="data-table data-table--design points-table-layout">
+      <table
+        class="data-table data-table--design points-table-layout"
+        :class="{
+          'points-table-layout--member': config.showMemberColumns,
+          'points-table-layout--personal': !config.showMemberColumns,
+        }"
+      >
         <colgroup>
           <col class="col-time" />
           <col class="col-type" />
           <col class="col-change" />
           <col class="col-status" />
           <col class="col-source" />
-          <col class="col-validity" />
           <template v-if="config.showMemberColumns">
             <col class="col-operator" />
             <col class="col-role" />
@@ -397,7 +393,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
             <th>积分变动</th>
             <th>状态</th>
             <th>来源/用途</th>
-            <th>有效期</th>
             <template v-if="config.showMemberColumns">
               <th>操作人</th>
               <th>身份</th>
@@ -444,11 +439,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
             </td>
             <td>
               <span class="points-source">{{ resolveSourceUsage(record) }}</span>
-            </td>
-            <td>
-              <span class="points-validity">{{
-                resolveValidityPeriod(record)
-              }}</span>
             </td>
             <td v-if="config.showMemberColumns">
               <div class="points-member-cell">
@@ -519,7 +509,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     <div class="points-filter-bar">
       <div class="points-filter-row">
         <template v-if="config.showCurrentMember">
-          <span class="points-current-member-label">当前成员：</span>
+          <span class="points-current-member-label">当前账号：</span>
           <strong class="points-current-member-name">{{
             config.currentMemberName
           }}</strong>
@@ -527,7 +517,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         </template>
 
         <div v-if="config.showMemberFilter" class="points-filter-item">
-          <label>成员账号</label>
+          <label>账号</label>
           <NSelect
             class="points-filter-select is-wide"
             size="small"
@@ -1088,6 +1078,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-member-cell {
   display: flex;
+  min-width: 180px;
   align-items: center;
   gap: 8px;
 }
@@ -1762,42 +1753,70 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-table-layout {
   width: 100%;
-  min-width: 0;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
-.points-flow-card--design .points-table-layout .col-time {
-  width: 17%;
+.points-flow-card--design .points-table-layout--personal th:nth-child(1),
+.points-flow-card--design .points-table-layout--personal td:nth-child(1) {
+  min-width: 168px;
 }
 
-.points-flow-card--design .points-table-layout .col-type {
-  width: 11%;
+.points-flow-card--design .points-table-layout--personal th:nth-child(2),
+.points-flow-card--design .points-table-layout--personal td:nth-child(2) {
+  min-width: 112px;
 }
 
-.points-flow-card--design .points-table-layout .col-change {
-  width: 11%;
+.points-flow-card--design .points-table-layout--personal th:nth-child(3),
+.points-flow-card--design .points-table-layout--personal td:nth-child(3) {
+  min-width: 96px;
 }
 
-.points-flow-card--design .points-table-layout .col-status {
-  width: 11%;
+.points-flow-card--design .points-table-layout--personal th:nth-child(4),
+.points-flow-card--design .points-table-layout--personal td:nth-child(4) {
+  min-width: 110px;
 }
 
-.points-flow-card--design .points-table-layout .col-source {
-  width: 34%;
+.points-flow-card--design .points-table-layout--personal th:nth-child(5),
+.points-flow-card--design .points-table-layout--personal td:nth-child(5) {
+  min-width: 140px;
 }
 
-.points-flow-card--design .points-table-layout .col-validity {
-  width: 16%;
+.points-flow-card--design .points-table-layout--member th:nth-child(1),
+.points-flow-card--design .points-table-layout--member td:nth-child(1) {
+  min-width: 160px;
 }
 
-.points-flow-card--design .points-table-layout .col-operator {
-  width: 14%;
+.points-flow-card--design .points-table-layout--member th:nth-child(2),
+.points-flow-card--design .points-table-layout--member td:nth-child(2) {
+  min-width: 112px;
 }
 
-.points-flow-card--design .points-table-layout .col-role {
-  width: 10%;
+.points-flow-card--design .points-table-layout--member th:nth-child(3),
+.points-flow-card--design .points-table-layout--member td:nth-child(3) {
+  min-width: 96px;
+}
+
+.points-flow-card--design .points-table-layout--member th:nth-child(4),
+.points-flow-card--design .points-table-layout--member td:nth-child(4) {
+  min-width: 110px;
+}
+
+.points-flow-card--design .points-table-layout--member th:nth-child(5),
+.points-flow-card--design .points-table-layout--member td:nth-child(5) {
+  min-width: 120px;
+}
+
+.points-flow-card--design .points-table-layout--member th:nth-child(6),
+.points-flow-card--design .points-table-layout--member td:nth-child(6) {
+  min-width: 180px;
+}
+
+.points-flow-card--design .points-table-layout--member th:nth-child(7),
+.points-flow-card--design .points-table-layout--member td:nth-child(7) {
+  min-width: 92px;
 }
 
 .points-flow-card--design .points-table-panel.is-empty .data-table--design th {
@@ -1913,7 +1932,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .points-source,
-.points-flow-card--design .points-validity,
 .points-flow-card--design .points-time {
   color: #334155;
   font-size: 12px;
@@ -1924,10 +1942,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.points-flow-card--design .points-validity {
-  color: #64748b;
 }
 
 .points-flow-card--design .points-pagination-bar {
@@ -1965,6 +1979,11 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-color: rgb(239 194 76 / 45%);
   background: rgb(239 194 76 / 16%);
   color: #fde68a;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-copy strong,
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-copy span {
+  color: #ffffff;
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-section-title h2,
@@ -2047,12 +2066,9 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
-  .points-flow-card--design .points-table-layout .col-time {
-    width: 16%;
-  }
-
-  .points-flow-card--design .points-table-layout .col-source {
-    width: 30%;
+  .points-flow-card--design .points-table-layout--member th:nth-child(6),
+  .points-flow-card--design .points-table-layout--member td:nth-child(6) {
+    min-width: 168px;
   }
 }
 

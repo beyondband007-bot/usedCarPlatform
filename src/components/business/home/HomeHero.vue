@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { CSSProperties } from "vue";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import {
@@ -8,23 +9,44 @@ import {
 } from "@/constants/home-page";
 import { useAppStore } from "@/stores/app";
 
+/** 背景图仅展示原图垂直 25% ~ 100% 区间 */
+const HERO_IMAGE_WIDTH = 1672;
+const HERO_IMAGE_HEIGHT = 941;
+const HERO_IMAGE_CROP_START = 25;
+const HERO_IMAGE_CROP_END = 100;
+const HERO_IMAGE_CROP_SPAN = (HERO_IMAGE_CROP_END - HERO_IMAGE_CROP_START) / 100;
+const HERO_VISIBLE_HEIGHT = HERO_IMAGE_HEIGHT * HERO_IMAGE_CROP_SPAN;
+const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_VISIBLE_HEIGHT}`;
+
 const appStore = useAppStore();
 
 const homeHeroImageSrc = computed(() =>
   appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,
 );
+
+const heroImageStyle = computed(
+  (): CSSProperties => ({
+    width: "100%",
+    height: `${100 / HERO_IMAGE_CROP_SPAN}%`,
+    minHeight: `${100 / HERO_IMAGE_CROP_SPAN}%`,
+    objectFit: "cover",
+    objectPosition: "center 31%",
+    transform: `translateY(-${HERO_IMAGE_CROP_START}%)`,
+  }),
+);
 </script>
 
 <template>
   <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
-    <div class="hero-visual">
+    <div class="hero-visual" :style="{ aspectRatio: HERO_VIEWPORT_ASPECT }">
       <div class="hero-media">
         <PreloadImage
           class="hero-image"
           :src="homeHeroImageSrc"
           alt=""
           fit="cover"
-          object-position="center 52%"
+          object-position="center top"
+          :img-style="heroImageStyle"
           loading="eager"
           fetchpriority="high"
           decoding="async"
@@ -43,11 +65,14 @@ const homeHeroImageSrc = computed(() =>
 .hero {
   position: relative;
   width: 100%;
-  margin-bottom: var(--home-hero-bottom-gap, 24px);
+  flex-shrink: 0;
+  margin-bottom: 0;
 }
 
 .hero-visual {
   width: 100%;
+  height: auto;
+  max-height: calc(100dvh - var(--app-header-offset, 72px));
   overflow: hidden;
   background: var(--home-hero-bg);
 }
@@ -57,19 +82,12 @@ const homeHeroImageSrc = computed(() =>
   container-name: hero-media;
   position: relative;
   width: 100%;
-  height: calc(
-    (
-        100dvh - var(--app-header-offset, 72px) - var(
-            --home-suite-peek,
-            calc(259px / 3)
-          ) - var(--home-hero-bottom-gap, 21.6px) - var(--home-suite-top-gap, 21.6px)
-      ) * var(--home-hero-height-scale, 1)
-  );
-  min-height: calc(420px * var(--home-hero-height-scale, 1));
+  height: 100%;
   line-height: 0;
-  --hero-text-top: max(18%, calc(var(--app-header-offset, 72px) + 16px));
-  --hero-car-top: 56%;
-  --hero-text-car-gap: 24px;
+  --hero-car-roof-line: 42%;
+  --hero-text-gap: clamp(30px, 4.2cqh, 56px);
+  --hero-text-top: calc(var(--app-header-offset, 72px) + var(--hero-text-gap));
+  --hero-text-car-gap: clamp(12px, 2.5cqh, 28px);
 }
 
 .hero-image {
@@ -77,26 +95,17 @@ const homeHeroImageSrc = computed(() =>
   inset: 0;
   z-index: 0;
   display: block;
+  overflow: hidden;
   width: 100%;
   height: 100%;
 }
 
 .hero-image :deep(.preload-image) {
   display: block;
+  overflow: hidden;
   width: 100%;
   height: 100%;
-  min-height: 100%;
   background: transparent !important;
-}
-
-.hero-image :deep(.preload-image__img) {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-  object-fit: cover;
-  object-position: center 52%;
-  image-rendering: auto;
 }
 
 .hero-copy {
@@ -112,8 +121,10 @@ const homeHeroImageSrc = computed(() =>
   width: fit-content;
   max-width: calc(100% - 40px);
   max-height: calc(
-    var(--hero-car-top) - var(--hero-text-top) - var(--hero-text-car-gap)
+    var(--hero-car-roof-line, 42%) - var(--hero-text-top) -
+      var(--hero-text-car-gap)
   );
+  overflow: hidden;
   margin: 0 auto;
   padding: 0;
   line-height: normal;
@@ -125,7 +136,7 @@ const homeHeroImageSrc = computed(() =>
 .hero h1 {
   margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: clamp(22px, 4.8cqh, 46px);
+  font-size: clamp(22px, 4cqh, 40px);
   line-height: 1.12;
   letter-spacing: 0;
   white-space: nowrap;
@@ -135,7 +146,7 @@ const homeHeroImageSrc = computed(() =>
 .subtitle {
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
-  font-size: clamp(14px, 1.85cqh, 20px);
+  font-size: clamp(14px, 1.45cqh, 18px);
   line-height: 1.35;
   white-space: nowrap;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
@@ -179,31 +190,75 @@ const homeHeroImageSrc = computed(() =>
   }
 
   .subtitle {
-    font-size: clamp(14px, 0.92vw, 20px);
+    font-size: clamp(14px, 0.92vw, 16px);
   }
 }
 
-@media (max-width: 700px) {
-  .hero-copy {
-    width: min(100% - 28px, 900px);
-  }
-}
-
-@media (min-width: 1600px) {
+@media (max-width: 1279px) {
   .hero-media {
-    --hero-text-top: max(15%, calc(var(--app-header-offset, 72px) + 16px));
-    --hero-car-top: 50%;
-    --hero-text-car-gap: 48px;
+    --hero-car-roof-line: 40%;
+  }
+}
+
+@media (max-width: 1023px) {
+  .hero-media {
+    --hero-car-roof-line: 38%;
+  }
+}
+
+@media (max-width: 767px) {
+  .hero-media {
+    --hero-car-roof-line: 36%;
+  }
+
+  .hero-copy {
+    width: min(100% - (var(--home-space-x, 16px) * 2), 900px);
+    max-width: calc(100% - (var(--home-space-x, 16px) * 2));
+  }
+
+  .hero h1,
+  .subtitle {
+    white-space: normal;
   }
 
   .hero h1 {
-    margin-bottom: 24px;
-    font-size: clamp(27px, 4.8cqh, 54px);
+    font-size: clamp(20px, 5.2vw, 28px);
+  }
+
+  .subtitle {
+    font-size: clamp(13px, 3.6vw, 16px);
+  }
+}
+
+@media (min-width: 1440px) {
+  .hero-media {
+    --hero-car-roof-line: 44%;
+    --hero-text-car-gap: clamp(16px, 2.8cqh, 36px);
+  }
+
+  .hero h1 {
+    margin-bottom: clamp(12px, 2cqh, 24px);
+    font-size: clamp(28px, 4.2cqh, 46px);
     font-weight: 800;
   }
 
   .subtitle {
-    font-size: clamp(19px, 1.85cqh, 25px);
+    font-size: clamp(16px, 1.55cqh, 20px);
+  }
+}
+
+@media (max-height: 820px) {
+  .hero-media {
+    --hero-car-roof-line: 40%;
+    --hero-text-gap: clamp(24px, 3.5cqh, 48px);
+  }
+
+  .hero h1 {
+    font-size: clamp(20px, 4.2cqh, 36px);
+  }
+
+  .subtitle {
+    font-size: clamp(13px, 1.6cqh, 17px);
   }
 }
 </style>

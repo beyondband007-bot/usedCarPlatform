@@ -87,6 +87,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 .pricing-plan-motion {
   container-type: inline-size;
   width: 100%;
+  height: 100%;
   min-width: 0;
   transition: z-index 0s;
 }
@@ -121,6 +122,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   position: relative;
   display: flex;
   width: 100%;
+  height: 100%;
   min-height: calc(100cqw * 505 / 406);
   min-width: 0;
   flex-direction: column;
@@ -340,6 +342,8 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   flex: 1;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -385,31 +389,62 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   display: flex;
   align-self: stretch;
   flex-direction: column;
-  justify-content: space-evenly;
-  gap: clamp(8px, 2.2cqw, 16px);
+  justify-content: space-between;
+  height: 100%;
   min-height: 0;
   margin: 0;
-  padding: 0;
-  overflow: hidden;
+  padding: clamp(2px, 0.6cqw, 6px) 0;
+  overflow: visible;
   list-style: none;
 }
 
 .plan-benefits li {
   display: flex;
-  align-items: flex-start;
-  gap: clamp(8px, 2.4cqw, 14px);
+  flex: 1 1 0;
+  align-items: center;
+  gap: clamp(6px, 2.2cqw, 13px);
+  min-height: clamp(22px, 5.2cqw, 40px);
   color: var(--plan-benefit-text);
-  font-size: clamp(13px, 4.1cqw, 24px);
+  font-size: clamp(12px, 3.75cqw, 22px);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.3;
+  letter-spacing: clamp(0em, 0.012cqw, 0.035em);
   white-space: nowrap;
 }
 
 .benefit-icon {
   flex: 0 0 auto;
   color: var(--plan-accent);
-  font-size: clamp(14px, 4.2cqw, 24px);
-  margin-top: 0.12em;
+  font-size: clamp(13px, 3.9cqw, 22px);
+}
+
+@container (max-width: 360px) {
+  .plan-benefits li {
+    gap: clamp(5px, 1.8cqw, 10px);
+    min-height: clamp(18px, 4.6cqw, 28px);
+    font-size: clamp(11px, 3.35cqw, 16px);
+    line-height: 1.26;
+    letter-spacing: clamp(0em, 0.008cqw, 0.02em);
+  }
+
+  .benefit-icon {
+    font-size: clamp(12px, 3.4cqw, 16px);
+  }
+}
+
+@container (min-width: 361px) and (max-width: 420px) {
+  .plan-benefits li {
+    min-height: clamp(20px, 4.9cqw, 32px);
+    font-size: clamp(12px, 3.55cqw, 18px);
+    line-height: 1.32;
+  }
+}
+
+@container (min-width: 421px) {
+  .plan-benefits li {
+    min-height: clamp(24px, 5.4cqw, 38px);
+    line-height: 1.34;
+  }
 }
 
 .plan-action {
@@ -419,7 +454,8 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   min-height: clamp(42px, 13.6cqw, 76px);
   align-items: center;
   justify-content: center;
-  margin-top: clamp(16px, 4.5cqw, 28px);
+  align-self: end;
+  margin-top: clamp(12px, 3.2cqw, 22px);
   padding: clamp(10px, 3.5cqw, 19px) clamp(14px, 4.8cqw, 28px);
   border: 1px solid var(--plan-action-border);
   border-radius: clamp(12px, 3.3cqw, 18px);
@@ -503,20 +539,19 @@ const showBadge = computed(() => Boolean(props.plan.badge));
   }
 
   .plan-benefits {
-    justify-content: flex-start;
-    gap: clamp(4px, 1.8cqw, 10px);
-    overflow: visible;
+    padding-block: clamp(1px, 0.4cqw, 4px);
   }
 
   .plan-benefits li {
-    gap: clamp(7px, 2cqw, 11px);
-    font-size: clamp(11px, 3.35cqw, 16px);
-    line-height: 1.22;
+    gap: clamp(5px, 1.7cqw, 10px);
+    min-height: clamp(16px, 4.2cqw, 24px);
+    font-size: clamp(11px, 3.15cqw, 15px);
+    line-height: 1.24;
+    letter-spacing: clamp(0em, 0.006cqw, 0.018em);
   }
 
   .benefit-icon {
-    font-size: clamp(13px, 3.5cqw, 17px);
-    margin-top: 0;
+    font-size: clamp(12px, 3.25cqw, 16px);
   }
 
   .plan-action {

@@ -78,6 +78,9 @@ const enterpriseLoginHeroImage = computed(() =>
   --login-feature-bg: rgba(8, 8, 8, 0.42);
   --login-feature-border: rgba(255, 255, 255, 0.1);
   --login-feature-icon-bg: rgba(239, 194, 76, 0.14);
+  --login-shell-top-gap: calc(
+    (100dvh - var(--app-header-offset, 72px)) * 0.2
+  );
   --login-overlay: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.62) 0%,
@@ -87,6 +90,7 @@ const enterpriseLoginHeroImage = computed(() =>
   );
 
   position: relative;
+  display: flow-root;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -133,24 +137,16 @@ const enterpriseLoginHeroImage = computed(() =>
 }
 
 .enterprise-login-shell {
-  position: fixed;
+  position: relative;
   z-index: 2;
-  left: 50%;
-  top: calc(
-    var(--app-header-offset, 72px) +
-      (100dvh - var(--app-header-offset, 72px)) * 0.5
-  );
   display: grid;
   width: min(calc(100vw - clamp(48px, 11vw, 176px)), 1120px);
-  max-height: calc(100dvh - var(--app-header-offset, 72px) - 24px);
+  margin: var(--login-shell-top-gap) auto 0;
   box-sizing: border-box;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
-  align-items: center;
+  align-items: start;
   gap: clamp(32px, 5vw, 80px);
-  transform: translate(-50%, -50%);
-  overscroll-behavior: contain;
 }
 
 .enterprise-login-bg,
@@ -263,6 +259,8 @@ const enterpriseLoginHeroImage = computed(() =>
 
 .enterprise-login-panel {
   width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 @media (max-width: 1100px) {

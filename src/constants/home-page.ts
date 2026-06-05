@@ -1,15 +1,21 @@
 import homeHeroImageDark from '@/assets/media/home/home-hero-bg-dark.png'
+import homeCapabilitySceneBgLocal from '@/assets/media/home/home-capability-scene-bg.png'
+import techBadgeIconColor from '@/assets/img/icon/调色.svg'
+import techBadgeIconCutout from '@/assets/img/icon/抠图.svg'
+import techBadgeIconEliminate from '@/assets/img/icon/消除.svg'
+import techBadgeIconPose from '@/assets/img/icon/矫正.svg'
+import techBadgeIconQuality from '@/assets/img/icon/画质提升.svg'
+import techBadgeIconResize from '@/assets/img/icon/尺寸.svg'
 import { mediaUrls } from '@/constants/media-urls'
 
 const {
   caseUsedCar: caseUsedImage,
   capabilityBatch: featureBatchImage,
-  capabilitySkyStudio: featureOutdoorImage,
+  capabilitySkyStudio: featureSkyStudioImage,
   capabilityRefine: featureRefineImage,
   capabilityRoadMotion: featureRoadImage,
   capabilitySceneBg: featureSceneImage,
   capabilityShowroom: featureShowroomImage,
-  capabilityOutdoor: featureSkyImage,
   capabilityMarketingVideo: featureMarketingVideo,
   heroBgLight: homeHeroImageLight,
   entryEnterpriseDark: suiteEnterpriseImageDark,
@@ -33,6 +39,8 @@ export interface HomeCapabilityCard {
   title: string
   description: string
   image?: string
+  /** 图床加载失败时回退（如场景背景直链 403） */
+  fallbackImage?: string
   video?: string
 }
 
@@ -78,6 +86,7 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
     title: '场景背景一键更换',
     description: '秒级替换车辆场景，适配各国营销风格',
     image: featureSceneImage,
+    fallbackImage: homeCapabilitySceneBgLocal,
   },
   {
     title: '外观细节一键精修',
@@ -102,7 +111,7 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
     title: '户外自然实景',
     description: '真实街道融合自然风光，提升车辆场景代入感',
-    image: featureSkyImage,
+    image: 'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjvqw1w55rtuqc6nDIYxBIJvAdixAvxzBIUzAIr=.png',
   },
   {
     title: '行驶动态特效',
@@ -112,17 +121,22 @@ export const homeMainCapabilities: HomeCapabilityCard[] = [
   {
     title: '高质天空影棚',
     description: '干净通透的天空场景，让车辆展示更清晰醒目',
-    image: featureOutdoorImage,
+    image: featureSkyStudioImage,
   },
 ]
 
-export const homeTechBadges = [
-  '姿态矫正',
-  '智能抠图',
-  '画质提升',
-  '一键消除',
-  '尺寸调整',
-  '智能调色',
+export interface HomeTechBadge {
+  label: string
+  icon: string
+}
+
+export const homeTechBadges: HomeTechBadge[] = [
+  { label: '姿态矫正', icon: techBadgeIconPose },
+  { label: '智能抠图', icon: techBadgeIconCutout },
+  { label: '画质提升', icon: techBadgeIconQuality },
+  { label: '一键消除', icon: techBadgeIconEliminate },
+  { label: '尺寸调整', icon: techBadgeIconResize },
+  { label: '智能调色', icon: techBadgeIconColor },
 ]
 
 export const homeCaseTabs: HomeCaseTab[] = [

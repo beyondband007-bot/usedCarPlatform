@@ -10,7 +10,7 @@ export type CreditsAccountScope = 'personal' | 'tenant'
 export interface CreditsIdentity {
   userId: number
   accountScope: CreditsAccountScope
-  tenantId?: number | null
+  tenantId?: number | string | null
 }
 
 const STORAGE_KEY = 'ai-car-studio:credits-identity'

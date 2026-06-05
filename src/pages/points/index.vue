@@ -70,6 +70,10 @@ const filters = ref<PointsQueryFilters>(defaultFilters());
 const currentPage = ref(1);
 const { rechargeSuccessTick, openRechargeModal } = usePointsRechargeModal();
 
+const canRecharge = computed(
+  () => authStore.userInfo?.enterpriseAccountRole !== "child",
+);
+
 const viewConfigMap: Record<string, PointsQueryViewConfig> = {
   personal: {
     version: "personal",
@@ -82,12 +86,13 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     showCurrentMember: false,
     showMemberColumns: false,
     adminTheme: false,
+    canRecharge: true,
   },
   member: {
     version: "member",
     icon: "mdi:coins",
     iconClassName: "is-blue",
-    subtitle: "成员积分流水筛选与查看",
+    subtitle: "子账号积分流水筛选与查看",
     teamLabel: "XX创意团队",
     badges: [
       {
@@ -97,7 +102,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
       },
       {
         icon: "mdi:account-outline",
-        text: "李芳（成员）",
+        text: "李芳（子账号）",
         className: "is-member",
       },
     ],
@@ -107,6 +112,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     currentMemberName: "李芳",
     showMemberColumns: false,
     adminTheme: false,
+    canRecharge: true,
   },
   admin: {
     version: "admin",
@@ -122,7 +128,7 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
       },
       {
         icon: "mdi:shield-check-outline",
-        text: "张小明（管理员）",
+        text: "张小明（子账号）",
         className: "is-admin",
       },
     ],
@@ -131,60 +137,68 @@ const viewConfigMap: Record<string, PointsQueryViewConfig> = {
     showCurrentMember: false,
     showMemberColumns: true,
     adminTheme: true,
+    canRecharge: true,
   },
 };
 
 const viewConfig = computed(() => {
   if (usesTeamDashboard.value) {
-    const currentRole =
-      authStore.userInfo?.canViewEnterpriseChildren
-        ? "???"
-        : authStore.userInfo?.enterpriseMemberRole === "admin"
-          ? "???"
-          : "??";
+    const currentRole = authStore.userInfo?.canViewEnterpriseChildren
+      ? "主账号"
+      : "子账号";
 
     return {
       version: "admin",
       icon: "mdi:office-building-outline",
       iconClassName: "is-violet",
-      subtitle: "???????????",
-      teamLabel: teamName.value || authStore.userInfo?.enterpriseTenantName || "????",
+      subtitle: "",
+      teamLabel: teamName.value || authStore.userInfo?.enterpriseTenantName || "",
       badges: [
         {
           icon: "mdi:office-building-outline",
-          text: teamName.value || authStore.userInfo?.enterpriseTenantName || "????",
+          text: teamName.value || authStore.userInfo?.enterpriseTenantName || "",
           className: "is-team",
         },
         {
           icon: "mdi:account-circle-outline",
-          text: `${authStore.userInfo?.displayName || "????"}?${currentRole}?`,
+          text:
+            authStore.userInfo?.displayName
+              ? `${authStore.userInfo.displayName}（${currentRole}）`
+              : currentRole,
           className: authStore.userInfo?.canViewEnterpriseChildren
             ? "is-admin"
             : "is-member",
         },
+        {
+          icon: "mdi:account-group-outline",
+          text: `团队人数 ${childMembers.value.length} 人`,
+          className: "is-team",
+        },
       ],
       tableTitle:
         filters.value.member && selectedChild.value
-          ? `${selectedChild.value.label}?????`
-          : "????????",
+          ? `${selectedChild.value.label}的积分流水`
+          : "团队积分流水",
       showMemberFilter: true,
       showCurrentMember: false,
       showMemberColumns: true,
       adminTheme: true,
       showSubAccountScope: true,
+      canRecharge: canRecharge.value,
     } satisfies PointsQueryViewConfig;
   }
 
   const base = viewConfigMap[version.value];
   const tableTitle =
     showSubAccountScope.value && accountScopeMode.value === "child" && selectedChild.value
-      ? `${selectedChild.value.label}?????`
+      ? `${selectedChild.value.label}的积分流水`
       : base.tableTitle;
 
   return {
     ...base,
     tableTitle,
     showSubAccountScope: showSubAccountScope.value,
+    canRecharge: canRecharge.value,
   };
 });
 const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
@@ -215,16 +229,8 @@ const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
         tone: "rose",
       },
       {
-        key: "memberCount",
-        label: "成员总数",
-        value: "5",
-        unit: "人",
-        icon: "mdi:account-group-outline",
-        tone: "violet",
-      },
-      {
         key: "activeMemberCount",
-        label: "活跃成员数",
+        label: "活跃账号数",
         value: "4",
         unit: "人",
         note: "（近30天）",
@@ -283,8 +289,13 @@ const mockSummaryCards = computed<PointsSummaryCard[]>(() => {
 });
 
 const summaryCards = computed(() => {
-  if (usesTeamDashboard.value) return apiSummaryCards.value;
-  return usesLiveApi.value ? apiSummaryCards.value : mockSummaryCards.value;
+  const cards = usesTeamDashboard.value
+    ? apiSummaryCards.value
+    : usesLiveApi.value
+      ? apiSummaryCards.value
+      : mockSummaryCards.value;
+
+  return cards.filter((card) => card.key !== "memberCount");
 });
 
 const filteredRecords = computed(() => {
@@ -419,7 +430,7 @@ function handleExport() {
     ];
 
     if (viewConfig.value.showMemberColumns) {
-      base.push(record.memberName, record.isOwner ? "主账号" : "成员");
+      base.push(record.memberName, record.isOwner ? "主账号" : "子账号");
     }
 
     base.push(record.createdAt);
@@ -579,15 +590,15 @@ watch(filteredRecords, () => {
   position: relative;
   display: flex;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 100%;
+  height: auto;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   padding: clamp(16px, 2.8vh, 28px) var(--points-shell-x)
     clamp(12px, 2vh, 24px);
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: visible;
   color: #0f172a;
   font-family:
     "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
@@ -642,7 +653,7 @@ watch(filteredRecords, () => {
     calc((100dvh - var(--app-header-offset, 72px)) * 1.42)
   );
   min-width: 0;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   margin-inline: auto;
@@ -663,8 +674,7 @@ watch(filteredRecords, () => {
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 0;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: var(--points-section-gap);
   padding: 0;
@@ -728,6 +738,10 @@ watch(filteredRecords, () => {
   color: #94a3b8;
 }
 
+.points-query-page.theme-dark .points-query-team-label {
+  color: #ffffff;
+}
+
 .points-query-hero-badges {
   display: flex;
   flex-wrap: wrap;
@@ -739,6 +753,10 @@ watch(filteredRecords, () => {
 .points-query-team-label {
   color: #94a3b8;
   font-size: 12px;
+}
+
+.points-query-page.theme-light .points-query-team-label {
+  color: #000000;
 }
 
 .points-query-badge {
@@ -766,6 +784,24 @@ watch(filteredRecords, () => {
   background: rgb(212 160 23 / 18%);
   color: #9a6700;
   font-weight: 700;
+}
+
+.points-query-page.theme-light .points-query-badge {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.points-query-page.theme-light .points-query-badge.is-personal,
+.points-query-page.theme-light .points-query-badge.is-team {
+  color: #b8860b;
+}
+
+.points-query-page.theme-light .points-query-badge.is-member {
+  color: #475569;
+}
+
+.points-query-page.theme-light .points-query-badge.is-admin {
+  color: #9a6700;
 }
 
 .points-query-page.theme-dark .points-query-badge.is-personal,
@@ -820,13 +856,8 @@ watch(filteredRecords, () => {
 }
 
 @media (min-width: 1024px) {
-  .points-query-page {
-    overflow: hidden;
-  }
-
   .points-query-shell {
-    min-height: 0;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
   }
 }
 

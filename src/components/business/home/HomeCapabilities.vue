@@ -75,9 +75,11 @@ onMounted(() => {
           v-else-if="item.image"
           class="feature-card-image"
           :src="item.image"
+          :fallback-src="item.fallbackImage"
           :alt="item.title"
           loading="lazy"
           decoding="async"
+          referrerpolicy="no-referrer"
         />
         <h3>{{ item.title }}</h3>
         <p>{{ item.description }}</p>
@@ -85,16 +87,25 @@ onMounted(() => {
     </div>
 
     <div class="badge-row" aria-label="能力标签">
-      <span v-for="badge in homeTechBadges" :key="badge">{{ badge }}</span>
+      <span
+        v-for="badge in homeTechBadges"
+        :key="badge.label"
+        class="tech-badge"
+      >
+        <img class="tech-badge-icon" :src="badge.icon" alt="" aria-hidden="true" />
+        <span class="tech-badge-label">{{ badge.label }}</span>
+      </span>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
 .section-block {
-  width: min(1660px, calc(100% - 40px));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--home-shell-max, 1440px);
   margin: 0 auto;
-  padding-bottom: 130px;
+  padding: 0 var(--home-space-x, 24px) var(--home-section-pb, 130px);
 }
 
 .section-title {
@@ -123,10 +134,16 @@ onMounted(() => {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--home-grid-gap, 24px);
   width: 100%;
   margin: 0 auto;
+}
+
+@media (min-width: 1280px) {
+  .feature-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .feature-card {
@@ -218,117 +235,119 @@ onMounted(() => {
 
 .badge-row {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  flex-wrap: nowrap;
+  gap: clamp(10px, 1.2vw, 16px);
   width: 100%;
-  margin: 38px auto 0;
+  margin: 32px auto 0;
   padding: 0;
-  column-gap: clamp(12px, 1.6vw, 24px);
 }
 
-.badge-row span {
-  position: relative;
+.tech-badge {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  min-height: 41px;
-  padding: 0 20px;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1px solid var(--home-badge-border, rgba(255, 255, 255, 0.06));
   border-radius: 999px;
-  font-size: clamp(25px, 2.4vw, 30px);
-  font-weight: 800;
-  white-space: nowrap;
+  color: var(--home-badge-text, #f8fafc);
+  background: var(--home-badge-bg, #1a1a1a);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   transition:
     transform var(--home-motion-fast, 160ms ease),
     border-color var(--home-motion-fast, 160ms ease),
-    color var(--home-motion-fast, 160ms ease),
-    background var(--home-motion-fast, 160ms ease),
-    box-shadow var(--home-motion-fast, 160ms ease);
+    background var(--home-motion-fast, 160ms ease);
 }
 
-.section-block.theme-dark .badge-row span {
-  color: #f8fafc;
-  background: #0b0b0b;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.section-block.theme-dark .badge-row span:hover {
+.tech-badge:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--home-badge-bg-hover, #242424);
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--home-gold) 42%, transparent);
-  color: #ffffff;
 }
 
-.section-block.theme-dark .badge-row span::before {
-  background: linear-gradient(180deg, var(--home-gold-strong), #d6a617);
+.section-block.theme-light .tech-badge {
+  background: rgb(71, 71, 73);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-.section-block.theme-light .badge-row span {
-  color: #334155;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafd 100%);
-  border: 1px solid #e6eaf2;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 1px 2px rgba(47, 107, 255, 0.04);
+.section-block.theme-light .tech-badge:hover {
+  background: rgb(82, 82, 84);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.section-block.theme-light .badge-row span:hover {
-  transform: translateY(-1px);
-  border-color: #b8cdf4;
-  background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%);
-  color: #1e293b;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 6px 16px rgba(47, 107, 255, 0.1);
+.tech-badge-icon {
+  display: block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
-.badge-row span::before {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  margin-right: 11px;
-  content: "";
-  border-radius: 5px;
+.tech-badge-label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.section-block.theme-light .badge-row span::before {
-  background: linear-gradient(180deg, #4f7fff 0%, #2f6bff 100%);
-  box-shadow: 0 2px 6px rgba(47, 107, 255, 0.22);
+.section-block.theme-dark .tech-badge {
+  background: #141414;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-@media (max-width: 1100px) {
-  .feature-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 22px;
-  }
+.section-block.theme-dark .tech-badge:hover {
+  border-color: color-mix(in srgb, var(--home-gold) 36%, transparent);
+  background: var(--home-badge-bg-hover, #1f1f1f);
+}
 
+@media (max-width: 1023px) {
   .badge-row {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    row-gap: 18px;
+    justify-content: center;
   }
 }
 
-@media (max-width: 700px) {
-  .section-block {
-    width: min(100% - 28px, 1520px);
-    padding-bottom: 86px;
+@media (max-width: 767px) {
+  .section-title {
+    width: 100%;
+    margin-bottom: 34px;
   }
 
-  .section-title {
-    margin-bottom: 34px;
+  .section-title h2,
+  .section-title p {
+    white-space: normal;
+  }
+
+  .section-title h2 {
+    font-size: clamp(22px, 6vw, 28px);
   }
 
   .feature-grid {
     grid-template-columns: 1fr;
-    gap: 18px;
+  }
+
+  .feature-card h3,
+  .feature-card p {
+    white-space: normal;
   }
 
   .badge-row {
-    justify-content: flex-start;
-    gap: 18px;
+    gap: 10px;
   }
 
-  .badge-row span {
+  .tech-badge {
+    min-height: 36px;
+    padding: 7px 14px;
+  }
+
+  .tech-badge-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .tech-badge-label {
     font-size: 13px;
   }
 }

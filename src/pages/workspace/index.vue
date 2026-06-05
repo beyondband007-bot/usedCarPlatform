@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog, useMessage } from "naive-ui";
 
@@ -881,23 +881,20 @@ function handleSelectCapability(code: string) {
     previewedDeliveryTaskId.value = null;
   }
 
-  if (
-    code === SHORT_VIDEO_CAPABILITY_CODE &&
-    sidebarGeneratingCodes.value.includes(code)
-  ) {
-    assistPanelRef.value?.focusShortVideoGeneratingView?.();
-  }
-
-  if (
-    code === "delivery" &&
-    sidebarGeneratingCodes.value.includes("delivery")
-  ) {
-    assistPanelRef.value?.focusDeliveryBatchProcessingView?.();
-  }
-
   if (route.params.code !== code) {
     router.replace({ name: "Workspace", params: { code } });
   }
+
+  void nextTick(() => {
+    if (!sidebarGeneratingCodes.value.includes(code)) return;
+
+    if (code === "delivery") {
+      assistPanelRef.value?.focusDeliveryBatchProcessingView?.();
+      return;
+    }
+
+    assistPanelRef.value?.focusGeneratingView?.();
+  });
 }
 
 const sidebarGeneratingCodes = computed(() => {

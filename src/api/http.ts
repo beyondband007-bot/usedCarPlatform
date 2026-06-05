@@ -4,37 +4,110 @@ import { toCreditsHeaders } from '@/utils/credits-identity'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
 
+type ErrorMessageRule = {
+  matches: string[]
+  text: string
+}
+
+const errorMessageRules: ErrorMessageRule[] = [
+  {
+    matches: ['login is required'],
+    text: '请先登录后再操作',
+  },
+  {
+    matches: ['subscription batch concurrent task limit reached'],
+    text: '当前套餐批量任务并发已达上限，请等待任务完成后再提交',
+  },
+  {
+    matches: ['subscription concurrent task limit reached'],
+    text: '当前套餐并发任务已达上限，请等待任务完成后再提交',
+  },
+  {
+    matches: ['no available kie api key'],
+    text: '生成服务暂时繁忙，请稍后再试',
+  },
+  {
+    matches: ['credits platform request timed out', 'credits platform request failed'],
+    text: '积分服务暂时不可用，请稍后重试',
+  },
+  {
+    matches: ['credits platform rejected the request'],
+    text: '积分服务校验未通过，请检查账户状态后重试',
+  },
+  {
+    matches: ['inputassetid is required'],
+    text: '请先上传图片后再生成',
+  },
+  {
+    matches: ['asset not found'],
+    text: '所选素材不存在或已失效，请重新上传后重试',
+  },
+  {
+    matches: [
+      'requires a car_exterior asset',
+      'requires a car_interior asset',
+      'asset purpose must be car_exterior',
+      'reference asset must be an image',
+      'asset must be car_exterior',
+      'asset must be car_interior',
+    ],
+    text: '当前功能与上传素材类型不匹配，请更换符合要求的图片后重试',
+  },
+  {
+    matches: ['logoassetid must point to a logo asset', 'default logo is not configured'],
+    text: 'Logo 素材无效或未配置，请检查后重试',
+  },
+  {
+    matches: [
+      'scene reference image is missing',
+      'reference image is required',
+      'no reference asset in this conversation',
+    ],
+    text: '参考图缺失，请重新选择参考图后重试',
+  },
+  {
+    matches: ['file upload failed', 'upload response missing fileurl'],
+    text: '素材上传到生成服务失败，请稍后重试',
+  },
+  {
+    matches: ['kie video task rejected'],
+    text: '短视频服务拒绝了本次请求，请检查素材或稍后重试',
+  },
+  {
+    matches: ['kie video response missing taskid'],
+    text: '短视频服务返回异常，未拿到任务编号，请稍后重试',
+  },
+  {
+    matches: ['kie create video task failed', 'short-video task creation failed'],
+    text: '短视频任务创建失败，请稍后重试',
+  },
+  {
+    matches: ['kie text-to-image response missing taskid'],
+    text: '创意生图服务返回异常，未拿到任务编号，请稍后重试',
+  },
+  {
+    matches: ['kie create text-to-image task failed'],
+    text: '创意生图任务创建失败，请稍后重试',
+  },
+  {
+    matches: ['kie response missing taskid'],
+    text: '图片生成服务返回异常，未拿到任务编号，请稍后重试',
+  },
+  {
+    matches: ['kie create task failed'],
+    text: '图片生成任务创建失败，请稍后重试',
+  },
+]
+
 export function normalizeApiErrorMessage(message: string) {
   if (!message) return ''
 
   const normalized = message.toLowerCase()
 
-  if (normalized.includes('no available kie api key')) {
-    return '短视频服务暂时繁忙，请稍后再试'
-  }
-
-  if (normalized.includes('kie video response missing taskid')) {
-    return '短视频任务创建失败，请稍后重试'
-  }
-
-  if (normalized.includes('kie create video task failed')) {
-    return '短视频服务创建任务失败，请稍后重试'
-  }
-
-  if (normalized.includes('short-video task creation failed')) {
-    return '短视频任务创建失败，请稍后重试'
-  }
-
-  if (normalized.includes('subscription concurrent task limit reached')) {
-    return '当前套餐并发任务已达上限，请等待任务完成后再提交'
-  }
-
-  if (normalized.includes('subscription batch concurrent task limit reached')) {
-    return '当前套餐批量任务并发已达上限，请等待任务完成后再提交'
-  }
-
-  if (normalized.includes('login is required')) {
-    return '请先登录后再操作'
+  for (const rule of errorMessageRules) {
+    if (rule.matches.some((item) => normalized.includes(item.toLowerCase()))) {
+      return rule.text
+    }
   }
 
   return message

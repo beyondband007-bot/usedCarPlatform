@@ -222,11 +222,15 @@ function handlePlanConsult() {
   white-space: nowrap;
 }
 
+.pricing-page.theme-light .pricing-hero-intro {
+  color: var(--pricing-hero-text);
+}
+
 .pricing-plans-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(18px, 3.1vw, 42px);
-  align-items: center;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
   margin-bottom: 0;
@@ -244,61 +248,87 @@ function handlePlanConsult() {
   flex: 0 0 auto;
   box-sizing: border-box;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(16px, 3.2vw, 58px);
+  gap: clamp(14px, 2.4cqw, 42px);
   width: 100%;
   min-width: 0;
   margin: 0;
-  min-height: clamp(120px, 12vh, 148px);
-  padding: clamp(24px, 2.8vh, 32px) clamp(26px, 4.8vw, 84px);
+  min-height: clamp(108px, 11vh, 148px);
+  padding: clamp(20px, 2.6vh, 32px) clamp(18px, 3.6cqw, 56px);
   border: 1px solid var(--pricing-footer-border);
   border-radius: var(--pricing-card-radius);
   background: var(--pricing-footer-bg);
   box-shadow: none;
-  overflow: hidden;
 }
 
 .footer-feature {
   display: flex;
-  justify-content: center;
-  gap: clamp(10px, 1.3vw, 18px);
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(6px, 1.1cqw, 12px);
   min-width: 0;
   align-items: center;
   text-align: center;
 }
 
 .footer-feature > div {
+  display: grid;
+  gap: clamp(3px, 0.72cqw, 10px);
   min-width: 0;
+  width: 100%;
 }
 
 .footer-feature-icon {
   display: none;
   flex: 0 0 auto;
   place-items: center;
-  width: clamp(34px, 3.4vw, 48px);
-  height: clamp(34px, 3.4vw, 48px);
+  width: clamp(34px, 3.4cqw, 48px);
+  height: clamp(34px, 3.4cqw, 48px);
   border: 1px solid var(--pricing-footer-icon-border);
   border-radius: 14px;
   background: var(--pricing-footer-icon-bg);
   color: var(--pricing-accent-strong);
-  font-size: clamp(18px, 1.7vw, 24px);
+  font-size: clamp(18px, 1.7cqw, 24px);
 }
 
 .footer-feature h3 {
   margin: 0;
   color: var(--pricing-footer-title);
-  font-size: 32px;
+  font-size: clamp(15px, 2.35cqw, 28px);
   font-weight: 900;
-  line-height: 1.3;
-  white-space: nowrap;
+  line-height: clamp(1.24, 1.34, 1.4);
+  letter-spacing: clamp(0.01em, 0.022cqw, 0.04em);
 }
 
 .footer-feature p {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--pricing-hero-sub);
-  font-size: 20px;
+  font-size: clamp(12px, 1.45cqw, 18px);
   font-weight: 600;
-  line-height: 1.35;
-  white-space: nowrap;
+  line-height: clamp(1.32, 1.42, 1.52);
+  letter-spacing: clamp(0.004em, 0.012cqw, 0.028em);
+}
+
+@container (max-width: 980px) {
+  .pricing-footer-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: clamp(16px, 2.8vh, 24px);
+    min-height: 0;
+    padding-inline: clamp(16px, 3.2cqw, 32px);
+  }
+
+  .footer-feature > div {
+    gap: clamp(2px, 0.58cqw, 8px);
+  }
+
+  .footer-feature h3 {
+    line-height: 1.28;
+    letter-spacing: clamp(0.008em, 0.018cqw, 0.032em);
+  }
+
+  .footer-feature p {
+    line-height: 1.38;
+    letter-spacing: clamp(0.002em, 0.01cqw, 0.02em);
+  }
 }
 
 @media (max-height: 760px) {
@@ -327,6 +357,22 @@ function handlePlanConsult() {
     min-height: 108px;
     padding-block: 20px;
   }
+
+  .footer-feature > div {
+    gap: clamp(2px, 0.5cqw, 6px);
+  }
+
+  .footer-feature h3 {
+    font-size: clamp(14px, 2cqw, 22px);
+    line-height: 1.26;
+    letter-spacing: clamp(0.006em, 0.016cqw, 0.028em);
+  }
+
+  .footer-feature p {
+    font-size: clamp(11px, 1.25cqw, 15px);
+    line-height: 1.34;
+    letter-spacing: clamp(0em, 0.008cqw, 0.018em);
+  }
 }
 
 @media (max-width: 900px) {
@@ -339,13 +385,21 @@ function handlePlanConsult() {
     width: min(980px, calc(100vw - 28px), calc((100dvh - 72px) * 1.65));
   }
 
+  .pricing-plans-grid {
+    grid-template-columns: 1fr;
+    gap: clamp(14px, 2.4vh, 22px);
+  }
+
   .pricing-footer-bar {
-    padding-inline: 18px;
-    gap: 12px;
+    grid-template-columns: 1fr;
+    gap: clamp(14px, 2.2vh, 20px);
+    min-height: 0;
+    padding-inline: clamp(16px, 4vw, 24px);
   }
 
   .footer-feature {
-    justify-content: flex-start;
+    align-items: flex-start;
+    text-align: left;
   }
 }
 </style>

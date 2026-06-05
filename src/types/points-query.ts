@@ -81,4 +81,5 @@ export interface PointsQueryViewConfig {
   showMemberColumns: boolean;
   adminTheme: boolean;
   showSubAccountScope?: boolean;
+  canRecharge?: boolean;
 }

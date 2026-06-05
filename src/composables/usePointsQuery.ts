@@ -135,6 +135,11 @@ export function usePointsQuery() {
     }),
   )
 
+  const isFlagshipChildAccount = computed(() =>
+    subscriptionStore.currentPlan === 'flagship'
+    && authStore.userInfo?.enterpriseAccountRole === 'child',
+  )
+
   const selectedChild = computed(() =>
     childMembers.value.find((member) => member.id === selectedChildId.value) ?? null,
   )
@@ -231,6 +236,7 @@ export function usePointsQuery() {
       summaryCards.value = buildPersonalSummaryCards({
         availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
         records: records.value,
+        availableBalanceLabel: isFlagshipChildAccount.value ? '团队可用积分' : undefined,
       })
 
       if (!targetCreditsUserId) {
@@ -251,6 +257,7 @@ export function usePointsQuery() {
       summaryCards.value = buildPersonalSummaryCards({
         availableBalance: 0,
         records: [],
+        availableBalanceLabel: isFlagshipChildAccount.value ? '团队可用积分' : undefined,
       })
       dataSource.value = 'api'
     } finally {
@@ -293,7 +300,6 @@ export function usePointsQuery() {
       summaryCards.value = buildTeamSummaryCards({
         availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
         records: records.value,
-        memberCount: childMembers.value.length,
       })
 
       dataSource.value = 'api'
@@ -304,7 +310,6 @@ export function usePointsQuery() {
       summaryCards.value = buildTeamSummaryCards({
         availableBalance: 0,
         records: [],
-        memberCount: childMembers.value.length,
       })
       dataSource.value = 'api'
     } finally {

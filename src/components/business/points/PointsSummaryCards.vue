@@ -85,11 +85,15 @@ function isAssetIcon(icon: string) {
 
 .points-summary-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--points-summary-gap, 16px);
 }
 
 .points-summary-grid.is-standard {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.points-summary-section.is-glass .points-summary-grid.is-standard {
+  gap: var(--points-summary-gap, clamp(12px, 1.2vw, 16px));
 }
 
 .points-summary-grid.is-admin {
@@ -119,7 +123,7 @@ function isAssetIcon(icon: string) {
 .summary-card {
   position: relative;
   overflow: hidden;
-  padding: 20px;
+  padding: clamp(14px, 1.6vw, 20px);
 }
 
 .summary-card:hover {
@@ -273,7 +277,7 @@ function isAssetIcon(icon: string) {
 .summary-value {
   color: #0f172a;
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 26px;
+  font-size: clamp(20px, 2vw, 26px);
   font-weight: 800;
   line-height: 1;
 }
@@ -308,14 +312,21 @@ function isAssetIcon(icon: string) {
   animation: fadeIn 0.35s ease forwards;
 }
 
-@media (max-width: 1024px) {
-  .points-summary-grid.is-standard,
-  .points-summary-grid.is-admin {
+/* 1440+：四列指标卡 */
+@media (max-width: 1439px) {
+  .points-summary-grid.is-standard {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1023px) {
+  .points-summary-grid.is-admin {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+@media (max-width: 767px) {
   .points-summary-grid.is-standard,
   .points-summary-grid.is-admin {
     grid-template-columns: 1fr;
@@ -475,6 +486,10 @@ function isAssetIcon(icon: string) {
 .points-summary-section.is-glass .summary-icon.cyan {
   background: linear-gradient(180deg, #f4d36a 0%, #d4a017 100%);
   color: #ffffff;
+}
+
+.points-summary-section.is-glass .summary-card {
+  padding: clamp(12px, 1.4vw, 18px);
 }
 
 .points-summary-section.is-glass .summary-value {
