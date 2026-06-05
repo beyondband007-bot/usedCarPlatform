@@ -122,7 +122,7 @@ onMounted(() => {
     0 12px 34px rgba(244, 200, 64, 0.18);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 700px) {
   .final-cta h2,
   .final-cta p {
     white-space: normal;

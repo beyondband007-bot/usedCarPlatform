@@ -50,6 +50,9 @@ import PreloadImage from "@/components/common/PreloadImage.vue";
 import CapabilityOptionSelector from "@/components/business/workspace/CapabilityOptionSelector.vue";
 import GenerateActionFooter from "@/components/business/workspace/GenerateActionFooter.vue";
 import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.vue";
+import PresetCombobox, {
+  type PresetComboboxOption,
+} from "@/components/business/workspace/PresetCombobox.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -114,6 +117,21 @@ const paintColorCode = ref("");
 const batchPaintColorCode = ref("");
 const outputRatio = ref<string>(DEFAULT_GENERATION_OUTPUT_RATIO);
 const batchTab = ref<"create" | "visual">("create");
+const DRAFT_CREATE_PRESET_VALUE = "__draft__";
+const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
+  name: "",
+  enableSceneChange: false,
+  sceneIndex: 0,
+  sceneCategory: "展厅灯光",
+  outputRatio: DEFAULT_BATCH_OUTPUT_RATIO,
+  useRecentLogo: false,
+  lightConsistency: true,
+  paintRefresh: false,
+  colorCode: null,
+  interiorEnhance: false,
+  interiorCollage: false,
+};
+const draftCreateTemplate = ref<BatchVisualTemplate | null>(null);
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
 const batchSceneIndex = ref(0);
@@ -143,6 +161,7 @@ const activeDeliveryTaskId = ref<string | null>(null);
 const isLoadingDeliveryTasks = ref(false);
 const isLoadingDeliveryAssets = ref(false);
 const isCreatingBatchTask = ref(false);
+const isSavingVisualPreset = ref(false);
 const isDeletingDeliveryAssets = ref(false);
 const deletingPresetIds = ref<Set<string>>(new Set());
 const lastCreatedBatchId = ref<string | null>(null);
@@ -328,39 +347,30 @@ const toPresetSelectOption = (
     template: item,
   });
 
-const visualPresetOptions = computed(() =>
-  visualTemplates.value.map(toPresetSelectOption),
+const presetComboboxOptions = computed<PresetComboboxOption[]>(() =>
+  visualTemplates.value.map((item) => ({
+    id: item.id,
+    name: item.name,
+  })),
 );
 
-const selectedPresetKey = computed({
-  get() {
-    if (visualPreset.value === NEW_PRESET_VALUE) {
-      return presetInput.value || null;
-    }
-
-    return visualPreset.value;
-  },
-  set(value: string | null) {
-    if (!value) {
-      resetVisualConfigSelection();
-      return;
-    }
-
-    const template = getTemplateById(value);
-    if (template) {
-      visualPreset.value = template.id;
-      presetInput.value = template.name;
-      return;
-    }
-
-    visualPreset.value = NEW_PRESET_VALUE;
-    presetInput.value = value;
-  },
+const createPresetOptions = computed(() => {
+  const options = visualTemplates.value.map(toPresetSelectOption);
+  if (
+    draftCreateTemplate.value &&
+    createTaskPresetId.value === DRAFT_CREATE_PRESET_VALUE
+  ) {
+    return [
+      {
+        label: `${draftCreateTemplate.value.name}（未保存）`,
+        value: DRAFT_CREATE_PRESET_VALUE,
+        template: draftCreateTemplate.value,
+      },
+      ...options,
+    ];
+  }
+  return options;
 });
-
-const createPresetOptions = computed(() =>
-  visualTemplates.value.map(toPresetSelectOption),
-);
 
 function setPresetDeleting(id: string, deleting: boolean) {
   const next = new Set(deletingPresetIds.value);
@@ -394,13 +404,18 @@ function syncSelectionAfterPresetDeleted(
   }
 }
 
+async function deletePresetById(presetId: string) {
+  const remainingTemplates = await deleteTemplate(presetId);
+  syncSelectionAfterPresetDeleted(presetId, remainingTemplates);
+  return remainingTemplates;
+}
+
 async function handleDeletePreset(template: BatchVisualTemplate) {
   if (deletingPresetIds.value.has(template.id)) return;
 
   setPresetDeleting(template.id, true);
   try {
-    const remainingTemplates = await deleteTemplate(template.id);
-    syncSelectionAfterPresetDeleted(template.id, remainingTemplates);
+    await deletePresetById(template.id);
     message.success("预设已删除");
   } catch (error) {
     const text = error instanceof Error ? error.message : "预设删除失败，请重试";
@@ -408,6 +423,20 @@ async function handleDeletePreset(template: BatchVisualTemplate) {
   } finally {
     setPresetDeleting(template.id, false);
   }
+}
+
+function handlePresetComboboxSelect(option: PresetComboboxOption) {
+  const template = getTemplateById(option.id);
+  if (!template) {
+    message.error("预设不存在，请刷新后重试");
+    return;
+  }
+
+  isApplyingTemplate.value = true;
+  visualPreset.value = template.id;
+  presetInput.value = option.name;
+  applyTemplate(template);
+  isApplyingTemplate.value = false;
 }
 
 function renderPresetOptionLabel(option: {
@@ -418,7 +447,7 @@ function renderPresetOptionLabel(option: {
   const template = option.template;
   const label = String(option.label ?? "");
 
-  if (!template) {
+  if (!template || template.id === DRAFT_CREATE_PRESET_VALUE) {
     return h("span", { class: "preset-select-option-name" }, label);
   }
 
@@ -427,54 +456,66 @@ function renderPresetOptionLabel(option: {
   return h("div", { class: "preset-select-option" }, [
     h("span", { class: "preset-select-option-name" }, label),
     h(
-      NPopconfirm,
-      {
-        positiveText: "删除",
-        negativeText: "取消",
-        placement: "right",
-        onPositiveClick: () => handleDeletePreset(template),
-      },
-      {
-        default: () => `删除预设「${template.name}」？删除后不可恢复。`,
-        trigger: () =>
-          h(
-            "button",
-            {
-              type: "button",
-              class: [
-                "preset-option-delete",
-                isDeleting ? "is-deleting" : "",
+      "span",
+      { class: "preset-option-delete-anchor" },
+      h(
+        NPopconfirm,
+        {
+          positiveText: "删除",
+          negativeText: "取消",
+          placement: "right",
+          onPositiveClick: () => handleDeletePreset(template),
+        },
+        {
+          default: () => `删除预设「${template.name}」？删除后不可恢复。`,
+          trigger: () =>
+            h(
+              "button",
+              {
+                type: "button",
+                class: [
+                  "preset-option-delete",
+                  isDeleting ? "is-deleting" : "",
+                ],
+                disabled: isDeleting,
+                "aria-label": `删除预设${template.name}`,
+                title: "删除预设",
+                onMousedown: (event: MouseEvent) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                },
+                onClick: (event: MouseEvent) => {
+                  event.stopPropagation();
+                },
+              },
+              [
+                h(Icon, {
+                  icon: isDeleting ? "mdi:loading" : "mdi:trash-can-outline",
+                }),
               ],
-              disabled: isDeleting,
-              "aria-label": `删除预设${template.name}`,
-              title: "删除预设",
-              onMousedown: (event: MouseEvent) => {
-                event.preventDefault();
-                event.stopPropagation();
-              },
-              onClick: (event: MouseEvent) => {
-                event.stopPropagation();
-              },
-            },
-            [
-              h(Icon, {
-                icon: isDeleting ? "mdi:loading" : "mdi:trash-can-outline",
-              }),
-            ],
-          ),
-      },
+            ),
+        },
+      ),
     ),
   ]);
 }
 
 const activeCreateTemplate = computed(() =>
-  createTaskPresetId.value
+  createTaskPresetId.value &&
+    createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE
     ? getTemplateById(createTaskPresetId.value)
     : undefined,
 );
 
+const effectiveCreateTemplate = computed(() => {
+  if (createTaskPresetId.value === DRAFT_CREATE_PRESET_VALUE) {
+    return draftCreateTemplate.value;
+  }
+  return activeCreateTemplate.value;
+});
+
 const showCreateInteriorUpload = computed(() =>
-  Boolean(activeCreateTemplate.value?.interiorCollage),
+  Boolean(effectiveCreateTemplate.value?.interiorCollage),
 );
 
 const uploadedExteriorAssets = computed(() =>
@@ -550,6 +591,88 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     interiorEnhance: interiorCollage.value && interiorEnhance.value,
     interiorCollage: interiorCollage.value,
   };
+}
+
+function normalizeTemplateInput(
+  input: BatchVisualTemplateInput,
+): BatchVisualTemplateInput {
+  return {
+    ...input,
+    name: input.name.trim(),
+    colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
+    interiorEnhance: input.interiorCollage && input.interiorEnhance,
+  };
+}
+
+function isSameTemplateInput(
+  left: BatchVisualTemplateInput,
+  right: BatchVisualTemplateInput | BatchVisualTemplate,
+): boolean {
+  const normalizedLeft = normalizeTemplateInput(left);
+  const normalizedRight = normalizeTemplateInput(right);
+
+  return (
+    normalizedLeft.enableSceneChange === normalizedRight.enableSceneChange &&
+    normalizedLeft.sceneIndex === normalizedRight.sceneIndex &&
+    normalizedLeft.sceneCategory === normalizedRight.sceneCategory &&
+    normalizedLeft.outputRatio === normalizedRight.outputRatio &&
+    normalizedLeft.useRecentLogo === normalizedRight.useRecentLogo &&
+    normalizedLeft.lightConsistency === normalizedRight.lightConsistency &&
+    normalizedLeft.paintRefresh === normalizedRight.paintRefresh &&
+    (normalizedLeft.colorCode ?? null) === (normalizedRight.colorCode ?? null) &&
+    normalizedLeft.interiorCollage === normalizedRight.interiorCollage &&
+    normalizedLeft.interiorEnhance === normalizedRight.interiorEnhance
+  );
+}
+
+const isVisualConfigDirty = computed(() => {
+  const current = buildTemplateInput();
+
+  if (visualPreset.value === NEW_PRESET_VALUE) {
+    return !isSameTemplateInput(current, DEFAULT_VISUAL_TEMPLATE_INPUT);
+  }
+
+  const saved = getTemplateById(visualPreset.value);
+  if (!saved) return true;
+
+  return !isSameTemplateInput(current, saved);
+});
+
+function buildDraftTemplate(): BatchVisualTemplate {
+  const input = buildTemplateInput();
+
+  return {
+    id: DRAFT_CREATE_PRESET_VALUE,
+    name: input.name || "未保存配置",
+    enableSceneChange: input.enableSceneChange,
+    sceneIndex: input.sceneIndex,
+    sceneCategory: input.sceneCategory,
+    outputRatio: input.outputRatio,
+    useRecentLogo: input.useRecentLogo,
+    lightConsistency: input.lightConsistency,
+    paintRefresh: input.paintRefresh,
+    colorCode: input.colorCode ?? null,
+    interiorEnhance: input.interiorEnhance,
+    interiorCollage: input.interiorCollage,
+    updatedAt: "",
+  };
+}
+
+function syncVisualConfigToCreateTab() {
+  draftCreateTemplate.value = buildDraftTemplate();
+  createTaskPresetId.value = DRAFT_CREATE_PRESET_VALUE;
+}
+
+function resolveBatchTaskPresetId() {
+  if (createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE) {
+    return createTaskPresetId.value;
+  }
+
+  if (visualPreset.value !== NEW_PRESET_VALUE) {
+    return visualPreset.value;
+  }
+
+  return visualTemplates.value[0]?.id ?? DRAFT_CREATE_PRESET_VALUE;
 }
 
 function mapBatchVisualConfigFromTemplate(
@@ -646,13 +769,18 @@ watch(showCreateInteriorUpload, (enabled) => {
 });
 
 async function handleSaveVisualPreset() {
-  const input = buildTemplateInput();
+  const presetName = presetInput.value.trim();
+  const input = {
+    ...buildTemplateInput(),
+    name: presetName,
+  };
 
-  if (!input.name) {
+  if (!presetName) {
     message.warning("请输入预设名称");
     return;
   }
 
+  isSavingVisualPreset.value = true;
   try {
     if (visualPreset.value === NEW_PRESET_VALUE) {
       const created = await saveTemplate(input);
@@ -668,11 +796,14 @@ async function handleSaveVisualPreset() {
     }
 
     message.success("视觉配置保存成功");
+    draftCreateTemplate.value = null;
     resetVisualConfigSelection();
   } catch (error) {
     const text =
       error instanceof Error ? error.message : "预设保存失败，请重试";
     message.error(text);
+  } finally {
+    isSavingVisualPreset.value = false;
   }
 }
 
@@ -1097,7 +1228,7 @@ async function handleCreateBatchTask() {
     return;
   }
 
-  const template = getTemplateById(createTaskPresetId.value);
+  const template = effectiveCreateTemplate.value;
   if (!template) {
     message.warning("视觉预设不存在，请重新选择");
     return;
@@ -1129,10 +1260,11 @@ async function handleCreateBatchTask() {
 
     const visualConfig = mapBatchVisualConfigFromTemplate(template);
     const normalizedProjectName = projectName.value.trim();
+    const presetId = resolveBatchTaskPresetId();
 
     const created = await createBatchTask({
       projectName: normalizedProjectName,
-      presetId: createTaskPresetId.value,
+      presetId,
       carGroups: [
         {
           groupTitle: normalizedProjectName || "车辆图组",
@@ -1175,7 +1307,11 @@ async function handleCreateBatchTask() {
   }
 }
 
-async function syncDeliveryTaskPreview() {
+function resolveActiveDeliveryTaskId() {
+  return activeDeliveryTaskId.value ?? props.previewedDeliveryTaskId ?? null;
+}
+
+async function syncDeliveryTaskPreview(options?: { autoSelect?: boolean }) {
   if (props.capability.kind !== "delivery") return;
 
   const tasks = deliveryTasks.value;
@@ -1185,12 +1321,20 @@ async function syncDeliveryTaskPreview() {
     return;
   }
 
-  const activeId = activeDeliveryTaskId.value;
-  const target =
-    (activeId
-      ? tasks.find((task) => task.taskId === activeId)
-      : undefined) ?? tasks[0];
+  const preferredId = resolveActiveDeliveryTaskId();
+  const activeTask = preferredId
+    ? tasks.find((task) => task.taskId === preferredId)
+    : undefined;
 
+  if (activeTask) {
+    activeDeliveryTaskId.value = activeTask.taskId;
+    await emitDeliveryTaskPreview(activeTask);
+    return;
+  }
+
+  if (options?.autoSelect === false) return;
+
+  const target = tasks[0];
   activeDeliveryTaskId.value = target.taskId;
   await emitDeliveryTaskPreview(target);
 }
@@ -1237,7 +1381,20 @@ async function refreshDeliveryTasks(options?: { silent?: boolean }) {
     }
 
     if (props.capability.kind === "delivery") {
-      await syncDeliveryTaskPreview();
+      if (silent) {
+        const preferredId = resolveActiveDeliveryTaskId();
+        if (
+          preferredId &&
+          deliveryTasks.value.some((task) => task.taskId === preferredId)
+        ) {
+          if (!activeDeliveryTaskId.value) {
+            activeDeliveryTaskId.value = preferredId;
+          }
+          await refreshActiveDeliveryPreview({ refresh: true });
+        }
+      } else {
+        await syncDeliveryTaskPreview({ autoSelect: true });
+      }
     }
   } catch (error) {
     const text =
@@ -1408,9 +1565,22 @@ watch(
   },
 );
 
-watch(batchTab, (tab) => {
+watch(batchTab, (tab, previousTab) => {
   if (tab === "visual") {
     void ensureLoaded();
+    return;
+  }
+
+  if (tab === "create" && previousTab === "visual") {
+    if (isVisualConfigDirty.value) {
+      syncVisualConfigToCreateTab();
+      return;
+    }
+
+    draftCreateTemplate.value = null;
+    if (visualPreset.value !== NEW_PRESET_VALUE) {
+      createTaskPresetId.value = visualPreset.value;
+    }
   }
 });
 
@@ -1678,7 +1848,7 @@ watch(
   (kind, previousKind) => {
     if (kind !== "delivery" || previousKind === "delivery") return;
 
-    activeDeliveryTaskId.value = null;
+    activeDeliveryTaskId.value = props.previewedDeliveryTaskId ?? null;
     void refreshDeliveryTasks();
   },
 );
@@ -1910,7 +2080,7 @@ const showOutputRatioForGenerate = computed(() => {
 });
 
 const activeCreateRatioLabel = computed(() => {
-  const ratio = activeCreateTemplate.value?.outputRatio;
+  const ratio = effectiveCreateTemplate.value?.outputRatio;
   return getOutputRatioOptionLabel(ratio ?? DEFAULT_BATCH_OUTPUT_RATIO);
 });
 
@@ -1964,7 +2134,7 @@ defineExpose({
             </section>
 
             <section
-              v-if="createTaskPresetId && activeCreateTemplate"
+              v-if="createTaskPresetId && effectiveCreateTemplate"
               class="preset-summary"
             >
               <header class="preset-summary-head">
@@ -1972,22 +2142,28 @@ defineExpose({
                   <Icon icon="mdi:check-decagram" />
                 </span>
                 <div class="preset-summary-copy">
-                  <p>已套用视觉配置</p>
-                  <strong>{{ activeCreateTemplate.name }}</strong>
+                  <p>
+                    {{
+                      createTaskPresetId === DRAFT_CREATE_PRESET_VALUE
+                        ? "已套用未保存配置"
+                        : "已套用视觉配置"
+                    }}
+                  </p>
+                  <strong>{{ effectiveCreateTemplate.name }}</strong>
                 </div>
               </header>
 
               <div class="preset-summary-tags">
                 <span
-                  v-if="activeCreateTemplate.enableSceneChange"
+                  v-if="effectiveCreateTemplate.enableSceneChange"
                   class="preset-tag is-scene"
                 >
                   <Icon icon="mdi:image-filter-hdr" />
-                  {{ activeCreateTemplate.sceneCategory }} ·
+                  {{ effectiveCreateTemplate.sceneCategory }} ·
                   {{
                     getBatchSceneTitle(
-                      activeCreateTemplate.sceneCategory,
-                      activeCreateTemplate.sceneIndex,
+                      effectiveCreateTemplate.sceneCategory,
+                      effectiveCreateTemplate.sceneIndex,
                     )
                   }}
                 </span>
@@ -1996,21 +2172,21 @@ defineExpose({
                   {{ activeCreateRatioLabel }}
                 </span>
                 <span
-                  v-if="activeCreateTemplate.lightConsistency"
+                  v-if="effectiveCreateTemplate.lightConsistency"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:weather-sunny" />
                   光污一致化
                 </span>
                 <span
-                  v-if="activeCreateTemplate.useRecentLogo"
+                  v-if="effectiveCreateTemplate.useRecentLogo"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:badge-account-horizontal-outline" />
                   最近 Logo
                 </span>
                 <span
-                  v-if="activeCreateTemplate.paintRefresh"
+                  v-if="effectiveCreateTemplate.paintRefresh"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:spray" />
@@ -2018,16 +2194,16 @@ defineExpose({
                 </span>
                 <span
                   v-if="
-                    activeCreateTemplate.paintRefresh &&
-                    activeCreateTemplate.colorCode
+                    effectiveCreateTemplate.paintRefresh &&
+                    effectiveCreateTemplate.colorCode
                   "
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:palette" />
-                  {{ activeCreateTemplate.colorCode }}
+                  {{ effectiveCreateTemplate.colorCode }}
                 </span>
                 <span
-                  v-if="activeCreateTemplate.interiorCollage"
+                  v-if="effectiveCreateTemplate.interiorCollage"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:image-multiple-outline" />
@@ -2035,8 +2211,8 @@ defineExpose({
                 </span>
                 <span
                   v-if="
-                    activeCreateTemplate.interiorCollage &&
-                    activeCreateTemplate.interiorEnhance
+                    effectiveCreateTemplate.interiorCollage &&
+                    effectiveCreateTemplate.interiorEnhance
                   "
                   class="preset-tag is-on"
                 >
@@ -2265,22 +2441,19 @@ defineExpose({
             <section class="batch-card preset-save-card">
               <div class="preset-save-row">
                 <span>预设</span>
-                <NSelect
-                  v-model:value="selectedPresetKey"
-                  class="preset-combobox"
-                  :options="visualPresetOptions"
-                  :render-label="renderPresetOptionLabel"
+                <PresetCombobox
+                  v-model="presetInput"
+                  :options="presetComboboxOptions"
                   :loading="isLoadingVisualPresets"
-                  size="large"
-                  filterable
-                  tag
-                  clearable
+                  :on-delete="deletePresetById"
                   placeholder="输入或选择预设名称"
+                  @select="handlePresetComboboxSelect"
                 />
                 <NButton
                   type="primary"
                   size="large"
                   class="batch-primary-btn"
+                  :loading="isSavingVisualPreset"
                   @click="handleSaveVisualPreset"
                 >
                   保存
@@ -3006,6 +3179,12 @@ defineExpose({
   transform: translateY(-50%);
 }
 
+:global(.n-base-select-option .n-base-select-option__content) {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
 :global(.preset-select-option) {
   display: flex;
   min-width: 0;
@@ -3022,12 +3201,18 @@ defineExpose({
   white-space: nowrap;
 }
 
+:global(.preset-option-delete-anchor) {
+  display: flex;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 :global(.preset-option-delete) {
   display: grid;
   width: 26px;
   height: 26px;
   flex: 0 0 26px;
-  margin-left: auto;
+  margin-left: 0;
   place-items: center;
   border: 0;
   border-radius: 8px;
@@ -3045,6 +3230,8 @@ defineExpose({
 
 :global(.n-base-select-option:hover .preset-option-delete),
 :global(.n-base-select-option:focus-within .preset-option-delete),
+:global(.n-base-select-option:hover .preset-option-delete-anchor .preset-option-delete),
+:global(.n-base-select-option:focus-within .preset-option-delete-anchor .preset-option-delete),
 :global(.preset-option-delete.is-deleting) {
   opacity: 1;
   transform: translateX(0);

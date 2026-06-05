@@ -20,7 +20,8 @@ import type {
   PointsTxnType,
 } from "@/types/points-query";
 
-const pageSize = 10;
+const pageSize = ref(10);
+const pageSizeOptions = [10, 20, 30, 50] as const;
 const appStore = useAppStore();
 const authStore = useAuthStore();
 
@@ -339,8 +340,8 @@ const filteredRecords = computed(() => {
 });
 
 const pagedRecords = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return filteredRecords.value.slice(start, start + pageSize);
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredRecords.value.slice(start, start + pageSize.value);
 });
 
 const txnTypeExportNameMap: Record<"" | PointsTxnType, string> = {
@@ -487,7 +488,7 @@ watch(
 watch(filteredRecords, () => {
   const maxPage = Math.max(
     1,
-    Math.ceil(filteredRecords.value.length / pageSize),
+    Math.ceil(filteredRecords.value.length / pageSize.value),
   );
   if (currentPage.value > maxPage) currentPage.value = maxPage;
 });
@@ -538,13 +539,14 @@ watch(filteredRecords, () => {
         <PointsFlowTable
           v-model:current-page="currentPage"
           v-model:filters="filters"
+          v-model:page-size="pageSize"
           glass
           :account-scope-mode="accountScopeMode"
           :child-members="childMembers"
           :selected-child-id="selectedChildId"
           :config="viewConfig"
           :loading="isLoading && usesLiveApi"
-          :page-size="pageSize"
+          :page-size-options="pageSizeOptions"
           :records="pagedRecords"
           :total="filteredRecords.length"
           @export="handleExport"

@@ -145,14 +145,14 @@ onMounted(() => {
   min-height: 40px;
   padding: 0 24px;
   white-space: nowrap;
-  color: var(--home-tab-text, #ffffff);
+  color: var(--home-tab-text, #8a8a8a);
   background: transparent;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 900;
   transition:
     color var(--home-motion-fast, 160ms ease),
     background var(--home-motion-fast, 160ms ease);
@@ -168,9 +168,9 @@ onMounted(() => {
 }
 
 .tab.active {
-  color: var(--home-tab-active-text, #0f172a);
-  background: var(--home-tab-active-bg, #ffffff);
-  font-weight: 700;
+  color: var(--home-tab-active-text, #f3f3f3);
+  background: var(--home-tab-active-bg, transparent);
+  font-weight: 900;
 }
 
 .case-layout {

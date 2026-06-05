@@ -287,10 +287,14 @@ onMounted(() => {
 }
 
 .tech-badge-label {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: clamp(25px, 2.4vw, 30px);
+  font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+}
+
+.section-block.theme-light .tech-badge-label {
+  color: #334155;
 }
 
 .section-block.theme-dark .tech-badge {
@@ -306,6 +310,12 @@ onMounted(() => {
 @media (max-width: 1023px) {
   .badge-row {
     justify-content: center;
+  }
+}
+
+@media (max-width: 700px) {
+  .tech-badge-label {
+    font-size: 13px;
   }
 }
 
@@ -345,10 +355,6 @@ onMounted(() => {
   .tech-badge-icon {
     width: 16px;
     height: 16px;
-  }
-
-  .tech-badge-label {
-    font-size: 13px;
   }
 }
 </style>

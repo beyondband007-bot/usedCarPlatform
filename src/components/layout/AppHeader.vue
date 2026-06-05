@@ -476,7 +476,7 @@ const showHeaderRecharge = computed(
   flex-shrink: 0;
   color: var(--studio-chrome-logo, #121826);
   font-family: inherit;
-  font-size: var(--studio-chrome-logo-size, clamp(18px, 1.45vw, 24px));
+  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -528,8 +528,7 @@ const showHeaderRecharge = computed(
   align-items: center;
   gap: var(--studio-chrome-nav-gap, clamp(18px, 2.2vw, 42px));
   color: var(--studio-chrome-nav, #6b7280);
-  font-size: var(--studio-chrome-nav-size, clamp(13px, 0.95vw, 15px));
-  font-weight: 700;
+  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
 }
 
 .nav-link {
@@ -582,7 +581,7 @@ const showHeaderRecharge = computed(
 
 .nav-link.active {
   color: var(--studio-chrome-nav-active, #111827);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .nav-link--action {
@@ -604,7 +603,7 @@ const showHeaderRecharge = computed(
   color: var(--studio-chrome-credit-text, #111827);
   font-family: inherit;
   font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
@@ -677,16 +676,21 @@ const showHeaderRecharge = computed(
 
 .site-header .header-action-pill.user-menu-trigger--studio {
   max-width: min(100%, 240px);
-  border: 1px solid var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
-  background: var(--studio-chrome-credit-bg, transparent);
-  color: var(--studio-chrome-credit-text, #111827);
+  border: 1px solid var(--studio-chrome-user-border, rgba(15, 23, 42, 0.12));
+  background: var(--studio-chrome-user-bg, transparent);
+  color: var(--studio-chrome-user-text, #111827);
   box-shadow: none;
 }
 
 .site-header .header-action-pill.user-menu-trigger--studio:hover {
-  border-color: var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
-  background: var(--studio-chrome-credit-hover, rgba(15, 23, 42, 0.04));
+  border-color: var(--studio-chrome-user-hover-border, rgba(15, 23, 42, 0.16));
+  background: var(--studio-chrome-user-hover-bg, rgba(15, 23, 42, 0.04));
   box-shadow: none;
+}
+
+.user-menu-trigger--studio .user-menu-name {
+  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  font-weight: 700;
 }
 
 .user-menu-trigger--studio .user-menu-chevron {

@@ -224,13 +224,13 @@ const {
 
   --studio-chrome-nav-underline-active: #efc24c;
 
-  --studio-chrome-credit-bg: transparent;
+  --studio-chrome-credit-bg: #ffffff;
 
-  --studio-chrome-credit-text: #f7f1e4;
+  --studio-chrome-credit-text: #0f172a;
 
   --studio-chrome-credit-border: rgba(255, 255, 255, 0.32);
 
-  --studio-chrome-credit-hover: rgba(255, 255, 255, 0.06);
+  --studio-chrome-credit-hover: rgba(255, 255, 255, 0.92);
 
   --studio-chrome-theme-bg: rgba(255, 255, 255, 0.05);
 
@@ -240,13 +240,13 @@ const {
 
   --studio-chrome-user-border: var(--studio-chrome-credit-border);
 
-  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
+  --studio-chrome-user-bg: rgba(255, 255, 255, 0.05);
 
-  --studio-chrome-user-text: var(--studio-chrome-credit-text);
+  --studio-chrome-user-text: #f7f1e4;
 
   --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
 
-  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
+  --studio-chrome-user-hover-bg: rgba(255, 255, 255, 0.06);
 
   --studio-chrome-avatar-bg: rgba(239, 194, 76, 0.14);
 
@@ -279,24 +279,24 @@ const {
   --studio-chrome-bg: rgb(224, 234, 242);
   --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
-  --studio-chrome-nav: #64748b;
-  --studio-chrome-nav-hover: #475569;
-  --studio-chrome-nav-active: #0f172a;
-  --studio-chrome-nav-underline: #0f172a;
-  --studio-chrome-nav-underline-hover: #0f172a;
-  --studio-chrome-nav-underline-active: #0f172a;
-  --studio-chrome-credit-bg: transparent;
-  --studio-chrome-credit-text: #0f172a;
-  --studio-chrome-credit-border: #0f172a;
-  --studio-chrome-credit-hover: rgba(15, 23, 42, 0.04);
+  --studio-chrome-nav: #475569;
+  --studio-chrome-nav-hover: #2f6bff;
+  --studio-chrome-nav-active: #2f6bff;
+  --studio-chrome-nav-underline: #2f6bff;
+  --studio-chrome-nav-underline-hover: #2f6bff;
+  --studio-chrome-nav-underline-active: #2f6bff;
+  --studio-chrome-credit-bg: #d4a017;
+  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-border: #d4a017;
+  --studio-chrome-credit-hover: rgba(212, 160, 23, 0.88);
   --studio-chrome-theme-bg: #0f172a;
   --studio-chrome-theme-text: #ffffff;
   --studio-chrome-theme-border: transparent;
-  --studio-chrome-user-border: var(--studio-chrome-credit-border);
-  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
-  --studio-chrome-user-text: var(--studio-chrome-credit-text);
-  --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
-  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
+  --studio-chrome-user-border: rgba(15, 23, 42, 0.12);
+  --studio-chrome-user-bg: transparent;
+  --studio-chrome-user-text: #0f172a;
+  --studio-chrome-user-hover-border: rgba(15, 23, 42, 0.16);
+  --studio-chrome-user-hover-bg: rgba(15, 23, 42, 0.04);
   --studio-chrome-subnav-bg: rgb(224, 234, 242);
   --studio-chrome-subnav-border: #d5e0ea;
 
@@ -329,24 +329,24 @@ const {
   --studio-chrome-bg: rgb(224, 234, 242);
   --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
-  --studio-chrome-nav: #64748b;
-  --studio-chrome-nav-hover: #475569;
-  --studio-chrome-nav-active: #0f172a;
-  --studio-chrome-nav-underline: #0f172a;
-  --studio-chrome-nav-underline-hover: #0f172a;
-  --studio-chrome-nav-underline-active: #0f172a;
-  --studio-chrome-credit-bg: transparent;
-  --studio-chrome-credit-text: #0f172a;
-  --studio-chrome-credit-border: #0f172a;
-  --studio-chrome-credit-hover: rgba(15, 23, 42, 0.04);
+  --studio-chrome-nav: #475569;
+  --studio-chrome-nav-hover: #2f6bff;
+  --studio-chrome-nav-active: #2f6bff;
+  --studio-chrome-nav-underline: #2f6bff;
+  --studio-chrome-nav-underline-hover: #2f6bff;
+  --studio-chrome-nav-underline-active: #2f6bff;
+  --studio-chrome-credit-bg: #d4a017;
+  --studio-chrome-credit-text: #ffffff;
+  --studio-chrome-credit-border: #d4a017;
+  --studio-chrome-credit-hover: rgba(212, 160, 23, 0.88);
   --studio-chrome-theme-bg: #0f172a;
   --studio-chrome-theme-text: #ffffff;
   --studio-chrome-theme-border: transparent;
-  --studio-chrome-user-border: var(--studio-chrome-credit-border);
-  --studio-chrome-user-bg: var(--studio-chrome-credit-bg);
-  --studio-chrome-user-text: var(--studio-chrome-credit-text);
-  --studio-chrome-user-hover-border: var(--studio-chrome-credit-border);
-  --studio-chrome-user-hover-bg: var(--studio-chrome-credit-hover);
+  --studio-chrome-user-border: rgba(15, 23, 42, 0.12);
+  --studio-chrome-user-bg: transparent;
+  --studio-chrome-user-text: #0f172a;
+  --studio-chrome-user-hover-border: rgba(15, 23, 42, 0.16);
+  --studio-chrome-user-hover-bg: rgba(15, 23, 42, 0.04);
   --studio-chrome-subnav-bg: rgb(224, 234, 242);
   --studio-chrome-subnav-border: #d5e0ea;
 

@@ -181,10 +181,10 @@ const tutorialTemplatePreviewImages = [
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(212, 160, 23, 0.28);
+  border: 1px solid rgb(255, 192, 0);
   border-radius: 999px;
-  background: rgba(212, 160, 23, 0.08);
-  color: #d4a017;
+  background: rgb(255, 192, 0);
+  color: #000000;
   pointer-events: none;
 }
 

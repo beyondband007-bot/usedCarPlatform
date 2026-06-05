@@ -277,7 +277,7 @@ function isAssetIcon(icon: string) {
 .summary-value {
   color: #0f172a;
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: clamp(20px, 2vw, 26px);
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
 }

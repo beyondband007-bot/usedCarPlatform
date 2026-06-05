@@ -262,12 +262,9 @@ function openPreviewModal() {
 <style scoped lang="scss">
 .upload-task-card {
   --upload-accent-border: var(--workspace-accent, #efc24c);
-  --upload-accent-badge-bg: color-mix(
-    in srgb,
-    var(--workspace-accent, #efc24c) 18%,
-    #1a1508
-  );
-  --upload-accent-badge-text: var(--workspace-accent-strong, #ffd75a);
+  --upload-accent-badge-border: rgb(255, 183, 0);
+  --upload-accent-badge-bg: rgb(255, 183, 0);
+  --upload-accent-badge-text: #000000;
   --upload-surface: var(--workspace-panel-soft, #151515);
   --upload-shadow: var(
     --workspace-shadow,
@@ -281,8 +278,9 @@ function openPreviewModal() {
 
 :global(.workspace-page.theme-light) .upload-task-card {
   --upload-accent-border: var(--workspace-commercial-strong, #d4a017);
-  --upload-accent-badge-bg: var(--workspace-commercial-bg, #fff8e8);
-  --upload-accent-badge-text: var(--workspace-commercial-strong, #d4a017);
+  --upload-accent-badge-border: rgb(255, 183, 0);
+  --upload-accent-badge-bg: rgb(255, 183, 0);
+  --upload-accent-badge-text: #000000;
   --upload-surface: var(--workspace-panel-soft, #f7fafd);
   --upload-shadow: var(
     --workspace-shadow,
@@ -310,14 +308,18 @@ function openPreviewModal() {
 }
 
 .upload-task-card__badge {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
-  padding: 3px 10px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--upload-accent-badge-border);
   border-radius: 999px;
   background: var(--upload-accent-badge-bg);
   color: var(--upload-accent-badge-text);
   font-size: 12px;
-  font-weight: 800;
-  line-height: 1.4;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .upload-task-card__desc {

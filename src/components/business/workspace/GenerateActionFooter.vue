@@ -51,6 +51,8 @@ const emit = defineEmits<{
   z-index: 2;
   flex-shrink: 0;
   padding-top: 12px;
+  --generate-action-bg: #efc24c;
+  --generate-action-text: #000000;
 }
 
 .generate-action-button {
@@ -62,12 +64,12 @@ const emit = defineEmits<{
   padding: 10px 20px;
   border: 0;
   border-radius: 999px;
-  background: var(--workspace-accent, #efc24c);
-  color: #111111;
+  background: var(--generate-action-bg);
+  color: var(--generate-action-text);
   cursor: pointer;
   outline: none;
   box-shadow: 0 8px 22px
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 30%, transparent);
+    color-mix(in srgb, var(--generate-action-bg) 30%, transparent);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -77,13 +79,13 @@ const emit = defineEmits<{
 .generate-action-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 14px 32px
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 42%, transparent);
+    color-mix(in srgb, var(--generate-action-bg) 42%, transparent);
 }
 
 .generate-action-button:focus-visible {
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, transparent),
-    0 10px 28px color-mix(in srgb, var(--workspace-accent, #efc24c) 34%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--generate-action-bg) 28%, transparent),
+    0 10px 28px color-mix(in srgb, var(--generate-action-bg) 34%, transparent);
 }
 
 .generate-action-button:disabled {
@@ -107,11 +109,11 @@ const emit = defineEmits<{
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: rgba(17, 17, 17, 0.72);
+  color: rgba(0, 0, 0, 0.72);
 }
 
 .generate-action-cost {
-  color: rgba(17, 17, 17, 0.76);
+  color: rgba(0, 0, 0, 0.76);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;

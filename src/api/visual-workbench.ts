@@ -1,4 +1,5 @@
 import { normalizeApiErrorMessage, request } from '@/api/http'
+import { compressUploadImage } from '@/utils/compress-upload-image'
 
 export interface ApiResponse<T> {
   code: number
@@ -401,9 +402,10 @@ export async function uploadCarExterior(file: File) {
 }
 
 export async function uploadAsset(file: File, purpose: AssetPurpose) {
+  const uploadFile = await compressUploadImage(file, 'photo')
   const formData = new FormData()
   formData.append('purpose', purpose)
-  formData.append('file', file)
+  formData.append('file', uploadFile)
 
   const response = await request.post<ApiResponse<UploadedAsset>>(
     '/assets/upload',
@@ -420,8 +422,9 @@ export async function getDefaultLogo() {
 }
 
 export async function uploadDefaultLogo(file: File) {
+  const uploadFile = await compressUploadImage(file, 'logo')
   const formData = new FormData()
-  formData.append('file', file)
+  formData.append('file', uploadFile)
 
   const response = await request.post<ApiResponse<UserLogoSetting>>(
     '/user/logo',
@@ -498,9 +501,10 @@ export async function getCreativeImageMessages(conversationId: string) {
 }
 
 export async function uploadCreativeImageReference(conversationId: string, file: File) {
+  const uploadFile = await compressUploadImage(file, 'photo')
   const formData = new FormData()
   formData.append('purpose', 'car_exterior')
-  formData.append('file', file)
+  formData.append('file', uploadFile)
 
   const response = await request.post<ApiResponse<UploadedAsset>>(
     `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/assets`,

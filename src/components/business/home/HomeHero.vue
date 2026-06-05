@@ -136,7 +136,7 @@ const heroImageStyle = computed(
 .hero h1 {
   margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: clamp(22px, 4cqh, 40px);
+  font-size: clamp(22px, 4.8cqh, 46px);
   line-height: 1.12;
   letter-spacing: 0;
   white-space: nowrap;
@@ -146,7 +146,7 @@ const heroImageStyle = computed(
 .subtitle {
   margin: 0;
   color: var(--home-hero-sub, #d5d5d5);
-  font-size: clamp(14px, 1.45cqh, 18px);
+  font-size: clamp(14px, 1.85cqh, 20px);
   line-height: 1.35;
   white-space: nowrap;
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
@@ -190,7 +190,7 @@ const heroImageStyle = computed(
   }
 
   .subtitle {
-    font-size: clamp(14px, 0.92vw, 16px);
+    font-size: clamp(14px, 0.92vw, 20px);
   }
 }
 
@@ -244,6 +244,16 @@ const heroImageStyle = computed(
 
   .subtitle {
     font-size: clamp(16px, 1.55cqh, 20px);
+  }
+}
+
+@media (min-width: 1600px) {
+  .hero h1 {
+    font-size: clamp(28px, 4.2cqh, 54px);
+  }
+
+  .subtitle {
+    font-size: clamp(16px, 1.85cqh, 25px);
   }
 }
 

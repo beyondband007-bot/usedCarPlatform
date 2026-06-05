@@ -201,7 +201,7 @@ function handlePlanConsult() {
   margin: 0;
   color: var(--pricing-hero-text);
   font-size: clamp(30px, min(3.2vw, 4.6vh), 50px);
-  font-weight: 950;
+  font-weight: 900;
   letter-spacing: 0.02em;
   line-height: 1.08;
   white-space: nowrap;

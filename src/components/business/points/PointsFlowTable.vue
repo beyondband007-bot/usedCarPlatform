@@ -24,6 +24,7 @@ const props = defineProps<{
   total: number;
   currentPage: number;
   pageSize: number;
+  pageSizeOptions?: readonly number[];
   loading?: boolean;
   glass?: boolean;
   accountScopeMode?: PointsAccountScopeMode;
@@ -34,6 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:filters": [value: PointsQueryFilters];
   "update:currentPage": [value: number];
+  "update:pageSize": [value: number];
   "update:accountScopeMode": [value: PointsAccountScopeMode];
   selectChildAccount: [childId: string];
   export: [];
@@ -131,6 +133,18 @@ const txnTypeLabelMap: Record<PointsTxnType, string> = {
   refund: "退款",
 };
 
+const defaultPageSizeOptions = [10, 20, 30, 50] as const;
+
+const resolvedPageSizeOptions = computed(() => {
+  const options = props.pageSizeOptions?.length
+    ? props.pageSizeOptions
+    : defaultPageSizeOptions;
+  return options.map((value) => ({
+    value,
+    label: String(value),
+  }));
+});
+
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(props.total / props.pageSize)),
 );
@@ -193,6 +207,12 @@ function getMemberRoleText(record: {
 function setPage(page: number) {
   if (page < 1 || page > totalPages.value || page === props.currentPage) return;
   emit("update:currentPage", page);
+}
+
+function setPageSize(size: number) {
+  if (size === props.pageSize) return;
+  emit("update:pageSize", size);
+  emit("update:currentPage", 1);
 }
 
 function resolveRecordStatus(record: PointsFlowRecord): PointsFlowStatus {
@@ -467,33 +487,48 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
     <div class="points-pagination-bar">
       <span>{{ rangeText }}</span>
-      <div class="points-pagination">
-        <button
-          type="button"
-          :disabled="currentPage === 1"
-          @click="setPage(currentPage - 1)"
-        >
-          <Icon icon="mdi:chevron-left" />
-        </button>
-        <button
-          v-for="page in pageItems"
-          :key="page"
-          type="button"
-          :class="{
-            active: page === currentPage,
-            'is-admin': config.adminTheme,
-          }"
-          @click="setPage(page)"
-        >
-          {{ page }}
-        </button>
-        <button
-          type="button"
-          :disabled="currentPage === totalPages"
-          @click="setPage(currentPage + 1)"
-        >
-          <Icon icon="mdi:chevron-right" />
-        </button>
+      <div class="points-pagination-controls">
+        <div class="points-page-size">
+          <span class="points-page-size-label">每页</span>
+          <NSelect
+            class="points-page-size-select"
+            size="small"
+            :value="pageSize"
+            :options="resolvedPageSizeOptions"
+            :consistent-menu-width="false"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="(value) => setPageSize(Number(value ?? pageSize))"
+          />
+          <span class="points-page-size-label">条</span>
+        </div>
+        <div class="points-pagination">
+          <button
+            type="button"
+            :disabled="currentPage === 1"
+            @click="setPage(currentPage - 1)"
+          >
+            <Icon icon="mdi:chevron-left" />
+          </button>
+          <button
+            v-for="page in pageItems"
+            :key="page"
+            type="button"
+            :class="{
+              active: page === currentPage,
+              'is-admin': config.adminTheme,
+            }"
+            @click="setPage(page)"
+          >
+            {{ page }}
+          </button>
+          <button
+            type="button"
+            :disabled="currentPage === totalPages"
+            @click="setPage(currentPage + 1)"
+          >
+            <Icon icon="mdi:chevron-right" />
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -719,33 +754,48 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
     <div class="points-pagination-bar">
       <span>{{ rangeText }}</span>
-      <div class="points-pagination">
-        <button
-          type="button"
-          :disabled="currentPage === 1"
-          @click="setPage(currentPage - 1)"
-        >
-          <Icon icon="mdi:chevron-left" />
-        </button>
-        <button
-          v-for="page in pageItems"
-          :key="page"
-          type="button"
-          :class="{
-            active: page === currentPage,
-            'is-admin': config.adminTheme,
-          }"
-          @click="setPage(page)"
-        >
-          {{ page }}
-        </button>
-        <button
-          type="button"
-          :disabled="currentPage === totalPages"
-          @click="setPage(currentPage + 1)"
-        >
-          <Icon icon="mdi:chevron-right" />
-        </button>
+      <div class="points-pagination-controls">
+        <div class="points-page-size">
+          <span class="points-page-size-label">每页</span>
+          <NSelect
+            class="points-page-size-select"
+            size="small"
+            :value="pageSize"
+            :options="resolvedPageSizeOptions"
+            :consistent-menu-width="false"
+            :menu-props="{ class: 'points-filter-select-menu' }"
+            @update:value="(value) => setPageSize(Number(value ?? pageSize))"
+          />
+          <span class="points-page-size-label">条</span>
+        </div>
+        <div class="points-pagination">
+          <button
+            type="button"
+            :disabled="currentPage === 1"
+            @click="setPage(currentPage - 1)"
+          >
+            <Icon icon="mdi:chevron-left" />
+          </button>
+          <button
+            v-for="page in pageItems"
+            :key="page"
+            type="button"
+            :class="{
+              active: page === currentPage,
+              'is-admin': config.adminTheme,
+            }"
+            @click="setPage(page)"
+          >
+            {{ page }}
+          </button>
+          <button
+            type="button"
+            :disabled="currentPage === totalPages"
+            @click="setPage(currentPage + 1)"
+          >
+            <Icon icon="mdi:chevron-right" />
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -1162,6 +1212,36 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   font-size: 12px;
 }
 
+.points-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.points-page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.points-page-size-label {
+  color: #94a3b8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.points-page-size-select {
+  width: 72px;
+}
+
+.points-page-size-select :deep(.n-base-selection) {
+  min-height: 28px;
+}
+
+.points-page-size-select :deep(.n-base-selection-label) {
+  font-size: 12px;
+}
+
 .points-pagination {
   display: flex;
   align-items: center;
@@ -1231,6 +1311,13 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   .points-pagination-bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .points-pagination-controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .points-recharge-button {
@@ -1417,6 +1504,10 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card.theme-dark .points-pagination-bar > span {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-page-size-label {
   color: #9ca3af;
 }
 
@@ -2146,6 +2237,13 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   .points-flow-card--design .points-pagination-bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .points-flow-card--design .points-pagination-controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 }
 

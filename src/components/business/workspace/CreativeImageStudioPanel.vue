@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NDropdown, NInput, NSelect } from 'naive-ui'
 
@@ -8,16 +8,19 @@ import {
   creativeImageAspectRatios,
   creativeImageDefaultOutputRatio,
   creativeImageDefaultPreview,
-  creativeImagePromptMaxLength,
 } from '@/constants/creative-image-studio'
 import type { CreativeThreadTurn, WorkspaceCapability, WorkspaceGenerateResult } from '@/types/workspace'
 import { useAppStore } from '@/stores/app'
 import type { CreativeImageConversation, UploadedAsset } from '@/api/visual-workbench'
 import { downloadFile } from '@/utils/download'
+import { useAuthStore } from '@/stores/auth'
+import { useCreditsStore } from '@/stores/credits'
 
 const CREATIVE_DOWNLOAD_FILENAME = '汽车图片.jpg'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const creditsStore = useCreditsStore()
 
 const props = defineProps<{
   capability: WorkspaceCapability
@@ -71,13 +74,19 @@ const activeRatio = computed(
     creativeImageAspectRatios[0],
 )
 
-const promptLength = computed(() => prompt.value.length)
 const canSubmit = computed(
   () =>
     prompt.value.trim().length > 0 &&
     !props.isGenerating &&
     pendingTurns.value.length === 0,
 )
+
+const creditsBalanceText = computed(() => {
+  if (creditsStore.accountsLoaded) {
+    return Number(creditsStore.availableBalance ?? 0).toLocaleString('zh-CN')
+  }
+  return authStore.credits
+})
 
 const activeConversation = computed(() =>
   props.conversations?.find((item) => item.conversationId === props.activeConversationId) ?? null,
@@ -206,6 +215,12 @@ watch(
 
 onUnmounted(() => {
   clearPendingReferencePreview()
+})
+
+onMounted(() => {
+  if (authStore.isLoggedIn && !creditsStore.accountsLoaded) {
+    void creditsStore.hydrateAccounts()
+  }
 })
 
 function resolveConversationTitle(conversation: CreativeImageConversation) {
@@ -407,86 +422,6 @@ function toggleSidebar() {
     ]"
     aria-label="创意生图工作台"
   >
-    <aside class="creative-sidebar" aria-label="创意生图会话" :aria-hidden="sidebarCollapsed">
-      <header class="creative-sidebar-head">
-        <strong>开启创作</strong>
-        <button type="button" aria-label="折叠会话栏" @click="toggleSidebar">
-          <Icon icon="mdi:dock-left" />
-        </button>
-      </header>
-
-      <button
-        type="button"
-        class="creative-new-chat"
-        :disabled="props.isNewConversationDisabled"
-        @click="emit('newConversation')"
-      >
-        <Icon icon="mdi:pencil-outline" />
-        新对话
-      </button>
-
-      <section class="creative-recent">
-        <p>最近</p>
-        <div class="creative-recent-list">
-          <div
-            v-for="conversation in recentConversations"
-            :key="conversation.conversationId"
-            class="creative-recent-item"
-            :class="{ active: conversation.conversationId === props.activeConversationId }"
-            role="button"
-            tabindex="0"
-            @click="selectRecentConversation(conversation.conversationId)"
-            @keydown.enter.prevent="
-              selectRecentConversation(conversation.conversationId)
-            "
-            @keydown.space.prevent="
-              selectRecentConversation(conversation.conversationId)
-            "
-          >
-            <span class="creative-recent-thumb">
-              <PreloadImage
-                :key="`${conversation.conversationId}-${resolveConversationThumb(conversation)}`"
-                :src="resolveConversationThumb(conversation)"
-                :alt="resolveConversationTitle(conversation)"
-                fit="cover"
-              />
-            </span>
-            <span class="creative-recent-label">
-              {{ resolveConversationTitle(conversation) }}
-            </span>
-            <NDropdown
-              trigger="click"
-              placement="bottom-end"
-              :options="recentConversationMenuOptions"
-              @select="
-                (key) =>
-                  handleRecentConversationMenuSelect(
-                    key,
-                    conversation.conversationId,
-                  )
-              "
-            >
-              <button
-                type="button"
-                class="creative-recent-more"
-                aria-label="更多操作"
-                @click.stop
-              >
-                <Icon icon="mdi:dots-horizontal" />
-              </button>
-            </NDropdown>
-          </div>
-        </div>
-      </section>
-
-      <footer class="creative-sidebar-foot">
-        <span class="creative-credit">
-          <Icon icon="mdi:star-four-points" />
-          {{ props.capability.balance }} 积分
-        </span>
-      </footer>
-    </aside>
-
     <main class="creative-main" :class="{ 'is-empty': !hasConversation }">
       <button
         v-if="sidebarCollapsed"
@@ -495,7 +430,7 @@ function toggleSidebar() {
         aria-label="展开会话栏"
         @click="toggleSidebar"
       >
-        <Icon icon="mdi:dock-right" />
+        <Icon icon="mdi:dock-left" />
       </button>
 
       <div class="creative-main-stack">
@@ -639,7 +574,7 @@ function toggleSidebar() {
       </Teleport>
 
       <section
-        class="creative-composer creative-content-shell"
+        class="creative-composer creative-composer-shell"
         :class="{ 'is-inline': !hasConversation, 'is-docked': hasConversation }"
         aria-label="创意输入"
       >
@@ -674,44 +609,16 @@ function toggleSidebar() {
           </div>
         </div>
 
-        <div class="creative-composer-row">
-          <button
-            type="button"
-            class="creative-upload"
-            :class="{ 'is-spinning': props.isGenerating || props.isUploadingReference }"
-            :disabled="props.isGenerating || pendingTurns.length > 0"
-            aria-label="上传参考图"
-            @click="openReferencePicker"
-          >
-            <Icon v-if="props.isUploadingReference" icon="mdi:loading" />
-            <Icon v-else icon="mdi:plus" />
-          </button>
-          <input
-            ref="fileInputRef"
-            class="creative-hidden-input"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            @change="handleReferenceSelected"
-          />
+        <div class="creative-composer-body">
           <NInput
             v-model:value="prompt"
             class="creative-prompt-input"
             type="textarea"
             size="small"
-            :maxlength="creativeImagePromptMaxLength"
             placeholder="输入想法、脚本或上传参考图，描述你想生成的汽车创意图片"
-            :autosize="{ minRows: 3, maxRows: 5 }"
+            :autosize="{ minRows: 3, maxRows: 10 }"
             @keydown="handlePromptKeydown"
           />
-          <button
-            type="button"
-            class="creative-submit"
-            :disabled="!canSubmit"
-            :aria-label="`生成创意图，消耗 ${props.capability.cost} 积分`"
-            @click="handleSubmit"
-          >
-            <Icon :icon="props.isGenerating ? 'mdi:stop' : 'mdi:arrow-up'" />
-          </button>
         </div>
 
         <footer class="creative-composer-foot">
@@ -726,13 +633,118 @@ function toggleSidebar() {
                 class="creative-ratio-select"
               />
             </div>
-            <span class="creative-prompt-count">
-              {{ promptLength }}/{{ creativeImagePromptMaxLength }}
-            </span>
+            <button
+              type="button"
+              class="creative-submit"
+              :disabled="!canSubmit"
+              :aria-label="`生成创意图，消耗 ${props.capability.cost} 积分`"
+              @click="handleSubmit"
+            >
+              <Icon :icon="props.isGenerating ? 'mdi:stop' : 'mdi:arrow-up'" />
+            </button>
           </div>
         </footer>
+
+        <button
+          type="button"
+          class="creative-upload creative-upload-anchor"
+          :class="{ 'is-spinning': props.isGenerating || props.isUploadingReference }"
+          :disabled="props.isGenerating || pendingTurns.length > 0"
+          aria-label="上传参考图"
+          @click="openReferencePicker"
+        >
+          <Icon v-if="props.isUploadingReference" icon="mdi:loading" />
+          <Icon v-else icon="mdi:plus" />
+        </button>
+        <input
+          ref="fileInputRef"
+          class="creative-hidden-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          @change="handleReferenceSelected"
+        />
       </section>
     </main>
+
+    <aside class="creative-sidebar" aria-label="创意生图会话" :aria-hidden="sidebarCollapsed">
+      <header class="creative-sidebar-head">
+        <button type="button" aria-label="折叠会话栏" @click="toggleSidebar">
+          <Icon icon="mdi:dock-right" />
+        </button>
+        <strong>开启创作</strong>
+      </header>
+
+      <button
+        type="button"
+        class="creative-new-chat"
+        :disabled="props.isNewConversationDisabled"
+        @click="emit('newConversation')"
+      >
+        <Icon icon="mdi:pencil-outline" />
+        新对话
+      </button>
+
+      <section class="creative-recent">
+        <p>最近</p>
+        <div class="creative-recent-list">
+          <div
+            v-for="conversation in recentConversations"
+            :key="conversation.conversationId"
+            class="creative-recent-item"
+            :class="{ active: conversation.conversationId === props.activeConversationId }"
+            role="button"
+            tabindex="0"
+            @click="selectRecentConversation(conversation.conversationId)"
+            @keydown.enter.prevent="
+              selectRecentConversation(conversation.conversationId)
+            "
+            @keydown.space.prevent="
+              selectRecentConversation(conversation.conversationId)
+            "
+          >
+            <span class="creative-recent-thumb">
+              <PreloadImage
+                :key="`${conversation.conversationId}-${resolveConversationThumb(conversation)}`"
+                :src="resolveConversationThumb(conversation)"
+                :alt="resolveConversationTitle(conversation)"
+                fit="cover"
+              />
+            </span>
+            <span class="creative-recent-label">
+              {{ resolveConversationTitle(conversation) }}
+            </span>
+            <NDropdown
+              trigger="click"
+              placement="bottom-end"
+              :options="recentConversationMenuOptions"
+              @select="
+                (key) =>
+                  handleRecentConversationMenuSelect(
+                    key,
+                    conversation.conversationId,
+                  )
+              "
+            >
+              <button
+                type="button"
+                class="creative-recent-more"
+                aria-label="更多操作"
+                @click.stop
+              >
+                <Icon icon="mdi:dots-horizontal" />
+              </button>
+            </NDropdown>
+          </div>
+        </div>
+      </section>
+
+      <footer class="creative-sidebar-foot">
+        <span class="creative-credit">
+          <Icon icon="mdi:star-four-points" />
+          {{ creditsBalanceText }} 积分
+        </span>
+      </footer>
+    </aside>
   </section>
 </template>
 
@@ -766,9 +778,12 @@ function toggleSidebar() {
   --creative-scroll-thumb-hover: rgba(255, 255, 255, 0.68);
 
   display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
   flex: 1;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   overflow: hidden;
   background: var(--creative-bg);
   color: var(--creative-text);
@@ -806,24 +821,29 @@ function toggleSidebar() {
   width: 304px;
   min-width: 0;
   min-height: 0;
+  flex-shrink: 0;
   grid-template-rows: auto auto 1fr auto;
   gap: 22px;
   overflow: hidden;
-  border-right: 1px solid var(--creative-line);
+  margin: 12px 12px 12px 24px;
+  border-left: 1px solid var(--creative-line);
   background: var(--creative-sidebar-bg);
   padding: 24px 22px;
   transition:
     width 0.24s ease,
     padding 0.24s ease,
+    margin 0.24s ease,
     opacity 0.2s ease,
     border-color 0.24s ease;
 }
 
 .creative-app.sidebar-collapsed .creative-sidebar {
   width: 0;
+  margin-left: 0;
+  margin-right: 0;
   padding-inline: 0;
   opacity: 0;
-  border-right-color: transparent;
+  border-left-color: transparent;
   pointer-events: none;
 }
 
@@ -836,7 +856,8 @@ function toggleSidebar() {
 }
 
 .creative-sidebar-head {
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .creative-sidebar-head strong {
@@ -876,7 +897,8 @@ function toggleSidebar() {
 .creative-sidebar-expand {
   position: absolute;
   top: 18px;
-  left: 18px;
+  right: 18px;
+  left: auto;
   z-index: 2;
   display: grid;
   place-items: center;
@@ -1068,17 +1090,24 @@ function toggleSidebar() {
 .creative-main {
   position: relative;
   display: grid;
-  width: 100%;
   min-width: 0;
+  max-width: 100%;
   min-height: 0;
+  align-self: stretch;
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   overflow: hidden;
   border: 1px solid var(--creative-line);
   border-radius: 14px;
-  margin: 12px 24px 12px 12px;
+  margin: 12px 0 12px 24px;
   background: var(--creative-main-glow), var(--creative-main-bg);
+}
+
+.creative-composer-shell {
+  width: 50%;
+  max-width: var(--creative-content-max);
+  margin-inline: auto;
 }
 
 .creative-content-shell {
@@ -1155,14 +1184,23 @@ function toggleSidebar() {
 
 .creative-empty-state {
   display: grid;
-  align-content: center;
   justify-items: center;
   gap: 34px;
-  padding: 40px 0 0;
+  width: 100%;
+  padding: 0;
+}
+
+.creative-main.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
 }
 
 .creative-main.is-empty .creative-composer.is-inline {
   flex: 0 0 auto;
+  grid-row: auto;
   margin-top: 34px;
   margin-bottom: 40px;
 }
@@ -1236,14 +1274,6 @@ function toggleSidebar() {
   border: 2px solid color-mix(in srgb, var(--creative-accent) 20%, transparent);
   border-top-color: var(--creative-accent);
   animation: creative-spin 0.9s linear infinite;
-}
-
-.creative-main.is-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: auto;
 }
 
 .creative-result-card {
@@ -1383,18 +1413,25 @@ function toggleSidebar() {
 }
 
 .creative-composer {
+  position: relative;
   box-sizing: border-box;
   border: 1px solid var(--creative-line);
   border-radius: 16px;
   background: var(--creative-composer-bg);
-  padding: 16px 18px 14px;
+  padding: 16px 18px 14px 66px;
   box-shadow: var(--creative-composer-shadow);
 }
 
-.creative-composer-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+.creative-composer-body {
+  min-width: 0;
+}
+
+.creative-upload-anchor {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  z-index: 2;
+  margin-top: 0;
 }
 
 .creative-upload {
@@ -1451,6 +1488,8 @@ function toggleSidebar() {
 .creative-prompt-input :deep(textarea) {
   box-sizing: border-box;
   min-height: calc(15px * 1.7 * 3 + 16px);
+  max-height: calc(15px * 1.7 * 10 + 16px);
+  overflow-y: auto !important;
   padding: 8px !important;
   margin: 0;
   color: var(--creative-text);
@@ -1491,16 +1530,8 @@ function toggleSidebar() {
 .creative-submit-row {
   gap: 8px;
   width: 100%;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
-}
-
-.creative-prompt-count {
-  margin-left: auto;
-  color: var(--creative-muted);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .creative-submit {
@@ -1513,7 +1544,7 @@ function toggleSidebar() {
   background: var(--creative-submit-bg);
   color: var(--creative-submit-text);
   font-size: 18px;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .creative-ratio-field {
@@ -1541,6 +1572,7 @@ function toggleSidebar() {
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 12px;
+  margin-left: 48px;
 }
 
 .creative-attachment {
@@ -1640,6 +1672,10 @@ function toggleSidebar() {
     width: 264px;
   }
 
+  .creative-composer-shell {
+    width: min(68%, 960px);
+  }
+
   .creative-composer-foot {
     align-items: stretch;
   }
@@ -1653,6 +1689,18 @@ function toggleSidebar() {
 @media (max-width: 860px) {
   .creative-app {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creative-composer-shell {
+    width: 100%;
+  }
+
+  .creative-main {
+    margin: 12px;
+  }
+
+  .creative-sidebar {
+    margin: 0;
   }
 
   .creative-sidebar,

@@ -51,13 +51,15 @@ const optionRows = computed(() => {
       :aria-disabled="disabled || undefined"
     >
       <header class="option-selector-head">
-        <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
-        <span
-          v-if="capability.kind === 'scene'"
-          class="option-selector-badge"
-        >
-          必选
-        </span>
+        <div class="option-selector-head-main">
+          <h2 class="option-selector-title">{{ capability.selectorTitle }}</h2>
+          <span
+            v-if="capability.kind === 'scene'"
+            class="option-selector-badge"
+          >
+            必选
+          </span>
+        </div>
       </header>
 
       <div class="option-scroll-shell">
@@ -128,16 +130,33 @@ const optionRows = computed(() => {
   box-shadow: var(--workspace-shadow, 0 18px 60px rgba(15, 23, 42, 0.08));
 }
 
+.option-selector-card.is-scene {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 :global([data-theme="dark"]) .option-selector-card {
   box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
+}
+
+:global([data-theme="dark"]) .option-selector-card.is-scene {
+  box-shadow: none;
 }
 
 .option-selector-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 14px;
+}
+
+.option-selector-head-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .option-selector-title {
@@ -149,16 +168,23 @@ const optionRows = computed(() => {
 }
 
 .option-selector-card.is-scene .option-selector-title {
-  color: #f2ca50;
+  color: #000000;
   font-weight: 600;
+}
+
+:global(.workspace-page.theme-dark)
+  .option-selector-card.is-scene
+  .option-selector-title {
+  color: var(--app-text);
 }
 
 .option-selector-badge {
   flex-shrink: 0;
   padding: 2px 8px;
   border-radius: 6px;
-  background: var(--workspace-accent, #d4a017);
-  color: #111111;
+  border: 1px solid rgb(255, 183, 0);
+  background: rgb(255, 183, 0);
+  color: #000000;
   font-size: 12px;
   font-weight: 800;
   line-height: 1.4;
@@ -169,10 +195,10 @@ const optionRows = computed(() => {
   align-items: center;
   height: 24px;
   padding: 0 10px;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgb(255, 183, 0);
   border-radius: 999px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
+  background: rgb(255, 183, 0);
+  color: #000000;
   font-size: 12px;
   font-weight: 600;
   line-height: 1;

@@ -226,17 +226,15 @@ onMounted(() => {
   .suite-card-copy {
     padding: 40px 28px 24px;
   }
-
-  .suite-card h2 {
-    font-size: 24px;
-  }
 }
 
 @media (max-width: 767px) {
   .suite-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 700px) {
   .suite-card div,
   .suite-card-copy {
     max-width: 72%;
