@@ -203,7 +203,7 @@ export function buildPersonalSummaryCards(input: {
 export function buildTeamSummaryCards(input: {
   availableBalance: number
   records: PointsFlowRecord[]
-  memberCount: number
+  memberCount?: number
 }): PointsSummaryCard[] {
   const personalCards = buildPersonalSummaryCards({
     availableBalance: input.availableBalance,
@@ -213,7 +213,7 @@ export function buildTeamSummaryCards(input: {
   return [
     {
       key: 'teamAvailableBalance',
-      label: '当前团队可用总余额',
+      label: '团队可用总余额',
       value: personalCards[0]?.value ?? '0',
       unit: '积分',
       icon: 'mdi:bank-outline',
@@ -229,7 +229,7 @@ export function buildTeamSummaryCards(input: {
     },
     {
       key: 'totalConsumed',
-      label: '累计消耗',
+      label: '累计消费',
       value: personalCards[2]?.value ?? '0',
       unit: '积分',
       icon: 'mdi:shopping-outline',
@@ -238,7 +238,7 @@ export function buildTeamSummaryCards(input: {
     {
       key: 'memberCount',
       label: '团队人数',
-      value: formatPoints(input.memberCount),
+      value: formatPoints(input.memberCount ?? 0),
       unit: '人',
       icon: 'mdi:account-group-outline',
       tone: 'violet',

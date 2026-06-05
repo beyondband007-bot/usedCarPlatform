@@ -268,6 +268,14 @@ export function usePointsQuery() {
       childMembers.value = mapTeamMembers(overview.members, authStore.userInfo)
       activeAccount.value = overview.account
 
+      if (overview.account) {
+        creditsStore.$patch({
+          accounts: [overview.account],
+          accountsLoaded: true,
+          lastError: null,
+        })
+      }
+
       if (!selectedChildId.value || !childMembers.value.some((item) => item.id === selectedChildId.value)) {
         selectedChildId.value = null
       }

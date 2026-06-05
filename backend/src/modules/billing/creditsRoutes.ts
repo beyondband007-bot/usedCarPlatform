@@ -7,6 +7,7 @@ import { ok } from "../../shared/response";
 import { getRequiredCurrentUser, requirePermission } from "../auth/authMiddleware";
 import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import { getCreditsAdminOverview } from "./creditsAdminService";
+import { loadFallbackCreditsAccount, pickCreditsAccount } from "./creditsAccountLookupService";
 import { resolveBillingIdentity } from "./billingIdentity";
 import { creditsClient, type CreditAccountResponse } from "./creditsClient";
 import { resolveChildCreditsIdentity } from "../enterprise/enterpriseMembersService";
@@ -77,29 +78,6 @@ const resolveTransactionIdentity = async (
   return resolveProxyIdentity(query, headers);
 };
 
-const selectTransactionAccount = (
-  accounts: CreditAccountResponse[],
-  input: {
-    accountId: number | null;
-    accountScope: "personal" | "tenant";
-    tenantId?: number;
-  },
-) => {
-  if (input.accountId) {
-    return accounts.find((account) => account.id === input.accountId) ?? null;
-  }
-  if (input.accountScope === "tenant") {
-    return (
-      accounts.find(
-        (account) =>
-          account.accountScope === "tenant" &&
-          (input.tenantId === undefined || account.tenantId === input.tenantId),
-      ) ?? null
-    );
-  }
-  return accounts.find((account) => account.accountScope === "personal") ?? accounts[0] ?? null;
-};
-
 export const creditsRoutes = Router();
 
 creditsRoutes.get(
@@ -126,7 +104,15 @@ creditsRoutes.get(
   "/accounts",
   asyncHandler(async (req, res) => {
     const identity = await resolveProxyIdentity(req.query as Record<string, unknown>, req.headers);
-    ok(res, await creditsClient.listAccounts({ userId: identity.userId }));
+    const accountsResult = await creditsClient.listAccounts({ userId: identity.userId });
+    const fallbackAccount = await loadFallbackCreditsAccount(identity);
+
+    ok(res, {
+      accounts:
+        accountsResult.accounts.length || !fallbackAccount
+          ? accountsResult.accounts
+          : [fallbackAccount],
+    });
   }),
 );
 
@@ -137,18 +123,32 @@ creditsRoutes.get(
     const identity = await resolveTransactionIdentity(query, req.headers);
     const accountId = parsePositiveInteger(query.accountId, "accountId");
     const limit = parseLimit(query.limit);
+    const requestedScope = parseAccountScope(query.accountScope) ?? identity.accountScope;
+    const requestedTenantId =
+      parsePositiveInteger(query.tenantId ?? query.creditsTenantId, "tenantId") ?? identity.tenantId;
     const accountsResult = await creditsClient.listAccounts({ userId: identity.userId });
-    const account = selectTransactionAccount(accountsResult.accounts, {
-      accountId,
-      accountScope: parseAccountScope(query.accountScope) ?? identity.accountScope,
-      tenantId: parsePositiveInteger(query.tenantId ?? query.creditsTenantId, "tenantId") ?? identity.tenantId,
-    });
+    let account =
+      accountId
+        ? accountsResult.accounts.find((item) => item.id === accountId) ?? null
+        : pickCreditsAccount(accountsResult.accounts, {
+            accountScope: requestedScope,
+            tenantId: requestedTenantId,
+          });
+
+    if (!account) {
+      const fallbackAccount = await loadFallbackCreditsAccount({
+        userId: identity.userId,
+        accountScope: requestedScope,
+        tenantId: requestedTenantId,
+      });
+      account = !accountId || fallbackAccount?.id === accountId ? fallbackAccount : null;
+    }
 
     if (!account) {
       throw errors.invalidParameter("credit account not found for transaction query", {
         accountId,
-        accountScope: identity.accountScope,
-        tenantId: identity.tenantId ?? null,
+        accountScope: requestedScope,
+        tenantId: requestedTenantId ?? null,
       });
     }
 
