@@ -8,7 +8,10 @@ import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import type { AuthenticatedUser, SubscriptionPlanCode, UserRole } from "../auth/authTypes";
 import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
-import { ensurePersonalCreditsAccount } from "../billing/creditsAccountLinkService";
+import {
+  ensurePersonalCreditsAccount,
+  ensureTenantCreditsBundle,
+} from "../billing/creditsAccountLinkService";
 import type { AccountCreationTargetRole, AccountCreationTargetScope } from "./accountCreationPolicyDefaults";
 import { accountCreationPolicyService } from "./accountCreationPolicyService";
 
@@ -55,10 +58,18 @@ export type PlatformUserCreationResponse = {
   };
   creditsAccount: {
     userId: number;
+    tenantId?: number | null;
     accountId: number;
     totalBalance: string;
     availableBalance: string;
   };
+  childAccounts?: Array<{
+    id: string;
+    username: string;
+    displayName: string;
+    creditsUserId: number;
+    accountScope: "tenant";
+  }>;
   applicationLink: {
     id: string;
     applicationCode: string;
@@ -241,6 +252,28 @@ function targetRoleToAppRole(targetRole: PlatformUserCreationTargetRole): UserRo
   return targetRole === "user" ? "enterprise" : targetRole;
 }
 
+function shouldCreateFlagshipTenant(input: NormalizedPlatformUserCreationInput) {
+  return input.targetRole === "user" && input.planCode === "flagship";
+}
+
+function flagshipChildUsername(username: string, index: number) {
+  return `${username.slice(0, 24)}_child_${index}`;
+}
+
+function buildFlagshipChildDrafts(input: NormalizedPlatformUserCreationInput) {
+  return [1, 2, 3].map((index) => {
+    const username = flagshipChildUsername(input.username, index);
+    return {
+      id: createId("user"),
+      username,
+      displayName: `${input.displayName} 子账号 ${index}`,
+      email: `${username}@used-car.local`,
+      memberRole: index === 1 ? "admin" : "member",
+      creditsRole: index === 1 ? "admin" : "employee",
+    } as const;
+  });
+}
+
 async function reserveIdempotency(operator: AuthenticatedUser, idempotencyKey: string, requestHash: string) {
   const id = createId("puci");
   const [result] = await pool.query<ResultSetHeader>(
@@ -306,14 +339,14 @@ async function failIdempotency(id: string) {
   );
 }
 
-async function usernameOrPhoneExists(username: string, phone: string | null) {
+async function usernamesOrPhoneExist(usernames: string[], phone: string | null) {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT id
      FROM app_users
-     WHERE username = :username
+     WHERE username IN (:usernames)
         OR (:phone IS NOT NULL AND phone = :phone)
      LIMIT 1`,
-    { username, phone },
+    { usernames, phone },
   );
   return rows.length > 0;
 }
@@ -391,6 +424,8 @@ export async function createPlatformUser(
   }
 
   const input = normalizePlatformUserCreationInput(payload);
+  const createsFlagshipTenant = shouldCreateFlagshipTenant(input);
+  const effectiveAccountScope: AccountCreationTargetScope = createsFlagshipTenant ? "tenant" : input.accountScope;
   const requestHash = platformUserCreationRequestHash(input);
   const reservation = await reserveIdempotency(current.user, input.idempotencyKey, requestHash);
   if (reservation.replay) return reservation.replay;
@@ -399,7 +434,7 @@ export async function createPlatformUser(
     const policyDecision = await accountCreationPolicyService.canCreateAccount(
       { userId: current.user.id, roleCode: current.user.role },
       input.targetRole,
-      input.accountScope,
+      effectiveAccountScope,
     );
     if (!policyDecision.allowed) {
       await writeDeniedAudit({
@@ -410,7 +445,7 @@ export async function createPlatformUser(
         reason: policyDecision.reason,
         idempotencyKey: input.idempotencyKey,
         requestHash,
-        accountScope: input.accountScope,
+        accountScope: effectiveAccountScope,
       });
       throw errors.forbidden("account creation policy denied this request", {
         reason: policyDecision.reason,
@@ -418,16 +453,35 @@ export async function createPlatformUser(
       });
     }
 
-    if (await usernameOrPhoneExists(input.username, input.phone)) {
+    const childDrafts = createsFlagshipTenant ? buildFlagshipChildDrafts(input) : [];
+    if (await usernamesOrPhoneExist([input.username, ...childDrafts.map((child) => child.username)], input.phone)) {
       throw errors.conflict("username or phone already exists");
     }
 
-    const credits = await ensurePersonalCreditsAccount({
-      email: input.email,
-      initialPoints: input.initialPoints,
-    });
+    const tenantCredits = createsFlagshipTenant
+      ? await ensureTenantCreditsBundle({
+          tenantName: `${input.username} 旗舰共享积分账户`,
+          initialPoints: input.initialPoints,
+          members: [
+            { email: input.email, role: "owner" },
+            ...childDrafts.map((child) => ({
+              email: child.email,
+              role: child.creditsRole,
+            })),
+          ],
+        })
+      : null;
+    const credits =
+      tenantCredits ??
+      (await ensurePersonalCreditsAccount({
+        email: input.email,
+        initialPoints: input.initialPoints,
+      }));
+    const creditsTenantId = tenantCredits?.tenantId ?? null;
+    const tenantMemberUserIds = tenantCredits?.memberUserIds ?? [];
 
     const appUserId = createId("user");
+    const appTenantId = createsFlagshipTenant ? createId("tenant") : null;
     const appRole = targetRoleToAppRole(input.targetRole);
     const applicationLinkId = createId("acl");
     const agentRelationId = current.user.role === "agent" && input.targetRole === "user" ? createId("acr") : null;
@@ -438,9 +492,11 @@ export async function createPlatformUser(
 
         await connection.query(
           `INSERT INTO app_users
-            (id, username, phone, password_hash, display_name, status, credits_user_id, account_scope)
+            (id, username, phone, password_hash, display_name, status,
+             credits_user_id, credits_tenant_id, account_scope)
            VALUES
-            (:id, :username, :phone, :passwordHash, :displayName, 'active', :creditsUserId, :accountScope)`,
+            (:id, :username, :phone, :passwordHash, :displayName, 'active',
+             :creditsUserId, :creditsTenantId, :accountScope)`,
           {
             id: appUserId,
             username: input.username,
@@ -448,7 +504,8 @@ export async function createPlatformUser(
             passwordHash: hashPassword(input.password),
             displayName: input.displayName,
             creditsUserId: credits.userId,
-            accountScope: input.accountScope,
+            creditsTenantId,
+            accountScope: effectiveAccountScope,
           },
         );
 
@@ -485,17 +542,21 @@ export async function createPlatformUser(
             (id, application_code, user_id, credits_user_id, account_scope, credits_tenant_id,
              created_by_user_id, created_by_role_code, status, metadata_json)
            VALUES
-            (:id, :applicationCode, :userId, :creditsUserId, :accountScope, NULL,
+            (:id, :applicationCode, :userId, :creditsUserId, :accountScope, :creditsTenantId,
              :createdByUserId, :createdByRoleCode, 'active', :metadataJson)`,
           {
             id: applicationLinkId,
             applicationCode: input.applicationCode,
             userId: appUserId,
             creditsUserId: credits.userId,
-            accountScope: input.accountScope,
+            accountScope: effectiveAccountScope,
+            creditsTenantId,
             createdByUserId: current.user.id,
             createdByRoleCode: current.user.role,
-            metadataJson: JSON.stringify({ targetRole: input.targetRole }),
+            metadataJson: JSON.stringify({
+              targetRole: input.targetRole,
+              enterpriseAccountRole: createsFlagshipTenant ? "mother" : "standalone",
+            }),
           },
         );
 
@@ -518,6 +579,117 @@ export async function createPlatformUser(
           );
         }
 
+        if (createsFlagshipTenant && appTenantId && tenantCredits) {
+          await connection.query(
+            `INSERT INTO enterprise_tenants
+              (id, name, owner_user_id, subscription_user_id, status)
+             VALUES
+              (:id, :name, :ownerUserId, :subscriptionUserId, 'active')`,
+            {
+              id: appTenantId,
+              name: `${input.username} 旗舰共享积分账户`,
+              ownerUserId: appUserId,
+              subscriptionUserId: appUserId,
+            },
+          );
+
+          await connection.query(
+            `INSERT INTO enterprise_members
+              (id, tenant_id, user_id, member_role, status)
+             VALUES
+              (:id, :tenantId, :userId, 'owner', 'active')`,
+            {
+              id: createId("em"),
+              tenantId: appTenantId,
+              userId: appUserId,
+            },
+          );
+
+          for (const [index, child] of childDrafts.entries()) {
+            const childCreditsUserId = tenantMemberUserIds[index + 1];
+            await connection.query(
+              `INSERT INTO app_users
+                (id, username, phone, password_hash, display_name, status,
+                 credits_user_id, credits_tenant_id, account_scope)
+               VALUES
+                (:id, :username, NULL, :passwordHash, :displayName, 'active',
+                 :creditsUserId, :creditsTenantId, 'tenant')`,
+              {
+                id: child.id,
+                username: child.username,
+                passwordHash: hashPassword(input.password),
+                displayName: child.displayName,
+                creditsUserId: childCreditsUserId,
+                creditsTenantId,
+              },
+            );
+
+            await connection.query(
+              `INSERT INTO app_user_roles (user_id, role_code)
+               VALUES (:userId, 'enterprise')`,
+              { userId: child.id },
+            );
+
+            await connection.query(
+              `INSERT INTO enterprise_members
+                (id, tenant_id, user_id, member_role, status)
+               VALUES
+                (:id, :tenantId, :userId, :memberRole, 'active')`,
+              {
+                id: createId("em"),
+                tenantId: appTenantId,
+                userId: child.id,
+                memberRole: child.memberRole,
+              },
+            );
+
+            await connection.query(
+              `INSERT INTO application_customer_links
+                (id, application_code, user_id, credits_user_id, account_scope, credits_tenant_id,
+                 created_by_user_id, created_by_role_code, status, metadata_json)
+               VALUES
+                (:id, :applicationCode, :userId, :creditsUserId, 'tenant', :creditsTenantId,
+                 :createdByUserId, :createdByRoleCode, 'active', :metadataJson)`,
+              {
+                id: createId("acl"),
+                applicationCode: input.applicationCode,
+                userId: child.id,
+                creditsUserId: childCreditsUserId,
+                creditsTenantId,
+                createdByUserId: current.user.id,
+                createdByRoleCode: current.user.role,
+                metadataJson: JSON.stringify({
+                  targetRole: input.targetRole,
+                  enterpriseAccountRole: "child",
+                  parentUserId: appUserId,
+                }),
+              },
+            );
+
+            if (agentRelationId) {
+              await connection.query(
+                `INSERT INTO agent_customer_relations
+                  (id, agent_user_id, customer_user_id, customer_credits_user_id,
+                   application_code, relation_type, status, metadata_json)
+                 VALUES
+                  (:id, :agentUserId, :customerUserId, :customerCreditsUserId,
+                   :applicationCode, 'direct', 'active', :metadataJson)`,
+                {
+                  id: createId("acr"),
+                  agentUserId: current.user.id,
+                  customerUserId: child.id,
+                  customerCreditsUserId: childCreditsUserId,
+                  applicationCode: input.applicationCode,
+                  metadataJson: JSON.stringify({
+                    source: "platform-user-creation",
+                    parentUserId: appUserId,
+                  }),
+                },
+              );
+            }
+          }
+        }
+
         const result: PlatformUserCreationResponse = {
           user: {
             id: appUserId,
@@ -526,14 +698,24 @@ export async function createPlatformUser(
             phone: input.phone,
             role: appRole,
             creditsUserId: credits.userId,
-            accountScope: input.accountScope,
+            accountScope: effectiveAccountScope,
           },
           creditsAccount: {
             userId: credits.userId,
+            tenantId: creditsTenantId,
             accountId: credits.accountId,
             totalBalance: credits.totalBalance,
             availableBalance: credits.availableBalance,
           },
+          childAccounts: createsFlagshipTenant && tenantCredits
+            ? childDrafts.map((child, index) => ({
+                id: child.id,
+                username: child.username,
+                displayName: child.displayName,
+                creditsUserId: tenantMemberUserIds[index + 1],
+                accountScope: "tenant" as const,
+              }))
+            : undefined,
           applicationLink: {
             id: applicationLinkId,
             applicationCode: input.applicationCode,
@@ -572,7 +754,10 @@ export async function createPlatformUser(
             reason: policyDecision.reason,
             idempotencyKey: input.idempotencyKey,
             requestHash,
-            metadataJson: JSON.stringify({ accountScope: input.accountScope }),
+            metadataJson: JSON.stringify({
+              accountScope: effectiveAccountScope,
+              flagshipChildCount: childDrafts.length,
+            }),
           },
         );
 

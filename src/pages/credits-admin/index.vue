@@ -643,6 +643,17 @@ function formatAgentCustomerCount(row: CreditsCustomerProfile) {
   return String(agentCustomerCountByUserId.value.get(row.userId) ?? 0)
 }
 
+function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
+  if (row.enterpriseAccountRole === 'mother') {
+    return row.enterpriseTenantName ? `母账号 · ${row.enterpriseTenantName}` : '母账号'
+  }
+  if (row.enterpriseAccountRole === 'child') {
+    const owner = row.enterpriseOwnerDisplayName || row.enterpriseOwnerUsername || row.enterpriseOwnerUserId
+    return owner ? `子账号 · 母账号 ${owner}` : '子账号'
+  }
+  return '-'
+}
+
 function openDeleteAgentModal(row: PlatformAgentProfile) {
   openDeleteAccountModal(agentProfileToCustomerProfile(row))
 }
@@ -815,7 +826,11 @@ async function handleCreateAccount() {
       initialPoints: Number(createAccountForm.initialPoints ?? 0),
     })
 
-    message.success(`已创建 ${targetRoleLabel(createAccountForm.targetRole)}：${result.user.username}`)
+    message.success(
+      result.childAccounts?.length
+        ? `已创建 ${targetRoleLabel(createAccountForm.targetRole)}：${result.user.username}，并创建 ${result.childAccounts.length} 个子账号`
+        : `已创建 ${targetRoleLabel(createAccountForm.targetRole)}：${result.user.username}`,
+    )
     isCreateAccountModalOpen.value = false
     await refreshOverview()
   } catch (error) {
@@ -1323,6 +1338,14 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
     minWidth: 180,
     render(row) {
       return `${row.displayName} (${row.username})`
+    },
+  },
+  {
+    title: '账号关系',
+    key: 'enterpriseAccountRole',
+    width: 190,
+    render(row) {
+      return formatEnterpriseAccountRelation(row)
     },
   },
   { title: '角色', key: 'role', width: 110 },

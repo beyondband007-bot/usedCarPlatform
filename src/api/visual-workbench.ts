@@ -875,6 +875,13 @@ export interface CreditsCustomerProfile {
   creditsCurrency?: string | null
   accountScope: 'personal' | 'tenant' | string
   creditsTenantId?: number | string | null
+  enterpriseTenantId?: string | null
+  enterpriseTenantName?: string | null
+  enterpriseMemberRole?: 'owner' | 'admin' | 'member' | string | null
+  enterpriseOwnerUserId?: string | null
+  enterpriseOwnerUsername?: string | null
+  enterpriseOwnerDisplayName?: string | null
+  enterpriseAccountRole?: 'standalone' | 'mother' | 'child' | string | null
   createdByUserId: string
   createdByRole: string
   status: string
@@ -1144,10 +1151,18 @@ export interface PlatformUserCreationResult {
   }
   creditsAccount: {
     userId: number | string
+    tenantId?: number | string | null
     accountId: number | string
     totalBalance: string
     availableBalance: string
   }
+  childAccounts?: Array<{
+    id: string
+    username: string
+    displayName: string
+    creditsUserId: number | string
+    accountScope: 'tenant'
+  }>
   applicationLink: {
     id: string
     applicationCode: string

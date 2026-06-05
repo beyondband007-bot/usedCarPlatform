@@ -24,6 +24,13 @@ type CustomerProfileRow = RowDataPacket & {
   credits_user_id: number;
   account_scope: "personal" | "tenant";
   credits_tenant_id: number | null;
+  enterprise_tenant_id: string | null;
+  enterprise_tenant_name: string | null;
+  enterprise_member_role: "owner" | "admin" | "member" | null;
+  enterprise_owner_user_id: string | null;
+  enterprise_owner_username: string | null;
+  enterprise_owner_display_name: string | null;
+  enterprise_subscription_user_id: string | null;
   created_by_user_id: string;
   created_by_role_code: string;
   status: string;
@@ -124,6 +131,14 @@ function normalizeBackOfficeCustomerRole(roleCode: string | null) {
   return roleCode === "enterprise" || !roleCode ? "user" : roleCode;
 }
 
+function resolveEnterpriseAccountRole(row: CustomerProfileRow) {
+  if (!row.enterprise_tenant_id) return "standalone";
+  return row.user_id === row.enterprise_owner_user_id ||
+    row.user_id === row.enterprise_subscription_user_id
+    ? "mother"
+    : "child";
+}
+
 function enrichTransactions(
   transactions: CreditTransactionResponse[],
   applications: CreditsApplicationResponse[],
@@ -158,6 +173,13 @@ async function listCustomerProfiles() {
        acl.credits_user_id,
        acl.account_scope,
        acl.credits_tenant_id,
+       MAX(em.tenant_id) enterprise_tenant_id,
+       MAX(et.name) enterprise_tenant_name,
+       MAX(em.member_role) enterprise_member_role,
+       MAX(et.owner_user_id) enterprise_owner_user_id,
+       MAX(owner.username) enterprise_owner_username,
+       MAX(owner.display_name) enterprise_owner_display_name,
+       MAX(et.subscription_user_id) enterprise_subscription_user_id,
        acl.created_by_user_id,
        acl.created_by_role_code,
        acl.status,
@@ -165,6 +187,13 @@ async function listCustomerProfiles() {
      FROM application_customer_links acl
      JOIN app_users u ON u.id = acl.user_id
      LEFT JOIN app_user_roles aur ON aur.user_id = u.id
+     LEFT JOIN enterprise_members em
+       ON em.user_id = u.id
+      AND em.status = 'active'
+     LEFT JOIN enterprise_tenants et
+       ON et.id = em.tenant_id
+      AND et.status = 'active'
+     LEFT JOIN app_users owner ON owner.id = et.owner_user_id
      GROUP BY acl.id, acl.application_code, acl.user_id, u.username, u.display_name,
               u.phone, acl.credits_user_id, acl.account_scope, acl.credits_tenant_id,
               acl.created_by_user_id, acl.created_by_role_code, acl.status, acl.created_at
@@ -181,14 +210,22 @@ async function listCustomerProfiles() {
     Array.from(new Set(rows.map((row) => row.credits_user_id).filter(Boolean))).map(async (creditsUserId) => {
       try {
         const result = await creditsClient.listAccounts({ userId: creditsUserId });
-        const personalAccount =
-          result.accounts.find((account) => account.accountScope === "personal" && account.tenantId === null) ??
-          result.accounts[0];
-        if (personalAccount) {
+        const linkedRows = rows.filter((row) => row.credits_user_id === creditsUserId);
+        const linkedRow = linkedRows.find((row) => row.account_scope === "tenant") ?? linkedRows[0];
+        const matchingAccount =
+          linkedRow?.account_scope === "tenant"
+            ? result.accounts.find(
+                (account) =>
+                  account.accountScope === "tenant" &&
+                  account.tenantId === linkedRow.credits_tenant_id,
+              )
+            : result.accounts.find((account) => account.accountScope === "personal" && account.tenantId === null);
+        const account = matchingAccount ?? result.accounts[0];
+        if (account) {
           balanceByCreditsUserId.set(creditsUserId, {
-            totalBalance: personalAccount.totalBalance,
-            availableBalance: personalAccount.availableBalance,
-            currency: personalAccount.currency,
+            totalBalance: account.totalBalance,
+            availableBalance: account.availableBalance,
+            currency: account.currency,
           });
         }
       } catch {
@@ -211,6 +248,13 @@ async function listCustomerProfiles() {
     creditsCurrency: balanceByCreditsUserId.get(row.credits_user_id)?.currency ?? null,
     accountScope: row.account_scope,
     creditsTenantId: row.credits_tenant_id,
+    enterpriseTenantId: row.enterprise_tenant_id,
+    enterpriseTenantName: row.enterprise_tenant_name,
+    enterpriseMemberRole: row.enterprise_member_role,
+    enterpriseOwnerUserId: row.enterprise_owner_user_id,
+    enterpriseOwnerUsername: row.enterprise_owner_username,
+    enterpriseOwnerDisplayName: row.enterprise_owner_display_name,
+    enterpriseAccountRole: resolveEnterpriseAccountRole(row),
     createdByUserId: row.created_by_user_id,
     createdByRole: row.created_by_role_code,
     status: row.status,
