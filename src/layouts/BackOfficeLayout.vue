@@ -83,7 +83,7 @@ async function handleLogout() {
         <small>{{ roleScope }}</small>
       </section>
 
-      <p class="back-office-nav-label">MVP 功能骨架</p>
+      <p class="back-office-nav-label">功能</p>
       <nav class="back-office-nav" aria-label="后台菜单">
         <a
           v-for="item in navItems"
