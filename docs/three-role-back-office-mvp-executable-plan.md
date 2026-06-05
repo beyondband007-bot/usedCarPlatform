@@ -1,6 +1,6 @@
 # Three-Role Back Office MVP Executable Plan
 
-Status: Phase 2 started
+Status: Phase 8 completed
 Date: 2026-06-05
 Source PRD: `/Users/shenghangwang/Desktop/积分后台-MVP-功能骨架PRD.md`
 
@@ -187,6 +187,19 @@ Verification:
 
 Goal: implement Developer’s full MVP skeleton with real responses for every visible action.
 
+Implementation status:
+
+- Started by wiring the console frontend to `GET /api/v1/platform/dashboard`.
+- The top dashboard now shows backend-scoped metrics for:
+  - linked customers
+  - open tickets
+  - connected applications
+  - active agents
+  - active leads
+  - draft settlements
+- Developer/Admin see global scope labels from the dashboard API.
+- Agent sees own-scope labels from the same dashboard API.
+
 Pages:
 
 - Dashboard
@@ -218,6 +231,16 @@ Verification:
 ## Phase 4: Company Admin MVP Pages
 
 Goal: implement Admin as sales-operations role, not financial superuser.
+
+Implementation status:
+
+- Started with Admin Agent management separation in the console.
+- Added `GET /api/v1/platform/agents` for local back-office Agent management.
+- Admin now has a dedicated Agent management table.
+- Admin can create Agent from the Admin page when the Developer gate allows it.
+- Admin can disable Agent through the backend capability route.
+- Admin regular User list remains read-only and excludes Agent rows.
+- Admin still cannot adjust points.
 
 Pages:
 
@@ -251,6 +274,17 @@ Verification:
 
 Goal: implement Agent as own-customer operations role.
 
+Implementation status:
+
+- Started by wiring existing backend Agent operations routes into the console.
+- Agent workbench now has real quick actions for:
+  - creating User when policy gates allow
+  - reporting leads
+  - creating support tickets
+- Agent lead reporting uses modal forms and refreshes the Agent overview after success.
+- Agent ticket creation uses modal forms and refreshes the Agent overview after success.
+- Agent settlement rows now expose a real confirm action for draft settlement bills.
+
 Pages:
 
 - Agent workbench
@@ -282,6 +316,18 @@ Verification:
 
 Goal: make recharge-based commission and monthly settlement deterministic.
 
+Implementation status:
+
+- Started with `GET /api/v1/platform/commission-policy`.
+- The policy endpoint exposes the MVP fixed rules:
+  - `1 RMB = 100 credits`
+  - fixed `10%` commission rate
+  - commission base is customer recharge amount, not consumption
+  - monthly settlement on the 25th for the previous month
+  - refunds must append reversal rows instead of editing originals
+- Agent commission/settlement page now renders these rules beside the commission preview table.
+- The response documents which records remain source-of-truth in Reusable Credits Platform and which workflow tables are local MVP back-office tables.
+
 Rules:
 
 - `1 RMB = 100 credits`.
@@ -303,6 +349,19 @@ Verification:
 
 Goal: satisfy PRD interaction rule: every visible button responds.
 
+Implementation status:
+
+- Started with Agent table interaction completeness.
+- Added row detail buttons for Agent-owned tables:
+  - customers
+  - leads
+  - commission previews
+  - settlements
+  - materials
+  - tickets
+- Added one shared detail modal that displays the full row fields.
+- Added CSV export buttons with immediate success/empty-state feedback for Agent-owned tables.
+
 Checklist:
 
 - Create/edit opens modal form.
@@ -323,6 +382,22 @@ Verification:
 ## Phase 8: Documentation, Tests, And Handoff
 
 Goal: make the MVP reviewable by frontend, backend, and product.
+
+Implementation status:
+
+- Added `docs/three-role-back-office-phase-8-handoff.md`.
+- The handoff doc covers routes, demo accounts, API contracts, seed data notes, PRD traceability, local review checklist, and usedCarPlatform impact.
+- Completed local review checks:
+  - `npm run typecheck`
+  - `npm run build`
+  - `cd backend && npm run typecheck`
+  - `cd backend && npm run build`
+  - `cd backend && npm run phase2:policy-test`
+  - `cd backend && npm run phase4:user-api-test`
+  - `cd backend && npm run phase7:integration-contract-test`
+  - `git diff --check`
+  - Developer/Admin/Agent browser smoke for `/back-office`
+  - Regular User API boundary smoke returns `403`
 
 Tasks:
 

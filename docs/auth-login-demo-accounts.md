@@ -1,6 +1,6 @@
 # Auth Login Demo Accounts
 
-Status: Phase 1 updated for Reusable Credits Platform console
+Status: Phase 8 updated for Reusable Credits Platform console handoff
 Date: 2026-06-05
 
 ## Scope
@@ -99,4 +99,9 @@ Production still needs:
 - secure token/session expiration
 - audit logging for account creation and role changes
 
-The current implementation completes the local demo/mock login behavior so team members can test the first release flows consistently.
+The current implementation uses backend sessions and demo seed users so team members can test the first release flows consistently.
+
+See also:
+
+- `docs/three-role-back-office-phase-8-handoff.md`
+- `docs/usedcarplatform-impact-notes.md`

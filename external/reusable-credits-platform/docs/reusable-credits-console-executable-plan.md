@@ -1,6 +1,6 @@
 # Reusable Credits Platform Console Executable Plan
 
-Status: Latest PRD Phase 0/1 started locally
+Status: Phase 8 completed locally
 Date: 2026-06-05
 Primary route: `/back-office`
 Compatibility routes: `/reusable-credits-console`, `/credits-admin`
@@ -234,3 +234,54 @@ Implementation status:
 - Added `npm run phase7:integration-contract-test` to verify application/function codes, lifecycle steps, seed payloads, and idempotency key patterns.
 - Added `npm run print:application-contract-seed -- clothing_ai` to print the planned `clothing_ai` seed payload and billing example.
 - Documented the app onboarding checklist and function registration contract in `docs/reusable-credits-application-integration-contract.md`.
+
+## Phase 8: Documentation, Tests, And Handoff
+
+Goal: make the MVP reviewable by frontend, backend, and product collaborators.
+
+Deliverables:
+
+- Update route docs.
+- Update demo account docs.
+- Update API contract docs.
+- Add seed data notes.
+- Add PRD traceability matrix.
+- Add test checklist for local review.
+
+Implementation status:
+
+- Added `docs/three-role-back-office-phase-8-handoff.md` for the Reusable Credits Platform console MVP.
+- The handoff doc covers primary and compatibility routes, demo accounts, role capabilities, API contracts, seed data notes, PRD traceability, local review checks, and usedCarPlatform impact notes.
+- Updated `docs/auth-login-demo-accounts.md` with backend-session demo accounts and the independent `/back-office/login` path.
+- Updated `docs/usedcarplatform-impact-notes.md` with the reusable console handoff and boundaries for colleagues who own usedCarPlatform.
+- Verified the live Agent management API returns application links across both `clothing_ai` and `used-car-platform`.
+- Completed local review checks:
+  - `npm run typecheck`
+  - `npm run build`
+  - `cd backend && npm run typecheck`
+  - `cd backend && npm run build`
+  - `cd backend && npm run phase2:policy-test`
+  - `cd backend && npm run phase4:user-api-test`
+  - `cd backend && npm run phase7:integration-contract-test`
+  - `git diff --check`
+  - Developer/Admin/Agent browser smoke for `/back-office`
+  - Regular User API boundary smoke returns `403`
+
+Verification:
+
+- `npm run typecheck`
+- `npm run build`
+- `cd backend && npm run typecheck`
+- `cd backend && npm run build`
+- backend route tests for permissions
+- browser smoke for `/back-office/login` and `/back-office`
+
+## First Implementation Slice
+
+The first implementation slice is now complete through Phase 8.
+
+Remaining future work:
+
+- Full production CRUD for tenants, accounts, recharge products, and recharge orders.
+- Production approval workflow hardening.
+- Additional future application onboarding beyond the planned `clothing_ai` contract seed.

@@ -3,7 +3,8 @@ dist/
 .DS_Store
 *.local
 
-docs/
+docs/*
+!docs/three-role-back-office-phase-8-handoff.md
 .env
 .env.*
 !.env.example

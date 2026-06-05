@@ -112,3 +112,173 @@ Verification:
 - Backend typecheck should pass.
 - Developer/Admin/Agent sessions can call `GET /api/v1/platform/dashboard`.
 - Regular product users remain blocked by `menu:admin`.
+
+## 2026-06-05: Phase 3 Developer Dashboard Frontend Start
+
+Reason:
+
+Phase 3 begins the Developer MVP pages by making the console dashboard consume the real Phase 2 dashboard API.
+
+Shared/frontend files changed:
+
+- `src/api/visual-workbench.ts`
+- `src/pages/credits-admin/index.vue`
+
+Behavior impact:
+
+- Adds typed frontend support for `GET /api/v1/platform/dashboard`.
+- The console summary now displays backend-provided operational scope and metrics.
+- No usedCarPlatform product page calls this endpoint.
+
+Expected usedCarPlatform impact:
+
+- Product workspace, product login, generation flows, and package/points pages are unchanged.
+- The shared API module has one new platform-console function; existing usedCarPlatform API calls are unchanged.
+
+Verification:
+
+- Frontend typecheck should pass.
+
+## 2026-06-05: Phase 4 Admin Agent Management Start
+
+Reason:
+
+Phase 4 begins the Company Admin MVP pages. Admin must operate as sales operations, not as a financial superuser.
+
+Shared/frontend files changed:
+
+- `src/pages/credits-admin/index.vue`
+
+Behavior impact:
+
+- Adds `GET /api/v1/platform/agents` for Developer/Admin Agent management.
+- Admin now sees a dedicated Agent management table.
+- Admin regular User list remains read-only and excludes Agent rows.
+- Admin can use the existing backend capability route to disable Agent accounts.
+- Admin still does not see or receive point-adjust controls.
+
+Expected usedCarPlatform impact:
+
+- No usedCarPlatform product pages are changed.
+- This affects only the independent Reusable Credits Platform console mounted at `/back-office`.
+
+Verification:
+
+- Frontend typecheck should pass.
+- Admin direct point-adjust API call should still return `403`.
+
+## 2026-06-05: Phase 5 Agent Operations Start
+
+Reason:
+
+Phase 5 begins the Agent MVP pages by turning existing Agent tables into real workflows.
+
+Shared/frontend files changed:
+
+- `src/api/visual-workbench.ts`
+- `src/pages/credits-admin/index.vue`
+
+Behavior impact:
+
+- Adds frontend calls for existing backend routes:
+  - `POST /api/v1/platform/agent/leads`
+  - `POST /api/v1/platform/agent/tickets`
+  - `POST /api/v1/platform/agent/settlements/:settlementId/confirm`
+- Agent can report leads from the console.
+- Agent can create support tickets from the console.
+- Agent can confirm draft settlement bills.
+
+Expected usedCarPlatform impact:
+
+- No usedCarPlatform product pages are changed.
+- These actions are available only through the independent back-office console.
+
+Verification:
+
+- Frontend and backend typechecks should pass.
+- Agent browser smoke should show quick actions for `创建 User`, `报备线索`, and `新建工单`.
+
+## 2026-06-05: Phase 6 Commission Policy Start
+
+Reason:
+
+Phase 6 makes commission and settlement rules deterministic before deeper settlement automation is added.
+
+Shared/backend files changed:
+
+- `backend/src/modules/platform/platformRoutes.ts`
+- `backend/src/modules/platform/commissionPolicyService.ts`
+
+Shared/frontend files changed:
+
+- `src/api/visual-workbench.ts`
+- `src/pages/credits-admin/index.vue`
+
+Behavior impact:
+
+- Adds `GET /api/v1/platform/commission-policy`.
+- Agent commission/settlement page displays fixed MVP rules:
+  - `1 RMB = 100 credits`
+  - `10%` commission
+  - commission is based on customer recharge amount
+  - settlement runs monthly on the 25th for previous month
+  - refunds append reversal rows
+
+Expected usedCarPlatform impact:
+
+- No usedCarPlatform product pages are changed.
+- This endpoint is for the independent back-office console.
+
+Verification:
+
+- Frontend and backend typechecks should pass.
+- The commission-policy endpoint should return `200` for a back-office role.
+
+## 2026-06-05: Phase 7 Agent Interaction Completeness Start
+
+Reason:
+
+Phase 7 requires every visible back-office button to respond and read-only tables to still provide useful detail/export actions.
+
+Shared/frontend files changed:
+
+- `src/pages/credits-admin/index.vue`
+
+Behavior impact:
+
+- Agent-owned tables now have `查看详情` buttons that open a full row detail modal.
+- Agent-owned tables now have CSV `导出` buttons with immediate success or empty-state feedback.
+- Existing create, settlement confirmation, and refresh actions remain unchanged.
+
+Expected usedCarPlatform impact:
+
+- No usedCarPlatform product pages are changed.
+- CSV export is only exposed inside the independent back-office console.
+
+Verification:
+
+- Frontend typecheck should pass.
+- Agent browser smoke should verify detail modal and export button response.
+
+## 2026-06-05: Phase 8 Handoff Documentation
+
+Reason:
+
+Phase 8 makes the MVP reviewable by frontend, backend, product, and usedCarPlatform application teammates.
+
+Docs added:
+
+- `docs/three-role-back-office-phase-8-handoff.md`
+
+Behavior impact:
+
+- Documentation only.
+- No product or back-office runtime behavior changes.
+
+Expected usedCarPlatform impact:
+
+- None.
+
+Verification:
+
+- Handoff doc should be reviewed alongside this impact note before product teammates integrate against the console APIs.

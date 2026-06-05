@@ -17,10 +17,12 @@ import {
   getApplicationIntegrationContract,
   getApplicationIntegrationContracts,
 } from "./applicationIntegrationContract";
+import { getCommissionPolicy } from "./commissionPolicyService";
 import {
   adjustPlatformUserCredits,
   deletePlatformUserByCapability,
 } from "./platformAccountCapabilities";
+import { listPlatformAgents } from "./platformAgentsService";
 import { getPlatformDashboard } from "./platformDashboardService";
 import { createPlatformUser } from "./platformUserCreation";
 
@@ -56,6 +58,22 @@ platformRoutes.get(
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await getPlatformDashboard(req));
+  }),
+);
+
+platformRoutes.get(
+  "/agents",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await listPlatformAgents(req));
+  }),
+);
+
+platformRoutes.get(
+  "/commission-policy",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (_req, res) => {
+    ok(res, getCommissionPolicy());
   }),
 );
 

@@ -978,6 +978,102 @@ export interface AgentOperationsOverview {
   tickets: AgentOperationsTicket[]
 }
 
+export interface PlatformDashboardMetricSet {
+  linkedCustomerCount: number
+  activeAgentCount: number
+  activeLeadCount: number
+  openTicketCount: number
+  draftSettlementCount: number
+  applicationCount: number
+  applications: string[]
+}
+
+export interface PlatformDashboardSection {
+  code: string
+  label: string
+  source: 'reusableCreditsPlatform' | 'usedCarPlatformMvpBackend' | string
+  access: string
+}
+
+export interface PlatformDashboard {
+  role: 'developer' | 'admin' | 'agent' | string
+  scope: 'global_back_office_scope' | 'own_agent_scope' | string
+  generatedAt: string
+  metrics: PlatformDashboardMetricSet
+  sections: PlatformDashboardSection[]
+  sourceOfTruth: {
+    reusableCreditsPlatform: string[]
+    usedCarPlatformMvpBackend: string[]
+  }
+  notes: string[]
+}
+
+export interface PlatformAgentProfile {
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  creditsUserId?: number | string | null
+  status: string
+  assignmentStatus: string
+  assignedByUserId?: string | null
+  assignedByUsername?: string | null
+  customerCount: number
+  leadCount: number
+  openTicketCount: number
+  applications: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlatformAgentList {
+  items: PlatformAgentProfile[]
+}
+
+export interface CreateAgentLeadPayload {
+  agentUserId?: string
+  applicationCode?: string
+  customerName: string
+  phone?: string
+  source?: string
+  stage?: string
+  expectedPoints?: number
+  note?: string
+}
+
+export interface CreateAgentTicketPayload {
+  agentUserId?: string
+  subject: string
+  category?: string
+  priority?: string
+  message?: string
+}
+
+export interface AgentOperationMutationResult {
+  id: string
+  agentUserId: string
+  status?: string
+}
+
+export interface CommissionPolicy {
+  currency: string
+  creditsPerRmb: number
+  commissionRate: number
+  commissionBase: string
+  settlementDayOfMonth: number
+  settlementPeriod: string
+  settlementStatusFlow: string[]
+  refundHandling: string
+  sourceOfTruth: {
+    rechargeOrders: string
+    paymentOrders: string
+    creditTransactions: string
+    commissionPreview: string
+    settlementWorkflow: string
+  }
+  notes: string[]
+}
+
 export type PlatformUserTargetRole = 'admin' | 'agent' | 'user'
 export type PlatformUserPlanCode = 'basic' | 'team' | 'flagship'
 
@@ -1318,6 +1414,53 @@ export async function getAgentOperationsOverview(params?: {
 }): Promise<AgentOperationsOverview> {
   const response = await request.get<ApiResponse<AgentOperationsOverview>>(
     '/platform/agent/overview',
+    { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformDashboard(): Promise<PlatformDashboard> {
+  const response = await request.get<ApiResponse<PlatformDashboard>>('/platform/dashboard')
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformAgents(): Promise<PlatformAgentList> {
+  const response = await request.get<ApiResponse<PlatformAgentList>>('/platform/agents')
+  return unwrapApiResponse(response)
+}
+
+export async function getCommissionPolicy(): Promise<CommissionPolicy> {
+  const response = await request.get<ApiResponse<CommissionPolicy>>('/platform/commission-policy')
+  return unwrapApiResponse(response)
+}
+
+export async function createAgentLead(
+  payload: CreateAgentLeadPayload,
+): Promise<AgentOperationMutationResult> {
+  const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
+    '/platform/agent/leads',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function createAgentTicket(
+  payload: CreateAgentTicketPayload,
+): Promise<AgentOperationMutationResult> {
+  const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
+    '/platform/agent/tickets',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function confirmAgentSettlement(
+  settlementId: string,
+  params?: { agentUserId?: string },
+): Promise<AgentOperationMutationResult> {
+  const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
+    `/platform/agent/settlements/${encodeURIComponent(settlementId)}/confirm`,
+    null,
     { params },
   )
   return unwrapApiResponse(response)
