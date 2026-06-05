@@ -1,45 +1,48 @@
-﻿import { computed, ref } from 'vue'
+import { computed, ref } from 'vue'
 
-import {
-  getDefaultLogo,
-  uploadDefaultLogo,
-  type UserLogoSetting,
-} from '@/api/visual-workbench'
+import { uploadAsset, type UploadedAsset } from '@/api/visual-workbench'
 import { formatDate } from '@/utils/dayjs'
 
-const STORAGE_KEY = 'workspace-recent-logo'
+const STORAGE_CUSTOM_LOGO = 'workspace-custom-logo'
+const STORAGE_LOGO_ENABLED = 'workspace-logo-enabled'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024
 const ACCEPT_TYPES = new Set(['image/png', 'image/svg+xml'])
 
-export interface WorkspaceLogoAsset {
+export interface LogoInfo {
   dataUrl: string
-  assetId?: string
+  assetId: string
   fileName: string
   mimeType: string
   size?: number
   uploadedAt: string
 }
 
-function toLogoAsset(setting: UserLogoSetting): WorkspaceLogoAsset {
+/** @deprecated Use LogoInfo instead */
+export type WorkspaceLogoAsset = LogoInfo
+
+function toLogoInfoFromAsset(
+  asset: UploadedAsset,
+  uploadedAt = new Date().toISOString(),
+): LogoInfo {
   return {
-    dataUrl: setting.logo.url,
-    assetId: setting.logoAssetId,
-    fileName: setting.logo.fileName,
-    mimeType: setting.logo.mimeType,
-    size: setting.logo.size,
-    uploadedAt: setting.updatedAt,
+    dataUrl: asset.url,
+    assetId: asset.assetId,
+    fileName: asset.fileName,
+    mimeType: asset.mimeType,
+    size: asset.size,
+    uploadedAt,
   }
 }
 
-function readStoredLogo(): WorkspaceLogoAsset | null {
+function readStoredCustomLogo(): LogoInfo | null {
   if (typeof window === 'undefined') return null
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(STORAGE_CUSTOM_LOGO)
     if (!raw) return null
 
-    const parsed = JSON.parse(raw) as WorkspaceLogoAsset
-    if (!parsed?.dataUrl || !parsed.uploadedAt) return null
+    const parsed = JSON.parse(raw) as LogoInfo
+    if (!parsed?.dataUrl || !parsed.assetId || !parsed.uploadedAt) return null
 
     return parsed
   } catch {
@@ -47,15 +50,30 @@ function readStoredLogo(): WorkspaceLogoAsset | null {
   }
 }
 
-function persistLogo(asset: WorkspaceLogoAsset | null) {
+function readStoredLogoEnabled(): boolean {
+  if (typeof window === 'undefined') return false
+
+  try {
+    return window.localStorage.getItem(STORAGE_LOGO_ENABLED) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function persistCustomLogo(asset: LogoInfo | null) {
   if (typeof window === 'undefined') return
 
   if (!asset) {
-    window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(STORAGE_CUSTOM_LOGO)
     return
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(asset))
+  window.localStorage.setItem(STORAGE_CUSTOM_LOGO, JSON.stringify(asset))
+}
+
+function persistLogoEnabled(enabled: boolean) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(STORAGE_LOGO_ENABLED, enabled ? 'true' : 'false')
 }
 
 function formatUploadLabel(iso: string) {
@@ -63,14 +81,16 @@ function formatUploadLabel(iso: string) {
   return formatted === 'Invalid Date' ? '' : formatted
 }
 
+const customLogoState = ref<LogoInfo | null>(readStoredCustomLogo())
+const logoEnabledState = ref(readStoredLogoEnabled())
+const isUploadingState = ref(false)
+const isLoadingState = ref(false)
+
 export function useWorkspaceLogo() {
-  const recentLogo = ref<WorkspaceLogoAsset | null>(readStoredLogo())
-  const useRecentLogo = ref(Boolean(recentLogo.value))
-  const isUploading = ref(false)
-  const isLoading = ref(false)
+  const activeLogo = computed<LogoInfo | null>(() => customLogoState.value)
 
   const uploadedAtLabel = computed(() =>
-    recentLogo.value ? formatUploadLabel(recentLogo.value.uploadedAt) : '',
+    customLogoState.value ? formatUploadLabel(customLogoState.value.uploadedAt) : '',
   )
 
   function validateLogoFile(file: File): string | null {
@@ -84,63 +104,59 @@ export function useWorkspaceLogo() {
   }
 
   async function refreshDefaultLogo() {
-    isLoading.value = true
-
-    try {
-      const setting = await getDefaultLogo()
-      const asset = setting ? toLogoAsset(setting) : null
-      recentLogo.value = asset
-      useRecentLogo.value = Boolean(asset)
-      persistLogo(asset)
-      return asset
-    } finally {
-      isLoading.value = false
-    }
+    return customLogoState.value
   }
 
-  async function uploadLogoFile(file: File) {
+  async function uploadCustomLogoFile(file: File) {
     const validationError = validateLogoFile(file)
     if (validationError) throw new Error(validationError)
 
-    isUploading.value = true
+    isUploadingState.value = true
 
     try {
-      const setting = await uploadDefaultLogo(file)
-      const asset = toLogoAsset(setting)
+      const uploaded = await uploadAsset(file, 'logo')
+      const asset = toLogoInfoFromAsset(uploaded)
 
-      recentLogo.value = asset
-      useRecentLogo.value = true
-      persistLogo(asset)
+      customLogoState.value = asset
+      persistCustomLogo(asset)
 
       return asset
     } finally {
-      isUploading.value = false
+      isUploadingState.value = false
     }
   }
 
-  function selectRecentLogo() {
-    if (!recentLogo.value) return false
-
-    useRecentLogo.value = true
-    return true
+  function setLogoEnabled(enabled: boolean) {
+    logoEnabledState.value = enabled
+    persistLogoEnabled(enabled)
   }
 
-  function clearRecentLogo() {
-    recentLogo.value = null
-    useRecentLogo.value = false
-    persistLogo(null)
+  function removeCustomLogo() {
+    customLogoState.value = null
+    persistCustomLogo(null)
   }
 
   return {
-    recentLogo,
-    useRecentLogo,
-    isUploading,
-    isLoading,
+    customLogo: customLogoState,
+    logoEnabled: logoEnabledState,
+    activeLogo,
     uploadedAtLabel,
+    isUploading: isUploadingState,
+    isLoading: isLoadingState,
     refreshDefaultLogo,
-    uploadLogoFile,
-    selectRecentLogo,
-    clearRecentLogo,
+    uploadCustomLogoFile,
+    setLogoEnabled,
+    removeCustomLogo,
     validateLogoFile,
+    /** @deprecated Use activeLogo instead */
+    recentLogo: activeLogo,
+    /** @deprecated Use logoEnabled instead */
+    useRecentLogo: logoEnabledState,
+    /** @deprecated Use uploadCustomLogoFile instead */
+    uploadLogoFile: uploadCustomLogoFile,
+    /** @deprecated No-op kept for compatibility */
+    selectRecentLogo: () => Boolean(customLogoState.value),
+    /** @deprecated Use removeCustomLogo instead */
+    clearRecentLogo: removeCustomLogo,
   }
 }

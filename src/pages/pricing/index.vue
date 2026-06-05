@@ -260,6 +260,24 @@ function handlePlanConsult() {
   box-shadow: none;
 }
 
+.pricing-page.theme-dark .pricing-footer-bar {
+  position: relative;
+  border: 1px solid rgba(96, 91, 84, 0.7);
+  background: transparent;
+  isolation: isolate;
+}
+
+.pricing-page.theme-dark .pricing-footer-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--pricing-footer-bg);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .footer-feature {
   display: flex;
   flex-direction: column;
@@ -268,6 +286,12 @@ function handlePlanConsult() {
   min-width: 0;
   align-items: center;
   text-align: center;
+}
+
+.pricing-page.theme-dark .footer-feature {
+  position: relative;
+  z-index: 1;
+  opacity: 0.4;
 }
 
 .footer-feature > div {

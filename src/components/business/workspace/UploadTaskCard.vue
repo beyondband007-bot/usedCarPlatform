@@ -21,6 +21,7 @@ const props = defineProps<{
   isUploading?: boolean;
   uploadDisabled?: boolean;
   compact?: boolean;
+  embedded?: boolean;
   uploadTitle?: string;
   uploadHint?: string;
   requiredLabel?: string;
@@ -120,7 +121,10 @@ function openPreviewModal() {
     :class="{ 'upload-task-card--compact': compact }"
   >
     <section
-      :class="compact ? 'upload-compact-shell' : 'upload-task-card'"
+      :class="[
+        compact ? 'upload-compact-shell' : 'upload-task-card',
+        { 'is-embedded': embedded },
+      ]"
     >
       <header v-if="!compact" class="upload-task-card__header">
         <div class="upload-task-card__title-row">
@@ -197,13 +201,14 @@ function openPreviewModal() {
                   : 'upload-trigger'
               "
             >
-              <img
-                v-if="!compact"
-                :src="uploadIconSrc"
-                alt=""
-                class="upload-trigger-icon"
-                draggable="false"
-              />
+              <span v-if="!compact" class="upload-trigger-icon-wrap">
+                <img
+                  :src="uploadIconSrc"
+                  alt=""
+                  class="upload-trigger-icon"
+                  draggable="false"
+                />
+              </span>
               <Icon
                 v-else
                 :icon="displayUploadIcon"
@@ -274,6 +279,12 @@ function openPreviewModal() {
   border-radius: 12px;
   background: var(--workspace-panel, var(--app-surface));
   box-shadow: var(--upload-shadow);
+}
+
+.upload-task-card.is-embedded {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 :global(.workspace-page.theme-light) .upload-task-card {

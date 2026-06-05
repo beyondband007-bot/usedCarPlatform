@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue";
-import { NSwitch, useMessage } from "naive-ui";
+import { NModal, NSwitch, useMessage } from "naive-ui";
 import { computed, ref, watch } from "vue";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
@@ -9,10 +8,12 @@ import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 const props = withDefaults(
   defineProps<{
     variant?: "scene" | "batch";
+    embedded?: boolean;
     disabled?: boolean;
   }>(),
   {
     variant: "scene",
+    embedded: false,
     disabled: false,
   },
 );
@@ -21,16 +22,14 @@ const enabled = defineModel<boolean>("enabled", { default: false });
 
 const message = useMessage();
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const previewModalVisible = ref(false);
 
 const {
-  recentLogo,
-  useRecentLogo,
+  customLogo,
   isUploading,
-  isLoading,
   uploadedAtLabel,
-  refreshDefaultLogo,
-  uploadLogoFile,
-  selectRecentLogo,
+  uploadCustomLogoFile,
+  setLogoEnabled,
 } = useWorkspaceLogo();
 
 const isBatch = computed(() => props.variant === "batch");
@@ -39,35 +38,24 @@ const panelTitle = computed(() =>
 );
 const panelDescription = computed(() =>
   isBatch.value
-    ? "开启后可沿用最近上传 Logo，也可重新上传。"
-    : "开启后默认沿用最近上传的Logo，也可重新上传",
+    ? "开启后将直接使用当前上传的 Logo，可随时重新上传替换。"
+    : "开启后将直接使用当前上传的 Logo，可随时重新上传替换。",
 );
-const recentTitle = computed(() => {
-  if (!recentLogo.value) {
-    return isBatch.value ? "暂无最近 Logo" : "暂无默认 Logo";
-  }
-
-  return isBatch.value ? "使用最近 Logo" : "使用默认 Logo";
-});
-const recentHint = computed(() => {
-  if (recentLogo.value) return uploadedAtLabel.value;
+const currentLogoHint = computed(() => {
+  if (customLogo.value) return uploadedAtLabel.value;
   return "请先上传 PNG / SVG Logo";
 });
-const reuploadLabel = computed(() => {
+const uploadButtonLabel = computed(() => {
   if (isUploading.value) return "上传中...";
-  if (recentLogo.value) return "重新上传";
+  if (customLogo.value) return "重新上传";
   return "上传 Logo";
 });
 
 watch(
   enabled,
-  async (value) => {
-    if (!value) return;
-
-    try {
-      await refreshDefaultLogo();
-    } catch {
-      message.warning("Logo 读取失败，请稍后重试");
+  (value) => {
+    if (!isBatch.value) {
+      setLogoEnabled(value);
     }
   },
   { immediate: true },
@@ -76,6 +64,11 @@ watch(
 function openUpload() {
   if (props.disabled) return;
   fileInputRef.value?.click();
+}
+
+function openLogoPreview() {
+  if (props.disabled || !customLogo.value?.dataUrl) return;
+  previewModalVisible.value = true;
 }
 
 async function handleFileChange(event: Event) {
@@ -89,23 +82,13 @@ async function handleFileChange(event: Event) {
   if (!file) return;
 
   try {
-    await uploadLogoFile(file);
-    message.success("Logo 上传成功");
+    const hadCustomLogo = Boolean(customLogo.value);
+    await uploadCustomLogoFile(file);
+    message.success(hadCustomLogo ? "Logo 已更新" : "Logo 上传成功");
   } catch (error) {
     const text = error instanceof Error ? error.message : "Logo 上传失败";
     message.error(text);
   }
-}
-
-function handleSelectRecent() {
-  if (props.disabled) return;
-
-  if (!selectRecentLogo()) {
-    message.info("请先上传 Logo");
-    return;
-  }
-
-  message.success("已选择默认 Logo");
 }
 </script>
 
@@ -114,6 +97,7 @@ function handleSelectRecent() {
     class="workspace-logo-panel"
     :class="{
       'workspace-logo-panel--batch': isBatch,
+      'workspace-logo-panel--embedded': embedded,
       'is-disabled': disabled,
     }"
   >
@@ -126,140 +110,110 @@ function handleSelectRecent() {
     />
 
     <section
-      class="logo-setting-card bg-[var(--app-surface)]"
+      class="logo-setting-card"
+      :class="{ 'bg-[var(--app-surface)]': !embedded }"
       aria-label="Logo 设置"
     >
       <div class="logo-setting-head px-6 py-5">
         <div class="flex items-start justify-between gap-5">
           <div class="min-w-0">
-            <h3
-              class="text-base font-black tracking-normal text-[var(--app-text)]"
-            >
+            <h3 class="logo-setting-title">
               {{ panelTitle }}
             </h3>
-            <p
-              class="mt-3 text-sm font-semibold leading-6 text-[var(--app-text-soft)]"
-            >
+            <p class="logo-setting-desc">
               {{ panelDescription }}
             </p>
           </div>
-          <NSwitch v-model:value="enabled" size="large" :disabled="disabled" />
+          <NSwitch
+            v-model:value="enabled"
+            size="large"
+            class="logo-switch"
+            :disabled="disabled"
+          />
         </div>
       </div>
 
-      <div v-if="enabled" class="logo-recent-block">
-        <button
-          type="button"
-          class="recent-logo-row"
-          :class="{ 'is-active': useRecentLogo && recentLogo }"
-          :disabled="disabled || !recentLogo || isLoading"
-          @click="handleSelectRecent"
+      <div v-if="enabled" class="logo-content-block">
+        <div
+          class="logo-card logo-card--selected"
+          :class="{ 'is-empty': !customLogo }"
         >
-          <span class="logo-preview">
-            <PreloadImage
-              v-if="recentLogo?.dataUrl"
-              class="logo-preview-image"
-              :src="recentLogo.dataUrl"
-              :alt="recentLogo.fileName"
-              loading="lazy"
-              decoding="async"
-              fit="contain"
-            />
-            <span v-else class="logo-preview-placeholder">Logo</span>
+          <span class="logo-card__preview">
+            <button
+              v-if="customLogo?.dataUrl"
+              type="button"
+              class="logo-card__preview-btn"
+              aria-label="查看 Logo 大图"
+              :disabled="disabled"
+              @click="openLogoPreview"
+            >
+              <PreloadImage
+                class="logo-card__preview-image"
+                :src="customLogo.dataUrl"
+                :alt="customLogo.fileName"
+                loading="lazy"
+                decoding="async"
+                fit="contain"
+              />
+            </button>
+            <span v-else class="logo-card__preview-placeholder">Logo</span>
           </span>
-          <span class="logo-copy">
-            <strong>{{ recentTitle }}</strong>
-            <small>{{ recentHint }}</small>
+          <span class="logo-card__copy">
+            <strong>{{ customLogo ? "当前 Logo" : "尚未上传 Logo" }}</strong>
+            <small>{{ currentLogoHint }}</small>
           </span>
-        </button>
+        </div>
 
         <button
-          v-if="isBatch || recentLogo"
           type="button"
           class="reupload-button"
           :disabled="disabled || isUploading"
           @click="openUpload"
         >
-          {{ reuploadLabel }}
+          {{ uploadButtonLabel }}
         </button>
       </div>
     </section>
 
-    <button
-      v-if="enabled && !isBatch"
-      type="button"
-      class="logo-upload-drop"
-      :disabled="disabled || isUploading"
-      @click="openUpload"
+    <NModal
+      v-model:show="previewModalVisible"
+      preset="card"
+      title="当前 Logo"
+      class="logo-preview-modal"
+      :bordered="false"
+      :segmented="{ content: true }"
     >
-      <Icon icon="mdi:tag-heart-outline" />
-      <strong>{{ isUploading ? "上传中..." : "上传 Logo" }}</strong>
-      <span>PNG / SVG · <= 2MB</span>
-    </button>
+      <PreloadImage
+        v-if="customLogo?.dataUrl"
+        class="logo-preview-modal-image"
+        :src="customLogo.dataUrl"
+        :alt="customLogo.fileName"
+        loading="eager"
+        decoding="async"
+        fit="contain"
+      />
+    </NModal>
   </div>
 </template>
 
 <style scoped lang="scss">
 .workspace-logo-panel {
-  --logo-accent: var(--workspace-accent, #efc24c);
-  --logo-accent-border: color-mix(
-    in srgb,
-    var(--logo-accent) 55%,
-    var(--workspace-line, var(--app-border))
-  );
-  --logo-drop-bg: color-mix(
-    in srgb,
-    var(--workspace-panel, var(--app-surface)) 92%,
-    var(--logo-accent) 8%
-  );
-  --logo-drop-border: color-mix(
-    in srgb,
-    var(--logo-accent) 44%,
-    var(--workspace-line, var(--app-border))
-  );
-  --logo-preview-bg: color-mix(
-    in srgb,
-    var(--workspace-panel-deep, #111722) 92%,
-    transparent
-  );
-  --logo-preview-text: var(--workspace-accent-strong, #f5d37a);
-  --logo-preview-border: color-mix(
-    in srgb,
-    var(--workspace-accent-strong, #f5d37a) 62%,
-    transparent
-  );
-  --logo-icon: var(--workspace-accent-strong, #f4a329);
-
   display: grid;
   gap: 12px;
 }
 
-:global([data-theme="dark"]) .workspace-logo-panel {
-  --logo-drop-bg: color-mix(
-    in srgb,
-    var(--workspace-panel, var(--app-surface)) 78%,
-    var(--logo-accent) 22%
-  );
-  --logo-drop-border: color-mix(
-    in srgb,
-    var(--logo-accent) 55%,
-    var(--workspace-line, var(--app-border))
-  );
-  --logo-preview-bg: color-mix(
-    in srgb,
-    var(--workspace-panel-deep, #0a101c) 94%,
-    transparent
-  );
-  --logo-preview-text: var(--workspace-accent-strong, #f8d891);
-  --logo-preview-border: color-mix(
-    in srgb,
-    var(--workspace-accent-strong, #f8d891) 45%,
-    transparent
-  );
-}
-
 .workspace-logo-panel--batch {
   gap: 0;
+}
+
+.workspace-logo-panel--embedded {
+  gap: 0;
+}
+
+.workspace-logo-panel--embedded .logo-setting-card {
+  background: transparent !important;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .workspace-logo-panel--batch .logo-setting-card {
@@ -277,19 +231,17 @@ function handleSelectRecent() {
 
 .workspace-logo-panel--batch .logo-setting-head p {
   margin-top: 8px;
+  margin-bottom: 12px;
   font-size: 14px;
   line-height: 1.65;
 }
 
-.workspace-logo-panel--batch .logo-recent-block {
-  margin-top: 4px;
-  padding: 0;
-  background: transparent;
+.logo-switch :deep(.n-switch.n-switch--active .n-switch__rail) {
+  background-color: #ffb800 !important;
 }
 
-.workspace-logo-panel--batch .recent-logo-row {
-  margin-top: 14px;
-  background: color-mix(in srgb, var(--app-surface-soft) 88%, transparent);
+.logo-switch :deep(.n-switch.n-switch--active .n-switch__button) {
+  background-color: #ffffff !important;
 }
 
 .logo-file-input {
@@ -301,144 +253,164 @@ function handleSelectRecent() {
   border-radius: 12px;
 }
 
-.logo-recent-block {
-  display: grid;
-  gap: 12px;
-  background: var(--workspace-panel, var(--app-surface));
-  padding: 0 20px 20px;
+.logo-setting-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
-.recent-logo-row,
+.logo-setting-desc {
+  margin: 8px 0 12px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.logo-setting-head {
+  padding-bottom: 0;
+}
+
+.logo-content-block {
+  display: grid;
+  gap: 10px;
+  padding: 0 20px 20px;
+  background: var(--workspace-panel, var(--app-surface));
+}
+
+.workspace-logo-panel--embedded .logo-content-block,
+.workspace-logo-panel--batch .logo-content-block {
+  padding: 0;
+  background: transparent;
+}
+
+.logo-card,
 .reupload-button {
   width: 100%;
   border-radius: 10px;
   font-family: inherit;
   transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
     box-shadow 0.2s ease,
     opacity 0.2s ease;
 }
 
-.recent-logo-row {
+.logo-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   min-height: 68px;
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--workspace-panel, var(--app-surface));
+  padding: 12px 14px;
+  border: none;
+  background: var(--saas-logo-upload-surface, var(--saas-logo-row-surface, #ffffff));
+  box-shadow: none;
   text-align: left;
-  cursor: pointer;
 }
 
-.recent-logo-row.is-active {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--logo-accent) 18%, transparent);
+.logo-card.is-empty {
+  box-shadow: none;
 }
 
-.recent-logo-row:disabled {
-  cursor: not-allowed;
-  opacity: 0.85;
-}
-
-.logo-preview {
+.logo-card__preview {
   display: grid;
   place-items: center;
-  width: 96px;
-  height: 34px;
+  width: 72px;
+  height: 36px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 5px;
-  background:
-    linear-gradient(90deg, rgba(255, 214, 114, 0.14), transparent 55%),
-    var(--logo-preview-bg);
+  border-radius: 6px;
+  background: var(--saas-logo-preview-surface, #f3f4f6);
 }
 
-.logo-preview-image {
+.logo-card__preview-btn {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.logo-card__preview-btn:disabled {
+  cursor: not-allowed;
+}
+
+.logo-card__preview-image {
   display: block;
   width: 100%;
   height: 100%;
   padding: 2px 4px;
-  background: var(--logo-preview-bg);
 }
 
-.logo-preview-placeholder {
-  color: var(--logo-preview-text);
-  font-size: 13px;
-  font-weight: 900;
+.logo-card__preview-placeholder {
+  color: #8c8c8c;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.logo-copy {
+.logo-card__copy {
   min-width: 0;
 }
 
-.logo-copy strong,
-.logo-copy small {
+.logo-card__copy strong,
+.logo-card__copy small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.logo-copy strong {
-  color: var(--app-text);
-  font-size: 15px;
-  font-weight: 900;
+.logo-card__copy strong {
+  color: var(--saas-title, #1f1f1f);
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.logo-copy small {
+.logo-card__copy small {
   margin-top: 4px;
-  color: var(--workspace-muted, var(--app-text-soft));
-  font-size: 14px;
-  font-weight: 700;
+  color: var(--saas-muted, #8c8c8c);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .reupload-button {
-  height: 48px;
-  background: var(--workspace-panel, var(--app-surface));
-  color: var(--app-text);
-  text-align: left;
-  padding: 0 18px;
-  font-size: 15px;
-  font-weight: 800;
+  height: 44px;
+  border: 1px solid var(--saas-logo-row-border, #e5e7eb);
+  background: var(--saas-logo-row-surface, #ffffff);
+  color: var(--saas-title, #1f1f1f);
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
   cursor: pointer;
 }
 
 .reupload-button:hover:not(:disabled) {
+  border-color: #d1d5db;
 }
 
-.reupload-button:disabled,
-.logo-upload-drop:disabled {
+.reupload-button:disabled {
   cursor: wait;
   opacity: 0.72;
 }
 
-.logo-upload-drop {
-  display: grid;
-  width: 100%;
-  place-items: center;
-  min-height: 190px;
-  border-radius: 12px;
-  background: var(--logo-drop-bg);
-  color: var(--app-text);
-  cursor: pointer;
-  font-family: inherit;
+:global(html[data-theme="dark"]) .workspace-logo-panel:not(.workspace-logo-panel--embedded) {
+  --saas-logo-row-surface: #14171a;
+  --saas-logo-row-border: #2a2e34;
+  --saas-logo-row-selected-surface: #14171a;
+  --saas-logo-preview-surface: #14171a;
+  --saas-title: #ffffff;
+  --saas-muted: #9ca3af;
 }
 
-.logo-upload-drop .iconify {
-  margin-bottom: 12px;
-  color: var(--logo-icon);
-  font-size: 34px;
+:global(html[data-theme="dark"]) .workspace-logo-panel:not(.workspace-logo-panel--embedded) .logo-setting-title {
+  color: #ffffff;
 }
 
-.logo-upload-drop strong {
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.logo-upload-drop span {
-  margin-top: 8px;
-  color: var(--workspace-muted, var(--app-text-soft));
-  font-size: 14px;
-  font-weight: 700;
+:global(html[data-theme="dark"]) .workspace-logo-panel:not(.workspace-logo-panel--embedded) .logo-setting-desc {
+  color: #9ca3af;
 }
 
 .workspace-logo-panel.is-disabled {
@@ -447,8 +419,27 @@ function handleSelectRecent() {
   user-select: none;
 }
 
-.workspace-logo-panel.is-disabled .logo-setting-card,
-.workspace-logo-panel.is-disabled .logo-upload-drop {
+.workspace-logo-panel.is-disabled .logo-setting-card {
   cursor: not-allowed;
+}
+</style>
+
+<style lang="scss">
+.logo-preview-modal {
+  width: min(720px, calc(100vw - 32px)) !important;
+  max-width: min(720px, calc(100vw - 32px)) !important;
+}
+
+.logo-preview-modal-image {
+  display: block;
+  width: 100%;
+  height: min(60vh, 480px);
+  margin: 0 auto;
+  border-radius: 12px;
+  background: color-mix(
+    in srgb,
+    var(--workspace-panel-soft, var(--app-surface-soft)) 88%,
+    #0f172a
+  );
 }
 </style>

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
-
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceCapability } from "@/types/workspace";
 
@@ -95,13 +93,6 @@ const optionRows = computed(() => {
                   decoding="async"
                   :draggable="false"
                 />
-                <span
-                  v-if="capability.kind === 'scene' && option.id === selectedOptionId"
-                  class="option-item-check"
-                  aria-hidden="true"
-                >
-                  <Icon icon="mdi:check" />
-                </span>
                 <div class="option-item-caption">
                   <strong class="option-item-title">{{ option.title }}</strong>
                 </div>
@@ -138,6 +129,13 @@ const optionRows = computed(() => {
   box-shadow: none;
 }
 
+:global(html[data-theme="dark"]) .option-selector-card.is-scene {
+  --saas-scene-surface: transparent;
+  --saas-scene-border: #2a2e34;
+  --saas-scene-border-hover: #3a4048;
+  --saas-title: #ffffff;
+}
+
 :global([data-theme="dark"]) .option-selector-card {
   box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
 }
@@ -150,6 +148,10 @@ const optionRows = computed(() => {
   display: flex;
   align-items: center;
   margin-bottom: 14px;
+}
+
+.option-selector-card.is-scene .option-selector-head {
+  margin-bottom: 8px;
 }
 
 .option-selector-head-main {
@@ -168,22 +170,17 @@ const optionRows = computed(() => {
 }
 
 .option-selector-card.is-scene .option-selector-title {
-  color: #000000;
-  font-weight: 600;
-}
-
-:global(.workspace-page.theme-dark)
-  .option-selector-card.is-scene
-  .option-selector-title {
-  color: var(--app-text);
+  color: var(--saas-title, #1f1f1f);
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .option-selector-badge {
   flex-shrink: 0;
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid rgb(255, 183, 0);
-  background: rgb(255, 183, 0);
+  border: 1px solid #ffb800;
+  background: #ffb800;
   color: #000000;
   font-size: 12px;
   font-weight: 800;
@@ -195,9 +192,9 @@ const optionRows = computed(() => {
   align-items: center;
   height: 24px;
   padding: 0 10px;
-  border: 1px solid rgb(255, 183, 0);
+  border: 1px solid #ffb800;
   border-radius: 999px;
-  background: rgb(255, 183, 0);
+  background: #ffb800;
   color: #000000;
   font-size: 12px;
   font-weight: 600;
@@ -259,69 +256,48 @@ const optionRows = computed(() => {
     transform 0.2s ease;
 }
 
-.option-selector-card.is-scene .option-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  transition: all 0.25s ease;
-}
-
 .option-item:hover {
   transform: translateY(-2px);
 }
 
-.option-selector-card.is-scene .option-item:hover:not(.is-active) {
-  border-color: #60a5fa;
-  transform: translateY(-2px);
-}
-
 .option-item.is-active {
-  border-color: var(--workspace-accent, #2f6bff);
-  box-shadow:
-    0 0 0 2px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)),
-    0 10px 24px var(--workspace-accent-glow, rgba(47, 107, 255, 0.12));
-}
-
-.option-selector-card.is-scene .option-item.is-active {
-  border-color: #3b82f6;
-  background: linear-gradient(
-    180deg,
-    rgba(59, 130, 246, 0.08) 0%,
-    rgba(255, 255, 255, 0.98) 100%
-  );
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-  transform: none;
+  border-color: #ffb800;
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
 }
 
 .option-item:focus-visible {
-  border-color: var(--workspace-accent, #2f6bff);
-  box-shadow: 0 0 0 3px var(--workspace-accent-glow, rgba(47, 107, 255, 0.2));
+  border-color: #ffb800;
+  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.18);
+}
+
+.option-selector-card.is-scene .option-item {
+  border: 1px solid var(--saas-scene-border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--saas-scene-surface, #ffffff);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.option-selector-card.is-scene .option-item:hover:not(.is-active) {
+  border-color: var(--saas-scene-border-hover, #d9d9d9);
+  transform: none;
+}
+
+.option-selector-card.is-scene .option-scroll {
+  padding-bottom: 4px;
+}
+
+.option-selector-card.is-scene .option-item.is-active {
+  border: 2px solid #ffb800;
+  background: var(--saas-scene-surface, #ffffff);
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
+  transform: none;
 }
 
 .option-selector-card.is-scene .option-item:focus-visible {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-}
-
-.option-item-check {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
-  pointer-events: none;
-}
-
-.option-item-check :deep(svg) {
-  width: 14px;
-  height: 14px;
+  border-color: #ffb800;
+  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.18);
 }
 
 .option-item-cover {
@@ -360,7 +336,7 @@ const optionRows = computed(() => {
 }
 
 .option-selector-card.is-scene .option-item-caption {
-  padding: 20px 10px 10px;
+  padding: 20px 10px 8px;
   background: linear-gradient(
     180deg,
     transparent 0%,

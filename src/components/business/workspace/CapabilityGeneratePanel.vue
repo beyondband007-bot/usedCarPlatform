@@ -23,6 +23,7 @@ import {
 } from "@/constants/output-ratio";
 import { DELIVERY_REFRESH_MS } from "@/constants/workspace-polling";
 import { useSubscriptionStore } from "@/stores/subscription";
+import { useAppStore } from "@/stores/app";
 import {
   batchSceneCategoryOptions,
   getBatchSceneImageUrl,
@@ -75,6 +76,7 @@ const emit = defineEmits<{
 
 const message = useMessage();
 const subscriptionStore = useSubscriptionStore();
+const appStore = useAppStore();
 
 function isTerminalBatchJobStatus(status: WorkspaceRecentItem["status"]) {
   return status === "success" || status === "fail" || status === "canceled";
@@ -111,8 +113,7 @@ const {
   isLoading: isLoadingVisualPresets,
 } = useBatchVisualTemplates();
 
-const useLogo = ref(false);
-const { recentLogo } = useWorkspaceLogo();
+const { activeLogo, logoEnabled: useLogo } = useWorkspaceLogo();
 const paintColorCode = ref("");
 const batchPaintColorCode = ref("");
 const outputRatio = ref<string>(DEFAULT_GENERATION_OUTPUT_RATIO);
@@ -691,8 +692,8 @@ function mapBatchVisualConfigFromTemplate(
     outputRatio: template.outputRatio,
     useRecentLogo: template.useRecentLogo,
     logoAssetId:
-      template.useRecentLogo && recentLogo.value?.assetId
-        ? recentLogo.value.assetId
+      template.useRecentLogo && activeLogo.value?.assetId
+        ? activeLogo.value.assetId
         : null,
     enableLightConsistency: template.lightConsistency,
     enablePaintRefresh: template.paintRefresh,
@@ -1183,6 +1184,11 @@ function handleGenerate() {
     return;
   }
 
+  if (supportsLogoForGenerate.value && useLogo.value && !activeLogo.value?.assetId) {
+    message.warning("已开启使用 Logo，请先选择或上传 Logo");
+    return;
+  }
+
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
     outputRatio: outputRatio.value,
@@ -1193,12 +1199,12 @@ function handleGenerate() {
         ? props.capability.options.find((item) => item.id === props.selectedOptionId)
             ?.image
         : undefined,
-    useLogo: props.capability.kind === "scene" ? useLogo.value : undefined,
+    useLogo: supportsLogoForGenerate.value ? useLogo.value : undefined,
     logoAssetId:
-      props.capability.kind === "scene" &&
+      supportsLogoForGenerate.value &&
       useLogo.value &&
-      recentLogo.value?.assetId
-        ? recentLogo.value.assetId
+      activeLogo.value?.assetId
+        ? activeLogo.value.assetId
         : undefined,
     colorCode:
       props.capability.code === "paint-refresh"
@@ -1238,7 +1244,7 @@ async function handleCreateBatchTask() {
     return;
   }
 
-  if (template.useRecentLogo && !recentLogo.value?.assetId) {
+  if (template.useRecentLogo && !activeLogo.value?.assetId) {
     message.warning("已勾选使用 Logo，请先上传 Logo 后再提交任务");
     return;
   }
@@ -2056,6 +2062,12 @@ async function refreshActiveDeliveryPreview(options?: { refresh?: boolean }) {
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
+const supportsLogoForGenerate = computed(
+  () =>
+    props.capability.kind === "scene" ||
+    props.capability.code === "short-video",
+);
+
 const showOutputRatioForGenerate = computed(() => {
   const { code, kind } = props.capability;
 
@@ -2740,6 +2752,14 @@ defineExpose({
           :disabled="props.isGenerating"
           @select="emit('selectOption', $event)"
         />
+
+        <section class="workspace-config-module workspace-config-module--logo">
+          <WorkspaceLogoPanel
+            v-model:enabled="useLogo"
+            embedded
+            :disabled="props.isGenerating"
+          />
+        </section>
       </div>
 
       <GenerateActionFooter
@@ -2910,73 +2930,66 @@ defineExpose({
     </template>
 
     <template v-else>
-      <div class="generate-panel-body">
-        <UploadTaskCard
-          :capability="props.capability"
-          :upload-preview-url="uploadedPreviewUrl"
-          :is-uploading="isUploadingVehicle"
-          :upload-disabled="props.isGenerating"
-          @select-file="handleVehicleFileSelected"
-          @remove="handleVehicleImageRemove"
-        />
+      <div
+        class="generate-panel-body generate-panel-body--saas"
+        :class="{ 'is-theme-dark': appStore.isDarkMode }"
+      >
+        <section class="workspace-config-module workspace-config-module--primary">
+          <UploadTaskCard
+            embedded
+            :capability="props.capability"
+            :upload-preview-url="uploadedPreviewUrl"
+            :is-uploading="isUploadingVehicle"
+            :upload-disabled="props.isGenerating"
+            @select-file="handleVehicleFileSelected"
+            @remove="handleVehicleImageRemove"
+          />
 
-        <PaintColorPicker
-          v-if="props.capability.code === 'paint-refresh'"
-          v-model="paintColorCode"
-        />
+          <PaintColorPicker
+            v-if="props.capability.code === 'paint-refresh'"
+            v-model="paintColorCode"
+          />
 
-        <CapabilityOptionSelector
-          v-if="hasBlock('selector')"
-          :capability="props.capability"
-          :selected-option-id="props.selectedOptionId"
-          :disabled="props.isGenerating"
-          @select="emit('selectOption', $event)"
-        />
+          <CapabilityOptionSelector
+            v-if="hasBlock('selector')"
+            :capability="props.capability"
+            :selected-option-id="props.selectedOptionId"
+            :disabled="props.isGenerating"
+            @select="emit('selectOption', $event)"
+          />
+        </section>
 
         <div
-          v-if="showOutputRatioForGenerate"
-          class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
+          v-if="showOutputRatioForGenerate && props.capability.kind !== 'scene'"
+          class="workspace-output-ratio workspace-output-ratio--standalone"
         >
-          <div class="flex items-center gap-4">
-            <span
-              class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
-            >
-              输出比例
-            </span>
-            <NSelect
-              v-model:value="outputRatio"
-              :options="outputRatioSelectOptions"
-              size="large"
-              class="min-w-0 flex-1"
-            />
-          </div>
+          <span class="workspace-output-ratio__label">输出比例</span>
+          <NSelect
+            v-model:value="outputRatio"
+            :options="outputRatioSelectOptions"
+            class="workspace-output-ratio__select"
+          />
         </div>
 
         <template
           v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
-          <WorkspaceLogoPanel
-            v-model:enabled="useLogo"
-            :disabled="props.isGenerating"
-          />
+          <section class="workspace-config-module workspace-config-module--logo">
+            <WorkspaceLogoPanel
+              v-model:enabled="useLogo"
+              embedded
+              :disabled="props.isGenerating"
+            />
 
-          <div
-            class="border border-[var(--app-border)] bg-[var(--app-surface)] px-6 py-4 logo-setting-card"
-          >
-            <div class="flex items-center gap-4">
-              <span
-                class="shrink-0 text-sm font-semibold text-[var(--app-text-soft)]"
-              >
-                输出比例
-              </span>
+            <div class="workspace-output-ratio">
+              <span class="workspace-output-ratio__label">输出比例</span>
               <NSelect
                 v-model:value="outputRatio"
                 :options="outputRatioSelectOptions"
-                size="large"
-                class="min-w-0 flex-1"
+                class="workspace-output-ratio__select"
               />
             </div>
-          </div>
+          </section>
         </template>
       </div>
 
@@ -3027,8 +3040,327 @@ defineExpose({
   padding-bottom: 4px;
 }
 
+.generate-panel-body--saas {
+  gap: 24px;
+  padding: 0 4px 4px 0;
+
+  --saas-surface: #ffffff;
+  --saas-surface-border: transparent;
+  --saas-surface-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --saas-title: #1f1f1f;
+  --saas-muted: #8c8c8c;
+  --saas-upload-surface: #ffffff;
+  --saas-upload-border: #cfcfcf;
+  --saas-upload-border-hover: #bfbfbf;
+  --saas-input-surface: #ffffff;
+  --saas-input-border: #d9d9d9;
+  --saas-input-text: #1f1f1f;
+  --saas-scene-surface: #ffffff;
+  --saas-scene-border: #e5e7eb;
+  --saas-scene-border-hover: #d9d9d9;
+  --saas-logo-upload-surface: #fafafa;
+  --saas-logo-upload-border: #bfbfbf;
+  --saas-logo-row-surface: #fafafa;
+  --saas-logo-row-border: #e5e7eb;
+  --saas-logo-row-selected-surface: #fafafa;
+  --saas-logo-preview-surface: #f3f4f6;
+  --saas-trigger-title: #1f1f1f;
+}
+
+.generate-panel-body--saas.is-theme-dark {
+  --saas-surface: #1b1e22;
+  --saas-surface-border: #2a2e34;
+  --saas-surface-shadow: none;
+  --saas-title: #ffffff;
+  --saas-muted: #9ca3af;
+  --saas-upload-surface: #1b1e22;
+  --saas-upload-border: #2a2e34;
+  --saas-upload-border-hover: #3a4048;
+  --saas-input-surface: #1b1e22;
+  --saas-input-border: #2a2e34;
+  --saas-input-text: #ffffff;
+  --saas-scene-surface: transparent;
+  --saas-scene-border: #2a2e34;
+  --saas-scene-border-hover: #3a4048;
+  --saas-logo-upload-surface: #14171a;
+  --saas-logo-upload-border: #2a2e34;
+  --saas-logo-row-surface: #14171a;
+  --saas-logo-row-border: #2a2e34;
+  --saas-logo-row-selected-surface: #14171a;
+  --saas-logo-preview-surface: #14171a;
+  --saas-trigger-title: #ffffff;
+}
+
+:global(html[data-theme="dark"]) .generate-panel-body--saas {
+  --saas-surface: #1b1e22;
+  --saas-surface-border: #2a2e34;
+  --saas-surface-shadow: none;
+  --saas-title: #ffffff;
+  --saas-muted: #9ca3af;
+  --saas-upload-surface: #1b1e22;
+  --saas-upload-border: #2a2e34;
+  --saas-upload-border-hover: #3a4048;
+  --saas-input-surface: #1b1e22;
+  --saas-input-border: #2a2e34;
+  --saas-input-text: #ffffff;
+  --saas-scene-surface: transparent;
+  --saas-scene-border: #2a2e34;
+  --saas-scene-border-hover: #3a4048;
+  --saas-logo-upload-surface: #14171a;
+  --saas-logo-upload-border: #2a2e34;
+  --saas-logo-row-surface: #14171a;
+  --saas-logo-row-border: #2a2e34;
+  --saas-logo-row-selected-surface: #14171a;
+  --saas-logo-preview-surface: #14171a;
+  --saas-trigger-title: #ffffff;
+}
+
 .generate-panel-body > * {
   flex-shrink: 0;
+}
+
+.workspace-config-module {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow: hidden;
+  border: 1px solid var(--saas-surface-border);
+  background: var(--saas-surface);
+  box-shadow: var(--saas-surface-shadow);
+}
+
+.workspace-config-module--primary {
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.workspace-config-module--logo {
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.workspace-config-module--primary :deep(.upload-task-card.is-embedded) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-config-module--primary :deep(.upload-task-card__header) {
+  padding: 0;
+}
+
+.workspace-config-module--primary :deep(.upload-task-card__title) {
+  color: var(--saas-title);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.workspace-config-module--primary :deep(.upload-task-card__badge) {
+  border-color: #ffb800;
+  background: #ffb800;
+  color: #000000;
+}
+
+.workspace-config-module--primary :deep(.upload-task-card__desc) {
+  margin-bottom: 12px;
+  color: var(--saas-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.workspace-config-module--primary :deep(.upload-panel) {
+  padding: 0;
+}
+
+.workspace-config-module--primary :deep(.upload-dragger) {
+  min-height: 220px !important;
+  border: 1px solid var(--saas-upload-border) !important;
+  border-radius: 16px !important;
+  background: var(--saas-upload-surface) !important;
+  box-shadow: none !important;
+}
+
+.workspace-config-module--primary :deep(.upload-dragger:hover:not(.is-blocked)) {
+  border-color: var(--saas-upload-border-hover) !important;
+  box-shadow: none !important;
+}
+
+.workspace-config-module--primary :deep(.upload-trigger-icon-wrap) {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: #ffb800;
+}
+
+.workspace-config-module--primary :deep(.upload-trigger-icon) {
+  width: 34px;
+  height: 34px;
+}
+
+.workspace-config-module--primary :deep(.upload-trigger-title) {
+  color: var(--saas-trigger-title);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.workspace-config-module--primary :deep(.upload-trigger-hint) {
+  color: var(--saas-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.workspace-config-module--primary :deep(.option-selector-card.is-scene) {
+  padding: 0;
+}
+
+.workspace-config-module--primary :deep(.option-selector-head) {
+  margin-bottom: 8px;
+}
+
+.workspace-config-module--primary :deep(.option-selector-title) {
+  color: var(--saas-title);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.workspace-config-module--primary :deep(.option-selector-card.is-scene .option-item) {
+  background: var(--saas-scene-surface);
+  border-color: var(--saas-scene-border);
+}
+
+.workspace-config-module--primary :deep(.option-selector-card.is-scene .option-item.is-active) {
+  border: 2px solid #ffb800;
+  background: var(--saas-scene-surface);
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
+}
+
+.workspace-config-module--logo :deep(.reupload-button) {
+  border: 1px solid var(--saas-logo-row-border);
+  background: var(--saas-logo-row-surface);
+  color: var(--saas-title);
+}
+
+.workspace-config-module--primary :deep(.option-selector-badge) {
+  border-color: #ffb800;
+  background: #ffb800;
+  color: #000000;
+}
+
+.workspace-config-module--logo :deep(.logo-setting-head) {
+  padding: 0 !important;
+}
+
+.workspace-config-module--logo :deep(.logo-setting-head h3) {
+  color: var(--saas-title);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.workspace-config-module--logo :deep(.logo-setting-head p) {
+  margin-top: 8px !important;
+  margin-bottom: 12px !important;
+  color: var(--saas-muted) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.6 !important;
+}
+
+.workspace-config-module--logo :deep(.logo-copy strong) {
+  color: var(--saas-title);
+}
+
+.workspace-config-module--logo :deep(.logo-copy small) {
+  color: var(--saas-muted);
+}
+
+.workspace-config-module--logo :deep(.logo-card) {
+  border: none;
+  box-shadow: none;
+  background: var(--saas-logo-upload-surface);
+}
+
+.workspace-config-module--logo :deep(.logo-card--selected) {
+  border: none;
+  box-shadow: none;
+  background: var(--saas-logo-upload-surface);
+}
+
+.workspace-config-module--logo :deep(.logo-card__preview) {
+  background: var(--saas-logo-preview-surface);
+}
+
+.workspace-config-module--logo :deep(.logo-card__copy strong) {
+  color: var(--saas-title);
+}
+
+.workspace-config-module--logo :deep(.logo-card__copy small) {
+  color: var(--saas-muted);
+}
+
+.workspace-config-module--logo :deep(.logo-upload-drop--embedded) {
+  border-color: var(--saas-logo-upload-border);
+  background: var(--saas-logo-upload-surface);
+}
+
+.workspace-config-module--logo :deep(.logo-upload-drop__copy strong) {
+  color: var(--saas-title);
+}
+
+.workspace-config-module--logo :deep(.logo-upload-drop__copy span) {
+  color: var(--saas-muted);
+}
+
+.workspace-config-module--logo :deep(.logo-upload-drop__icon) {
+  color: var(--saas-muted);
+}
+
+.workspace-config-module--logo :deep(.logo-content-block) {
+  padding: 0;
+}
+
+.workspace-output-ratio {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.workspace-output-ratio--standalone {
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--saas-surface-border);
+  background: var(--saas-surface);
+  box-shadow: var(--saas-surface-shadow);
+}
+
+.workspace-output-ratio__label {
+  flex-shrink: 0;
+  color: var(--saas-title);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.workspace-output-ratio__select {
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-output-ratio__select :deep(.n-base-selection) {
+  --n-height: 40px !important;
+  --n-border: 1px solid var(--saas-input-border) !important;
+  --n-border-hover: 1px solid var(--saas-input-border) !important;
+  --n-border-active: 1px solid var(--saas-input-border) !important;
+  --n-border-focus: 1px solid var(--saas-input-border) !important;
+  --n-box-shadow-active: none !important;
+  --n-box-shadow-focus: none !important;
+  --n-color: var(--saas-input-surface) !important;
+  --n-color-active: var(--saas-input-surface) !important;
+  --n-text-color: var(--saas-input-text) !important;
+  --n-placeholder-color: var(--saas-muted) !important;
+  --n-arrow-color: var(--saas-muted) !important;
+  --n-border-radius: 8px !important;
 }
 
 .batch-panel {

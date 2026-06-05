@@ -2122,13 +2122,13 @@ onUnmounted(() => {
 }
 
 .workspace-page.theme-light .workspace-col--main {
-  border-color: var(--workspace-line);
-  background: var(--workspace-panel);
-  box-shadow: var(--workspace-shadow);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .workspace-page.theme-light .workspace-shell {
-  background: #eef4fb;
+  background: var(--app-bg);
 }
 
 .workspace-shell {
@@ -2140,7 +2140,7 @@ onUnmounted(() => {
   gap: 0;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr);
-  background: var(--workspace-panel-deep);
+  background: var(--app-bg);
 
   @media (width >= 1024px) and (width < 1180px) {
     gap: 12px;
@@ -2182,10 +2182,26 @@ onUnmounted(() => {
 .workspace-col--main {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--workspace-line);
-  border-radius: 20px;
-  background: var(--workspace-panel);
-  box-shadow: var(--workspace-shadow);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-col--main .workspace-col-scroll {
+  background: var(--app-bg);
+}
+
+.workspace-page.theme-light .workspace-col--main .workspace-col-scroll {
+  background: #f5f6f8;
+}
+
+.workspace-page.theme-dark .workspace-col--main .workspace-col-scroll {
+  background: #14171a;
+}
+
+:global(html[data-theme="dark"]) .workspace-col--main .workspace-col-scroll {
+  background: #14171a;
 }
 
 .workspace-col-scroll {
