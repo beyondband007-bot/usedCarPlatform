@@ -120,6 +120,10 @@ async function listFunctionsForApplications(applications: CreditsApplicationResp
   return hasClothingAi ? [...functions, ...PLANNED_FUNCTIONS] : functions;
 }
 
+function normalizeBackOfficeCustomerRole(roleCode: string | null) {
+  return roleCode === "enterprise" || !roleCode ? "user" : roleCode;
+}
+
 function enrichTransactions(
   transactions: CreditTransactionResponse[],
   applications: CreditsApplicationResponse[],
@@ -168,6 +172,31 @@ async function listCustomerProfiles() {
      LIMIT 100`,
   );
 
+  const balanceByCreditsUserId = new Map<number, {
+    totalBalance: string;
+    availableBalance: string;
+    currency: string;
+  }>();
+  await Promise.all(
+    Array.from(new Set(rows.map((row) => row.credits_user_id).filter(Boolean))).map(async (creditsUserId) => {
+      try {
+        const result = await creditsClient.listAccounts({ userId: creditsUserId });
+        const personalAccount =
+          result.accounts.find((account) => account.accountScope === "personal" && account.tenantId === null) ??
+          result.accounts[0];
+        if (personalAccount) {
+          balanceByCreditsUserId.set(creditsUserId, {
+            totalBalance: personalAccount.totalBalance,
+            availableBalance: personalAccount.availableBalance,
+            currency: personalAccount.currency,
+          });
+        }
+      } catch {
+        // Keep customer profiles visible even if a linked credits account cannot be read.
+      }
+    }),
+  );
+
   return rows.map((row) => ({
     id: row.id,
     applicationCode: row.application_code,
@@ -175,8 +204,11 @@ async function listCustomerProfiles() {
     username: row.username,
     displayName: row.display_name,
     phone: row.phone,
-    role: row.role_code ?? "enterprise",
+    role: normalizeBackOfficeCustomerRole(row.role_code),
     creditsUserId: row.credits_user_id,
+    creditsTotalBalance: balanceByCreditsUserId.get(row.credits_user_id)?.totalBalance ?? null,
+    creditsAvailableBalance: balanceByCreditsUserId.get(row.credits_user_id)?.availableBalance ?? null,
+    creditsCurrency: balanceByCreditsUserId.get(row.credits_user_id)?.currency ?? null,
     accountScope: row.account_scope,
     creditsTenantId: row.credits_tenant_id,
     createdByUserId: row.created_by_user_id,

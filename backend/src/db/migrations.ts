@@ -228,6 +228,33 @@ export const migrations = [
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS back_office_admin_policy_overrides (
+    admin_user_id VARCHAR(64) PRIMARY KEY,
+    developer_allows_create_users TINYINT(1) NOT NULL DEFAULT 1,
+    developer_allows_create_agents TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by_user_id VARCHAR(64) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_admin_policy_overrides_updated_by (updated_by_user_id),
+    CONSTRAINT admin_policy_overrides_admin_fk FOREIGN KEY (admin_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT admin_policy_overrides_updated_by_fk FOREIGN KEY (updated_by_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS back_office_agent_policy_overrides (
+    agent_user_id VARCHAR(64) PRIMARY KEY,
+    developer_allows_create_users TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by_user_id VARCHAR(64) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_policy_overrides_updated_by (updated_by_user_id),
+    CONSTRAINT agent_policy_overrides_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT agent_policy_overrides_updated_by_fk FOREIGN KEY (updated_by_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS platform_user_creation_idempotency (
     id VARCHAR(64) PRIMARY KEY,
     operator_user_id VARCHAR(64) NOT NULL,

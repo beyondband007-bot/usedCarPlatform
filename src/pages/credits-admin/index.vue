@@ -28,8 +28,14 @@ import {
   getCommissionPolicy,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
+  getPlatformAdminPolicyOverrides,
+  getPlatformAgentPolicyOverrides,
   getPlatformAgents,
   getPlatformDashboard,
+  promotePlatformUserToAgent,
+  updatePlatformAdminPolicyOverride,
+  updatePlatformAgentPolicyOverride,
+  updateApplicationFunctionDefaultPoints,
   type AgentOperationsCommissionPreview,
   type AgentOperationsCustomer,
   type AgentOperationsLead,
@@ -44,30 +50,31 @@ import {
   type CommissionPolicy,
   type PlatformUserPlanCode,
   type PlatformUserTargetRole,
+  type PlatformAdminPolicyOverride,
+  type PlatformAgentPolicyOverride,
   type PlatformAgentProfile,
   type PlatformDashboard,
   type RechargeProduct,
 } from '@/api/visual-workbench'
 import {
-  accountCreationPolicies,
   defaultAccountCreationPolicyState,
   resolveAccountCreationPolicy,
   reusableCreditsApplicationCatalog,
   type BackOfficeRole,
 } from '@/policies/accountProvisioning'
-import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
 type RoleTab = BackOfficeRole
 type DetailRecord = Record<string, unknown>
 
-const appStore = useAppStore()
 const authStore = useAuthStore()
 const message = useMessage()
 
 const overview = ref<CreditsAdminOverview | null>(null)
 const agentOverview = ref<AgentOperationsOverview | null>(null)
 const platformAgents = ref<PlatformAgentProfile[]>([])
+const adminPolicyOverrides = ref<PlatformAdminPolicyOverride[]>([])
+const agentPolicyOverrides = ref<PlatformAgentPolicyOverride[]>([])
 const platformDashboard = ref<PlatformDashboard | null>(null)
 const commissionPolicy = ref<CommissionPolicy | null>(null)
 const isLoading = ref(false)
@@ -81,11 +88,16 @@ const isAdjustCreditsModalOpen = ref(false)
 const isAdjustingCredits = ref(false)
 const isDeleteAccountModalOpen = ref(false)
 const isDeletingAccount = ref(false)
+const isFunctionBillingOpen = ref(false)
+const promotingUserId = ref<string | null>(null)
 const isCreateLeadModalOpen = ref(false)
 const isCreatingLead = ref(false)
 const isCreateTicketModalOpen = ref(false)
 const isCreatingTicket = ref(false)
 const confirmingSettlementId = ref<string | null>(null)
+const updatingAdminPolicyUserId = ref<string | null>(null)
+const updatingAgentPolicyUserId = ref<string | null>(null)
+const updatingFunctionKey = ref<string | null>(null)
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
 const selectedDetail = ref<{ title: string; row: DetailRecord } | null>(null)
 const interactionFeedback = ref('')
@@ -122,6 +134,7 @@ const ticketForm = reactive({
   priority: 'normal',
   message: '',
 })
+const functionPointDrafts = reactive<Record<string, number | null>>({})
 
 const detailEntries = computed(() =>
   selectedDetail.value
@@ -170,13 +183,27 @@ watchEffect(() => {
 async function refreshOverview() {
   isLoading.value = true
   try {
-    const [creditsResult, operationsResult, dashboardResult, agentsResult, commissionPolicyResult] =
+    const [
+      creditsResult,
+      operationsResult,
+      dashboardResult,
+      agentsResult,
+      adminPolicyResult,
+      agentPolicyResult,
+      commissionPolicyResult,
+    ] =
       await Promise.allSettled([
         getCreditsAdminOverview(),
         getAgentOperationsOverview(),
         getPlatformDashboard(),
         authStore.role === 'developer' || authStore.role === 'admin'
           ? getPlatformAgents()
+          : Promise.resolve({ items: [] }),
+        authStore.role === 'developer' || authStore.role === 'admin'
+          ? getPlatformAdminPolicyOverrides()
+          : Promise.resolve({ items: [] }),
+        authStore.role === 'developer' || authStore.role === 'admin' || authStore.role === 'agent'
+          ? getPlatformAgentPolicyOverrides()
           : Promise.resolve({ items: [] }),
         getCommissionPolicy(),
       ])
@@ -192,6 +219,12 @@ async function refreshOverview() {
     }
     if (agentsResult.status === 'fulfilled') {
       platformAgents.value = agentsResult.value.items
+    }
+    if (adminPolicyResult.status === 'fulfilled') {
+      adminPolicyOverrides.value = adminPolicyResult.value.items
+    }
+    if (agentPolicyResult.status === 'fulfilled') {
+      agentPolicyOverrides.value = agentPolicyResult.value.items
     }
     if (commissionPolicyResult.status === 'fulfilled') {
       commissionPolicy.value = commissionPolicyResult.value
@@ -281,10 +314,16 @@ const applicationSelectOptions = computed(() =>
   })),
 )
 
+const planInitialPoints: Record<PlatformUserPlanCode, number> = {
+  basic: 20_000,
+  team: 100_000,
+  flagship: 800_000,
+}
+
 const planOptions: Array<{ label: string; value: PlatformUserPlanCode }> = [
-  { label: 'Basic / 普通用户默认', value: 'basic' },
-  { label: 'Team / 代理商默认', value: 'team' },
-  { label: 'Flagship / 管理员默认', value: 'flagship' },
+  { label: '企业基础档', value: 'basic' },
+  { label: '企业团队档', value: 'team' },
+  { label: '企业旗舰档', value: 'flagship' },
 ]
 
 const leadStageOptions = [
@@ -318,6 +357,11 @@ const createTargetOptions = computed(() => {
 
   if (activeRole.value === 'admin') {
     return [
+      {
+        label: 'User / 普通用户',
+        value: 'user',
+        disabled: !effectiveAccountCreationPolicy.value.adminCanCreateUsers,
+      },
       {
         label: 'Agent / 代理商',
         value: 'agent',
@@ -388,9 +432,10 @@ function exportRows(filename: string, rows: unknown[]) {
   message.success(`已导出 ${records.length} 条记录`)
 }
 
-const filteredApplicationFunctions = computed(() =>
-  applicationFunctions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
-)
+const selectedApplicationFunctions = computed(() => {
+  if (selectedApplicationCode.value === 'all') return []
+  return applicationFunctions.value.filter((item) => item.applicationCode === selectedApplicationCode.value)
+})
 
 const filteredRecentTransactions = computed(() =>
   recentTransactions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
@@ -410,6 +455,32 @@ const filteredRegularUserProfiles = computed(() =>
   filteredCustomerProfiles.value.filter((item) => matrixTargetRole(item.role) === 'user'),
 )
 
+const agentCustomerCountByUserId = computed(
+  () => new Map(platformAgents.value.map((item) => [item.userId, item.customerCount])),
+)
+
+const adminPolicyByUserId = computed(
+  () => new Map(adminPolicyOverrides.value.map((item) => [item.userId, item])),
+)
+
+const agentPolicyByUserId = computed(
+  () => new Map(agentPolicyOverrides.value.map((item) => [item.userId, item])),
+)
+
+const currentAdminDeveloperGate = computed(() => {
+  if (authStore.role !== 'admin') return true
+  const currentUserId = authStore.userInfo?.id
+  if (!currentUserId) return true
+  return adminPolicyByUserId.value.get(currentUserId)?.developerAllowsCreateAgents ?? true
+})
+
+const currentAgentDeveloperGate = computed(() => {
+  if (authStore.role !== 'agent') return true
+  const currentUserId = authStore.userInfo?.id
+  if (!currentUserId) return true
+  return agentPolicyByUserId.value.get(currentUserId)?.developerAllowsCreateUsers ?? true
+})
+
 const filteredAgentCustomers = computed(() =>
   agentCustomers.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
 )
@@ -426,32 +497,20 @@ const filteredAgentMaterials = computed(() =>
   agentMaterials.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
 )
 
-const effectiveAccountCreationPolicy = computed(() =>
-  resolveAccountCreationPolicy(accountCreationPolicyState),
-)
-
-const accountCreationPolicyRows = computed(() =>
-  accountCreationPolicies.map((policy) => {
-    const enabled =
-      policy.role === 'developer'
-        ? effectiveAccountCreationPolicy.value.developerCanCreateAdmins &&
-          effectiveAccountCreationPolicy.value.developerCanCreateAgents &&
-          effectiveAccountCreationPolicy.value.developerCanCreateUsers
-        : policy.role === 'admin'
-          ? effectiveAccountCreationPolicy.value.adminCanCreateAgents
-          : effectiveAccountCreationPolicy.value.agentCanCreateUsers
-
-    return {
-      ...policy,
-      enabled,
-      controllerText: policy.controllerText
-        ? policy.controllerText
-        : policy.controlledBy.length
-        ? policy.controlledBy.map((role) => roleTabs.find((tab) => tab.value === role)?.label ?? role).join(' + ')
-        : '始终开启',
-    }
-  }),
-)
+const effectiveAccountCreationPolicy = computed(() => {
+  const state = {
+    ...accountCreationPolicyState,
+    developerAllowsAdminCreateAgentsAndUsers:
+      accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers &&
+      currentAdminDeveloperGate.value,
+    developerAllowsAdminCreateUsers:
+      accountCreationPolicyState.developerAllowsAdminCreateUsers,
+    developerAllowsAgentCreateUsers:
+      accountCreationPolicyState.developerAllowsAgentCreateUsers &&
+      currentAgentDeveloperGate.value,
+  }
+  return resolveAccountCreationPolicy(state)
+})
 
 const agentCreationGateText = computed(() => {
   if (!accountCreationPolicyState.developerAllowsAgentCreateUsers) {
@@ -467,6 +526,21 @@ function defaultPlanForRole(role: PlatformUserTargetRole): PlatformUserPlanCode 
   if (role === 'admin') return 'flagship'
   if (role === 'agent') return 'team'
   return 'basic'
+}
+
+function syncPlanInitialPoints(planCode: PlatformUserPlanCode) {
+  createAccountForm.initialPoints = planInitialPoints[planCode]
+}
+
+function handleCreateTargetRoleChange(value: string | number | null) {
+  const role = value as PlatformUserTargetRole
+  const nextPlan = defaultPlanForRole(role)
+  createAccountForm.planCode = nextPlan
+  syncPlanInitialPoints(nextPlan)
+}
+
+function handleCreatePlanChange(value: string | number | null) {
+  syncPlanInitialPoints(value as PlatformUserPlanCode)
 }
 
 function targetRoleLabel(role: PlatformUserTargetRole) {
@@ -517,6 +591,16 @@ function canDeleteCustomer(row: CreditsCustomerProfile) {
   )
 }
 
+function canPromoteCustomer(row: CreditsCustomerProfile) {
+  const targetRole = matrixTargetRole(row.role)
+  if (targetRole !== 'user' || row.status !== 'active' || authStore.userInfo?.id === row.userId) {
+    return false
+  }
+
+  if (activeRole.value === 'developer') return true
+  return activeRole.value === 'admin' && effectiveAccountCreationPolicy.value.adminCanPromoteUserToAgent
+}
+
 function deleteActionText(row: CreditsCustomerProfile) {
   const targetRole = matrixTargetRole(row.role)
   if (activeRole.value === 'admin' && targetRole === 'agent') return '禁用代理商'
@@ -540,6 +624,23 @@ function agentProfileToCustomerProfile(row: PlatformAgentProfile): CreditsCustom
     status: row.status,
     createdAt: row.createdAt,
   }
+}
+
+function formatCreditsBalance(row: CreditsCustomerProfile) {
+  const value = row.creditsAvailableBalance ?? row.creditsTotalBalance
+  if (value === null || value === undefined || value === '') return '-'
+
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return String(value)
+  return numeric.toLocaleString('zh-CN', {
+    minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 4,
+  })
+}
+
+function formatAgentCustomerCount(row: CreditsCustomerProfile) {
+  if (matrixTargetRole(row.role) !== 'agent') return 'N/A'
+  return String(agentCustomerCountByUserId.value.get(row.userId) ?? 0)
 }
 
 function openDeleteAgentModal(row: PlatformAgentProfile) {
@@ -574,7 +675,7 @@ function resetCreateAccountForm(role: PlatformUserTargetRole) {
   createAccountForm.email = ''
   createAccountForm.applicationCode = defaultApplicationCode()
   createAccountForm.planCode = defaultPlanForRole(role)
-  createAccountForm.initialPoints = 0
+  syncPlanInitialPoints(createAccountForm.planCode)
 }
 
 function openCreateAccountModal(role: PlatformUserTargetRole) {
@@ -585,6 +686,90 @@ function openCreateAccountModal(role: PlatformUserTargetRole) {
 
   resetCreateAccountForm(role)
   isCreateAccountModalOpen.value = true
+}
+
+async function handleAdminGateChange(
+  adminUserId: string,
+  gate: 'createUsers' | 'createAgents',
+  enabled: boolean,
+) {
+  const previous = [...adminPolicyOverrides.value]
+  adminPolicyOverrides.value = adminPolicyOverrides.value.map((item) =>
+    item.userId === adminUserId
+      ? {
+          ...item,
+          ...(gate === 'createUsers'
+            ? {
+                developerAllowsCreateUsers: enabled,
+                effectiveCanCreateUsers:
+                  accountCreationPolicyState.developerAllowsAdminCreateUsers && enabled,
+              }
+            : {
+                developerAllowsCreateAgents: enabled,
+                effectiveCanCreateAgents:
+                  accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers && enabled,
+              }),
+        }
+      : item,
+  )
+  updatingAdminPolicyUserId.value = adminUserId
+
+  try {
+    const result = await updatePlatformAdminPolicyOverride(adminUserId, {
+      ...(gate === 'createUsers'
+        ? { developerAllowsCreateUsers: enabled }
+        : { developerAllowsCreateAgents: enabled }),
+    })
+    adminPolicyOverrides.value = result.items
+    message.success(
+      gate === 'createUsers'
+        ? enabled
+          ? '已允许该 Admin 创建 User'
+          : '已关闭该 Admin 创建 User'
+        : enabled
+          ? '已允许该 Admin 创建 Agent'
+          : '已关闭该 Admin 创建 Agent',
+    )
+  } catch (error) {
+    adminPolicyOverrides.value = previous
+    const text = error instanceof Error ? error.message : '更新公司管理员授权失败'
+    message.error(text)
+  } finally {
+    updatingAdminPolicyUserId.value = null
+  }
+}
+
+async function handleAgentCreateUserDisableChange(agentUserId: string, disabled: boolean) {
+  const previous = [...agentPolicyOverrides.value]
+  const enabled = !disabled
+  agentPolicyOverrides.value = agentPolicyOverrides.value.map((item) =>
+    item.userId === agentUserId
+      ? {
+          ...item,
+          developerAllowsCreateUsers: enabled,
+          developerDisabledCreateUsers: disabled,
+          effectiveCanCreateUsers:
+            accountCreationPolicyState.developerAllowsAgentCreateUsers &&
+            accountCreationPolicyState.adminAllowsAgentCreateUsers &&
+            enabled,
+        }
+      : item,
+  )
+  updatingAgentPolicyUserId.value = agentUserId
+
+  try {
+    const result = await updatePlatformAgentPolicyOverride(agentUserId, {
+      developerAllowsCreateUsers: enabled,
+    })
+    agentPolicyOverrides.value = result.items
+    message.success(disabled ? '已禁用该 Agent 创建 User' : '已允许该 Agent 创建 User')
+  } catch (error) {
+    agentPolicyOverrides.value = previous
+    const text = error instanceof Error ? error.message : '更新代理商授权失败'
+    message.error(text)
+  } finally {
+    updatingAgentPolicyUserId.value = null
+  }
 }
 
 async function handleCreateAccount() {
@@ -637,6 +822,26 @@ async function handleCreateAccount() {
     message.error(error instanceof Error ? error.message : '创建账号失败')
   } finally {
     isCreatingAccount.value = false
+  }
+}
+
+async function handlePromoteUserToAgent(row: CreditsCustomerProfile) {
+  if (!canPromoteCustomer(row)) {
+    message.warning('当前 User 升级为 Agent 的权限已关闭')
+    return
+  }
+
+  promotingUserId.value = row.userId
+  try {
+    const result = await promotePlatformUserToAgent(row.userId, {
+      applicationCode: row.applicationCode,
+    })
+    message.success(`已将 ${result.user.displayName} 升级为代理`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '升级为代理失败')
+  } finally {
+    promotingUserId.value = null
   }
 }
 
@@ -824,11 +1029,6 @@ async function handleDeleteAccount() {
   }
 }
 
-function policyTagType(enabled: boolean, controlled: boolean) {
-  if (!enabled) return 'error'
-  return controlled ? 'warning' : 'success'
-}
-
 function renderDetailButton(title: string, row: unknown) {
   return h(
     NButton,
@@ -844,24 +1044,88 @@ function renderDetailButton(title: string, row: unknown) {
   )
 }
 
+function functionDraftKey(row: CreditsAdminOverview['applicationFunctions'][number]) {
+  return `${row.applicationCode ?? 'unknown'}:${row.code}`
+}
+
+function functionDraftValue(row: CreditsAdminOverview['applicationFunctions'][number]) {
+  const key = functionDraftKey(row)
+  return functionPointDrafts[key] ?? Number(row.defaultPoints ?? 0)
+}
+
+function canEditFunctionDefaultPoints(row: CreditsAdminOverview['applicationFunctions'][number]) {
+  return (
+    activeRole.value === 'developer' &&
+    selectedApplicationCode.value !== 'all' &&
+    !!row.applicationCode &&
+    row.status !== 'planned'
+  )
+}
+
+async function handleSaveFunctionDefaultPoints(
+  row: CreditsAdminOverview['applicationFunctions'][number],
+) {
+  if (!canEditFunctionDefaultPoints(row) || !row.applicationCode) {
+    message.warning('请选择已接入应用后再编辑默认积分')
+    return
+  }
+
+  const value = Number(functionDraftValue(row))
+  if (!Number.isFinite(value) || value < 0) {
+    message.error('默认积分必须为非负数字')
+    return
+  }
+
+  const key = functionDraftKey(row)
+  updatingFunctionKey.value = key
+  try {
+    await updateApplicationFunctionDefaultPoints(row.applicationCode, row.code, value)
+    message.success(`已更新 ${row.name} 默认积分`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新默认积分失败')
+  } finally {
+    updatingFunctionKey.value = null
+  }
+}
+
 const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]> = [
-  {
-    title: '应用',
-    key: 'applicationCode',
-    width: 160,
-    render(row) {
-      return row.applicationName ?? row.applicationCode ?? '-'
-    },
-  },
   { title: '功能编码', key: 'code', width: 220 },
   { title: '功能名称', key: 'name', width: 200 },
   { title: '计费模式', key: 'chargeMode', width: 140, render(row) { return row.chargeMode ?? '-' } },
   {
     title: '默认积分',
     key: 'defaultPoints',
-    width: 120,
+    width: 230,
     render(row) {
-      return Number(row.defaultPoints ?? 0).toLocaleString('zh-CN')
+      return h(
+        'div',
+        { class: 'admin-function-points-cell' },
+        [
+          h(NInputNumber, {
+            value: functionDraftValue(row),
+            min: 0,
+            precision: 4,
+            size: 'small',
+            disabled: !canEditFunctionDefaultPoints(row),
+            'onUpdate:value': (value: number | null) => {
+              functionPointDrafts[functionDraftKey(row)] = value
+            },
+          }),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              disabled: !canEditFunctionDefaultPoints(row),
+              loading: updatingFunctionKey.value === functionDraftKey(row),
+              onClick: () => handleSaveFunctionDefaultPoints(row),
+            },
+            { default: () => '保存' },
+          ),
+        ],
+      )
     },
   },
   {
@@ -1063,8 +1327,22 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   },
   { title: '角色', key: 'role', width: 110 },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
-  { title: 'Credits User', key: 'creditsUserId', width: 130 },
-  { title: '创建角色', key: 'createdByRole', width: 120 },
+  {
+    title: '积分余额',
+    key: 'creditsAvailableBalance',
+    width: 130,
+    render(row) {
+      return formatCreditsBalance(row)
+    },
+  },
+  {
+    title: '名下客户数',
+    key: 'agentCustomerCount',
+    width: 130,
+    render(row) {
+      return formatAgentCustomerCount(row)
+    },
+  },
   {
     title: '状态',
     key: 'status',
@@ -1088,18 +1366,36 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
     render(row) {
       const canAdjust = canAdjustCustomer(row)
       const canDelete = canDeleteCustomer(row)
-      if (!canAdjust && !canDelete) return '-'
+      const canPromote = canPromoteCustomer(row)
+      if (!canAdjust && !canDelete && !canPromote) return '-'
 
-      return h(
-        'div',
-        { class: 'admin-table-actions' },
-        [
+      const actions = []
+      if (matrixTargetRole(row.role) === 'user') {
+        actions.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'success',
+              secondary: true,
+              disabled: !canPromote,
+              loading: promotingUserId.value === row.userId,
+              onClick: () => handlePromoteUserToAgent(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:account-arrow-up-outline' }),
+              default: () => '升级为代理',
+            },
+          ),
+        )
+      }
+      if (canAdjust) {
+        actions.push(
           h(
             NButton,
             {
               size: 'small',
               secondary: true,
-              disabled: !canAdjust,
               onClick: () => openAdjustCreditsModal(row),
             },
             {
@@ -1107,19 +1403,140 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
               default: () => '增减积分',
             },
           ),
+        )
+      }
+      if (canDelete) {
+        actions.push(
           h(
             NButton,
             {
               size: 'small',
               type: 'error',
               secondary: true,
-              disabled: !canDelete,
               onClick: () => openDeleteAccountModal(row),
             },
             {
               icon: () => h(Icon, { icon: 'mdi:trash-can-outline' }),
               default: () => '删除',
             },
+          ),
+        )
+      }
+
+      return h(
+        'div',
+        { class: 'admin-table-actions' },
+        actions,
+      )
+    },
+  },
+]
+
+const adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride> = [
+  {
+    title: '公司管理员',
+    key: 'displayName',
+    minWidth: 220,
+    render(row) {
+      return `${row.displayName} (${row.username})`
+    },
+  },
+  { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  {
+    title: '允许创建 User',
+    key: 'developerAllowsCreateUsers',
+    minWidth: 220,
+    render(row) {
+      const rowEnabled = row.developerAllowsCreateUsers
+      const effectiveEnabled =
+        accountCreationPolicyState.developerAllowsAdminCreateUsers && rowEnabled
+
+      return h(
+        'div',
+        { class: 'admin-auth-switch-cell' },
+        [
+          h(NSwitch, {
+            value: rowEnabled,
+            loading: updatingAdminPolicyUserId.value === row.userId,
+            disabled: !accountCreationPolicyState.developerAllowsAdminCreateUsers,
+            'onUpdate:value': (value: boolean) =>
+              handleAdminGateChange(row.userId, 'createUsers', value),
+          }),
+          h(
+            'span',
+            { class: effectiveEnabled ? 'is-enabled' : 'is-disabled' },
+            effectiveEnabled ? '已允许' : '已关闭',
+          ),
+        ],
+      )
+    },
+  },
+  {
+    title: '允许创建 Agent / User 成为 Agent',
+    key: 'developerAllowsCreateAgents',
+    minWidth: 260,
+    render(row) {
+      const rowEnabled = row.developerAllowsCreateAgents
+      const effectiveEnabled =
+        accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers && rowEnabled
+
+      return h(
+        'div',
+        { class: 'admin-auth-switch-cell' },
+        [
+          h(NSwitch, {
+            value: rowEnabled,
+            loading: updatingAdminPolicyUserId.value === row.userId,
+            disabled: !accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers,
+            'onUpdate:value': (value: boolean) =>
+              handleAdminGateChange(row.userId, 'createAgents', value),
+          }),
+          h(
+            'span',
+            { class: effectiveEnabled ? 'is-enabled' : 'is-disabled' },
+            effectiveEnabled ? '已允许' : '已关闭',
+          ),
+        ],
+      )
+    },
+  },
+]
+
+const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> = [
+  {
+    title: '代理商',
+    key: 'displayName',
+    minWidth: 220,
+    render(row) {
+      return `${row.displayName} (${row.username})`
+    },
+  },
+  { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  {
+    title: '创建 User',
+    key: 'developerDisabledCreateUsers',
+    minWidth: 240,
+    render(row) {
+      const effectiveEnabled =
+        accountCreationPolicyState.developerAllowsAgentCreateUsers &&
+        accountCreationPolicyState.adminAllowsAgentCreateUsers &&
+        !row.developerDisabledCreateUsers
+
+      return h(
+        'div',
+        { class: 'admin-auth-switch-cell' },
+        [
+          h(NSwitch, {
+            value: !row.developerDisabledCreateUsers,
+            loading: updatingAgentPolicyUserId.value === row.userId,
+            disabled: !accountCreationPolicyState.developerAllowsAgentCreateUsers,
+            'onUpdate:value': (value: boolean) =>
+              handleAgentCreateUserDisableChange(row.userId, !value),
+          }),
+          h(
+            'span',
+            { class: effectiveEnabled ? 'is-enabled' : 'is-disabled' },
+            effectiveEnabled ? '可创建 User' : '已禁用',
           ),
         ],
       )
@@ -1380,7 +1797,7 @@ const developerPlaceholder = [
 </script>
 
 <template>
-  <main class="credits-admin-page" :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'">
+  <main class="credits-admin-page theme-light">
     <section class="admin-shell">
       <header class="admin-hero">
         <div class="admin-hero-copy">
@@ -1479,48 +1896,11 @@ const developerPlaceholder = [
           </button>
         </section>
 
-        <section class="admin-section">
-          <h2>应用接入目录</h2>
-          <div class="admin-app-grid">
-            <article
-              v-for="item in applicationCatalog"
-              :key="item.code"
-              class="admin-app-card"
-            >
-              <div>
-                <h3>{{ item.name }}</h3>
-                <p>{{ item.code }}</p>
-              </div>
-              <NTag
-                round
-                :bordered="false"
-                :type="item.statusText === '已注册' ? 'success' : 'info'"
-              >
-                {{ item.statusText }}
-              </NTag>
-              <span>{{ item.functions.join(' / ') }}</span>
-            </article>
-          </div>
-        </section>
-
         <template v-if="activeRole === 'developer'">
-          <section class="admin-section">
-            <h2>跨应用功能计费配置</h2>
-            <NDataTable
-              v-if="filteredApplicationFunctions.length"
-              :columns="functionColumns"
-              :data="filteredApplicationFunctions"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无功能计费配置" />
-          </section>
-
           <section class="admin-section">
             <h2>账号创建权限层级</h2>
             <p class="admin-section-note">
-              开发者可创建 Admin、Agent 和 User；开发者开关控制公司管理员是否能创建 Agent，也可禁用代理商创建 User。
+              开发者可创建 Admin、Agent 和 User；开发者开关分别控制公司管理员创建 User、创建 Agent/升级代理，以及代理商创建 User。
             </p>
             <div class="admin-action-row" aria-label="开发者创建账号">
               <NButton type="primary" @click="openCreateAccountModal('admin')">
@@ -1545,48 +1925,55 @@ const developerPlaceholder = [
             <div class="admin-toggle-grid">
               <article class="admin-toggle-card">
                 <div>
-                  <h3>开发者创建 Admin / Agent / User</h3>
-                  <p>最高层级权限，始终开启。</p>
+                  <h3>允许公司管理员创建 User</h3>
+                  <p>一级总开关；关闭后，公司管理员不能创建普通 User。</p>
                 </div>
-                <NSwitch :value="true" disabled />
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateUsers" />
               </article>
               <article class="admin-toggle-card">
                 <div>
                   <h3>允许公司管理员创建 Agent</h3>
-                  <p>关闭后，公司管理员不能创建 Agent，也不能让 User 成为 Agent。</p>
+                  <p>一级总开关；关闭后，所有公司管理员都不能创建 Agent，也不能让 User 成为 Agent。</p>
                 </div>
                 <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers" />
               </article>
               <article class="admin-toggle-card">
                 <div>
-                  <h3>禁用代理商创建 User</h3>
-                  <p>开发者覆盖开关；公司管理员通常控制代理商是否可创建 User。</p>
+                  <h3>允许代理商创建 User</h3>
+                  <p>一级总开关；关闭后，所有代理商都不能创建 User。</p>
                 </div>
-                <NSwitch
-                  :value="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
-                  @update:value="accountCreationPolicyState.developerAllowsAgentCreateUsers = !$event"
-                />
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAgentCreateUsers" />
               </article>
             </div>
-            <div class="admin-policy-grid">
-              <article
-                v-for="policy in accountCreationPolicyRows"
-                :key="policy.role"
-                class="admin-policy-card"
-              >
-                <div>
-                  <h3>{{ policy.label }}</h3>
-                  <p>{{ policy.scope }}</p>
-                  <p>{{ policy.capabilities.join(' / ') }}</p>
-                </div>
-                <NTag
-                  round
-                  :bordered="false"
-                  :type="policyTagType(policy.enabled, policy.controlledBy.length > 0)"
-                >
-                  {{ policy.enabled ? '可执行' : '已关闭' }} · {{ policy.controllerText }}
-                </NTag>
-              </article>
+            <div class="admin-subsection">
+              <h3>代理商授权</h3>
+              <p>
+                二级开关；默认全部关闭“禁用”。一级总开关开启时，开发者可单独禁用某个 Agent 创建 User。
+              </p>
+              <NDataTable
+                v-if="agentPolicyOverrides.length"
+                :columns="agentAuthorizationColumns"
+                :data="agentPolicyOverrides"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无代理商账号" />
+            </div>
+            <div class="admin-subsection">
+              <h3>公司管理员授权</h3>
+              <p>
+                二级开关；一级总开关开启后，开发者可单独控制每个 Admin 是否能创建 Agent、以及让 User 成为 Agent。
+              </p>
+              <NDataTable
+                v-if="adminPolicyOverrides.length"
+                :columns="adminAuthorizationColumns"
+                :data="adminPolicyOverrides"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无公司管理员账号" />
             </div>
           </section>
 
@@ -1601,6 +1988,36 @@ const developerPlaceholder = [
               :pagination="false"
             />
             <NEmpty v-else description="暂无客户档案" />
+          </section>
+
+          <section class="admin-section" id="developer-function-billing">
+            <button
+              type="button"
+              class="admin-collapse-trigger"
+              @click="isFunctionBillingOpen = !isFunctionBillingOpen"
+            >
+              <span>
+                <strong>跨应用功能计费配置</strong>
+                <small>
+                  {{ selectedApplicationCode === 'all' ? '请先在应用筛选中选择一个应用' : selectedApplicationLabel }}
+                </small>
+              </span>
+              <Icon :icon="isFunctionBillingOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" />
+            </button>
+            <div v-if="isFunctionBillingOpen" class="admin-collapse-body">
+              <NDataTable
+                v-if="selectedApplicationFunctions.length"
+                :columns="functionColumns"
+                :data="selectedApplicationFunctions"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty
+                v-else
+                :description="selectedApplicationCode === 'all' ? '请在应用筛选中选择一个应用后查看功能计费配置' : '暂无功能计费配置'"
+              />
+            </div>
           </section>
 
           <section class="admin-section">
@@ -1618,11 +2035,20 @@ const developerPlaceholder = [
           <section class="admin-section">
             <h2>账号创建权限</h2>
             <p class="admin-section-note">
-              公司管理员可创建和管理 Agent；普通 User 清单只读。公司管理员还可以控制代理商创建 User，以及 User 是否能成为 Agent。
+              公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。代理商创建 User 仍由公司管理员开关控制，开发者可覆盖禁用。
             </p>
             <div class="admin-action-row" aria-label="公司管理员创建账号">
               <NButton
                 type="primary"
+                :disabled="!effectiveAccountCreationPolicy.adminCanCreateUsers"
+                @click="openCreateAccountModal('user')"
+              >
+                <template #icon>
+                  <Icon icon="mdi:account-plus-outline" />
+                </template>
+                创建 User
+              </NButton>
+              <NButton
                 :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
                 @click="openCreateAccountModal('agent')"
               >
@@ -1633,6 +2059,13 @@ const developerPlaceholder = [
               </NButton>
             </div>
             <div class="admin-toggle-grid">
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>公司管理员创建 User</h3>
+                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
+                </div>
+                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
+              </article>
               <article class="admin-toggle-card">
                 <div>
                   <h3>公司管理员创建 Agent</h3>
@@ -1682,7 +2115,7 @@ const developerPlaceholder = [
           <section class="admin-section">
             <h2>用户清单</h2>
             <p class="admin-section-note">
-              公司管理员可读取全部客户余额/流水；普通 User 清单只读，不能直接调账、禁用或启用普通用户。
+              公司管理员可读取全部客户余额/流水；普通 User 可以通过“升级为代理”获得 Agent 后台登录权限。
             </p>
             <NDataTable
               v-if="filteredRegularUserProfiles.length"
@@ -1996,7 +2429,7 @@ const developerPlaceholder = [
             <NSelect
               v-model:value="createAccountForm.targetRole"
               :options="createTargetOptions"
-              @update:value="(value) => { createAccountForm.planCode = defaultPlanForRole(value as PlatformUserTargetRole) }"
+              @update:value="handleCreateTargetRoleChange"
             />
           </NFormItem>
           <div class="admin-create-form-grid">
@@ -2035,7 +2468,11 @@ const developerPlaceholder = [
               />
             </NFormItem>
             <NFormItem label="订阅计划">
-              <NSelect v-model:value="createAccountForm.planCode" :options="planOptions" />
+              <NSelect
+                v-model:value="createAccountForm.planCode"
+                :options="planOptions"
+                @update:value="handleCreatePlanChange"
+              />
             </NFormItem>
           </div>
           <NFormItem label="初始积分">
@@ -2271,6 +2708,19 @@ const developerPlaceholder = [
   color: var(--app-text);
 }
 
+.credits-admin-page.theme-light {
+  color-scheme: light;
+  --app-bg: #f6f9fc;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f8fafd;
+  --app-border: #e6ecf5;
+  --app-text: #0f172a;
+  --app-text-soft: #475569;
+  --app-text-muted: #64748b;
+  --app-text-disabled: #94a3b8;
+  --color-accent-blue: #2f6bff;
+}
+
 .admin-shell {
   display: flex;
   flex-direction: column;
@@ -2486,41 +2936,6 @@ const developerPlaceholder = [
   background: color-mix(in srgb, var(--color-accent-blue, #2f6bff) 8%, var(--app-surface));
 }
 
-.admin-app-grid,
-.admin-policy-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
-
-.admin-app-card,
-.admin-policy-card {
-  display: grid;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 16px 18px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: var(--app-surface-soft);
-}
-
-.admin-app-card h3,
-.admin-policy-card h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.admin-app-card p,
-.admin-policy-card p,
-.admin-app-card span {
-  margin: 0;
-  color: var(--app-text-soft);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.55;
-}
-
 .admin-toggle-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -2561,6 +2976,33 @@ const developerPlaceholder = [
   margin: 0 0 14px;
 }
 
+.admin-subsection {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface-soft);
+}
+
+.admin-subsection h3,
+.admin-subsection p {
+  margin: 0;
+}
+
+.admin-subsection h3 {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.admin-subsection p {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
 .admin-section {
   padding: 20px clamp(18px, 1.8vw, 26px);
   border: 1px solid var(--app-border);
@@ -2583,6 +3025,47 @@ const developerPlaceholder = [
   color: var(--app-text-soft);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.admin-collapse-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-collapse-trigger span {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-collapse-trigger strong {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.admin-collapse-trigger small {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-collapse-trigger svg {
+  flex: 0 0 auto;
+  color: var(--app-text-soft);
+  font-size: 22px;
+}
+
+.admin-collapse-body {
+  margin-top: 14px;
 }
 
 .admin-section-actions {
@@ -2610,6 +3093,17 @@ const developerPlaceholder = [
   border-radius: 10px;
   font-size: 14px;
   font-weight: 700;
+}
+
+:deep(.admin-function-points-cell) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.admin-function-points-cell .n-input-number) {
+  width: 124px;
+  flex: 0 0 124px;
 }
 
 .admin-agent-grid {
@@ -2779,6 +3273,25 @@ const developerPlaceholder = [
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+:deep(.admin-auth-switch-cell) {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+:deep(.admin-auth-switch-cell span) {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+:deep(.admin-auth-switch-cell .is-enabled) {
+  color: #12845d;
+}
+
+:deep(.admin-auth-switch-cell .is-disabled) {
+  color: #b45309;
 }
 
 :deep(.admin-create-modal.n-modal) {

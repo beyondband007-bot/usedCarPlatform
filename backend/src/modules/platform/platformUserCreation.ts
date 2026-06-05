@@ -75,6 +75,28 @@ export type PlatformUserCreationResponse = {
   };
 };
 
+export type PlatformUserPromotionResponse = {
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    phone: string | null;
+    role: "agent";
+    creditsUserId: number | null;
+    accountScope: "personal" | "tenant";
+  };
+  backOfficeRoleAssignment: {
+    id: string;
+    userId: string;
+    roleCode: "agent";
+    status: "active";
+  };
+  policyDecision: {
+    allowed: boolean;
+    reason: string;
+  };
+};
+
 type IdempotencyRow = RowDataPacket & {
   id: string;
   request_hash: string;
@@ -82,7 +104,23 @@ type IdempotencyRow = RowDataPacket & {
   status: string;
 };
 
+type PromotionTargetRow = RowDataPacket & {
+  id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  status: string;
+  credits_user_id: number | null;
+  account_scope: "personal" | "tenant";
+  roles_csv: string | null;
+};
+
 const DEFAULT_APPLICATION_CODE = "used-car-platform";
+const defaultInitialPointsByPlan: Record<SubscriptionPlanCode, number> = {
+  basic: 20_000,
+  team: 100_000,
+  flagship: 800_000,
+};
 
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -132,8 +170,8 @@ function normalizePlanCode(value: unknown, targetRole: PlatformUserCreationTarge
   return "basic";
 }
 
-function normalizeInitialPoints(value: unknown) {
-  if (value === undefined || value === null || value === "") return 0;
+function normalizeInitialPoints(value: unknown, defaultPoints: number) {
+  if (value === undefined || value === null || value === "") return defaultPoints;
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw errors.invalidParameter("initialPoints must be a non-negative number");
@@ -159,6 +197,7 @@ export function normalizePlatformUserCreationInput(
   const phone = normalizeString(input.phone) || null;
   const email = normalizeString(input.email) || `${username}@used-car.local`;
   const applicationCode = normalizeApplicationCode(input.applicationCode);
+  const planCode = normalizePlanCode(input.planCode, targetRole);
 
   return {
     username,
@@ -169,8 +208,8 @@ export function normalizePlatformUserCreationInput(
     targetRole,
     applicationCode,
     accountScope: normalizeAccountScope(input.accountScope),
-    planCode: normalizePlanCode(input.planCode, targetRole),
-    initialPoints: normalizeInitialPoints(input.initialPoints),
+    planCode,
+    initialPoints: normalizeInitialPoints(input.initialPoints, defaultInitialPointsByPlan[planCode]),
     idempotencyKey: normalizeIdempotencyKey(input.idempotencyKey),
   };
 }
@@ -309,6 +348,35 @@ async function writeDeniedAudit(input: {
       idempotencyKey: input.idempotencyKey,
       requestHash: input.requestHash,
       metadataJson: JSON.stringify({ accountScope: input.accountScope }),
+    },
+  );
+}
+
+async function writePromotionAudit(input: {
+  operator: AuthenticatedUser;
+  targetUserId: string;
+  applicationCode: string;
+  policySnapshot: unknown;
+  decision: "allowed" | "denied";
+  reason: string;
+}) {
+  await pool.query(
+    `INSERT INTO account_creation_audit_logs
+      (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+       application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+     VALUES
+      (:id, :operatorUserId, :operatorRoleCode, :targetUserId, 'agent',
+       :applicationCode, 'account:promote', :policySnapshotJson, :decision, :reason, :metadataJson)`,
+    {
+      id: createId("acal"),
+      operatorUserId: input.operator.id,
+      operatorRoleCode: input.operator.role,
+      targetUserId: input.targetUserId,
+      applicationCode: input.applicationCode,
+      policySnapshotJson: JSON.stringify(input.policySnapshot),
+      decision: input.decision,
+      reason: input.reason,
+      metadataJson: JSON.stringify({ source: "user-to-agent-promotion" }),
     },
   );
 }
@@ -523,5 +591,151 @@ export async function createPlatformUser(
   } catch (error) {
     await failIdempotency(reservation.id);
     throw error;
+  }
+}
+
+export async function promotePlatformUserToAgent(
+  req: Parameters<typeof getRequiredCurrentUser>[0],
+  userId: string,
+  payload: { applicationCode?: unknown } = {},
+): Promise<PlatformUserPromotionResponse> {
+  const current = getRequiredCurrentUser(req);
+  if (!current.user.permissions.includes(BACK_OFFICE_PERMISSION)) {
+    throw errors.forbidden("back office permission is required");
+  }
+
+  const applicationCode = normalizeApplicationCode(payload.applicationCode);
+  const policyDecision = await accountCreationPolicyService.canPromoteUserToAgent({
+    userId: current.user.id,
+    roleCode: current.user.role,
+  });
+
+  if (!policyDecision.allowed) {
+    await writePromotionAudit({
+      operator: current.user,
+      targetUserId: userId,
+      applicationCode,
+      policySnapshot: policyDecision.snapshot,
+      decision: "denied",
+      reason: policyDecision.reason,
+    });
+    throw errors.forbidden("user-to-agent promotion policy denied this request", {
+      reason: policyDecision.reason,
+      targetUserId: userId,
+    });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [users] = await connection.query<PromotionTargetRow[]>(
+      `SELECT
+         u.id,
+         u.username,
+         u.display_name,
+         u.phone,
+       u.status,
+       u.credits_user_id,
+       u.account_scope,
+        (
+          SELECT GROUP_CONCAT(DISTINCT aur.role_code ORDER BY aur.role_code SEPARATOR ',')
+          FROM app_user_roles aur
+          WHERE aur.user_id = u.id
+        ) roles_csv
+       FROM app_users u
+       WHERE u.id = :userId
+       LIMIT 1
+       FOR UPDATE`,
+      { userId },
+    );
+    const user = users[0];
+    if (!user || user.status !== "active") {
+      throw errors.invalidParameter("target user account not found or inactive");
+    }
+    if (user.id === current.user.id) {
+      throw errors.invalidParameter("cannot promote the current operator account");
+    }
+
+    const roles = new Set((user.roles_csv ?? "enterprise").split(",").filter(Boolean));
+    if (roles.has("developer") || roles.has("admin")) {
+      throw errors.invalidParameter("Developer/Admin accounts cannot be promoted to Agent");
+    }
+    if (roles.has("agent")) {
+      throw errors.conflict("target user is already an Agent");
+    }
+
+    await connection.query(
+      `INSERT INTO app_user_roles (user_id, role_code)
+       VALUES (:userId, 'agent')
+       ON DUPLICATE KEY UPDATE role_code = VALUES(role_code)`,
+      { userId },
+    );
+
+    const roleAssignmentId = createId("boa");
+    await connection.query(
+      `INSERT INTO back_office_role_assignments
+        (id, user_id, role_code, assigned_by_user_id, status, scope_json)
+       VALUES
+        (:id, :userId, 'agent', :assignedByUserId, 'active', :scopeJson)
+       ON DUPLICATE KEY UPDATE
+        assigned_by_user_id = VALUES(assigned_by_user_id),
+        status = 'active',
+        scope_json = VALUES(scope_json)`,
+      {
+        id: roleAssignmentId,
+        userId,
+        assignedByUserId: current.user.id,
+        scopeJson: JSON.stringify({ applicationCode, promotedFromUser: true }),
+      },
+    );
+
+    await connection.query(
+      `INSERT INTO account_creation_audit_logs
+        (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+         application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+       VALUES
+        (:id, :operatorUserId, :operatorRoleCode, :targetUserId, 'agent',
+         :applicationCode, 'account:promote', :policySnapshotJson, 'allowed', :reason, :metadataJson)`,
+      {
+        id: createId("acal"),
+        operatorUserId: current.user.id,
+        operatorRoleCode: current.user.role,
+        targetUserId: userId,
+        applicationCode,
+        policySnapshotJson: JSON.stringify(policyDecision.snapshot),
+        reason: policyDecision.reason,
+        metadataJson: JSON.stringify({ source: "user-to-agent-promotion" }),
+      },
+    );
+
+    await connection.commit();
+
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name,
+        phone: user.phone,
+        role: "agent",
+        creditsUserId: user.credits_user_id,
+        accountScope: user.account_scope,
+      },
+      backOfficeRoleAssignment: {
+        id: roleAssignmentId,
+        userId,
+        roleCode: "agent",
+        status: "active",
+      },
+      policyDecision: {
+        allowed: policyDecision.allowed,
+        reason: policyDecision.reason,
+      },
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
 }

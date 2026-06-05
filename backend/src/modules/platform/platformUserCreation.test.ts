@@ -23,6 +23,7 @@ assert.equal(first.username, "new_user");
 assert.equal(first.applicationCode, "used-car-platform");
 assert.equal(first.accountScope, "personal");
 assert.equal(first.planCode, "basic");
+assert.equal(first.initialPoints, 20000);
 assert.equal(platformUserCreationRequestHash(first), platformUserCreationRequestHash(second));
 
 const agent = normalizePlatformUserCreationInput({
@@ -32,6 +33,16 @@ const agent = normalizePlatformUserCreationInput({
   idempotencyKey: "agent-key",
 });
 assert.equal(agent.planCode, "team");
+assert.equal(agent.initialPoints, 100000);
+
+const admin = normalizePlatformUserCreationInput({
+  username: "admin_created",
+  password: "123456",
+  targetRole: "admin",
+  idempotencyKey: "admin-key",
+});
+assert.equal(admin.planCode, "flagship");
+assert.equal(admin.initialPoints, 800000);
 
 assert.throws(
   () =>

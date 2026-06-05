@@ -180,6 +180,33 @@ class CreditsClient {
     );
   }
 
+  async updateFunctionDefaultPoints(input: {
+    applicationCode: string;
+    functionCode: string;
+    defaultPoints: string;
+  }) {
+    const functions = await this.listFunctions(input.applicationCode);
+    const fn = functions.functions.find((item) => item.code === input.functionCode);
+    if (!fn) {
+      throw errors.invalidParameter("credit function not found", {
+        applicationCode: input.applicationCode,
+        functionCode: input.functionCode,
+      });
+    }
+
+    return this.post<CreditsFunctionResponse>(
+      `/integration/applications/${encodeURIComponent(input.applicationCode)}/functions`,
+      {
+        code: fn.code,
+        name: fn.name,
+        description: fn.description,
+        chargeMode: fn.chargeMode,
+        defaultPoints: input.defaultPoints,
+        status: fn.status,
+      },
+    );
+  }
+
   async createPaymentOrder(input: {
     userId: number;
     accountScope: "personal" | "tenant";

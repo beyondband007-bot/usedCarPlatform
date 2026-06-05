@@ -870,6 +870,9 @@ export interface CreditsCustomerProfile {
   phone?: string | null
   role: string
   creditsUserId: number | string
+  creditsTotalBalance?: string | number | null
+  creditsAvailableBalance?: string | number | null
+  creditsCurrency?: string | null
   accountScope: 'personal' | 'tenant' | string
   creditsTenantId?: number | string | null
   createdByUserId: string
@@ -1034,6 +1037,39 @@ export interface PlatformAgentList {
   items: PlatformAgentProfile[]
 }
 
+export interface PlatformAdminPolicyOverride {
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  developerAllowsCreateUsers: boolean
+  developerAllowsCreateAgents: boolean
+  effectiveCanCreateUsers: boolean
+  effectiveCanCreateAgents: boolean
+  updatedByUserId?: string | null
+  updatedAt?: string | null
+}
+
+export interface PlatformAdminPolicyOverrideList {
+  items: PlatformAdminPolicyOverride[]
+}
+
+export interface PlatformAgentPolicyOverride {
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  developerAllowsCreateUsers: boolean
+  developerDisabledCreateUsers: boolean
+  effectiveCanCreateUsers: boolean
+  updatedByUserId?: string | null
+  updatedAt?: string | null
+}
+
+export interface PlatformAgentPolicyOverrideList {
+  items: PlatformAgentPolicyOverride[]
+}
+
 export interface CreateAgentLeadPayload {
   agentUserId?: string
   applicationCode?: string
@@ -1128,6 +1164,28 @@ export interface PlatformUserCreationResult {
   }
 }
 
+export interface PlatformUserPromotionResult {
+  user: {
+    id: string
+    username: string
+    displayName: string
+    phone: string | null
+    role: 'agent'
+    creditsUserId: number | string | null
+    accountScope: string
+  }
+  backOfficeRoleAssignment: {
+    id: string
+    userId: string
+    roleCode: 'agent'
+    status: 'active'
+  }
+  policyDecision: {
+    allowed: boolean
+    reason: string
+  }
+}
+
 export interface AdjustPlatformCreditsPayload {
   idempotencyKey: string
   targetUserId: string
@@ -1160,6 +1218,17 @@ export interface DeletePlatformUserResult {
     displayName: string
     role: string
   }
+}
+
+export interface UpdateApplicationFunctionDefaultPointsResult {
+  id: number | string
+  applicationId: number | string
+  applicationCode?: string
+  code: string
+  name: string
+  chargeMode: string
+  defaultPoints: string | number
+  status: string
 }
 
 function extractCreditsList<T>(payload: unknown, keys: string[]) {
@@ -1433,6 +1502,57 @@ export async function getPlatformAgents(): Promise<PlatformAgentList> {
   return unwrapApiResponse(response)
 }
 
+export async function getPlatformAdminPolicyOverrides(): Promise<PlatformAdminPolicyOverrideList> {
+  const response = await request.get<ApiResponse<PlatformAdminPolicyOverrideList>>(
+    '/platform/admin-policy-overrides',
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function updatePlatformAdminPolicyOverride(
+  adminUserId: string,
+  payload: {
+    developerAllowsCreateUsers?: boolean
+    developerAllowsCreateAgents?: boolean
+  },
+): Promise<PlatformAdminPolicyOverrideList> {
+  const response = await request.patch<ApiResponse<PlatformAdminPolicyOverrideList>>(
+    `/platform/admin-policy-overrides/${encodeURIComponent(adminUserId)}`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformAgentPolicyOverrides(): Promise<PlatformAgentPolicyOverrideList> {
+  const response = await request.get<ApiResponse<PlatformAgentPolicyOverrideList>>(
+    '/platform/agent-policy-overrides',
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function updatePlatformAgentPolicyOverride(
+  agentUserId: string,
+  payload: { developerAllowsCreateUsers: boolean },
+): Promise<PlatformAgentPolicyOverrideList> {
+  const response = await request.patch<ApiResponse<PlatformAgentPolicyOverrideList>>(
+    `/platform/agent-policy-overrides/${encodeURIComponent(agentUserId)}`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function updateApplicationFunctionDefaultPoints(
+  applicationCode: string,
+  functionCode: string,
+  defaultPoints: number,
+): Promise<UpdateApplicationFunctionDefaultPointsResult> {
+  const response = await request.patch<ApiResponse<UpdateApplicationFunctionDefaultPointsResult>>(
+    `/platform/application-functions/${encodeURIComponent(applicationCode)}/${encodeURIComponent(functionCode)}/default-points`,
+    { defaultPoints },
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function getCommissionPolicy(): Promise<CommissionPolicy> {
   const response = await request.get<ApiResponse<CommissionPolicy>>('/platform/commission-policy')
   return unwrapApiResponse(response)
@@ -1475,6 +1595,17 @@ export async function createPlatformUser(
 ): Promise<PlatformUserCreationResult> {
   const response = await request.post<ApiResponse<PlatformUserCreationResult>>(
     '/platform/users',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function promotePlatformUserToAgent(
+  userId: string,
+  payload: { applicationCode?: string } = {},
+): Promise<PlatformUserPromotionResult> {
+  const response = await request.post<ApiResponse<PlatformUserPromotionResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/promote-agent`,
     payload,
   )
   return unwrapApiResponse(response)

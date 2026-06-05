@@ -8,21 +8,33 @@ import {
   NNotificationProvider,
   type GlobalThemeOverrides,
 } from "naive-ui";
+import { useRoute } from "vue-router";
 
 import { syncDocumentTheme } from "@/composables/useDocumentTheme";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
-syncDocumentTheme(appStore.isDarkMode);
+const route = useRoute();
+
+const isBackOfficeRoute = computed(
+  () =>
+    route.path.startsWith("/back-office") ||
+    route.path.startsWith("/reusable-credits-console") ||
+    route.path.startsWith("/credits-admin"),
+);
+
+const isEffectiveDarkMode = computed(() => appStore.isDarkMode && !isBackOfficeRoute.value);
+
+syncDocumentTheme(isEffectiveDarkMode.value);
 
 watchEffect(() => {
-  syncDocumentTheme(appStore.isDarkMode);
+  syncDocumentTheme(isEffectiveDarkMode.value);
 });
 
-const activeTheme = computed(() => (appStore.isDarkMode ? darkTheme : null));
+const activeTheme = computed(() => (isEffectiveDarkMode.value ? darkTheme : null));
 
 const themeOverrides = computed<GlobalThemeOverrides>(() =>
-  appStore.isDarkMode
+  isEffectiveDarkMode.value
     ? {
         // 夜间模式整体样式
 

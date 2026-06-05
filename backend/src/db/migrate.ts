@@ -684,6 +684,11 @@ const run = async () => {
     );
     await addColumnIfMissing("account_creation_audit_logs", "idempotency_key", "VARCHAR(160) NULL");
     await addColumnIfMissing("account_creation_audit_logs", "request_hash", "CHAR(64) NULL");
+    await addColumnIfMissing(
+      "back_office_admin_policy_overrides",
+      "developer_allows_create_users",
+      "TINYINT(1) NOT NULL DEFAULT 1 AFTER admin_user_id",
+    );
     await addIndexIfMissing(
       "account_creation_audit_logs",
       "idx_account_creation_audit_idempotency",

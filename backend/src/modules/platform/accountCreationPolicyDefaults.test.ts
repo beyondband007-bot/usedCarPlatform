@@ -25,7 +25,7 @@ assert.equal(defaults.developerCanCreateAdmins, true);
 assert.equal(defaults.developerCanCreateAgents, true);
 assert.equal(defaults.developerCanCreateUsers, true);
 assert.equal(defaults.adminCanCreateAgents, true);
-assert.equal(defaults.adminCanCreateUsers, false);
+assert.equal(defaults.adminCanCreateUsers, true);
 assert.equal(defaults.adminCanPromoteUserToAgent, true);
 assert.equal(defaults.agentCanCreateUsers, true);
 
@@ -33,7 +33,7 @@ assert.equal(canCreateAccountFromSnapshot("developer", "admin", defaultAccountCr
 assert.equal(canCreateAccountFromSnapshot("developer", "agent", defaultAccountCreationPolicySnapshot).allowed, true);
 assert.equal(canCreateUserFromSnapshot("developer", defaultAccountCreationPolicySnapshot).allowed, true);
 assert.equal(canCreateAccountFromSnapshot("admin", "agent", defaultAccountCreationPolicySnapshot).allowed, true);
-assert.equal(canCreateUserFromSnapshot("admin", defaultAccountCreationPolicySnapshot).allowed, false);
+assert.equal(canCreateUserFromSnapshot("admin", defaultAccountCreationPolicySnapshot).allowed, true);
 assert.equal(canCreateUserFromSnapshot("agent", defaultAccountCreationPolicySnapshot).allowed, true);
 assert.equal(canCreateUserFromSnapshot("enterprise", defaultAccountCreationPolicySnapshot).allowed, false);
 
@@ -41,8 +41,8 @@ assert.ok(defaultBackOfficeRolePermissions.developer.includes("account:delete:ad
 assert.ok(defaultBackOfficeRolePermissions.developer.includes("credits:points:adjust"));
 assert.ok(defaultBackOfficeRolePermissions.developer.includes("credits:transaction:read:all"));
 assert.ok(defaultBackOfficeRolePermissions.admin.includes("account:delete:agent"));
+assert.ok(defaultBackOfficeRolePermissions.admin.includes("account:create:user"));
 assert.ok(defaultBackOfficeRolePermissions.admin.includes("credits:balance:read:all"));
-assert.ok(!(defaultBackOfficeRolePermissions.admin as readonly string[]).includes("account:create:user"));
 assert.ok(!(defaultBackOfficeRolePermissions.admin as readonly string[]).includes("account:delete:user"));
 assert.ok(!(defaultBackOfficeRolePermissions.admin as readonly string[]).includes("credits:points:adjust"));
 assert.ok(!(defaultBackOfficeRolePermissions.admin as readonly string[]).includes("account:delete:admin"));
@@ -55,14 +55,14 @@ const developerBlocksAdmin = resolveAccountCreationPolicy(
   withPolicy({ developer_allows_admin_create_agents_users: false }),
 );
 assert.equal(developerBlocksAdmin.adminCanCreateAgents, false);
-assert.equal(developerBlocksAdmin.adminCanCreateUsers, false);
+assert.equal(developerBlocksAdmin.adminCanCreateUsers, true);
 assert.equal(developerBlocksAdmin.adminCanPromoteUserToAgent, false);
 assert.equal(canCreateAccountFromSnapshot("admin", "agent", withPolicy({
   developer_allows_admin_create_agents_users: false,
 })).allowed, false);
-assert.equal(canCreateUserFromSnapshot("admin", withPolicy({
-  developer_allows_admin_create_agents_users: false,
-})).allowed, false);
+const developerBlocksAdminUserCreation = withPolicy({ developer_allows_admin_create_users: false });
+assert.equal(resolveAccountCreationPolicy(developerBlocksAdminUserCreation).adminCanCreateUsers, false);
+assert.equal(canCreateUserFromSnapshot("admin", developerBlocksAdminUserCreation).allowed, false);
 
 const developerBlocksAgent = withPolicy({ developer_allows_agent_create_users: false });
 assert.equal(resolveAccountCreationPolicy(developerBlocksAgent).agentCanCreateUsers, false);

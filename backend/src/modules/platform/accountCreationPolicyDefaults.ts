@@ -6,6 +6,7 @@ export type AccountCreationPolicyCode =
   | "developer_create_admin"
   | "developer_create_agent"
   | "developer_create_user"
+  | "developer_allows_admin_create_users"
   | "developer_allows_admin_create_agents_users"
   | "developer_allows_agent_create_users"
   | "admin_allows_agent_create_users"
@@ -61,6 +62,7 @@ export const defaultBackOfficeRolePermissions = {
     "menu:recharge",
     "menu:admin",
     "account:create:agent",
+    "account:create:user",
     "account:delete:agent",
     "credits:balance:read:all",
     "credits:transaction:read:all",
@@ -152,15 +154,26 @@ export const defaultBackOfficePermissionPolicies: BackOfficePermissionPolicySeed
     description: "Developer can always create regular User accounts.",
   },
   {
+    policyCode: "developer_allows_admin_create_users",
+    name: "开发者允许 Admin 创建 User",
+    controllerRoleCode: "developer",
+    subjectRoleCode: "admin",
+    actionCode: "policy:allow",
+    targetRoleCode: "user",
+    isEnabled: true,
+    isDisableable: true,
+    description: "Developer gate for Admin creating regular User accounts.",
+  },
+  {
     policyCode: "developer_allows_admin_create_agents_users",
-    name: "开发者允许 Admin 创建 Agent/User",
+    name: "开发者允许 Admin 创建 Agent / 升级 User",
     controllerRoleCode: "developer",
     subjectRoleCode: "admin",
     actionCode: "policy:allow",
     targetRoleCode: "agent",
     isEnabled: true,
     isDisableable: true,
-    description: "Developer gate for Admin creating Agent and User accounts.",
+    description: "Developer gate for Admin creating Agent accounts and promoting User accounts to Agent.",
   },
   {
     policyCode: "developer_allows_agent_create_users",
@@ -213,7 +226,7 @@ export function resolveAccountCreationPolicy(
     developerCanCreateAgents: snapshot.developer_create_agent,
     developerCanCreateUsers: snapshot.developer_create_user,
     adminCanCreateAgents: snapshot.developer_allows_admin_create_agents_users,
-    adminCanCreateUsers: false,
+    adminCanCreateUsers: snapshot.developer_allows_admin_create_users,
     adminCanPromoteUserToAgent:
       snapshot.developer_allows_admin_create_agents_users &&
       snapshot.admin_allows_user_become_agent,
@@ -245,10 +258,13 @@ export function canCreateAccountFromSnapshot(
     if (targetRole === "agent" && effective.adminCanCreateAgents) {
       return { allowed: true, reason: "developer allows admin to create agents" };
     }
+    if (targetRole === "user" && effective.adminCanCreateUsers) {
+      return { allowed: true, reason: "developer allows admin to create users" };
+    }
     return {
       allowed: false,
       reason: targetRole === "user"
-        ? "latest PRD makes admin user list read-only"
+        ? "developer has disabled admin user creation"
         : "developer has disabled admin account creation",
     };
   }

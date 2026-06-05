@@ -12,6 +12,7 @@ export interface AccountCreationPolicy {
 }
 
 export interface AccountCreationPolicyState {
+  developerAllowsAdminCreateUsers: boolean
   developerAllowsAdminCreateAgentsAndUsers: boolean
   developerAllowsAgentCreateUsers: boolean
   adminAllowsAgentCreateUsers: boolean
@@ -29,6 +30,7 @@ export interface EffectiveAccountCreationPolicy {
 }
 
 export const defaultAccountCreationPolicyState: AccountCreationPolicyState = {
+  developerAllowsAdminCreateUsers: true,
   developerAllowsAdminCreateAgentsAndUsers: true,
   developerAllowsAgentCreateUsers: true,
   adminAllowsAgentCreateUsers: true,
@@ -43,7 +45,7 @@ export function resolveAccountCreationPolicy(
     developerCanCreateAgents: true,
     developerCanCreateUsers: true,
     adminCanCreateAgents: state.developerAllowsAdminCreateAgentsAndUsers,
-    adminCanCreateUsers: false,
+    adminCanCreateUsers: state.developerAllowsAdminCreateUsers,
     adminCanPromoteUserToAgent:
       state.developerAllowsAdminCreateAgentsAndUsers &&
       state.adminAllowsUserBecomeAgent,
@@ -69,10 +71,10 @@ export const accountCreationPolicies: AccountCreationPolicy[] = [
     role: 'admin',
     label: '公司管理员',
     capabilities: [
-      '创建 Agent',
+      '创建 Agent / User',
       '读取全部流水与余额',
       '代理商基础信息管理',
-      '控制 User 成为 Agent',
+      '升级 User 为 Agent',
     ],
     controlledBy: ['developer'],
     scope: '平台运营范围内的客户与代理商',

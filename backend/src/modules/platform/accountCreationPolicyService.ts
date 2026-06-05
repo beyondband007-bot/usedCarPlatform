@@ -1,4 +1,4 @@
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
@@ -36,6 +36,52 @@ type BackOfficePermissionPolicyRow = RowDataPacket & {
   is_enabled: 0 | 1;
 };
 
+export type AdminPolicyOverride = {
+  userId: string;
+  username: string;
+  displayName: string;
+  phone: string | null;
+  developerAllowsCreateUsers: boolean;
+  developerAllowsCreateAgents: boolean;
+  effectiveCanCreateUsers: boolean;
+  effectiveCanCreateAgents: boolean;
+  updatedByUserId: string | null;
+  updatedAt: string | null;
+};
+
+export type AgentPolicyOverride = {
+  userId: string;
+  username: string;
+  displayName: string;
+  phone: string | null;
+  developerAllowsCreateUsers: boolean;
+  developerDisabledCreateUsers: boolean;
+  effectiveCanCreateUsers: boolean;
+  updatedByUserId: string | null;
+  updatedAt: string | null;
+};
+
+type AdminPolicyOverrideRow = RowDataPacket & {
+  user_id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  developer_allows_create_users: 0 | 1 | null;
+  developer_allows_create_agents: 0 | 1 | null;
+  updated_by_user_id: string | null;
+  override_updated_at: Date | null;
+};
+
+type AgentPolicyOverrideRow = RowDataPacket & {
+  user_id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  developer_allows_create_users: 0 | 1 | null;
+  updated_by_user_id: string | null;
+  override_updated_at: Date | null;
+};
+
 const policyCodes = new Set<AccountCreationPolicyCode>(
   defaultBackOfficePermissionPolicies.map((policy) => policy.policyCode),
 );
@@ -56,6 +102,61 @@ async function getPolicySnapshot(): Promise<AccountCreationPolicySnapshot> {
      FROM back_office_permission_policies`,
   );
   return mergePolicyRows(rows);
+}
+
+async function getAdminPolicyOverride(adminUserId: string) {
+  const [rows] = await pool.query<Array<RowDataPacket & {
+    developer_allows_create_users: 0 | 1 | null;
+    developer_allows_create_agents: 0 | 1 | null;
+  }>>(
+    `SELECT developer_allows_create_users, developer_allows_create_agents
+     FROM back_office_admin_policy_overrides
+     WHERE admin_user_id = :adminUserId
+     LIMIT 1`,
+    { adminUserId },
+  );
+  return {
+    createUsers: rows[0]?.developer_allows_create_users !== 0,
+    createAgents: rows[0]?.developer_allows_create_agents !== 0,
+  };
+}
+
+async function getAgentCreateUserOverride(agentUserId: string) {
+  const [rows] = await pool.query<Array<RowDataPacket & { developer_allows_create_users: 0 | 1 }>>(
+    `SELECT developer_allows_create_users
+     FROM back_office_agent_policy_overrides
+     WHERE agent_user_id = :agentUserId
+     LIMIT 1`,
+    { agentUserId },
+  );
+  return rows[0] ? rows[0].developer_allows_create_users === 1 : true;
+}
+
+async function getScopedPolicySnapshot(operator: AccountCreationOperator) {
+  const snapshot = await getPolicySnapshot();
+  if (operator.roleCode === "admin") {
+    const adminOverride = await getAdminPolicyOverride(operator.userId);
+    return {
+      ...snapshot,
+      developer_allows_admin_create_users:
+        snapshot.developer_allows_admin_create_users &&
+        adminOverride.createUsers,
+      developer_allows_admin_create_agents_users:
+        snapshot.developer_allows_admin_create_agents_users &&
+        adminOverride.createAgents,
+    };
+  }
+
+  if (operator.roleCode === "agent") {
+    return {
+      ...snapshot,
+      developer_allows_agent_create_users:
+        snapshot.developer_allows_agent_create_users &&
+        (await getAgentCreateUserOverride(operator.userId)),
+    };
+  }
+
+  return snapshot;
 }
 
 function withSnapshot(
@@ -79,7 +180,7 @@ async function canCreateAccount(
   targetRole: AccountCreationTargetRole,
   targetScope?: AccountCreationTargetScope,
 ): Promise<AccountCreationPolicyResult> {
-  const snapshot = await getPolicySnapshot();
+  const snapshot = await getScopedPolicySnapshot(operator);
   return withSnapshot(
     operator,
     targetRole,
@@ -93,7 +194,7 @@ async function canCreateUser(
   operator: AccountCreationOperator,
   targetScope: AccountCreationTargetScope = "personal",
 ): Promise<AccountCreationPolicyResult> {
-  const snapshot = await getPolicySnapshot();
+  const snapshot = await getScopedPolicySnapshot(operator);
   return withSnapshot(
     operator,
     "user",
@@ -106,7 +207,7 @@ async function canCreateUser(
 async function canPromoteUserToAgent(
   operator: AccountCreationOperator,
 ): Promise<AccountCreationPolicyResult> {
-  const snapshot = await getPolicySnapshot();
+  const snapshot = await getScopedPolicySnapshot(operator);
   return withSnapshot(
     operator,
     "agent",
@@ -131,11 +232,188 @@ async function setPolicyEnabled(policyCode: AccountCreationPolicyCode, enabled: 
   return getPolicySnapshot();
 }
 
+async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[] }> {
+  const snapshot = await getPolicySnapshot();
+  const globalCreateUserGate = snapshot.developer_allows_admin_create_users;
+  const globalCreateAgentGate = snapshot.developer_allows_admin_create_agents_users;
+  const [rows] = await pool.query<AdminPolicyOverrideRow[]>(
+    `SELECT
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       override.developer_allows_create_users,
+       override.developer_allows_create_agents,
+       override.updated_by_user_id,
+       override.updated_at override_updated_at
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     LEFT JOIN back_office_admin_policy_overrides override ON override.admin_user_id = u.id
+     WHERE boa.role_code = 'admin'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     ORDER BY boa.created_at DESC`,
+  );
+
+  return {
+    items: rows.map((row) => {
+      const rowUserGate = row.developer_allows_create_users !== 0;
+      const rowAgentGate = row.developer_allows_create_agents !== 0;
+      return {
+        userId: row.user_id,
+        username: row.username,
+        displayName: row.display_name,
+        phone: row.phone,
+        developerAllowsCreateUsers: rowUserGate,
+        developerAllowsCreateAgents: rowAgentGate,
+        effectiveCanCreateUsers: globalCreateUserGate && rowUserGate,
+        effectiveCanCreateAgents: globalCreateAgentGate && rowAgentGate,
+        updatedByUserId: row.updated_by_user_id,
+        updatedAt: row.override_updated_at?.toISOString() ?? null,
+      };
+    }),
+  };
+}
+
+async function setAdminCreateAgentPolicy(input: {
+  developerUserId: string;
+  adminUserId: string;
+  createUsersEnabled?: boolean;
+  createAgentsEnabled?: boolean;
+}) {
+  const [admins] = await pool.query<Array<RowDataPacket & { user_id: string }>>(
+    `SELECT u.id user_id
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     WHERE boa.user_id = :adminUserId
+       AND boa.role_code = 'admin'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     LIMIT 1`,
+    { adminUserId: input.adminUserId },
+  );
+
+  if (!admins.length) {
+    throw errors.invalidParameter("target admin account not found");
+  }
+
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO back_office_admin_policy_overrides
+      (admin_user_id, developer_allows_create_users, developer_allows_create_agents, updated_by_user_id)
+     VALUES
+      (:adminUserId, COALESCE(:createUsersEnabled, 1), COALESCE(:createAgentsEnabled, 1), :developerUserId)
+     ON DUPLICATE KEY UPDATE
+      developer_allows_create_users = COALESCE(:createUsersEnabled, developer_allows_create_users),
+      developer_allows_create_agents = COALESCE(:createAgentsEnabled, developer_allows_create_agents),
+      updated_by_user_id = VALUES(updated_by_user_id)`,
+    {
+      adminUserId: input.adminUserId,
+      createUsersEnabled: input.createUsersEnabled ?? null,
+      createAgentsEnabled: input.createAgentsEnabled ?? null,
+      developerUserId: input.developerUserId,
+    },
+  );
+
+  return listAdminPolicyOverrides();
+}
+
+async function listAgentPolicyOverrides(
+  operator?: AccountCreationOperator,
+): Promise<{ items: AgentPolicyOverride[] }> {
+  const snapshot = await getPolicySnapshot();
+  const globalGate =
+    snapshot.developer_allows_agent_create_users &&
+    snapshot.admin_allows_agent_create_users;
+  const params: Record<string, string> = {};
+  const scopeSql = operator?.roleCode === "agent" ? "AND u.id = :agentUserId" : "";
+  if (operator?.roleCode === "agent") params.agentUserId = operator.userId;
+
+  const [rows] = await pool.query<AgentPolicyOverrideRow[]>(
+    `SELECT
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       override.developer_allows_create_users,
+       override.updated_by_user_id,
+       override.updated_at override_updated_at
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     LEFT JOIN back_office_agent_policy_overrides override ON override.agent_user_id = u.id
+     WHERE boa.role_code = 'agent'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+       ${scopeSql}
+     ORDER BY boa.created_at DESC`,
+    params,
+  );
+
+  return {
+    items: rows.map((row) => {
+      const rowGate = row.developer_allows_create_users !== 0;
+      return {
+        userId: row.user_id,
+        username: row.username,
+        displayName: row.display_name,
+        phone: row.phone,
+        developerAllowsCreateUsers: rowGate,
+        developerDisabledCreateUsers: !rowGate,
+        effectiveCanCreateUsers: globalGate && rowGate,
+        updatedByUserId: row.updated_by_user_id,
+        updatedAt: row.override_updated_at?.toISOString() ?? null,
+      };
+    }),
+  };
+}
+
+async function setAgentCreateUserPolicy(input: {
+  developerUserId: string;
+  agentUserId: string;
+  enabled: boolean;
+}) {
+  const [agents] = await pool.query<Array<RowDataPacket & { user_id: string }>>(
+    `SELECT u.id user_id
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     WHERE boa.user_id = :agentUserId
+       AND boa.role_code = 'agent'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     LIMIT 1`,
+    { agentUserId: input.agentUserId },
+  );
+
+  if (!agents.length) {
+    throw errors.invalidParameter("target agent account not found");
+  }
+
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO back_office_agent_policy_overrides
+      (agent_user_id, developer_allows_create_users, updated_by_user_id)
+     VALUES
+      (:agentUserId, :enabled, :developerUserId)
+     ON DUPLICATE KEY UPDATE
+      developer_allows_create_users = VALUES(developer_allows_create_users),
+      updated_by_user_id = VALUES(updated_by_user_id)`,
+    {
+      agentUserId: input.agentUserId,
+      enabled: input.enabled,
+      developerUserId: input.developerUserId,
+    },
+  );
+
+  return listAgentPolicyOverrides();
+}
+
 export const accountCreationPolicyService = {
   canCreateAccount,
   canCreateUser,
   canPromoteUserToAgent,
   getPolicySnapshot,
+  listAdminPolicyOverrides,
+  listAgentPolicyOverrides,
   resolveAccountCreationPolicy,
+  setAdminCreateAgentPolicy,
+  setAgentCreateUserPolicy,
   setPolicyEnabled,
 };
