@@ -343,7 +343,7 @@ export function usePointsQuery() {
     void refresh()
   })
 
-  watch(showSubAccountScope, (enabled) => {
+  watch(showSubAccountScope, async (enabled, previousEnabled) => {
     if (!enabled) {
       accountScopeMode.value = 'self'
       selectedChildId.value = null
@@ -351,7 +351,12 @@ export function usePointsQuery() {
       teamName.value = ''
       return
     }
-    void loadChildMembers()
+
+    await loadChildMembers()
+
+    if (!previousEnabled || dataSource.value !== 'api' || loadError.value) {
+      await refresh()
+    }
   })
 
   watch(
@@ -359,6 +364,7 @@ export function usePointsQuery() {
     () => {
       if (showSubAccountScope.value) {
         void loadChildMembers()
+        void refresh()
       }
     },
   )

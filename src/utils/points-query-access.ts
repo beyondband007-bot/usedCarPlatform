@@ -7,8 +7,18 @@ export function canUseFlagshipSubAccountSwitch(input: {
   userInfo: UserInfo | null
   currentPlan: SubscriptionPlanCode
 }) {
+  const isEnterpriseMotherAccount =
+    input.userInfo?.enterpriseAccountRole === 'mother'
+    || Boolean(input.userInfo?.canViewEnterpriseChildren && input.userInfo?.enterpriseTenantId)
+
   return (
-    input.currentPlan === 'flagship'
-    && Boolean(input.userInfo?.canViewEnterpriseChildren)
+    Boolean(input.userInfo)
+    && (
+      isEnterpriseMotherAccount
+      || (
+        input.currentPlan === 'flagship'
+        && Boolean(input.userInfo?.canViewEnterpriseChildren)
+      )
+    )
   )
 }
