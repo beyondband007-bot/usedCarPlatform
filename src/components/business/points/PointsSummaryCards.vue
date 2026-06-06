@@ -276,9 +276,10 @@ function isAssetIcon(icon: string) {
 
 .summary-value {
   color: #0f172a;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 26px;
-  font-weight: 800;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 30px;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -493,7 +494,7 @@ function isAssetIcon(icon: string) {
 }
 
 .points-summary-section.is-glass .summary-value {
-  font-size: 26px;
+  font-size: 30px;
 }
 
 .points-summary-section.theme-dark.is-glass .card {

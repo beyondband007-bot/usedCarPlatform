@@ -26,9 +26,7 @@ import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityG
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
-import {
-  DEFAULT_GENERATION_OUTPUT_RATIO,
-} from "@/constants/output-ratio";
+import { DEFAULT_GENERATION_OUTPUT_RATIO } from "@/constants/output-ratio";
 import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,
@@ -85,7 +83,9 @@ const generationFailureMessageMap: Record<string, string> = {
   KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
 };
 
-function getGenerationFailureMessage(item: Pick<WorkspaceRecentItem, "errorCode" | "moduleCode">) {
+function getGenerationFailureMessage(
+  item: Pick<WorkspaceRecentItem, "errorCode" | "moduleCode">,
+) {
   if (item.errorCode && generationFailureMessageMap[item.errorCode]) {
     return generationFailureMessageMap[item.errorCode];
   }
@@ -149,9 +149,9 @@ const shortVideoSessionPreview = ref<WorkspaceGenerateResult | null>(null);
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(
   null,
 );
-const generatePanelRef = ref<InstanceType<typeof CapabilityGeneratePanel> | null>(
-  null,
-);
+const generatePanelRef = ref<InstanceType<
+  typeof CapabilityGeneratePanel
+> | null>(null);
 const batchActiveJobs = ref<WorkspaceBatchActiveJob[]>([]);
 const trackedRunningTasks = ref<Record<string, string>>({});
 let batchPollTimer: number | null = null;
@@ -325,7 +325,9 @@ function countRunningBatchJobs() {
 }
 
 function countTotalRunningTasks() {
-  return Object.keys(trackedRunningTasks.value).length + countRunningBatchJobs();
+  return (
+    Object.keys(trackedRunningTasks.value).length + countRunningBatchJobs()
+  );
 }
 
 function syncRunningTaskSummaryCount() {
@@ -463,8 +465,8 @@ function isCreativeTaskGenerating(
 
   return Boolean(
     trackedRunningTasks.value[taskId] ||
-      (conversationId &&
-        creativeGeneratingConversations.value[conversationId] === taskId),
+    (conversationId &&
+      creativeGeneratingConversations.value[conversationId] === taskId),
   );
 }
 
@@ -634,16 +636,16 @@ function handleBatchCreated(payload: WorkspaceBatchCreatedPayload) {
   const next = [
     ...batchActiveJobs.value,
     {
-    batchId: payload.batchId,
-    projectName: payload.projectName,
-    previewUrl: payload.previewUrl,
-    createdAt: payload.createdAt,
-    status: payload.status,
-    total: payload.total,
-    completed: payload.completed,
-    failed: payload.failed,
-    progress: payload.progress,
-    items: [],
+      batchId: payload.batchId,
+      projectName: payload.projectName,
+      previewUrl: payload.previewUrl,
+      createdAt: payload.createdAt,
+      status: payload.status,
+      total: payload.total,
+      completed: payload.completed,
+      failed: payload.failed,
+      progress: payload.progress,
+      items: [],
     },
   ];
   setBatchActiveJobs(next);
@@ -956,7 +958,8 @@ const activeCreativeConversationGenerating = computed(() => {
 
   const conversation = activeCreativeConversation.value;
   return Boolean(
-    conversation?.lastTaskId && trackedRunningTasks.value[conversation.lastTaskId],
+    conversation?.lastTaskId &&
+    trackedRunningTasks.value[conversation.lastTaskId],
   );
 });
 
@@ -1272,8 +1275,8 @@ async function resolveInteriorCollageTasks(
 ) {
   try {
     const polled = await pollMultipleGenerationTasks(taskIds);
-    const finishedTasks = polled.filter(
-      (task): task is GenerationTaskDetail => Boolean(task),
+    const finishedTasks = polled.filter((task): task is GenerationTaskDetail =>
+      Boolean(task),
     );
 
     const successTasks = finishedTasks.filter(
@@ -1284,7 +1287,9 @@ async function resolveInteriorCollageTasks(
     ).length;
 
     if (failedCount > 0) {
-      message.warning(`${failedCount} 个内饰拼图任务生成失败，其它任务不受影响`);
+      message.warning(
+        `${failedCount} 个内饰拼图任务生成失败，其它任务不受影响`,
+      );
     }
 
     const result = buildInteriorCollageResult(
@@ -1453,7 +1458,9 @@ async function refreshCreativeConversations() {
       pageSize: 20,
     });
     creativeConversationsAll.value = result.items;
-    creativeConversations.value = listVisibleCreativeConversations(result.items);
+    creativeConversations.value = listVisibleCreativeConversations(
+      result.items,
+    );
 
     const savedConversationId = readActiveCreativeConversationId();
     const candidateId =
@@ -1462,7 +1469,8 @@ async function refreshCreativeConversations() {
       ? result.items.find((item) => item.conversationId === candidateId)
       : null;
     const nextConversationId =
-      candidateConversation && !isCreativeConversationDraft(candidateConversation)
+      candidateConversation &&
+      !isCreativeConversationDraft(candidateConversation)
         ? candidateConversation.conversationId
         : null;
 
@@ -1526,7 +1534,10 @@ async function ensureCreativeConversation(prompt?: string) {
   const conversation = await createCreativeImageConversation({ title });
   activeCreativeConversationId.value = conversation.conversationId;
   saveActiveCreativeConversationId(conversation.conversationId);
-  creativeConversationsAll.value = [conversation, ...creativeConversationsAll.value];
+  creativeConversationsAll.value = [
+    conversation,
+    ...creativeConversationsAll.value,
+  ];
   return conversation.conversationId;
 }
 
@@ -1574,9 +1585,13 @@ function handleSelectCreativeConversation(conversationId: string) {
   creativeThreadTurns.value = [];
 
   if (conversation?.lastTaskId && !conversation.lastResultUrl) {
-    void resolveCreativeGenerationTask(conversation.lastTaskId, conversationId, {
-      restored: true,
-    });
+    void resolveCreativeGenerationTask(
+      conversation.lastTaskId,
+      conversationId,
+      {
+        restored: true,
+      },
+    );
   }
   void loadCreativeConversationThread(conversationId);
 }
@@ -1593,7 +1608,8 @@ async function handleDeleteCreativeConversation(conversationId: string) {
       (item) => item.conversationId !== conversationId,
     );
     creativeConversationsAll.value = remainingAll;
-    creativeConversations.value = listVisibleCreativeConversations(remainingAll);
+    creativeConversations.value =
+      listVisibleCreativeConversations(remainingAll);
     setCreativeConversationGenerating(conversationId, null);
 
     if (activeCreativeConversationId.value !== conversationId) {
@@ -2193,11 +2209,11 @@ onUnmounted(() => {
 }
 
 .workspace-page.theme-light .workspace-col--main .workspace-col-scroll {
-  background: #f5f6f8;
+  // background: #f5f6f8;
 }
 
 .workspace-page.theme-dark .workspace-col--main .workspace-col-scroll {
-  background: #14171a;
+  // background: #14171a;
 }
 
 :global(html[data-theme="dark"]) .workspace-col--main .workspace-col-scroll {
@@ -2210,10 +2226,10 @@ onUnmounted(() => {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 20px 20px 32px;
+  // padding: 20px 20px 32px;
 
   @media (width >= 1024px) {
-    padding: 32px 32px 40px;
+    // padding: 32px 32px 40px;
   }
 }
 

@@ -2328,7 +2328,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
         v-model:show="isCreateAccountModalOpen"
         preset="card"
         class="admin-create-modal account-create-modal"
-        :style="{ width: '600px', maxWidth: '92vw', height: '400px', maxHeight: 'calc(100vh - 80px)' }"
+        :style="{ width: '600px', maxWidth: '92vw', maxHeight: 'calc(100vh - 80px)' }"
         :mask-closable="!isCreatingAccount"
       >
         <template #header>
@@ -3273,7 +3273,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 }
 
 /* ===== 创建账号弹窗（企业级表单样式，作用域限定，不影响其它共用弹窗） ===== */
-/* 宽高由模板内联 style 控制（teleport 弹窗，deep 不可靠）；此处仅补充视觉样式 */
+/* 宽度与最大高度由模板控制；高度由内容自适应，内容过长时内部滚动。 */
 :deep(.account-create-modal.n-card) {
   border-radius: 16px;
   background: #fff;

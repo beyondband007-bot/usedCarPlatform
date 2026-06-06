@@ -128,9 +128,11 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
 .sidebar-group-title {
   margin: 0 0 10px;
   padding: 0 8px;
-  color: var(--workspace-muted, var(--app-text-muted, var(--app-text-soft)));
-  font-size: 12px;
-  font-weight: 800;
+  color: #9ca3af;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 900;
   letter-spacing: 0.02em;
 }
 
@@ -212,8 +214,10 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
 .sidebar-menu-label {
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 800;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 900;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -1643,9 +1643,10 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   box-shadow: 0 10px 22px rgb(212 160 23 / 28%);
   color: #ffffff;
   cursor: pointer;
-  font-family: inherit;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 900;
   white-space: nowrap;
 }
 
@@ -1753,14 +1754,19 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-subaccount-copy strong {
   color: #0f172a;
-  font-size: 13px;
-  font-weight: 700;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
   white-space: nowrap;
 }
 
 .points-flow-card--design .points-subaccount-copy span {
   color: #64748b;
-  font-size: 11px;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .points-flow-card--design .points-section-title {
@@ -1790,8 +1796,10 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 .points-flow-card--design .points-section-title h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 600;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
   line-height: 1.3;
 }
 

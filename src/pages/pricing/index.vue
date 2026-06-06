@@ -123,6 +123,8 @@ function handlePlanConsult() {
   overflow: visible;
   background: var(--pricing-bg-fallback);
   color: #f8fafc;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
 }
 
 .pricing-page.theme-light {
@@ -200,7 +202,7 @@ function handlePlanConsult() {
 .pricing-hero h1 {
   margin: 0;
   color: var(--pricing-hero-text);
-  font-size: clamp(30px, min(3.2vw, 4.6vh), 50px);
+  font-size: 45px;
   font-weight: 900;
   letter-spacing: 0.02em;
   line-height: 1.08;
@@ -216,7 +218,7 @@ function handlePlanConsult() {
   width: max-content;
   margin: clamp(12px, 1.5vh, 18px) auto 0;
   color: var(--pricing-hero-sub);
-  font-size: clamp(15px, min(1.55vw, 2.2vh), 24px);
+  font-size: 20px;
   font-weight: 500;
   line-height: 1.35;
   white-space: nowrap;
@@ -234,6 +236,33 @@ function handlePlanConsult() {
   width: 100%;
   min-width: 0;
   margin-bottom: 0;
+}
+
+.pricing-plans-grid :deep(*) {
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+
+.pricing-plans-grid :deep(h2),
+.pricing-plans-grid :deep(h3) {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.pricing-plans-grid :deep(li) {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.pricing-plans-grid :deep(button) {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.pricing-plans-grid :deep([class*="unit"]),
+.pricing-plans-grid :deep([class*="suffix"]) {
+  font-size: 16px;
+  font-weight: 900;
 }
 
 .pricing-footer-spacer {
@@ -317,7 +346,7 @@ function handlePlanConsult() {
 .footer-feature h3 {
   margin: 0;
   color: var(--pricing-footer-title);
-  font-size: clamp(15px, 2.35cqw, 28px);
+  font-size: 18px;
   font-weight: 900;
   line-height: clamp(1.24, 1.34, 1.4);
   letter-spacing: clamp(0.01em, 0.022cqw, 0.04em);
@@ -326,8 +355,8 @@ function handlePlanConsult() {
 .footer-feature p {
   margin: 0;
   color: var(--pricing-hero-sub);
-  font-size: clamp(12px, 1.45cqw, 18px);
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   line-height: clamp(1.32, 1.42, 1.52);
   letter-spacing: clamp(0.004em, 0.012cqw, 0.028em);
 }
@@ -369,12 +398,12 @@ function handlePlanConsult() {
   }
 
   .pricing-hero h1 {
-    font-size: clamp(26px, 4.3vh, 34px);
+    font-size: 45px;
   }
 
   .pricing-hero-intro {
     margin-top: 8px;
-    font-size: clamp(13px, 2vh, 16px);
+    font-size: 20px;
   }
 
   .pricing-footer-bar {
@@ -387,13 +416,13 @@ function handlePlanConsult() {
   }
 
   .footer-feature h3 {
-    font-size: clamp(14px, 2cqw, 22px);
+    font-size: 18px;
     line-height: 1.26;
     letter-spacing: clamp(0.006em, 0.016cqw, 0.028em);
   }
 
   .footer-feature p {
-    font-size: clamp(11px, 1.25cqw, 15px);
+    font-size: 12px;
     line-height: 1.34;
     letter-spacing: clamp(0em, 0.008cqw, 0.018em);
   }

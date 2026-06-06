@@ -2061,7 +2061,7 @@ defineExpose({
   flex-shrink: 0;
   gap: 18px;
   min-height: 32px;
-  margin-bottom: 0;
+  margin-bottom: 18px;
 }
 
 .assist-detail-layer {
@@ -3257,7 +3257,7 @@ defineExpose({
   }
 
   .assist-tabs {
-    margin-bottom: 10px;
+    margin-bottom: 18px;
     min-height: 32px;
   }
 
@@ -3292,7 +3292,7 @@ defineExpose({
   }
 
   .assist-tabs {
-    margin-bottom: 12px;
+    margin-bottom: 18px;
   }
 
   .guide-layout {

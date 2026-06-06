@@ -720,8 +720,10 @@ watch(filteredRecords, () => {
 .points-query-hero-copy h1 {
   margin: 0;
   color: #0f172a;
-  font-size: clamp(22px, min(2vw, 3.2vh), 30px);
-  font-weight: 800;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
   line-height: 1.2;
 }
 
@@ -754,7 +756,10 @@ watch(filteredRecords, () => {
 
 .points-query-team-label {
   color: #94a3b8;
+  font-family:
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
+  font-weight: 900;
 }
 
 .points-query-page.theme-light .points-query-team-label {
