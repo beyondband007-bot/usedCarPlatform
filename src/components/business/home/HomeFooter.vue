@@ -81,7 +81,8 @@ const footerBrandLogoSrc = computed(() =>
 
           <div class="brand-copy">
             <p class="brand-desc">
-              面向汽车电商、二手车商和企业运营团队的 AI SaaS 工作台
+              面向汽车电商、二手车商和企业<br />
+              运营团队的<span class="nowrap">AI SaaS 工作台</span>
             </p>
             <p class="brand-tip">
               添加客服微信，了解更多定制服务<br />
@@ -240,6 +241,10 @@ const footerBrandLogoSrc = computed(() =>
   color: var(--footer-text);
   font-size: 13px;
   line-height: 1.75;
+}
+
+.brand-desc .nowrap {
+  white-space: nowrap;
 }
 
 .qr-codes {

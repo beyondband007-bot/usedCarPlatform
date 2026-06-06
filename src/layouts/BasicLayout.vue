@@ -202,8 +202,8 @@ const {
   --studio-chrome-pad-x: 24px;
   --studio-chrome-header-height: 72px;
   --studio-chrome-logo-size: clamp(20px, 1.75vw, 30px);
-  --studio-chrome-nav-size: clamp(15px, 1.15vw, 19px);
-  --studio-chrome-action-size: clamp(12px, 0.95vw, 15px);
+  --studio-chrome-nav-size: clamp(14px, 0.85vw, 16px);
+  --studio-chrome-action-size: clamp(13px, 0.78vw, 15px);
   --studio-chrome-nav-gap: clamp(20px, 2.8vw, 56px);
 
   --studio-chrome-bg: #060606;
@@ -280,11 +280,11 @@ const {
   --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
   --studio-chrome-nav: #475569;
-  --studio-chrome-nav-hover: #2f6bff;
-  --studio-chrome-nav-active: #2f6bff;
-  --studio-chrome-nav-underline: #2f6bff;
-  --studio-chrome-nav-underline-hover: #2f6bff;
-  --studio-chrome-nav-underline-active: #2f6bff;
+  --studio-chrome-nav-hover: #0f172a;
+  --studio-chrome-nav-active: #0f172a;
+  --studio-chrome-nav-underline: #0f172a;
+  --studio-chrome-nav-underline-hover: #0f172a;
+  --studio-chrome-nav-underline-active: #0f172a;
   --studio-chrome-credit-bg: #d4a017;
   --studio-chrome-credit-text: #ffffff;
   --studio-chrome-credit-border: #d4a017;
@@ -330,11 +330,11 @@ const {
   --studio-chrome-header-bg: rgb(224, 234, 242);
   --studio-chrome-logo: #0f172a;
   --studio-chrome-nav: #475569;
-  --studio-chrome-nav-hover: #2f6bff;
-  --studio-chrome-nav-active: #2f6bff;
-  --studio-chrome-nav-underline: #2f6bff;
-  --studio-chrome-nav-underline-hover: #2f6bff;
-  --studio-chrome-nav-underline-active: #2f6bff;
+  --studio-chrome-nav-hover: #0f172a;
+  --studio-chrome-nav-active: #0f172a;
+  --studio-chrome-nav-underline: #0f172a;
+  --studio-chrome-nav-underline-hover: #0f172a;
+  --studio-chrome-nav-underline-active: #0f172a;
   --studio-chrome-credit-bg: #d4a017;
   --studio-chrome-credit-text: #ffffff;
   --studio-chrome-credit-border: #d4a017;

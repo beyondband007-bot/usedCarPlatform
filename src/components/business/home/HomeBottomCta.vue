@@ -75,14 +75,18 @@ onMounted(() => {
 .final-cta h2 {
   margin: 0 0 14px;
   color: var(--home-text);
-  font-size: clamp(28px, 3vw, 42px);
+  font-family: "PingFang SC", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .final-cta p {
   margin: 0 0 28px;
   color: var(--home-muted);
-  font-size: 16px;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 18px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -99,9 +103,9 @@ onMounted(() => {
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 900;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
   text-decoration: none;
   transition:
     transform 0.22s ease,

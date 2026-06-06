@@ -3,6 +3,8 @@ import type { RouteRecordRaw } from 'vue-router'
 import { WORKSPACE_DEFAULT_CAPABILITY } from '@/constants/app-flow'
 import BackOfficeLayout from '@/layouts/BackOfficeLayout.vue'
 import BasicLayout from '@/layouts/BasicLayout.vue'
+import BackOfficeLoginPage from '@/pages/back-office-login/index.vue'
+import CreditsAdminPage from '@/pages/credits-admin/index.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -113,7 +115,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/back-office/login',
     name: 'BackOfficeLogin',
-    component: () => import('@/pages/back-office-login/index.vue'),
+    component: BackOfficeLoginPage,
     meta: {
       title: '积分后台登录',
       guestOnly: true,
@@ -133,7 +135,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: '',
         name: 'ReusableCreditsConsole',
-        component: () => import('@/pages/credits-admin/index.vue'),
+        component: CreditsAdminPage,
         meta: {
           title: 'Reusable Credits Platform Console',
           requiresAuth: true,

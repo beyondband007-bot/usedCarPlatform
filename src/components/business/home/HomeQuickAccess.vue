@@ -177,8 +177,9 @@ onMounted(() => {
 .suite-card h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 28px;
-  font-weight: 700;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
   line-height: 1.3;
   white-space: nowrap;
 }
@@ -186,7 +187,9 @@ onMounted(() => {
 .suite-card p {
   margin: 0 0 8px;
   color: var(--home-media-desc);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
+  font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
 }

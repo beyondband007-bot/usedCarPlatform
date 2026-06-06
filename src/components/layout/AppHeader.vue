@@ -5,6 +5,8 @@ import { computed, inject, ref, watch } from "vue";
 
 import themeIconMoon from "@/assets/img/icon/月亮.svg";
 import themeIconSun from "@/assets/img/icon/太阳.svg";
+import siteLogoDay from "@/assets/img/icon/logo/顶部logo日间.png";
+import siteLogoNight from "@/assets/img/icon/logo/顶部logo夜间.png";
 import { useRoute, useRouter } from "vue-router";
 
 import { CREDITS_ROUTE } from "@/constants/app-flow";
@@ -29,6 +31,10 @@ const userMenuOpen = ref(false);
 const { usesStudioChrome } = useStudioChrome();
 const { rechargeModalVisible, openRechargeModal, notifyRechargeSuccess } =
   usePointsRechargeModal();
+
+const siteLogoSrc = computed(() =>
+  appStore.isDarkMode ? siteLogoNight : siteLogoDay,
+);
 
 const creditsBalanceText = computed(() => {
   if (creditsStore.accountsLoaded) {
@@ -161,10 +167,9 @@ const showHeaderRecharge = computed(
       aria-label="顶部导航"
     >
       <div class="site-brand">
-        <RouterLink class="logo" to="/home">AI CARXEN</RouterLink>
-        <div class="logo-cn-badge">
-          <span class="logo-cn-name">车新新</span>
-        </div>
+        <RouterLink class="logo" to="/home" aria-label="AI CARXEN 车新新">
+          <img class="logo-img" :src="siteLogoSrc" alt="AI CARXEN 车新新" />
+        </RouterLink>
       </div>
       <nav class="nav-links" aria-label="主导航">
         <template v-for="item in navItems" :key="item.path + item.label">
@@ -467,20 +472,25 @@ const showHeaderRecharge = computed(
   );
   color: var(--studio-chrome-logo, #121826);
   font-family:
-    "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   backdrop-filter: blur(12px);
 }
 
 .logo {
+  display: inline-flex;
   flex-shrink: 0;
-  color: var(--studio-chrome-logo, #121826);
-  font-family: inherit;
-  font-size: var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px));
-  font-weight: 900;
-  letter-spacing: 0;
+  align-items: center;
+  margin-right: 18px;
   line-height: 1;
   text-decoration: none;
+}
+
+.logo-img {
+  display: block;
+  width: auto;
+  height: calc(var(--studio-chrome-logo-size, clamp(24px, 2vw, 36px)) * 0.9);
+  object-fit: contain;
 }
 
 .site-brand {
@@ -490,45 +500,13 @@ const showHeaderRecharge = computed(
   gap: 8px;
 }
 
-.logo-cn-badge {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  height: calc(var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) - 2px);
-  margin-right: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: #000;
-}
-
-.logo-cn-name {
-  color: #fff;
-  font-family: inherit;
-  font-size: calc(
-    var(--studio-chrome-logo-size, clamp(20px, 1.75vw, 30px)) / 2
-  );
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.site-header.is-light .logo-cn-badge {
-  background: #fff;
-}
-
-.site-header.is-light .logo-cn-name {
-  color: #0f172a;
-}
-
 .nav-links {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: var(--studio-chrome-nav-gap, clamp(18px, 2.2vw, 42px));
   color: var(--studio-chrome-nav, #6b7280);
-  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
+  font-size: var(--studio-chrome-nav-size, clamp(14px, 0.85vw, 16px));
 }
 
 .nav-link {
@@ -542,6 +520,7 @@ const showHeaderRecharge = computed(
   font-size: inherit;
   font-weight: 600;
   line-height: 1.2;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.25s ease;
@@ -602,9 +581,10 @@ const showHeaderRecharge = computed(
   background: var(--studio-chrome-credit-bg, #ffffff);
   color: var(--studio-chrome-credit-text, #111827);
   font-family: inherit;
-  font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
-  font-weight: 700;
+  font-size: var(--studio-chrome-action-size, clamp(13px, 0.78vw, 15px));
+  font-weight: 600;
   line-height: 1.2;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -689,8 +669,9 @@ const showHeaderRecharge = computed(
 }
 
 .user-menu-trigger--studio .user-menu-name {
-  font-size: var(--studio-chrome-nav-size, clamp(15px, 1.15vw, 19px));
-  font-weight: 700;
+  font-size: var(--studio-chrome-action-size, clamp(13px, 0.78vw, 15px));
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .user-menu-trigger--studio .user-menu-chevron {

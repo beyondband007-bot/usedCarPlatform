@@ -17,6 +17,7 @@
     "compressorjs": "^1.2.1",
     "cropperjs": "^2.1.0",
     "dayjs": "^1.11.19",
+    "echarts": "^6.1.0",
     "gsap": "^3.13.0",
     "lodash-es": "^4.17.21",
     "motion-v": "^2.2.1",

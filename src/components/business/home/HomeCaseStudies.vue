@@ -113,7 +113,9 @@ onMounted(() => {
 .section-title h2 {
   margin: 0 0 18px;
   color: var(--home-text);
-  font-size: clamp(28px, 3.2vw, 42px);
+  font-family: "PingFang SC", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
   line-height: 1.12;
   white-space: nowrap;
 }
@@ -121,7 +123,9 @@ onMounted(() => {
 .section-title p {
   margin: 0;
   color: var(--home-muted);
-  font-size: 15px;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 1.8;
   white-space: nowrap;
 }
@@ -150,9 +154,9 @@ onMounted(() => {
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 900;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
   transition:
     color var(--home-motion-fast, 160ms ease),
     background var(--home-motion-fast, 160ms ease);
@@ -168,9 +172,9 @@ onMounted(() => {
 }
 
 .tab.active {
-  color: var(--home-tab-active-text, #f3f3f3);
-  background: var(--home-tab-active-bg, transparent);
-  font-weight: 900;
+  color: var(--home-tab-active-text, #1a1a1a);
+  background: var(--home-tab-active-bg, #ffffff);
+  font-weight: 700;
 }
 
 .case-layout {
@@ -236,7 +240,8 @@ onMounted(() => {
 .case-panel h3 {
   margin: 0 0 40px;
   color: var(--home-case-panel-title, #ffffff);
-  font-size: clamp(32px, 3.2vw, 46px);
+  font-family: "PingFang SC", sans-serif;
+  font-size: 32px;
   font-weight: 800;
   line-height: 1.28;
   letter-spacing: -0.01em;
@@ -251,8 +256,9 @@ onMounted(() => {
   display: block;
   margin-bottom: 14px;
   color: var(--home-case-panel-label, #f3f3f3);
-  font-size: clamp(20px, 1.55vw, 24px);
-  font-weight: 700;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 20px;
+  font-weight: 800;
   line-height: 1.45;
   white-space: nowrap;
 }
@@ -260,7 +266,8 @@ onMounted(() => {
 .case-panel p {
   margin: 0 0 34px;
   color: var(--home-case-panel-desc, rgba(255, 255, 255, 0.82));
-  font-size: clamp(18px, 1.4vw, 21px);
+  font-family: "PingFang SC", sans-serif;
+  font-size: 15px;
   font-weight: 500;
   line-height: 1.82;
 }

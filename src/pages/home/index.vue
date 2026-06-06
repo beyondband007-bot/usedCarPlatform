@@ -220,12 +220,12 @@ function openWorkbench() {
   --home-card-shadow: var(--shadow-panel);
   --home-badge-bg: rgb(71, 71, 73);
   --home-badge-bg-hover: rgb(82, 82, 84);
-  --home-badge-text: #f8fafc;
+  --home-badge-text: #ffffff;
   --home-badge-border: rgba(255, 255, 255, 0.08);
-  --home-tabs-bg: #eef2f7;
-  --home-tab-text: #64748b;
-  --home-tab-active-text: #2f6bff;
-  --home-tab-active-bg: transparent;
+  --home-tabs-bg: #1a1a1a;
+  --home-tab-text: #8a8a8a;
+  --home-tab-active-text: #1a1a1a;
+  --home-tab-active-bg: #ffffff;
   --home-case-panel-bg: rgb(49, 49, 49);
   --home-case-panel-title: #ffffff;
   --home-case-panel-desc: rgba(255, 255, 255, 0.82);

@@ -119,7 +119,9 @@ onMounted(() => {
 .section-title h2 {
   margin: 0 0 18px;
   color: var(--home-text);
-  font-size: clamp(28px, 3.2vw, 42px);
+  font-family: "PingFang SC", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
   line-height: 1.12;
   white-space: nowrap;
 }
@@ -127,7 +129,9 @@ onMounted(() => {
 .section-title p {
   margin: 0;
   color: var(--home-muted);
-  font-size: 15px;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 1.8;
   white-space: nowrap;
 }
@@ -217,7 +221,9 @@ onMounted(() => {
   margin: 24px 14px 6px;
   overflow: hidden;
   color: var(--home-card-title);
-  font-size: 21px;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -227,7 +233,9 @@ onMounted(() => {
   margin: 0 14px;
   overflow: hidden;
   color: var(--home-card-muted);
-  font-size: 14px;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.65;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -287,14 +295,15 @@ onMounted(() => {
 }
 
 .tech-badge-label {
-  font-size: clamp(25px, 2.4vw, 30px);
-  font-weight: 800;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 }
 
 .section-block.theme-light .tech-badge-label {
-  color: #334155;
+  color: #ffffff;
 }
 
 .section-block.theme-dark .tech-badge {

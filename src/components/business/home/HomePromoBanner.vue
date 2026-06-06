@@ -286,8 +286,9 @@ onUnmounted(() => {
 .promo-banner-copy h2 {
   margin: 0 0 12px;
   color: var(--home-media-title);
-  font-size: 28px;
-  font-weight: 700;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
   line-height: 1.3;
   white-space: nowrap;
 }
@@ -295,7 +296,9 @@ onUnmounted(() => {
 .promo-banner-copy p {
   margin: 0 0 8px;
   color: var(--home-media-desc);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
+  font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
 }
@@ -319,9 +322,9 @@ onUnmounted(() => {
     0 12px 34px rgba(244, 200, 64, 0.18);
   color: #171100;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 900;
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .promo-banner-action:focus-visible {

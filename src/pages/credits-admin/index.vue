@@ -62,6 +62,7 @@ import {
   reusableCreditsApplicationCatalog,
   type BackOfficeRole,
 } from '@/policies/accountProvisioning'
+import DeveloperHomeDashboard from '@/components/business/credits-admin/DeveloperHomeDashboard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 type RoleTab = BackOfficeRole
@@ -1812,23 +1813,15 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
   },
 ]
 
-const developerPlaceholder = [
-  { label: '跨应用 CRUD 审批流程', status: '规划中' },
-  { label: '应用密钥管理', status: '规划中' },
-  { label: '功能上下架与计费策略', status: '规划中' },
-]
 </script>
 
 <template>
   <main class="credits-admin-page theme-light">
     <section class="admin-shell">
-      <header class="admin-hero">
+      <header v-if="activeRole !== 'developer'" class="admin-hero">
         <div class="admin-hero-copy">
           <p class="admin-hero-kicker">Reusable Credits Platform Console</p>
           <h1>三角色积分平台控制台</h1>
-          <p class="admin-hero-sub">
-            当前主入口为 <code>/reusable-credits-console</code>；<code>/credits-admin</code> 仅作为历史兼容入口。控制台面向所有接入应用，usedCarPlatform 只是其中一个应用。
-          </p>
         </div>
         <div class="admin-hero-actions">
           <NButton type="primary" :loading="isLoading" @click="refreshOverview">
@@ -1859,200 +1852,91 @@ const developerPlaceholder = [
         <p v-if="lastError" class="admin-error">{{ lastError }}</p>
         <p v-if="interactionFeedback" class="admin-feedback">{{ interactionFeedback }}</p>
 
-        <section class="admin-summary" aria-label="平台概览">
-          <article class="admin-summary-card">
-            <p>当前筛选</p>
-            <strong>{{ selectedApplicationLabel }}</strong>
-            <span>{{ selectedApplicationCode === 'all' ? '跨应用平台视图' : `code: ${selectedApplicationCode}` }}</span>
-          </article>
-          <article class="admin-summary-card">
-            <p>后台范围</p>
-            <strong>{{ dashboardScopeLabel }}</strong>
-            <span>更新于 {{ dashboardGeneratedAtText }}</span>
-          </article>
-          <article class="admin-summary-card">
-            <p>关联客户</p>
-            <strong>{{ dashboardMetrics?.linkedCustomerCount ?? filteredCustomerProfiles.length }}</strong>
-            <span>应用客户链接</span>
-          </article>
-          <article class="admin-summary-card">
-            <p>开放工单</p>
-            <strong>{{ dashboardMetrics?.openTicketCount ?? agentOverview?.metrics.openTicketCount ?? 0 }}</strong>
-            <span>待处理支持事项</span>
-          </article>
-        </section>
-
-        <section v-if="platformDashboard" class="admin-dashboard-band" aria-label="MVP 运营总览">
-          <article class="admin-dashboard-metric">
-            <p>接入应用</p>
-            <strong>{{ dashboardMetrics?.applicationCount ?? 0 }}</strong>
-            <span>{{ platformDashboard.metrics.applications.join(' / ') || '暂无应用' }}</span>
-          </article>
-          <article class="admin-dashboard-metric">
-            <p>活跃代理商</p>
-            <strong>{{ dashboardMetrics?.activeAgentCount ?? 0 }}</strong>
-            <span>Developer/Admin 为全局，Agent 为自身</span>
-          </article>
-          <article class="admin-dashboard-metric">
-            <p>活跃线索</p>
-            <strong>{{ dashboardMetrics?.activeLeadCount ?? 0 }}</strong>
-            <span>CRM 报备与跟进</span>
-          </article>
-          <article class="admin-dashboard-metric">
-            <p>待确认结算</p>
-            <strong>{{ dashboardMetrics?.draftSettlementCount ?? 0 }}</strong>
-            <span>settlement workflow</span>
-          </article>
-        </section>
-
-        <section class="admin-filter-band" aria-label="应用筛选">
-          <button
-            v-for="item in applicationFilterOptions"
-            :key="item.code"
-            type="button"
-            class="admin-filter-chip"
-            :class="{ active: selectedApplicationCode === item.code }"
-            @click="selectedApplicationCode = item.code"
-          >
-            <span>{{ item.name }}</span>
-            <small>{{ item.statusText }}</small>
-          </button>
-        </section>
-
-        <template v-if="activeRole === 'developer'">
-          <section class="admin-section">
-            <h2>账号创建权限层级</h2>
-            <p class="admin-section-note">
-              开发者可创建 Admin、Agent 和 User；开发者开关分别控制公司管理员创建 User、创建 Agent/升级代理，以及代理商创建 User。
-            </p>
-            <div class="admin-action-row" aria-label="开发者创建账号">
-              <NButton type="primary" @click="openCreateAccountModal('admin')">
-                <template #icon>
-                  <Icon icon="mdi:account-tie-outline" />
-                </template>
-                创建 Admin
-              </NButton>
-              <NButton @click="openCreateAccountModal('agent')">
-                <template #icon>
-                  <Icon icon="mdi:handshake-outline" />
-                </template>
-                创建 Agent
-              </NButton>
-              <NButton @click="openCreateAccountModal('user')">
-                <template #icon>
-                  <Icon icon="mdi:account-plus-outline" />
-                </template>
-                创建 User
-              </NButton>
-            </div>
-            <div class="admin-toggle-grid">
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>允许公司管理员创建 User</h3>
-                  <p>一级总开关；关闭后，公司管理员不能创建普通 User。</p>
-                </div>
-                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateUsers" />
-              </article>
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>允许公司管理员创建 Agent</h3>
-                  <p>一级总开关；关闭后，所有公司管理员都不能创建 Agent，也不能让 User 成为 Agent。</p>
-                </div>
-                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers" />
-              </article>
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>允许代理商创建 User</h3>
-                  <p>一级总开关；关闭后，所有代理商都不能创建 User。</p>
-                </div>
-                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAgentCreateUsers" />
-              </article>
-            </div>
-            <div class="admin-subsection">
-              <h3>代理商授权</h3>
-              <p>
-                二级开关；默认全部关闭“禁用”。一级总开关开启时，开发者可单独禁用某个 Agent 创建 User。
-              </p>
-              <NDataTable
-                v-if="agentPolicyOverrides.length"
-                :columns="agentAuthorizationColumns"
-                :data="agentPolicyOverrides"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <NEmpty v-else description="暂无代理商账号" />
-            </div>
-            <div class="admin-subsection">
-              <h3>公司管理员授权</h3>
-              <p>
-                二级开关；一级总开关开启后，开发者可单独控制每个 Admin 是否能创建 Agent、以及让 User 成为 Agent。
-              </p>
-              <NDataTable
-                v-if="adminPolicyOverrides.length"
-                :columns="adminAuthorizationColumns"
-                :data="adminPolicyOverrides"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <NEmpty v-else description="暂无公司管理员账号" />
-            </div>
+        <template v-if="activeRole !== 'developer'">
+          <section class="admin-summary" aria-label="平台概览">
+            <article class="admin-summary-card">
+              <p>当前筛选</p>
+              <strong>{{ selectedApplicationLabel }}</strong>
+              <span>{{ selectedApplicationCode === 'all' ? '跨应用平台视图' : `code: ${selectedApplicationCode}` }}</span>
+            </article>
+            <article class="admin-summary-card">
+              <p>后台范围</p>
+              <strong>{{ dashboardScopeLabel }}</strong>
+              <span>更新于 {{ dashboardGeneratedAtText }}</span>
+            </article>
+            <article class="admin-summary-card">
+              <p>关联客户</p>
+              <strong>{{ dashboardMetrics?.linkedCustomerCount ?? filteredCustomerProfiles.length }}</strong>
+              <span>应用客户链接</span>
+            </article>
+            <article class="admin-summary-card">
+              <p>开放工单</p>
+              <strong>{{ dashboardMetrics?.openTicketCount ?? agentOverview?.metrics.openTicketCount ?? 0 }}</strong>
+              <span>待处理支持事项</span>
+            </article>
           </section>
 
-          <section class="admin-section">
-            <h2>跨应用客户档案</h2>
-            <NDataTable
-              v-if="filteredCustomerProfiles.length"
-              :columns="customerColumns"
-              :data="filteredCustomerProfiles"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无客户档案" />
+          <section v-if="platformDashboard" class="admin-dashboard-band" aria-label="MVP 运营总览">
+            <article class="admin-dashboard-metric">
+              <p>接入应用</p>
+              <strong>{{ dashboardMetrics?.applicationCount ?? 0 }}</strong>
+              <span>{{ platformDashboard.metrics.applications.join(' / ') || '暂无应用' }}</span>
+            </article>
+            <article class="admin-dashboard-metric">
+              <p>活跃代理商</p>
+              <strong>{{ dashboardMetrics?.activeAgentCount ?? 0 }}</strong>
+              <span>Developer/Admin 为全局，Agent 为自身</span>
+            </article>
+            <article class="admin-dashboard-metric">
+              <p>活跃线索</p>
+              <strong>{{ dashboardMetrics?.activeLeadCount ?? 0 }}</strong>
+              <span>CRM 报备与跟进</span>
+            </article>
+            <article class="admin-dashboard-metric">
+              <p>待确认结算</p>
+              <strong>{{ dashboardMetrics?.draftSettlementCount ?? 0 }}</strong>
+              <span>settlement workflow</span>
+            </article>
           </section>
 
-          <section class="admin-section" id="developer-function-billing">
+          <section class="admin-filter-band" aria-label="应用筛选">
             <button
+              v-for="item in applicationFilterOptions"
+              :key="item.code"
               type="button"
-              class="admin-collapse-trigger"
-              @click="isFunctionBillingOpen = !isFunctionBillingOpen"
+              class="admin-filter-chip"
+              :class="{ active: selectedApplicationCode === item.code }"
+              @click="selectedApplicationCode = item.code"
             >
-              <span>
-                <strong>跨应用功能计费配置</strong>
-                <small>
-                  {{ selectedApplicationCode === 'all' ? '请先在应用筛选中选择一个应用' : selectedApplicationLabel }}
-                </small>
-              </span>
-              <Icon :icon="isFunctionBillingOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" />
+              <span>{{ item.name }}</span>
+              <small>{{ item.statusText }}</small>
             </button>
-            <div v-if="isFunctionBillingOpen" class="admin-collapse-body">
-              <NDataTable
-                v-if="selectedApplicationFunctions.length"
-                :columns="functionColumns"
-                :data="selectedApplicationFunctions"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <NEmpty
-                v-else
-                :description="selectedApplicationCode === 'all' ? '请在应用筛选中选择一个应用后查看功能计费配置' : '暂无功能计费配置'"
-              />
-            </div>
-          </section>
-
-          <section class="admin-section">
-            <h2>开发者待办（规划中）</h2>
-            <ul class="admin-placeholder-list">
-              <li v-for="item in developerPlaceholder" :key="item.label">
-                <span>{{ item.label }}</span>
-                <NTag round :bordered="false" type="info">{{ item.status }}</NTag>
-              </li>
-            </ul>
           </section>
         </template>
+
+        <DeveloperHomeDashboard
+          v-if="activeRole === 'developer'"
+          :is-loading="isLoading"
+          :overview="overview"
+          :platform-dashboard="platformDashboard"
+          :selected-application-code="selectedApplicationCode"
+          :application-catalog="applicationCatalog"
+          :filtered-customer-profiles="filteredCustomerProfiles"
+          :customer-columns="customerColumns"
+          :admin-policy-overrides="adminPolicyOverrides"
+          :agent-policy-overrides="agentPolicyOverrides"
+          :account-creation-policy-state="accountCreationPolicyState"
+          :is-function-billing-open="isFunctionBillingOpen"
+          :selected-application-functions="selectedApplicationFunctions"
+          :function-columns="functionColumns"
+          :admin-authorization-columns="adminAuthorizationColumns"
+          :agent-authorization-columns="agentAuthorizationColumns"
+          :selected-application-label="selectedApplicationLabel"
+          @refresh="refreshOverview"
+          @create-account="openCreateAccountModal"
+          @update:selected-application-code="selectedApplicationCode = $event"
+          @update:is-function-billing-open="isFunctionBillingOpen = $event"
+        />
 
         <template v-else-if="activeRole === 'admin'">
           <section class="admin-section">
@@ -2443,27 +2327,31 @@ const developerPlaceholder = [
       <NModal
         v-model:show="isCreateAccountModalOpen"
         preset="card"
-        class="admin-create-modal"
-        :title="`创建 ${targetRoleLabel(createAccountForm.targetRole)}`"
+        class="admin-create-modal account-create-modal"
+        :style="{ width: '600px', maxWidth: '92vw', height: '400px', maxHeight: 'calc(100vh - 80px)' }"
         :mask-closable="!isCreatingAccount"
       >
-        <NForm label-placement="top" class="admin-create-form">
-          <NFormItem label="账号类型">
-            <NSelect
-              v-model:value="createAccountForm.targetRole"
-              :options="createTargetOptions"
-              @update:value="handleCreateTargetRoleChange"
-            />
-          </NFormItem>
-          <div class="admin-create-form-grid">
-            <NFormItem label="用户名">
-              <NInput
-                v-model:value="createAccountForm.username"
-                placeholder="lowercase_name"
-                maxlength="32"
+        <template #header>
+          <div class="account-create-header">
+            <span class="account-create-header-icon">
+              <Icon icon="mdi:account-plus-outline" />
+            </span>
+            <div>
+              <strong>创建 {{ targetRoleLabel(createAccountForm.targetRole) }}</strong>
+              <small>填写用户信息，完成后将自动创建账号</small>
+            </div>
+          </div>
+        </template>
+        <NForm label-placement="top" class="admin-create-form account-create-form" :show-feedback="false">
+          <div class="account-create-grid">
+            <NFormItem label="账号类型" required>
+              <NSelect
+                v-model:value="createAccountForm.targetRole"
+                :options="createTargetOptions"
+                @update:value="handleCreateTargetRoleChange"
               />
             </NFormItem>
-            <NFormItem label="初始密码">
+            <NFormItem label="初始密码" required>
               <NInput
                 v-model:value="createAccountForm.password"
                 type="password"
@@ -2471,19 +2359,22 @@ const developerPlaceholder = [
                 maxlength="64"
               />
             </NFormItem>
-          </div>
-          <div class="admin-create-form-grid">
-            <NFormItem label="显示名称">
-              <NInput v-model:value="createAccountForm.displayName" placeholder="默认使用用户名" />
+            <NFormItem label="用户名" required>
+              <NInput
+                v-model:value="createAccountForm.username"
+                placeholder="lowercase_name"
+                maxlength="32"
+              />
             </NFormItem>
             <NFormItem label="手机号">
               <NInput v-model:value="createAccountForm.phone" placeholder="可选" />
             </NFormItem>
-          </div>
-          <NFormItem label="邮箱">
-            <NInput v-model:value="createAccountForm.email" placeholder="可选，未填时后端生成本地邮箱" />
-          </NFormItem>
-          <div class="admin-create-form-grid">
+            <NFormItem label="显示名称">
+              <NInput v-model:value="createAccountForm.displayName" placeholder="默认使用用户名" />
+            </NFormItem>
+            <NFormItem label="邮箱">
+              <NInput v-model:value="createAccountForm.email" placeholder="可选，未填时后端生成本地邮箱" />
+            </NFormItem>
             <NFormItem label="接入应用">
               <NSelect
                 v-model:value="createAccountForm.applicationCode"
@@ -2497,19 +2388,19 @@ const developerPlaceholder = [
                 @update:value="handleCreatePlanChange"
               />
             </NFormItem>
+            <NFormItem label="初始积分" required class="account-create-full">
+              <NInputNumber
+                v-model:value="createAccountForm.initialPoints"
+                :min="0"
+                :precision="0"
+                :show-button="true"
+                class="admin-create-number"
+              />
+            </NFormItem>
           </div>
-          <NFormItem label="初始积分">
-            <NInputNumber
-              v-model:value="createAccountForm.initialPoints"
-              :min="0"
-              :precision="0"
-              :show-button="true"
-              class="admin-create-number"
-            />
-          </NFormItem>
         </NForm>
         <template #footer>
-          <div class="admin-modal-footer">
+          <div class="admin-modal-footer account-create-footer">
             <NButton :disabled="isCreatingAccount" @click="isCreateAccountModalOpen = false">
               取消
             </NButton>
@@ -2725,32 +2616,56 @@ const developerPlaceholder = [
 
 <style scoped lang="scss">
 .credits-admin-page {
-  min-height: calc(100vh - var(--app-header-offset));
-  padding: clamp(16px, 2vw, 30px);
+  padding: 0;
   background: var(--app-bg);
   color: var(--app-text);
 }
 
 .credits-admin-page.theme-light {
   color-scheme: light;
-  --app-bg: #f6f9fc;
+  --app-bg: #f5f7fa;
   --app-surface: #ffffff;
   --app-surface-soft: #f8fafd;
-  --app-border: #e6ecf5;
+  --app-border: transparent;
   --app-text: #0f172a;
   --app-text-soft: #475569;
   --app-text-muted: #64748b;
   --app-text-disabled: #94a3b8;
   --color-accent-blue: #2f6bff;
+  --bo-text: #0f172a;
+  --bo-text-soft: #475569;
+  --bo-text-muted: #64748b;
+  --bo-surface: #ffffff;
+  --bo-surface-soft: #f8fafc;
+  --bo-accent: #2f6bff;
+  --bo-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.credits-admin-page.theme-dark {
+  color-scheme: dark;
+  --app-bg: #0b1220;
+  --app-surface: #111827;
+  --app-surface-soft: #1a2332;
+  --app-border: transparent;
+  --app-text: #f8fafc;
+  --app-text-soft: #cbd5e1;
+  --app-text-muted: #94a3b8;
+  --app-text-disabled: #64748b;
+  --color-accent-blue: #5b8cff;
+  --bo-text: #f8fafc;
+  --bo-text-soft: #cbd5e1;
+  --bo-text-muted: #94a3b8;
+  --bo-surface: #111827;
+  --bo-surface-soft: #1a2332;
+  --bo-accent: #5b8cff;
+  --bo-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
 }
 
 .admin-shell {
   display: flex;
   flex-direction: column;
-  gap: clamp(16px, 1.6vw, 24px);
+  gap: 16px;
   width: 100%;
-  max-width: 1500px;
-  margin: 0 auto;
 }
 
 .admin-hero {
@@ -2758,10 +2673,16 @@ const developerPlaceholder = [
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px clamp(20px, 2vw, 32px);
-  border: 1px solid var(--app-border);
-  border-radius: 16px;
+  padding: 20px 24px;
+  border-radius: 12px;
   background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .admin-hero-kicker {
@@ -2804,9 +2725,10 @@ const developerPlaceholder = [
   align-items: center;
   gap: 6px 12px;
   padding: 16px 18px;
-  border: 1px solid var(--app-border);
-  border-radius: 14px;
+  border: 0;
+  border-radius: 12px;
   background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
   color: var(--app-text);
   text-align: left;
   cursor: pointer;
@@ -2855,9 +2777,16 @@ const developerPlaceholder = [
   display: grid;
   gap: 4px;
   padding: 18px 20px;
-  border: 1px solid var(--app-border);
-  border-radius: 14px;
+  border: 0;
+  border-radius: 12px;
   background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .admin-summary-card p {
@@ -2881,21 +2810,28 @@ const developerPlaceholder = [
 .admin-dashboard-band {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--app-border);
-  border-radius: 8px;
-  background: var(--app-surface);
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
 }
 
 .admin-dashboard-metric {
   display: grid;
   gap: 5px;
   min-height: 108px;
-  padding: 14px 16px;
-  border: 1px solid var(--app-border);
-  border-radius: 8px;
-  background: var(--app-surface-soft);
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .admin-dashboard-metric p {
@@ -2923,10 +2859,11 @@ const developerPlaceholder = [
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--app-border);
-  border-radius: 14px;
+  padding: 16px;
+  border: 0;
+  border-radius: 12px;
   background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
 }
 
 .admin-filter-chip {
@@ -2934,7 +2871,7 @@ const developerPlaceholder = [
   gap: 2px;
   min-width: 160px;
   padding: 10px 14px;
-  border: 1px solid var(--app-border);
+  border: 0;
   border-radius: 10px;
   background: var(--app-surface-soft);
   color: var(--app-text);
@@ -2973,7 +2910,7 @@ const developerPlaceholder = [
   gap: 16px;
   min-height: 92px;
   padding: 16px 18px;
-  border: 1px dashed var(--app-border);
+  border: 0;
   border-radius: 12px;
   background: var(--app-surface-soft);
 }
@@ -3004,7 +2941,7 @@ const developerPlaceholder = [
   gap: 10px;
   margin: 0 0 14px;
   padding: 14px;
-  border: 1px solid var(--app-border);
+  border: 0;
   border-radius: 12px;
   background: var(--app-surface-soft);
 }
@@ -3027,10 +2964,17 @@ const developerPlaceholder = [
 }
 
 .admin-section {
-  padding: 20px clamp(18px, 1.8vw, 26px);
-  border: 1px solid var(--app-border);
-  border-radius: 14px;
+  padding: 20px 24px;
+  border: 0;
+  border-radius: 12px;
   background: var(--app-surface);
+  box-shadow: var(--bo-card-shadow, 0 2px 12px rgba(0, 0, 0, 0.04));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .admin-section + .admin-section {
@@ -3096,26 +3040,6 @@ const developerPlaceholder = [
   justify-content: flex-end;
   gap: 10px;
   margin: -4px 0 12px;
-}
-
-.admin-placeholder-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-placeholder-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px dashed var(--app-border);
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 700;
 }
 
 :deep(.admin-function-points-cell) {
@@ -3345,6 +3269,145 @@ const developerPlaceholder = [
 
   .admin-detail-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===== 创建账号弹窗（企业级表单样式，作用域限定，不影响其它共用弹窗） ===== */
+/* 宽高由模板内联 style 控制（teleport 弹窗，deep 不可靠）；此处仅补充视觉样式 */
+:deep(.account-create-modal.n-card) {
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.account-create-modal .n-card__content) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+}
+
+:deep(.account-create-modal .n-card-header) {
+  padding: 20px 24px 14px;
+}
+
+:deep(.account-create-modal .n-card-header__close) {
+  margin: 18px 18px 0 0;
+}
+
+.account-create-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-create-header-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(47, 107, 255, 0.1);
+  color: #2f6bff;
+  font-size: 24px;
+}
+
+.account-create-header strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.account-create-header small {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.account-create-form {
+  padding: 16px;
+  border: 1px solid #e5eaf3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.account-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 16px;
+}
+
+.account-create-full {
+  grid-column: 1 / -1;
+}
+
+:deep(.account-create-form .n-form-item-label) {
+  padding-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+:deep(.account-create-form .n-form-item-label__asterisk) {
+  color: #ef4444;
+}
+
+:deep(.account-create-form .n-input),
+:deep(.account-create-form .n-base-selection) {
+  --n-height: 42px;
+  border-radius: 8px;
+}
+
+:deep(.account-create-form .n-input .n-input__input-el),
+:deep(.account-create-form .n-base-selection .n-base-selection-label) {
+  min-height: 42px;
+}
+
+:deep(.account-create-form .n-input__placeholder),
+:deep(.account-create-form .n-base-selection-placeholder) {
+  color: #a3aab8;
+}
+
+:deep(.account-create-footer) {
+  padding: 16px 24px 20px;
+  border-top: 1px solid #eef2f7;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+:deep(.account-create-footer .n-button) {
+  height: 40px;
+  border-radius: 8px;
+}
+
+:deep(.account-create-footer .n-button--default-type) {
+  padding: 0 22px;
+}
+
+:deep(.account-create-footer .n-button--primary-type) {
+  padding: 0 24px;
+  box-shadow: 0 6px 14px rgba(47, 107, 255, 0.24);
+}
+
+@media (max-width: 900px) {
+  :deep(.account-create-modal.n-modal) {
+    width: 94vw;
+  }
+
+  .account-create-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account-create-full {
+    grid-column: 1 / -1;
   }
 }
 </style>

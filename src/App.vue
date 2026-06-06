@@ -5,12 +5,13 @@ import {
   NConfigProvider,
   NDialogProvider,
   NMessageProvider,
-  NNotificationProvider,
   type GlobalThemeOverrides,
 } from "naive-ui";
-import { useRoute } from "vue-router";
+import { RouterView, useRoute } from "vue-router";
 
 import { syncDocumentTheme } from "@/composables/useDocumentTheme";
+import BackOfficeLayout from "@/layouts/BackOfficeLayout.vue";
+import BackOfficeLoginPage from "@/pages/back-office-login/index.vue";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
@@ -32,7 +33,6 @@ watchEffect(() => {
 });
 
 const activeTheme = computed(() => (isEffectiveDarkMode.value ? darkTheme : null));
-
 const themeOverrides = computed<GlobalThemeOverrides>(() =>
   isEffectiveDarkMode.value
     ? {
@@ -100,11 +100,20 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
   <NConfigProvider :theme="activeTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
       <NDialogProvider>
-        <NNotificationProvider>
-          <div class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
-            <RouterView />
-          </div>
-        </NNotificationProvider>
+        <div class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
+          <BackOfficeLoginPage v-if="route.path === '/back-office/login'" />
+          <BackOfficeLayout
+            v-else-if="
+              route.path.startsWith('/back-office') ||
+              route.path.startsWith('/reusable-credits-console') ||
+              route.path.startsWith('/credits-admin')
+            "
+          />
+          <RouterView v-else v-slot="{ Component }">
+            <component :is="Component" v-if="Component" />
+            <div v-else class="route-render-fallback">Route view is empty.</div>
+          </RouterView>
+        </div>
       </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
+import CreditsAdminPage from '@/pages/credits-admin/index.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -25,35 +26,36 @@ const roleScope = computed(() => {
 const navItems = computed(() => {
   if (authStore.role === 'developer') {
     return [
-      { label: '系统总览', anchor: 'developer-dashboard' },
-      { label: '租户/客户管理', anchor: 'developer-customers' },
-      { label: '用户/账户管理', anchor: 'developer-accounts' },
-      { label: '充值与订单', anchor: 'developer-recharge' },
-      { label: '代理商管理', anchor: 'developer-agents' },
-      { label: '返佣记录', anchor: 'developer-commissions' },
-      { label: '结算管理', anchor: 'developer-settlements' },
+      { label: '系统总览', anchor: 'developer-dashboard', icon: 'mdi:view-dashboard-outline' },
+      { label: '租户/客户管理', anchor: 'developer-customers', icon: 'mdi:office-building-outline' },
+      { label: '用户/账户管理', anchor: 'developer-permissions', icon: 'mdi:account-cog-outline' },
+      { label: '充值与订单', anchor: 'developer-customers', icon: 'mdi:credit-card-outline' },
+      { label: '代理商管理', anchor: 'developer-permissions', icon: 'mdi:handshake-outline' },
+      { label: '运营记录', anchor: 'developer-trends', icon: 'mdi:chart-timeline-variant' },
+      { label: '结算管理', anchor: 'developer-customers', icon: 'mdi:cash-multiple' },
+      { label: '系统配置', anchor: 'developer-resources', icon: 'mdi:cog-outline' },
     ]
   }
 
   if (authStore.role === 'admin') {
     return [
-      { label: '系统总览', anchor: 'admin-dashboard' },
-      { label: '代理商管理', anchor: 'admin-agents' },
-      { label: '用户清单', anchor: 'admin-users' },
-      { label: '充值记录', anchor: 'admin-recharge' },
-      { label: '工单处理', anchor: 'admin-tickets' },
-      { label: '结算审批', anchor: 'admin-settlements' },
-      { label: '线索/报备', anchor: 'admin-leads' },
+      { label: '系统总览', anchor: 'admin-dashboard', icon: 'mdi:view-dashboard-outline' },
+      { label: '代理商管理', anchor: 'admin-agents', icon: 'mdi:handshake-outline' },
+      { label: '用户清单', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
+      { label: '充值记录', anchor: 'admin-recharge', icon: 'mdi:credit-card-outline' },
+      { label: '工单处理', anchor: 'admin-tickets', icon: 'mdi:lifebuoy' },
+      { label: '结算审批', anchor: 'admin-settlements', icon: 'mdi:cash-check' },
+      { label: '线索/报备', anchor: 'admin-leads', icon: 'mdi:clipboard-text-outline' },
     ]
   }
 
   if (authStore.role === 'agent') {
     return [
-      { label: '代理工作台', anchor: 'agent-dashboard' },
-      { label: '线索/报备', anchor: 'agent-leads' },
-      { label: '我的客户', anchor: 'agent-customers' },
-      { label: '客户消费', anchor: 'agent-consumption' },
-      { label: '返佣结算', anchor: 'agent-settlements' },
+      { label: '代理工作台', anchor: 'agent-dashboard', icon: 'mdi:view-dashboard-outline' },
+      { label: '线索/报备', anchor: 'agent-leads', icon: 'mdi:clipboard-text-outline' },
+      { label: '我的客户', anchor: 'agent-customers', icon: 'mdi:account-group-outline' },
+      { label: '客户消费', anchor: 'agent-consumption', icon: 'mdi:chart-line' },
+      { label: '返佣结算', anchor: 'agent-settlements', icon: 'mdi:cash-multiple' },
     ]
   }
 
@@ -77,22 +79,23 @@ async function handleLogout() {
         </span>
       </RouterLink>
 
+      <p class="back-office-nav-label">{{ roleLabel.replace('后台', '') }}</p>
       <section class="back-office-profile">
-        <strong>{{ authStore.userName }}</strong>
-        <span>{{ roleLabel }}</span>
+        <strong>{{ roleLabel }}</strong>
         <small>{{ roleScope }}</small>
       </section>
 
       <p class="back-office-nav-label">功能</p>
       <nav class="back-office-nav" aria-label="后台菜单">
         <a
-          v-for="item in navItems"
-          :key="item.anchor"
+          v-for="(item, index) in navItems"
+          :key="`${item.anchor}-${index}`"
           :href="`#${item.anchor}`"
           class="back-office-nav-link"
+          :class="{ active: index === 0 }"
         >
+          <Icon :icon="item.icon" />
           <span>{{ item.label }}</span>
-          <Icon icon="mdi:chevron-right" />
         </a>
       </nav>
 
@@ -103,18 +106,32 @@ async function handleLogout() {
     </aside>
 
     <main class="back-office-main">
-      <header class="back-office-topbar">
+      <header class="back-office-topbar back-office-topbar-fixed">
         <div>
           <p>Reusable Credits Platform Console</p>
           <h1>{{ roleLabel }}</h1>
         </div>
-        <div class="back-office-app-signal">
-          <Icon icon="mdi:apps" />
-          <span>当前接入：usedCarPlatform</span>
+        <div class="back-office-topbar-actions">
+          <button type="button" class="back-office-icon-btn" aria-label="通知">
+            <Icon icon="mdi:bell-outline" />
+          </button>
+          <button type="button" class="back-office-icon-btn" aria-label="帮助">
+            <Icon icon="mdi:help-circle-outline" />
+          </button>
+          <div class="back-office-app-signal">
+            <Icon icon="mdi:apps" />
+            <span>usedCarPlatform</span>
+          </div>
+          <div class="back-office-user">
+            <span class="back-office-user-avatar">{{ authStore.userName?.slice(0, 1) || 'U' }}</span>
+            <span class="back-office-user-name">{{ authStore.userName }}</span>
+          </div>
         </div>
       </header>
 
-      <RouterView />
+      <div class="back-office-content">
+        <CreditsAdminPage />
+      </div>
     </main>
   </div>
 </template>
@@ -123,8 +140,8 @@ async function handleLogout() {
 .back-office-layout {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 292px minmax(0, 1fr);
-  background: #f8fafc;
+  grid-template-columns: 220px minmax(0, 1fr);
+  background: #f5f7fa;
   color: #0f172a;
 }
 
@@ -173,28 +190,27 @@ async function handleLogout() {
 
 .back-office-profile {
   display: grid;
-  gap: 6px;
-  margin: 22px 0 18px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  gap: 4px;
+  margin: 6px 0 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
 }
 
 .back-office-profile strong {
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.back-office-profile span,
 .back-office-profile small {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
 .back-office-nav-label {
-  margin: 4px 0 8px;
+  margin: 16px 0 8px;
   font-size: 12px;
   font-weight: 700;
+  color: #94a3b8;
 }
 
 .back-office-nav {
@@ -205,16 +221,28 @@ async function handleLogout() {
 .back-office-nav-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 11px;
   border-radius: 8px;
-  color: inherit;
-  padding: 10px 11px;
+  color: #cbd5e1;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
   text-decoration: none;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.back-office-nav-link .iconify {
+  font-size: 18px;
 }
 
 .back-office-nav-link:hover {
   background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.back-office-nav-link.active {
+  background: #2563eb;
+  color: #fff;
 }
 
 .back-office-logout {
@@ -233,16 +261,30 @@ async function handleLogout() {
 }
 
 .back-office-main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 28px;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .back-office-topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 18px;
+}
+
+.back-office-topbar-fixed {
+  flex: 0 0 auto;
+  padding: 16px 16px 12px;
+}
+
+.back-office-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 16px;
 }
 
 .back-office-topbar p {
@@ -258,18 +300,72 @@ async function handleLogout() {
   font-weight: 900;
 }
 
+.back-office-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-office-icon-btn {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  color: #64748b;
+  font-size: 20px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.back-office-icon-btn:hover {
+  color: #2563eb;
+}
+
 .back-office-app-signal {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   padding: 9px 12px;
   color: #334155;
   font-size: 13px;
   font-weight: 800;
+}
+
+.back-office-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  padding: 6px 12px 6px 6px;
+}
+
+.back-office-user-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.back-office-user-name {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {

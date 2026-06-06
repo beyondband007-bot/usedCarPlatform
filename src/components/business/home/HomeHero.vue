@@ -9,14 +9,33 @@ import {
 } from "@/constants/home-page";
 import { useAppStore } from "@/stores/app";
 
-/** 背景图仅展示原图垂直 25% ~ 100% 区间 */
+/** 容器宽高比保持原图 25% ~ 100% 区间的比例（不改变 hero 高度） */
 const HERO_IMAGE_WIDTH = 1672;
 const HERO_IMAGE_HEIGHT = 941;
 const HERO_IMAGE_CROP_START = 25;
 const HERO_IMAGE_CROP_END = 100;
-const HERO_IMAGE_CROP_SPAN = (HERO_IMAGE_CROP_END - HERO_IMAGE_CROP_START) / 100;
+const HERO_IMAGE_CROP_SPAN =
+  (HERO_IMAGE_CROP_END - HERO_IMAGE_CROP_START) / 100;
 const HERO_VISIBLE_HEIGHT = HERO_IMAGE_HEIGHT * HERO_IMAGE_CROP_SPAN;
 const HERO_VIEWPORT_ASPECT = `${HERO_IMAGE_WIDTH} / ${HERO_VISIBLE_HEIGHT}`;
+
+/** 实际展示的背景图垂直区间（仅影响背景图内容，不影响 hero 高度，且不缩放图片） */
+const HERO_DISPLAY_CROP_START = 15;
+const HERO_DISPLAY_CROP_END = 75;
+const HERO_DISPLAY_CROP_SPAN =
+  (HERO_DISPLAY_CROP_END - HERO_DISPLAY_CROP_START) / 100;
+
+/**
+ * 车顶在“原始整图”中的垂直位置（百分比）。
+ * 用于把车顶位置换算到当前裁切后的 hero 容器坐标，从而精确控制文案与车身的间距。
+ */
+const HERO_CAR_ROOF_IN_IMAGE = 38;
+/** 车顶在当前 hero 容器中的相对位置（%） */
+const HERO_CAR_ROOF_LINE = (
+  ((HERO_CAR_ROOF_IN_IMAGE - HERO_DISPLAY_CROP_START) /
+    (HERO_DISPLAY_CROP_SPAN * 100)) *
+  100
+).toFixed(2);
 
 const appStore = useAppStore();
 
@@ -24,14 +43,16 @@ const homeHeroImageSrc = computed(() =>
   appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,
 );
 
+/**
+ * 仅展示原图 25% ~ 75% 高度的区域，且不缩放图片本身：
+ * 图片按原始宽高比铺满容器宽度（高度 auto），再向上平移裁掉顶部 25%，
+ * 容器高度负责裁掉底部，从而只露出 25% ~ 75% 的区间。
+ */
 const heroImageStyle = computed(
   (): CSSProperties => ({
     width: "100%",
-    height: `${100 / HERO_IMAGE_CROP_SPAN}%`,
-    minHeight: `${100 / HERO_IMAGE_CROP_SPAN}%`,
-    objectFit: "cover",
-    objectPosition: "center 31%",
-    transform: `translateY(-${HERO_IMAGE_CROP_START}%)`,
+    height: "auto",
+    transform: `translateY(-${HERO_DISPLAY_CROP_START}%)`,
   }),
 );
 </script>
@@ -39,7 +60,10 @@ const heroImageStyle = computed(
 <template>
   <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
     <div class="hero-visual" :style="{ aspectRatio: HERO_VIEWPORT_ASPECT }">
-      <div class="hero-media">
+      <div
+        class="hero-media"
+        :style="{ '--hero-car-roof-line': `${HERO_CAR_ROOF_LINE}%` }"
+      >
         <PreloadImage
           class="hero-image"
           :src="homeHeroImageSrc"
@@ -84,10 +108,8 @@ const heroImageStyle = computed(
   width: 100%;
   height: 100%;
   line-height: 0;
+  /* 车顶位置由脚本按裁切区间换算后通过内联样式注入，这里兜底 42% */
   --hero-car-roof-line: 42%;
-  --hero-text-gap: clamp(30px, 4.2cqh, 56px);
-  --hero-text-top: calc(var(--app-header-offset, 72px) + var(--hero-text-gap));
-  --hero-text-car-gap: clamp(12px, 2.5cqh, 28px);
 }
 
 .hero-image {
@@ -111,19 +133,18 @@ const heroImageStyle = computed(
 .hero-copy {
   position: absolute;
   z-index: 2;
-  top: var(--hero-text-top);
+  /* 文案占据「菜单栏下方」到「车顶」之间的区域，并在其中垂直居中，
+     使「顶部间距」与「到车顶间距」自然相等 */
+  top: var(--app-header-offset, 72px);
   right: 0;
   left: 0;
+  height: calc(var(--hero-car-roof-line, 42%) - var(--app-header-offset, 72px));
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   width: fit-content;
   max-width: calc(100% - 40px);
-  max-height: calc(
-    var(--hero-car-roof-line, 42%) - var(--hero-text-top) -
-      var(--hero-text-car-gap)
-  );
   overflow: hidden;
   margin: 0 auto;
   padding: 0;
@@ -137,8 +158,9 @@ const heroImageStyle = computed(
   margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
   font-size: clamp(22px, 4.8cqh, 46px);
+  font-weight: 800;
   line-height: 1.12;
-  letter-spacing: 0;
+  letter-spacing: 5px;
   white-space: nowrap;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.42);
 }
@@ -194,23 +216,7 @@ const heroImageStyle = computed(
   }
 }
 
-@media (max-width: 1279px) {
-  .hero-media {
-    --hero-car-roof-line: 40%;
-  }
-}
-
-@media (max-width: 1023px) {
-  .hero-media {
-    --hero-car-roof-line: 38%;
-  }
-}
-
 @media (max-width: 767px) {
-  .hero-media {
-    --hero-car-roof-line: 36%;
-  }
-
   .hero-copy {
     width: min(100% - (var(--home-space-x, 16px) * 2), 900px);
     max-width: calc(100% - (var(--home-space-x, 16px) * 2));
@@ -231,15 +237,9 @@ const heroImageStyle = computed(
 }
 
 @media (min-width: 1440px) {
-  .hero-media {
-    --hero-car-roof-line: 44%;
-    --hero-text-car-gap: clamp(16px, 2.8cqh, 36px);
-  }
-
   .hero h1 {
     margin-bottom: clamp(12px, 2cqh, 24px);
     font-size: clamp(28px, 4.2cqh, 46px);
-    font-weight: 800;
   }
 
   .subtitle {
@@ -258,11 +258,6 @@ const heroImageStyle = computed(
 }
 
 @media (max-height: 820px) {
-  .hero-media {
-    --hero-car-roof-line: 40%;
-    --hero-text-gap: clamp(24px, 3.5cqh, 48px);
-  }
-
   .hero h1 {
     font-size: clamp(20px, 4.2cqh, 36px);
   }
