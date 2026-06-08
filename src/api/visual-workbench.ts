@@ -407,6 +407,160 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
   return response.data
 }
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin
+const mediaPathPrefixes = ['/uploads/', '/results/', '/packages/', '/scene-refs/']
+
+function normalizeMediaUrl(url?: string | null) {
+  const trimmed = url?.trim()
+  if (!trimmed) return url ?? trimmed
+
+  try {
+    const parsed = new URL(trimmed, apiOrigin)
+    if (
+      mediaPathPrefixes.some((prefix) => parsed.pathname.startsWith(prefix)) &&
+      parsed.origin !== apiOrigin
+    ) {
+      return `${apiOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`
+    }
+    return parsed.toString()
+  } catch {
+    return trimmed
+  }
+}
+
+function normalizeUploadedAsset(asset: UploadedAsset): UploadedAsset {
+  return {
+    ...asset,
+    url: normalizeMediaUrl(asset.url) ?? asset.url,
+    thumbnailUrl: normalizeMediaUrl(asset.thumbnailUrl),
+  }
+}
+
+function normalizeShowroomSceneItem(item: ShowroomLightSceneItem): ShowroomLightSceneItem {
+  return {
+    ...item,
+    referenceImageUrl: normalizeMediaUrl(item.referenceImageUrl) ?? item.referenceImageUrl,
+  }
+}
+
+function normalizeGenerationResultImage(image: GenerationResultImage): GenerationResultImage {
+  return {
+    ...image,
+    url: normalizeMediaUrl(image.url) ?? image.url,
+    sourceUrl: normalizeMediaUrl(image.sourceUrl),
+  }
+}
+
+function normalizeGenerationTaskDetail(task: GenerationTaskDetail): GenerationTaskDetail {
+  return {
+    ...task,
+    resultImages: task.resultImages.map(normalizeGenerationResultImage),
+    resultVideos: task.resultVideos?.map(normalizeGenerationResultImage),
+    videoUrl: normalizeMediaUrl(task.videoUrl),
+    previewVideo: normalizeMediaUrl(task.previewVideo),
+    downloadUrl: normalizeMediaUrl(task.downloadUrl),
+  }
+}
+
+function normalizeCreativeImageConversation(
+  conversation: CreativeImageConversation,
+): CreativeImageConversation {
+  return {
+    ...conversation,
+    lastResultUrl: normalizeMediaUrl(conversation.lastResultUrl) ?? null,
+  }
+}
+
+function normalizeCreativeImageMessage(message: CreativeImageMessage): CreativeImageMessage {
+  return {
+    ...message,
+    sourceImageUrl: normalizeMediaUrl(message.sourceImageUrl) ?? null,
+    resultUrl: normalizeMediaUrl(message.resultUrl) ?? null,
+  }
+}
+
+function normalizeRecentGenerationTask(task: RecentGenerationTask): RecentGenerationTask {
+  return {
+    ...task,
+    thumbnail: normalizeMediaUrl(task.thumbnail),
+    previewImage: normalizeMediaUrl(task.previewImage),
+    downloadUrl: normalizeMediaUrl(task.downloadUrl),
+    inputAssetThumbnailUrl: normalizeMediaUrl(task.inputAssetThumbnailUrl),
+    inputAssetUrl: normalizeMediaUrl(task.inputAssetUrl),
+  }
+}
+
+function normalizeBatchVisualConfig(config: BatchVisualConfig): BatchVisualConfig {
+  return {
+    ...config,
+    sceneReferenceImageUrl: normalizeMediaUrl(config.sceneReferenceImageUrl),
+  }
+}
+
+function normalizeBatchPreset(preset: BatchPreset): BatchPreset {
+  return {
+    ...preset,
+    visualConfig: normalizeBatchVisualConfig(preset.visualConfig),
+  }
+}
+
+function normalizeDeliveryTaskItem(task: DeliveryTaskItem): DeliveryTaskItem {
+  return {
+    ...task,
+    firstInputCoverUrl: normalizeMediaUrl(task.firstInputCoverUrl) ?? null,
+  }
+}
+
+function normalizeDeliveryAsset(asset: DeliveryAsset): DeliveryAsset {
+  return {
+    ...asset,
+    url: normalizeMediaUrl(asset.url) ?? asset.url,
+    thumbnailUrl: normalizeMediaUrl(asset.thumbnailUrl) ?? null,
+  }
+}
+
+function normalizeDeliveryInputCover(cover: DeliveryInputCover): DeliveryInputCover {
+  return {
+    ...cover,
+    coverUrl: normalizeMediaUrl(cover.coverUrl) ?? null,
+  }
+}
+
+function normalizeDeliveryTaskAssetsResult(
+  result: DeliveryTaskAssetsResult,
+): DeliveryTaskAssetsResult {
+  return {
+    ...result,
+    items: result.items.map(normalizeDeliveryAsset),
+    inputCovers: result.inputCovers?.map(normalizeDeliveryInputCover),
+  }
+}
+
+function normalizeDeliveryPackage(pkg: DeliveryPackage): DeliveryPackage {
+  return {
+    ...pkg,
+    downloadUrl: normalizeMediaUrl(pkg.downloadUrl) ?? null,
+  }
+}
+
+function normalizeCreatedGenerationTask(task: CreatedGenerationTask): CreatedGenerationTask {
+  return {
+    ...task,
+    sceneReferenceImageUrl: normalizeMediaUrl(task.sceneReferenceImageUrl),
+  }
+}
+
+function normalizeCreatedCreativeGeneration(
+  task: CreatedCreativeGeneration,
+): CreatedCreativeGeneration {
+  return {
+    ...task,
+    sceneReferenceImageUrl: normalizeMediaUrl(task.sceneReferenceImageUrl),
+    sourceImageUrl: normalizeMediaUrl(task.sourceImageUrl) ?? null,
+  }
+}
+
 const generationRequestConfig = {
   timeout: 0,
 }
@@ -427,12 +581,17 @@ export async function uploadAsset(file: File, purpose: AssetPurpose) {
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 
-  return unwrapApiResponse(response)
+  return normalizeUploadedAsset(unwrapApiResponse(response))
 }
 
 export async function getDefaultLogo() {
   const response = await request.get<ApiResponse<UserLogoSetting | null>>('/user/logo')
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  if (!result) return result
+  return {
+    ...result,
+    logo: normalizeUploadedAsset(result.logo),
+  }
 }
 
 export async function uploadDefaultLogo(file: File) {
@@ -446,7 +605,11 @@ export async function uploadDefaultLogo(file: File) {
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    logo: normalizeUploadedAsset(result.logo),
+  }
 }
 
 export async function createGenerationTask(
@@ -459,14 +622,18 @@ export async function createGenerationTask(
     generationRequestConfig,
   )
 
-  return unwrapApiResponse(response)
+  return normalizeCreatedGenerationTask(unwrapApiResponse(response))
 }
 
 export async function getShowroomLightScenes() {
   const response = await request.get<ApiResponse<{ items: ShowroomLightSceneItem[] }>>(
     '/modules/showroom-light/scenes',
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeShowroomSceneItem),
+  }
 }
 
 export async function createInteriorCollageTask(
@@ -497,14 +664,18 @@ export async function getCreativeImageConversations(params?: {
     '/modules/creative-image/conversations',
     { params },
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeCreativeImageConversation),
+  }
 }
 
 export async function getCreativeImageConversation(conversationId: string) {
   const response = await request.get<ApiResponse<CreativeImageConversation>>(
     `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}`,
   )
-  return unwrapApiResponse(response)
+  return normalizeCreativeImageConversation(unwrapApiResponse(response))
 }
 
 export async function deleteCreativeImageConversation(conversationId: string) {
@@ -518,7 +689,11 @@ export async function getCreativeImageMessages(conversationId: string) {
   const response = await request.get<ApiResponse<{ items: CreativeImageMessage[] }>>(
     `/modules/creative-image/conversations/${encodeURIComponent(conversationId)}/messages`,
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeCreativeImageMessage),
+  }
 }
 
 export async function uploadCreativeImageReference(conversationId: string, file: File) {
@@ -532,7 +707,7 @@ export async function uploadCreativeImageReference(conversationId: string, file:
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
-  return unwrapApiResponse(response)
+  return normalizeUploadedAsset(unwrapApiResponse(response))
 }
 
 export async function createCreativeImageGeneration(
@@ -544,12 +719,12 @@ export async function createCreativeImageGeneration(
     payload,
     generationRequestConfig,
   )
-  return unwrapApiResponse(response)
+  return normalizeCreatedCreativeGeneration(unwrapApiResponse(response))
 }
 
 export async function getGenerationTask(taskId: string) {
   const response = await request.get<ApiResponse<GenerationTaskDetail>>(`/tasks/${taskId}`)
-  return unwrapApiResponse(response)
+  return normalizeGenerationTaskDetail(unwrapApiResponse(response))
 }
 
 export async function getRecentGenerationTasks(params?: {
@@ -565,18 +740,30 @@ export async function getRecentGenerationTasks(params?: {
       `/modules/${encodeURIComponent(moduleCode)}/recent-tasks`,
       { params: query },
     )
-    return unwrapApiResponse(response)
+    const result = unwrapApiResponse(response)
+    return {
+      ...result,
+      items: result.items.map(normalizeRecentGenerationTask),
+    }
   }
 
   const response = await request.get<ApiResponse<PagedResult<RecentGenerationTask>>>('/tasks', {
     params,
   })
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeRecentGenerationTask),
+  }
 }
 
 export async function getBatchPresets() {
   const response = await request.get<ApiResponse<BatchPresetList>>('/modules/batch-new/presets')
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeBatchPreset),
+  }
 }
 
 export async function saveBatchPreset(payload: {
@@ -585,7 +772,7 @@ export async function saveBatchPreset(payload: {
   visualConfig: BatchVisualConfig
 }) {
   const response = await request.post<ApiResponse<BatchPreset>>('/modules/batch-new/presets', payload)
-  return unwrapApiResponse(response)
+  return normalizeBatchPreset(unwrapApiResponse(response))
 }
 
 export async function deleteBatchPreset(presetId: string) {
@@ -635,7 +822,11 @@ export async function getDeliveryTasks(params?: {
       },
     },
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeDeliveryTaskItem),
+  }
 }
 
 export async function getDeliveryTaskAssets(
@@ -656,7 +847,7 @@ export async function getDeliveryTaskAssets(
       },
     },
   )
-  return unwrapApiResponse(response)
+  return normalizeDeliveryTaskAssetsResult(unwrapApiResponse(response))
 }
 
 export async function createDeliveryPackage(payload: {
@@ -665,7 +856,7 @@ export async function createDeliveryPackage(payload: {
   assetIds: string[]
 }) {
   const response = await request.post<ApiResponse<DeliveryPackage>>('/modules/delivery/packages', payload)
-  return unwrapApiResponse(response)
+  return normalizeDeliveryPackage(unwrapApiResponse(response))
 }
 
 export async function deleteDeliveryAssets(assetIds: string[]) {
@@ -688,7 +879,7 @@ export async function getDeliveryPackage(packageId: string) {
   const response = await request.get<ApiResponse<DeliveryPackage>>(
     `/modules/delivery/packages/${encodeURIComponent(packageId)}`,
   )
-  return unwrapApiResponse(response)
+  return normalizeDeliveryPackage(unwrapApiResponse(response))
 }
 
 export async function getDeliveryPackages(params?: {
@@ -700,7 +891,11 @@ export async function getDeliveryPackages(params?: {
     '/modules/delivery/packages',
     { params },
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return {
+    ...result,
+    items: result.items.map(normalizeDeliveryPackage),
+  }
 }
 
 export async function pollDeliveryPackage(
