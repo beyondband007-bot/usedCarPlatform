@@ -3,13 +3,13 @@
 export const sceneReferenceMediaUrls = {
   showroom: {
     whiteStudio:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjwz0tdutvtv8e5oDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmzldg3i4pn8kbxDIYxBIJvAdixAvxzBIUzAIr=.png',
     glassHall:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjwzxwsbtjtv9devDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7w2k4md85k7mx2kDIYxBIJvAdixAvxzBIUzAIr=.png',
     luxuryDark:
-      'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygusvfez9tofs18zDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmt5my1lmpn5lygDIYxBIJvAdixAvxzBIUzAIr=.png',
     softTopLight:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjx35qctrwtvb7pfDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/ymjew503t0n000ddy7w8j8l064k7o12vDIYxBIJvAdixAvxzBIUzAIr=.png',
     minimalSpace:
       'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybmybi6j7tpn7u6lDIYxBIJvAdixAvxzBIUzAIr=.png',
     wideAngle:
@@ -17,23 +17,23 @@ export const sceneReferenceMediaUrls = {
   },
   outdoor: {
     treePark:
-      'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygup71wh4gofpofgDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
     mountainLake:
-      'https://vip.123pan.cn/1849524247/ymjew503t0n000ddyguklm16vxofodpaDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyboa0qamynpnt1z8DIYxBIJvAdixAvxzBIUzAIr=.png',
     cityBlock:
-      'https://vip.123pan.cn/1849524247/ymjew503t0m000ddyguj7y8ty1ofnjrhDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybo4mc19qipnsx41DIYxBIJvAdixAvxzBIUzAIr=.png',
     coastDaylight:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjwvc8sy5ptv7iqyDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7xb5scpo6k88m3eDIYxBIJvAdixAvxzBIUzAIr=.png',
   },
   sky: {
     mirrorField:
-      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjx9ld3ftjtvfaxaDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7wt7tz9adk7y9bsDIYxBIJvAdixAvxzBIUzAIr=.png',
     sunsetDrive:
-      'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygv1med97oofyryvDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7wwfo8bmfk7z8blDIYxBIJvAdixAvxzBIUzAIr=.png',
     cloudSeaStage:
-      'https://vip.123pan.cn/1849524247/ymjew503t0n000ddygv15uhqv1ofx70iDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybnnhxeyk0pnkuvcDIYxBIJvAdixAvxzBIUzAIr=.png',
     cloudParking:
-      'https://vip.123pan.cn/1849524247/ymjew503t0m000ddygv08r36t1ofwzddDIYxBIJvAdixAvxzBIUzAIr=.png',
+      'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddybnoit1y2xpnlni5DIYxBIJvAdixAvxzBIUzAIr=.png',
   },
   road: {
     cityDayRoad:

@@ -201,7 +201,7 @@ const {
 
   --studio-chrome-pad-x: 24px;
   --studio-chrome-header-height: 72px;
-  --studio-chrome-logo-size: clamp(20px, 1.75vw, 30px);
+  --studio-chrome-logo-size: 21px;
   --studio-chrome-nav-size: clamp(14px, 0.85vw, 16px);
   --studio-chrome-action-size: clamp(13px, 0.78vw, 15px);
   --studio-chrome-nav-gap: clamp(20px, 2.8vw, 56px);

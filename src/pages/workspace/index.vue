@@ -1481,7 +1481,8 @@ async function refreshCreativeConversations() {
       : null;
     const nextConversationId =
       candidateConversation &&
-      !isCreativeConversationDraft(candidateConversation)
+      (!isCreativeConversationDraft(candidateConversation) ||
+        activeCreativeConversationId.value === candidateConversation.conversationId)
         ? candidateConversation.conversationId
         : null;
 
@@ -1567,6 +1568,22 @@ function syncCreativeConversationPendingTask(
           lastMessage: prompt.trim(),
           lastTaskId: taskId,
           lastResultUrl: null,
+        }
+      : item,
+  );
+  creativeConversationsAll.value = nextAll;
+  creativeConversations.value = listVisibleCreativeConversations(nextAll);
+}
+
+function syncCreativeConversationReferenceAsset(
+  conversationId: string,
+  assetId: string,
+) {
+  const nextAll = creativeConversationsAll.value.map((item) =>
+    item.conversationId === conversationId
+      ? {
+          ...item,
+          lastReferenceAssetId: assetId,
         }
       : item,
   );
@@ -1662,6 +1679,7 @@ async function handleUploadCreativeReference(file: File) {
     const conversationId = await ensureCreativeConversation();
     const asset = await uploadCreativeImageReference(conversationId, file);
     creativeReferenceAsset.value = asset;
+    syncCreativeConversationReferenceAsset(conversationId, asset.assetId);
     message.success("参考图上传成功");
     await refreshCreativeConversations();
     if (activeCreativeConversationId.value) {
@@ -1835,6 +1853,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       sceneReferenceImageUrl: payload.sceneReferenceImageUrl,
       useLogo: payload.useLogo,
       logoAssetId: payload.logoAssetId,
+      logoPlacements: payload.logoPlacements,
       colorCode: payload.colorCode,
       outputRatio:
         activeCode.value === SHORT_VIDEO_CAPABILITY_CODE

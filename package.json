@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc -b"
   },
   "dependencies": {
+    "@company/ai-studio-sdk": "file:sdk/company-ai-studio-sdk-0.1.1.tgz",
     "@iconify/vue": "^5.0.1",
     "@tailwindcss/vite": "^4.3.0",
     "@vueuse/core": "^14.0.0",

@@ -1,3 +1,5 @@
+import type { LogoPlacement } from '@/api/visual-workbench'
+
 export type WorkspaceCapabilityKind = 'scene' | 'beauty' | 'interior' | 'batch' | 'delivery' | 'future'
 export type WorkspaceCapabilityBlock = 'selector' | 'scene-settings' | 'actions'
 
@@ -124,6 +126,7 @@ export interface WorkspaceGeneratePayload {
   sceneReferenceImageUrl?: string
   useLogo?: boolean
   logoAssetId?: string
+  logoPlacements?: LogoPlacement[]
   colorCode?: string
   prompt?: string
 }
@@ -234,6 +237,7 @@ export interface BatchVisualTemplate {
   sceneCategory: string
   outputRatio: string
   useRecentLogo: boolean
+  logoPlacements: LogoPlacement[]
   lightConsistency: boolean
   paintRefresh: boolean
   colorCode?: string | null
