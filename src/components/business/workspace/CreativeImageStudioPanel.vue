@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NDropdown, NInput, NSelect } from 'naive-ui'
+import { NDropdown } from 'naive-ui'
 
+import CreativeImageSdkComposer from '@/components/business/workspace/CreativeImageSdkComposer.vue'
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
   creativeImageAspectRatios,
@@ -15,6 +16,19 @@ import type { CreativeImageConversation, UploadedAsset } from '@/api/visual-work
 import { downloadFile } from '@/utils/download'
 import { useAuthStore } from '@/stores/auth'
 import { useCreditsStore } from '@/stores/credits'
+
+type ComposerTheme = 'light' | 'dark' | 'auto'
+
+type ComposerAttachment = {
+  id: string
+  file: File
+  name: string
+  size: number
+  type: string
+  previewUrl?: string
+  status: 'ready' | 'invalid'
+  error?: string
+}
 
 const CREATIVE_DOWNLOAD_FILENAME = '汽车图片.jpg'
 
@@ -56,7 +70,6 @@ const emit = defineEmits<{
 const prompt = ref('')
 const selectedRatio = ref<string>(creativeImageDefaultOutputRatio)
 const lastSubmittedPrompt = ref('')
-const fileInputRef = ref<HTMLInputElement | null>(null)
 const threadScrollRef = ref<HTMLElement | null>(null)
 const sidebarCollapsed = ref(false)
 const previewModalVisible = ref(false)
@@ -67,6 +80,10 @@ const editingReference = ref<{
   resultUrl: string
 } | null>(null)
 const pendingTurns = ref<CreativeThreadTurn[]>([])
+const composerKey = ref(0)
+const composerAttachments = ref<ComposerAttachment[]>([])
+const lastUploadedAttachmentId = ref<string | null>(null)
+const uploadedReferenceAttachmentId = ref<string | null>(null)
 
 const activeRatio = computed(
   () =>
@@ -74,11 +91,8 @@ const activeRatio = computed(
     creativeImageAspectRatios[0],
 )
 
-const canSubmit = computed(
-  () =>
-    prompt.value.trim().length > 0 &&
-    !props.isGenerating &&
-    pendingTurns.value.length === 0,
+const composerTheme = computed<ComposerTheme>(() =>
+  appStore.isDarkMode ? 'dark' : 'light',
 )
 
 const creditsBalanceText = computed(() => {
@@ -187,36 +201,6 @@ function selectRecentConversation(conversationId: string) {
   emit('selectConversation', conversationId)
 }
 
-const pendingReferenceObjectUrl = ref<string | null>(null)
-const pendingReferencePreview = ref<string | null>(null)
-
-function clearPendingReferencePreview() {
-  if (pendingReferenceObjectUrl.value) {
-    URL.revokeObjectURL(pendingReferenceObjectUrl.value)
-    pendingReferenceObjectUrl.value = null
-  }
-  pendingReferencePreview.value = null
-}
-
-const referencePreview = computed(
-  () => editingReference.value?.resultUrl ?? props.referenceAsset?.url ?? pendingReferencePreview.value,
-)
-
-const isReferenceUploading = computed(
-  () => Boolean(props.isUploadingReference) && !props.referenceAsset?.url,
-)
-
-watch(
-  () => props.referenceAsset?.url,
-  (url) => {
-    if (url) clearPendingReferencePreview()
-  },
-)
-
-onUnmounted(() => {
-  clearPendingReferencePreview()
-})
-
 onMounted(() => {
   if (authStore.isLoggedIn && !creditsStore.accountsLoaded) {
     void creditsStore.hydrateAccounts()
@@ -239,11 +223,29 @@ function resolveConversationThumb(conversation: CreativeImageConversation) {
 
 watch(
   () => props.activeConversationId,
-  () => {
+  (newId, oldId) => {
+    if (newId === oldId) return
+
+    const hasLocalReferenceContext =
+      props.isUploadingReference ||
+      composerAttachments.value.length > 0 ||
+      Boolean(props.referenceAsset?.assetId)
+
+    // 首次上传参考图时会创建/绑定会话
+    if (!oldId && newId && hasLocalReferenceContext) {
+      return
+    }
+
+    // 上传成功后 refresh 不应清掉当前草稿会话，此处兜底
+    if (oldId && !newId && hasLocalReferenceContext) {
+      return
+    }
+
     prompt.value = ''
     lastSubmittedPrompt.value = ''
     pendingTurns.value = []
     editingReference.value = null
+    resetComposerState()
     threadScrollRef.value?.scrollTo({ top: 0 })
   },
 )
@@ -258,12 +260,34 @@ watch(
   },
 )
 
+watch(
+  () => props.referenceAsset?.assetId ?? null,
+  (assetId) => {
+    if (!assetId) {
+      uploadedReferenceAttachmentId.value = null
+      return
+    }
+
+    const currentAttachment = composerAttachments.value[0]
+    if (currentAttachment?.status === 'ready') {
+      uploadedReferenceAttachmentId.value = currentAttachment.id
+    }
+  },
+)
+
 function scrollThreadToBottom() {
   void nextTick().then(() => {
     const el = threadScrollRef.value
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   })
+}
+
+function resetComposerState() {
+  composerKey.value += 1
+  composerAttachments.value = []
+  lastUploadedAttachmentId.value = null
+  uploadedReferenceAttachmentId.value = null
 }
 
 function pushPendingTurn(text: string) {
@@ -297,20 +321,38 @@ function handleSubmit() {
   if (!text || props.isGenerating || pendingTurns.value.length > 0) return
 
   lastSubmittedPrompt.value = text
-  prompt.value = ''
   const editSource = editingReference.value
   const chain = editSource ? null : findChainSource()
+  const referenceAssetId = chain || editSource ? undefined : props.referenceAsset?.assetId
+  const useLastReference =
+    chain || editSource ? false : Boolean(props.referenceAsset?.assetId)
+
+  prompt.value = ''
   editingReference.value = null
   pushPendingTurn(text)
+
+  if (props.referenceAsset?.assetId) {
+    emit('removeReference')
+  }
+  resetComposerState()
+
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
     resolution: '2K',
-    referenceAssetId: chain || editSource ? undefined : props.referenceAsset?.assetId,
-    useLastReference: chain || editSource ? false : Boolean(props.referenceAsset?.assetId),
+    referenceAssetId,
+    useLastReference,
     sourceTaskId: editSource?.taskId ?? chain?.taskId ?? undefined,
     sourceImageUrl: editSource?.resultUrl ?? chain?.resultUrl ?? undefined,
   })
+}
+
+function handleComposerSend(
+  value: string,
+  _context: { attachments: ComposerAttachment[] },
+) {
+  prompt.value = value
+  handleSubmit()
 }
 
 function handleRegenerateTurn(turn: CreativeThreadTurn) {
@@ -336,7 +378,7 @@ function handleEditTurn(turn: CreativeThreadTurn) {
   const text = turn.prompt.trim()
   if (!text || !turn.resultUrl || props.isGenerating || pendingTurns.value.length > 0) return
 
-  clearPendingReferencePreview()
+  resetComposerState()
   editingReference.value = {
     prompt: text,
     taskId: turn.taskId,
@@ -349,47 +391,53 @@ function shouldShowResultCard(turn: CreativeThreadTurn) {
   return Boolean(turn.resultUrl || turn.taskId || turn.isLoadingImage)
 }
 
-function handlePromptKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-    event.preventDefault()
-    handleSubmit()
-  }
-}
-
 function applyPromptSuggestion(text: string) {
   prompt.value = text
 }
 
-function openReferencePicker() {
-  if (props.isUploadingReference || props.isGenerating || pendingTurns.value.length > 0) return
-  fileInputRef.value?.click()
+function isVirtualReferenceAttachment(attachment: ComposerAttachment) {
+  return attachment.id.startsWith('reference-')
 }
 
-function handleReferenceSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
+function handleComposerAttachmentsChange(attachments: ComposerAttachment[]) {
+  const userAttachments = attachments.filter(
+    (item) => !isVirtualReferenceAttachment(item),
+  )
+  composerAttachments.value = userAttachments
 
-  editingReference.value = null
-  clearPendingReferencePreview()
-  const objectUrl = URL.createObjectURL(file)
-  pendingReferenceObjectUrl.value = objectUrl
-  pendingReferencePreview.value = objectUrl
-
-  emit('uploadReference', file)
-}
-
-function handleRemoveReference() {
-  if (editingReference.value) {
-    editingReference.value = null
+  if (userAttachments.length === 0) {
+    lastUploadedAttachmentId.value = null
+    uploadedReferenceAttachmentId.value = null
+    if (editingReference.value) {
+      editingReference.value = null
+    }
+    if (props.referenceAsset?.assetId) {
+      emit('removeReference')
+    }
     return
   }
 
-  clearPendingReferencePreview()
-  emit('removeReference')
-}
+  const nextAttachment =
+    userAttachments.find((item) => item.status === 'ready') ?? null
 
+  if (!nextAttachment) {
+    return
+  }
+
+  if (lastUploadedAttachmentId.value === nextAttachment.id) {
+    return
+  }
+
+  editingReference.value = null
+  lastUploadedAttachmentId.value = nextAttachment.id
+  uploadedReferenceAttachmentId.value = null
+
+  if (props.referenceAsset?.assetId) {
+    emit('removeReference')
+  }
+
+  emit('uploadReference', nextAttachment.file)
+}
 function openImagePreview(imageUrl?: string | null) {
   const url = imageUrl || primaryResultImage.value
   if (!url) return
@@ -518,7 +566,11 @@ function toggleSidebar() {
               </p>
 
               <div class="creative-result-actions">
-                <button type="button" @click="handleRegenerateTurn(turn)">
+                <button
+                  type="button"
+                  :disabled="props.isGenerating || pendingTurns.length > 0"
+                  @click="handleRegenerateTurn(turn)"
+                >
                   <Icon icon="mdi:reload" />
                   重新生成
                 </button>
@@ -576,92 +628,25 @@ function toggleSidebar() {
       <section
         class="creative-composer creative-composer-shell"
         :class="{ 'is-inline': !hasConversation, 'is-docked': hasConversation }"
-        aria-label="创意输入"
+        aria-label="Creative input"
       >
-        <div v-if="referencePreview" class="creative-attachments">
-          <div
-            class="creative-attachment"
-            :class="{ 'is-loading': isReferenceUploading }"
-          >
-            <img
-              :src="referencePreview"
-              alt="参考图"
-              class="creative-attachment-img"
-            />
-            <span
-              v-if="isReferenceUploading"
-              class="creative-attachment-overlay"
-              aria-hidden="true"
-            >
-              <span class="creative-attachment-spinner"></span>
-            </span>
-            <span v-else-if="editingReference" class="creative-attachment-badge">
-              待编辑
-            </span>
-            <button
-              type="button"
-              class="creative-attachment-remove"
-              aria-label="移除参考图"
-              @click="handleRemoveReference"
-            >
-              <Icon icon="mdi:close" />
-            </button>
-          </div>
-        </div>
-
-        <div class="creative-composer-body">
-          <NInput
-            v-model:value="prompt"
-            class="creative-prompt-input"
-            type="textarea"
-            size="small"
-            placeholder="输入想法、脚本或上传参考图，描述你想生成的汽车创意图片"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            @keydown="handlePromptKeydown"
-          />
-        </div>
-
-        <footer class="creative-composer-foot">
-          <div class="creative-submit-row">
-            <div class="creative-ratio-field">
-              <span class="creative-ratio-label">输出比例</span>
-              <NSelect
-                v-model:value="selectedRatio"
-                :options="creativeImageAspectRatioOptions"
-                size="large"
-                :disabled="props.isGenerating || pendingTurns.length > 0"
-                class="creative-ratio-select"
-              />
-            </div>
-            <button
-              type="button"
-              class="creative-submit"
-              :disabled="!canSubmit"
-              :aria-label="`生成创意图，消耗 ${props.capability.cost} 积分`"
-              @click="handleSubmit"
-            >
-              <Icon :icon="props.isGenerating ? 'mdi:stop' : 'mdi:arrow-up'" />
-            </button>
-          </div>
-        </footer>
-
-        <button
-          type="button"
-          class="creative-upload creative-upload-anchor"
-          :class="{ 'is-spinning': props.isGenerating || props.isUploadingReference }"
-          :disabled="props.isGenerating || pendingTurns.length > 0"
-          aria-label="上传参考图"
-          @click="openReferencePicker"
-        >
-          <Icon v-if="props.isUploadingReference" icon="mdi:loading" />
-          <Icon v-else icon="mdi:plus" />
-        </button>
-        <input
-          ref="fileInputRef"
-          class="creative-hidden-input"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          @change="handleReferenceSelected"
+        <CreativeImageSdkComposer
+          v-model="prompt"
+          :composer-key="composerKey"
+          :theme="composerTheme"
+          :selected-ratio="selectedRatio"
+          :ratio-options="creativeImageAspectRatioOptions"
+          :reference-preview="
+            editingReference?.resultUrl ?? props.referenceAsset?.url ?? null
+          "
+          :is-editing-reference="Boolean(editingReference)"
+          :is-uploading-reference="props.isUploadingReference"
+          :is-generating="props.isGenerating"
+          :pending-turns="pendingTurns.length"
+          :cost="props.capability.cost"
+          @update:selected-ratio="selectedRatio = $event"
+          @send="handleComposerSend"
+          @attachments-change="handleComposerAttachmentsChange"
         />
       </section>
     </main>
@@ -1104,6 +1089,11 @@ function toggleSidebar() {
   background: var(--creative-main-glow), var(--creative-main-bg);
 }
 
+.creative-main.is-empty {
+  border-color: transparent;
+  background: transparent;
+}
+
 .creative-composer-shell {
   width: 50%;
   max-width: var(--creative-content-max);
@@ -1415,11 +1405,10 @@ function toggleSidebar() {
 .creative-composer {
   position: relative;
   box-sizing: border-box;
-  border: 1px solid var(--creative-line);
-  border-radius: 16px;
-  background: var(--creative-composer-bg);
-  padding: 16px 18px 14px 66px;
-  box-shadow: var(--creative-composer-shadow);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
 }
 
 .creative-composer-body {

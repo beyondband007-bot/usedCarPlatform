@@ -5,6 +5,7 @@ import {
   getBatchPresets,
   saveBatchPreset,
   type BatchVisualConfig,
+  type LogoPlacement,
 } from '@/api/visual-workbench'
 import { getBatchSceneImageUrl, getBatchSceneOptionId } from '@/constants/workspace'
 import type { BatchVisualTemplate, BatchVisualTemplateInput } from '@/types/workspace'
@@ -14,6 +15,20 @@ const NEW_PRESET_VALUE = '__new__'
 const templates = ref<BatchVisualTemplate[]>([])
 const isLoading = ref(false)
 const isReady = ref(false)
+const allLogoPlacements: LogoPlacement[] = ['plate', 'wall']
+
+function normalizeLogoPlacements(
+  placements: LogoPlacement[] | null | undefined,
+  enabled: boolean,
+) {
+  if (!enabled) return [] as LogoPlacement[]
+
+  const next = allLogoPlacements.filter((placement, index, source) =>
+    placements?.includes(placement) && source.indexOf(placement) === index,
+  )
+
+  return (next.length ? next : ['plate']) as LogoPlacement[]
+}
 
 function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
   return {
@@ -28,6 +43,10 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
     sceneCategory: input.sceneCategory,
     outputRatio: input.outputRatio,
     useRecentLogo: input.useRecentLogo,
+    logoPlacements: normalizeLogoPlacements(
+      input.logoPlacements,
+      input.useRecentLogo,
+    ),
     enableLightConsistency: input.lightConsistency,
     enablePaintRefresh: input.paintRefresh,
     colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
@@ -61,6 +80,10 @@ async function ensureLoaded() {
       sceneCategory: item.visualConfig.sceneCategory,
       outputRatio: item.visualConfig.outputRatio,
       useRecentLogo: item.visualConfig.useRecentLogo,
+      logoPlacements: normalizeLogoPlacements(
+        item.visualConfig.logoPlacements,
+        item.visualConfig.useRecentLogo,
+      ),
       lightConsistency: item.visualConfig.enableLightConsistency,
       paintRefresh: item.visualConfig.enablePaintRefresh,
       colorCode: item.visualConfig.colorCode ?? null,
@@ -99,6 +122,10 @@ export function useBatchVisualTemplates() {
       sceneCategory: created.visualConfig.sceneCategory,
       outputRatio: created.visualConfig.outputRatio,
       useRecentLogo: created.visualConfig.useRecentLogo,
+      logoPlacements: normalizeLogoPlacements(
+        created.visualConfig.logoPlacements,
+        created.visualConfig.useRecentLogo,
+      ),
       lightConsistency: created.visualConfig.enableLightConsistency,
       paintRefresh: created.visualConfig.enablePaintRefresh,
       colorCode: created.visualConfig.colorCode ?? null,
@@ -125,6 +152,10 @@ export function useBatchVisualTemplates() {
       sceneCategory: updated.visualConfig.sceneCategory,
       outputRatio: updated.visualConfig.outputRatio,
       useRecentLogo: updated.visualConfig.useRecentLogo,
+      logoPlacements: normalizeLogoPlacements(
+        updated.visualConfig.logoPlacements,
+        updated.visualConfig.useRecentLogo,
+      ),
       lightConsistency: updated.visualConfig.enableLightConsistency,
       paintRefresh: updated.visualConfig.enablePaintRefresh,
       colorCode: updated.visualConfig.colorCode ?? null,

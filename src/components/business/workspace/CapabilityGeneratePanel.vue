@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, h, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, h, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { NButton, NPopconfirm, NSelect, NSwitch, useMessage } from "naive-ui";
 
@@ -8,11 +8,13 @@ import {
   deleteDeliveryTasks,
   getDeliveryTaskAssets,
   getDeliveryTasks,
+  getShowroomLightScenes,
   uploadAsset,
   type BatchVisualConfig,
   type DeliveryAsset,
   type DeliveryInputCover,
   type DeliveryTaskItem,
+  type LogoPlacement,
   type UploadedAsset,
 } from "@/api/visual-workbench";
 import {
@@ -77,6 +79,42 @@ const emit = defineEmits<{
 const message = useMessage();
 const subscriptionStore = useSubscriptionStore();
 const appStore = useAppStore();
+const allLogoPlacements: LogoPlacement[] = ["plate", "wall"];
+
+function normalizeSupportedLogoPlacements(
+  placements: LogoPlacement[] | null | undefined,
+  fallback: LogoPlacement[],
+) {
+  const next = allLogoPlacements.filter((placement) =>
+    placements?.includes(placement),
+  );
+  return (next.length ? next : fallback) as LogoPlacement[];
+}
+
+function normalizeLogoPlacements(
+  placements: LogoPlacement[] | null | undefined,
+  supported: LogoPlacement[],
+  enabled: boolean,
+) {
+  if (!enabled) return [] as LogoPlacement[];
+
+  const filtered = supported.filter((placement) =>
+    placements?.includes(placement),
+  );
+  if (filtered.length) return filtered as LogoPlacement[];
+  if (supported.includes("plate")) return ["plate"] as LogoPlacement[];
+  return supported[0] ? ([supported[0]] as LogoPlacement[]) : [];
+}
+
+function formatLogoPlacements(placements: LogoPlacement[] | null | undefined) {
+  const normalized = allLogoPlacements.filter((placement) =>
+    placements?.includes(placement),
+  );
+  if (!normalized.length) return "车牌";
+  return normalized
+    .map((placement) => (placement === "plate" ? "车牌" : "背景"))
+    .join(" + ");
+}
 
 function isTerminalBatchJobStatus(status: WorkspaceRecentItem["status"]) {
   return status === "success" || status === "fail" || status === "canceled";
@@ -126,6 +164,7 @@ const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
   sceneCategory: "展厅灯光",
   outputRatio: DEFAULT_BATCH_OUTPUT_RATIO,
   useRecentLogo: false,
+  logoPlacements: ["plate"],
   lightConsistency: true,
   paintRefresh: false,
   colorCode: null,
@@ -141,10 +180,13 @@ const batchScenes = computed(() =>
   getBatchScenesByCategory(batchSceneCategory.value),
 );
 const useRecentLogo = ref(false);
+const generateLogoPlacements = ref<LogoPlacement[]>(["plate"]);
+const batchLogoPlacements = ref<LogoPlacement[]>(["plate"]);
 const lightConsistency = ref(true);
 const paintRefresh = ref(false);
 const interiorEnhance = ref(false);
 const interiorCollage = ref(false);
+const showroomSceneLogoPlacementMap = ref<Record<string, LogoPlacement[]>>({});
 const projectName = ref("");
 const createTaskPresetId = ref(visualTemplates.value[0]?.id ?? "");
 const visualPreset = ref(visualTemplates.value[0]?.id ?? NEW_PRESET_VALUE);
@@ -211,6 +253,151 @@ const interiorCollageUploads = ref<InteriorCollageUploadItem[]>([]);
 const batchDeliverySnapshots = ref<Record<string, BatchDeliverySnapshot>>(
   loadBatchDeliverySnapshots(),
 );
+const showroomWallEnabledOptionIds = new Set([
+  "white-studio",
+  "soft-top-light",
+  "luxury-dark",
+  "wide-angle",
+]);
+
+function resolveShowroomLogoPlacements(optionId?: string | null) {
+  if (!optionId) return ["plate"] as LogoPlacement[];
+  if (showroomWallEnabledOptionIds.has(optionId)) {
+    return ["plate", "wall"] as LogoPlacement[];
+  }
+  return ["plate"] as LogoPlacement[];
+}
+
+function getDefaultGenerateSupportedLogoPlacements() {
+  if (props.capability.code === "showroom-light") {
+    return resolveShowroomLogoPlacements(props.selectedOptionId);
+  }
+
+  return ["plate"] as LogoPlacement[];
+}
+
+function getBatchSupportedLogoPlacementsForInput(input: {
+  enableSceneChange: boolean;
+  sceneCategory: string;
+  sceneIndex?: number;
+}) {
+  if (!input.enableSceneChange) return ["plate"] as LogoPlacement[];
+  if (input.sceneCategory === "展厅灯光") {
+    return resolveShowroomLogoPlacements(
+      getBatchSceneOptionId(input.sceneCategory, input.sceneIndex ?? 0),
+    );
+  }
+  return ["plate"] as LogoPlacement[];
+}
+
+const generateSupportedLogoPlacements = computed(() => {
+  if (props.capability.kind !== "scene") {
+    return ["plate"] as LogoPlacement[];
+  }
+
+  if (props.capability.code !== "showroom-light") {
+    return ["plate"] as LogoPlacement[];
+  }
+
+  return normalizeSupportedLogoPlacements(
+    showroomSceneLogoPlacementMap.value[props.selectedOptionId],
+    getDefaultGenerateSupportedLogoPlacements(),
+  );
+});
+
+const batchSupportedLogoPlacements = computed(() =>
+  getBatchSupportedLogoPlacementsForInput({
+    enableSceneChange: enableSceneChange.value,
+    sceneCategory: batchSceneCategory.value,
+    sceneIndex: batchSceneIndex.value,
+  }),
+);
+
+const showGenerateLogoPlacementControls = computed(
+  () => supportsLogoForGenerate.value && props.capability.kind === "scene" && useLogo.value,
+);
+
+const showBatchLogoPlacementControls = computed(() => useRecentLogo.value);
+
+const generateLogoPlacementSummary = computed(() =>
+  formatLogoPlacements(generateLogoPlacements.value),
+);
+
+const batchLogoPlacementSummary = computed(() =>
+  formatLogoPlacements(batchLogoPlacements.value),
+);
+
+const batchWallPlacementHint = computed(() => {
+  if (!enableSceneChange.value) return "开启场景更换后才可上传到背景";
+  if (!batchSupportedLogoPlacements.value.includes("wall")) {
+    return "该场景不支持上传到背景";
+  }
+  return "场景图支持把 Logo 放到背景墙";
+});
+
+function setPlacementEnabled(
+  target: Ref<LogoPlacement[]>,
+  placement: LogoPlacement,
+  enabled: boolean,
+  supported: LogoPlacement[],
+) {
+  if (!supported.includes(placement)) return;
+
+  const current = allLogoPlacements.filter((item) =>
+    target.value.includes(item),
+  );
+
+  if (enabled) {
+    target.value = current.includes(placement) ? current : [...current, placement];
+    return;
+  }
+
+  const next = current.filter((item) => item !== placement);
+  if (!next.length) return;
+  target.value = next;
+}
+
+function handleGenerateLogoPlacementToggle(
+  placement: LogoPlacement,
+  enabled: boolean,
+) {
+  setPlacementEnabled(
+    generateLogoPlacements,
+    placement,
+    enabled,
+    generateSupportedLogoPlacements.value,
+  );
+}
+
+function handleBatchLogoPlacementToggle(
+  placement: LogoPlacement,
+  enabled: boolean,
+) {
+  setPlacementEnabled(
+    batchLogoPlacements,
+    placement,
+    enabled,
+    batchSupportedLogoPlacements.value,
+  );
+}
+
+async function hydrateShowroomLightSceneLogoPlacements() {
+  if (props.capability.code !== "showroom-light") return;
+
+  try {
+    const result = await getShowroomLightScenes();
+    showroomSceneLogoPlacementMap.value = Object.fromEntries(
+      result.items.map((item) => [
+        item.optionId,
+        normalizeSupportedLogoPlacements(item.supportedLogoPlacements, [
+          ...resolveShowroomLogoPlacements(item.optionId),
+        ]),
+      ]),
+    );
+  } catch {
+    showroomSceneLogoPlacementMap.value = {};
+  }
+}
 
 function loadBatchDeliverySnapshots() {
   if (typeof window === "undefined") return {};
@@ -588,6 +775,11 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     sceneCategory: batchSceneCategory.value,
     outputRatio: outputRatio.value,
     useRecentLogo: useRecentLogo.value,
+    logoPlacements: normalizeLogoPlacements(
+      batchLogoPlacements.value,
+      batchSupportedLogoPlacements.value,
+      useRecentLogo.value,
+    ),
     lightConsistency: lightConsistency.value,
     paintRefresh: paintRefresh.value,
     colorCode: paintRefresh.value
@@ -601,9 +793,20 @@ function buildTemplateInput(): BatchVisualTemplateInput {
 function normalizeTemplateInput(
   input: BatchVisualTemplateInput,
 ): BatchVisualTemplateInput {
+  const supportedLogoPlacements = getBatchSupportedLogoPlacementsForInput({
+    enableSceneChange: input.enableSceneChange,
+    sceneCategory: input.sceneCategory,
+    sceneIndex: input.sceneIndex,
+  });
+
   return {
     ...input,
     name: input.name.trim(),
+    logoPlacements: normalizeLogoPlacements(
+      input.logoPlacements,
+      supportedLogoPlacements,
+      input.useRecentLogo,
+    ),
     colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
     interiorEnhance: input.interiorCollage && input.interiorEnhance,
   };
@@ -622,6 +825,8 @@ function isSameTemplateInput(
     normalizedLeft.sceneCategory === normalizedRight.sceneCategory &&
     normalizedLeft.outputRatio === normalizedRight.outputRatio &&
     normalizedLeft.useRecentLogo === normalizedRight.useRecentLogo &&
+    normalizedLeft.logoPlacements.join("|") ===
+      normalizedRight.logoPlacements.join("|") &&
     normalizedLeft.lightConsistency === normalizedRight.lightConsistency &&
     normalizedLeft.paintRefresh === normalizedRight.paintRefresh &&
     (normalizedLeft.colorCode ?? null) ===
@@ -655,6 +860,7 @@ function buildDraftTemplate(): BatchVisualTemplate {
     sceneCategory: input.sceneCategory,
     outputRatio: input.outputRatio,
     useRecentLogo: input.useRecentLogo,
+    logoPlacements: input.logoPlacements,
     lightConsistency: input.lightConsistency,
     paintRefresh: input.paintRefresh,
     colorCode: input.colorCode ?? null,
@@ -696,6 +902,15 @@ function mapBatchVisualConfigFromTemplate(
     sceneCategory: template.sceneCategory,
     outputRatio: template.outputRatio,
     useRecentLogo: template.useRecentLogo,
+    logoPlacements: normalizeLogoPlacements(
+      template.logoPlacements,
+      getBatchSupportedLogoPlacementsForInput({
+        enableSceneChange: template.enableSceneChange,
+        sceneCategory: template.sceneCategory,
+        sceneIndex: template.sceneIndex,
+      }),
+      template.useRecentLogo,
+    ),
     logoAssetId:
       template.useRecentLogo && activeLogo.value?.assetId
         ? activeLogo.value.assetId
@@ -717,6 +932,15 @@ function applyTemplate(template: BatchVisualTemplate) {
   batchSceneCategory.value = template.sceneCategory;
   outputRatio.value = template.outputRatio;
   useRecentLogo.value = template.useRecentLogo;
+  batchLogoPlacements.value = normalizeLogoPlacements(
+    template.logoPlacements,
+    getBatchSupportedLogoPlacementsForInput({
+      enableSceneChange: template.enableSceneChange,
+      sceneCategory: template.sceneCategory,
+      sceneIndex: template.sceneIndex,
+    }),
+    template.useRecentLogo,
+  );
   lightConsistency.value = template.lightConsistency;
   paintRefresh.value = template.paintRefresh;
   batchPaintColorCode.value = template.colorCode ?? "";
@@ -743,6 +967,7 @@ function resetVisualConfigSelection() {
   batchSceneCategory.value = "展厅灯光";
   outputRatio.value = DEFAULT_BATCH_OUTPUT_RATIO;
   useRecentLogo.value = false;
+  batchLogoPlacements.value = ["plate"];
   lightConsistency.value = true;
   paintRefresh.value = false;
   batchPaintColorCode.value = "";
@@ -759,6 +984,30 @@ watch(batchSceneCategory, () => {
   if (isApplyingTemplate.value) return;
   batchSceneIndex.value = 0;
 });
+
+watch(
+  [useLogo, generateSupportedLogoPlacements],
+  ([enabled, supported]) => {
+    generateLogoPlacements.value = normalizeLogoPlacements(
+      generateLogoPlacements.value,
+      supported,
+      enabled,
+    );
+  },
+  { immediate: true },
+);
+
+watch(
+  [useRecentLogo, batchSupportedLogoPlacements],
+  ([enabled, supported]) => {
+    batchLogoPlacements.value = normalizeLogoPlacements(
+      batchLogoPlacements.value,
+      supported,
+      enabled,
+    );
+  },
+  { immediate: true },
+);
 
 watch(paintRefresh, (enabled) => {
   if (isApplyingTemplate.value || enabled) return;
@@ -844,8 +1093,10 @@ async function handleVehicleFileSelected(file: File) {
       props.capability.kind === "interior" ? "car_interior" : "car_exterior";
     const asset = await uploadAsset(file, purpose);
     uploadedAsset.value = asset;
-    revokePreviewObjectUrl();
-    uploadedPreviewUrl.value = asset.url;
+    // Keep the local object URL for immediate preview. The backend public URL can
+    // lag or be inaccessible in some local environments, which would otherwise
+    // make the just-uploaded image disappear from the UI.
+    uploadedPreviewUrl.value = previewObjectUrl ?? asset.url;
     message.success(
       props.capability.kind === "interior"
         ? "内饰图片上传成功"
@@ -946,11 +1197,9 @@ async function handleBatchExteriorFilesSelected(files: File[]) {
   const results = await Promise.allSettled(
     pendingItems.map(async (item, index) => {
       const asset = await uploadAsset(selectedFiles[index], "car_exterior");
-      revokeBatchExteriorObjectUrl(item);
       updateBatchExteriorUpload(item.id, {
         asset,
-        previewUrl: asset.url,
-        objectUrl: undefined,
+        previewUrl: item.objectUrl ?? asset.url,
         status: "success",
       });
     }),
@@ -1065,11 +1314,9 @@ async function handleInteriorCollageFilesSelected(files: File[]) {
   const results = await Promise.allSettled(
     pendingItems.map(async (item, index) => {
       const asset = await uploadAsset(selectedFiles[index], "car_interior");
-      revokeBatchExteriorObjectUrl(item);
       updateInteriorCollageUpload(item.id, {
         asset,
-        previewUrl: asset.url,
-        objectUrl: undefined,
+        previewUrl: item.objectUrl ?? asset.url,
         status: "success",
       });
     }),
@@ -1200,6 +1447,21 @@ function handleGenerate() {
     return;
   }
 
+  const normalizedGenerateLogoPlacements = normalizeLogoPlacements(
+    generateLogoPlacements.value,
+    generateSupportedLogoPlacements.value,
+    useLogo.value,
+  );
+
+  if (
+    supportsLogoForGenerate.value &&
+    useLogo.value &&
+    !normalizedGenerateLogoPlacements.length
+  ) {
+    message.warning("请至少选择一个 Logo 上传位置");
+    return;
+  }
+
   emit("generate", {
     inputAssetId: uploadedAsset.value.assetId,
     outputRatio: outputRatio.value,
@@ -1217,6 +1479,10 @@ function handleGenerate() {
       useLogo.value &&
       activeLogo.value?.assetId
         ? activeLogo.value.assetId
+        : undefined,
+    logoPlacements:
+      supportsLogoForGenerate.value && useLogo.value
+        ? normalizedGenerateLogoPlacements
         : undefined,
     colorCode:
       props.capability.code === "paint-refresh"
@@ -1258,6 +1524,11 @@ async function handleCreateBatchTask() {
 
   if (template.useRecentLogo && !activeLogo.value?.assetId) {
     message.warning("已勾选使用 Logo，请先上传 Logo 后再提交任务");
+    return;
+  }
+
+  if (template.useRecentLogo && !template.logoPlacements.length) {
+    message.warning("请至少选择一个 Logo 上传位置");
     return;
   }
 
@@ -1519,10 +1790,19 @@ watch(
     resetInteriorCollageUploads();
     paintColorCode.value = "";
     batchPaintColorCode.value = "";
+    generateLogoPlacements.value = ["plate"];
+    batchLogoPlacements.value = ["plate"];
     outputRatio.value =
       code === "batch-new"
         ? DEFAULT_BATCH_OUTPUT_RATIO
         : DEFAULT_GENERATION_OUTPUT_RATIO;
+
+    if (code === "showroom-light") {
+      void hydrateShowroomLightSceneLogoPlacements();
+      return;
+    }
+
+    showroomSceneLogoPlacementMap.value = {};
   },
 );
 
@@ -1873,6 +2153,9 @@ watch(
 
 onMounted(() => {
   void ensureLoaded();
+  if (props.capability.code === "showroom-light") {
+    void hydrateShowroomLightSceneLogoPlacements();
+  }
   if (props.capability.kind === "batch") {
     void subscriptionStore.hydrate();
   }
@@ -2207,7 +2490,8 @@ defineExpose({
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:badge-account-horizontal-outline" />
-                  最近 Logo
+                  最近 Logo ·
+                  {{ formatLogoPlacements(effectiveCreateTemplate.logoPlacements) }}
                 </span>
                 <span
                   v-if="effectiveCreateTemplate.paintRefresh"
@@ -2538,6 +2822,65 @@ defineExpose({
                 variant="batch"
                 :disabled="props.isGenerating"
               />
+
+              <div
+                v-if="showBatchLogoPlacementControls"
+                class="logo-placement-card"
+              >
+                <header class="logo-placement-card__head">
+                  <div>
+                    <h4>Logo 上传位置</h4>
+                    <p>开启后至少保留一个位置，默认优先上传到车牌。</p>
+                  </div>
+                  <span class="logo-placement-card__summary">
+                    当前：{{ batchLogoPlacementSummary }}
+                  </span>
+                </header>
+
+                <div class="logo-placement-list">
+                  <label class="logo-placement-item">
+                    <span class="logo-placement-item__copy">
+                      <strong>上传到车牌</strong>
+                      <small>适用于所有批量场景模板</small>
+                    </span>
+                    <NSwitch
+                      :value="batchLogoPlacements.includes('plate')"
+                      size="large"
+                      :disabled="
+                        props.isGenerating ||
+                        !batchSupportedLogoPlacements.includes('plate')
+                      "
+                      @update:value="
+                        handleBatchLogoPlacementToggle('plate', $event)
+                      "
+                    />
+                  </label>
+
+                  <label
+                    class="logo-placement-item"
+                    :class="{
+                      'is-disabled':
+                        !batchSupportedLogoPlacements.includes('wall'),
+                    }"
+                  >
+                    <span class="logo-placement-item__copy">
+                      <strong>上传到背景</strong>
+                      <small>{{ batchWallPlacementHint }}</small>
+                    </span>
+                    <NSwitch
+                      :value="batchLogoPlacements.includes('wall')"
+                      size="large"
+                      :disabled="
+                        props.isGenerating ||
+                        !batchSupportedLogoPlacements.includes('wall')
+                      "
+                      @update:value="
+                        handleBatchLogoPlacementToggle('wall', $event)
+                      "
+                    />
+                  </label>
+                </div>
+              </div>
             </section>
 
             <section class="batch-card switch-card">
@@ -2999,6 +3342,83 @@ defineExpose({
               :disabled="props.isGenerating"
             />
 
+            <div
+              v-if="showGenerateLogoPlacementControls"
+              class="logo-placement-card logo-placement-card--embedded"
+            >
+              <header class="logo-placement-card__head">
+                <div>
+                  <h4>Logo 上传位置</h4>
+                  <p>根据当前场景能力自动开放可用位置。</p>
+                </div>
+                <span class="logo-placement-card__summary">
+                  当前：{{ generateLogoPlacementSummary }}
+                </span>
+              </header>
+
+              <div class="logo-placement-list">
+                <label
+                  class="logo-placement-item"
+                  :class="{
+                    'is-disabled':
+                      !generateSupportedLogoPlacements.includes('plate'),
+                  }"
+                >
+                  <span class="logo-placement-item__copy">
+                    <strong>上传到车牌</strong>
+                    <small>
+                      {{
+                        generateSupportedLogoPlacements.includes("plate")
+                          ? "优先保持车辆主体识别一致"
+                          : "当前场景暂不支持车牌位置"
+                      }}
+                    </small>
+                  </span>
+                  <NSwitch
+                    :value="generateLogoPlacements.includes('plate')"
+                    size="large"
+                    :disabled="
+                      props.isGenerating ||
+                      !generateSupportedLogoPlacements.includes('plate')
+                    "
+                    @update:value="
+                      handleGenerateLogoPlacementToggle('plate', $event)
+                    "
+                  />
+                </label>
+
+                <label
+                  class="logo-placement-item"
+                  :class="{
+                    'is-disabled':
+                      !generateSupportedLogoPlacements.includes('wall'),
+                  }"
+                >
+                  <span class="logo-placement-item__copy">
+                    <strong>上传到背景</strong>
+                    <small>
+                      {{
+                        generateSupportedLogoPlacements.includes("wall")
+                          ? "适合展厅背景墙或空间品牌露出"
+                          : "该场景不支持上传到背景"
+                      }}
+                    </small>
+                  </span>
+                  <NSwitch
+                    :value="generateLogoPlacements.includes('wall')"
+                    size="large"
+                    :disabled="
+                      props.isGenerating ||
+                      !generateSupportedLogoPlacements.includes('wall')
+                    "
+                    @update:value="
+                      handleGenerateLogoPlacementToggle('wall', $event)
+                    "
+                  />
+                </label>
+              </div>
+            </div>
+
             <div class="workspace-output-ratio">
               <span class="workspace-output-ratio__label">输出比例</span>
               <NSelect
@@ -3339,6 +3759,96 @@ defineExpose({
 
 .workspace-config-module--logo :deep(.logo-content-block) {
   padding: 0;
+}
+
+.logo-placement-card {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--saas-surface-border);
+  border-radius: 16px;
+  background: color-mix(
+    in srgb,
+    var(--saas-logo-upload-surface, var(--app-surface)) 84%,
+    transparent
+  );
+}
+
+.logo-placement-card--embedded {
+  margin-top: 18px;
+}
+
+.logo-placement-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.logo-placement-card__head h4 {
+  margin: 0;
+  color: var(--saas-title, var(--app-text));
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.logo-placement-card__head p {
+  margin: 6px 0 0;
+  color: var(--saas-muted, var(--app-text-soft));
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.logo-placement-card__summary {
+  flex-shrink: 0;
+  color: var(--workspace-accent, #efc24c);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.logo-placement-list {
+  display: grid;
+  gap: 10px;
+}
+
+.logo-placement-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--saas-input-border, var(--app-border));
+  border-radius: 12px;
+  background: var(--saas-input-surface, var(--app-surface));
+}
+
+.logo-placement-item.is-disabled {
+  opacity: 0.62;
+}
+
+.logo-placement-item__copy {
+  min-width: 0;
+}
+
+.logo-placement-item__copy strong,
+.logo-placement-item__copy small {
+  display: block;
+}
+
+.logo-placement-item__copy strong {
+  color: var(--saas-title, var(--app-text));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.logo-placement-item__copy small {
+  margin-top: 4px;
+  color: var(--saas-muted, var(--app-text-soft));
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .workspace-output-ratio {

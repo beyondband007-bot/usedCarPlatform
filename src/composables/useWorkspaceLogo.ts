@@ -22,16 +22,37 @@ export type WorkspaceLogoAsset = LogoInfo
 
 function toLogoInfoFromAsset(
   asset: UploadedAsset,
+  previewDataUrl?: string,
   uploadedAt = new Date().toISOString(),
 ): LogoInfo {
   return {
-    dataUrl: asset.url,
+    dataUrl: previewDataUrl || asset.url,
     assetId: asset.assetId,
     fileName: asset.fileName,
     mimeType: asset.mimeType,
     size: asset.size,
     uploadedAt,
   }
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string' && reader.result) {
+        resolve(reader.result)
+        return
+      }
+      reject(new Error('Logo 预览生成失败'))
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Logo 预览生成失败'))
+    }
+
+    reader.readAsDataURL(file)
+  })
 }
 
 function readStoredCustomLogo(): LogoInfo | null {
@@ -114,8 +135,9 @@ export function useWorkspaceLogo() {
     isUploadingState.value = true
 
     try {
+      const previewDataUrl = await readFileAsDataUrl(file)
       const uploaded = await uploadAsset(file, 'logo')
-      const asset = toLogoInfoFromAsset(uploaded)
+      const asset = toLogoInfoFromAsset(uploaded, previewDataUrl)
 
       customLogoState.value = asset
       persistCustomLogo(asset)

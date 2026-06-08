@@ -170,7 +170,7 @@ const heroImageStyle = computed(
 .hero h1 {
   margin: 0 0 clamp(6px, 1cqh, 12px);
   color: var(--home-hero-title, #f3f3f3);
-  font-size: 24px;
+  font-size: 45px;
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: 5px;
@@ -211,7 +211,7 @@ const heroImageStyle = computed(
 
 @supports (width: 1cqw) {
   .hero h1 {
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {
@@ -221,7 +221,7 @@ const heroImageStyle = computed(
 
 @supports not (width: 1cqw) {
   .hero h1 {
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {
@@ -241,7 +241,7 @@ const heroImageStyle = computed(
   }
 
   .hero h1 {
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {
@@ -252,7 +252,7 @@ const heroImageStyle = computed(
 @media (min-width: 1440px) {
   .hero h1 {
     margin-bottom: clamp(12px, 2cqh, 24px);
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {
@@ -262,7 +262,7 @@ const heroImageStyle = computed(
 
 @media (min-width: 1600px) {
   .hero h1 {
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {
@@ -272,7 +272,7 @@ const heroImageStyle = computed(
 
 @media (max-height: 820px) {
   .hero h1 {
-    font-size: 24px;
+    font-size: 45px;
   }
 
   .subtitle {

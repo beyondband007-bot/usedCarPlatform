@@ -19,6 +19,16 @@ export interface UploadedAsset {
 }
 
 export type AssetPurpose = 'car_exterior' | 'car_interior' | 'logo'
+export type LogoPlacement = 'plate' | 'wall'
+export type LogoPlacementMode = 'none' | 'plate' | 'wall' | 'plate_wall'
+
+export interface ShowroomLightSceneItem {
+  optionId: string
+  title: string
+  referenceImageUrl: string
+  supportedLogoPlacements: LogoPlacement[]
+  disabledLogoPlacementReasons?: Partial<Record<LogoPlacement, string>>
+}
 
 export interface UserLogoSetting {
   userId: string
@@ -41,6 +51,7 @@ export interface CreateGenerationTaskPayload {
   sceneReferenceImageUrl?: string
   useLogo?: boolean
   logoAssetId?: string
+  logoPlacements?: LogoPlacement[]
   colorCode?: string
   outputRatio?: string
   resolution?: string
@@ -57,6 +68,8 @@ export interface CreatedGenerationTask {
   sceneTitle?: string
   sceneReferenceImageUrl?: string
   logoAssetId?: string | null
+  logoPlacements?: LogoPlacement[]
+  logoPlacementMode?: LogoPlacementMode | null
   colorCode?: string | null
   inputImageCount: number
   pollingUrl: string
@@ -185,6 +198,7 @@ export interface BatchVisualConfig {
   outputRatio: string
   useRecentLogo: boolean
   logoAssetId?: string | null
+  logoPlacements?: LogoPlacement[]
   enableLightConsistency: boolean
   enablePaintRefresh: boolean
   colorCode?: string | null
@@ -445,6 +459,13 @@ export async function createGenerationTask(
     generationRequestConfig,
   )
 
+  return unwrapApiResponse(response)
+}
+
+export async function getShowroomLightScenes() {
+  const response = await request.get<ApiResponse<{ items: ShowroomLightSceneItem[] }>>(
+    '/modules/showroom-light/scenes',
+  )
   return unwrapApiResponse(response)
 }
 

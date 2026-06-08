@@ -491,7 +491,8 @@ const showHeaderRecharge = computed(
 .logo-img {
   display: block;
   width: auto;
-  height: calc(var(--studio-chrome-logo-size, clamp(24px, 2vw, 36px)) * 0.9);
+  max-height: 21px;
+  height: auto;
   object-fit: contain;
 }
 

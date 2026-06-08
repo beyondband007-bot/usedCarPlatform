@@ -282,16 +282,7 @@ onBeforeUnmount(() => {
         </label>
 
         <div v-if="loginMode === 'password'" class="login-field login-field--password">
-          <div class="login-field-header">
-            <span class="login-field-label">密码</span>
-            <button
-              type="button"
-              class="login-forgot"
-              @click.stop.prevent="openResetModal"
-            >
-              忘记密码?
-            </button>
-          </div>
+          <span class="login-field-label">密码</span>
           <div class="login-password-input">
             <NInput
               v-model:value="password"
@@ -301,6 +292,15 @@ onBeforeUnmount(() => {
               show-password-on="mousedown"
               placeholder="请输入密码"
             />
+          </div>
+          <div class="login-forgot-row">
+            <button
+              type="button"
+              class="login-forgot"
+              @click.stop.prevent="openResetModal"
+            >
+              忘记密码?
+            </button>
           </div>
         </div>
 
@@ -552,16 +552,13 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.login-field-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 20px;
-}
-
 .login-field--password {
   gap: 8px;
+}
+
+.login-forgot-row {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .login-password-input {
@@ -739,12 +736,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 520px) {
-  .login-field-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-  }
-
   .login-code-row {
     grid-template-columns: minmax(0, 1fr);
   }
