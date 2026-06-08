@@ -75,7 +75,6 @@ async function ensureCreditsUser(
 export const ensurePersonalCreditsAccount = async (input: {
   email: string;
   initialPoints: number | string;
-  preferredUserId?: number | null;
 }): Promise<LinkedCreditsAccount> => {
   const pool = getCreditsPool();
   const connection = await pool.getConnection();
@@ -84,21 +83,16 @@ export const ensurePersonalCreditsAccount = async (input: {
   try {
     await connection.beginTransaction();
 
-    let userId = input.preferredUserId ?? null;
-
     const [existingUsers] = await connection.query<any[]>(
       `SELECT id
        FROM users
        WHERE email = :email
-          OR (:preferredUserId IS NOT NULL AND id = :preferredUserId)
        ORDER BY id
        LIMIT 1`,
-      {
-        email: input.email,
-        preferredUserId: userId,
-      },
+      { email: input.email },
     );
 
+    let userId: number;
     if (existingUsers[0]) {
       userId = Number(existingUsers[0].id);
       await connection.query(
@@ -108,12 +102,6 @@ export const ensurePersonalCreditsAccount = async (input: {
              updated_at = CURRENT_TIMESTAMP(3)
          WHERE id = :userId`,
         { email: input.email, userId },
-      );
-    } else if (userId) {
-      await connection.query(
-        `INSERT INTO users (id, email, status)
-         VALUES (:userId, :email, 'active')`,
-        { userId, email: input.email },
       );
     } else {
       const [created] = await connection.query<any>(
@@ -175,7 +163,7 @@ export const ensurePersonalCreditsAccount = async (input: {
     await connection.commit();
 
     return {
-      userId: userId as number,
+      userId,
       accountId,
       totalBalance: String(finalRows[0]?.total_balance ?? initialPoints),
       availableBalance: String(finalRows[0]?.available_balance ?? initialPoints),
@@ -243,8 +231,7 @@ export const ensureTenantCreditsBundle = async (input: {
           `UPDATE tenant_members
            SET role = :role,
                status = 'active',
-               joined_at = COALESCE(joined_at, CURRENT_TIMESTAMP(3)),
-               updated_at = CURRENT_TIMESTAMP(3)
+               joined_at = COALESCE(joined_at, CURRENT_TIMESTAMP(3))
            WHERE id = :id`,
           { id: existingMembers[0].id, role: member.role },
         );

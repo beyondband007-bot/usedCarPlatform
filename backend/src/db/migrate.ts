@@ -2,6 +2,12 @@ import { pbkdf2Sync, randomBytes } from "node:crypto";
 
 import { pool } from "./mysql";
 import { migrations } from "./migrations";
+import { env } from "../config/env";
+import {
+  closeCreditsAccountLinkPool,
+  ensurePersonalCreditsAccount,
+  ensureTenantCreditsBundle,
+} from "../modules/billing/creditsAccountLinkService";
 import {
   defaultBackOfficePermissionPolicies,
   defaultBackOfficeRolePermissions,
@@ -112,6 +118,30 @@ const hashPassword = (password: string) => {
   return `pbkdf2_sha256$${iterations}$${salt}$${hash}`;
 };
 
+const creditsEmailForUsername = (username: string) => `${username}@used-car.local`;
+
+const planGiftPoints = async (planCode: string) => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT gift_points
+     FROM subscription_plans
+     WHERE code = :planCode
+     LIMIT 1`,
+    { planCode },
+  );
+  return rows[0]?.gift_points ?? 0;
+};
+
+const ensureSeedPersonalCreditsUser = async (input: { username: string; plan: string }) => {
+  if (!env.credits.enabled) return null;
+
+  const credits = await ensurePersonalCreditsAccount({
+    email: creditsEmailForUsername(input.username),
+    initialPoints: await planGiftPoints(input.plan),
+  });
+
+  return credits.userId;
+};
+
 const seedSubscriptionPlans = async () => {
   await pool.query(
     `INSERT INTO subscription_plans
@@ -212,7 +242,6 @@ const seedAuthData = async () => {
       displayName: "开发者",
       role: "developer",
       plan: "flagship",
-      creditsUserId: 6,
     },
     {
       id: "user_admin",
@@ -221,7 +250,6 @@ const seedAuthData = async () => {
       displayName: "管理员",
       role: "admin",
       plan: "flagship",
-      creditsUserId: 1,
     },
     {
       id: "user_agent",
@@ -230,7 +258,6 @@ const seedAuthData = async () => {
       displayName: "代理商",
       role: "agent",
       plan: "team",
-      creditsUserId: 7,
     },
     {
       id: "user_enterprise",
@@ -239,7 +266,6 @@ const seedAuthData = async () => {
       displayName: "企业用户",
       role: "enterprise",
       plan: "team",
-      creditsUserId: 2,
     },
     {
       id: "user_basic",
@@ -248,7 +274,6 @@ const seedAuthData = async () => {
       displayName: "基础版企业用户",
       role: "enterprise",
       plan: "basic",
-      creditsUserId: 3,
     },
     {
       id: "user_team",
@@ -257,7 +282,6 @@ const seedAuthData = async () => {
       displayName: "团队版企业用户",
       role: "enterprise",
       plan: "team",
-      creditsUserId: 4,
     },
     {
       id: "user_flagship",
@@ -266,11 +290,13 @@ const seedAuthData = async () => {
       displayName: "旗舰版企业用户",
       role: "enterprise",
       plan: "flagship",
-      creditsUserId: 5,
+      usesTenantCreditsBundle: true,
     },
   ];
 
   for (const user of users) {
+    const creditsUserId = user.usesTenantCreditsBundle ? null : await ensureSeedPersonalCreditsUser(user);
+
     await pool.query(
       `INSERT INTO app_users
         (id, username, phone, password_hash, display_name, status, credits_user_id, account_scope)
@@ -283,7 +309,7 @@ const seedAuthData = async () => {
         status = VALUES(status),
         credits_user_id = VALUES(credits_user_id),
         account_scope = VALUES(account_scope)`,
-      { ...user, passwordHash: hashPassword("123456") },
+      { ...user, creditsUserId, passwordHash: hashPassword("123456") },
     );
 
     await pool.query(
@@ -360,38 +386,76 @@ const seedFlagshipEnterpriseTenant = async () => {
       username: "flagship_sub_sales",
       phone: "13800000006",
       displayName: "旗舰子账号-销售",
-      creditsUserId: 5,
+      creditsRole: "admin" as const,
+      memberRole: "admin",
     },
     {
       id: "user_flagship_sub_ops",
       username: "flagship_sub_ops",
       phone: "13800000007",
       displayName: "旗舰子账号-运营",
-      creditsUserId: 5,
+      creditsRole: "employee" as const,
+      memberRole: "member",
     },
     {
       id: "user_flagship_sub_design",
       username: "flagship_sub_design",
       phone: "13800000008",
       displayName: "旗舰子账号-设计",
-      creditsUserId: 5,
+      creditsRole: "employee" as const,
+      memberRole: "member",
     },
   ];
 
-  for (const user of childUsers) {
+  const tenantCredits = env.credits.enabled
+    ? await ensureTenantCreditsBundle({
+        tenantName: "企业旗舰版演示企业",
+        initialPoints: await planGiftPoints("flagship"),
+        members: [
+          { email: creditsEmailForUsername("flagship"), role: "owner" },
+          ...childUsers.map((user) => ({
+            email: creditsEmailForUsername(user.username),
+            role: user.creditsRole,
+          })),
+        ],
+      })
+    : null;
+
+  if (tenantCredits) {
+    await pool.query(
+      `UPDATE app_users
+       SET credits_user_id = :creditsUserId,
+           credits_tenant_id = :creditsTenantId,
+           account_scope = 'tenant'
+       WHERE id = 'user_flagship'`,
+      {
+        creditsUserId: tenantCredits.userId,
+        creditsTenantId: tenantCredits.tenantId,
+      },
+    );
+  }
+
+  for (const [index, user] of childUsers.entries()) {
+    const creditsUserId = tenantCredits?.memberUserIds[index + 1] ?? null;
+    const creditsTenantId = tenantCredits?.tenantId ?? null;
+    const accountScope = tenantCredits ? "tenant" : "personal";
+
     await pool.query(
       `INSERT INTO app_users
-        (id, username, phone, password_hash, display_name, status, credits_user_id, account_scope)
+        (id, username, phone, password_hash, display_name, status,
+         credits_user_id, credits_tenant_id, account_scope)
        VALUES
-        (:id, :username, :phone, :passwordHash, :displayName, 'active', :creditsUserId, 'personal')
+        (:id, :username, :phone, :passwordHash, :displayName, 'active',
+         :creditsUserId, :creditsTenantId, :accountScope)
        ON DUPLICATE KEY UPDATE
         username = VALUES(username),
         phone = VALUES(phone),
         display_name = VALUES(display_name),
         status = VALUES(status),
         credits_user_id = VALUES(credits_user_id),
+        credits_tenant_id = VALUES(credits_tenant_id),
         account_scope = VALUES(account_scope)`,
-      { ...user, passwordHash: hashPassword("123456") },
+      { ...user, creditsUserId, creditsTenantId, accountScope, passwordHash: hashPassword("123456") },
     );
 
     await pool.query(
@@ -416,9 +480,11 @@ const seedFlagshipEnterpriseTenant = async () => {
 
   const members = [
     { id: "em_flagship_owner", userId: "user_flagship", role: "owner" },
-    { id: "em_flagship_sub_sales", userId: "user_flagship_sub_sales", role: "admin" },
-    { id: "em_flagship_sub_ops", userId: "user_flagship_sub_ops", role: "member" },
-    { id: "em_flagship_sub_design", userId: "user_flagship_sub_design", role: "member" },
+    ...childUsers.map((user) => ({
+      id: `em_${user.id.replace(/^user_/, "")}`,
+      userId: user.id,
+      role: user.memberRole,
+    })),
   ];
 
   for (const member of members) {
@@ -436,47 +502,64 @@ const seedFlagshipEnterpriseTenant = async () => {
 };
 
 const seedAgentOperationsData = async () => {
-  await pool.query(
-    `INSERT INTO application_customer_links
-      (id, application_code, user_id, credits_user_id, account_scope,
-       credits_tenant_id, created_by_user_id, created_by_role_code, status, metadata_json)
-     VALUES
-      ('acl_seed_agent_enterprise', 'used-car-platform', 'user_enterprise', 2, 'personal',
-       NULL, 'user_agent', 'agent', 'active', :metadataJson)
-     ON DUPLICATE KEY UPDATE
-      credits_user_id = VALUES(credits_user_id),
-      account_scope = VALUES(account_scope),
-      created_by_user_id = VALUES(created_by_user_id),
-      created_by_role_code = VALUES(created_by_role_code),
-      status = VALUES(status),
-      metadata_json = VALUES(metadata_json)`,
-    {
-      metadataJson: JSON.stringify({
-        seededFor: "phase-6-agent-operations",
-        applicationName: "usedCarPlatform",
-      }),
-    },
+  const [enterpriseRows] = await pool.query<any[]>(
+    `SELECT credits_user_id, credits_tenant_id, account_scope
+     FROM app_users
+     WHERE id = 'user_enterprise'
+     LIMIT 1`,
   );
+  const enterprise = enterpriseRows[0];
 
-  await pool.query(
-    `INSERT INTO agent_customer_relations
-      (id, agent_user_id, customer_user_id, customer_credits_user_id,
-       application_code, relation_type, status, metadata_json)
-     VALUES
-      ('acr_seed_agent_enterprise', 'user_agent', 'user_enterprise', 2,
-       'used-car-platform', 'direct', 'active', :metadataJson)
-     ON DUPLICATE KEY UPDATE
-      customer_credits_user_id = VALUES(customer_credits_user_id),
-      relation_type = VALUES(relation_type),
-      status = VALUES(status),
-      metadata_json = VALUES(metadata_json)`,
-    {
-      metadataJson: JSON.stringify({
-        source: "demo-seed",
-        approvalMode: "auto",
-      }),
-    },
-  );
+  if (enterprise?.credits_user_id) {
+    await pool.query(
+      `INSERT INTO application_customer_links
+        (id, application_code, user_id, credits_user_id, account_scope,
+         credits_tenant_id, created_by_user_id, created_by_role_code, status, metadata_json)
+       VALUES
+        ('acl_seed_agent_enterprise', 'used-car-platform', 'user_enterprise', :creditsUserId, :accountScope,
+         :creditsTenantId, 'user_agent', 'agent', 'active', :metadataJson)
+       ON DUPLICATE KEY UPDATE
+        credits_user_id = VALUES(credits_user_id),
+        account_scope = VALUES(account_scope),
+        credits_tenant_id = VALUES(credits_tenant_id),
+        created_by_user_id = VALUES(created_by_user_id),
+        created_by_role_code = VALUES(created_by_role_code),
+        status = VALUES(status),
+        metadata_json = VALUES(metadata_json)`,
+      {
+        creditsUserId: enterprise.credits_user_id,
+        creditsTenantId: enterprise.credits_tenant_id,
+        accountScope: enterprise.account_scope,
+        metadataJson: JSON.stringify({
+          seededFor: "phase-6-agent-operations",
+          applicationName: "usedCarPlatform",
+        }),
+      },
+    );
+
+    await pool.query(
+      `INSERT INTO agent_customer_relations
+        (id, agent_user_id, customer_user_id, customer_credits_user_id,
+         application_code, relation_type, status, metadata_json)
+       VALUES
+        ('acr_seed_agent_enterprise', 'user_agent', 'user_enterprise', :creditsUserId,
+         'used-car-platform', 'direct', 'active', :metadataJson)
+       ON DUPLICATE KEY UPDATE
+        customer_credits_user_id = VALUES(customer_credits_user_id),
+        relation_type = VALUES(relation_type),
+        status = VALUES(status),
+        metadata_json = VALUES(metadata_json)`,
+      {
+        creditsUserId: enterprise.credits_user_id,
+        metadataJson: JSON.stringify({
+          source: "demo-seed",
+          approvalMode: "auto",
+        }),
+      },
+    );
+  } else {
+    console.warn("Skipped seeded agent/customer credit links because user_enterprise has no credits link.");
+  }
 
   const leads = [
     {
@@ -523,10 +606,10 @@ const seedAgentOperationsData = async () => {
   }
 
   await pool.query(
-    `INSERT INTO agent_settlement_bills
-      (id, agent_user_id, period, total_commission_points, status)
-     VALUES
-      ('asb_agent_2026_06', 'user_agent', '2026-06', 2160.0000, 'draft')
+     `INSERT INTO agent_settlement_bills
+       (id, agent_user_id, period, total_commission_points, status)
+      VALUES
+      ('asb_agent_2026_06', 'user_agent', '2026-06', 1800.0000, 'draft')
      ON DUPLICATE KEY UPDATE
       total_commission_points = VALUES(total_commission_points),
       status = VALUES(status)`,
@@ -538,7 +621,7 @@ const seedAgentOperationsData = async () => {
        consumed_points, commission_rate, commission_points, status, settlement_id)
      VALUES
       ('acp_agent_enterprise_2026_06', 'user_agent', 'user_enterprise',
-       'used-car-platform', '2026-06', 18000.0000, 0.1200, 2160.0000,
+       'used-car-platform', '2026-06', 18000.0000, 0.1000, 1800.0000,
        'preview', 'asb_agent_2026_06')
      ON DUPLICATE KEY UPDATE
       customer_user_id = VALUES(customer_user_id),
@@ -710,6 +793,7 @@ const run = async () => {
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();
+    await closeCreditsAccountLinkPool();
     await pool.end();
   }
 };
