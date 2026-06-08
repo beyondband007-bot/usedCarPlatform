@@ -384,8 +384,8 @@ function openPreviewModal() {
 
 .upload-trigger-icon {
   display: block;
-  width: 72px;
-  height: 72px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
 

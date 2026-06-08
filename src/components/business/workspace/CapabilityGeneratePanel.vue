@@ -171,7 +171,8 @@ const interiorCollageInputRef = ref<HTMLInputElement | null>(null);
 const MAX_BATCH_EXTERIOR_IMAGES = 5;
 const MIN_INTERIOR_COLLAGE_IMAGES = 2;
 const MAX_INTERIOR_COLLAGE_IMAGES = 10;
-const BATCH_DELIVERY_SNAPSHOT_STORAGE_KEY = "workspace:batch-delivery-snapshots";
+const BATCH_DELIVERY_SNAPSHOT_STORAGE_KEY =
+  "workspace:batch-delivery-snapshots";
 
 let previewObjectUrl: string | null = null;
 
@@ -343,10 +344,10 @@ type BatchPresetSelectOption = {
 const toPresetSelectOption = (
   item: BatchVisualTemplate,
 ): BatchPresetSelectOption => ({
-    label: item.name,
-    value: item.id,
-    template: item,
-  });
+  label: item.name,
+  value: item.id,
+  template: item,
+});
 
 const presetComboboxOptions = computed<PresetComboboxOption[]>(() =>
   visualTemplates.value.map((item) => ({
@@ -419,7 +420,8 @@ async function handleDeletePreset(template: BatchVisualTemplate) {
     await deletePresetById(template.id);
     message.success("预设已删除");
   } catch (error) {
-    const text = error instanceof Error ? error.message : "预设删除失败，请重试";
+    const text =
+      error instanceof Error ? error.message : "预设删除失败，请重试";
     message.error(text);
   } finally {
     setPresetDeleting(template.id, false);
@@ -503,7 +505,7 @@ function renderPresetOptionLabel(option: {
 
 const activeCreateTemplate = computed(() =>
   createTaskPresetId.value &&
-    createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE
+  createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE
     ? getTemplateById(createTaskPresetId.value)
     : undefined,
 );
@@ -588,7 +590,9 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     useRecentLogo: useRecentLogo.value,
     lightConsistency: lightConsistency.value,
     paintRefresh: paintRefresh.value,
-    colorCode: paintRefresh.value ? batchPaintColorCode.value.trim() || null : null,
+    colorCode: paintRefresh.value
+      ? batchPaintColorCode.value.trim() || null
+      : null,
     interiorEnhance: interiorCollage.value && interiorEnhance.value,
     interiorCollage: interiorCollage.value,
   };
@@ -620,7 +624,8 @@ function isSameTemplateInput(
     normalizedLeft.useRecentLogo === normalizedRight.useRecentLogo &&
     normalizedLeft.lightConsistency === normalizedRight.lightConsistency &&
     normalizedLeft.paintRefresh === normalizedRight.paintRefresh &&
-    (normalizedLeft.colorCode ?? null) === (normalizedRight.colorCode ?? null) &&
+    (normalizedLeft.colorCode ?? null) ===
+      (normalizedRight.colorCode ?? null) &&
     normalizedLeft.interiorCollage === normalizedRight.interiorCollage &&
     normalizedLeft.interiorEnhance === normalizedRight.interiorEnhance
   );
@@ -697,7 +702,9 @@ function mapBatchVisualConfigFromTemplate(
         : null,
     enableLightConsistency: template.lightConsistency,
     enablePaintRefresh: template.paintRefresh,
-    colorCode: template.paintRefresh ? template.colorCode?.trim() || null : null,
+    colorCode: template.paintRefresh
+      ? template.colorCode?.trim() || null
+      : null,
     enableInteriorClean: template.interiorCollage && template.interiorEnhance,
     enableInteriorCollage: template.interiorCollage,
   };
@@ -1184,7 +1191,11 @@ function handleGenerate() {
     return;
   }
 
-  if (supportsLogoForGenerate.value && useLogo.value && !activeLogo.value?.assetId) {
+  if (
+    supportsLogoForGenerate.value &&
+    useLogo.value &&
+    !activeLogo.value?.assetId
+  ) {
     message.warning("已开启使用 Logo，请先选择或上传 Logo");
     return;
   }
@@ -1196,8 +1207,9 @@ function handleGenerate() {
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     sceneReferenceImageUrl:
       props.capability.kind === "scene"
-        ? props.capability.options.find((item) => item.id === props.selectedOptionId)
-            ?.image
+        ? props.capability.options.find(
+            (item) => item.id === props.selectedOptionId,
+          )?.image
         : undefined,
     useLogo: supportsLogoForGenerate.value ? useLogo.value : undefined,
     logoAssetId:
@@ -1440,16 +1452,11 @@ async function loadDeliveryAssets(
   }
 }
 
-function getExpectedDeliveryAssetCount(task: {
-  assetCount: number;
-}) {
+function getExpectedDeliveryAssetCount(task: { assetCount: number }) {
   return Math.max(task.assetCount, 0);
 }
 
-function isDeliveryAssetsCacheComplete(
-  taskId: string,
-  expectedCount: number,
-) {
+function isDeliveryAssetsCacheComplete(taskId: string, expectedCount: number) {
   const cached = deliveryTaskAssets.value[taskId];
   if (!cached?.length) return false;
   if (expectedCount <= 0) return true;
@@ -1639,7 +1646,10 @@ function buildDeliveryTaskMetrics(
   const deliveryTotal = Math.max(snapshotTotal ?? item.total, 0);
   const deliveryCompleted =
     item.status === "fail" || item.status === "canceled"
-      ? Math.min(deliveryTotal, Math.max(item.completed + item.failed, item.total))
+      ? Math.min(
+          deliveryTotal,
+          Math.max(item.completed + item.failed, item.total),
+        )
       : Math.min(deliveryTotal, Math.max(item.assetCount, 0));
   const deliveryProgress =
     deliveryTotal > 0
@@ -1761,17 +1771,16 @@ function buildDeliveryPreviewSlots(
     maxInputSlot,
   );
   const pendingLabel = getDeliveryPendingSlotLabel(task);
-  const defaultRatio =
-    assets[0]?.ratio ?? snapshot?.outputRatio ?? "4:3";
+  const defaultRatio = assets[0]?.ratio ?? snapshot?.outputRatio ?? "4:3";
 
   return Array.from({ length: totalCount }, (_, slotIndex) => {
-    const title = getDeliveryPreviewSlotTitle(
-      projectName,
-      slotIndex,
-      snapshot,
-    );
+    const title = getDeliveryPreviewSlotTitle(projectName, slotIndex, snapshot);
     const inputCoverMeta = resolveInputCoverMetaForSlot(inputCovers, slotIndex);
-    const uploadCover = resolveInputCoverForSlot(snapshot, inputCovers, slotIndex);
+    const uploadCover = resolveInputCoverForSlot(
+      snapshot,
+      inputCovers,
+      slotIndex,
+    );
     const generated =
       findDeliveryAssetForGenerationTask(
         assets,
@@ -1808,8 +1817,7 @@ async function emitDeliveryTaskPreview(
   task: DeliveryTask,
   options?: { forceAssets?: boolean; refresh?: boolean },
 ) {
-  const forceAssets =
-    options?.forceAssets ?? !isDeliveryTaskComplete(task);
+  const forceAssets = options?.forceAssets ?? !isDeliveryTaskComplete(task);
   const refresh = options?.refresh ?? forceAssets;
   const assets = await getDeliveryAssetsForTask(task, {
     force: forceAssets,
@@ -1821,15 +1829,19 @@ async function emitDeliveryTaskPreview(
       page: 1,
       pageSize: 1,
       refresh: false,
-    }).then((result) => {
-      deliveryInputCovers.value = {
-        ...deliveryInputCovers.value,
-        [task.taskId]: result.inputCovers ?? [],
-      };
-      return result.inputCovers ?? [];
-    }).catch(() => []));
+    })
+      .then((result) => {
+        deliveryInputCovers.value = {
+          ...deliveryInputCovers.value,
+          [task.taskId]: result.inputCovers ?? [],
+        };
+        return result.inputCovers ?? [];
+      })
+      .catch(() => []));
   const previewAssets = buildDeliveryPreviewSlots(task, assets, inputCovers);
-  const firstReadyAsset = previewAssets.find((asset) => asset.status === "ready");
+  const firstReadyAsset = previewAssets.find(
+    (asset) => asset.status === "ready",
+  );
   const firstCoverAsset = previewAssets.find((asset) => asset.thumbnailUrl);
 
   emit("previewDeliveryTask", {
@@ -2557,10 +2569,7 @@ defineExpose({
               <NSwitch v-model:value="interiorCollage" size="large" />
             </section>
 
-            <section
-              v-if="interiorCollage"
-              class="batch-card switch-card"
-            >
+            <section v-if="interiorCollage" class="batch-card switch-card">
               <div>
                 <h3>内饰清洁增强</h3>
                 <p>对已上传内饰图做清洁与质感增强。</p>
@@ -2792,7 +2801,10 @@ defineExpose({
             <span>正在加载交付列表</span>
           </div>
           <div v-else-if="!deliveryTasks.length" class="delivery-list-state">
-            <Icon icon="mdi:clipboard-text-outline" class="delivery-list-state-icon" />
+            <Icon
+              icon="mdi:clipboard-text-outline"
+              class="delivery-list-state-icon"
+            />
             <span>暂无交付任务</span>
           </div>
           <div v-else class="delivery-list">
@@ -2918,7 +2930,9 @@ defineExpose({
               <button
                 type="button"
                 class="delivery-link-btn is-danger"
-                :disabled="deliverySelectedCount === 0 || isDeletingDeliveryAssets"
+                :disabled="
+                  deliverySelectedCount === 0 || isDeletingDeliveryAssets
+                "
                 @click="handleDeleteDeliveryTasks"
               >
                 批量删除
@@ -2934,7 +2948,9 @@ defineExpose({
         class="generate-panel-body generate-panel-body--saas"
         :class="{ 'is-theme-dark': appStore.isDarkMode }"
       >
-        <section class="workspace-config-module workspace-config-module--primary">
+        <section
+          class="workspace-config-module workspace-config-module--primary"
+        >
           <UploadTaskCard
             embedded
             :capability="props.capability"
@@ -2974,7 +2990,9 @@ defineExpose({
         <template
           v-if="props.capability.kind === 'scene' && hasBlock('scene-settings')"
         >
-          <section class="workspace-config-module workspace-config-module--logo">
+          <section
+            class="workspace-config-module workspace-config-module--logo"
+          >
             <WorkspaceLogoPanel
               v-model:enabled="useLogo"
               embedded
@@ -3180,7 +3198,8 @@ defineExpose({
   box-shadow: none !important;
 }
 
-.workspace-config-module--primary :deep(.upload-dragger:hover:not(.is-blocked)) {
+.workspace-config-module--primary
+  :deep(.upload-dragger:hover:not(.is-blocked)) {
   border-color: var(--saas-upload-border-hover) !important;
   box-shadow: none !important;
 }
@@ -3195,8 +3214,8 @@ defineExpose({
 }
 
 .workspace-config-module--primary :deep(.upload-trigger-icon) {
-  width: 34px;
-  height: 34px;
+  width: 48px;
+  height: 48px;
 }
 
 .workspace-config-module--primary :deep(.upload-trigger-title) {
@@ -3225,12 +3244,14 @@ defineExpose({
   font-weight: 700;
 }
 
-.workspace-config-module--primary :deep(.option-selector-card.is-scene .option-item) {
+.workspace-config-module--primary
+  :deep(.option-selector-card.is-scene .option-item) {
   background: var(--saas-scene-surface);
   border-color: var(--saas-scene-border);
 }
 
-.workspace-config-module--primary :deep(.option-selector-card.is-scene .option-item.is-active) {
+.workspace-config-module--primary
+  :deep(.option-selector-card.is-scene .option-item.is-active) {
   border: 2px solid #ffb800;
   background: var(--saas-scene-surface);
   box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
@@ -3562,8 +3583,14 @@ defineExpose({
 
 :global(.n-base-select-option:hover .preset-option-delete),
 :global(.n-base-select-option:focus-within .preset-option-delete),
-:global(.n-base-select-option:hover .preset-option-delete-anchor .preset-option-delete),
-:global(.n-base-select-option:focus-within .preset-option-delete-anchor .preset-option-delete),
+:global(
+  .n-base-select-option:hover .preset-option-delete-anchor .preset-option-delete
+),
+:global(
+  .n-base-select-option:focus-within
+    .preset-option-delete-anchor
+    .preset-option-delete
+),
 :global(.preset-option-delete.is-deleting) {
   opacity: 1;
   transform: translateX(0);

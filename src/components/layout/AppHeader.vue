@@ -148,10 +148,7 @@ const canShowRechargeEntry = computed(
 );
 
 const showHeaderRecharge = computed(
-  () =>
-    authStore.isLoggedIn &&
-    canShowRechargeEntry.value &&
-    navItems.value.some((item) => item.path === "/credits"),
+  () => authStore.isLoggedIn && canShowRechargeEntry.value,
 );
 </script>
 
@@ -181,25 +178,30 @@ const showHeaderRecharge = computed(
           >
             {{ item.label }}
           </button>
+        </template>
+      </nav>
+      <div class="site-header-actions">
+        <div
+          v-if="authStore.isLoggedIn"
+          class="credit-pill-group"
+          :class="{ 'has-recharge': showHeaderRecharge }"
+        >
+          <RouterLink
+            class="credit-pill-balance"
+            to="/credits"
+            aria-label="查看积分余额与流水"
+          >
+            积分余额 {{ creditsBalanceText }}
+          </RouterLink>
           <button
-            v-if="item.path === '/credits' && showHeaderRecharge"
+            v-if="showHeaderRecharge"
             type="button"
-            class="nav-link nav-link--action"
+            class="credit-recharge-btn"
             @click="handleOpenRecharge"
           >
             充值
           </button>
-        </template>
-      </nav>
-      <div class="site-header-actions">
-        <RouterLink
-          v-if="authStore.isLoggedIn"
-          class="header-action-pill credit-pill"
-          to="/credits"
-          aria-label="查看积分余额与流水"
-        >
-          积分余额 {{ creditsBalanceText }}
-        </RouterLink>
+        </div>
         <RouterLink
           v-else-if="route.path !== '/login'"
           class="header-action-pill credit-pill site-login-fallback"
@@ -601,6 +603,77 @@ const showHeaderRecharge = computed(
   background: var(--studio-chrome-credit-hover, #f8fafc);
 }
 
+/* 积分余额 + 充值：同一个胶囊模块 */
+.credit-pill-group {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: clamp(36px, 2.4vw, 40px);
+  border: 1px solid var(--studio-chrome-credit-border, rgba(15, 23, 42, 0.12));
+  border-radius: 999px;
+  background: var(--studio-chrome-credit-bg, #ffffff);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.credit-pill-balance {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 100%;
+  padding: clamp(6px, 0.55vw, 8px) clamp(12px, 1vw, 16px);
+  color: var(--studio-chrome-credit-text, #111827);
+  font-family: inherit;
+  font-size: var(--studio-chrome-action-size, clamp(13px, 0.78vw, 15px));
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.credit-pill-group.has-recharge .credit-pill-balance {
+  padding-right: clamp(8px, 0.7vw, 12px);
+}
+
+.credit-recharge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: clamp(3px, 0.3vw, 5px);
+  padding: clamp(4px, 0.4vw, 6px) clamp(11px, 0.85vw, 15px);
+  border: none;
+  border-radius: 999px;
+  background: var(--color-brand-primary, #efc24c);
+  color: #1a1a1a;
+  font-family: inherit;
+  font-size: var(--studio-chrome-action-size, clamp(13px, 0.78vw, 15px));
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.credit-recharge-btn:hover {
+  background: var(--color-brand-strong, #e3b53c);
+}
+
+.site-header.is-light .credit-recharge-btn {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12) inset;
+}
+
+.site-header.is-light .credit-recharge-btn:hover {
+  background: #f1f5f9;
+}
+
+.credit-pill-group:hover {
+  background: var(--studio-chrome-credit-hover, #f8fafc);
+}
+
 .site-login-fallback {
   display: none;
 }
@@ -700,7 +773,8 @@ const showHeaderRecharge = computed(
     padding: 14px var(--studio-chrome-pad-x, 18px);
   }
 
-  .credit-pill {
+  .credit-pill,
+  .credit-pill-balance {
     padding: clamp(6px, 0.55vw, 8px) clamp(10px, 0.9vw, 14px);
     font-size: var(--studio-chrome-action-size, clamp(12px, 0.95vw, 15px));
   }

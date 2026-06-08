@@ -151,7 +151,7 @@ const optionRows = computed(() => {
 }
 
 .option-selector-card.is-scene .option-selector-head {
-  margin-bottom: 8px;
+  margin-bottom: 24px;
 }
 
 .option-selector-head-main {
