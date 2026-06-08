@@ -37,6 +37,7 @@ import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 import { formatDate } from "@/utils/dayjs";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
+import { resolveSceneReferenceImageUrl } from "@/utils/scene-reference-url";
 import type {
   BatchVisualTemplate,
   BatchVisualTemplateInput,
@@ -896,7 +897,9 @@ function mapBatchVisualConfigFromTemplate(
       ? getBatchSceneOptionId(template.sceneCategory, template.sceneIndex)
       : undefined,
     sceneReferenceImageUrl: template.enableSceneChange
-      ? getBatchSceneImageUrl(template.sceneCategory, template.sceneIndex)
+      ? resolveSceneReferenceImageUrl(
+          getBatchSceneImageUrl(template.sceneCategory, template.sceneIndex),
+        )
       : undefined,
     sceneIndex: template.sceneIndex,
     sceneCategory: template.sceneCategory,
@@ -1469,9 +1472,11 @@ function handleGenerate() {
       props.capability.kind === "scene" ? props.selectedOptionId : undefined,
     sceneReferenceImageUrl:
       props.capability.kind === "scene"
-        ? props.capability.options.find(
-            (item) => item.id === props.selectedOptionId,
-          )?.image
+        ? resolveSceneReferenceImageUrl(
+            props.capability.options.find(
+              (item) => item.id === props.selectedOptionId,
+            )?.image,
+          )
         : undefined,
     useLogo: supportsLogoForGenerate.value ? useLogo.value : undefined,
     logoAssetId:

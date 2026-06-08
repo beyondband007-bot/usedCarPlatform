@@ -7,6 +7,10 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
+import showroomSceneCharcoalStone from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-charcoal-stone.png'
+import showroomSceneDarkGrayHalo from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-dark-gray-halo.png'
+import showroomSceneVerticalLight from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-vertical-light.png'
+import showroomSceneWarmBeige from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-warm-beige.png'
 import { mediaUrls } from '@/constants/media-urls'
 
 const {
@@ -67,6 +71,10 @@ const sceneImageUrls = {
   showroomWideAngle: showroomMedia.sceneWideAngle,
   showroomGlass: showroomMedia.tutorialGlassHall,
   showroomLuxuryDark: showroomMedia.tutorialLuxuryDark,
+  showroomWarmBeige: showroomSceneWarmBeige,
+  showroomDarkGrayHalo: showroomSceneDarkGrayHalo,
+  showroomCharcoalStone: showroomSceneCharcoalStone,
+  showroomVerticalLight: showroomSceneVerticalLight,
 }
 
 const tutorial = [
@@ -100,6 +108,10 @@ const showroomOptions = createOptions([
   ['soft-top-light', '柔光灯顶', sceneImageUrls.showroomSoftTop],
   ['minimal-space', '极简留白', sceneImageUrls.showroomMinimal],
   ['wide-angle', '广角空间', sceneImageUrls.showroomWideAngle],
+  ['warm-beige-studio', '暖调米棚', sceneImageUrls.showroomWarmBeige],
+  ['dark-gray-halo', '深灰光晕', sceneImageUrls.showroomDarkGrayHalo],
+  ['charcoal-stone-wall', '炭灰岩墙', sceneImageUrls.showroomCharcoalStone],
+  ['vertical-light-hall', '竖光展厅', sceneImageUrls.showroomVerticalLight],
 ])
 
 const outdoorOptions = createOptions([

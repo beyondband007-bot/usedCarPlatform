@@ -43,7 +43,7 @@ const panelDescription = computed(() =>
 );
 const currentLogoHint = computed(() => {
   if (customLogo.value) return uploadedAtLabel.value;
-  return "请先上传 PNG / SVG Logo";
+  return "请先上传 PNG / JPG / SVG Logo";
 });
 const uploadButtonLabel = computed(() => {
   if (isUploading.value) return "上传中...";
@@ -105,7 +105,7 @@ async function handleFileChange(event: Event) {
       ref="fileInputRef"
       type="file"
       class="logo-file-input"
-      accept="image/png,image/svg+xml,.png,.svg"
+      accept="image/png,image/jpeg,image/svg+xml,.png,.jpg,.jpeg,.svg"
       @change="handleFileChange"
     />
 
