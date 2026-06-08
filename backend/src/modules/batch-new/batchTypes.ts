@@ -1,4 +1,4 @@
-import type { OutputRatio, TaskStatus } from "../../shared/types";
+import type { LogoPlacement, OutputRatio, TaskStatus } from "../../shared/types";
 
 export interface BatchVisualConfig {
   enableSceneChange?: boolean;
@@ -9,6 +9,7 @@ export interface BatchVisualConfig {
   outputRatio?: OutputRatio;
   useRecentLogo?: boolean;
   logoAssetId?: string | null;
+  logoPlacements?: LogoPlacement[];
   enableLightConsistency?: boolean;
   lightConsistency?: boolean;
   enablePaintRefresh?: boolean;
