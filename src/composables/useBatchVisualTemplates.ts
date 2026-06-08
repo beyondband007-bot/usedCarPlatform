@@ -9,6 +9,7 @@ import {
 } from '@/api/visual-workbench'
 import { getBatchSceneImageUrl, getBatchSceneOptionId } from '@/constants/workspace'
 import type { BatchVisualTemplate, BatchVisualTemplateInput } from '@/types/workspace'
+import { resolveSceneReferenceImageUrl } from '@/utils/scene-reference-url'
 
 const NEW_PRESET_VALUE = '__new__'
 
@@ -37,7 +38,9 @@ function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
       ? getBatchSceneOptionId(input.sceneCategory, input.sceneIndex)
       : undefined,
     sceneReferenceImageUrl: input.enableSceneChange
-      ? getBatchSceneImageUrl(input.sceneCategory, input.sceneIndex)
+      ? resolveSceneReferenceImageUrl(
+          getBatchSceneImageUrl(input.sceneCategory, input.sceneIndex),
+        )
       : undefined,
     sceneIndex: input.sceneIndex,
     sceneCategory: input.sceneCategory,

@@ -73,6 +73,10 @@ Copy-Mapped 'src\assets\img\展厅灯光\教程图片\经典白棚.png' 'workspa
 Copy-Mapped 'src\assets\img\展厅灯光\教程图片\玻璃展厅.png' 'workspace\showroom\workspace-showroom-tutorial-glass-hall.png'
 Copy-Mapped 'src\assets\img\展厅灯光\教程图片\暗调豪华.png' 'workspace\showroom\workspace-showroom-tutorial-luxury-dark.png'
 Copy-Mapped 'src\assets\img\展厅灯光\教程图片\柔光灯顶.png' 'workspace\showroom\workspace-showroom-tutorial-soft-top-light.png'
+Copy-Mapped 'src\assets\img\展厅灯光\场景选择\暖调米棚.png' 'workspace\showroom\scene\workspace-showroom-scene-warm-beige.png'
+Copy-Mapped 'src\assets\img\展厅灯光\场景选择\深灰光晕.png' 'workspace\showroom\scene\workspace-showroom-scene-dark-gray-halo.png'
+Copy-Mapped 'src\assets\img\展厅灯光\场景选择\炭灰岩墙.png' 'workspace\showroom\scene\workspace-showroom-scene-charcoal-stone.png'
+Copy-Mapped 'src\assets\img\展厅灯光\场景选择\竖光展厅.png' 'workspace\showroom\scene\workspace-showroom-scene-vertical-light.png'
 
 # Road scenes
 Copy-Mapped 'src\assets\img\道路动态\场景选择\城市主干道.png' 'workspace\road\scene\workspace-road-scene-city-day.png'

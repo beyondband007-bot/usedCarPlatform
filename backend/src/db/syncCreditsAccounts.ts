@@ -20,6 +20,7 @@ const run = async () => {
      JOIN subscription_plans p ON p.code = us.plan_code
      WHERE u.status = 'active'
        AND us.status = 'active'
+       AND u.account_scope <> 'tenant'
      ORDER BY u.created_at, u.username`,
   );
 
@@ -28,7 +29,6 @@ const run = async () => {
     const credits = await ensurePersonalCreditsAccount({
       email: `${user.username}@used-car.local`,
       initialPoints: user.gift_points,
-      preferredUserId: user.credits_user_id,
     });
 
     await pool.query(

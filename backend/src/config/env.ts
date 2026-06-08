@@ -38,6 +38,7 @@ export const env = {
   uploadDir: path.resolve(rootDir, process.env.UPLOAD_DIR ?? "storage/uploads"),
   resultsDir: path.resolve(rootDir, process.env.RESULTS_DIR ?? "storage/results"),
   packagesDir: path.resolve(rootDir, process.env.PACKAGES_DIR ?? "storage/packages"),
+  sceneRefsDir: path.resolve(rootDir, process.env.SCENE_REFS_DIR ?? "storage/scene-refs"),
   maxUploadMb: toNumber(process.env.MAX_UPLOAD_MB, 20),
 
   mysql: {

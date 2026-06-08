@@ -1,5 +1,10 @@
+import path from "node:path";
+
+import { env } from "../../config/env";
 import { sceneReferenceMediaUrls } from "../../shared/mediaUrls";
 import type { LogoPlacement } from "../../shared/types";
+
+const showroomSceneRefDir = path.resolve(env.sceneRefsDir, "showroom");
 
 export interface ShowroomLightScene {
   optionId: string;
@@ -47,6 +52,42 @@ export const showroomLightScenes: ShowroomLightScene[] = [
     optionId: "wide-angle",
     title: "广角空间",
     referenceImageUrl: sceneReferenceMediaUrls.showroom.wideAngle,
+    supportedLogoPlacements: defaultLogoPlacements,
+  },
+  {
+    optionId: "warm-beige-studio",
+    title: "暖调米棚",
+    referenceImagePath: path.join(
+      showroomSceneRefDir,
+      "workspace-showroom-scene-warm-beige.png",
+    ),
+    supportedLogoPlacements: defaultLogoPlacements,
+  },
+  {
+    optionId: "dark-gray-halo",
+    title: "深灰光晕",
+    referenceImagePath: path.join(
+      showroomSceneRefDir,
+      "workspace-showroom-scene-dark-gray-halo.png",
+    ),
+    supportedLogoPlacements: defaultLogoPlacements,
+  },
+  {
+    optionId: "charcoal-stone-wall",
+    title: "炭灰岩墙",
+    referenceImagePath: path.join(
+      showroomSceneRefDir,
+      "workspace-showroom-scene-charcoal-stone.png",
+    ),
+    supportedLogoPlacements: defaultLogoPlacements,
+  },
+  {
+    optionId: "vertical-light-hall",
+    title: "竖光展厅",
+    referenceImagePath: path.join(
+      showroomSceneRefDir,
+      "workspace-showroom-scene-vertical-light.png",
+    ),
     supportedLogoPlacements: defaultLogoPlacements,
   },
 ];

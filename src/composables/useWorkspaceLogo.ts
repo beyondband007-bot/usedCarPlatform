@@ -6,7 +6,7 @@ import { formatDate } from '@/utils/dayjs'
 const STORAGE_CUSTOM_LOGO = 'workspace-custom-logo'
 const STORAGE_LOGO_ENABLED = 'workspace-logo-enabled'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024
-const ACCEPT_TYPES = new Set(['image/png', 'image/svg+xml'])
+const ACCEPT_TYPES = new Set(['image/png', 'image/jpeg', 'image/svg+xml'])
 
 export interface LogoInfo {
   dataUrl: string
@@ -115,10 +115,15 @@ export function useWorkspaceLogo() {
   )
 
   function validateLogoFile(file: File): string | null {
-    const isSvg = file.name.toLowerCase().endsWith('.svg')
-    const typeAllowed = ACCEPT_TYPES.has(file.type) || (isSvg && file.type === '')
+    const lowerName = file.name.toLowerCase()
+    const isSvg = lowerName.endsWith('.svg')
+    const isJpg = lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')
+    const typeAllowed =
+      ACCEPT_TYPES.has(file.type) ||
+      (isSvg && file.type === '') ||
+      (isJpg && file.type === '')
 
-    if (!typeAllowed) return '仅支持 PNG / SVG 格式'
+    if (!typeAllowed) return '仅支持 PNG / JPG / SVG 格式'
     if (file.size > MAX_SIZE_BYTES) return 'Logo 文件不能超过 2MB'
 
     return null
