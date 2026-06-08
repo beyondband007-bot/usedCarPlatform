@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
@@ -12,7 +12,12 @@ import {
   pointsQueryBackgroundDark,
   pointsQueryBackgroundLight,
   pointsQueryHeroCopy,
+  pointsStaticImageUrls,
 } from "@/constants/points-page";
+import {
+  registerStaticImageUrls,
+  warmStaticImages,
+} from "@/utils/static-image-cache";
 import type {
   PointsQueryFilters,
   PointsQueryViewConfig,
@@ -24,6 +29,8 @@ const pageSize = ref(10);
 const pageSizeOptions = [10, 20, 30, 50] as const;
 const appStore = useAppStore();
 const authStore = useAuthStore();
+
+registerStaticImageUrls(pointsStaticImageUrls);
 
 const pageBackgroundStyle = computed(() => {
   const backgroundImage = appStore.isDarkMode
@@ -491,6 +498,10 @@ watch(filteredRecords, () => {
     Math.ceil(filteredRecords.value.length / pageSize.value),
   );
   if (currentPage.value > maxPage) currentPage.value = maxPage;
+});
+
+onMounted(() => {
+  void warmStaticImages(pointsStaticImageUrls);
 });
 </script>
 

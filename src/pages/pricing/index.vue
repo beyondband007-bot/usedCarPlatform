@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { computed, inject, ref } from "vue";
+import { computed, inject, onMounted, ref } from "vue";
 
 import PricingPlanCard from "@/components/business/pricing/PricingPlanCard.vue";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
@@ -11,15 +11,22 @@ import {
 } from "@/constants/prototype";
 import { mediaUrls } from "@/constants/media-urls";
 import { useAppStore } from "@/stores/app";
+import {
+  registerStaticImageUrls,
+  warmStaticImages,
+} from "@/utils/static-image-cache";
 
 const copy = pricingPageCopy;
 const appStore = useAppStore();
 const pricingHeroBgDark = mediaUrls.pricing.heroBgDark;
 const pricingHeroBgLight = mediaUrls.pricing.heroBgLight;
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
+const pricingStaticImageUrls = [pricingHeroBgDark, pricingHeroBgLight];
 
 const selectedPlanName = ref<string | null>(null);
 const pressingPlanName = ref<string | null>(null);
+
+registerStaticImageUrls(pricingStaticImageUrls);
 
 const pageStyle = computed(() => ({
   "--pricing-bg-image": `url(${appStore.isDarkMode ? pricingHeroBgDark : pricingHeroBgLight})`,
@@ -40,6 +47,10 @@ function handlePlanSelect(name: string) {
 function handlePlanConsult() {
   workbenchEntry?.openVisitorModal();
 }
+
+onMounted(() => {
+  void warmStaticImages(pricingStaticImageUrls);
+});
 </script>
 
 <template>

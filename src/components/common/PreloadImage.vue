@@ -2,6 +2,13 @@
 import { computed, ref, watch } from "vue";
 import type { CSSProperties } from "vue";
 
+import {
+  isRegisteredStaticImage,
+  isStaticImageReady,
+  markStaticImageReady,
+  warmStaticImage,
+} from "@/utils/static-image-cache";
+
 type ImageReferrerPolicy =
   | ""
   | "no-referrer"
@@ -67,14 +74,22 @@ const imageStyle = computed(
 watch(
   [normalizedSrc, normalizedFallbackSrc],
   ([src]) => {
-    isLoaded.value = false;
+    isLoaded.value = isStaticImageReady(src);
     hasError.value = !src;
     activeSrc.value = src;
+
+    if (src && isRegisteredStaticImage(src)) {
+      void warmStaticImage(src, {
+        crossorigin: props.crossorigin,
+        referrerpolicy: props.referrerpolicy,
+      });
+    }
   },
   { immediate: true },
 );
 
 function handleLoad(event: Event) {
+  markStaticImageReady(activeSrc.value);
   hasError.value = false;
   isLoaded.value = true;
   emit("load", event);

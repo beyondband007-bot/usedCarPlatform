@@ -30,6 +30,7 @@ import { DEFAULT_GENERATION_OUTPUT_RATIO } from "@/constants/output-ratio";
 import {
   defaultWorkspaceCapabilityCode,
   workspaceCapabilities,
+  workspaceStaticImageUrls,
 } from "@/constants/workspace";
 import {
   BATCH_TASK_POLL_MS,
@@ -53,6 +54,10 @@ import type {
 import { isInteriorBatchItemKind } from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
 import { useAppStore } from "@/stores/app";
+import {
+  registerStaticImageUrls,
+  warmStaticImages,
+} from "@/utils/static-image-cache";
 
 const route = useRoute();
 const router = useRouter();
@@ -64,6 +69,8 @@ const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
 const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
+
+registerStaticImageUrls(workspaceStaticImageUrls);
 
 function isShortVideoModuleCode(moduleCode?: string) {
   return moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
@@ -173,6 +180,10 @@ function resolveCapabilityCodeFromModule(moduleCode: string) {
 const workspaceOwnerKey = computed(
   () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
 );
+
+onMounted(() => {
+  void warmStaticImages(workspaceStaticImageUrls);
+});
 
 function scopedWorkspaceStorageKey(key: string) {
   return `${key}:${workspaceOwnerKey.value}`;

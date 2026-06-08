@@ -60,3 +60,7 @@ export const homePromoBannerSlides: HomePromoBannerSlide[] = [
 ]
 
 export const homePromoBannerIntervalMs = 5000
+
+export const homePromoBannerImageUrls = homePromoBannerSlides.map(
+  (slide) => slide.image,
+)

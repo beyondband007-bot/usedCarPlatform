@@ -32,3 +32,8 @@ export const enterpriseLoginFeatures: EnterpriseLoginFeature[] = [
 
 export const enterpriseLoginHeroImageDark = enterpriseLoginBgDark
 export const enterpriseLoginHeroImageLight = enterpriseLoginBgLight
+
+export const enterpriseLoginStaticImageUrls = [
+  enterpriseLoginHeroImageDark,
+  enterpriseLoginHeroImageLight,
+]

@@ -13,6 +13,11 @@ export const pointsQueryBackgroundLight = pointsQueryBgLight
 /** 积分查询页整页背景：夜间 */
 export const pointsQueryBackgroundDark = pointsQueryBgDark
 
+export const pointsStaticImageUrls = [
+  pointsQueryBackgroundLight,
+  pointsQueryBackgroundDark,
+]
+
 export const pointsQueryHeroCopy = {
   title: '积分查询',
   subtitle: '三档套餐覆盖试运行，团队批量上新与集团化交付场景',

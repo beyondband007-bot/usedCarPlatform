@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from "vue";
+import { inject, onMounted } from "vue";
 
 import HomeBottomCta from "@/components/business/home/HomeBottomCta.vue";
 import HomeCapabilities from "@/components/business/home/HomeCapabilities.vue";
@@ -7,15 +7,28 @@ import HomeCaseStudies from "@/components/business/home/HomeCaseStudies.vue";
 import HomeFooter from "@/components/business/home/HomeFooter.vue";
 import HomeHero from "@/components/business/home/HomeHero.vue";
 import HomeQuickAccess from "@/components/business/home/HomeQuickAccess.vue";
+import { homePromoBannerImageUrls } from "@/constants/home-promo-banners";
+import { homeStaticImageUrls } from "@/constants/home-page";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import { useAppStore } from "@/stores/app";
+import {
+  registerStaticImageUrls,
+  warmStaticImages,
+} from "@/utils/static-image-cache";
 
 const appStore = useAppStore();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
+const staticHomeImageUrls = [...homeStaticImageUrls, ...homePromoBannerImageUrls];
+
+registerStaticImageUrls(staticHomeImageUrls);
 
 function openWorkbench() {
   workbenchEntry?.openWorkbench();
 }
+
+onMounted(() => {
+  void warmStaticImages(staticHomeImageUrls);
+});
 </script>
 
 <template>

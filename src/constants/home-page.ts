@@ -231,3 +231,11 @@ export const homeFooterContactItems = [
   '商务合作：13718492350@163.com',
   '媒体联系：13718492350@163.com',
 ] as const
+
+export const homeStaticImageUrls = [
+  homeHeroImageDarkSrc,
+  homeHeroImageLightSrc,
+  ...homeQuickEntries.flatMap((entry) => [entry.imageDark, entry.imageLight]),
+  ...homeMainCapabilities.flatMap((item) => [item.image, item.fallbackImage]),
+  ...homeCaseTabs.map((tab) => tab.image),
+]

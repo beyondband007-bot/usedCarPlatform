@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import LoginPanel from "@/components/business/account/LoginPanel.vue";
@@ -7,14 +7,25 @@ import {
   enterpriseLoginFeatures,
   enterpriseLoginHeroImageDark,
   enterpriseLoginHeroImageLight,
+  enterpriseLoginStaticImageUrls,
 } from "@/constants/enterprise-login";
 import { useAppStore } from "@/stores/app";
+import {
+  registerStaticImageUrls,
+  warmStaticImages,
+} from "@/utils/static-image-cache";
 
 const appStore = useAppStore();
 const isDark = computed(() => appStore.isDarkMode);
 const enterpriseLoginHeroImage = computed(() =>
   isDark.value ? enterpriseLoginHeroImageDark : enterpriseLoginHeroImageLight,
 );
+
+registerStaticImageUrls(enterpriseLoginStaticImageUrls);
+
+onMounted(() => {
+  void warmStaticImages(enterpriseLoginStaticImageUrls);
+});
 </script>
 
 <template>

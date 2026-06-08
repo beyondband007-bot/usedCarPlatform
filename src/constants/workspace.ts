@@ -16,6 +16,15 @@ const {
   sky: skyMedia,
 } = mediaUrls.workspace
 
+const {
+  tutorialStepUpload: showroomTutorialStepUpload,
+  tutorialStepTemplate01: showroomTutorialStepTemplate01,
+  tutorialStepTemplate02: showroomTutorialStepTemplate02,
+  tutorialStepTemplate03: showroomTutorialStepTemplate03,
+  tutorialStepResult: showroomTutorialStepResult,
+  tutorialLogoSample: showroomTutorialLogoSample,
+} = showroomMedia
+
 const roadSceneBusinessPark = roadMedia.sceneBusinessPark
 const roadSceneCityDay = roadMedia.sceneCityDay
 const roadSceneCoastal = roadMedia.sceneCoastal
@@ -627,6 +636,36 @@ export const workspaceTemplateRecommendations: WorkspaceTemplateRecommendation[]
   ...roadTemplateRecommendations,
   ...skyTemplateRecommendations,
 ]
+
+const workspaceGuideImageUrls = [
+  showroomTutorialStepUpload,
+  showroomTutorialStepTemplate01,
+  showroomTutorialStepTemplate02,
+  showroomTutorialStepTemplate03,
+  showroomTutorialStepResult,
+  showroomTutorialLogoSample,
+]
+
+const workspaceTutorialImageUrls = tutorial.flatMap((item) =>
+  typeof item.image === 'string' && item.image ? [item.image] : [],
+)
+
+const workspaceCapabilityOptionImageUrls = workspaceCapabilities.flatMap((capability) =>
+  capability.options.flatMap((option) => (option.image ? [option.image] : [])),
+)
+
+const workspaceTemplateImageUrls = workspaceTemplateRecommendations.flatMap((item) =>
+  item.image ? [item.image] : [],
+)
+
+export const workspaceStaticImageUrls = Array.from(
+  new Set([
+    ...workspaceGuideImageUrls,
+    ...workspaceTutorialImageUrls,
+    ...workspaceCapabilityOptionImageUrls,
+    ...workspaceTemplateImageUrls,
+  ]),
+)
 
 function menuTagVariant(
   tag: string,
