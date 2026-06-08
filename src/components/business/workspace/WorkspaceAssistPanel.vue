@@ -3,7 +3,10 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
 
-import { getRecentGenerationTasks, type RecentGenerationTask } from "@/api/visual-workbench";
+import {
+  getRecentGenerationTasks,
+  type RecentGenerationTask,
+} from "@/api/visual-workbench";
 import SceneTemplateRecommendations, {
   type SceneTemplateRecommendationItem,
 } from "@/components/business/workspace/SceneTemplateRecommendations.vue";
@@ -22,9 +25,7 @@ import {
   resolveRecentGenerateCacheKey,
 } from "@/utils/recent-generate-cache";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
-import {
-  resolveBatchRecentSceneLabel,
-} from "@/utils/batch-display-title";
+import { resolveBatchRecentSceneLabel } from "@/utils/batch-display-title";
 import {
   getBatchItemKindLabel,
   isInteriorBatchItemKind,
@@ -126,8 +127,7 @@ const templateCards = computed<SceneTemplateRecommendationItem[]>(() =>
       id: item.optionId,
       title: item.title,
       image: item.image,
-      description:
-        templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景",
+      description: templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景",
     })),
 );
 
@@ -216,9 +216,9 @@ const recentItems = ref<WorkspaceRecentItem[]>([]);
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
 const recentLayoutRef = ref<HTMLElement | null>(null);
-const shortVideoInitialView = ref<"guide" | "preview" | "generating" | "recent">(
-  "guide",
-);
+const shortVideoInitialView = ref<
+  "guide" | "preview" | "generating" | "recent"
+>("guide");
 let recentRefreshTimer: number | null = null;
 
 const isBatchCapability = computed(() => props.capability.kind === "batch");
@@ -227,9 +227,7 @@ const isDeliveryCapability = computed(
   () => props.capability.kind === "delivery",
 );
 
-function isTerminalBatchJobStatus(
-  status: WorkspaceRecentItem["status"],
-) {
+function isTerminalBatchJobStatus(status: WorkspaceRecentItem["status"]) {
   return status === "success" || status === "fail" || status === "canceled";
 }
 
@@ -374,16 +372,19 @@ function closeDeliveryImagePreview() {
   emit("closeDeliveryImagePreview");
 }
 
-const deliveryReadyAssetCount = computed(() =>
-  props.deliveryTaskPreview?.assets.filter((asset) => asset.status === "ready")
-    .length ?? 0,
+const deliveryReadyAssetCount = computed(
+  () =>
+    props.deliveryTaskPreview?.assets.filter(
+      (asset) => asset.status === "ready",
+    ).length ?? 0,
 );
 
 async function handleDownloadDeliveryGroup() {
   const task = props.deliveryTaskPreview;
   const readyAssets =
-    task?.assets.filter((asset) => asset.status === "ready" && asset.imageUrl) ??
-    [];
+    task?.assets.filter(
+      (asset) => asset.status === "ready" && asset.imageUrl,
+    ) ?? [];
 
   if (!readyAssets.length) {
     message.warning("当前任务组没有可下载成片");
@@ -582,7 +583,9 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     previewImage: coverUrl,
     ratioLabel: isShortVideo
       ? "16:9 · 720p · 10秒"
-      : (item.ratioLabel ?? formatOutputRatioLabel(item.outputRatio) ?? undefined),
+      : (item.ratioLabel ??
+        formatOutputRatioLabel(item.outputRatio) ??
+        undefined),
     sceneLabel: isShortVideo
       ? "营销短视频"
       : item.moduleCode === "batch-new"
@@ -598,7 +601,10 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     deadlineAt: item.deadlineAt ?? undefined,
     softTimeoutAt: item.softTimeoutAt ?? undefined,
     winningModel: item.winningModel ?? undefined,
-    errorCode: typeof item.error === "string" ? undefined : (item.error?.code ?? undefined),
+    errorCode:
+      typeof item.error === "string"
+        ? undefined
+        : (item.error?.code ?? undefined),
     error: isShortVideo
       ? undefined
       : typeof item.error === "string"
@@ -859,14 +865,18 @@ watch(
     if (isDeliveryCapability.value) {
       recentItems.value = [];
       recentLoaded.value = false;
-      activeTab.value = isBatchProcessingView.value ? "batchProcessing" : "guide";
+      activeTab.value = isBatchProcessingView.value
+        ? "batchProcessing"
+        : "guide";
       return;
     }
 
     const cacheKey = resolveRecentCacheKey();
     if (cacheKey && applyCachedRecentList(cacheKey)) {
       recentLoaded.value = true;
-      if (recentGenerateStore.isCacheStale(cacheKey, RECENT_GENERATE_STALE_MS)) {
+      if (
+        recentGenerateStore.isCacheStale(cacheKey, RECENT_GENERATE_STALE_MS)
+      ) {
         void loadRecentItems({ silent: true, force: true });
       }
     } else {
@@ -960,10 +970,7 @@ defineExpose({
     class="assist-panel h-full min-h-0"
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
   >
-    <div
-      v-show="showGenerationResultOverlay"
-      class="assist-detail-layer"
-    >
+    <div v-show="showGenerationResultOverlay" class="assist-detail-layer">
       <WorkspaceGenerateResultPanel
         v-if="generationResult && capability.code !== 'short-video'"
         :result="generationResult"
@@ -971,10 +978,7 @@ defineExpose({
       />
     </div>
 
-    <div
-      v-show="showDeliveryImageOverlay"
-      class="assist-detail-layer"
-    >
+    <div v-show="showDeliveryImageOverlay" class="assist-detail-layer">
       <WorkspaceImagePreviewPanel
         v-if="isDeliveryCapability && deliveryImagePreview"
         :preview="deliveryImagePreview"
@@ -983,7 +987,9 @@ defineExpose({
     </div>
 
     <section
-      v-if="isDeliveryCapability && deliveryTaskPreview && !deliveryImagePreview"
+      v-if="
+        isDeliveryCapability && deliveryTaskPreview && !deliveryImagePreview
+      "
       class="delivery-group-preview"
       aria-label="成片图组预览"
     >
@@ -999,7 +1005,9 @@ defineExpose({
           </h2>
           <span>
             {{ deliveryTaskPreview.meta }} ·
-            {{ deliveryTaskPreview.completedCount }}/{{ deliveryTaskPreview.totalCount }}
+            {{ deliveryTaskPreview.completedCount }}/{{
+              deliveryTaskPreview.totalCount
+            }}
             张成片
           </span>
         </div>
@@ -1007,7 +1015,9 @@ defineExpose({
           <button
             type="button"
             class="delivery-group-download-all"
-            :disabled="isDownloadingDeliveryGroup || deliveryReadyAssetCount === 0"
+            :disabled="
+              isDownloadingDeliveryGroup || deliveryReadyAssetCount === 0
+            "
             @click="handleDownloadDeliveryGroup"
           >
             <Icon icon="mdi:download-multiple" />
@@ -1029,7 +1039,8 @@ defineExpose({
           :key="asset.id"
           class="delivery-group-card"
           :class="{
-            'is-clickable': asset.status === 'ready' || Boolean(asset.generationTaskId),
+            'is-clickable':
+              asset.status === 'ready' || Boolean(asset.generationTaskId),
           }"
           :role="
             asset.status === 'ready' || asset.generationTaskId
@@ -1390,10 +1401,7 @@ defineExpose({
       class="delivery-panel delivery-panel--placeholder"
       aria-label="成片交付预览"
     >
-      <div
-        v-if="props.deliveryListLoading"
-        class="recent-empty-state"
-      >
+      <div v-if="props.deliveryListLoading" class="recent-empty-state">
         <Icon icon="mdi:loading" class="recent-loading-icon" />
         <span>正在加载交付列表</span>
       </div>
@@ -1573,23 +1581,45 @@ defineExpose({
               :active-id="selectedOptionId"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
               @select="handleTemplatePick"
-            />
-
-            <section class="requirement-section" aria-label="素材要求">
-              <strong class="requirement-title">素材要求</strong>
-              <div class="requirement-grid">
-                <article
-                  v-for="item in requirementCards"
-                  :key="item.title"
-                  class="requirement-card"
+            >
+              <template #footer>
+                <section
+                  class="requirement-section is-inline"
+                  aria-label="素材要求"
                 >
-                  <div class="requirement-card-copy">
-                    <strong>{{ item.title }}</strong>
-                    <span>{{ item.desc }}</span>
+                  <strong class="requirement-title">素材要求</strong>
+                  <div class="requirement-grid">
+                    <article
+                      v-for="item in requirementCards"
+                      :key="item.title"
+                      class="requirement-card"
+                    >
+                      <div class="requirement-card-copy">
+                        <strong>{{ item.title }}</strong>
+                        <span>{{ item.desc }}</span>
+                      </div>
+                    </article>
                   </div>
-                </article>
-              </div>
-            </section>
+                </section>
+              </template>
+            </SceneTemplateRecommendations>
+            <template v-else>
+              <section class="requirement-section" aria-label="素材要求">
+                <strong class="requirement-title">素材要求</strong>
+                <div class="requirement-grid">
+                  <article
+                    v-for="item in requirementCards"
+                    :key="item.title"
+                    class="requirement-card"
+                  >
+                    <div class="requirement-card-copy">
+                      <strong>{{ item.title }}</strong>
+                      <span>{{ item.desc }}</span>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </template>
           </section>
 
           <section
@@ -1852,7 +1882,11 @@ defineExpose({
 
 .delivery-group-back:hover,
 .delivery-group-download-all:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+  background: color-mix(
+    in srgb,
+    var(--assist-blue) 10%,
+    var(--assist-card-strong)
+  );
 }
 
 .delivery-group-grid {
@@ -1901,7 +1935,11 @@ defineExpose({
 }
 
 .delivery-group-card.is-clickable:hover {
-  border-color: color-mix(in srgb, var(--assist-blue) 42%, var(--assist-border));
+  border-color: color-mix(
+    in srgb,
+    var(--assist-blue) 42%,
+    var(--assist-border)
+  );
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--assist-blue) 12%, transparent),
     var(--assist-shadow);
@@ -1922,7 +1960,8 @@ defineExpose({
 }
 
 .delivery-group-media.is-pending {
-  border-bottom: 1px dashed color-mix(in srgb, var(--assist-border) 88%, transparent);
+  border-bottom: 1px dashed
+    color-mix(in srgb, var(--assist-border) 88%, transparent);
 }
 
 .delivery-slot-status {
@@ -2040,7 +2079,11 @@ defineExpose({
   height: 34px;
   place-items: center;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--assist-blue) 10%, var(--assist-card-strong));
+  background: color-mix(
+    in srgb,
+    var(--assist-blue) 10%,
+    var(--assist-card-strong)
+  );
   color: var(--assist-blue);
   font-size: 18px;
   text-decoration: none;
@@ -2050,7 +2093,11 @@ defineExpose({
 }
 
 .delivery-group-download:hover {
-  background: color-mix(in srgb, var(--assist-blue) 16%, var(--assist-card-strong));
+  background: color-mix(
+    in srgb,
+    var(--assist-blue) 16%,
+    var(--assist-card-strong)
+  );
   transform: translateY(-1px);
 }
 
@@ -2867,6 +2914,15 @@ defineExpose({
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
+.requirement-section.is-inline {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .requirement-title {
   color: #fff;
   font-size: 16px;
@@ -2900,6 +2956,11 @@ defineExpose({
 .assist-panel.theme-light .requirement-card {
   border-color: rgba(203, 213, 225, 0.82);
   background: #f8fafc;
+  box-shadow: none;
+}
+
+.assist-panel.theme-light .requirement-section.is-inline {
+  background: transparent;
   box-shadow: none;
 }
 

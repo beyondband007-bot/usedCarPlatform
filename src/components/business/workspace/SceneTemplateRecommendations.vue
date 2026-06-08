@@ -72,6 +72,9 @@ const emit = defineEmits<{
         </div>
       </article>
     </div>
+    <div v-if="$slots.footer" class="scene-template-footer">
+      <slot name="footer" />
+    </div>
   </section>
 </template>
 
@@ -118,6 +121,16 @@ const emit = defineEmits<{
   gap: 10px;
   align-items: start;
   margin-top: 12px;
+}
+
+.scene-template-footer {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scene-template-section.theme-light .scene-template-footer {
+  border-top-color: #e5e7eb;
 }
 
 .scene-template-card {
