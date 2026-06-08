@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client'
 import type { DefaultEventsMap } from 'socket.io-client/build/typed-events'
 
 // Socket.IO 连接配置
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3001'
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3101'
 
 // 事件类型定义
 export interface ServerToClientEvents {
