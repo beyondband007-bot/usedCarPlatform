@@ -361,16 +361,17 @@ function handleRegenerateTurn(turn: CreativeThreadTurn) {
 
   lastSubmittedPrompt.value = text
   prompt.value = ''
-  const chain = findChainSource(turn.id)
   pushPendingTurn(text)
   emit('generate', {
     prompt: text,
     outputRatio: activeRatio.value.value,
     resolution: '2K',
-    referenceAssetId: chain ? undefined : props.referenceAsset?.assetId,
-    useLastReference: chain ? false : Boolean(props.referenceAsset?.assetId),
-    sourceTaskId: chain?.taskId ?? undefined,
-    sourceImageUrl: chain?.resultUrl ?? undefined,
+    referenceAssetId:
+      turn.taskId && turn.resultUrl ? undefined : props.referenceAsset?.assetId,
+    useLastReference:
+      turn.taskId && turn.resultUrl ? false : Boolean(props.referenceAsset?.assetId),
+    sourceTaskId: turn.taskId ?? undefined,
+    sourceImageUrl: turn.resultUrl ?? undefined,
   })
 }
 
