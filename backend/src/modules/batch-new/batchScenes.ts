@@ -3,12 +3,14 @@ import { roadMotionScenes } from "../road-motion/roadMotionScenes";
 import { showroomLightScenes } from "../showroom-light/showroomLightScenes";
 import { skyStudioScenes } from "../sky-studio/skyStudioScenes";
 import { sceneReferenceMediaUrls } from "../../shared/mediaUrls";
+import type { LogoPlacement } from "../../shared/types";
 
 export interface BatchScene {
   optionId: string;
   title: string;
   referenceImageUrl?: string;
   referenceImagePath?: string;
+  supportedLogoPlacements?: LogoPlacement[];
 }
 
 /** 与前端 `workspace.ts` 道路动态场景 optionId 一致 */
@@ -29,14 +31,15 @@ const roadMotionBatchScenes: BatchScene[] = roadMotionScenes.map((scene) => ({
   optionId: scene.optionId,
   title: scene.title,
   referenceImageUrl: roadSceneReferenceByOptionId[scene.optionId],
+  supportedLogoPlacements: ["plate"],
 }));
 
 /** 与场景更换各模块及前端批量场景目录保持一致 */
 export const batchScenes: BatchScene[] = [
   ...showroomLightScenes.map((scene) => ({ ...scene })),
-  ...outdoorSceneScenes.map((scene) => ({ ...scene })),
+  ...outdoorSceneScenes.map((scene) => ({ ...scene, supportedLogoPlacements: ["plate"] as LogoPlacement[] })),
   ...roadMotionBatchScenes,
-  ...skyStudioScenes.map((scene) => ({ ...scene })),
+  ...skyStudioScenes.map((scene) => ({ ...scene, supportedLogoPlacements: ["plate"] as LogoPlacement[] })),
 ];
 
 const findBatchSceneByOptionId = (optionId: string) =>
@@ -54,6 +57,7 @@ const findRoadMotionBatchScene = (optionId: string): BatchScene | undefined => {
     optionId: roadScene.optionId,
     title: roadScene.title,
     referenceImageUrl: roadSceneReferenceByOptionId[roadScene.optionId],
+    supportedLogoPlacements: ["plate"],
   };
 };
 

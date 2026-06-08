@@ -13,3 +13,10 @@ showroomLightRoutes.post(
     ok(res, result);
   }),
 );
+
+showroomLightRoutes.get(
+  "/scenes",
+  asyncHandler(async (_req, res) => {
+    ok(res, showroomLightService.listScenes());
+  }),
+);

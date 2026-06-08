@@ -3,6 +3,11 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import {
+  logoPlacementMode,
+  resolveLogoPlacements,
+  unsupportedLogoPlacements,
+} from "../../shared/logoPlacements";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
 import type { CreateModuleTaskRequest } from "../../shared/types";
 import {
@@ -17,10 +22,22 @@ import type { BillingRequestContext } from "../billing/billingIdentity";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { userLogoService } from "../user-logo/userLogoService";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
-import { showroomLightPrompt, showroomLightWithLogoPrompt } from "./showroomLightPrompts";
-import { getShowroomLightScene } from "./showroomLightScenes";
+import { buildShowroomLightPrompt } from "./showroomLightPrompts";
+import { getShowroomLightScene, showroomLightScenes } from "./showroomLightScenes";
 
 class ShowroomLightService {
+  listScenes() {
+    return {
+      items: showroomLightScenes.map((scene) => ({
+        optionId: scene.optionId,
+        title: scene.title,
+        referenceImageUrl: scene.referenceImageUrl ?? null,
+        supportedLogoPlacements: scene.supportedLogoPlacements,
+        disabledLogoPlacementReasons: scene.disabledLogoPlacementReasons ?? {},
+      })),
+    };
+  }
+
   async createTask(body: CreateModuleTaskRequest, context?: BillingRequestContext) {
     if (!body.inputAssetId) {
       throw errors.invalidParameter("inputAssetId is required");
@@ -39,7 +56,25 @@ class ShowroomLightService {
       });
     }
 
-    const shouldUseLogo = body.extra?.useLogo === true || (body as CreateModuleTaskRequest & { useLogo?: boolean }).useLogo === true;
+    const shouldUseLogo = body.extra?.useLogo === true || body.useLogo === true;
+    const scene = getShowroomLightScene(body.optionId);
+    const logoPlacements = resolveLogoPlacements({
+      enabled: shouldUseLogo,
+      logoPlacements: body.logoPlacements,
+      extraLogoPlacements: body.extra?.logoPlacements,
+      legacyDefault: ["plate"],
+    });
+    const unsupportedPlacements = unsupportedLogoPlacements(
+      logoPlacements,
+      scene.supportedLogoPlacements,
+    );
+    if (unsupportedPlacements.length) {
+      throw errors.invalidParameter("selected showroom scene does not support requested logo placement", {
+        optionId: scene.optionId,
+        unsupportedPlacements,
+        supportedLogoPlacements: scene.supportedLogoPlacements,
+      });
+    }
     let logoAsset: Awaited<ReturnType<typeof assetsRepository.findById>> = null;
     if (body.logoAssetId) {
       logoAsset = await assetsRepository.findById(body.logoAssetId, subscription.userKey);
@@ -59,11 +94,11 @@ class ShowroomLightService {
     const outputRatio = resolveOutputRatio(body.outputRatio);
     const resolution = "2K";
     const prompt = appendOutputRatioPrompt(
-      logoAsset ? showroomLightWithLogoPrompt : showroomLightPrompt,
+      buildShowroomLightPrompt(logoAsset ? logoPlacements : []),
       outputRatio,
     );
-    const scene = getShowroomLightScene(body.optionId);
     const taskId = createId("task");
+    const logoMode = logoPlacementMode(logoAsset ? logoPlacements : []);
 
     await tasksRepository.createWaitingTask({
       id: taskId,
@@ -153,6 +188,8 @@ class ShowroomLightService {
             referenceImageUrl: sceneReferenceImageUrl,
           },
           logoAssetId: logoAsset?.id ?? null,
+          logoPlacements: logoAsset ? logoPlacements : [],
+          logoPlacementMode: logoMode,
         },
         responseJson: kieTask.raw,
       });
@@ -167,6 +204,8 @@ class ShowroomLightService {
         sceneTitle: scene.title,
         sceneReferenceImageUrl,
         logoAssetId: logoAsset?.id ?? null,
+        logoPlacements: logoAsset ? logoPlacements : [],
+        logoPlacementMode: logoMode,
         inputImageCount: inputUrls.length,
         ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,

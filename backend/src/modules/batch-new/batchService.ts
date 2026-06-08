@@ -6,6 +6,11 @@ import { tasksService } from "../tasks/tasksService";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import type { KieAccountLease } from "../../providers/kie/kieTypes";
+import {
+  logoPlacementMode,
+  resolveLogoPlacements,
+  unsupportedLogoPlacements,
+} from "../../shared/logoPlacements";
 import { resolveOutputRatio } from "../../shared/outputRatio";
 import type { OutputRatio } from "../../shared/types";
 import {
@@ -95,6 +100,37 @@ const requireBatchLogoAsset = async (config: BatchVisualConfig, userId: string) 
     });
   }
   return asset;
+};
+
+const resolveBatchLogoPlacements = (config: BatchVisualConfig) =>
+  resolveLogoPlacements({
+    enabled: config.useRecentLogo === true,
+    logoPlacements: config.logoPlacements,
+    legacyDefault: ["plate"],
+  });
+
+const validateBatchLogoPlacements = (config: BatchVisualConfig) => {
+  const placements = resolveBatchLogoPlacements(config);
+  if (!placements.length) return placements;
+  if (placements.includes("wall") && !booleanFlag(config, "enableSceneChange")) {
+    throw errors.invalidParameter("wall logo placement requires scene change", {
+      logoPlacements: placements,
+    });
+  }
+  if (booleanFlag(config, "enableSceneChange")) {
+    const scene = resolveBatchScene(config.sceneOptionId, config.sceneReferenceImageUrl);
+    const supportedLogoPlacements = scene.supportedLogoPlacements ?? ["plate", "wall"];
+    const unsupportedPlacements = unsupportedLogoPlacements(placements, supportedLogoPlacements);
+    if (unsupportedPlacements.length) {
+      throw errors.invalidParameter("selected batch scene does not support requested logo placement", {
+        optionId: scene.optionId,
+        sceneOptionId: config.sceneOptionId,
+        unsupportedPlacements,
+        supportedLogoPlacements,
+      });
+    }
+  }
+  return placements;
 };
 
 const deliveryTitleByKind: Record<BatchItemKind, string> = {
@@ -215,6 +251,10 @@ class BatchService {
     const interiorCollage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
     let total = 0;
 
+    const logoPlacements = validateBatchLogoPlacements(config);
+    if (config.useRecentLogo === true && !config.logoPlacements?.length) {
+      config.logoPlacements = logoPlacements;
+    }
     await requireBatchLogoAsset(config, subscription.userKey);
 
     for (const group of body.carGroups) {
@@ -615,6 +655,8 @@ class BatchService {
           inputAssetIds: sourceAssetIds,
           inputUrls,
           visualConfig: config,
+          logoPlacements: resolveBatchLogoPlacements(config),
+          logoPlacementMode: logoPlacementMode(resolveBatchLogoPlacements(config)),
           aspectRatio: task.outputRatio,
           resolution: task.resolution,
         },
