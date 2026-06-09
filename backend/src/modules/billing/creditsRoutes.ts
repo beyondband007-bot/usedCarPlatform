@@ -9,7 +9,8 @@ import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import { getCreditsAdminOverview } from "./creditsAdminService";
 import { loadFallbackCreditsAccount, pickCreditsAccount } from "./creditsAccountLookupService";
 import { resolveBillingIdentity } from "./billingIdentity";
-import { creditsClient, type CreditAccountResponse } from "./creditsClient";
+import { creditsClient } from "./creditsClient";
+import { queryCreditsTransactions } from "./creditsTransactionQueryService";
 import { resolveChildCreditsIdentity } from "../enterprise/enterpriseMembersService";
 
 type ProxyIdentityBody = {
@@ -40,6 +41,14 @@ const parseLimit = (value: unknown) => {
   if (limit === null) return undefined;
   if (limit > 100) throw errors.invalidParameter("limit must be between 1 and 100");
   return limit;
+};
+
+const parsePage = (value: unknown) => parsePositiveInteger(value, "page") ?? 1;
+
+const parsePageSize = (value: unknown, fallback?: number) => {
+  const pageSize = parsePositiveInteger(value, "pageSize") ?? fallback ?? 10;
+  if (pageSize > 100) throw errors.invalidParameter("pageSize must be between 1 and 100");
+  return pageSize;
 };
 
 const parsePayChannel = (value: unknown) => {
@@ -123,6 +132,8 @@ creditsRoutes.get(
     const identity = await resolveTransactionIdentity(query, req.headers);
     const accountId = parsePositiveInteger(query.accountId, "accountId");
     const limit = parseLimit(query.limit);
+    const page = parsePage(query.page);
+    const pageSize = parsePageSize(query.pageSize, limit);
     const requestedScope = parseAccountScope(query.accountScope) ?? identity.accountScope;
     const requestedTenantId =
       parsePositiveInteger(query.tenantId ?? query.creditsTenantId, "tenantId") ?? identity.tenantId;
@@ -152,10 +163,15 @@ creditsRoutes.get(
       });
     }
 
-    const transactions = await creditsClient.listAccountTransactions({
-      accountId: account.id,
-      userId: identity.userId,
-      limit,
+    const transactions = await queryCreditsTransactions({
+      account,
+      page,
+      pageSize,
+      txnType: typeof query.txnType === "string" ? query.txnType : null,
+      status: typeof query.status === "string" ? query.status : null,
+      bizSource: typeof query.bizSource === "string" ? query.bizSource : null,
+      from: typeof query.from === "string" ? query.from : null,
+      to: typeof query.to === "string" ? query.to : null,
     });
 
     ok(res, {

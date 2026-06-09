@@ -2001,7 +2001,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .points-change.is-positive {
-  color: #0f172a;
+  color: #16a34a;
 }
 
 .points-flow-card--design .points-change.is-negative {

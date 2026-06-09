@@ -1661,8 +1661,11 @@ export type CreditsTransactionsQuery = {
   accountScope?: 'personal' | 'tenant'
   tenantId?: number | string
   targetCreditsUserId?: number
-  limit?: number
+  page?: number
+  pageSize?: number
   txnType?: CreditsTransactionType
+  status?: 'effective' | 'pending'
+  bizSource?: 'single' | 'batch' | 'package' | 'purchase' | 'fail'
   from?: string
   to?: string
 }
@@ -1671,6 +1674,13 @@ export type CreditsTransactionsResult = {
   account: CreditsAccount | null
   items: CreditsTransaction[]
   total: number
+  page: number
+  pageSize: number
+  summary?: {
+    totalGained: number
+    totalConsumed: number
+    recentNet: number
+  }
 }
 
 export async function getCreditsTransactions(
@@ -1683,6 +1693,13 @@ export async function getCreditsTransactions(
           items?: CreditsTransaction[]
           transactions?: CreditsTransaction[]
           total?: number
+          page?: number
+          pageSize?: number
+          summary?: {
+            totalGained?: number
+            totalConsumed?: number
+            recentNet?: number
+          }
         }
       | CreditsTransaction[]
     >
@@ -1692,7 +1709,13 @@ export async function getCreditsTransactions(
       accountScope: params?.accountScope,
       tenantId: params?.tenantId,
       targetCreditsUserId: params?.targetCreditsUserId,
-      limit: params?.limit,
+      page: params?.page,
+      pageSize: params?.pageSize,
+      txnType: params?.txnType,
+      status: params?.status,
+      bizSource: params?.bizSource,
+      from: params?.from,
+      to: params?.to,
     },
   })
   const payload = unwrapApiResponse(response)
@@ -1700,7 +1723,7 @@ export async function getCreditsTransactions(
     const items = payload.map((item) =>
       normalizeCreditsTransaction(item as CreditsTransaction & Record<string, unknown>),
     )
-    return { account: null, items, total: items.length }
+    return { account: null, items, total: items.length, page: 1, pageSize: items.length }
   }
 
   const items = extractCreditsList<CreditsTransaction & Record<string, unknown>>(
@@ -1716,6 +1739,15 @@ export async function getCreditsTransactions(
     account,
     items,
     total: payload.total ?? items.length,
+    page: Number(payload.page ?? params?.page ?? 1),
+    pageSize: Number(payload.pageSize ?? params?.pageSize ?? items.length),
+    summary: payload.summary
+      ? {
+          totalGained: parseCreditsNumber(payload.summary.totalGained),
+          totalConsumed: parseCreditsNumber(payload.summary.totalConsumed),
+          recentNet: parseCreditsNumber(payload.summary.recentNet),
+        }
+      : undefined,
   }
 }
 

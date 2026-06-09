@@ -17,7 +17,7 @@ interface CreditsAccountRow extends RowDataPacket {
 
 let creditsPool: Pool | null = null;
 
-function getCreditsPool() {
+export function getCreditsPool() {
   if (!creditsPool) {
     creditsPool = mysql.createPool({
       host: env.credits.mysql.host,

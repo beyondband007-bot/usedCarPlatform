@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
@@ -24,12 +24,14 @@ import {
 } from '@/utils/points-query-access'
 import {
   buildPersonalSummaryCards,
+  buildPersonalSummaryCardsFromAggregate,
   buildTeamSummaryCards,
   mapCreditsTransactionToFlowRecord,
   mapEnterpriseCreditsTransactionToFlowRecord,
 } from '@/utils/points-query-mapper'
 import type {
   PointsFlowRecord,
+  PointsQueryFilters,
   PointsQueryVersion,
   PointsSubAccountOption,
   PointsSummaryCard,
@@ -109,7 +111,43 @@ function mapTeamMembers(
   return options
 }
 
-export function usePointsQuery() {
+type UsePointsQueryOptions = {
+  filters?: Ref<PointsQueryFilters>
+  currentPage?: Ref<number>
+  pageSize?: Ref<number>
+}
+
+function resolveDateRange(filters?: PointsQueryFilters) {
+  if (!filters) return { from: undefined, to: undefined }
+
+  if (filters.dateRange === 'custom') {
+    return {
+      from: filters.startDate || undefined,
+      to: filters.endDate || undefined,
+    }
+  }
+
+  if (filters.dateRange) {
+    const days = Number(filters.dateRange)
+    if (Number.isFinite(days) && days > 0) {
+      const now = new Date()
+      const fromDate = new Date()
+      fromDate.setDate(now.getDate() - days + 1)
+      const format = (value: Date) => {
+        const pad = (part: number) => String(part).padStart(2, '0')
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`
+      }
+      return {
+        from: format(fromDate),
+        to: format(now),
+      }
+    }
+  }
+
+  return { from: undefined, to: undefined }
+}
+
+export function usePointsQuery(options: UsePointsQueryOptions = {}) {
   const route = useRoute()
   const authStore = useAuthStore()
   const subscriptionStore = useSubscriptionStore()
@@ -117,6 +155,7 @@ export function usePointsQuery() {
 
   const version = ref<PointsQueryVersion>(resolveVersion(route.query.view))
   const records = ref<PointsFlowRecord[]>([])
+  const totalRecords = ref(0)
   const summaryCards = ref<PointsSummaryCard[]>([])
   const activeAccount = ref<CreditsAccount | null>(null)
   const isLoading = ref(false)
@@ -205,14 +244,22 @@ export function usePointsQuery() {
     try {
       const identity = getCreditsIdentity()
       const targetCreditsUserId = activeTargetCreditsUserId.value ?? undefined
+      const activeFilters = options.filters?.value
+      const { from, to } = resolveDateRange(activeFilters)
 
       const [accounts, transactionResult] = await Promise.all([
         targetCreditsUserId ? Promise.resolve([] as CreditsAccount[]) : getCreditsAccounts(),
         getCreditsTransactions({
-          limit: 100,
+          page: options.currentPage?.value ?? 1,
+          pageSize: options.pageSize?.value ?? 10,
           accountScope: identity.accountScope,
           tenantId: identity.tenantId ?? undefined,
           targetCreditsUserId,
+          txnType: activeFilters?.txnType || undefined,
+          status: activeFilters?.status || undefined,
+          bizSource: activeFilters?.bizSource || undefined,
+          from,
+          to,
         }),
       ])
 
@@ -226,18 +273,22 @@ export function usePointsQuery() {
         ?? accounts[0]
         ?? null
 
-      const flowRecords = transactionResult.items.map(mapCreditsTransactionToFlowRecord)
-      records.value = flowRecords.sort(
-        (a, b) =>
-          new Date(b.createdAt.replace(/-/g, '/')).getTime()
-          - new Date(a.createdAt.replace(/-/g, '/')).getTime(),
-      )
+      records.value = transactionResult.items.map(mapCreditsTransactionToFlowRecord)
+      totalRecords.value = transactionResult.total
 
-      summaryCards.value = buildPersonalSummaryCards({
-        availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
-        records: records.value,
-        availableBalanceLabel: isFlagshipChildAccount.value ? '团队可用积分' : undefined,
-      })
+      summaryCards.value = transactionResult.summary
+        ? buildPersonalSummaryCardsFromAggregate({
+            availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
+            totalGained: transactionResult.summary.totalGained,
+            totalConsumed: transactionResult.summary.totalConsumed,
+            recentNet: transactionResult.summary.recentNet,
+            availableBalanceLabel: isFlagshipChildAccount.value ? '团队可用积分' : undefined,
+          })
+        : buildPersonalSummaryCards({
+            availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
+            records: records.value,
+            availableBalanceLabel: isFlagshipChildAccount.value ? '团队可用积分' : undefined,
+          })
 
       if (!targetCreditsUserId) {
         creditsStore.$patch({
@@ -254,6 +305,7 @@ export function usePointsQuery() {
       loadError.value =
         error instanceof Error ? error.message : '积分流水加载失败'
       records.value = []
+      totalRecords.value = 0
       summaryCards.value = buildPersonalSummaryCards({
         availableBalance: 0,
         records: [],
@@ -296,6 +348,7 @@ export function usePointsQuery() {
             new Date(b.createdAt.replace(/-/g, '/')).getTime()
             - new Date(a.createdAt.replace(/-/g, '/')).getTime(),
         )
+      totalRecords.value = records.value.length
 
       summaryCards.value = buildTeamSummaryCards({
         availableBalance: Number(activeAccount.value?.availableBalance ?? 0),
@@ -307,6 +360,7 @@ export function usePointsQuery() {
       loadError.value =
         error instanceof Error ? error.message : '团队积分流水加载失败'
       records.value = []
+      totalRecords.value = 0
       summaryCards.value = buildTeamSummaryCards({
         availableBalance: 0,
         records: [],
@@ -319,6 +373,7 @@ export function usePointsQuery() {
 
   function loadMockData() {
     records.value = version.value === 'member' ? memberRecords : adminRecords
+    totalRecords.value = records.value.length
     dataSource.value = 'mock'
     loadError.value = null
     isLoading.value = false
@@ -400,6 +455,24 @@ export function usePointsQuery() {
     },
   )
 
+  watch(
+    () => [
+      options.filters?.value.txnType ?? '',
+      options.filters?.value.status ?? '',
+      options.filters?.value.bizSource ?? '',
+      options.filters?.value.dateRange ?? '',
+      options.filters?.value.startDate ?? '',
+      options.filters?.value.endDate ?? '',
+      options.currentPage?.value ?? 1,
+      options.pageSize?.value ?? 10,
+    ],
+    () => {
+      if (usesLiveApi.value) {
+        void refresh()
+      }
+    },
+  )
+
   onMounted(async () => {
     await ensureEnterpriseIdentityReady()
 
@@ -412,6 +485,7 @@ export function usePointsQuery() {
   return {
     version,
     records,
+    totalRecords,
     summaryCards,
     activeAccount,
     isLoading,
