@@ -30,6 +30,7 @@ import {
   getCommissionPolicy,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
+  getPlatformCustomerLedger,
   getPlatformAdminPolicyOverrides,
   getPlatformAgentPolicyOverrides,
   getPlatformAgents,
@@ -611,6 +612,10 @@ function canPromoteCustomer(row: CreditsCustomerProfile) {
   return activeRole.value === 'admin' && effectiveAccountCreationPolicy.value.adminCanPromoteUserToAgent
 }
 
+function canViewCustomerLedger() {
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
 function canDisableAgent(row: PlatformAgentProfile) {
   if (row.status !== 'active' || authStore.userInfo?.id === row.userId) return false
   if (!authStore.permissions.includes('account:delete:agent')) return false
@@ -1173,6 +1178,21 @@ async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
   }
 }
 
+async function openCustomerProfileLedger(row: CreditsCustomerProfile) {
+  selectedAgentCustomer.value = null
+  agentCustomerLedger.value = null
+  isAgentCustomerLedgerOpen.value = true
+  isLoadingAgentCustomerLedger.value = true
+  try {
+    agentCustomerLedger.value = await getPlatformCustomerLedger(row.id)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载积分流水失败')
+    isAgentCustomerLedgerOpen.value = false
+  } finally {
+    isLoadingAgentCustomerLedger.value = false
+  }
+}
+
 function functionDraftKey(row: CreditsAdminOverview['applicationFunctions'][number]) {
   return `${row.applicationCode ?? 'unknown'}:${row.code}`
 }
@@ -1499,14 +1519,31 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   {
     title: '能力操作',
     key: 'actions',
-    width: 210,
+    width: 300,
     render(row) {
+      const canViewLedger = canViewCustomerLedger()
       const canAdjust = canAdjustCustomer(row)
       const canDelete = canDeleteCustomer(row)
       const canPromote = canPromoteCustomer(row)
-      if (!canAdjust && !canDelete && !canPromote) return '-'
+      if (!canViewLedger && !canAdjust && !canDelete && !canPromote) return '-'
 
       const actions = []
+      if (canViewLedger) {
+        actions.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => void openCustomerProfileLedger(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+              default: () => '查看详情',
+            },
+          ),
+        )
+      }
       if (matrixTargetRole(row.role) === 'user') {
         actions.push(
           h(
