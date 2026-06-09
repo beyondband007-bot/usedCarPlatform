@@ -7,6 +7,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
+import { getCommissionPolicy } from "./commissionPolicyService";
 
 type AgentUserRow = RowDataPacket & {
   id: string;
@@ -657,7 +658,22 @@ async function listAgentLeads(agentUserId: string) {
   }));
 }
 
+async function getEffectiveAgentCommissionRate(agentUserId: string) {
+  const [rows] = await pool.query<Array<RowDataPacket & { commission_rate: string | number | null }>>(
+    `SELECT commission_rate
+     FROM back_office_agent_policy_overrides
+     WHERE agent_user_id = :agentUserId
+     LIMIT 1`,
+    { agentUserId },
+  );
+  const overrideRate = rows[0]?.commission_rate;
+  return overrideRate === null || overrideRate === undefined
+    ? getCommissionPolicy().commissionRate
+    : toNumber(overrideRate);
+}
+
 async function listAgentCommissionPreviews(agentUserId: string) {
+  const commissionRate = await getEffectiveAgentCommissionRate(agentUserId);
   const [rows] = await pool.query<AgentCommissionRow[]>(
     `SELECT
        acp.id,
@@ -680,20 +696,23 @@ async function listAgentCommissionPreviews(agentUserId: string) {
     { agentUserId },
   );
 
-  return rows.map((row) => ({
-    id: row.id,
-    applicationCode: row.application_code,
-    period: row.period,
-    consumedPoints: toNumber(row.consumed_points),
-    commissionRate: toNumber(row.commission_rate),
-    commissionPoints: toNumber(row.commission_points),
-    status: row.status,
-    settlementId: row.settlement_id,
-    customerUserId: row.customer_user_id,
-    customerUsername: row.customer_username,
-    customerDisplayName: row.customer_display_name,
-    createdAt: row.created_at.toISOString(),
-  }));
+  return rows.map((row) => {
+    const consumedPoints = toNumber(row.consumed_points);
+    return {
+      id: row.id,
+      applicationCode: row.application_code,
+      period: row.period,
+      consumedPoints,
+      commissionRate,
+      commissionPoints: Number((consumedPoints * commissionRate).toFixed(4)),
+      status: row.status,
+      settlementId: row.settlement_id,
+      customerUserId: row.customer_user_id,
+      customerUsername: row.customer_username,
+      customerDisplayName: row.customer_display_name,
+      createdAt: row.created_at.toISOString(),
+    };
+  });
 }
 
 async function listAgentSettlementBills(agentUserId: string) {

@@ -104,6 +104,7 @@ const isCreatingTicket = ref(false)
 const confirmingSettlementId = ref<string | null>(null)
 const updatingAdminPolicyUserId = ref<string | null>(null)
 const updatingAgentPolicyUserId = ref<string | null>(null)
+const updatingAgentCommissionUserId = ref<string | null>(null)
 const updatingFunctionKey = ref<string | null>(null)
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
 const selectedDetail = ref<{ title: string; row: DetailRecord } | null>(null)
@@ -130,6 +131,7 @@ const adjustCreditsForm = reactive({
 const deleteAccountForm = reactive({
   reason: '',
 })
+const agentCommissionRateDrafts = reactive<Record<string, number | null>>({})
 const leadForm = reactive({
   applicationCode: 'used-car-platform',
   customerName: '',
@@ -864,6 +866,34 @@ async function handleAgentCreateUserDisableChange(agentUserId: string, disabled:
     message.error(text)
   } finally {
     updatingAgentPolicyUserId.value = null
+  }
+}
+
+function agentCommissionRatePercent(row: PlatformAgentPolicyOverride) {
+  return agentCommissionRateDrafts[row.userId] ?? Number((Number(row.commissionRate ?? 0) * 100).toFixed(2))
+}
+
+async function handleAgentCommissionRateSave(row: PlatformAgentPolicyOverride) {
+  const percent = Number(agentCommissionRatePercent(row))
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+    message.warning('返佣比例必须在 0% 到 100% 之间')
+    return
+  }
+
+  updatingAgentCommissionUserId.value = row.userId
+  try {
+    const result = await updatePlatformAgentPolicyOverride(row.userId, {
+      commissionRate: Number((percent / 100).toFixed(4)),
+    })
+    agentPolicyOverrides.value = result.items
+    delete agentCommissionRateDrafts[row.userId]
+    message.success(`已更新 ${row.displayName} 的返佣比例`)
+    await refreshOverview()
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '更新返佣比例失败'
+    message.error(text)
+  } finally {
+    updatingAgentCommissionUserId.value = null
   }
 }
 
@@ -1752,6 +1782,49 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
     },
   },
   {
+    title: '返佣比例',
+    key: 'commissionRate',
+    minWidth: 210,
+    render(row) {
+      const isBusy = updatingAgentCommissionUserId.value === row.userId
+      return h(
+        'div',
+        { class: 'admin-function-points-cell' },
+        [
+          h(NInputNumber, {
+            value: agentCommissionRatePercent(row),
+            min: 0,
+            max: 100,
+            precision: 2,
+            step: 0.5,
+            size: 'small',
+            disabled: isBusy,
+            'onUpdate:value': (value: number | null) => {
+              agentCommissionRateDrafts[row.userId] = value
+            },
+          }),
+          h(
+            'span',
+            { class: 'admin-percent-suffix' },
+            '%',
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              loading: isBusy,
+              disabled: isBusy,
+              onClick: () => void handleAgentCommissionRateSave(row),
+            },
+            { default: () => '保存' },
+          ),
+        ],
+      )
+    },
+  },
+  {
     title: '管理动作',
     key: 'actions',
     width: 150,
@@ -2517,7 +2590,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
                 <span>{{ commissionPolicy.currency }}</span>
               </article>
               <article class="admin-rule-card">
-                <p>固定返佣</p>
+                <p>默认返佣</p>
                 <strong>{{ (commissionPolicy.commissionRate * 100).toFixed(0) }}%</strong>
                 <span>基于客户实际充值金额</span>
               </article>
@@ -3435,6 +3508,12 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 :deep(.admin-function-points-cell .n-input-number) {
   width: 124px;
   flex: 0 0 124px;
+}
+
+.admin-percent-suffix {
+  color: var(--bo-text-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .admin-agent-grid {

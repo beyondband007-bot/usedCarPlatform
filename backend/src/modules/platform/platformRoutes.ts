@@ -209,19 +209,39 @@ platformRoutes.patch(
     const agentUserId = Array.isArray(req.params.agentUserId)
       ? req.params.agentUserId[0]
       : req.params.agentUserId;
-    const enabled = (req.body as { developerAllowsCreateUsers?: unknown })?.developerAllowsCreateUsers;
-    if (typeof enabled !== "boolean") {
-      throw errors.invalidParameter("developerAllowsCreateUsers must be boolean");
+    const body = req.body as {
+      developerAllowsCreateUsers?: unknown;
+      commissionRate?: unknown;
+    };
+    const hasCreateUsers = Object.prototype.hasOwnProperty.call(body, "developerAllowsCreateUsers");
+    const hasCommissionRate = Object.prototype.hasOwnProperty.call(body, "commissionRate");
+    if (!hasCreateUsers && !hasCommissionRate) {
+      throw errors.invalidParameter("developerAllowsCreateUsers or commissionRate is required");
     }
 
-    ok(
-      res,
-      await accountCreationPolicyService.setAgentCreateUserPolicy({
+    let result;
+    if (hasCreateUsers) {
+      const enabled = body.developerAllowsCreateUsers;
+      if (typeof enabled !== "boolean") {
+        throw errors.invalidParameter("developerAllowsCreateUsers must be boolean");
+      }
+      result = await accountCreationPolicyService.setAgentCreateUserPolicy({
         developerUserId: current.user.id,
         agentUserId,
         enabled,
-      }),
-    );
+      });
+    }
+
+    if (hasCommissionRate) {
+      const commissionRate = Number(body.commissionRate);
+      result = await accountCreationPolicyService.setAgentCommissionRate({
+        developerUserId: current.user.id,
+        agentUserId,
+        commissionRate,
+      });
+    }
+
+    ok(res, result);
   }),
 );
 

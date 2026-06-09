@@ -1339,6 +1339,7 @@ export interface PlatformAgentPolicyOverride {
   assignedByUserId?: string | null
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null
+  commissionRate: number
   developerAllowsCreateUsers: boolean
   developerDisabledCreateUsers: boolean
   effectiveCanCreateUsers: boolean
@@ -1908,7 +1909,7 @@ export async function getPlatformAgentPolicyOverrides(): Promise<PlatformAgentPo
 
 export async function updatePlatformAgentPolicyOverride(
   agentUserId: string,
-  payload: { developerAllowsCreateUsers: boolean },
+  payload: { developerAllowsCreateUsers?: boolean; commissionRate?: number },
 ): Promise<PlatformAgentPolicyOverrideList> {
   const response = await request.patch<ApiResponse<PlatformAgentPolicyOverrideList>>(
     `/platform/agent-policy-overrides/${encodeURIComponent(agentUserId)}`,

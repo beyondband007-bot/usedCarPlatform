@@ -782,6 +782,7 @@ const run = async () => {
     await addColumnIfMissing("kie_task_records", "role", "VARCHAR(24) NOT NULL DEFAULT 'primary'");
     await addColumnIfMissing("kie_task_records", "is_winner", "TINYINT(1) NOT NULL DEFAULT 0");
     await addColumnIfMissing("kie_task_records", "finished_at", "DATETIME(3) NULL");
+    await addColumnIfMissing("back_office_agent_policy_overrides", "commission_rate", "DECIMAL(8, 4) NULL");
     await dropIndexIfExists("kie_task_records", "uk_kie_task_records_task");
     await addUniqueIndexIfMissing("kie_task_records", "uk_kie_task_records_task_role", "(task_id, role)");
     await backfillGenerationOwnership();
