@@ -23,6 +23,12 @@ import type { AccountCreationPolicyState } from '@/policies/accountProvisioning'
 
 type ChartPeriod = 'today' | '7d' | '30d'
 type ChartMetric = 'consume' | 'recharge'
+type ManagementSectionKey =
+  | 'adminAuthorization'
+  | 'agentAuthorization'
+  | 'functionBilling'
+  | 'customers'
+  | 'resources'
 
 interface ApplicationCatalogItem {
   code: string
@@ -49,6 +55,7 @@ const props = defineProps<{
   adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride>
   agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride>
   selectedApplicationLabel: string
+  collapseStorageKey: string
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +69,13 @@ const emit = defineEmits<{
 const chartPeriod = ref<ChartPeriod>('7d')
 const chartMetric = ref<ChartMetric>('recharge')
 const chartRef = ref<HTMLElement | null>(null)
+const managementSectionOpen = ref<Record<ManagementSectionKey, boolean>>({
+  adminAuthorization: true,
+  agentAuthorization: true,
+  functionBilling: false,
+  customers: true,
+  resources: true,
+})
 let chartInstance: echarts.ECharts | null = null
 
 const applications = computed(() => props.overview?.applications ?? [])
@@ -189,56 +203,12 @@ const overviewList = computed(() => {
   ]
 })
 
-const recentActivities = computed(() => {
-  const fmt = (iso: string) =>
-    new Intl.DateTimeFormat('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(iso))
-
-  const fromTxns = recentTransactions.value
-    .slice()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
-    .map((item, index) => ({
-      key: `txn-${item.id ?? index}`,
-      title: `${item.applicationName ?? item.applicationCode ?? '平台'} ${txnTypeLabel(item.txnType)}`,
-      time: fmt(item.createdAt),
-      tone: item.points >= 0 ? 'green' : 'orange',
-    }))
-
-  if (fromTxns.length) return fromTxns
-
-  return applications.value.slice(0, 5).map((item, index) => ({
-    key: `app-${item.code ?? index}`,
-    title: `${item.name ?? item.code} 已接入`,
-    time: '-',
-    tone: 'blue',
-  }))
-})
-
 const developerResources = [
   { key: 'docs', label: '开发文档', desc: '查看接入文档与使用指南', icon: 'mdi:book-open-page-variant-outline' },
   { key: 'api', label: 'API 文档', desc: '查看 OpenAPI 接口说明', icon: 'mdi:api' },
   { key: 'sdk', label: 'SDK 下载', desc: '多语言 SDK 快速集成', icon: 'mdi:download-box-outline' },
   { key: 'demo', label: '示例代码', desc: '查看可运行的示例项目', icon: 'mdi:code-braces-box' },
 ]
-
-function txnTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    recharge: '充值入账',
-    settle: '结算扣费',
-    freeze: '冻结积分',
-    refund: '退款入账',
-    estimate: '预估扣费',
-    adjust: '人工调账',
-    adjustment: '人工调账',
-  }
-  return map[type] ?? type
-}
 
 function isConsumeTxn(transaction: CreditsTransaction) {
   return ['settle', 'freeze', 'estimate'].includes(transaction.txnType)
@@ -410,6 +380,77 @@ function handleAppCardClick(code: string) {
   emit('update:selectedApplicationCode', code)
   document.getElementById('developer-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
+
+function loadManagementSectionState() {
+  const defaults: Record<ManagementSectionKey, boolean> = {
+    adminAuthorization: true,
+    agentAuthorization: true,
+    functionBilling: props.isFunctionBillingOpen,
+    customers: true,
+    resources: true,
+  }
+
+  if (typeof window === 'undefined') {
+    managementSectionOpen.value = defaults
+    return
+  }
+
+  try {
+    const stored = window.localStorage.getItem(props.collapseStorageKey)
+    const parsed = stored ? JSON.parse(stored) as Partial<Record<ManagementSectionKey, boolean>> : {}
+    managementSectionOpen.value = {
+      adminAuthorization: typeof parsed.adminAuthorization === 'boolean'
+        ? parsed.adminAuthorization
+        : defaults.adminAuthorization,
+      agentAuthorization: typeof parsed.agentAuthorization === 'boolean'
+        ? parsed.agentAuthorization
+        : defaults.agentAuthorization,
+      functionBilling: typeof parsed.functionBilling === 'boolean'
+        ? parsed.functionBilling
+        : defaults.functionBilling,
+      customers: typeof parsed.customers === 'boolean'
+        ? parsed.customers
+        : defaults.customers,
+      resources: typeof parsed.resources === 'boolean'
+        ? parsed.resources
+        : defaults.resources,
+    }
+  } catch {
+    managementSectionOpen.value = defaults
+  }
+
+  emit('update:isFunctionBillingOpen', managementSectionOpen.value.functionBilling)
+}
+
+function persistManagementSectionState() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(props.collapseStorageKey, JSON.stringify(managementSectionOpen.value))
+  } catch {
+    // Ignore storage failures; collapse controls should still work for the current session.
+  }
+}
+
+function isManagementSectionOpen(key: ManagementSectionKey) {
+  return managementSectionOpen.value[key]
+}
+
+function setManagementSectionOpen(key: ManagementSectionKey, open: boolean) {
+  managementSectionOpen.value = {
+    ...managementSectionOpen.value,
+    [key]: open,
+  }
+  if (key === 'functionBilling') {
+    emit('update:isFunctionBillingOpen', open)
+  }
+  persistManagementSectionState()
+}
+
+function toggleManagementSection(key: ManagementSectionKey) {
+  setManagementSectionOpen(key, !managementSectionOpen.value[key])
+}
+
+watch(() => props.collapseStorageKey, loadManagementSectionState, { immediate: true })
 
 watch([chartPeriod, chartMetric, recentTransactions], async () => {
   await nextTick()
@@ -628,120 +669,170 @@ onBeforeUnmount(() => {
             </article>
           </div>
 
-          <div class="dev-auth-grid">
-            <div class="dev-auth-block">
-              <h4>代理商授权与管理</h4>
-              <p class="dev-auth-sub">控制 Agent 创建 User，并可禁用 Agent 使账号回到普通 User 身份。</p>
-              <NDataTable
-                v-if="agentPolicyOverrides.length"
-                :columns="agentAuthorizationColumns"
-                :data="agentPolicyOverrides"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <p v-else class="dev-auth-empty">暂无代理商账号</p>
-            </div>
+          <div class="dev-management-stack">
+            <section class="dev-auth-block">
+              <button
+                type="button"
+                class="dev-collapse-head"
+                :aria-expanded="isManagementSectionOpen('adminAuthorization')"
+                @click="toggleManagementSection('adminAuthorization')"
+              >
+                <span>
+                  <strong>公司管理员授权</strong>
+                  <small>二级开关，控制 Admin 是否能创建 Agent 及 User</small>
+                </span>
+                <Icon
+                  icon="mdi:chevron-down"
+                  :class="{ rotated: isManagementSectionOpen('adminAuthorization') }"
+                />
+              </button>
+              <div v-if="isManagementSectionOpen('adminAuthorization')" class="dev-collapse-body">
+                <NDataTable
+                  v-if="adminPolicyOverrides.length"
+                  :columns="adminAuthorizationColumns"
+                  :data="adminPolicyOverrides"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="false"
+                />
+                <p v-else class="dev-auth-empty">暂无公司管理员账号</p>
+              </div>
+            </section>
 
-            <div class="dev-auth-block">
-              <h4>公司管理员授权</h4>
-              <p class="dev-auth-sub">二级开关，控制 Admin 是否能创建 Agent 及 User</p>
-              <NDataTable
-                v-if="adminPolicyOverrides.length"
-                :columns="adminAuthorizationColumns"
-                :data="adminPolicyOverrides"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <p v-else class="dev-auth-empty">暂无公司管理员账号</p>
-            </div>
+            <section class="dev-auth-block">
+              <button
+                type="button"
+                class="dev-collapse-head"
+                :aria-expanded="isManagementSectionOpen('agentAuthorization')"
+                @click="toggleManagementSection('agentAuthorization')"
+              >
+                <span>
+                  <strong>代理商授权与管理</strong>
+                  <small>控制 Agent 创建 User，并可禁用 Agent 使账号回到普通 User 身份。</small>
+                </span>
+                <Icon
+                  icon="mdi:chevron-down"
+                  :class="{ rotated: isManagementSectionOpen('agentAuthorization') }"
+                />
+              </button>
+              <div v-if="isManagementSectionOpen('agentAuthorization')" class="dev-collapse-body">
+                <NDataTable
+                  v-if="agentPolicyOverrides.length"
+                  :columns="agentAuthorizationColumns"
+                  :data="agentPolicyOverrides"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="false"
+                />
+                <p v-else class="dev-auth-empty">暂无代理商账号</p>
+              </div>
+            </section>
+
+            <section class="dev-auth-block">
+              <button
+                type="button"
+                class="dev-collapse-head"
+                :aria-expanded="isManagementSectionOpen('functionBilling')"
+                @click="toggleManagementSection('functionBilling')"
+              >
+                <span>
+                  <strong>跨应用功能计费配置 · {{ selectedApplicationLabel }}</strong>
+                  <small>按当前应用筛选功能编码、计费模式、默认积分与状态。</small>
+                </span>
+                <Icon
+                  icon="mdi:chevron-down"
+                  :class="{ rotated: isManagementSectionOpen('functionBilling') }"
+                />
+              </button>
+              <div v-if="isManagementSectionOpen('functionBilling')" class="dev-collapse-body">
+                <NDataTable
+                  v-if="selectedApplicationFunctions.length"
+                  :columns="functionColumns"
+                  :data="selectedApplicationFunctions"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="false"
+                />
+                <NEmpty
+                  v-else
+                  :description="selectedApplicationCode === 'all' ? '请先选择一个应用后查看功能计费配置' : '暂无功能计费配置'"
+                />
+              </div>
+            </section>
           </div>
-
-          <details class="dev-billing-details">
-            <summary>
-              <span>跨应用功能计费配置 · {{ selectedApplicationLabel }}</span>
-              <Icon icon="mdi:chevron-down" />
-            </summary>
-            <NDataTable
-              v-if="selectedApplicationFunctions.length"
-              :columns="functionColumns"
-              :data="selectedApplicationFunctions"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty
-              v-else
-              :description="selectedApplicationCode === 'all' ? '请先选择一个应用后查看功能计费配置' : '暂无功能计费配置'"
-            />
-          </details>
         </div>
       </article>
 
-      <article class="dev-card dev-activity-card">
-        <div class="dev-section-head">
-          <h3>最近操作</h3>
-        </div>
-        <ul class="dev-activity-list">
-          <li v-for="item in recentActivities" :key="item.key">
-            <span class="dev-activity-dot" :class="`tone-${item.tone}`" />
-            <div class="dev-activity-copy">
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.time }}</small>
-            </div>
-          </li>
-        </ul>
-        <button type="button" class="dev-link-btn dev-activity-more" @click="handleQuickAction('scroll-customers')">
-          查看全部
-        </button>
-      </article>
     </section>
 
     <!-- 第五屏：客户目录 -->
     <section id="developer-customers" class="dev-screen">
       <article class="dev-card dev-table-card">
-        <div class="dev-section-head">
-          <h3>客户目录</h3>
-          <span class="dev-section-count">{{ filteredCustomerProfiles.length }} 条记录</span>
+        <button
+          type="button"
+          class="dev-collapse-head"
+          :aria-expanded="isManagementSectionOpen('customers')"
+          @click="toggleManagementSection('customers')"
+        >
+          <span>
+            <strong>客户目录</strong>
+            <small>{{ filteredCustomerProfiles.length }} 条记录</small>
+          </span>
+          <Icon
+            icon="mdi:chevron-down"
+            :class="{ rotated: isManagementSectionOpen('customers') }"
+          />
+        </button>
+        <div v-if="isManagementSectionOpen('customers')" class="dev-collapse-body">
+          <NDataTable
+            v-if="filteredCustomerProfiles.length"
+            class="dev-customer-table"
+            :columns="customerColumns"
+            :data="filteredCustomerProfiles"
+            :bordered="false"
+            :single-line="false"
+            :pagination="false"
+          />
+          <NEmpty v-else description="暂无客户档案" />
         </div>
-        <NDataTable
-          v-if="filteredCustomerProfiles.length"
-          class="dev-customer-table"
-          :columns="customerColumns"
-          :data="filteredCustomerProfiles"
-          :bordered="false"
-          :single-line="false"
-          :pagination="false"
-        />
-        <NEmpty v-else description="暂无客户档案" />
       </article>
     </section>
 
     <!-- 第六屏：开发者资源 -->
     <section id="developer-resources" class="dev-screen">
       <article class="dev-card dev-resource-card">
-        <div class="dev-section-head">
-          <div>
-            <h3>开发者资源</h3>
-            <p class="dev-section-sub">提供接入文档、SDK、API 和工具，帮助你快速接入积分中台</p>
+        <button
+          type="button"
+          class="dev-collapse-head"
+          :aria-expanded="isManagementSectionOpen('resources')"
+          @click="toggleManagementSection('resources')"
+        >
+          <span>
+            <strong>开发者资源</strong>
+            <small>提供接入文档、SDK、API 和工具，帮助你快速接入积分中台</small>
+          </span>
+          <Icon
+            icon="mdi:chevron-down"
+            :class="{ rotated: isManagementSectionOpen('resources') }"
+          />
+        </button>
+        <div v-if="isManagementSectionOpen('resources')" class="dev-collapse-body">
+          <div class="dev-resource-grid">
+            <button
+              v-for="res in developerResources"
+              :key="res.key"
+              type="button"
+              class="dev-resource-item"
+            >
+              <span class="dev-resource-icon tone-blue">
+                <Icon :icon="res.icon" />
+              </span>
+              <span class="dev-resource-copy">
+                <strong>{{ res.label }}</strong>
+                <small>{{ res.desc }}</small>
+              </span>
+            </button>
           </div>
-        </div>
-        <div class="dev-resource-grid">
-          <button
-            v-for="res in developerResources"
-            :key="res.key"
-            type="button"
-            class="dev-resource-item"
-          >
-            <span class="dev-resource-icon tone-blue">
-              <Icon :icon="res.icon" />
-            </span>
-            <span class="dev-resource-copy">
-              <strong>{{ res.label }}</strong>
-              <small>{{ res.desc }}</small>
-            </span>
-          </button>
         </div>
       </article>
     </section>
@@ -766,10 +857,6 @@ onBeforeUnmount(() => {
 
 .dev-screen-triple {
   grid-template-columns: 1fr 2fr 1fr;
-}
-
-.dev-screen-perm {
-  grid-template-columns: 3fr 1fr;
 }
 
 .dev-card {
@@ -871,7 +958,6 @@ onBeforeUnmount(() => {
 .dev-overview-card,
 .dev-apps-card,
 .dev-perm-card,
-.dev-activity-card,
 .dev-table-card,
 .dev-resource-card {
   padding: 20px;
@@ -1182,9 +1268,8 @@ onBeforeUnmount(() => {
   }
 }
 
-.dev-auth-grid {
+.dev-management-stack {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1201,6 +1286,54 @@ onBeforeUnmount(() => {
   }
 }
 
+.dev-collapse-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--bo-text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+
+  span {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  small {
+    color: var(--bo-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.55;
+  }
+
+  .iconify {
+    flex: 0 0 auto;
+    color: var(--bo-text-muted);
+    font-size: 20px;
+    transition: transform 0.2s ease;
+
+    &.rotated {
+      transform: rotate(180deg);
+    }
+  }
+}
+
+.dev-collapse-body {
+  margin-top: 12px;
+}
+
 .dev-auth-sub {
   margin: 0 0 12px;
   color: var(--bo-text-muted);
@@ -1213,90 +1346,6 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--bo-text-muted);
   font-size: 13px;
-}
-
-.dev-billing-details {
-  margin-top: 14px;
-
-  summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: var(--bo-surface-soft);
-    color: var(--bo-text);
-    font-size: 13px;
-    font-weight: 800;
-    cursor: pointer;
-    list-style: none;
-  }
-
-  summary::-webkit-details-marker {
-    display: none;
-  }
-
-  &[open] summary .iconify {
-    transform: rotate(180deg);
-  }
-
-  .iconify {
-    transition: transform 0.2s ease;
-  }
-
-  :deep(.n-data-table) {
-    margin-top: 12px;
-  }
-}
-
-/* 第四屏：最近操作时间线 */
-.dev-activity-list {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 10px 0;
-  }
-}
-
-.dev-activity-dot {
-  width: 8px;
-  height: 8px;
-  margin-top: 6px;
-  flex: 0 0 8px;
-  border-radius: 50%;
-  background: var(--bo-accent);
-
-  &.tone-green { background: #18b77d; }
-  &.tone-orange { background: #d97706; }
-  &.tone-blue { background: #2f6bff; }
-}
-
-.dev-activity-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-
-  strong {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--bo-text);
-  }
-
-  small {
-    color: var(--bo-text-muted);
-    font-size: 12px;
-  }
-}
-
-.dev-activity-more {
-  margin-top: 8px;
 }
 
 /* 第六屏：开发者资源 */
@@ -1385,8 +1434,7 @@ onBeforeUnmount(() => {
 
 /* 768 ~ 1200：两列布局 */
 @media (max-width: 1199.98px) {
-  .dev-screen-welcome,
-  .dev-screen-perm {
+  .dev-screen-welcome {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1408,7 +1456,6 @@ onBeforeUnmount(() => {
   .dev-grid-4,
   .dev-quick-grid,
   .dev-toggle-grid,
-  .dev-auth-grid,
   .dev-resource-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1423,7 +1470,6 @@ onBeforeUnmount(() => {
   .dev-overview-card,
   .dev-apps-card,
   .dev-perm-card,
-  .dev-activity-card,
   .dev-table-card,
   .dev-resource-card {
     padding: 16px;
