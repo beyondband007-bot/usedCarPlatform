@@ -1,11 +1,8 @@
-/* 首页在微信内置浏览器中的兼容样式 */
+/* 首页 H5 / 微信内置浏览器兼容样式 */
 
 html.is-wechat {
   -webkit-text-size-adjust: 100% !important;
   text-size-adjust: 100%;
-}
-
-html.is-wechat {
   --home-viewport-height: calc(var(--app-vh, 1vh) * 100);
 }
 
@@ -15,13 +12,13 @@ html.is-wechat.app-layout--studio-chrome:not([data-subnav="true"]) {
 
 @media (max-width: 767px) {
   html.is-mobile.app-layout--studio-chrome:not([data-subnav="true"]) {
-    --app-header-offset: calc(52px + env(safe-area-inset-top, 0px));
+    --app-header-offset: calc(64px + env(safe-area-inset-top, 0px));
   }
 }
 
 @media (max-width: 700px) {
   html.is-wechat.app-layout--studio-chrome:not([data-subnav="true"]) {
-    --app-header-offset: calc(52px + env(safe-area-inset-top, 0px));
+    --app-header-offset: calc(64px + env(safe-area-inset-top, 0px));
   }
 }
 
@@ -32,62 +29,40 @@ html.is-wechat .home-chrome {
 
 html.is-wechat .app-layout--home .home-page {
   scroll-behavior: auto;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html.is-wechat .app-layout--home .home-page::before {
   position: absolute;
 }
 
-html.is-wechat .app-layout--home .hero-visual {
-  max-height: calc(
-    var(--home-viewport-height) - var(--app-header-offset, 72px)
-  );
+@media (min-width: 768px) {
+  html.is-wechat .app-layout--home .hero-visual {
+    max-height: calc(
+      var(--home-viewport-height) - var(--app-header-offset, 72px)
+    );
+  }
 }
 
-html.is-wechat.is-mobile .app-layout--home .hero h1 {
-  font-size: clamp(18px, 5.6vw, 24px);
-  letter-spacing: 1px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
+@media (max-width: 767px) {
+  html.is-mobile .app-layout--home .hero-visual,
+  html.is-wechat .app-layout--home .hero-visual {
+    max-height: none;
+    min-height: 0;
+  }
 
-html.is-wechat.is-mobile .app-layout--home .hero-eyebrow {
-  font-size: 11px;
-  letter-spacing: 2px;
-  white-space: nowrap;
-}
+  html.is-mobile .app-layout--home .hero-intro {
+    min-height: 0;
+  }
 
-html.is-wechat.is-mobile .app-layout--home .hero .subtitle {
-  font-size: clamp(10px, 3vw, 13px);
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
-html.is-wechat.is-mobile .app-layout--home .final-cta h2 {
-  font-size: clamp(15px, 4.6vw, 22px);
-  white-space: nowrap;
-}
-
-html.is-wechat.is-mobile .app-layout--home .final-cta p {
-  font-size: clamp(10px, 2.85vw, 14px);
-  white-space: nowrap;
-}
-
-html.is-wechat.is-mobile .app-layout--home .suite-card h2 {
-  font-size: 20px;
-}
-
-html.is-wechat.is-mobile .app-layout--home .section-title h2 {
-  font-size: clamp(22px, 6vw, 26px);
-}
-
-html.is-wechat.is-mobile .app-layout--home .final-cta h2 {
-  font-size: clamp(22px, 6vw, 26px);
-}
-
-html.is-wechat.is-mobile .app-layout--home .tech-badge-label {
-  font-size: 13px;
+  html.is-mobile .app-layout--home .home-chrome.home-chrome--light,
+  html.is-wechat .app-layout--home .home-chrome.home-chrome--light {
+    --studio-chrome-header-height: 64px;
+    --studio-chrome-header-bg: linear-gradient(180deg, #f6fbff 0%, #e7f1fa 100%);
+    --studio-chrome-bg: #f6fbff;
+    --studio-chrome-subnav-bg: #f6fbff;
+    border-bottom-color: #d7e4ee;
+    backdrop-filter: none;
+  }
 }
 
 html.is-wechat .app-layout--home button,
@@ -105,6 +80,6 @@ html.is-wechat .app-layout--home .feature-card-video {
   pointer-events: none;
 }
 
-html.is-wechat .site-header .mobile-nav-panel {
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+html.is-mobile .site-header .mobile-nav-panel {
+  padding-bottom: calc(14px + var(--h5-bottom-inset, 0px));
 }

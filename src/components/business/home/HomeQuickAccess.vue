@@ -232,25 +232,35 @@ onMounted(() => {
 }
 
 @media (max-width: 767px) {
+  .suite-shell {
+    padding-inline: var(--home-space-x, 16px);
+  }
+
   .suite-grid {
     grid-template-columns: 1fr;
+    gap: var(--home-grid-gap, 12px);
   }
-}
 
-@media (max-width: 700px) {
+  .suite-card {
+    min-height: 140px;
+  }
+
   .suite-card div,
   .suite-card-copy {
-    max-width: 72%;
-    padding: 34px 20px 20px;
+    min-height: 140px;
+    max-width: 58%;
+    padding: 24px 16px 16px;
   }
 
   .suite-card h2 {
-    font-size: 22px;
+    margin-bottom: 8px;
+    font-size: clamp(16px, 4.4vw, 20px);
     white-space: normal;
   }
 
   .suite-card p {
-    font-size: 14px;
+    font-size: clamp(11px, 3vw, 13px);
+    line-height: 1.45;
     white-space: normal;
   }
 }

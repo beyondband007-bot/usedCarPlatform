@@ -1,5 +1,18 @@
+import { ref } from 'vue'
+
 const WECHAT_UA = /MicroMessenger/i
 const IOS_UA = /iPhone|iPad|iPod/i
+const H5_MEDIA_QUERY = '(max-width: 767px)'
+
+export const isH5ViewportRef = ref(
+  typeof window !== 'undefined' ? window.matchMedia(H5_MEDIA_QUERY).matches : false,
+)
+
+let viewportThemeSync: (() => void) | null = null
+
+export function registerViewportThemeSync(sync: () => void) {
+  viewportThemeSync = sync
+}
 
 export function isWeChatBrowser(userAgent = navigator.userAgent) {
   return WECHAT_UA.test(userAgent)
@@ -9,14 +22,24 @@ export function isIOSDevice(userAgent = navigator.userAgent) {
   return IOS_UA.test(userAgent)
 }
 
+export function isH5Viewport() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return window.matchMedia(H5_MEDIA_QUERY).matches
+}
+
 function updateViewportHeightUnit() {
   const vh = window.innerHeight * 0.01
   document.documentElement.style.setProperty('--app-vh', `${vh}px`)
 }
 
 function updateMobileClass() {
-  const isMobileViewport = window.matchMedia('(max-width: 767px)').matches
-  document.documentElement.classList.toggle('is-mobile', isMobileViewport)
+  const isMobile = isH5Viewport()
+  isH5ViewportRef.value = isMobile
+  document.documentElement.classList.toggle('is-mobile', isMobile)
+  viewportThemeSync?.()
 }
 
 function resumeWeChatAutoplayVideos() {
@@ -59,9 +82,7 @@ export function initBrowserEnv() {
   window.addEventListener('orientationchange', () => {
     window.setTimeout(updateViewportHeightUnit, 100)
   })
-  window
-    .matchMedia('(max-width: 767px)')
-    .addEventListener('change', updateMobileClass)
+  window.matchMedia(H5_MEDIA_QUERY).addEventListener('change', updateMobileClass)
 
   bindWeChatVideoAutoplay()
 }

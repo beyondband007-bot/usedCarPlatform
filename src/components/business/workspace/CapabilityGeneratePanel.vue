@@ -3474,6 +3474,20 @@ defineExpose({
   padding-bottom: 0;
 }
 
+.generate-panel.is-batch {
+  --batch-card-bg: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 9%,
+    var(--app-surface)
+  );
+  --batch-card-border: color-mix(
+    in srgb,
+    var(--workspace-accent, #efc24c) 28%,
+    var(--app-border)
+  );
+  --batch-text-primary: var(--workspace-accent-strong, #a86d00);
+}
+
 .generate-panel-body {
   display: flex;
   min-height: 0;
@@ -3989,15 +4003,10 @@ defineExpose({
 .batch-card,
 .batch-notice {
   padding: 16px 18px;
-  border: 1px solid
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, var(--app-border));
+  border: 1px solid var(--batch-card-border);
   border-radius: 12px;
-  background: color-mix(
-    in srgb,
-    var(--workspace-accent, #efc24c) 9%,
-    var(--app-surface)
-  );
-  color: var(--workspace-accent-strong, #a86d00);
+  background: var(--batch-card-bg);
+  color: var(--batch-text-primary);
   font-size: 14px;
   font-weight: 800;
   line-height: 1.8;
@@ -4137,21 +4146,9 @@ defineExpose({
 
 .preset-summary {
   padding: 16px 18px;
-  border: 1px solid
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border));
+  border: 1px solid var(--batch-card-border, color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, var(--app-border)));
   border-radius: 12px;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(
-          in srgb,
-          var(--workspace-accent, #efc24c) 9%,
-          var(--app-surface)
-        )
-        0%,
-      var(--app-surface) 58%
-    ),
-    var(--app-surface);
+  background: var(--batch-card-bg, var(--app-surface));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 75%, transparent);
 }
 
@@ -5076,6 +5073,25 @@ defineExpose({
   font-weight: 900 !important;
 }
 
+:global(.workspace-page.theme-dark) .generate-panel.is-batch,
+:global(html[data-theme="dark"]) .generate-panel.is-batch {
+  --batch-card-bg: #1b1e22;
+  --batch-card-border: transparent;
+  --batch-text-primary: var(--workspace-accent-strong, #ffd75a);
+}
+
+:global(.workspace-page.theme-dark) .generate-panel.is-batch :is(.batch-card, .batch-notice),
+:global(html[data-theme="dark"]) .generate-panel.is-batch :is(.batch-card, .batch-notice),
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .preset-summary,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .preset-summary {
+  background: var(--batch-card-bg);
+}
+
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .preset-summary,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .preset-summary {
+  box-shadow: none;
+}
+
 :global([data-theme="dark"]) .delivery-board {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 }
@@ -5089,7 +5105,8 @@ defineExpose({
     );
 }
 
-:global(.workspace-page.theme-light) .generate-panel.is-batch {
+:global(.workspace-page.theme-light) .generate-panel.is-batch,
+:global(html[data-theme="light"]) .generate-panel.is-batch {
   --batch-brand: var(--workspace-accent, #2f6bff);
   --batch-brand-strong: var(--workspace-accent-strong, #2f6bff);
   --batch-brand-text: #ffffff;
@@ -5097,12 +5114,12 @@ defineExpose({
   --batch-page-bg: var(--workspace-panel, #ffffff);
   --batch-shell-bg: var(--workspace-panel, #ffffff);
   --batch-shell-border: var(--workspace-line, #d6e0ed);
-  --batch-card-bg: var(--workspace-panel, #ffffff);
-  --batch-card-border: var(--workspace-line, #d6e0ed);
-  --batch-card-hover-border: var(--workspace-line-strong, #aebfd5);
-  --batch-text-primary: var(--workspace-text, #172033);
-  --batch-text-body: var(--workspace-text-secondary, #334155);
-  --batch-text-muted: var(--workspace-muted, #64748b);
+  --batch-card-bg: #ffffff;
+  --batch-card-border: transparent;
+  --batch-card-hover-border: transparent;
+  --batch-text-primary: #1b1b1b;
+  --batch-text-body: #1b1b1b;
+  --batch-text-muted: #1b1b1b;
   --batch-input-border: var(--workspace-line, #d6e0ed);
   --batch-upload-bg: var(--workspace-panel-soft, #f7fafd);
   --batch-upload-border: var(--workspace-line-strong, #cbd5e1);
@@ -5177,12 +5194,21 @@ defineExpose({
   background: var(--batch-brand);
 }
 
+:global(.workspace-page.theme-light) .generate-panel.is-batch :is(.batch-card, .batch-notice),
+:global(html[data-theme="light"]) .generate-panel.is-batch :is(.batch-card, .batch-notice),
+:global(.workspace-page.theme-light) .generate-panel.is-batch .preset-summary,
+:global(html[data-theme="light"]) .generate-panel.is-batch .preset-summary,
+:global(.workspace-page.theme-light) .generate-panel.is-batch .batch-scene-card,
+:global(html[data-theme="light"]) .generate-panel.is-batch .batch-scene-card {
+  border: none;
+  background: #ffffff;
+  color: #1b1b1b;
+  box-shadow: none;
+}
+
 :global(.workspace-page.theme-light) .generate-panel.is-batch .batch-notice {
   padding: 20px 24px;
-  border: 1px solid var(--workspace-accent-border, #b8cdf4);
   border-radius: 16px;
-  background: var(--workspace-accent-bg, #f2f7ff);
-  color: var(--batch-text-body);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.75;
@@ -5191,40 +5217,35 @@ defineExpose({
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-notice:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--workspace-accent, #2f6bff) 36%,
-    transparent
-  );
-  box-shadow: 0 6px 20px rgba(47, 107, 255, 0.08);
+  border: none;
+  box-shadow: none;
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-card:not(.batch-notice) {
   padding: 24px;
-  border: 1px solid var(--batch-card-border);
   border-radius: 16px;
-  background: var(--batch-card-bg);
-  color: var(--batch-text-body);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-card:not(.batch-notice):hover {
-  border-color: var(--batch-card-hover-border);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+  border: none;
+  box-shadow: none;
 }
 
 :global(.workspace-page.theme-light) .generate-panel.is-batch .batch-card h3,
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .inline-field
+  > span,
+:global(html[data-theme="light"]) .generate-panel.is-batch .batch-card h3,
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .inline-field
   > span {
-  color: var(--batch-text-primary);
+  color: #1b1b1b;
   font-weight: 700;
 }
 
@@ -5233,31 +5254,46 @@ defineExpose({
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .batch-upload-head
+  p,
+:global(html[data-theme="light"]) .generate-panel.is-batch .batch-card p,
+:global(html[data-theme="light"]) .generate-panel.is-batch .switch-card p,
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .batch-upload-head
   p {
-  color: var(--batch-text-muted);
+  color: #1b1b1b;
   font-weight: 500;
 }
 
 :global(.workspace-page.theme-light) .generate-panel.is-batch .preset-summary {
   padding: 24px;
-  border: 1px solid var(--batch-card-border);
   border-radius: 16px;
-  background: var(--batch-card-bg);
-  box-shadow: none;
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .preset-summary-icon {
-  background: var(--workspace-accent-bg, #f2f7ff);
-  color: var(--workspace-accent, #2f6bff);
+  background: #f5f5f5;
+  color: #1b1b1b;
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .preset-summary-copy
-  p {
-  color: var(--batch-text-muted);
+  p,
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .preset-summary-copy
+  strong,
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .preset-summary-copy
+  p,
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .preset-summary-copy
+  strong {
+  color: #1b1b1b;
   font-weight: 600;
 }
 
@@ -5265,7 +5301,6 @@ defineExpose({
   .generate-panel.is-batch
   .preset-summary-copy
   strong {
-  color: var(--batch-text-primary);
   font-weight: 700;
 }
 
@@ -5278,9 +5313,9 @@ defineExpose({
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
   .preset-tag.is-on {
-  border: 1px solid var(--workspace-accent-border, #b8cdf4);
-  background: var(--workspace-accent-bg, #f2f7ff);
-  color: var(--workspace-accent, #2f6bff);
+  border: none;
+  background: #f5f5f5;
+  color: #1b1b1b;
   font-weight: 600;
 }
 
@@ -5380,14 +5415,12 @@ defineExpose({
   .generate-panel.is-batch
   .batch-scene-card {
   padding: 24px;
-  border: 1px solid var(--batch-card-border);
   border-radius: 16px;
-  background: var(--batch-upload-bg);
-  color: var(--batch-text-body);
 }
 
-:global(.workspace-page.theme-light) .generate-panel.is-batch .scene-head h3 {
-  color: var(--batch-text-primary);
+:global(.workspace-page.theme-light) .generate-panel.is-batch .scene-head h3,
+:global(html[data-theme="light"]) .generate-panel.is-batch .scene-head h3 {
+  color: #1b1b1b;
   font-weight: 700;
 }
 
@@ -5497,34 +5530,69 @@ defineExpose({
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
+  .batch-primary-btn.n-button,
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
   .batch-primary-btn.n-button {
   height: 52px !important;
   border: 0 !important;
   border-radius: 14px !important;
-  background: linear-gradient(
-    135deg,
-    var(--batch-brand),
-    color-mix(in srgb, var(--batch-brand-strong) 88%, #1d4ed8)
-  ) !important;
-  color: var(--batch-brand-text) !important;
+  --n-color: #ffb800 !important;
+  --n-color-hover: #ffca28 !important;
+  --n-color-pressed: #f5b000 !important;
+  --n-color-focus: #ffb800 !important;
+  --n-border: 0 !important;
+  --n-border-hover: 0 !important;
+  --n-border-pressed: 0 !important;
+  --n-border-focus: 0 !important;
+  --n-text-color: #000000 !important;
+  --n-text-color-hover: #000000 !important;
+  --n-text-color-pressed: #000000 !important;
+  --n-text-color-focus: #000000 !important;
+  background: #ffb800 !important;
+  color: #000000 !important;
   font-weight: 600 !important;
   box-shadow: none !important;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease !important;
+  transition: background-color 0.2s ease !important;
 }
 
 :global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  :deep(.n-button__border),
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  :deep(.n-button__state-border),
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  :deep(.n-button__border),
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  :deep(.n-button__state-border) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:global(.workspace-page.theme-light)
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button:hover:not(:disabled),
+:global(html[data-theme="light"])
   .generate-panel.is-batch
   .batch-primary-btn.n-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px var(--workspace-accent-glow, rgba(47, 107, 255, 0.16)) !important;
+  background: #ffca28 !important;
+  box-shadow: none !important;
 }
 
 :global(.workspace-page.theme-light)
   .generate-panel.is-batch
+  .batch-primary-btn.n-button:active:not(:disabled),
+:global(html[data-theme="light"])
+  .generate-panel.is-batch
   .batch-primary-btn.n-button:active:not(:disabled) {
-  transform: translateY(0);
+  background: #f5b000 !important;
 }
 
 :global(.workspace-page.theme-light) .delivery-tabs button.active {
@@ -5546,5 +5614,86 @@ defineExpose({
 
 :global(.workspace-page.theme-light) .delivery-item:hover {
   background: var(--workspace-hover-bg, #f3f7fc);
+}
+</style>
+
+<style lang="scss">
+.workspace-page.theme-light .generate-panel.is-batch .batch-card,
+.workspace-page.theme-light .generate-panel.is-batch .batch-notice,
+.workspace-page.theme-light .generate-panel.is-batch .preset-summary,
+.workspace-page.theme-light .generate-panel.is-batch .batch-scene-card,
+html[data-theme="light"] .generate-panel.is-batch .batch-card,
+html[data-theme="light"] .generate-panel.is-batch .batch-notice,
+html[data-theme="light"] .generate-panel.is-batch .preset-summary,
+html[data-theme="light"] .generate-panel.is-batch .batch-scene-card {
+  border: none !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  color: #1b1b1b !important;
+}
+
+.workspace-page.theme-light .generate-panel.is-batch .batch-card h3,
+.workspace-page.theme-light .generate-panel.is-batch .inline-field > span,
+.workspace-page.theme-light .generate-panel.is-batch .batch-card p,
+.workspace-page.theme-light .generate-panel.is-batch .switch-card p,
+.workspace-page.theme-light .generate-panel.is-batch .batch-upload-head p,
+.workspace-page.theme-light .generate-panel.is-batch .preset-summary-copy p,
+.workspace-page.theme-light .generate-panel.is-batch .preset-summary-copy strong,
+html[data-theme="light"] .generate-panel.is-batch .batch-card h3,
+html[data-theme="light"] .generate-panel.is-batch .inline-field > span,
+html[data-theme="light"] .generate-panel.is-batch .batch-card p,
+html[data-theme="light"] .generate-panel.is-batch .switch-card p,
+html[data-theme="light"] .generate-panel.is-batch .batch-upload-head p,
+html[data-theme="light"] .generate-panel.is-batch .preset-summary-copy p,
+html[data-theme="light"] .generate-panel.is-batch .preset-summary-copy strong {
+  color: #1b1b1b !important;
+}
+
+.workspace-page.theme-light .generate-panel.is-batch .batch-primary-btn.n-button,
+html[data-theme="light"] .generate-panel.is-batch .batch-primary-btn.n-button {
+  --n-color: #ffb800 !important;
+  --n-color-hover: #ffca28 !important;
+  --n-color-pressed: #f5b000 !important;
+  --n-border: 0 !important;
+  --n-border-hover: 0 !important;
+  --n-border-pressed: 0 !important;
+  --n-border-focus: 0 !important;
+  --n-text-color: #000000 !important;
+  --n-text-color-hover: #000000 !important;
+  --n-text-color-pressed: #000000 !important;
+  border: 0 !important;
+  background: #ffb800 !important;
+  color: #000000 !important;
+  box-shadow: none !important;
+}
+
+.workspace-page.theme-light
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  .n-button__border,
+.workspace-page.theme-light
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  .n-button__state-border,
+html[data-theme="light"]
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  .n-button__border,
+html[data-theme="light"]
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button
+  .n-button__state-border {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.workspace-page.theme-light
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button:hover:not(:disabled),
+html[data-theme="light"]
+  .generate-panel.is-batch
+  .batch-primary-btn.n-button:hover:not(:disabled) {
+  background: #ffca28 !important;
+  color: #000000 !important;
 }
 </style>

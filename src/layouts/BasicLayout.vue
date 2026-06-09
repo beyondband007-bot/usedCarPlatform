@@ -381,9 +381,23 @@ const {
 
   .home-chrome {
 
-    --studio-chrome-header-height: 52px;
+    --studio-chrome-header-height: 64px;
 
     --studio-chrome-pad-x: 16px;
+
+  }
+
+  .home-chrome--light {
+
+    --studio-chrome-bg: #f6fbff;
+
+    --studio-chrome-header-bg: linear-gradient(180deg, #f6fbff 0%, #e7f1fa 100%);
+
+    --studio-chrome-subnav-bg: #f6fbff;
+
+    border-bottom-color: #d7e4ee;
+
+    backdrop-filter: none;
 
   }
 

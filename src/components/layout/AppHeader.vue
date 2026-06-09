@@ -949,8 +949,8 @@ const showHeaderRecharge = computed(
 @media (max-width: 767px) {
   .site-header-row {
     justify-content: center;
-    min-height: 52px;
-    padding: 10px var(--studio-chrome-pad-x, 16px);
+    min-height: 64px;
+    padding: 12px var(--studio-chrome-pad-x, 16px);
   }
 
   .site-header-tools {
@@ -962,7 +962,12 @@ const showHeaderRecharge = computed(
   }
 
   .logo-img {
-    max-height: 24px;
+    max-height: 22px;
+  }
+
+  .site-header.is-light {
+    border-bottom-color: #d7e4ee;
+    backdrop-filter: none;
   }
 }
 
