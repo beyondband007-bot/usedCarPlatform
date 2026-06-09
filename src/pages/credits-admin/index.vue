@@ -617,6 +617,12 @@ function canDisableAgent(row: PlatformAgentProfile) {
   return activeRole.value === 'developer' || activeRole.value === 'admin'
 }
 
+function canDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (authStore.userInfo?.id === row.userId) return false
+  if (!authStore.permissions.includes('account:delete:agent')) return false
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
 function deleteActionText(row: CreditsCustomerProfile) {
   const targetRole = matrixTargetRole(row.role)
   if (activeRole.value === 'admin' && targetRole === 'agent') return '禁用代理商'
@@ -916,6 +922,26 @@ async function handlePromoteUserToAgent(row: CreditsCustomerProfile) {
 
 async function handleDisableAgent(row: PlatformAgentProfile) {
   if (!canDisableAgent(row)) {
+    message.warning('当前角色不能禁用该代理商')
+    return
+  }
+
+  disablingAgentUserId.value = row.userId
+  try {
+    const result = await disablePlatformAgent(row.userId, {
+      reason: 'back-office disabled Agent role',
+    })
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到用户清单`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '禁用代理商失败')
+  } finally {
+    disablingAgentUserId.value = null
+  }
+}
+
+async function handleDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (!canDisableAgentPolicy(row)) {
     message.warning('当前角色不能禁用该代理商')
     return
   }
@@ -1653,6 +1679,29 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
       )
     },
   },
+  {
+    title: '管理动作',
+    key: 'actions',
+    width: 150,
+    render(row) {
+      const isBusy = disablingAgentUserId.value === row.userId
+      return h(
+        NButton,
+        {
+          size: 'small',
+          type: 'error',
+          secondary: true,
+          loading: isBusy,
+          disabled: isBusy || !canDisableAgentPolicy(row),
+          onClick: () => handleDisableAgentPolicy(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
+          default: () => '禁用代理商',
+        },
+      )
+    },
+  },
 ]
 
 const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
@@ -1673,7 +1722,6 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
-  { title: 'Credits User', key: 'creditsUserId', width: 130 },
   { title: '客户数', key: 'customerCount', width: 90 },
   { title: '线索数', key: 'leadCount', width: 90 },
   { title: '开放工单', key: 'openTicketCount', width: 100 },
@@ -2105,14 +2153,12 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
           :customer-columns="customerColumns"
           :admin-policy-overrides="adminPolicyOverrides"
           :agent-policy-overrides="agentPolicyOverrides"
-          :filtered-agent-profiles="filteredAgentProfiles"
           :account-creation-policy-state="accountCreationPolicyState"
           :is-function-billing-open="isFunctionBillingOpen"
           :selected-application-functions="selectedApplicationFunctions"
           :function-columns="functionColumns"
           :admin-authorization-columns="adminAuthorizationColumns"
           :agent-authorization-columns="agentAuthorizationColumns"
-          :agent-management-columns="agentManagementColumns"
           :selected-application-label="selectedApplicationLabel"
           @refresh="refreshOverview"
           @create-account="openCreateAccountModal"

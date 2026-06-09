@@ -16,7 +16,6 @@ import type {
   CreditsCustomerProfile,
   CreditsTransaction,
   PlatformAdminPolicyOverride,
-  PlatformAgentProfile,
   PlatformAgentPolicyOverride,
   PlatformDashboard,
 } from '@/api/visual-workbench'
@@ -43,14 +42,12 @@ const props = defineProps<{
   customerColumns: DataTableColumns<CreditsCustomerProfile>
   adminPolicyOverrides: PlatformAdminPolicyOverride[]
   agentPolicyOverrides: PlatformAgentPolicyOverride[]
-  filteredAgentProfiles: PlatformAgentProfile[]
   accountCreationPolicyState: AccountCreationPolicyState
   isFunctionBillingOpen: boolean
   selectedApplicationFunctions: CreditsAdminOverview['applicationFunctions']
   functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]>
   adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride>
   agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride>
-  agentManagementColumns: DataTableColumns<PlatformAgentProfile>
   selectedApplicationLabel: string
 }>()
 
@@ -633,8 +630,8 @@ onBeforeUnmount(() => {
 
           <div class="dev-auth-grid">
             <div class="dev-auth-block">
-              <h4>代理商授权</h4>
-              <p class="dev-auth-sub">默认全部可用「放养」，一键开启或禁用代理商创建 User</p>
+              <h4>代理商授权与管理</h4>
+              <p class="dev-auth-sub">控制 Agent 创建 User，并可禁用 Agent 使账号回到普通 User 身份。</p>
               <NDataTable
                 v-if="agentPolicyOverrides.length"
                 :columns="agentAuthorizationColumns"
@@ -658,20 +655,6 @@ onBeforeUnmount(() => {
                 :pagination="false"
               />
               <p v-else class="dev-auth-empty">暂无公司管理员账号</p>
-            </div>
-
-            <div class="dev-auth-block dev-auth-block-wide">
-              <h4>代理商管理</h4>
-              <p class="dev-auth-sub">开发者可禁用 Agent，并让该账号回到普通 User 身份。</p>
-              <NDataTable
-                v-if="filteredAgentProfiles.length"
-                :columns="agentManagementColumns"
-                :data="filteredAgentProfiles"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <p v-else class="dev-auth-empty">暂无代理商账号</p>
             </div>
           </div>
 
@@ -1216,10 +1199,6 @@ onBeforeUnmount(() => {
     font-weight: 800;
     color: var(--bo-text);
   }
-}
-
-.dev-auth-block-wide {
-  grid-column: 1 / -1;
 }
 
 .dev-auth-sub {
