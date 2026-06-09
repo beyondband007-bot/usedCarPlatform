@@ -2288,7 +2288,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
       <header v-if="activeRole !== 'developer'" class="admin-hero">
         <div class="admin-hero-copy">
           <p class="admin-hero-kicker">Reusable Credits Platform Console</p>
-          <h1>三角色积分平台控制台</h1>
+          <h1>欢迎使用 积分后台</h1>
         </div>
         <div class="admin-hero-actions">
           <NButton type="primary" :loading="isLoading" @click="refreshOverview">

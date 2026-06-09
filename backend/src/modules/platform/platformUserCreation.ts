@@ -463,8 +463,9 @@ export async function createPlatformUser(
           tenantName: `${input.username} 旗舰共享积分账户`,
           initialPoints: input.initialPoints,
           members: [
-            { email: input.email, role: "owner" },
+            { username: input.username, email: input.email, role: "owner" },
             ...childDrafts.map((child) => ({
+              username: child.username,
               email: child.email,
               role: child.creditsRole,
             })),
@@ -474,6 +475,7 @@ export async function createPlatformUser(
     const credits =
       tenantCredits ??
       (await ensurePersonalCreditsAccount({
+        username: input.username,
         email: input.email,
         initialPoints: input.initialPoints,
       }));

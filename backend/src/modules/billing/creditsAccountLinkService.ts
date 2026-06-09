@@ -35,44 +35,49 @@ export type LinkedTenantCreditsBundle = LinkedCreditsAccount & {
 };
 
 type TenantCreditsMemberInput = {
+  username: string;
   email: string;
   role: "owner" | "admin" | "employee";
 };
 
 async function ensureCreditsUser(
   connection: PoolConnection,
-  email: string,
+  input: { username: string; email: string },
 ) {
   const [existingUsers] = await connection.query<any[]>(
     `SELECT id
      FROM users
-     WHERE email = :email
+     WHERE username = :username
+        OR (username IS NULL AND email = :email)
      ORDER BY id
      LIMIT 1`,
-    { email },
+    input,
   );
 
   if (existingUsers[0]) {
     const userId = Number(existingUsers[0].id);
     await connection.query(
       `UPDATE users
-       SET status = 'active',
+       SET username = :username,
+           email = :email,
+           status = 'active',
            updated_at = CURRENT_TIMESTAMP(3)
        WHERE id = :userId`,
-      { userId },
+      { ...input, userId },
     );
     return userId;
   }
 
   const [created] = await connection.query<any>(
-    `INSERT INTO users (email, status)
-     VALUES (:email, 'active')`,
-    { email },
+    `INSERT INTO users (username, email, status)
+     VALUES (:username, :email, 'active')`,
+    input,
   );
   return Number(created.insertId);
 }
 
 export const ensurePersonalCreditsAccount = async (input: {
+  username: string;
   email: string;
   initialPoints: number | string;
 }): Promise<LinkedCreditsAccount> => {
@@ -86,10 +91,11 @@ export const ensurePersonalCreditsAccount = async (input: {
     const [existingUsers] = await connection.query<any[]>(
       `SELECT id
        FROM users
-       WHERE email = :email
+       WHERE username = :username
+          OR (username IS NULL AND email = :email)
        ORDER BY id
        LIMIT 1`,
-      { email: input.email },
+      { username: input.username, email: input.email },
     );
 
     let userId: number;
@@ -97,21 +103,24 @@ export const ensurePersonalCreditsAccount = async (input: {
       userId = Number(existingUsers[0].id);
       await connection.query(
         `UPDATE users
-         SET email = :email,
+         SET username = :username,
+             email = :email,
              status = 'active',
              updated_at = CURRENT_TIMESTAMP(3)
          WHERE id = :userId`,
-        { email: input.email, userId },
+        { username: input.username, email: input.email, userId },
       );
     } else {
       const [created] = await connection.query<any>(
-        `INSERT INTO users (email, status)
-         VALUES (:email, 'active')
+        `INSERT INTO users (username, email, status)
+         VALUES (:username, :email, 'active')
          ON DUPLICATE KEY UPDATE
           id = LAST_INSERT_ID(id),
+          username = VALUES(username),
+          email = VALUES(email),
           status = VALUES(status),
           updated_at = CURRENT_TIMESTAMP(3)`,
-        { email: input.email },
+        { username: input.username, email: input.email },
       );
       userId = Number(created.insertId);
     }
@@ -190,7 +199,7 @@ export const ensureTenantCreditsBundle = async (input: {
 
     const memberUserIds: number[] = [];
     for (const member of input.members) {
-      memberUserIds.push(await ensureCreditsUser(connection, member.email));
+      memberUserIds.push(await ensureCreditsUser(connection, member));
     }
 
     const [existingTenants] = await connection.query<any[]>(

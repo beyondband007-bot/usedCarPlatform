@@ -27,6 +27,7 @@ const run = async () => {
   const synced = [];
   for (const user of rows) {
     const credits = await ensurePersonalCreditsAccount({
+      username: user.username,
       email: `${user.username}@used-car.local`,
       initialPoints: user.gift_points,
     });

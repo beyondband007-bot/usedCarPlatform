@@ -335,6 +335,7 @@ export const authService = {
     const planCode = normalizePlanCode(input.planCode);
     const plan = await getPlanSeed(planCode);
     const credits = await ensurePersonalCreditsAccount({
+      username,
       email: `${username}@used-car.local`,
       initialPoints: plan.gift_points,
     });

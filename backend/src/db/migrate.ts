@@ -135,6 +135,7 @@ const ensureSeedPersonalCreditsUser = async (input: { username: string; plan: st
   if (!env.credits.enabled) return null;
 
   const credits = await ensurePersonalCreditsAccount({
+    username: input.username,
     email: creditsEmailForUsername(input.username),
     initialPoints: await planGiftPoints(input.plan),
   });
@@ -412,8 +413,9 @@ const seedFlagshipEnterpriseTenant = async () => {
         tenantName: "企业旗舰版演示企业",
         initialPoints: await planGiftPoints("flagship"),
         members: [
-          { email: creditsEmailForUsername("flagship"), role: "owner" },
+          { username: "flagship", email: creditsEmailForUsername("flagship"), role: "owner" },
           ...childUsers.map((user) => ({
+            username: user.username,
             email: creditsEmailForUsername(user.username),
             role: user.creditsRole,
           })),
