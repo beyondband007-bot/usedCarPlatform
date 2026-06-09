@@ -32,6 +32,8 @@ type CustomerProfileRow = RowDataPacket & {
   enterprise_owner_display_name: string | null;
   enterprise_subscription_user_id: string | null;
   created_by_user_id: string;
+  created_by_username: string | null;
+  created_by_display_name: string | null;
   created_by_role_code: string;
   status: string;
   created_at: Date;
@@ -181,6 +183,8 @@ async function listCustomerProfiles() {
        MAX(owner.display_name) enterprise_owner_display_name,
        MAX(et.subscription_user_id) enterprise_subscription_user_id,
        acl.created_by_user_id,
+       creator.username created_by_username,
+       creator.display_name created_by_display_name,
        acl.created_by_role_code,
        acl.status,
        acl.created_at
@@ -194,9 +198,11 @@ async function listCustomerProfiles() {
        ON et.id = em.tenant_id
       AND et.status = 'active'
      LEFT JOIN app_users owner ON owner.id = et.owner_user_id
+     LEFT JOIN app_users creator ON creator.id = acl.created_by_user_id
      GROUP BY acl.id, acl.application_code, acl.user_id, u.username, u.display_name,
               u.phone, acl.credits_user_id, acl.account_scope, acl.credits_tenant_id,
-              acl.created_by_user_id, acl.created_by_role_code, acl.status, acl.created_at
+              acl.created_by_user_id, creator.username, creator.display_name,
+              acl.created_by_role_code, acl.status, acl.created_at
      ORDER BY acl.created_at DESC
      LIMIT 100`,
   );
@@ -256,6 +262,8 @@ async function listCustomerProfiles() {
     enterpriseOwnerDisplayName: row.enterprise_owner_display_name,
     enterpriseAccountRole: resolveEnterpriseAccountRole(row),
     createdByUserId: row.created_by_user_id,
+    createdByUsername: row.created_by_username,
+    createdByDisplayName: row.created_by_display_name,
     createdByRole: row.created_by_role_code,
     status: row.status,
     createdAt: row.created_at.toISOString(),

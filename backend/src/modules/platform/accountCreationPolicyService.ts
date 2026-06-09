@@ -54,6 +54,9 @@ export type AgentPolicyOverride = {
   username: string;
   displayName: string;
   phone: string | null;
+  assignedByUserId: string | null;
+  assignedByUsername: string | null;
+  assignedByDisplayName: string | null;
   developerAllowsCreateUsers: boolean;
   developerDisabledCreateUsers: boolean;
   effectiveCanCreateUsers: boolean;
@@ -66,6 +69,9 @@ type AdminPolicyOverrideRow = RowDataPacket & {
   username: string;
   display_name: string;
   phone: string | null;
+  assigned_by_user_id: string | null;
+  assigned_by_username: string | null;
+  assigned_by_display_name: string | null;
   developer_allows_create_users: 0 | 1 | null;
   developer_allows_create_agents: 0 | 1 | null;
   updated_by_user_id: string | null;
@@ -334,11 +340,15 @@ async function listAgentPolicyOverrides(
        u.username,
        u.display_name,
        u.phone,
+       boa.assigned_by_user_id,
+       assigned_by.username assigned_by_username,
+       assigned_by.display_name assigned_by_display_name,
        override.developer_allows_create_users,
        override.updated_by_user_id,
        override.updated_at override_updated_at
      FROM back_office_role_assignments boa
      JOIN app_users u ON u.id = boa.user_id
+     LEFT JOIN app_users assigned_by ON assigned_by.id = boa.assigned_by_user_id
      LEFT JOIN back_office_agent_policy_overrides override ON override.agent_user_id = u.id
      WHERE boa.role_code = 'agent'
        AND boa.status = 'active'
@@ -356,6 +366,9 @@ async function listAgentPolicyOverrides(
         username: row.username,
         displayName: row.display_name,
         phone: row.phone,
+        assignedByUserId: row.assigned_by_user_id,
+        assignedByUsername: row.assigned_by_username,
+        assignedByDisplayName: row.assigned_by_display_name,
         developerAllowsCreateUsers: rowGate,
         developerDisabledCreateUsers: !rowGate,
         effectiveCanCreateUsers: globalGate && rowGate,

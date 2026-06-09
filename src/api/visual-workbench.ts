@@ -1106,6 +1106,8 @@ export interface CreditsCustomerProfile {
   enterpriseOwnerDisplayName?: string | null
   enterpriseAccountRole?: 'standalone' | 'mother' | 'child' | string | null
   createdByUserId: string
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
   createdByRole: string
   status: string
   createdAt: string
@@ -1132,6 +1134,10 @@ export interface AgentOperationsCustomer {
   customerDisplayName: string
   customerPhone?: string | null
   customerCreditsUserId: number | string
+  createdByUserId?: string | null
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
+  createdByRole?: string | null
   totalTopUpAmount?: number | string
 }
 
@@ -1295,6 +1301,7 @@ export interface PlatformAgentProfile {
   assignmentStatus: string
   assignedByUserId?: string | null
   assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
   customerCount: number
   leadCount: number
   openTicketCount: number
@@ -1329,6 +1336,9 @@ export interface PlatformAgentPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  assignedByUserId?: string | null
+  assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
   developerAllowsCreateUsers: boolean
   developerDisabledCreateUsers: boolean
   effectiveCanCreateUsers: boolean

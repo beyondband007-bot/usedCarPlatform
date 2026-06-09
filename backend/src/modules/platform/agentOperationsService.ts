@@ -20,6 +20,10 @@ type AgentCustomerRow = RowDataPacket & {
   relation_type: string;
   status: string;
   created_at: Date;
+  created_by_user_id: string | null;
+  created_by_username: string | null;
+  created_by_display_name: string | null;
+  created_by_role_code: string | null;
   customer_user_id: string;
   customer_username: string;
   customer_display_name: string;
@@ -244,6 +248,10 @@ async function listAgentCustomers(agentUserId: string) {
        acr.relation_type,
        acr.status,
        acr.created_at,
+       acl.created_by_user_id,
+       creator.username created_by_username,
+       creator.display_name created_by_display_name,
+       acl.created_by_role_code,
        u.id customer_user_id,
        u.username customer_username,
        u.display_name customer_display_name,
@@ -253,6 +261,10 @@ async function listAgentCustomers(agentUserId: string) {
        u.credits_tenant_id customer_credits_tenant_id
      FROM agent_customer_relations acr
      JOIN app_users u ON u.id = acr.customer_user_id
+     LEFT JOIN application_customer_links acl
+       ON acl.user_id = acr.customer_user_id
+      AND acl.application_code = acr.application_code
+     LEFT JOIN app_users creator ON creator.id = acl.created_by_user_id
      WHERE acr.agent_user_id = :agentUserId
      ORDER BY acr.created_at DESC
      LIMIT 100`,
@@ -267,6 +279,10 @@ async function listAgentCustomers(agentUserId: string) {
     relationType: row.relation_type,
     status: row.status,
     createdAt: row.created_at.toISOString(),
+    createdByUserId: row.created_by_user_id,
+    createdByUsername: row.created_by_username,
+    createdByDisplayName: row.created_by_display_name,
+    createdByRole: row.created_by_role_code,
     customerUserId: row.customer_user_id,
     customerUsername: row.customer_username,
     customerDisplayName: row.customer_display_name,

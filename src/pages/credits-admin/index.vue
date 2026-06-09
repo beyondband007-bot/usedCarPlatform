@@ -723,6 +723,25 @@ function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
   return '-'
 }
 
+function formatCreatorName(input: {
+  createdByUserId?: string | null
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
+  createdByRole?: string | null
+}) {
+  const name = input.createdByDisplayName || input.createdByUsername || input.createdByUserId
+  if (!name) return '-'
+  return input.createdByRole ? `${name} · ${input.createdByRole}` : name
+}
+
+function formatAssignerName(input: {
+  assignedByUserId?: string | null
+  assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
+}) {
+  return input.assignedByDisplayName || input.assignedByUsername || input.assignedByUserId || '-'
+}
+
 function canCreateTargetRole(role: PlatformUserTargetRole) {
   if (activeRole.value === 'developer') {
     return true
@@ -1485,6 +1504,14 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   { title: '角色', key: 'role', width: 110 },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '经办人',
+    key: 'createdByUserId',
+    width: 150,
+    render(row) {
+      return formatCreatorName(row)
+    },
+  },
+  {
     title: '积分余额',
     key: 'creditsAvailableBalance',
     width: 130,
@@ -1687,6 +1714,14 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '经办人',
+    key: 'assignedByUserId',
+    width: 150,
+    render(row) {
+      return formatAssignerName(row)
+    },
+  },
+  {
     title: '创建 User',
     key: 'developerDisabledCreateUsers',
     minWidth: 240,
@@ -1759,6 +1794,14 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  {
+    title: '经办人',
+    key: 'assignedByUserId',
+    width: 150,
+    render(row) {
+      return formatAssignerName(row)
+    },
+  },
   { title: '客户数', key: 'customerCount', width: 90 },
   { title: '线索数', key: 'leadCount', width: 90 },
   { title: '开放工单', key: 'openTicketCount', width: 100 },
@@ -1814,6 +1857,14 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     },
   },
   { title: '手机号', key: 'customerPhone', width: 140, render(row) { return row.customerPhone ?? '-' } },
+  {
+    title: '经办人',
+    key: 'createdByUserId',
+    width: 150,
+    render(row) {
+      return formatCreatorName(row)
+    },
+  },
   {
     title: '累计充值金额',
     key: 'totalTopUpAmount',
