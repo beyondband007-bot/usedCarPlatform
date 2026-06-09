@@ -719,7 +719,12 @@ function deleteActionText(row: CreditsCustomerProfile) {
   return '删除'
 }
 
-function formatCreditsBalance(row: CreditsCustomerProfile) {
+type CreditsBalanceLike = {
+  creditsAvailableBalance?: string | number | null
+  creditsTotalBalance?: string | number | null
+}
+
+function formatCreditsBalance(row: CreditsBalanceLike) {
   const value = row.creditsAvailableBalance ?? row.creditsTotalBalance
   if (value === null || value === undefined || value === '') return '-'
 
@@ -1744,6 +1749,14 @@ const adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride> =
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '积分余额',
+    key: 'creditsAvailableBalance',
+    width: 130,
+    render(row) {
+      return formatCreditsBalance(row)
+    },
+  },
+  {
     title: '允许创建 User',
     key: 'developerAllowsCreateUsers',
     minWidth: 220,
@@ -1813,6 +1826,14 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
+  {
+    title: '积分余额',
+    key: 'creditsAvailableBalance',
+    width: 130,
+    render(row) {
+      return formatCreditsBalance(row)
+    },
+  },
   {
     title: '经办人',
     key: 'assignedByUserId',
@@ -1946,6 +1967,14 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '积分余额',
+    key: 'creditsAvailableBalance',
+    width: 130,
+    render(row) {
+      return formatCreditsBalance(row)
+    },
+  },
+  {
     title: '经办人',
     key: 'assignedByUserId',
     width: 150,
@@ -2008,6 +2037,14 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     },
   },
   { title: '手机号', key: 'customerPhone', width: 140, render(row) { return row.customerPhone ?? '-' } },
+  {
+    title: '积分余额',
+    key: 'creditsAvailableBalance',
+    width: 130,
+    render(row) {
+      return formatCreditsBalance(row)
+    },
+  },
   {
     title: '经办人',
     key: 'createdByUserId',

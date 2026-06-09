@@ -8,6 +8,7 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { getCommissionPolicy } from "./commissionPolicyService";
+import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type AgentUserRow = RowDataPacket & {
   id: string;
@@ -273,6 +274,13 @@ async function listAgentCustomers(agentUserId: string) {
   );
 
   const totalTopUpAmountByCustomer = await listCustomerTopUpAmounts(rows);
+  const balances = await listCreditsBalances(
+    rows.map((row) => ({
+      creditsUserId: row.customer_credits_user_id,
+      accountScope: row.customer_account_scope,
+      creditsTenantId: row.customer_credits_tenant_id,
+    })),
+  );
 
   return rows.map((row) => ({
     id: row.id,
@@ -289,6 +297,18 @@ async function listAgentCustomers(agentUserId: string) {
     customerDisplayName: row.customer_display_name,
     customerPhone: row.customer_phone,
     customerCreditsUserId: row.customer_credits_user_id,
+    creditsAvailableBalance:
+      balances.get(creditsBalanceKey({
+        creditsUserId: row.customer_credits_user_id,
+        accountScope: row.customer_account_scope,
+        creditsTenantId: row.customer_credits_tenant_id,
+      }) ?? "")?.availableBalance ?? null,
+    creditsTotalBalance:
+      balances.get(creditsBalanceKey({
+        creditsUserId: row.customer_credits_user_id,
+        accountScope: row.customer_account_scope,
+        creditsTenantId: row.customer_credits_tenant_id,
+      }) ?? "")?.totalBalance ?? null,
     totalTopUpAmount:
       totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
   }));

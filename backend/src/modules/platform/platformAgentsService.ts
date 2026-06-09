@@ -4,6 +4,7 @@ import type { RowDataPacket } from "mysql2";
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
+import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type PlatformAgentRow = RowDataPacket & {
   user_id: string;
@@ -11,6 +12,8 @@ type PlatformAgentRow = RowDataPacket & {
   display_name: string;
   phone: string | null;
   credits_user_id: number | null;
+  account_scope: string | null;
+  credits_tenant_id: number | null;
   status: string;
   assigned_by_user_id: string | null;
   assigned_by_username: string | null;
@@ -42,6 +45,8 @@ export async function listPlatformAgents(req: Request) {
        u.display_name,
        u.phone,
        u.credits_user_id,
+       u.account_scope,
+       u.credits_tenant_id,
        u.status,
        boa.assigned_by_user_id,
        assigned_by.username assigned_by_username,
@@ -81,6 +86,8 @@ export async function listPlatformAgents(req: Request) {
        u.display_name,
        u.phone,
        u.credits_user_id,
+       u.account_scope,
+       u.credits_tenant_id,
        u.status,
        boa.assigned_by_user_id,
        assigned_by.username,
@@ -88,27 +95,44 @@ export async function listPlatformAgents(req: Request) {
        boa.status,
        boa.created_at,
        boa.updated_at
-     ORDER BY boa.created_at DESC`,
+    ORDER BY boa.created_at DESC`,
+  );
+  const balances = await listCreditsBalances(
+    rows.map((row) => ({
+      creditsUserId: row.credits_user_id,
+      accountScope: row.account_scope,
+      creditsTenantId: row.credits_tenant_id,
+    })),
   );
 
   return {
-    items: rows.map((row) => ({
-      userId: row.user_id,
-      username: row.username,
-      displayName: row.display_name,
-      phone: row.phone,
-      creditsUserId: row.credits_user_id,
-      status: row.status,
-      assignmentStatus: row.assignment_status,
-      assignedByUserId: row.assigned_by_user_id,
-      assignedByUsername: row.assigned_by_username,
-      assignedByDisplayName: row.assigned_by_display_name,
-      customerCount: toNumber(row.customer_count),
-      leadCount: toNumber(row.lead_count),
-      openTicketCount: toNumber(row.open_ticket_count),
-      applications: row.applications_csv ? row.applications_csv.split(",").filter(Boolean) : [],
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at.toISOString(),
-    })),
+    items: rows.map((row) => {
+      const balance = balances.get(creditsBalanceKey({
+        creditsUserId: row.credits_user_id,
+        accountScope: row.account_scope,
+        creditsTenantId: row.credits_tenant_id,
+      }) ?? "");
+      return {
+        userId: row.user_id,
+        username: row.username,
+        displayName: row.display_name,
+        phone: row.phone,
+        creditsUserId: row.credits_user_id,
+        creditsAvailableBalance: balance?.availableBalance ?? null,
+        creditsTotalBalance: balance?.totalBalance ?? null,
+        creditsCurrency: balance?.currency ?? null,
+        status: row.status,
+        assignmentStatus: row.assignment_status,
+        assignedByUserId: row.assigned_by_user_id,
+        assignedByUsername: row.assigned_by_username,
+        assignedByDisplayName: row.assigned_by_display_name,
+        customerCount: toNumber(row.customer_count),
+        leadCount: toNumber(row.lead_count),
+        openTicketCount: toNumber(row.open_ticket_count),
+        applications: row.applications_csv ? row.applications_csv.split(",").filter(Boolean) : [],
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      };
+    }),
   };
 }

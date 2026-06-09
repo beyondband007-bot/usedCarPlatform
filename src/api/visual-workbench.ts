@@ -1138,6 +1138,9 @@ export interface AgentOperationsCustomer {
   createdByUsername?: string | null
   createdByDisplayName?: string | null
   createdByRole?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   totalTopUpAmount?: number | string
 }
 
@@ -1297,6 +1300,9 @@ export interface PlatformAgentProfile {
   displayName: string
   phone?: string | null
   creditsUserId?: number | string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   status: string
   assignmentStatus: string
   assignedByUserId?: string | null
@@ -1319,6 +1325,9 @@ export interface PlatformAdminPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   developerAllowsCreateUsers: boolean
   developerAllowsCreateAgents: boolean
   effectiveCanCreateUsers: boolean
@@ -1336,6 +1345,9 @@ export interface PlatformAgentPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   assignedByUserId?: string | null
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null
