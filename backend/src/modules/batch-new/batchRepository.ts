@@ -20,6 +20,10 @@ export interface BatchTaskRecord {
   accountScope?: "personal" | "tenant" | null;
   estimatedPoints?: string | null;
   settledPoints?: string | null;
+  brandedSceneTaskId?: string | null;
+  brandedSceneUrl?: string | null;
+  brandedSceneErrorCode?: string | null;
+  brandedSceneErrorMessage?: string | null;
   subscriptionUserKey?: string | null;
   subscriptionPlanCode?: string | null;
   createdAt: Date;
@@ -46,6 +50,10 @@ interface BatchTaskRow extends RowDataPacket {
   account_scope: "personal" | "tenant" | null;
   estimated_points: string | null;
   settled_points: string | null;
+  branded_scene_task_id: string | null;
+  branded_scene_url: string | null;
+  branded_scene_error_code: string | null;
+  branded_scene_error_message: string | null;
   subscription_user_key: string | null;
   subscription_plan_code: string | null;
   created_at: Date;
@@ -105,6 +113,10 @@ const mapBatch = (row: BatchTaskRow): BatchTaskRecord => ({
   accountScope: row.account_scope,
   estimatedPoints: row.estimated_points,
   settledPoints: row.settled_points,
+  brandedSceneTaskId: row.branded_scene_task_id,
+  brandedSceneUrl: row.branded_scene_url,
+  brandedSceneErrorCode: row.branded_scene_error_code,
+  brandedSceneErrorMessage: row.branded_scene_error_message,
   subscriptionUserKey: row.subscription_user_key,
   subscriptionPlanCode: row.subscription_plan_code,
   createdAt: row.created_at,
@@ -175,14 +187,17 @@ export class BatchRepository extends Repository {
     accountScope?: "personal" | "tenant" | null;
     subscriptionUserKey?: string | null;
     subscriptionPlanCode?: string | null;
+    brandedSceneTaskId?: string | null;
   }) {
     await this.execute(
       `INSERT INTO batch_tasks
         (id, user_id, project_name, preset_id, status, total, completed, failed, progress, visual_config_json,
-         credits_user_id, credits_tenant_id, account_scope, subscription_user_key, subscription_plan_code)
+         credits_user_id, credits_tenant_id, account_scope, subscription_user_key, subscription_plan_code,
+         branded_scene_task_id)
        VALUES
         (:id, :userId, :projectName, :presetId, 'waiting', :total, 0, 0, 0, :visualConfig,
-         :creditsUserId, :creditsTenantId, :accountScope, :subscriptionUserKey, :subscriptionPlanCode)`,
+         :creditsUserId, :creditsTenantId, :accountScope, :subscriptionUserKey, :subscriptionPlanCode,
+         :brandedSceneTaskId)`,
       {
         ...input,
         visualConfig: JSON.stringify(input.visualConfig),
@@ -191,7 +206,41 @@ export class BatchRepository extends Repository {
         accountScope: input.accountScope ?? null,
         subscriptionUserKey: input.subscriptionUserKey ?? null,
         subscriptionPlanCode: input.subscriptionPlanCode ?? null,
+        brandedSceneTaskId: input.brandedSceneTaskId ?? null,
       },
+    );
+  }
+
+  async setBrandedSceneTask(input: { batchId: string; taskId: string }) {
+    await this.execute(
+      `UPDATE batch_tasks
+       SET branded_scene_task_id = :taskId,
+           branded_scene_url = NULL,
+           branded_scene_error_code = NULL,
+           branded_scene_error_message = NULL
+       WHERE id = :batchId`,
+      input,
+    );
+  }
+
+  async markBrandedSceneSuccess(input: { batchId: string; url: string }) {
+    await this.execute(
+      `UPDATE batch_tasks
+       SET branded_scene_url = :url,
+           branded_scene_error_code = NULL,
+           branded_scene_error_message = NULL
+       WHERE id = :batchId`,
+      input,
+    );
+  }
+
+  async markBrandedSceneFailed(input: { batchId: string; errorCode: string; errorMessage: string | null }) {
+    await this.execute(
+      `UPDATE batch_tasks
+       SET branded_scene_error_code = :errorCode,
+           branded_scene_error_message = :errorMessage
+       WHERE id = :batchId`,
+      input,
     );
   }
 
@@ -382,9 +431,14 @@ export class BatchRepository extends Repository {
       batchIds.map((batchId, index) => [`batchId${index}`, batchId]),
     );
     const rows = await this.query<Array<RowDataPacket & { generation_task_id: string }>>(
-      `SELECT DISTINCT generation_task_id
+      `SELECT generation_task_id
        FROM batch_task_items
-       WHERE batch_id IN (${placeholders})`,
+       WHERE batch_id IN (${placeholders})
+       UNION
+       SELECT branded_scene_task_id AS generation_task_id
+       FROM batch_tasks
+       WHERE id IN (${placeholders})
+         AND branded_scene_task_id IS NOT NULL`,
       params,
     );
     return rows.map((row) => row.generation_task_id).filter(Boolean);
@@ -408,13 +462,20 @@ export class BatchRepository extends Repository {
       `UPDATE batch_tasks bt
        LEFT JOIN (
         SELECT
-          bti.batch_id,
+          task_refs.batch_id,
           SUM(COALESCE(gt.estimated_points, 0)) estimated_points,
           SUM(COALESCE(gt.settled_points, 0)) settled_points
-        FROM batch_task_items bti
-        JOIN generation_tasks gt ON gt.id = bti.generation_task_id
-        WHERE bti.batch_id = :batchId
-        GROUP BY bti.batch_id
+        FROM (
+          SELECT batch_id, generation_task_id
+          FROM batch_task_items
+          WHERE batch_id = :batchId
+          UNION ALL
+          SELECT id AS batch_id, branded_scene_task_id AS generation_task_id
+          FROM batch_tasks
+          WHERE id = :batchId AND branded_scene_task_id IS NOT NULL
+        ) task_refs
+        JOIN generation_tasks gt ON gt.id = task_refs.generation_task_id
+        GROUP BY task_refs.batch_id
        ) billing ON billing.batch_id = bt.id
        SET bt.estimated_points = billing.estimated_points,
            bt.settled_points = billing.settled_points

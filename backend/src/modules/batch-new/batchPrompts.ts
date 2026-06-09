@@ -64,6 +64,34 @@ export const buildBatchPromptKey = (config: BatchVisualConfig) =>
     .filter(Boolean)
     .join("+");
 
+export const batchWallLogoScenePrompt =
+  "第一张图片是目标上新场景参考图，第二张图片是 Logo / 标识参考图。请基于第一张图片生成一张不含车辆的统一上新背景场景图，并将第二张图片中的 Logo / 标识自然设计到场景后方背景墙上。背景墙 Logo 只参考第二张图片中的文字轮廓、字形结构和图形符号，不要复制底色、底板、材质、外框、边框、螺丝、铆钉、牌匾造型、车牌比例或装饰风格。Logo 应直接附着在墙面上，与场景灯光、透视、材质和装修风格一致，可表现为浅灰金属立体字、白色亚克力字、磨砂银墙面字或轻微背光发光字。Logo 需要中等偏大、清晰可读，成为墙面主要品牌识别元素，位置通常位于主墙视觉中心或车辆未来摆放区域后方上方。请保持场景空间结构、地面材质、光线方向、景深和整体氛围稳定统一，不要生成车辆、人物、杂物、车牌号、额外文字、矩形牌子、黑色底牌、金色边框、螺丝固定件或悬挂牌匾。输出适合二手车电商批量上新的真实汽车广告背景图，画面干净、高级、统一。";
+
+export const resolveBatchExteriorPromptWithBrandedScene = (config: BatchVisualConfig) => {
+  const hasLight = config.enableLightConsistency === true || config.lightConsistency === true;
+  const hasPaint = config.enablePaintRefresh === true || config.paintRefresh === true;
+  const placements = resolveLogoPlacements({
+    enabled: config.useRecentLogo === true,
+    logoPlacements: config.logoPlacements,
+    legacyDefault: ["plate"],
+  }).filter((placement) => placement !== "wall");
+  const parts = [
+    "第一张图片是车辆主体，第二张图片是已经带有统一背景墙 Logo 的目标上新场景图。",
+    "请将第一张车自然放入第二张场景中，保持车辆真实车型、车身比例、车漆原色、轮毂、灯组、车窗结构和原车拍摄角度一致，车身完整，轮胎和车顶不要裁切。让车辆与第二张场景的地面接触、透视关系、阴影、环境反射和整体光照自然融合。第二张场景中的背景墙 Logo 是已经确认的品牌墙效果，必须保持其文字轮廓、位置、大小、材质、颜色、透视和光照关系不变，不要重绘、替换、移动、放大、缩小、遮挡或新增背景墙 Logo。",
+  ];
+
+  if (hasPaint) parts.push(paintInstruction);
+  if (hasLight) parts.push(lightInstruction);
+  if (!hasPaint && !hasLight && !placements.length) {
+    parts.push(lightInstruction);
+  }
+
+  if (placements.includes("plate")) parts.push(plateLogoInstruction("第三张图片"));
+  parts.push(negativeInstruction);
+
+  return appendBatchPaintColorPrompt(parts.join(""), hasPaint ? resolveBatchPaintColorCode(config) : null);
+};
+
 export const resolveBatchExteriorPrompt = (config: BatchVisualConfig) => {
   const hasSceneChange = config.enableSceneChange === true;
   const hasLight = config.enableLightConsistency === true || config.lightConsistency === true;

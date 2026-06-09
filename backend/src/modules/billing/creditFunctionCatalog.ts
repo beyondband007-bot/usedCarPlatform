@@ -1,5 +1,6 @@
 import {
   batchItemGenerationPoints,
+  batchWallLogoSceneGenerationPoints,
   shortVideoGenerationPoints,
   singleImageGenerationPoints,
 } from "./generationPointRules";
@@ -49,6 +50,14 @@ export const creditFunctionCatalog: CreditFunctionCatalogItem[] = [
     description: "Batch exterior image generation item",
     chargeMode: "estimate_required",
     defaultPoints: batchItemGenerationPoints({}),
+    status: "active",
+  },
+  {
+    code: "batch-new-wall-logo-scene",
+    name: "Batch New Wall Logo Scene",
+    description: "Batch wall-logo branded scene generation",
+    chargeMode: "estimate_required",
+    defaultPoints: batchWallLogoSceneGenerationPoints(),
     status: "active",
   },
   {

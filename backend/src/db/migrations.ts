@@ -83,12 +83,17 @@ export const migrations = [
     subscription_plan_code VARCHAR(32) NULL,
     estimated_points DECIMAL(18, 4) NULL,
     settled_points DECIMAL(18, 4) NULL,
+    branded_scene_task_id VARCHAR(64) NULL,
+    branded_scene_url VARCHAR(1024) NULL,
+    branded_scene_error_code VARCHAR(120) NULL,
+    branded_scene_error_message TEXT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_batch_tasks_status_created (status, created_at),
     INDEX idx_batch_tasks_user_status_created (user_id, status, created_at),
     INDEX idx_batch_tasks_credits_user_created (credits_user_id, created_at),
-    INDEX idx_batch_tasks_subscription_running (subscription_user_key, status, created_at)
+    INDEX idx_batch_tasks_subscription_running (subscription_user_key, status, created_at),
+    INDEX idx_batch_tasks_branded_scene_task (branded_scene_task_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS subscription_plans (

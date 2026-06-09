@@ -759,12 +759,17 @@ const run = async () => {
     await addColumnIfMissing("batch_tasks", "subscription_plan_code", "VARCHAR(32) NULL");
     await addColumnIfMissing("batch_tasks", "estimated_points", "DECIMAL(18, 4) NULL");
     await addColumnIfMissing("batch_tasks", "settled_points", "DECIMAL(18, 4) NULL");
+    await addColumnIfMissing("batch_tasks", "branded_scene_task_id", "VARCHAR(64) NULL");
+    await addColumnIfMissing("batch_tasks", "branded_scene_url", "VARCHAR(1024) NULL");
+    await addColumnIfMissing("batch_tasks", "branded_scene_error_code", "VARCHAR(120) NULL");
+    await addColumnIfMissing("batch_tasks", "branded_scene_error_message", "TEXT NULL");
     await addIndexIfMissing("batch_tasks", "idx_batch_tasks_credits_user_created", "(credits_user_id, created_at)");
     await addIndexIfMissing(
       "batch_tasks",
       "idx_batch_tasks_subscription_running",
       "(subscription_user_key, status, created_at)",
     );
+    await addIndexIfMissing("batch_tasks", "idx_batch_tasks_branded_scene_task", "(branded_scene_task_id)");
     await addColumnIfMissing("account_creation_audit_logs", "idempotency_key", "VARCHAR(160) NULL");
     await addColumnIfMissing("account_creation_audit_logs", "request_hash", "CHAR(64) NULL");
     await addColumnIfMissing(

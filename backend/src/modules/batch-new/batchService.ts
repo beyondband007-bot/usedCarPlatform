@@ -25,14 +25,19 @@ import {
   resolveBillingIdentity,
   type BillingRequestContext,
 } from "../billing/billingIdentity";
-import { batchItemGenerationPoints } from "../billing/generationPointRules";
+import {
+  batchItemGenerationPoints,
+  batchWallLogoSceneGenerationPoints,
+} from "../billing/generationPointRules";
 import { deliveryRepository } from "../delivery/deliveryRepository";
 import { assertCanStartBatchGeneration, type SubscriptionIdentity } from "../subscription/subscriptionService";
 import {
   batchInteriorCleanCollagePrompt,
   batchInteriorCollagePrompt,
   batchInteriorPrompt,
+  batchWallLogoScenePrompt,
   resolveBatchExteriorPrompt,
+  resolveBatchExteriorPromptWithBrandedScene,
 } from "./batchPrompts";
 import { batchRepository, type BatchTaskRecord } from "./batchRepository";
 import {
@@ -41,6 +46,7 @@ import {
   shouldUploadBatchSceneFromLocalPath,
 } from "./batchScenes";
 import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
+import { normalizeTaskResults, type GenerationTaskRecord } from "../tasks/tasksRepository";
 
 const terminalStatuses = ["success", "fail", "canceled"];
 
@@ -146,6 +152,8 @@ const batchItemFunctionCode = (itemKind: BatchItemKind) => {
   return "batch-new-interior";
 };
 
+const batchWallLogoSceneFunctionCode = "batch-new-wall-logo-scene";
+
 const batchItemBillingScope = (itemId: string) => ({
   bizType: "batch_item",
   bizId: itemId,
@@ -153,11 +161,23 @@ const batchItemBillingScope = (itemId: string) => ({
   idempotencyId: itemId,
 });
 
+const batchWallLogoSceneBillingScope = (batchId: string) => ({
+  bizType: "batch_wall_logo_scene",
+  bizId: batchId,
+  idempotencyType: "batch_wall_logo_scene",
+  idempotencyId: batchId,
+});
+
 const batchBillingBody = (batch: BatchTaskRecord) => ({
   creditsUserId: batch.creditsUserId,
   creditsTenantId: batch.creditsTenantId,
   accountScope: batch.accountScope,
 });
+
+const requiresBatchWallLogoScene = (config: BatchVisualConfig) =>
+  booleanFlag(config, "enableSceneChange") &&
+  config.useRecentLogo === true &&
+  resolveBatchLogoPlacements(config).includes("wall");
 
 const kieTimeoutErrorCodes = [
   "KIE_UPLOAD_TIMEOUT",
@@ -255,7 +275,9 @@ class BatchService {
     if (config.useRecentLogo === true && !config.logoPlacements?.length) {
       config.logoPlacements = logoPlacements;
     }
-    await requireBatchLogoAsset(config, subscription.userKey);
+    const logoAsset = await requireBatchLogoAsset(config, subscription.userKey);
+    const needsWallLogoScene = requiresBatchWallLogoScene(config);
+    const brandedSceneTaskId = needsWallLogoScene ? createId("task") : null;
 
     for (const group of body.carGroups) {
       if (!Array.isArray(group.exteriorAssetIds) || group.exteriorAssetIds.length === 0) {
@@ -282,7 +304,25 @@ class BatchService {
       accountScope: billingIdentity?.accountScope ?? null,
       subscriptionUserKey: subscription.userKey,
       subscriptionPlanCode: subscription.planCode,
+      brandedSceneTaskId,
     });
+
+    if (brandedSceneTaskId && logoAsset) {
+      const scene = resolveBatchScene(config.sceneOptionId, config.sceneReferenceImageUrl);
+      await tasksRepository.createWaitingTask({
+        id: brandedSceneTaskId,
+        userId: subscription.userKey,
+        moduleCode: batchWallLogoSceneFunctionCode,
+        inputAssetId: logoAsset.id,
+        optionId: scene.optionId,
+        outputRatio: outputRatioOrDefault(config.outputRatio),
+        resolution: IMAGE_GENERATION_RESOLUTION,
+        logoAssetId: logoAsset.id,
+        prompt: batchWallLogoScenePrompt,
+        subscriptionUserKey: subscription.userKey,
+        subscriptionPlanCode: subscription.planCode,
+      });
+    }
 
     let sortOrder = 0;
     for (const [groupIndex, group] of body.carGroups.entries()) {
@@ -412,7 +452,271 @@ class BatchService {
     };
   }
 
+  private async createWallLogoSceneTask(batch: BatchTaskRecord) {
+    const logoAsset = await requireBatchLogoAsset(batch.visualConfig, batch.userId);
+    if (!logoAsset) return null;
+    const taskId = createId("task");
+    const scene = resolveBatchScene(batch.visualConfig.sceneOptionId, batch.visualConfig.sceneReferenceImageUrl);
+
+    await tasksRepository.createWaitingTask({
+      id: taskId,
+      userId: batch.userId,
+      moduleCode: batchWallLogoSceneFunctionCode,
+      inputAssetId: logoAsset.id,
+      optionId: scene.optionId,
+      outputRatio: outputRatioOrDefault(batch.visualConfig.outputRatio),
+      resolution: IMAGE_GENERATION_RESOLUTION,
+      logoAssetId: logoAsset.id,
+      prompt: batchWallLogoScenePrompt,
+      subscriptionUserKey: batch.subscriptionUserKey,
+      subscriptionPlanCode: batch.subscriptionPlanCode,
+    });
+    await batchRepository.setBrandedSceneTask({ batchId: batch.id, taskId });
+    return taskId;
+  }
+
+  private async submitWallLogoSceneTask(batch: BatchTaskRecord, task: GenerationTaskRecord) {
+    const config = batch.visualConfig;
+    let billing: FrozenGenerationBilling | null = null;
+    let lease: KieAccountLease | null = null;
+    let leaseReleasedByKieClient = false;
+    let submittedToKie = false;
+    const runKieOperation = async <T>(operation: () => Promise<T>) => {
+      try {
+        return await operation();
+      } catch (error) {
+        leaseReleasedByKieClient = true;
+        throw error;
+      }
+    };
+
+    try {
+      lease = await kieKeyPool.acquire();
+      billing = await freezeGenerationBilling({
+        taskId: task.id,
+        functionCode: batchWallLogoSceneFunctionCode,
+        estimatedPoints: batchWallLogoSceneGenerationPoints(),
+        body: batchBillingBody(batch),
+        scope: batchWallLogoSceneBillingScope(batch.id),
+      });
+
+      const scene = resolveBatchScene(config.sceneOptionId, config.sceneReferenceImageUrl);
+      const uploadedScene =
+        shouldUploadBatchSceneFromLocalPath(config.sceneReferenceImageUrl) &&
+        scene.referenceImagePath
+          ? await runKieOperation(() =>
+              kieClient.uploadLocalFileWithLease(
+                lease as KieAccountLease,
+                scene.referenceImagePath as string,
+                "used-car-platform/batch-new/wall-logo-scene",
+              ),
+            )
+          : null;
+      const sceneReferenceImageUrl = resolveBatchSceneReferenceImageUrl({
+        sceneOptionId: config.sceneOptionId,
+        sceneReferenceImageUrl: config.sceneReferenceImageUrl,
+        uploadedLocalFileUrl: uploadedScene?.fileUrl,
+      });
+      if (!sceneReferenceImageUrl) {
+        throw errors.invalidParameter("batch-new wall logo scene reference image is missing", {
+          optionId: scene.optionId,
+          sceneOptionId: config.sceneOptionId,
+        });
+      }
+
+      const logoAsset = await requireBatchLogoAsset(config, batch.userId);
+      if (!logoAsset) throw errors.assetNotFound();
+      const uploadedLogo = await runKieOperation(() =>
+        kieClient.uploadLocalFileWithLease(
+          lease as KieAccountLease,
+          logoAsset.localPath,
+          "used-car-platform/batch-new/wall-logo",
+        ),
+      );
+
+      const inputUrls = [sceneReferenceImageUrl, uploadedLogo.fileUrl];
+      const kieTask = await runKieOperation(() =>
+        kieClient.createImageToImageTaskWithLease(lease as KieAccountLease, {
+          prompt: task.prompt ?? batchWallLogoScenePrompt,
+          inputUrls,
+          aspectRatio: task.outputRatio,
+          resolution: task.resolution,
+        }),
+      );
+
+      await tasksRepository.markSubmitted({
+        id: task.id,
+        kieTaskId: kieTask.kieTaskId,
+        kieAccountHash: kieTask.accountHash,
+        requestJson: {
+          model: kieTask.model ?? "gpt-image-2-image-to-image",
+          moduleCode: batchWallLogoSceneFunctionCode,
+          batchId: batch.id,
+          prompt: task.prompt,
+          scene: {
+            ...scene,
+            referenceImageUrl: sceneReferenceImageUrl,
+          },
+          logoAssetId: logoAsset.id,
+          inputUrls,
+          aspectRatio: task.outputRatio,
+          resolution: task.resolution,
+          fixedExtraPoints: batchWallLogoSceneGenerationPoints(),
+        },
+        responseJson: kieTask.raw,
+      });
+      submittedToKie = true;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("no available kie api key")) {
+        throw error;
+      }
+      if (submittedToKie) return;
+      if (lease && !leaseReleasedByKieClient) await kieKeyPool.release(lease.accountHash);
+      try {
+        await refundFrozenGenerationBilling(task.id, billing, batchWallLogoSceneBillingScope(batch.id));
+      } catch {
+        await markGenerationBillingRefundFailed(task.id, billing);
+      }
+      const errorCode = submitErrorCode(error);
+      const errorMessage = error instanceof Error ? error.message : "batch wall logo scene submit failed";
+      await tasksRepository.markFailed(task.id, errorCode, errorMessage);
+      await batchRepository.markBrandedSceneFailed({
+        batchId: batch.id,
+        errorCode,
+        errorMessage,
+      });
+      await this.failWallLogoSceneItems(batch.id, batch.userId, "BATCH_BRANDED_SCENE_FAILED", errorMessage);
+    }
+  }
+
+  private async refreshWallLogoSceneTask(batch: BatchTaskRecord, task: GenerationTaskRecord) {
+    const detail = await tasksService.getTaskDetail(task.id, {
+      finalizeBilling: false,
+      userId: batch.userId,
+    });
+    const refreshedTask = (await tasksRepository.findById(task.id, batch.userId)) ?? task;
+    if (shouldFinalizeGenerationBilling(refreshedTask)) {
+      await finalizeGenerationBilling(refreshedTask, batchWallLogoSceneBillingScope(batch.id));
+    }
+
+    if (detail.status === "success") {
+      const url = detail.resultImages[0]?.url;
+      if (url) {
+        await batchRepository.markBrandedSceneSuccess({ batchId: batch.id, url });
+        return true;
+      }
+      await batchRepository.markBrandedSceneFailed({
+        batchId: batch.id,
+        errorCode: "BATCH_BRANDED_SCENE_EMPTY_RESULT",
+        errorMessage: "batch wall logo scene result is empty",
+      });
+      await this.failWallLogoSceneItems(
+        batch.id,
+        batch.userId,
+        "BATCH_BRANDED_SCENE_EMPTY_RESULT",
+        "batch wall logo scene result is empty",
+      );
+      return false;
+    }
+
+    if (detail.status === "fail" || detail.status === "canceled") {
+      const errorCode = detail.error?.code ?? "BATCH_BRANDED_SCENE_FAILED";
+      const errorMessage = detail.error?.message ?? "batch wall logo scene failed";
+      await batchRepository.markBrandedSceneFailed({
+        batchId: batch.id,
+        errorCode,
+        errorMessage,
+      });
+      await this.failWallLogoSceneItems(batch.id, batch.userId, "BATCH_BRANDED_SCENE_FAILED", errorMessage);
+    }
+    return false;
+  }
+
+  private async ensureWallLogoSceneReady(batch: BatchTaskRecord) {
+    if (!requiresBatchWallLogoScene(batch.visualConfig)) return true;
+    if (batch.brandedSceneUrl) return true;
+    if (batch.brandedSceneErrorCode) return false;
+
+    const taskId = batch.brandedSceneTaskId ?? (await this.createWallLogoSceneTask(batch));
+    if (!taskId) return false;
+    const task = await tasksRepository.findById(taskId, batch.userId);
+    if (!task) {
+      await batchRepository.markBrandedSceneFailed({
+        batchId: batch.id,
+        errorCode: "BATCH_BRANDED_SCENE_TASK_MISSING",
+        errorMessage: "batch wall logo scene task is missing",
+      });
+      await this.failWallLogoSceneItems(
+        batch.id,
+        batch.userId,
+        "BATCH_BRANDED_SCENE_TASK_MISSING",
+        "batch wall logo scene task is missing",
+      );
+      return false;
+    }
+
+    if (task.status === "waiting") {
+      await this.submitWallLogoSceneTask(batch, task);
+      return false;
+    }
+
+    if (!terminalStatuses.includes(task.status)) {
+      return this.refreshWallLogoSceneTask(batch, task);
+    }
+
+    const results = normalizeTaskResults(task.resultJson);
+    if (task.status === "success" && results[0]?.url) {
+      await batchRepository.markBrandedSceneSuccess({ batchId: batch.id, url: results[0].url });
+      if (shouldFinalizeGenerationBilling(task)) {
+        await finalizeGenerationBilling(task, batchWallLogoSceneBillingScope(batch.id));
+      }
+      return true;
+    }
+
+    const errorCode = task.errorCode ?? "BATCH_BRANDED_SCENE_FAILED";
+    const errorMessage = task.errorMessage ?? "batch wall logo scene failed";
+    await batchRepository.markBrandedSceneFailed({
+      batchId: batch.id,
+      errorCode,
+      errorMessage,
+    });
+    await this.failWallLogoSceneItems(batch.id, batch.userId, "BATCH_BRANDED_SCENE_FAILED", errorMessage);
+    if (shouldFinalizeGenerationBilling(task)) {
+      await finalizeGenerationBilling(task, batchWallLogoSceneBillingScope(batch.id));
+    }
+    return false;
+  }
+
+  private async failWallLogoSceneItems(batchId: string, userId: string, errorCode: string, errorMessage: string) {
+    const items = await batchRepository.listItems(batchId);
+    for (const item of items) {
+      if (item.itemKind !== "exterior" || terminalStatuses.includes(item.status)) continue;
+      await tasksRepository.markFailed(item.generationTaskId, errorCode, errorMessage);
+      const failedTask = await tasksRepository.findById(item.generationTaskId, userId);
+      if (failedTask && shouldFinalizeGenerationBilling(failedTask)) {
+        await finalizeGenerationBilling(failedTask, batchItemBillingScope(item.itemId));
+      }
+      await batchRepository.updateItemFromTask({
+        itemId: item.itemId,
+        status: "fail",
+        progress: 100,
+        resultCount: 0,
+        errorCode,
+        errorMessage,
+      });
+    }
+  }
+
   private async refreshActiveBatch(batchId: string, userId: string) {
+    const batch = await batchRepository.findBatch(batchId, userId);
+    if (!batch) throw errors.batchNotFound();
+    try {
+      await this.ensureWallLogoSceneReady(batch);
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes("no available kie api key"))) {
+        throw error;
+      }
+    }
     const items = await batchRepository.listItems(batchId);
     for (const item of items) {
       if (item.status === "waiting") continue;
@@ -427,8 +731,21 @@ class BatchService {
   }
 
   async advanceBatch(batchId: string, userId?: string) {
-    const batch = await batchRepository.findBatch(batchId, userId);
+    let batch = await batchRepository.findBatch(batchId, userId);
     if (!batch) throw errors.batchNotFound();
+    let wallLogoSceneReady = true;
+    try {
+      wallLogoSceneReady = await this.ensureWallLogoSceneReady(batch);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("no available kie api key")) {
+        wallLogoSceneReady = false;
+      } else {
+        throw error;
+      }
+    }
+    if (wallLogoSceneReady && requiresBatchWallLogoScene(batch.visualConfig)) {
+      batch = (await batchRepository.findBatch(batchId, userId)) ?? batch;
+    }
 
     const items = await batchRepository.listItems(batchId);
     for (const item of items) {
@@ -437,6 +754,12 @@ class BatchService {
       } else if (item.status === "success" && item.resultCount === 0) {
         await this.persistDeliveryAssets(batchId, item, batch.userId);
       }
+    }
+
+    if (!wallLogoSceneReady) {
+      await batchRepository.recalcBatch(batchId);
+      await batchRepository.recalcBatchBilling(batchId);
+      return;
     }
 
     const waiting = await batchRepository.listWaitingItems(batchId, 2);
@@ -482,7 +805,11 @@ class BatchService {
 
     const taskId = createId("task");
     const prompt =
-      input.itemKind === "exterior" ? resolveBatchExteriorPrompt(input.config) : resolveInteriorPrompt(input.itemKind);
+      input.itemKind === "exterior"
+        ? requiresBatchWallLogoScene(input.config)
+          ? resolveBatchExteriorPromptWithBrandedScene(input.config)
+          : resolveBatchExteriorPrompt(input.config)
+        : resolveInteriorPrompt(input.itemKind);
     await tasksRepository.createWaitingTask({
       id: taskId,
       userId: input.subscription.userKey,
@@ -558,6 +885,8 @@ class BatchService {
     }
 
     const inputUrls: string[] = [];
+    const wallLogoSceneMode = item.itemKind === "exterior" && requiresBatchWallLogoScene(config);
+    const logoPlacements = resolveBatchLogoPlacements(config);
     let billing: FrozenGenerationBilling | null = null;
     let lease: KieAccountLease | null = null;
     let leaseReleasedByKieClient = false;
@@ -592,36 +921,50 @@ class BatchService {
       }
 
       if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
-        const scene = resolveBatchScene(
-          config.sceneOptionId,
-          config.sceneReferenceImageUrl,
-        );
-        const uploadedScene =
-          shouldUploadBatchSceneFromLocalPath(config.sceneReferenceImageUrl) &&
-          scene.referenceImagePath
-            ? await runKieOperation(() =>
-                kieClient.uploadLocalFileWithLease(
-                  lease as KieAccountLease,
-                  scene.referenceImagePath as string,
-                  "used-car-platform/batch-new/scene",
-                ),
-              )
-            : null;
-        const sceneReferenceImageUrl = resolveBatchSceneReferenceImageUrl({
-          sceneOptionId: config.sceneOptionId,
-          sceneReferenceImageUrl: config.sceneReferenceImageUrl,
-          uploadedLocalFileUrl: uploadedScene?.fileUrl,
-        });
-        if (!sceneReferenceImageUrl) {
-          throw errors.invalidParameter("batch-new scene reference image is missing", {
-            optionId: scene.optionId,
+        if (wallLogoSceneMode) {
+          if (!batch.brandedSceneUrl) {
+            throw errors.invalidParameter("batch-new branded scene is not ready", {
+              batchId: batch.id,
+              brandedSceneTaskId: batch.brandedSceneTaskId,
+            });
+          }
+          inputUrls.push(batch.brandedSceneUrl);
+        } else {
+          const scene = resolveBatchScene(
+            config.sceneOptionId,
+            config.sceneReferenceImageUrl,
+          );
+          const uploadedScene =
+            shouldUploadBatchSceneFromLocalPath(config.sceneReferenceImageUrl) &&
+            scene.referenceImagePath
+              ? await runKieOperation(() =>
+                  kieClient.uploadLocalFileWithLease(
+                    lease as KieAccountLease,
+                    scene.referenceImagePath as string,
+                    "used-car-platform/batch-new/scene",
+                  ),
+                )
+              : null;
+          const sceneReferenceImageUrl = resolveBatchSceneReferenceImageUrl({
             sceneOptionId: config.sceneOptionId,
+            sceneReferenceImageUrl: config.sceneReferenceImageUrl,
+            uploadedLocalFileUrl: uploadedScene?.fileUrl,
           });
+          if (!sceneReferenceImageUrl) {
+            throw errors.invalidParameter("batch-new scene reference image is missing", {
+              optionId: scene.optionId,
+              sceneOptionId: config.sceneOptionId,
+            });
+          }
+          inputUrls.push(sceneReferenceImageUrl);
         }
-        inputUrls.push(sceneReferenceImageUrl);
       }
 
-      if (item.itemKind === "exterior" && config.useRecentLogo) {
+      if (
+        item.itemKind === "exterior" &&
+        config.useRecentLogo &&
+        (!wallLogoSceneMode || logoPlacements.includes("plate"))
+      ) {
         const logoAsset = await requireBatchLogoAsset(config, batch.userId);
         if (!logoAsset) throw errors.assetNotFound();
         const uploadedLogo = await runKieOperation(() =>
@@ -655,8 +998,10 @@ class BatchService {
           inputAssetIds: sourceAssetIds,
           inputUrls,
           visualConfig: config,
-          logoPlacements: resolveBatchLogoPlacements(config),
-          logoPlacementMode: logoPlacementMode(resolveBatchLogoPlacements(config)),
+          brandedSceneTaskId: wallLogoSceneMode ? batch.brandedSceneTaskId ?? null : null,
+          brandedSceneUrl: wallLogoSceneMode ? batch.brandedSceneUrl ?? null : null,
+          logoPlacements,
+          logoPlacementMode: logoPlacementMode(logoPlacements),
           aspectRatio: task.outputRatio,
           resolution: task.resolution,
         },

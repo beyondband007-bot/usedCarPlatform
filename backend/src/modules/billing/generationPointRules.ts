@@ -4,6 +4,7 @@ const BASE_GENERATION_POINTS = 30;
 const SHORT_VIDEO_POINTS = 4000;
 const BATCH_LIGHT_CONSISTENCY_POINTS = 10;
 const BATCH_PAINT_REFRESH_POINTS = 10;
+const BATCH_WALL_LOGO_SCENE_POINTS = 30;
 
 const formatPoints = (points: number) => `${points.toFixed(4)}`;
 
@@ -28,10 +29,14 @@ export const batchItemGenerationPoints = (config: BatchVisualConfig) => {
   return formatPoints(BASE_GENERATION_POINTS + lightConsistencyPoints + paintRefreshPoints);
 };
 
+export const batchWallLogoSceneGenerationPoints = () =>
+  formatPoints(BATCH_WALL_LOGO_SCENE_POINTS);
+
 export const generationPointRuleSummary = {
   baseGenerationPoints: BASE_GENERATION_POINTS,
   shortVideoPoints: SHORT_VIDEO_POINTS,
   batchLightConsistencyPoints: BATCH_LIGHT_CONSISTENCY_POINTS,
   batchPaintRefreshPoints: BATCH_PAINT_REFRESH_POINTS,
+  batchWallLogoScenePoints: BATCH_WALL_LOGO_SCENE_POINTS,
   ignoredBatchOptions: ["enableSceneChange", "useRecentLogo", "enableInteriorClean", "enableInteriorCollage"],
 };
