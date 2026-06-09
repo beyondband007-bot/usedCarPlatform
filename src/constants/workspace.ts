@@ -7,10 +7,6 @@ import type {
   WorkspaceTemplateRecommendation,
 } from '@/types/workspace'
 
-import showroomSceneCharcoalStone from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-charcoal-stone.png'
-import showroomSceneDarkGrayHalo from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-dark-gray-halo.png'
-import showroomSceneVerticalLight from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-vertical-light.png'
-import showroomSceneWarmBeige from '@/assets/media/workspace/showroom/scene/workspace-showroom-scene-warm-beige.png'
 import { mediaUrls } from '@/constants/media-urls'
 
 const {
@@ -71,10 +67,10 @@ const sceneImageUrls = {
   showroomWideAngle: showroomMedia.sceneWideAngle,
   showroomGlass: showroomMedia.tutorialGlassHall,
   showroomLuxuryDark: showroomMedia.tutorialLuxuryDark,
-  showroomWarmBeige: showroomSceneWarmBeige,
-  showroomDarkGrayHalo: showroomSceneDarkGrayHalo,
-  showroomCharcoalStone: showroomSceneCharcoalStone,
-  showroomVerticalLight: showroomSceneVerticalLight,
+  showroomWarmBeige: 'https://vip.123pan.cn/1849524247/ymjew503t0m000ddyyjmg350sixmw5gfDIYxBIJvAdixAvxzBIUzAIr=.jpg',
+  showroomDarkGrayHalo: 'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddz2358r24r8336fuiDIYxBIJvAdixAvxzBIUzAIr=.jpg',
+  showroomCharcoalStone: 'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddz2365udvcu337lxoDIYxBIJvAdixAvxzBIUzAIr=.jpg',
+  showroomVerticalLight: 'https://vip.123pan.cn/1849524247/ymjew503t0n000ddyyjp4rs7bsxmxvheDIYxBIJvAdixAvxzBIUzAIr=.jpg',
 }
 
 const tutorial = [

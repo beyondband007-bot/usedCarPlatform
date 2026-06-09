@@ -9,23 +9,23 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3101',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3101',
         changeOrigin: true,
       },
       '/results': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3101',
         changeOrigin: true,
       },
       '/packages': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3101',
         changeOrigin: true,
       },
       '/scene-refs': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3101',
         changeOrigin: true,
       },
     },
