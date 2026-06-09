@@ -1,6 +1,8 @@
 import type { Request } from "express";
 import type { RowDataPacket } from "mysql2";
+import mysql, { type Pool } from "mysql2/promise";
 
+import { env } from "../../config/env";
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
@@ -23,6 +25,57 @@ type AgentCustomerRow = RowDataPacket & {
   customer_display_name: string;
   customer_phone: string | null;
   customer_credits_user_id: number;
+  customer_account_scope: "personal" | "tenant";
+  customer_credits_tenant_id: number | null;
+};
+
+type AgentCustomerLedgerRow = AgentCustomerRow & {
+  enterprise_tenant_id: string | null;
+  enterprise_tenant_name: string | null;
+  enterprise_owner_user_id: string | null;
+  enterprise_owner_credits_user_id: number | null;
+};
+
+type CreditsAccountRow = RowDataPacket & {
+  id: number;
+  tenant_id: number | null;
+  user_id: number | null;
+  account_scope: "personal" | "tenant";
+  total_balance: string | number;
+  locked_balance: string | number;
+  available_balance: string | number;
+  currency: string;
+  status: string;
+};
+
+type CreditsTransactionRow = RowDataPacket & {
+  id: number;
+  tenant_id: number | null;
+  user_id: number;
+  account_id: number;
+  billing_task_id: number | null;
+  payment_order_id: number | null;
+  application_id: number | null;
+  application_code: string | null;
+  application_name: string | null;
+  function_id: number | null;
+  function_code: string | null;
+  function_name: string | null;
+  txn_type: string;
+  points: string | number;
+  balance_before: string | number;
+  balance_after: string | number;
+  biz_type: string | null;
+  biz_id: string | null;
+  remark: string | null;
+  created_at: Date;
+};
+
+type EnterpriseMemberIdentityRow = RowDataPacket & {
+  credits_user_id: number | null;
+  username: string;
+  display_name: string;
+  member_role: "owner" | "admin" | "member";
 };
 
 type AgentLeadRow = RowDataPacket & {
@@ -84,6 +137,30 @@ type AgentTicketRow = RowDataPacket & {
   created_at: Date;
   updated_at: Date;
 };
+
+type CustomerTopUpRow = RowDataPacket & {
+  user_id?: number;
+  tenant_id?: number;
+  total_amount: string | number;
+};
+
+let creditsPool: Pool | null = null;
+
+function getCreditsPool() {
+  if (!creditsPool) {
+    creditsPool = mysql.createPool({
+      host: env.credits.mysql.host,
+      port: env.credits.mysql.port,
+      database: env.credits.mysql.database,
+      user: env.credits.mysql.user,
+      password: env.credits.mysql.password,
+      waitForConnections: true,
+      connectionLimit: env.credits.mysql.connectionLimit,
+      namedPlaceholders: true,
+    });
+  }
+  return creditsPool;
+}
 
 const toNumber = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0);
@@ -169,7 +246,9 @@ async function listAgentCustomers(agentUserId: string) {
        u.username customer_username,
        u.display_name customer_display_name,
        u.phone customer_phone,
-       acr.customer_credits_user_id
+       acr.customer_credits_user_id,
+       u.account_scope customer_account_scope,
+       u.credits_tenant_id customer_credits_tenant_id
      FROM agent_customer_relations acr
      JOIN app_users u ON u.id = acr.customer_user_id
      WHERE acr.agent_user_id = :agentUserId
@@ -177,6 +256,8 @@ async function listAgentCustomers(agentUserId: string) {
      LIMIT 100`,
     { agentUserId },
   );
+
+  const totalTopUpAmountByCustomer = await listCustomerTopUpAmounts(rows);
 
   return rows.map((row) => ({
     id: row.id,
@@ -189,7 +270,252 @@ async function listAgentCustomers(agentUserId: string) {
     customerDisplayName: row.customer_display_name,
     customerPhone: row.customer_phone,
     customerCreditsUserId: row.customer_credits_user_id,
+    totalTopUpAmount:
+      totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
   }));
+}
+
+function customerTopUpKey(row: AgentCustomerRow) {
+  if (row.customer_account_scope === "tenant" && row.customer_credits_tenant_id) {
+    return `tenant:${row.customer_credits_tenant_id}`;
+  }
+  return `user:${row.customer_credits_user_id}`;
+}
+
+async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
+  const result = new Map<string, number>();
+  const personalCreditsUserIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.customer_account_scope !== "tenant")
+        .map((row) => row.customer_credits_user_id)
+        .filter(Boolean),
+    ),
+  );
+  const tenantIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.customer_account_scope === "tenant" && row.customer_credits_tenant_id)
+        .map((row) => row.customer_credits_tenant_id as number),
+    ),
+  );
+
+  const creditsDb = getCreditsPool();
+
+  if (personalCreditsUserIds.length) {
+    const [personalRows] = await creditsDb.query<CustomerTopUpRow[]>(
+      `SELECT user_id, COALESCE(SUM(amount), 0) total_amount
+       FROM payment_orders
+       WHERE status = 'paid'
+         AND tenant_id IS NULL
+         AND user_id IN (:userIds)
+       GROUP BY user_id`,
+      { userIds: personalCreditsUserIds },
+    );
+    for (const row of personalRows) {
+      if (row.user_id) result.set(`user:${row.user_id}`, toNumber(row.total_amount));
+    }
+  }
+
+  if (tenantIds.length) {
+    const [tenantRows] = await creditsDb.query<CustomerTopUpRow[]>(
+      `SELECT tenant_id, COALESCE(SUM(amount), 0) total_amount
+       FROM payment_orders
+       WHERE status = 'paid'
+         AND tenant_id IN (:tenantIds)
+       GROUP BY tenant_id`,
+      { tenantIds },
+    );
+    for (const row of tenantRows) {
+      if (row.tenant_id) result.set(`tenant:${row.tenant_id}`, toNumber(row.total_amount));
+    }
+  }
+
+  return result;
+}
+
+async function loadAgentCustomerForLedger(agentUserId: string, relationId: string) {
+  const [rows] = await pool.query<AgentCustomerLedgerRow[]>(
+    `SELECT
+       acr.id,
+       acr.application_code,
+       acr.relation_type,
+       acr.status,
+       acr.created_at,
+       u.id customer_user_id,
+       u.username customer_username,
+       u.display_name customer_display_name,
+       u.phone customer_phone,
+       acr.customer_credits_user_id,
+       u.account_scope customer_account_scope,
+       u.credits_tenant_id customer_credits_tenant_id,
+       em.tenant_id enterprise_tenant_id,
+       et.name enterprise_tenant_name,
+       et.owner_user_id enterprise_owner_user_id,
+       owner.credits_user_id enterprise_owner_credits_user_id
+     FROM agent_customer_relations acr
+     JOIN app_users u ON u.id = acr.customer_user_id
+     LEFT JOIN enterprise_members em
+       ON em.user_id = u.id
+      AND em.status = 'active'
+     LEFT JOIN enterprise_tenants et
+       ON et.id = em.tenant_id
+      AND et.status = 'active'
+     LEFT JOIN app_users owner ON owner.id = et.owner_user_id
+     WHERE acr.id = :relationId
+       AND acr.agent_user_id = :agentUserId
+     LIMIT 1`,
+    { agentUserId, relationId },
+  );
+  return rows[0] ?? null;
+}
+
+async function loadEnterpriseMemberIdentityByCreditsUserId(tenantId: string | null) {
+  if (!tenantId) return new Map<number, EnterpriseMemberIdentityRow>();
+  const [rows] = await pool.query<EnterpriseMemberIdentityRow[]>(
+    `SELECT
+       u.credits_user_id,
+       u.username,
+       u.display_name,
+       em.member_role
+     FROM enterprise_members em
+     JOIN app_users u ON u.id = em.user_id
+     WHERE em.tenant_id = :tenantId
+       AND em.status = 'active'
+       AND u.credits_user_id IS NOT NULL`,
+    { tenantId },
+  );
+  return new Map(
+    rows
+      .filter((row) => row.credits_user_id)
+      .map((row) => [row.credits_user_id as number, row]),
+  );
+}
+
+async function loadCreditsAccountForCustomer(customer: AgentCustomerLedgerRow) {
+  const creditsDb = getCreditsPool();
+  const params =
+    customer.customer_account_scope === "tenant" && customer.customer_credits_tenant_id
+      ? {
+          accountScope: "tenant",
+          creditsUserId: null,
+          creditsTenantId: customer.customer_credits_tenant_id,
+        }
+      : {
+          accountScope: "personal",
+          creditsUserId: customer.customer_credits_user_id,
+          creditsTenantId: null,
+        };
+
+  const [rows] = await creditsDb.query<CreditsAccountRow[]>(
+    `SELECT
+       id,
+       tenant_id,
+       user_id,
+       account_scope,
+       total_balance,
+       locked_balance,
+       available_balance,
+       currency,
+       status
+     FROM credit_accounts
+     WHERE account_scope = :accountScope
+       AND (
+         (:accountScope = 'tenant' AND tenant_id = :creditsTenantId AND user_id IS NULL)
+         OR
+         (:accountScope = 'personal' AND user_id = :creditsUserId AND tenant_id IS NULL)
+       )
+       AND status = 'active'
+     ORDER BY id ASC
+     LIMIT 1`,
+    params,
+  );
+
+  return rows[0] ?? null;
+}
+
+function identityLabelForTransaction(
+  transaction: CreditsTransactionRow,
+  customer: AgentCustomerLedgerRow,
+  memberByCreditsUserId: Map<number, EnterpriseMemberIdentityRow>,
+) {
+  if (customer.customer_account_scope !== "tenant") return "客户";
+
+  const member = memberByCreditsUserId.get(transaction.user_id);
+  if (transaction.user_id === customer.enterprise_owner_credits_user_id) return "主账号";
+  if (member?.member_role === "owner") return "主账号";
+  if (member) return "子账号";
+  return "团队成员";
+}
+
+async function listLedgerTransactions(input: {
+  accountId: number;
+  customer: AgentCustomerLedgerRow;
+}) {
+  const creditsDb = getCreditsPool();
+  const memberByCreditsUserId = await loadEnterpriseMemberIdentityByCreditsUserId(
+    input.customer.enterprise_tenant_id,
+  );
+
+  const [rows] = await creditsDb.query<CreditsTransactionRow[]>(
+    `SELECT
+       ct.id,
+       ct.tenant_id,
+       ct.user_id,
+       ct.account_id,
+       ct.billing_task_id,
+       ct.payment_order_id,
+       ct.application_id,
+       app.code application_code,
+       app.name application_name,
+       ct.function_id,
+       fn.code function_code,
+       fn.name function_name,
+       ct.txn_type,
+       ct.points,
+       ct.balance_before,
+       ct.balance_after,
+       ct.biz_type,
+       ct.biz_id,
+       ct.remark,
+       ct.created_at
+     FROM credit_transactions ct
+     LEFT JOIN applications app ON app.id = ct.application_id
+     LEFT JOIN application_functions fn ON fn.id = ct.function_id
+     WHERE ct.account_id = :accountId
+     ORDER BY ct.created_at DESC, ct.id DESC
+     LIMIT 100`,
+    { accountId: input.accountId },
+  );
+
+  return rows.map((row) => {
+    const member = memberByCreditsUserId.get(row.user_id);
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      userId: row.user_id,
+      accountId: row.account_id,
+      billingTaskId: row.billing_task_id,
+      paymentOrderId: row.payment_order_id,
+      applicationId: row.application_id,
+      applicationCode: row.application_code,
+      applicationName: row.application_name,
+      functionId: row.function_id,
+      functionCode: row.function_code,
+      functionName: row.function_name,
+      txnType: row.txn_type,
+      points: toNumber(row.points),
+      balanceBefore: toNumber(row.balance_before),
+      balanceAfter: toNumber(row.balance_after),
+      bizType: row.biz_type,
+      bizId: row.biz_id,
+      remark: row.remark,
+      actorUsername: member?.username ?? null,
+      actorDisplayName: member?.display_name ?? null,
+      actorIdentityLabel: identityLabelForTransaction(row, input.customer, memberByCreditsUserId),
+      createdAt: row.created_at.toISOString(),
+    };
+  });
 }
 
 async function listAgentLeads(agentUserId: string) {
@@ -353,6 +679,69 @@ export async function getAgentOperationsOverview(req: Request) {
     settlementBills,
     materials,
     tickets,
+  };
+}
+
+export async function getAgentCustomerLedger(req: Request, relationId: string) {
+  const agent = await resolveAgentUser(req, req.query.agentUserId);
+  const customer = await loadAgentCustomerForLedger(agent.id, relationId);
+  if (!customer) throw errors.invalidParameter("agent customer is not available");
+
+  const account = await loadCreditsAccountForCustomer(customer);
+  if (!account) {
+    return {
+      customer: {
+        id: customer.id,
+        applicationCode: customer.application_code,
+        relationType: customer.relation_type,
+        status: customer.status,
+        customerUserId: customer.customer_user_id,
+        customerUsername: customer.customer_username,
+        customerDisplayName: customer.customer_display_name,
+        customerPhone: customer.customer_phone,
+        customerCreditsUserId: customer.customer_credits_user_id,
+        accountScope: customer.customer_account_scope,
+        creditsTenantId: customer.customer_credits_tenant_id,
+        enterpriseAccountRole: customer.customer_account_scope === "tenant" ? "team" : "personal",
+      },
+      account: null,
+      transactions: [],
+    };
+  }
+
+  return {
+    customer: {
+      id: customer.id,
+      applicationCode: customer.application_code,
+      relationType: customer.relation_type,
+      status: customer.status,
+      customerUserId: customer.customer_user_id,
+      customerUsername: customer.customer_username,
+      customerDisplayName: customer.customer_display_name,
+      customerPhone: customer.customer_phone,
+      customerCreditsUserId: customer.customer_credits_user_id,
+      accountScope: customer.customer_account_scope,
+      creditsTenantId: customer.customer_credits_tenant_id,
+      enterpriseTenantId: customer.enterprise_tenant_id,
+      enterpriseTenantName: customer.enterprise_tenant_name,
+      enterpriseOwnerUserId: customer.enterprise_owner_user_id,
+      enterpriseAccountRole: customer.customer_account_scope === "tenant" ? "team" : "personal",
+    },
+    account: {
+      id: account.id,
+      tenantId: account.tenant_id,
+      userId: account.user_id,
+      accountScope: account.account_scope,
+      totalBalance: toNumber(account.total_balance),
+      lockedBalance: toNumber(account.locked_balance),
+      availableBalance: toNumber(account.available_balance),
+      currency: account.currency,
+      status: account.status,
+    },
+    transactions: await listLedgerTransactions({
+      accountId: account.id,
+      customer,
+    }),
   };
 }
 

@@ -25,6 +25,8 @@ import {
   createAgentTicket,
   createPlatformUser,
   deletePlatformUser,
+  disablePlatformAgent,
+  getAgentCustomerLedger,
   getCommissionPolicy,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
@@ -36,6 +38,8 @@ import {
   updatePlatformAdminPolicyOverride,
   updatePlatformAgentPolicyOverride,
   updateApplicationFunctionDefaultPoints,
+  type AgentCustomerLedger,
+  type AgentCustomerLedgerTransaction,
   type AgentOperationsCommissionPreview,
   type AgentOperationsCustomer,
   type AgentOperationsLead,
@@ -91,6 +95,7 @@ const isDeleteAccountModalOpen = ref(false)
 const isDeletingAccount = ref(false)
 const isFunctionBillingOpen = ref(false)
 const promotingUserId = ref<string | null>(null)
+const disablingAgentUserId = ref<string | null>(null)
 const isCreateLeadModalOpen = ref(false)
 const isCreatingLead = ref(false)
 const isCreateTicketModalOpen = ref(false)
@@ -101,6 +106,10 @@ const updatingAgentPolicyUserId = ref<string | null>(null)
 const updatingFunctionKey = ref<string | null>(null)
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
 const selectedDetail = ref<{ title: string; row: DetailRecord } | null>(null)
+const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
+const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
+const isAgentCustomerLedgerOpen = ref(false)
+const isLoadingAgentCustomerLedger = ref(false)
 const interactionFeedback = ref('')
 const createAccountForm = reactive({
   targetRole: 'user' as PlatformUserTargetRole,
@@ -602,29 +611,22 @@ function canPromoteCustomer(row: CreditsCustomerProfile) {
   return activeRole.value === 'admin' && effectiveAccountCreationPolicy.value.adminCanPromoteUserToAgent
 }
 
+function canDisableAgent(row: PlatformAgentProfile) {
+  if (row.status !== 'active' || authStore.userInfo?.id === row.userId) return false
+  if (!authStore.permissions.includes('account:delete:agent')) return false
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
+function canDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (authStore.userInfo?.id === row.userId) return false
+  if (!authStore.permissions.includes('account:delete:agent')) return false
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
 function deleteActionText(row: CreditsCustomerProfile) {
   const targetRole = matrixTargetRole(row.role)
   if (activeRole.value === 'admin' && targetRole === 'agent') return '禁用代理商'
   return '删除'
-}
-
-function agentProfileToCustomerProfile(row: PlatformAgentProfile): CreditsCustomerProfile {
-  return {
-    id: `agent:${row.userId}`,
-    applicationCode: row.applications[0] ?? 'used-car-platform',
-    userId: row.userId,
-    username: row.username,
-    displayName: row.displayName,
-    phone: row.phone ?? null,
-    role: 'agent',
-    creditsUserId: row.creditsUserId ?? '',
-    accountScope: 'personal',
-    creditsTenantId: null,
-    createdByUserId: row.assignedByUserId ?? '',
-    createdByRole: row.assignedByUsername ? `assigned by ${row.assignedByUsername}` : 'back-office',
-    status: row.status,
-    createdAt: row.createdAt,
-  }
 }
 
 function formatCreditsBalance(row: CreditsCustomerProfile) {
@@ -637,6 +639,67 @@ function formatCreditsBalance(row: CreditsCustomerProfile) {
     minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 4,
   })
+}
+
+function formatCurrencyAmount(value: number | string | null | undefined) {
+  const numeric = Number(value ?? 0)
+  if (!Number.isFinite(numeric)) return '-'
+  return `¥${numeric.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function formatDateTime(value: string) {
+  const time = new Date(value)
+  if (Number.isNaN(time.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`
+}
+
+function transactionTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    recharge: '充值',
+    bonus: '赠送',
+    settle: '消费',
+    freeze: '冻结',
+    refund: '退款',
+    estimate: '预估',
+    grant: '发放',
+    adjustment: '调整',
+    adjust: '调整',
+    commission_grant: '返佣',
+  }
+  return labels[type] ?? type
+}
+
+function transactionTagType(type: string): 'success' | 'info' | 'warning' | 'error' | 'default' {
+  if (type === 'recharge' || type === 'bonus' || type === 'refund' || type === 'grant') return 'success'
+  if (type === 'settle') return 'error'
+  if (type === 'freeze' || type === 'adjustment' || type === 'adjust') return 'warning'
+  return 'default'
+}
+
+function formatSignedPoints(value: number | string | null | undefined) {
+  const numeric = Number(value ?? 0)
+  if (!Number.isFinite(numeric)) return '-'
+  const sign = numeric > 0 ? '+' : ''
+  return `${sign}${numeric.toLocaleString('zh-CN')}`
+}
+
+function ledgerSourceText(row: AgentCustomerLedgerTransaction) {
+  return row.functionName ?? row.functionCode ?? row.remark ?? row.bizType ?? row.txnType
+}
+
+function ledgerActorText(row: AgentCustomerLedgerTransaction) {
+  const actorName = row.actorDisplayName || row.actorUsername || `Credits User ${row.userId}`
+  return row.actorIdentityLabel ? `${actorName} · ${row.actorIdentityLabel}` : actorName
+}
+
+function ledgerModalTitle() {
+  return agentCustomerLedger.value?.customer.accountScope === 'tenant'
+    ? '(团队)积分流水'
+    : '积分流水'
 }
 
 function formatAgentCustomerCount(row: CreditsCustomerProfile) {
@@ -653,10 +716,6 @@ function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
     return owner ? `子账号 · 母账号 ${owner}` : '子账号'
   }
   return '-'
-}
-
-function openDeleteAgentModal(row: PlatformAgentProfile) {
-  openDeleteAccountModal(agentProfileToCustomerProfile(row))
 }
 
 function canCreateTargetRole(role: PlatformUserTargetRole) {
@@ -861,6 +920,46 @@ async function handlePromoteUserToAgent(row: CreditsCustomerProfile) {
   }
 }
 
+async function handleDisableAgent(row: PlatformAgentProfile) {
+  if (!canDisableAgent(row)) {
+    message.warning('当前角色不能禁用该代理商')
+    return
+  }
+
+  disablingAgentUserId.value = row.userId
+  try {
+    const result = await disablePlatformAgent(row.userId, {
+      reason: 'back-office disabled Agent role',
+    })
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到用户清单`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '禁用代理商失败')
+  } finally {
+    disablingAgentUserId.value = null
+  }
+}
+
+async function handleDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (!canDisableAgentPolicy(row)) {
+    message.warning('当前角色不能禁用该代理商')
+    return
+  }
+
+  disablingAgentUserId.value = row.userId
+  try {
+    const result = await disablePlatformAgent(row.userId, {
+      reason: 'back-office disabled Agent role',
+    })
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到用户清单`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '禁用代理商失败')
+  } finally {
+    disablingAgentUserId.value = null
+  }
+}
+
 function resetLeadForm() {
   leadForm.applicationCode = defaultApplicationCode()
   leadForm.customerName = ''
@@ -1058,6 +1157,20 @@ function renderDetailButton(title: string, row: unknown) {
       default: () => '查看详情',
     },
   )
+}
+
+async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
+  selectedAgentCustomer.value = row
+  agentCustomerLedger.value = null
+  isAgentCustomerLedgerOpen.value = true
+  isLoadingAgentCustomerLedger.value = true
+  try {
+    agentCustomerLedger.value = await getAgentCustomerLedger(row.id)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载积分流水失败')
+  } finally {
+    isLoadingAgentCustomerLedger.value = false
+  }
 }
 
 function functionDraftKey(row: CreditsAdminOverview['applicationFunctions'][number]) {
@@ -1566,6 +1679,29 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
       )
     },
   },
+  {
+    title: '管理动作',
+    key: 'actions',
+    width: 150,
+    render(row) {
+      const isBusy = disablingAgentUserId.value === row.userId
+      return h(
+        NButton,
+        {
+          size: 'small',
+          type: 'error',
+          secondary: true,
+          loading: isBusy,
+          disabled: isBusy || !canDisableAgentPolicy(row),
+          onClick: () => handleDisableAgentPolicy(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
+          default: () => '禁用代理商',
+        },
+      )
+    },
+  },
 ]
 
 const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
@@ -1586,7 +1722,6 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
-  { title: 'Credits User', key: 'creditsUserId', width: 130 },
   { title: '客户数', key: 'customerCount', width: 90 },
   { title: '线索数', key: 'leadCount', width: 90 },
   { title: '开放工单', key: 'openTicketCount', width: 100 },
@@ -1611,19 +1746,20 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     key: 'actions',
     width: 150,
     render(row) {
-      const canDelete = canDeleteCustomer(agentProfileToCustomerProfile(row))
+      const isBusy = disablingAgentUserId.value === row.userId
       return h(
         NButton,
         {
           size: 'small',
           type: 'error',
           secondary: true,
-          disabled: !canDelete,
-          onClick: () => openDeleteAgentModal(row),
+          loading: isBusy,
+          disabled: isBusy || !canDisableAgent(row),
+          onClick: () => handleDisableAgent(row),
         },
         {
           icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
-          default: () => deleteActionText(agentProfileToCustomerProfile(row)),
+          default: () => '禁用代理商',
         },
       )
     },
@@ -1641,7 +1777,14 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     },
   },
   { title: '手机号', key: 'customerPhone', width: 140, render(row) { return row.customerPhone ?? '-' } },
-  { title: 'Credits User', key: 'customerCreditsUserId', width: 130 },
+  {
+    title: '累计充值金额',
+    key: 'totalTopUpAmount',
+    width: 140,
+    render(row) {
+      return formatCurrencyAmount(row.totalTopUpAmount)
+    },
+  },
   { title: '关系', key: 'relationType', width: 100 },
   {
     title: '状态',
@@ -1664,7 +1807,92 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     key: 'actions',
     width: 130,
     render(row) {
-      return renderDetailButton('代理商客户详情', row)
+      return h(
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          onClick: () => void openAgentCustomerLedger(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+          default: () => '查看详情',
+        },
+      )
+    },
+  },
+]
+
+const agentCustomerLedgerColumns: DataTableColumns<AgentCustomerLedgerTransaction> = [
+  {
+    title: '时间',
+    key: 'createdAt',
+    width: 190,
+    render(row) {
+      return formatDateTime(row.createdAt)
+    },
+  },
+  {
+    title: '积分类型',
+    key: 'txnType',
+    width: 130,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: transactionTagType(row.txnType),
+        },
+        { default: () => transactionTypeLabel(row.txnType) },
+      )
+    },
+  },
+  {
+    title: '积分变动',
+    key: 'points',
+    width: 130,
+    render(row) {
+      return h(
+        'span',
+        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
+        formatSignedPoints(row.points),
+      )
+    },
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 120,
+    render() {
+      return h('span', { class: 'agent-ledger-status' }, [
+        h('span', { class: 'agent-ledger-status-dot' }),
+        '已生效',
+      ])
+    },
+  },
+  {
+    title: '来源/用途',
+    key: 'source',
+    minWidth: 170,
+    render(row) {
+      return ledgerSourceText(row)
+    },
+  },
+  {
+    title: '操作人',
+    key: 'actorIdentityLabel',
+    minWidth: 180,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: row.actorIdentityLabel === '主账号' ? 'warning' : 'default',
+        },
+        { default: () => ledgerActorText(row) },
+      )
     },
   },
 ]
@@ -2318,6 +2546,74 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
         <template #footer>
           <div class="admin-modal-footer">
             <NButton @click="selectedDetail = null">
+              关闭
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isAgentCustomerLedgerOpen"
+        preset="card"
+        class="admin-create-modal agent-ledger-modal"
+        :title="ledgerModalTitle()"
+        :style="{ width: '920px', maxWidth: '94vw', maxHeight: 'calc(100vh - 80px)' }"
+        @update:show="(show) => {
+          if (!show) {
+            selectedAgentCustomer = null
+            agentCustomerLedger = null
+          }
+        }"
+      >
+        <template #header>
+          <div class="agent-ledger-header">
+            <span class="agent-ledger-header-mark" />
+            <div>
+              <strong>{{ ledgerModalTitle() }}</strong>
+              <small>
+                {{ selectedAgentCustomer?.customerDisplayName ?? '客户' }}
+                <template v-if="agentCustomerLedger?.customer.enterpriseTenantName">
+                  · {{ agentCustomerLedger.customer.enterpriseTenantName }}
+                </template>
+              </small>
+            </div>
+          </div>
+        </template>
+
+        <div class="agent-ledger-toolbar">
+          <div class="agent-ledger-summary">
+            <span>当前余额</span>
+            <strong>{{ Number(agentCustomerLedger?.account?.availableBalance ?? 0).toLocaleString('zh-CN') }}</strong>
+          </div>
+          <NButton
+            size="small"
+            secondary
+            :disabled="!agentCustomerLedger?.transactions.length"
+            @click="exportRows('agent-customer-ledger', agentCustomerLedger?.transactions ?? [])"
+          >
+            <template #icon>
+              <Icon icon="mdi:download-outline" />
+            </template>
+            导出
+          </NButton>
+        </div>
+
+        <NSpin :show="isLoadingAgentCustomerLedger">
+          <NDataTable
+            v-if="agentCustomerLedger?.transactions.length"
+            :columns="agentCustomerLedgerColumns"
+            :data="agentCustomerLedger.transactions"
+            :bordered="false"
+            :single-line="false"
+            :pagination="false"
+            class="agent-ledger-table"
+          />
+          <NEmpty v-else description="暂无积分流水" />
+        </NSpin>
+
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton @click="isAgentCustomerLedgerOpen = false">
               关闭
             </NButton>
           </div>
@@ -3253,6 +3549,81 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 :deep(.admin-delta.is-down) {
   color: #e77835;
   font-weight: 800;
+}
+
+.agent-ledger-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agent-ledger-header-mark {
+  width: 5px;
+  height: 24px;
+  border-radius: 999px;
+  background: #e8ae25;
+}
+
+.agent-ledger-header strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.agent-ledger-header small {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-ledger-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.agent-ledger-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.agent-ledger-summary strong {
+  color: var(--app-text);
+  font-size: 20px;
+}
+
+:deep(.agent-ledger-table .n-data-table-th) {
+  color: #8da0bc;
+  font-weight: 900;
+}
+
+:deep(.agent-ledger-table .n-data-table-td) {
+  background: #f1f7ff;
+}
+
+:deep(.agent-ledger-status) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #506178;
+  font-weight: 800;
+}
+
+:deep(.agent-ledger-status-dot) {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #23c267;
 }
 
 @media (max-width: 1024px) {

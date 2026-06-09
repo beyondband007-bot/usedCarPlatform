@@ -1132,6 +1132,46 @@ export interface AgentOperationsCustomer {
   customerDisplayName: string
   customerPhone?: string | null
   customerCreditsUserId: number | string
+  totalTopUpAmount?: number | string
+}
+
+export interface AgentCustomerLedgerTransaction {
+  id: number | string
+  tenantId?: number | string | null
+  userId: number | string
+  accountId: number | string
+  billingTaskId?: number | string | null
+  paymentOrderId?: number | string | null
+  applicationId?: number | string | null
+  applicationCode?: string | null
+  applicationName?: string | null
+  functionId?: number | string | null
+  functionCode?: string | null
+  functionName?: string | null
+  txnType: CreditsTransactionType
+  points: number
+  balanceBefore: number
+  balanceAfter: number
+  bizType?: string | null
+  bizId?: string | null
+  remark?: string | null
+  actorUsername?: string | null
+  actorDisplayName?: string | null
+  actorIdentityLabel?: string | null
+  createdAt: string
+}
+
+export interface AgentCustomerLedger {
+  customer: AgentOperationsCustomer & {
+    accountScope?: 'personal' | 'tenant' | string
+    creditsTenantId?: number | string | null
+    enterpriseTenantId?: string | null
+    enterpriseTenantName?: string | null
+    enterpriseOwnerUserId?: string | null
+    enterpriseAccountRole?: 'personal' | 'team' | string
+  }
+  account: CreditsAccount | null
+  transactions: AgentCustomerLedgerTransaction[]
 }
 
 export interface AgentOperationsLead {
@@ -1421,6 +1461,18 @@ export interface PlatformUserPromotionResult {
   policyDecision: {
     allowed: boolean
     reason: string
+  }
+}
+
+export interface PlatformAgentDisableResult {
+  disabled: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: 'user'
+    creditsUserId: number | string | null
+    status: string
   }
 }
 
@@ -1730,6 +1782,29 @@ export async function getAgentOperationsOverview(params?: {
   return unwrapApiResponse(response)
 }
 
+export async function getAgentCustomerLedger(
+  relationId: string,
+  params?: { agentUserId?: string },
+): Promise<AgentCustomerLedger> {
+  const response = await request.get<ApiResponse<AgentCustomerLedger>>(
+    `/platform/agent/customers/${encodeURIComponent(relationId)}/ledger`,
+    { params },
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+    account: payload.account
+      ? normalizeCreditsAccount(payload.account as CreditsAccount & Record<string, unknown>)
+      : null,
+  }
+}
+
 export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const response = await request.get<ApiResponse<PlatformDashboard>>('/platform/dashboard')
   return unwrapApiResponse(response)
@@ -1844,6 +1919,17 @@ export async function promotePlatformUserToAgent(
 ): Promise<PlatformUserPromotionResult> {
   const response = await request.post<ApiResponse<PlatformUserPromotionResult>>(
     `/platform/users/${encodeURIComponent(userId)}/promote-agent`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function disablePlatformAgent(
+  userId: string,
+  payload: { reason?: string } = {},
+): Promise<PlatformAgentDisableResult> {
+  const response = await request.post<ApiResponse<PlatformAgentDisableResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/disable-agent`,
     payload,
   )
   return unwrapApiResponse(response)

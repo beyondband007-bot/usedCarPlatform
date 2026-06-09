@@ -356,3 +356,100 @@ export async function deletePlatformUserByCapability(
     },
   };
 }
+
+export async function disablePlatformAgentByCapability(
+  req: Parameters<typeof getRequiredCurrentUser>[0],
+  targetUserId: unknown,
+  payload: Record<string, unknown>,
+) {
+  const current = getRequiredCurrentUser(req);
+  const target = await findTargetUser(targetUserId);
+  const targetRole = requireMutationAllowed(
+    current.user,
+    target,
+    "account:delete:agent",
+    canDeleteTarget,
+  );
+  if (targetRole !== "agent") {
+    throw errors.invalidParameter("target user is not an active Agent");
+  }
+  if (target.status !== "active") {
+    throw errors.invalidParameter("target Agent account is not active");
+  }
+
+  const reason = normalizeText(payload.reason, 240) || "back-office agent disabled";
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.query(
+      `UPDATE back_office_role_assignments
+       SET status = 'revoked',
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE user_id = :targetUserId
+         AND role_code = 'agent'
+         AND status = 'active'`,
+      { targetUserId: target.id },
+    );
+
+    await connection.query(
+      `INSERT INTO app_user_roles (user_id, role_code)
+       VALUES (:targetUserId, 'enterprise')
+       ON DUPLICATE KEY UPDATE role_code = VALUES(role_code)`,
+      { targetUserId: target.id },
+    );
+
+    await connection.query(
+      `DELETE FROM app_user_roles
+       WHERE user_id = :targetUserId
+         AND role_code = 'agent'`,
+      { targetUserId: target.id },
+    );
+
+    await connection.query(
+      `DELETE FROM back_office_agent_policy_overrides
+       WHERE agent_user_id = :targetUserId`,
+      { targetUserId: target.id },
+    );
+
+    await connection.query(
+      `INSERT INTO account_creation_audit_logs
+        (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+         application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+       VALUES
+        (:id, :operatorUserId, :operatorRoleCode, :targetUserId, 'agent',
+         NULL, 'account:disable-agent', JSON_OBJECT(), 'allowed', :reason, :metadataJson)`,
+      {
+        id: createId("acal"),
+        operatorUserId: current.user.id,
+        operatorRoleCode: current.user.role,
+        targetUserId: target.id,
+        reason,
+        metadataJson: JSON.stringify({
+          username: target.username,
+          creditsUserId: target.credits_user_id,
+          revertedToRole: "user",
+        }),
+      },
+    );
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  return {
+    disabled: true,
+    user: {
+      id: target.id,
+      username: target.username,
+      displayName: target.display_name,
+      role: "user",
+      creditsUserId: target.credits_user_id,
+      status: target.status,
+    },
+  };
+}

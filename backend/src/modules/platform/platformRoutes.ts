@@ -9,6 +9,7 @@ import {
   confirmAgentSettlement,
   createAgentLead,
   createAgentTicket,
+  getAgentCustomerLedger,
   getAgentOperationsOverview,
 } from "./agentOperationsService";
 import {
@@ -21,6 +22,7 @@ import { getCommissionPolicy } from "./commissionPolicyService";
 import { accountCreationPolicyService } from "./accountCreationPolicyService";
 import {
   adjustPlatformUserCredits,
+  disablePlatformAgentByCapability,
   deletePlatformUserByCapability,
 } from "./platformAccountCapabilities";
 import { creditsClient } from "../billing/creditsClient";
@@ -93,6 +95,15 @@ platformRoutes.post(
   asyncHandler(async (req, res) => {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     ok(res, await promotePlatformUserToAgent(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.post(
+  "/users/:userId/disable-agent",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await disablePlatformAgentByCapability(req, userId, req.body ?? {}));
   }),
 );
 
@@ -226,6 +237,17 @@ platformRoutes.get(
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await getAgentOperationsOverview(req));
+  }),
+);
+
+platformRoutes.get(
+  "/agent/customers/:relationId/ledger",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const relationId = Array.isArray(req.params.relationId)
+      ? req.params.relationId[0]
+      : req.params.relationId;
+    ok(res, await getAgentCustomerLedger(req, relationId));
   }),
 );
 

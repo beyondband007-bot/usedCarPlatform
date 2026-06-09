@@ -630,8 +630,8 @@ onBeforeUnmount(() => {
 
           <div class="dev-auth-grid">
             <div class="dev-auth-block">
-              <h4>代理商授权</h4>
-              <p class="dev-auth-sub">默认全部可用「放养」，一键开启或禁用代理商创建 User</p>
+              <h4>代理商授权与管理</h4>
+              <p class="dev-auth-sub">控制 Agent 创建 User，并可禁用 Agent 使账号回到普通 User 身份。</p>
               <NDataTable
                 v-if="agentPolicyOverrides.length"
                 :columns="agentAuthorizationColumns"
