@@ -1648,6 +1648,7 @@ defineExpose({
             <WorkspaceTutorialGuide
               :animation-key="capability.code"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
+              :variant="isBatchCapability ? 'batch-new' : 'showroom'"
             />
 
             <SceneTemplateRecommendations

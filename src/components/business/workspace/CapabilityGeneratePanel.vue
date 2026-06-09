@@ -5076,20 +5076,227 @@ defineExpose({
 :global(.workspace-page.theme-dark) .generate-panel.is-batch,
 :global(html[data-theme="dark"]) .generate-panel.is-batch {
   --batch-card-bg: #1b1e22;
-  --batch-card-border: transparent;
-  --batch-text-primary: var(--workspace-accent-strong, #ffd75a);
+  --batch-card-border: #2a2e34;
+  --batch-text-primary: #ffffff;
+  --batch-text-body: #ffffff;
+  --batch-text-muted: #9ca3af;
+  --batch-input-border: #2a2e34;
+  --batch-upload-bg: #14171a;
+  --batch-upload-border: #2a2e34;
 }
 
 :global(.workspace-page.theme-dark) .generate-panel.is-batch :is(.batch-card, .batch-notice),
 :global(html[data-theme="dark"]) .generate-panel.is-batch :is(.batch-card, .batch-notice),
 :global(.workspace-page.theme-dark) .generate-panel.is-batch .preset-summary,
-:global(html[data-theme="dark"]) .generate-panel.is-batch .preset-summary {
+:global(html[data-theme="dark"]) .generate-panel.is-batch .preset-summary,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-scene-card,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-scene-card {
+  border: 1px solid var(--batch-card-border);
   background: var(--batch-card-bg);
+  color: var(--batch-text-primary);
+  box-shadow: none;
 }
 
 :global(.workspace-page.theme-dark) .generate-panel.is-batch .preset-summary,
 :global(html[data-theme="dark"]) .generate-panel.is-batch .preset-summary {
   box-shadow: none;
+}
+
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-card h3,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .inline-field > span,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-upload-head h3,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .scene-head h3,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-card h3,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .inline-field > span,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-upload-head h3,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .scene-head h3 {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-notice,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-card p,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .switch-card p,
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .batch-upload-head p,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-notice,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-card p,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .switch-card p,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .batch-upload-head p {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-summary-copy
+  p,
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-summary-copy
+  strong,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-summary-copy
+  p,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-summary-copy
+  strong {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-summary-icon,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-summary-icon {
+  background: #14171a;
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-tag.is-scene,
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-tag.is-ratio,
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-tag.is-on,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-tag.is-scene,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-tag.is-ratio,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-tag.is-on {
+  border: 1px solid #2a2e34;
+  background: #14171a;
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark) .generate-panel.is-batch .plain-input,
+:global(html[data-theme="dark"]) .generate-panel.is-batch .plain-input {
+  border: 1px solid var(--batch-input-border);
+  background: #14171a;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-count,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-count {
+  background: #14171a;
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-drop,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-drop {
+  border: 1px dashed var(--batch-upload-border);
+  background: var(--batch-upload-bg);
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  .iconify,
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  strong,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-drop
+  .iconify,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-drop
+  strong {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-drop
+  span,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-drop
+  span {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .batch-upload-item,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .batch-upload-item {
+  border: 1px solid #2a2e34;
+  background: #14171a;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .scene-grid
+  article,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .scene-grid
+  article {
+  border: 1px solid #2a2e34;
+  background: #14171a;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .scene-grid
+  strong,
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .scene-grid
+  strong {
+  color: #ffffff;
+}
+
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .scene-category-select
+  :deep(.n-base-selection),
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .preset-combobox
+  :deep(.n-base-selection),
+:global(.workspace-page.theme-dark)
+  .generate-panel.is-batch
+  .inline-field
+  :deep(.n-base-selection),
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .scene-category-select
+  :deep(.n-base-selection),
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .preset-combobox
+  :deep(.n-base-selection),
+:global(html[data-theme="dark"])
+  .generate-panel.is-batch
+  .inline-field
+  :deep(.n-base-selection) {
+  --n-border: 1px solid #2a2e34 !important;
+  --n-border-hover: 1px solid #3a4048 !important;
+  --n-border-focus: 1px solid #3a4048 !important;
+  --n-color: #14171a !important;
+  --n-text-color: #ffffff !important;
+  --n-arrow-color: #9ca3af !important;
 }
 
 :global([data-theme="dark"]) .delivery-board {
@@ -5695,5 +5902,53 @@ html[data-theme="light"]
   .batch-primary-btn.n-button:hover:not(:disabled) {
   background: #ffca28 !important;
   color: #000000 !important;
+}
+
+.workspace-page.theme-dark .generate-panel.is-batch .batch-card,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-notice,
+.workspace-page.theme-dark .generate-panel.is-batch .preset-summary,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-scene-card,
+html[data-theme="dark"] .generate-panel.is-batch .batch-card,
+html[data-theme="dark"] .generate-panel.is-batch .batch-notice,
+html[data-theme="dark"] .generate-panel.is-batch .preset-summary,
+html[data-theme="dark"] .generate-panel.is-batch .batch-scene-card {
+  border: 1px solid #2a2e34 !important;
+  background: #1b1e22 !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+.workspace-page.theme-dark .generate-panel.is-batch .batch-card h3,
+.workspace-page.theme-dark .generate-panel.is-batch .inline-field > span,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-upload-head h3,
+.workspace-page.theme-dark .generate-panel.is-batch .scene-head h3,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-notice,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-card p,
+.workspace-page.theme-dark .generate-panel.is-batch .switch-card p,
+.workspace-page.theme-dark .generate-panel.is-batch .batch-upload-head p,
+.workspace-page.theme-dark .generate-panel.is-batch .preset-summary-copy p,
+.workspace-page.theme-dark .generate-panel.is-batch .preset-summary-copy strong,
+html[data-theme="dark"] .generate-panel.is-batch .batch-card h3,
+html[data-theme="dark"] .generate-panel.is-batch .inline-field > span,
+html[data-theme="dark"] .generate-panel.is-batch .batch-upload-head h3,
+html[data-theme="dark"] .generate-panel.is-batch .scene-head h3,
+html[data-theme="dark"] .generate-panel.is-batch .batch-notice,
+html[data-theme="dark"] .generate-panel.is-batch .batch-card p,
+html[data-theme="dark"] .generate-panel.is-batch .switch-card p,
+html[data-theme="dark"] .generate-panel.is-batch .batch-upload-head p,
+html[data-theme="dark"] .generate-panel.is-batch .preset-summary-copy p,
+html[data-theme="dark"] .generate-panel.is-batch .preset-summary-copy strong {
+  color: #ffffff !important;
+}
+
+.workspace-page.theme-dark .generate-panel.is-batch .preset-tag.is-scene,
+.workspace-page.theme-dark .generate-panel.is-batch .preset-tag.is-ratio,
+.workspace-page.theme-dark .generate-panel.is-batch .preset-tag.is-on,
+html[data-theme="dark"] .generate-panel.is-batch .preset-tag.is-scene,
+html[data-theme="dark"] .generate-panel.is-batch .preset-tag.is-ratio,
+html[data-theme="dark"] .generate-panel.is-batch .preset-tag.is-on {
+  border: 1px solid #2a2e34 !important;
+  background: #14171a !important;
+  color: #ffffff !important;
 }
 </style>
