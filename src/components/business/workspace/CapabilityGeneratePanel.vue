@@ -259,6 +259,10 @@ const showroomWallEnabledOptionIds = new Set([
   "soft-top-light",
   "luxury-dark",
   "wide-angle",
+  "warm-beige-studio",
+  "dark-gray-halo",
+  "charcoal-stone-wall",
+  "vertical-light-hall",
 ]);
 
 function resolveShowroomLogoPlacements(optionId?: string | null) {
@@ -3593,9 +3597,9 @@ defineExpose({
 
 .workspace-config-module--primary :deep(.upload-task-card__title) {
   color: var(--saas-title);
-  font-size: 28px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 
 .workspace-config-module--primary :deep(.upload-task-card__badge) {

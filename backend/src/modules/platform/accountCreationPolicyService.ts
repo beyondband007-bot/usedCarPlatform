@@ -18,6 +18,7 @@ import {
   defaultBackOfficePermissionPolicies,
   resolveAccountCreationPolicy,
 } from "./accountCreationPolicyDefaults";
+import { getCommissionPolicy } from "./commissionPolicyService";
 
 export type AccountCreationOperator = {
   userId: string;
@@ -54,6 +55,10 @@ export type AgentPolicyOverride = {
   username: string;
   displayName: string;
   phone: string | null;
+  assignedByUserId: string | null;
+  assignedByUsername: string | null;
+  assignedByDisplayName: string | null;
+  commissionRate: number;
   developerAllowsCreateUsers: boolean;
   developerDisabledCreateUsers: boolean;
   effectiveCanCreateUsers: boolean;
@@ -77,6 +82,10 @@ type AgentPolicyOverrideRow = RowDataPacket & {
   username: string;
   display_name: string;
   phone: string | null;
+  assigned_by_user_id: string | null;
+  assigned_by_username: string | null;
+  assigned_by_display_name: string | null;
+  commission_rate: string | number | null;
   developer_allows_create_users: 0 | 1 | null;
   updated_by_user_id: string | null;
   override_updated_at: Date | null;
@@ -85,6 +94,11 @@ type AgentPolicyOverrideRow = RowDataPacket & {
 const policyCodes = new Set<AccountCreationPolicyCode>(
   defaultBackOfficePermissionPolicies.map((policy) => policy.policyCode),
 );
+
+const toNumber = (value: string | number | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 function mergePolicyRows(rows: BackOfficePermissionPolicyRow[]): AccountCreationPolicySnapshot {
   const snapshot = { ...defaultAccountCreationPolicySnapshot };
@@ -334,11 +348,16 @@ async function listAgentPolicyOverrides(
        u.username,
        u.display_name,
        u.phone,
+       boa.assigned_by_user_id,
+       assigned_by.username assigned_by_username,
+       assigned_by.display_name assigned_by_display_name,
+       override.commission_rate,
        override.developer_allows_create_users,
        override.updated_by_user_id,
        override.updated_at override_updated_at
      FROM back_office_role_assignments boa
      JOIN app_users u ON u.id = boa.user_id
+     LEFT JOIN app_users assigned_by ON assigned_by.id = boa.assigned_by_user_id
      LEFT JOIN back_office_agent_policy_overrides override ON override.agent_user_id = u.id
      WHERE boa.role_code = 'agent'
        AND boa.status = 'active'
@@ -356,6 +375,13 @@ async function listAgentPolicyOverrides(
         username: row.username,
         displayName: row.display_name,
         phone: row.phone,
+        assignedByUserId: row.assigned_by_user_id,
+        assignedByUsername: row.assigned_by_username,
+        assignedByDisplayName: row.assigned_by_display_name,
+        commissionRate:
+          row.commission_rate === null || row.commission_rate === undefined
+            ? getCommissionPolicy().commissionRate
+            : toNumber(row.commission_rate),
         developerAllowsCreateUsers: rowGate,
         developerDisabledCreateUsers: !rowGate,
         effectiveCanCreateUsers: globalGate && rowGate,
@@ -405,6 +431,49 @@ async function setAgentCreateUserPolicy(input: {
   return listAgentPolicyOverrides();
 }
 
+async function setAgentCommissionRate(input: {
+  developerUserId: string;
+  agentUserId: string;
+  commissionRate: number;
+}) {
+  if (!Number.isFinite(input.commissionRate) || input.commissionRate < 0 || input.commissionRate > 1) {
+    throw errors.invalidParameter("commissionRate must be a number between 0 and 1");
+  }
+
+  const [agents] = await pool.query<Array<RowDataPacket & { user_id: string }>>(
+    `SELECT u.id user_id
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     WHERE boa.user_id = :agentUserId
+       AND boa.role_code = 'agent'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     LIMIT 1`,
+    { agentUserId: input.agentUserId },
+  );
+
+  if (!agents.length) {
+    throw errors.invalidParameter("target agent account not found");
+  }
+
+  await pool.query<ResultSetHeader>(
+    `INSERT INTO back_office_agent_policy_overrides
+      (agent_user_id, commission_rate, updated_by_user_id)
+     VALUES
+      (:agentUserId, :commissionRate, :developerUserId)
+     ON DUPLICATE KEY UPDATE
+      commission_rate = VALUES(commission_rate),
+      updated_by_user_id = VALUES(updated_by_user_id)`,
+    {
+      agentUserId: input.agentUserId,
+      commissionRate: input.commissionRate.toFixed(4),
+      developerUserId: input.developerUserId,
+    },
+  );
+
+  return listAgentPolicyOverrides();
+}
+
 export const accountCreationPolicyService = {
   canCreateAccount,
   canCreateUser,
@@ -414,6 +483,7 @@ export const accountCreationPolicyService = {
   listAgentPolicyOverrides,
   resolveAccountCreationPolicy,
   setAdminCreateAgentPolicy,
+  setAgentCommissionRate,
   setAgentCreateUserPolicy,
   setPolicyEnabled,
 };

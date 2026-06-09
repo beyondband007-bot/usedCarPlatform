@@ -53,6 +53,7 @@ function resolveShortVideoView(preferred?: ShortVideoView): ShortVideoView {
 
 const emit = defineEmits<{
   pickRecent: [item: WorkspaceRecentItem];
+  deleteRecent: [item: WorkspaceRecentItem];
 }>();
 
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -261,7 +262,17 @@ function handleRecentPick(item: WorkspaceRecentItem) {
           <footer class="short-video-recent-foot">
             <strong class="short-video-recent-name">{{ item.title }}</strong>
             <p class="short-video-recent-scene">16:9 · 720p · 10秒</p>
-            <span class="short-video-recent-time">{{ item.createdAt }}</span>
+            <div class="short-video-recent-foot-actions">
+              <span class="short-video-recent-time">{{ item.createdAt }}</span>
+              <button
+                type="button"
+                class="short-video-recent-delete"
+                :aria-label="`删除${item.title}`"
+                @click.stop="emit('deleteRecent', item)"
+              >
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
+            </div>
           </footer>
         </article>
       </template>
@@ -532,6 +543,37 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   font-size: 34px;
 }
 
+.short-video-recent-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.short-video-recent-delete {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.short-video-recent-delete:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
 .short-video-recent-status {
   position: absolute;
   left: 8px;
@@ -635,7 +677,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
 }
 
 .short-video-recent-time {
-  margin-top: auto;
+  flex: 1;
   color: var(--assist-muted);
   font-size: 11px;
   font-weight: 700;

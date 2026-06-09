@@ -68,6 +68,10 @@ onMounted(() => {
           muted
           loop
           playsinline
+          webkit-playsinline
+          x5-playsinline
+          x5-video-player-type="h5"
+          x5-video-player-fullscreen="false"
           preload="metadata"
           :aria-label="item.title"
         />

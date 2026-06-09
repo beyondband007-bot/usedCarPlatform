@@ -28,6 +28,7 @@ const route = useRoute();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 
 const userMenuOpen = ref(false);
+const mobileNavOpen = ref(false);
 const { usesStudioChrome } = useStudioChrome();
 const { rechargeModalVisible, openRechargeModal, notifyRechargeSuccess } =
   usePointsRechargeModal();
@@ -55,6 +56,13 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => route.path,
+  () => {
+    mobileNavOpen.value = false;
+  },
+);
+
 function isNavItemActive(item: NavItem) {
   if (item.workbenchEntry) {
     return route.path === "/workspace" || route.path.startsWith("/workspace/");
@@ -64,12 +72,18 @@ function isNavItemActive(item: NavItem) {
 }
 
 function handleNavClick(item: NavItem) {
+  mobileNavOpen.value = false;
+
   if (item.workbenchEntry && !authStore.isLoggedIn) {
     workbenchEntry?.openWorkbench();
     return;
   }
 
   router.push(item.path);
+}
+
+function toggleMobileNav() {
+  mobileNavOpen.value = !mobileNavOpen.value;
 }
 
 function handleOpenCredits() {
@@ -160,133 +174,174 @@ const showHeaderRecharge = computed(
     <header
       v-if="usesStudioChrome"
       class="site-header"
-      :class="{ 'is-light': !appStore.isDarkMode }"
+      :class="{
+        'is-light': !appStore.isDarkMode,
+        'is-mobile-nav-open': mobileNavOpen,
+      }"
       aria-label="顶部导航"
     >
-      <div class="site-brand">
-        <RouterLink class="logo" to="/home" aria-label="AI CARXEN 车新新">
-          <img class="logo-img" :src="siteLogoSrc" alt="AI CARXEN 车新新" />
-        </RouterLink>
-      </div>
-      <nav class="nav-links" aria-label="主导航">
-        <template v-for="item in navItems" :key="item.path + item.label">
-          <button
-            type="button"
-            class="nav-link"
-            :class="{ active: isNavItemActive(item) }"
-            @click="handleNavClick(item)"
-          >
-            {{ item.label }}
-          </button>
-        </template>
-      </nav>
-      <div class="site-header-actions">
-        <div
-          v-if="authStore.isLoggedIn"
-          class="credit-pill-group"
-          :class="{ 'has-recharge': showHeaderRecharge }"
-        >
-          <RouterLink
-            class="credit-pill-balance"
-            to="/credits"
-            aria-label="查看积分余额与流水"
-          >
-            积分余额 {{ creditsBalanceText }}
+      <div class="site-header-row">
+        <div class="site-brand">
+          <RouterLink class="logo" to="/home" aria-label="AI CARXEN 车新新">
+            <img class="logo-img" :src="siteLogoSrc" alt="AI CARXEN 车新新" />
           </RouterLink>
-          <button
-            v-if="showHeaderRecharge"
-            type="button"
-            class="credit-recharge-btn"
-            @click="handleOpenRecharge"
-          >
-            充值
-          </button>
         </div>
-        <RouterLink
-          v-else-if="route.path !== '/login'"
-          class="header-action-pill credit-pill site-login-fallback"
-          to="/login"
-        >
-          企业账号登录
-        </RouterLink>
-        <NPopover
-          v-if="authStore.isLoggedIn"
-          v-model:show="userMenuOpen"
-          trigger="click"
-          placement="bottom-end"
-          :show-arrow="false"
-          raw
-          to="body"
-        >
-          <template #trigger>
+        <nav class="nav-links" aria-label="主导航">
+          <template v-for="item in navItems" :key="item.path + item.label">
             <button
               type="button"
-              class="header-action-pill user-menu-trigger user-menu-trigger--studio"
-              :aria-expanded="userMenuOpen"
-              aria-haspopup="menu"
+              class="nav-link"
+              :class="{ active: isNavItemActive(item) }"
+              @click="handleNavClick(item)"
             >
-              <span class="user-menu-name">{{ authStore.userName }}</span>
-              <Icon icon="mdi:chevron-down" class="user-menu-chevron" />
+              {{ item.label }}
             </button>
           </template>
+        </nav>
+        <div class="site-header-tools">
+          <div class="site-header-actions">
+            <div
+              v-if="authStore.isLoggedIn"
+              class="credit-pill-group"
+              :class="{ 'has-recharge': showHeaderRecharge }"
+            >
+              <RouterLink
+                class="credit-pill-balance"
+                to="/credits"
+                aria-label="查看积分余额与流水"
+              >
+                积分余额 {{ creditsBalanceText }}
+              </RouterLink>
+              <button
+                v-if="showHeaderRecharge"
+                type="button"
+                class="credit-recharge-btn"
+                @click="handleOpenRecharge"
+              >
+                充值
+              </button>
+            </div>
+            <RouterLink
+              v-else-if="route.path !== '/login'"
+              class="header-action-pill credit-pill site-login-fallback"
+              to="/login"
+            >
+              企业账号登录
+            </RouterLink>
+            <NPopover
+              v-if="authStore.isLoggedIn"
+              v-model:show="userMenuOpen"
+              trigger="click"
+              placement="bottom-end"
+              :show-arrow="false"
+              raw
+              to="body"
+            >
+              <template #trigger>
+                <button
+                  type="button"
+                  class="header-action-pill user-menu-trigger user-menu-trigger--studio"
+                  :aria-expanded="userMenuOpen"
+                  aria-haspopup="menu"
+                >
+                  <span class="user-menu-name">{{ authStore.userName }}</span>
+                  <Icon icon="mdi:chevron-down" class="user-menu-chevron" />
+                </button>
+              </template>
 
-          <div
-            class="user-menu-panel"
-            :class="appStore.isDarkMode ? 'is-dark' : 'is-light'"
-            role="menu"
-          >
+              <div
+                class="user-menu-panel"
+                :class="appStore.isDarkMode ? 'is-dark' : 'is-light'"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  class="user-menu-item"
+                  role="menuitem"
+                  @click="handleOpenCredits"
+                >
+                  <Icon icon="mdi:diamond-stone" class="user-menu-item-icon" />
+                  积分查询
+                </button>
+                <button
+                  v-if="showHeaderRecharge"
+                  type="button"
+                  class="user-menu-item"
+                  role="menuitem"
+                  @click="handleOpenRecharge"
+                >
+                  <Icon
+                    icon="mdi:wallet-plus-outline"
+                    class="user-menu-item-icon"
+                  />
+                  充值
+                </button>
+                <button
+                  type="button"
+                  class="user-menu-item"
+                  role="menuitem"
+                  @click="handleLogout"
+                >
+                  <Icon icon="mdi:logout" class="user-menu-item-icon" />
+                  退出登录
+                </button>
+              </div>
+            </NPopover>
             <button
               type="button"
-              class="user-menu-item"
-              role="menuitem"
-              @click="handleOpenCredits"
+              class="theme-toggle"
+              :aria-label="themeToggleAriaLabel"
+              @click="appStore.toggleTheme()"
             >
-              <Icon icon="mdi:diamond-stone" class="user-menu-item-icon" />
-              积分查询
-            </button>
-            <button
-              v-if="showHeaderRecharge"
-              type="button"
-              class="user-menu-item"
-              role="menuitem"
-              @click="handleOpenRecharge"
-            >
-              <Icon icon="mdi:wallet-plus-outline" class="user-menu-item-icon" />
-              充值
-            </button>
-            <button
-              type="button"
-              class="user-menu-item"
-              role="menuitem"
-              @click="handleLogout"
-            >
-              <Icon icon="mdi:logout" class="user-menu-item-icon" />
-              退出登录
+              <img
+                :src="themeToggleIcon"
+                alt=""
+                class="theme-toggle-icon"
+                :class="
+                  appStore.isDarkMode
+                    ? 'theme-toggle-icon--to-light'
+                    : 'theme-toggle-icon--to-dark'
+                "
+                width="22"
+                height="22"
+                decoding="async"
+                draggable="false"
+              />
             </button>
           </div>
-        </NPopover>
-        <button
-          type="button"
-          class="theme-toggle"
-          :aria-label="themeToggleAriaLabel"
-          @click="appStore.toggleTheme()"
-        >
-          <img
-            :src="themeToggleIcon"
-            alt=""
-            class="theme-toggle-icon"
-            :class="
-              appStore.isDarkMode
-                ? 'theme-toggle-icon--to-light'
-                : 'theme-toggle-icon--to-dark'
-            "
-            width="22"
-            height="22"
-            decoding="async"
-            draggable="false"
-          />
-        </button>
+          <button
+            type="button"
+            class="mobile-nav-toggle"
+            :aria-expanded="mobileNavOpen"
+            aria-controls="studio-mobile-nav"
+            aria-label="打开导航菜单"
+            @click="toggleMobileNav"
+          >
+            <Icon
+              :icon="mobileNavOpen ? 'mdi:close' : 'mdi:menu'"
+              class="mobile-nav-toggle-icon"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
       </div>
+      <nav
+        v-if="mobileNavOpen"
+        id="studio-mobile-nav"
+        class="mobile-nav-panel"
+        aria-label="移动端主导航"
+      >
+        <button
+          v-for="item in navItems"
+          :key="`mobile-${item.path}-${item.label}`"
+          type="button"
+          class="mobile-nav-link"
+          :class="{ active: isNavItemActive(item) }"
+          @click="handleNavClick(item)"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
     </header>
 
     <header
@@ -336,7 +391,9 @@ const showHeaderRecharge = computed(
               :icon="item.icon"
               class="text-xl"
               :class="
-                isNavItemActive(item) ? 'text-[var(--app-header-nav-active)]' : ''
+                isNavItemActive(item)
+                  ? 'text-[var(--app-header-nav-active)]'
+                  : ''
               "
             />
             <span>{{ item.label }}</span>
@@ -420,7 +477,10 @@ const showHeaderRecharge = computed(
               role="menuitem"
               @click="handleOpenRecharge"
             >
-              <Icon icon="mdi:wallet-plus-outline" class="user-menu-item-icon" />
+              <Icon
+                icon="mdi:wallet-plus-outline"
+                class="user-menu-item-icon"
+              />
               充值
             </button>
             <button
@@ -460,23 +520,45 @@ const showHeaderRecharge = computed(
 
 .site-header {
   display: flex;
-  align-items: center;
-  gap: clamp(18px, 2vw, 34px);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   width: 100%;
   max-width: none;
   box-sizing: border-box;
   min-height: var(--studio-chrome-header-height, 64px);
-  padding: 10px var(--studio-chrome-pad-x, 24px);
+  padding: 0;
   margin: 0;
   background: var(
     --studio-chrome-header-bg,
-    linear-gradient(180deg, rgba(248, 251, 255, 0.96) 0%, rgba(241, 247, 253, 0.92) 100%)
+    linear-gradient(
+      180deg,
+      rgba(248, 251, 255, 0.96) 0%,
+      rgba(241, 247, 253, 0.92) 100%
+    )
   );
   color: var(--studio-chrome-logo, #121826);
   font-family:
     "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   backdrop-filter: blur(12px);
+}
+
+.site-header-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(18px, 2vw, 34px);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--studio-chrome-header-height, 64px);
+  padding: 10px var(--studio-chrome-pad-x, 24px);
+}
+
+.site-header-tools {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  gap: clamp(8px, 0.75vw, 12px);
 }
 
 .logo {
@@ -682,7 +764,6 @@ const showHeaderRecharge = computed(
 .site-header-actions {
   display: inline-flex;
   align-items: center;
-  margin-left: auto;
   gap: clamp(8px, 0.75vw, 12px);
 }
 
@@ -708,11 +789,11 @@ const showHeaderRecharge = computed(
 }
 
 .theme-toggle:hover {
-  border-color: var(
-    --studio-chrome-user-hover-border,
-    rgba(15, 23, 42, 0.16)
+  border-color: var(--studio-chrome-user-hover-border, rgba(15, 23, 42, 0.16));
+  background: var(
+    --studio-chrome-theme-bg-hover,
+    var(--studio-chrome-user-hover-bg, #171a20)
   );
-  background: var(--studio-chrome-theme-bg-hover, var(--studio-chrome-user-hover-bg, #171a20));
   opacity: 0.92;
 }
 
@@ -759,9 +840,89 @@ const showHeaderRecharge = computed(
   background: #1e293b;
 }
 
+.mobile-nav-toggle {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--studio-chrome-theme-border, rgba(15, 23, 42, 0.1));
+  border-radius: 50%;
+  background: var(--studio-chrome-theme-bg, #0f1115);
+  color: var(--studio-chrome-theme-text, #ffffff);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.mobile-nav-toggle-icon {
+  font-size: 22px;
+}
+
+.mobile-nav-panel {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px var(--studio-chrome-pad-x, 24px) 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--studio-chrome-bg, #060606);
+}
+
+.mobile-nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--studio-chrome-nav, #c8c1b3);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.mobile-nav-link:hover,
+.mobile-nav-link.active {
+  color: var(--studio-chrome-nav-active, #efc24c);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.site-header.is-light .mobile-nav-panel {
+  border-top-color: #d5e0ea;
+}
+
+.site-header.is-light .mobile-nav-link {
+  color: #475569;
+}
+
+.site-header.is-light .mobile-nav-link:hover,
+.site-header.is-light .mobile-nav-link.active {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.04);
+}
+
 @media (max-width: 1100px) {
   .nav-links {
     display: none;
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex;
+  }
+
+  .mobile-nav-panel {
+    display: flex;
   }
 
   .site-login-fallback {
@@ -770,7 +931,7 @@ const showHeaderRecharge = computed(
 }
 
 @media (max-width: 700px) {
-  .site-header {
+  .site-header-row {
     padding: 14px var(--studio-chrome-pad-x, 18px);
   }
 
@@ -783,7 +944,26 @@ const showHeaderRecharge = computed(
   .site-header-actions {
     justify-self: end;
   }
+}
 
+@media (max-width: 767px) {
+  .site-header-row {
+    justify-content: center;
+    min-height: 52px;
+    padding: 10px var(--studio-chrome-pad-x, 16px);
+  }
+
+  .site-header-tools {
+    display: none;
+  }
+
+  .logo {
+    margin-right: 0;
+  }
+
+  .logo-img {
+    max-height: 24px;
+  }
 }
 
 .user-menu-trigger:not(.user-menu-trigger--studio) {

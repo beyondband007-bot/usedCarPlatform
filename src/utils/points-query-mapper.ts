@@ -48,7 +48,9 @@ export function mapCreditsTxnType(
   if (txnType === 'recharge') return 'recharge'
   if (txnType === 'refund') return 'refund'
   if (['grant', 'bonus', 'commission_grant'].includes(txnType)) return 'gift'
-  if (['settle', 'freeze', 'estimate'].includes(txnType)) return 'consume'
+  if (['settle', 'freeze', 'estimate'].includes(txnType)) {
+    return points >= 0 ? 'refund' : 'consume'
+  }
   if (txnType === 'adjustment' || txnType === 'adjust') {
     return points >= 0 ? 'gift' : 'consume'
   }
@@ -57,21 +59,24 @@ export function mapCreditsTxnType(
 
 export function mapCreditsBizSource(
   txnType: PointsTxnType,
+  rawTxnType?: string,
   bizType?: string | null,
 ): PointsBizSource {
   const normalized = (bizType ?? '').toLowerCase()
+  const normalizedTxnType = (rawTxnType ?? '').toLowerCase()
   if (txnType === 'recharge') return 'purchase'
   if (txnType === 'gift') return 'package'
-  if (txnType === 'refund') return 'fail'
+  if (txnType === 'refund' && normalizedTxnType === 'refund') return 'fail'
   if (normalized.includes('batch')) return 'batch'
   return 'single'
 }
 
-function resolveSceneTitle(txnType: PointsTxnType, bizType?: string | null) {
+function resolveSceneTitle(txnType: PointsTxnType, rawTxnType?: string, bizType?: string | null) {
   const normalized = (bizType ?? '').toLowerCase()
+  const normalizedTxnType = (rawTxnType ?? '').toLowerCase()
   if (txnType === 'recharge') return '充值购买'
   if (txnType === 'gift') return '套餐赠送'
-  if (txnType === 'refund') return '失败退款'
+  if (txnType === 'refund' && normalizedTxnType === 'refund') return '失败退款'
   if (normalized.includes('batch')) return '批量上新'
   if (normalized.includes('video')) return '短视频生成'
   return '单图生成'
@@ -92,8 +97,9 @@ export function mapCreditsTransactionToFlowRecord(
   transaction: CreditsTransaction,
 ): PointsFlowRecord {
   const pointsChange = parsePoints(transaction.points)
-  const txnType = mapCreditsTxnType(String(transaction.txnType), pointsChange)
-  const bizSource = mapCreditsBizSource(txnType, transaction.bizType)
+  const rawTxnType = String(transaction.txnType)
+  const txnType = mapCreditsTxnType(rawTxnType, pointsChange)
+  const bizSource = mapCreditsBizSource(txnType, rawTxnType, transaction.bizType)
 
   const status = txnType === 'gift' ? 'pending' : 'effective'
 
@@ -103,7 +109,7 @@ export function mapCreditsTransactionToFlowRecord(
     pointsChange,
     balanceAfter: parsePoints(transaction.balanceAfter),
     bizSource,
-    title: resolveSceneTitle(txnType, transaction.bizType),
+    title: resolveSceneTitle(txnType, rawTxnType, transaction.bizType),
     functionName: resolveFunctionName(transaction.bizType, transaction.remark),
     remark: transaction.remark?.trim() || transaction.bizId || '-',
     createdAt: formatDateTime(transaction.createdAt),
@@ -195,6 +201,51 @@ export function buildPersonalSummaryCards(input: {
       label: '近30天净变动',
       value: `${recentPrefix}${formatPoints(recentNet)}`,
       unit: '积分',
+      icon: pointsSummaryIcons.recentNet,
+      tone: 'amber',
+    },
+  ]
+}
+
+export function buildPersonalSummaryCardsFromAggregate(input: {
+  availableBalance: number
+  totalGained: number
+  totalConsumed: number
+  recentNet: number
+  availableBalanceLabel?: string
+}): PointsSummaryCard[] {
+  const recentPrefix = input.recentNet > 0 ? '+' : ''
+
+  return [
+    {
+      key: 'availableBalance',
+      label: input.availableBalanceLabel ?? '褰撳墠鍙敤绉垎',
+      value: formatPoints(input.availableBalance),
+      unit: '绉垎',
+      icon: pointsSummaryIcons.available,
+      tone: 'blue',
+    },
+    {
+      key: 'totalGained',
+      label: '绱鑾峰緱',
+      value: formatPoints(input.totalGained),
+      unit: '绉垎',
+      icon: pointsSummaryIcons.gained,
+      tone: 'emerald',
+    },
+    {
+      key: 'totalConsumed',
+      label: '绱娑堣垂',
+      value: formatPoints(input.totalConsumed),
+      unit: '绉垎',
+      icon: pointsSummaryIcons.consumed,
+      tone: 'rose',
+    },
+    {
+      key: 'recentNet',
+      label: '杩?0澶╁噣鍙樺姩',
+      value: `${recentPrefix}${formatPoints(input.recentNet)}`,
+      unit: '绉垎',
       icon: pointsSummaryIcons.recentNet,
       tone: 'amber',
     },

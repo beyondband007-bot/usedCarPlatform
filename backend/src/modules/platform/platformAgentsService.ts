@@ -14,6 +14,7 @@ type PlatformAgentRow = RowDataPacket & {
   status: string;
   assigned_by_user_id: string | null;
   assigned_by_username: string | null;
+  assigned_by_display_name: string | null;
   assignment_status: string;
   created_at: Date;
   updated_at: Date;
@@ -44,6 +45,7 @@ export async function listPlatformAgents(req: Request) {
        u.status,
        boa.assigned_by_user_id,
        assigned_by.username assigned_by_username,
+       assigned_by.display_name assigned_by_display_name,
        boa.status assignment_status,
        boa.created_at,
        boa.updated_at,
@@ -82,6 +84,7 @@ export async function listPlatformAgents(req: Request) {
        u.status,
        boa.assigned_by_user_id,
        assigned_by.username,
+       assigned_by.display_name,
        boa.status,
        boa.created_at,
        boa.updated_at
@@ -99,6 +102,7 @@ export async function listPlatformAgents(req: Request) {
       assignmentStatus: row.assignment_status,
       assignedByUserId: row.assigned_by_user_id,
       assignedByUsername: row.assigned_by_username,
+      assignedByDisplayName: row.assigned_by_display_name,
       customerCount: toNumber(row.customer_count),
       leadCount: toNumber(row.lead_count),
       openTicketCount: toNumber(row.open_ticket_count),

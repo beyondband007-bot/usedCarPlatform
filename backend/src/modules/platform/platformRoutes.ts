@@ -9,7 +9,9 @@ import {
   confirmAgentSettlement,
   createAgentLead,
   createAgentTicket,
+  getAgentCustomerLedger,
   getAgentOperationsOverview,
+  getPlatformCustomerLedger,
 } from "./agentOperationsService";
 import {
   buildBillingLifecycleExample,
@@ -21,6 +23,7 @@ import { getCommissionPolicy } from "./commissionPolicyService";
 import { accountCreationPolicyService } from "./accountCreationPolicyService";
 import {
   adjustPlatformUserCredits,
+  disablePlatformAgentByCapability,
   deletePlatformUserByCapability,
 } from "./platformAccountCapabilities";
 import { creditsClient } from "../billing/creditsClient";
@@ -93,6 +96,15 @@ platformRoutes.post(
   asyncHandler(async (req, res) => {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     ok(res, await promotePlatformUserToAgent(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.post(
+  "/users/:userId/disable-agent",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await disablePlatformAgentByCapability(req, userId, req.body ?? {}));
   }),
 );
 
@@ -197,19 +209,39 @@ platformRoutes.patch(
     const agentUserId = Array.isArray(req.params.agentUserId)
       ? req.params.agentUserId[0]
       : req.params.agentUserId;
-    const enabled = (req.body as { developerAllowsCreateUsers?: unknown })?.developerAllowsCreateUsers;
-    if (typeof enabled !== "boolean") {
-      throw errors.invalidParameter("developerAllowsCreateUsers must be boolean");
+    const body = req.body as {
+      developerAllowsCreateUsers?: unknown;
+      commissionRate?: unknown;
+    };
+    const hasCreateUsers = Object.prototype.hasOwnProperty.call(body, "developerAllowsCreateUsers");
+    const hasCommissionRate = Object.prototype.hasOwnProperty.call(body, "commissionRate");
+    if (!hasCreateUsers && !hasCommissionRate) {
+      throw errors.invalidParameter("developerAllowsCreateUsers or commissionRate is required");
     }
 
-    ok(
-      res,
-      await accountCreationPolicyService.setAgentCreateUserPolicy({
+    let result;
+    if (hasCreateUsers) {
+      const enabled = body.developerAllowsCreateUsers;
+      if (typeof enabled !== "boolean") {
+        throw errors.invalidParameter("developerAllowsCreateUsers must be boolean");
+      }
+      result = await accountCreationPolicyService.setAgentCreateUserPolicy({
         developerUserId: current.user.id,
         agentUserId,
         enabled,
-      }),
-    );
+      });
+    }
+
+    if (hasCommissionRate) {
+      const commissionRate = Number(body.commissionRate);
+      result = await accountCreationPolicyService.setAgentCommissionRate({
+        developerUserId: current.user.id,
+        agentUserId,
+        commissionRate,
+      });
+    }
+
+    ok(res, result);
   }),
 );
 
@@ -226,6 +258,28 @@ platformRoutes.get(
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await getAgentOperationsOverview(req));
+  }),
+);
+
+platformRoutes.get(
+  "/agent/customers/:relationId/ledger",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const relationId = Array.isArray(req.params.relationId)
+      ? req.params.relationId[0]
+      : req.params.relationId;
+    ok(res, await getAgentCustomerLedger(req, relationId));
+  }),
+);
+
+platformRoutes.get(
+  "/customers/:customerProfileId/ledger",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const customerProfileId = Array.isArray(req.params.customerProfileId)
+      ? req.params.customerProfileId[0]
+      : req.params.customerProfileId;
+    ok(res, await getPlatformCustomerLedger(req, customerProfileId));
   }),
 );
 

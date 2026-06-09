@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, watchEffect } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch, watchEffect } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   NButton,
@@ -25,9 +25,12 @@ import {
   createAgentTicket,
   createPlatformUser,
   deletePlatformUser,
+  disablePlatformAgent,
+  getAgentCustomerLedger,
   getCommissionPolicy,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
+  getPlatformCustomerLedger,
   getPlatformAdminPolicyOverrides,
   getPlatformAgentPolicyOverrides,
   getPlatformAgents,
@@ -36,6 +39,8 @@ import {
   updatePlatformAdminPolicyOverride,
   updatePlatformAgentPolicyOverride,
   updateApplicationFunctionDefaultPoints,
+  type AgentCustomerLedger,
+  type AgentCustomerLedgerTransaction,
   type AgentOperationsCommissionPreview,
   type AgentOperationsCustomer,
   type AgentOperationsLead,
@@ -67,6 +72,20 @@ import { useAuthStore } from '@/stores/auth'
 
 type RoleTab = BackOfficeRole
 type DetailRecord = Record<string, unknown>
+type ConsoleSectionKey =
+  | 'adminAccountCreation'
+  | 'adminAgents'
+  | 'adminUsers'
+  | 'adminCreditAccounts'
+  | 'adminRechargeProducts'
+  | 'adminTransactions'
+  | 'agentOverview'
+  | 'agentCustomers'
+  | 'agentLeads'
+  | 'agentCommissions'
+  | 'agentSettlements'
+  | 'agentMaterials'
+  | 'agentTickets'
 
 const authStore = useAuthStore()
 const message = useMessage()
@@ -90,7 +109,9 @@ const isAdjustingCredits = ref(false)
 const isDeleteAccountModalOpen = ref(false)
 const isDeletingAccount = ref(false)
 const isFunctionBillingOpen = ref(false)
+const consoleSectionOpen = ref<Record<string, boolean>>({})
 const promotingUserId = ref<string | null>(null)
+const disablingAgentUserId = ref<string | null>(null)
 const isCreateLeadModalOpen = ref(false)
 const isCreatingLead = ref(false)
 const isCreateTicketModalOpen = ref(false)
@@ -98,9 +119,14 @@ const isCreatingTicket = ref(false)
 const confirmingSettlementId = ref<string | null>(null)
 const updatingAdminPolicyUserId = ref<string | null>(null)
 const updatingAgentPolicyUserId = ref<string | null>(null)
+const updatingAgentCommissionUserId = ref<string | null>(null)
 const updatingFunctionKey = ref<string | null>(null)
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
 const selectedDetail = ref<{ title: string; row: DetailRecord } | null>(null)
+const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
+const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
+const isAgentCustomerLedgerOpen = ref(false)
+const isLoadingAgentCustomerLedger = ref(false)
 const interactionFeedback = ref('')
 const createAccountForm = reactive({
   targetRole: 'user' as PlatformUserTargetRole,
@@ -120,6 +146,7 @@ const adjustCreditsForm = reactive({
 const deleteAccountForm = reactive({
   reason: '',
 })
+const agentCommissionRateDrafts = reactive<Record<string, number | null>>({})
 const leadForm = reactive({
   applicationCode: 'used-car-platform',
   customerName: '',
@@ -135,6 +162,74 @@ const ticketForm = reactive({
   priority: 'normal',
   message: '',
 })
+
+const defaultConsoleSectionState: Record<RoleTab, Partial<Record<ConsoleSectionKey, boolean>>> = {
+  developer: {},
+  admin: {
+    adminAccountCreation: true,
+    adminAgents: true,
+    adminUsers: true,
+    adminCreditAccounts: true,
+    adminRechargeProducts: true,
+    adminTransactions: true,
+  },
+  agent: {
+    agentOverview: true,
+    agentCustomers: true,
+    agentLeads: true,
+    agentCommissions: true,
+    agentSettlements: true,
+    agentMaterials: true,
+    agentTickets: true,
+  },
+}
+
+const consoleCollapseStorageKey = computed(() =>
+  `credits-admin:${activeRole.value}-section-collapse:${authStore.userInfo?.id ?? 'anonymous'}`,
+)
+
+function loadConsoleSectionState() {
+  const defaults = defaultConsoleSectionState[activeRole.value] ?? {}
+  if (typeof window === 'undefined') {
+    consoleSectionOpen.value = { ...defaults }
+    return
+  }
+
+  try {
+    const stored = window.localStorage.getItem(consoleCollapseStorageKey.value)
+    const parsed = stored ? JSON.parse(stored) as Record<string, unknown> : {}
+    const next: Record<string, boolean> = {}
+    for (const [key, defaultValue] of Object.entries(defaults)) {
+      next[key] = typeof parsed[key] === 'boolean' ? parsed[key] as boolean : defaultValue ?? true
+    }
+    consoleSectionOpen.value = next
+  } catch {
+    consoleSectionOpen.value = { ...defaults }
+  }
+}
+
+function persistConsoleSectionState() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(consoleCollapseStorageKey.value, JSON.stringify(consoleSectionOpen.value))
+  } catch {
+    // Collapse controls should still work for the current session if storage is unavailable.
+  }
+}
+
+function isConsoleSectionOpen(key: ConsoleSectionKey) {
+  return consoleSectionOpen.value[key] ?? true
+}
+
+function toggleConsoleSection(key: ConsoleSectionKey) {
+  consoleSectionOpen.value = {
+    ...consoleSectionOpen.value,
+    [key]: !isConsoleSectionOpen(key),
+  }
+  persistConsoleSectionState()
+}
+
+watch(() => consoleCollapseStorageKey.value, loadConsoleSectionState, { immediate: true })
 const functionPointDrafts = reactive<Record<string, number | null>>({})
 
 const detailEntries = computed(() =>
@@ -602,29 +697,26 @@ function canPromoteCustomer(row: CreditsCustomerProfile) {
   return activeRole.value === 'admin' && effectiveAccountCreationPolicy.value.adminCanPromoteUserToAgent
 }
 
+function canViewCustomerLedger() {
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
+function canDisableAgent(row: PlatformAgentProfile) {
+  if (row.status !== 'active' || authStore.userInfo?.id === row.userId) return false
+  if (!authStore.permissions.includes('account:delete:agent')) return false
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
+function canDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (authStore.userInfo?.id === row.userId) return false
+  if (!authStore.permissions.includes('account:delete:agent')) return false
+  return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
 function deleteActionText(row: CreditsCustomerProfile) {
   const targetRole = matrixTargetRole(row.role)
   if (activeRole.value === 'admin' && targetRole === 'agent') return '禁用代理商'
   return '删除'
-}
-
-function agentProfileToCustomerProfile(row: PlatformAgentProfile): CreditsCustomerProfile {
-  return {
-    id: `agent:${row.userId}`,
-    applicationCode: row.applications[0] ?? 'used-car-platform',
-    userId: row.userId,
-    username: row.username,
-    displayName: row.displayName,
-    phone: row.phone ?? null,
-    role: 'agent',
-    creditsUserId: row.creditsUserId ?? '',
-    accountScope: 'personal',
-    creditsTenantId: null,
-    createdByUserId: row.assignedByUserId ?? '',
-    createdByRole: row.assignedByUsername ? `assigned by ${row.assignedByUsername}` : 'back-office',
-    status: row.status,
-    createdAt: row.createdAt,
-  }
 }
 
 function formatCreditsBalance(row: CreditsCustomerProfile) {
@@ -639,9 +731,65 @@ function formatCreditsBalance(row: CreditsCustomerProfile) {
   })
 }
 
-function formatAgentCustomerCount(row: CreditsCustomerProfile) {
-  if (matrixTargetRole(row.role) !== 'agent') return 'N/A'
-  return String(agentCustomerCountByUserId.value.get(row.userId) ?? 0)
+function formatCurrencyAmount(value: number | string | null | undefined) {
+  const numeric = Number(value ?? 0)
+  if (!Number.isFinite(numeric)) return '-'
+  return `¥${numeric.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function formatDateTime(value: string) {
+  const time = new Date(value)
+  if (Number.isNaN(time.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`
+}
+
+function transactionTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    recharge: '充值',
+    bonus: '赠送',
+    settle: '消费',
+    freeze: '冻结',
+    refund: '退款',
+    estimate: '预估',
+    grant: '发放',
+    adjustment: '调整',
+    adjust: '调整',
+    commission_grant: '返佣',
+  }
+  return labels[type] ?? type
+}
+
+function transactionTagType(type: string): 'success' | 'info' | 'warning' | 'error' | 'default' {
+  if (type === 'recharge' || type === 'bonus' || type === 'refund' || type === 'grant') return 'success'
+  if (type === 'settle') return 'error'
+  if (type === 'freeze' || type === 'adjustment' || type === 'adjust') return 'warning'
+  return 'default'
+}
+
+function formatSignedPoints(value: number | string | null | undefined) {
+  const numeric = Number(value ?? 0)
+  if (!Number.isFinite(numeric)) return '-'
+  const sign = numeric > 0 ? '+' : ''
+  return `${sign}${numeric.toLocaleString('zh-CN')}`
+}
+
+function ledgerSourceText(row: AgentCustomerLedgerTransaction) {
+  return row.functionName ?? row.functionCode ?? row.remark ?? row.bizType ?? row.txnType
+}
+
+function ledgerActorText(row: AgentCustomerLedgerTransaction) {
+  const actorName = row.actorDisplayName || row.actorUsername || `Credits User ${row.userId}`
+  return row.actorIdentityLabel ? `${actorName} · ${row.actorIdentityLabel}` : actorName
+}
+
+function ledgerModalTitle() {
+  return agentCustomerLedger.value?.customer.accountScope === 'tenant'
+    ? '(团队)积分流水'
+    : '积分流水'
 }
 
 function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
@@ -655,8 +803,23 @@ function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
   return '-'
 }
 
-function openDeleteAgentModal(row: PlatformAgentProfile) {
-  openDeleteAccountModal(agentProfileToCustomerProfile(row))
+function formatCreatorName(input: {
+  createdByUserId?: string | null
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
+  createdByRole?: string | null
+}) {
+  const name = input.createdByDisplayName || input.createdByUsername || input.createdByUserId
+  if (!name) return '-'
+  return input.createdByRole ? `${name} · ${input.createdByRole}` : name
+}
+
+function formatAssignerName(input: {
+  assignedByUserId?: string | null
+  assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
+}) {
+  return input.assignedByDisplayName || input.assignedByUsername || input.assignedByUserId || '-'
 }
 
 function canCreateTargetRole(role: PlatformUserTargetRole) {
@@ -784,6 +947,34 @@ async function handleAgentCreateUserDisableChange(agentUserId: string, disabled:
   }
 }
 
+function agentCommissionRatePercent(row: PlatformAgentPolicyOverride) {
+  return agentCommissionRateDrafts[row.userId] ?? Number((Number(row.commissionRate ?? 0) * 100).toFixed(2))
+}
+
+async function handleAgentCommissionRateSave(row: PlatformAgentPolicyOverride) {
+  const percent = Number(agentCommissionRatePercent(row))
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+    message.warning('返佣比例必须在 0% 到 100% 之间')
+    return
+  }
+
+  updatingAgentCommissionUserId.value = row.userId
+  try {
+    const result = await updatePlatformAgentPolicyOverride(row.userId, {
+      commissionRate: Number((percent / 100).toFixed(4)),
+    })
+    agentPolicyOverrides.value = result.items
+    delete agentCommissionRateDrafts[row.userId]
+    message.success(`已更新 ${row.displayName} 的返佣比例`)
+    await refreshOverview()
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '更新返佣比例失败'
+    message.error(text)
+  } finally {
+    updatingAgentCommissionUserId.value = null
+  }
+}
+
 async function handleCreateAccount() {
   const username = createAccountForm.username.trim().toLowerCase()
   const password = createAccountForm.password
@@ -858,6 +1049,46 @@ async function handlePromoteUserToAgent(row: CreditsCustomerProfile) {
     message.error(error instanceof Error ? error.message : '升级为代理失败')
   } finally {
     promotingUserId.value = null
+  }
+}
+
+async function handleDisableAgent(row: PlatformAgentProfile) {
+  if (!canDisableAgent(row)) {
+    message.warning('当前角色不能禁用该代理商')
+    return
+  }
+
+  disablingAgentUserId.value = row.userId
+  try {
+    const result = await disablePlatformAgent(row.userId, {
+      reason: 'back-office disabled Agent role',
+    })
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到用户清单`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '禁用代理商失败')
+  } finally {
+    disablingAgentUserId.value = null
+  }
+}
+
+async function handleDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
+  if (!canDisableAgentPolicy(row)) {
+    message.warning('当前角色不能禁用该代理商')
+    return
+  }
+
+  disablingAgentUserId.value = row.userId
+  try {
+    const result = await disablePlatformAgent(row.userId, {
+      reason: 'back-office disabled Agent role',
+    })
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到用户清单`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '禁用代理商失败')
+  } finally {
+    disablingAgentUserId.value = null
   }
 }
 
@@ -1058,6 +1289,35 @@ function renderDetailButton(title: string, row: unknown) {
       default: () => '查看详情',
     },
   )
+}
+
+async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
+  selectedAgentCustomer.value = row
+  agentCustomerLedger.value = null
+  isAgentCustomerLedgerOpen.value = true
+  isLoadingAgentCustomerLedger.value = true
+  try {
+    agentCustomerLedger.value = await getAgentCustomerLedger(row.id)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载积分流水失败')
+  } finally {
+    isLoadingAgentCustomerLedger.value = false
+  }
+}
+
+async function openCustomerProfileLedger(row: CreditsCustomerProfile) {
+  selectedAgentCustomer.value = null
+  agentCustomerLedger.value = null
+  isAgentCustomerLedgerOpen.value = true
+  isLoadingAgentCustomerLedger.value = true
+  try {
+    agentCustomerLedger.value = await getPlatformCustomerLedger(row.id)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载积分流水失败')
+    isAgentCustomerLedgerOpen.value = false
+  } finally {
+    isLoadingAgentCustomerLedger.value = false
+  }
 }
 
 function functionDraftKey(row: CreditsAdminOverview['applicationFunctions'][number]) {
@@ -1352,19 +1612,19 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   { title: '角色', key: 'role', width: 110 },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '经办人',
+    key: 'createdByUserId',
+    width: 150,
+    render(row) {
+      return formatCreatorName(row)
+    },
+  },
+  {
     title: '积分余额',
     key: 'creditsAvailableBalance',
     width: 130,
     render(row) {
       return formatCreditsBalance(row)
-    },
-  },
-  {
-    title: '名下客户数',
-    key: 'agentCustomerCount',
-    width: 130,
-    render(row) {
-      return formatAgentCustomerCount(row)
     },
   },
   {
@@ -1386,14 +1646,31 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   {
     title: '能力操作',
     key: 'actions',
-    width: 210,
+    width: 300,
     render(row) {
+      const canViewLedger = canViewCustomerLedger()
       const canAdjust = canAdjustCustomer(row)
       const canDelete = canDeleteCustomer(row)
       const canPromote = canPromoteCustomer(row)
-      if (!canAdjust && !canDelete && !canPromote) return '-'
+      if (!canViewLedger && !canAdjust && !canDelete && !canPromote) return '-'
 
       const actions = []
+      if (canViewLedger) {
+        actions.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => void openCustomerProfileLedger(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+              default: () => '查看详情',
+            },
+          ),
+        )
+      }
       if (matrixTargetRole(row.role) === 'user') {
         actions.push(
           h(
@@ -1537,6 +1814,22 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
+    title: '经办人',
+    key: 'assignedByUserId',
+    width: 150,
+    render(row) {
+      return formatAssignerName(row)
+    },
+  },
+  {
+    title: '名下客户数',
+    key: 'agentCustomerCount',
+    width: 120,
+    render(row) {
+      return String(agentCustomerCountByUserId.value.get(row.userId) ?? 0)
+    },
+  },
+  {
     title: '创建 User',
     key: 'developerDisabledCreateUsers',
     minWidth: 240,
@@ -1566,6 +1859,72 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
       )
     },
   },
+  {
+    title: '返佣比例',
+    key: 'commissionRate',
+    minWidth: 210,
+    render(row) {
+      const isBusy = updatingAgentCommissionUserId.value === row.userId
+      return h(
+        'div',
+        { class: 'admin-function-points-cell' },
+        [
+          h(NInputNumber, {
+            value: agentCommissionRatePercent(row),
+            min: 0,
+            max: 100,
+            precision: 2,
+            step: 0.5,
+            size: 'small',
+            disabled: isBusy,
+            'onUpdate:value': (value: number | null) => {
+              agentCommissionRateDrafts[row.userId] = value
+            },
+          }),
+          h(
+            'span',
+            { class: 'admin-percent-suffix' },
+            '%',
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              loading: isBusy,
+              disabled: isBusy,
+              onClick: () => void handleAgentCommissionRateSave(row),
+            },
+            { default: () => '保存' },
+          ),
+        ],
+      )
+    },
+  },
+  {
+    title: '管理动作',
+    key: 'actions',
+    width: 150,
+    render(row) {
+      const isBusy = disablingAgentUserId.value === row.userId
+      return h(
+        NButton,
+        {
+          size: 'small',
+          type: 'error',
+          secondary: true,
+          loading: isBusy,
+          disabled: isBusy || !canDisableAgentPolicy(row),
+          onClick: () => handleDisableAgentPolicy(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
+          default: () => '禁用代理商',
+        },
+      )
+    },
+  },
 ]
 
 const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
@@ -1586,7 +1945,14 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
-  { title: 'Credits User', key: 'creditsUserId', width: 130 },
+  {
+    title: '经办人',
+    key: 'assignedByUserId',
+    width: 150,
+    render(row) {
+      return formatAssignerName(row)
+    },
+  },
   { title: '客户数', key: 'customerCount', width: 90 },
   { title: '线索数', key: 'leadCount', width: 90 },
   { title: '开放工单', key: 'openTicketCount', width: 100 },
@@ -1611,19 +1977,20 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     key: 'actions',
     width: 150,
     render(row) {
-      const canDelete = canDeleteCustomer(agentProfileToCustomerProfile(row))
+      const isBusy = disablingAgentUserId.value === row.userId
       return h(
         NButton,
         {
           size: 'small',
           type: 'error',
           secondary: true,
-          disabled: !canDelete,
-          onClick: () => openDeleteAgentModal(row),
+          loading: isBusy,
+          disabled: isBusy || !canDisableAgent(row),
+          onClick: () => handleDisableAgent(row),
         },
         {
           icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
-          default: () => deleteActionText(agentProfileToCustomerProfile(row)),
+          default: () => '禁用代理商',
         },
       )
     },
@@ -1641,7 +2008,22 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     },
   },
   { title: '手机号', key: 'customerPhone', width: 140, render(row) { return row.customerPhone ?? '-' } },
-  { title: 'Credits User', key: 'customerCreditsUserId', width: 130 },
+  {
+    title: '经办人',
+    key: 'createdByUserId',
+    width: 150,
+    render(row) {
+      return formatCreatorName(row)
+    },
+  },
+  {
+    title: '累计充值金额',
+    key: 'totalTopUpAmount',
+    width: 140,
+    render(row) {
+      return formatCurrencyAmount(row.totalTopUpAmount)
+    },
+  },
   { title: '关系', key: 'relationType', width: 100 },
   {
     title: '状态',
@@ -1664,7 +2046,92 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     key: 'actions',
     width: 130,
     render(row) {
-      return renderDetailButton('代理商客户详情', row)
+      return h(
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          onClick: () => void openAgentCustomerLedger(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+          default: () => '查看详情',
+        },
+      )
+    },
+  },
+]
+
+const agentCustomerLedgerColumns: DataTableColumns<AgentCustomerLedgerTransaction> = [
+  {
+    title: '时间',
+    key: 'createdAt',
+    width: 190,
+    render(row) {
+      return formatDateTime(row.createdAt)
+    },
+  },
+  {
+    title: '积分类型',
+    key: 'txnType',
+    width: 130,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: transactionTagType(row.txnType),
+        },
+        { default: () => transactionTypeLabel(row.txnType) },
+      )
+    },
+  },
+  {
+    title: '积分变动',
+    key: 'points',
+    width: 130,
+    render(row) {
+      return h(
+        'span',
+        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
+        formatSignedPoints(row.points),
+      )
+    },
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 120,
+    render() {
+      return h('span', { class: 'agent-ledger-status' }, [
+        h('span', { class: 'agent-ledger-status-dot' }),
+        '已生效',
+      ])
+    },
+  },
+  {
+    title: '来源/用途',
+    key: 'source',
+    minWidth: 170,
+    render(row) {
+      return ledgerSourceText(row)
+    },
+  },
+  {
+    title: '操作人',
+    key: 'actorIdentityLabel',
+    minWidth: 180,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: row.actorIdentityLabel === '主账号' ? 'warning' : 'default',
+        },
+        { default: () => ledgerActorText(row) },
+      )
     },
   },
 ]
@@ -1705,7 +2172,7 @@ const agentCommissionColumns: DataTableColumns<AgentOperationsCommissionPreview>
     },
   },
   {
-    title: '消耗积分',
+    title: '充值金额',
     key: 'consumedPoints',
     width: 130,
     render(row) {
@@ -1921,7 +2388,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
           :platform-dashboard="platformDashboard"
           :selected-application-code="selectedApplicationCode"
           :application-catalog="applicationCatalog"
-          :filtered-customer-profiles="filteredCustomerProfiles"
+          :filtered-customer-profiles="filteredRegularUserProfiles"
           :customer-columns="customerColumns"
           :admin-policy-overrides="adminPolicyOverrides"
           :agent-policy-overrides="agentPolicyOverrides"
@@ -1932,6 +2399,7 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
           :admin-authorization-columns="adminAuthorizationColumns"
           :agent-authorization-columns="agentAuthorizationColumns"
           :selected-application-label="selectedApplicationLabel"
+          :collapse-storage-key="`credits-admin:developer-management-collapse:${authStore.userInfo?.id ?? 'anonymous'}`"
           @refresh="refreshOverview"
           @create-account="openCreateAccountModal"
           @update:selected-application-code="selectedApplicationCode = $event"
@@ -1940,360 +2408,557 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 
         <template v-else-if="activeRole === 'admin'">
           <section class="admin-section">
-            <h2>账号创建权限</h2>
-            <p class="admin-section-note">
-              公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。代理商创建 User 仍由公司管理员开关控制，开发者可覆盖禁用。
-            </p>
-            <div class="admin-action-row" aria-label="公司管理员创建账号">
-              <NButton
-                type="primary"
-                :disabled="!effectiveAccountCreationPolicy.adminCanCreateUsers"
-                @click="openCreateAccountModal('user')"
-              >
-                <template #icon>
-                  <Icon icon="mdi:account-plus-outline" />
-                </template>
-                创建 User
-              </NButton>
-              <NButton
-                :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
-                @click="openCreateAccountModal('agent')"
-              >
-                <template #icon>
-                  <Icon icon="mdi:handshake-outline" />
-                </template>
-                创建 Agent
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminAccountCreation')"
+              @click="toggleConsoleSection('adminAccountCreation')"
+            >
+              <span>
+                <strong>账号创建权限</strong>
+                <small>公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminAccountCreation') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminAccountCreation')" class="admin-collapse-body">
+              <div class="admin-action-row" aria-label="公司管理员创建账号">
+                <NButton
+                  type="primary"
+                  :disabled="!effectiveAccountCreationPolicy.adminCanCreateUsers"
+                  @click="openCreateAccountModal('user')"
+                >
+                  <template #icon>
+                    <Icon icon="mdi:account-plus-outline" />
+                  </template>
+                  创建 User
+                </NButton>
+                <NButton
+                  :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
+                  @click="openCreateAccountModal('agent')"
+                >
+                  <template #icon>
+                    <Icon icon="mdi:handshake-outline" />
+                  </template>
+                  创建 Agent
+                </NButton>
+              </div>
+              <div class="admin-toggle-grid">
+                <article class="admin-toggle-card">
+                  <div>
+                    <h3>公司管理员创建 User</h3>
+                    <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
+                  </div>
+                  <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
+                </article>
+                <article class="admin-toggle-card">
+                  <div>
+                    <h3>公司管理员创建 Agent</h3>
+                    <p>{{ effectiveAccountCreationPolicy.adminCanCreateAgents ? '开发者已开启' : '开发者已关闭' }}</p>
+                  </div>
+                  <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateAgents" disabled />
+                </article>
+                <article class="admin-toggle-card">
+                  <div>
+                    <h3>允许代理商创建 User</h3>
+                    <p>公司管理员主开关；若开发者禁用代理商权限，此开关不会生效。</p>
+                  </div>
+                  <NSwitch
+                    v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
+                    :disabled="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
+                  />
+                </article>
+                <article class="admin-toggle-card">
+                  <div>
+                    <h3>允许 User 成为 Agent</h3>
+                    <p>公司管理员开关；若开发者关闭公司管理员创建 Agent，此开关不会生效。</p>
+                  </div>
+                  <NSwitch
+                    v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
+                    :disabled="!accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers"
+                  />
+                </article>
+              </div>
             </div>
-            <div class="admin-toggle-grid">
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>公司管理员创建 User</h3>
-                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
-                </div>
-                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
-              </article>
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>公司管理员创建 Agent</h3>
-                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateAgents ? '开发者已开启' : '开发者已关闭' }}</p>
-                </div>
-                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateAgents" disabled />
-              </article>
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>允许代理商创建 User</h3>
-                  <p>公司管理员主开关；若开发者禁用代理商权限，此开关不会生效。</p>
-                </div>
-                <NSwitch
-                  v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
-                  :disabled="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
-                />
-              </article>
-              <article class="admin-toggle-card">
-                <div>
-                  <h3>允许 User 成为 Agent</h3>
-                  <p>公司管理员开关；若开发者关闭公司管理员创建 Agent，此开关不会生效。</p>
-                </div>
-                <NSwitch
-                  v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
-                  :disabled="!accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers"
-                />
-              </article>
+          </section>
+
+          <section class="admin-section">
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminAgents')"
+              @click="toggleConsoleSection('adminAgents')"
+            >
+              <span>
+                <strong>代理商管理</strong>
+                <small>公司管理员可以创建 Agent，并可禁用 Agent；不能调整 Agent 或 User 的积分。</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminAgents') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminAgents')" class="admin-collapse-body">
+              <NDataTable
+                v-if="filteredAgentProfiles.length"
+                :columns="agentManagementColumns"
+                :data="filteredAgentProfiles"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无代理商账号" />
             </div>
           </section>
 
           <section class="admin-section">
-            <h2>代理商管理</h2>
-            <p class="admin-section-note">
-              公司管理员可以创建 Agent，并可禁用 Agent；不能调整 Agent 或 User 的积分。
-            </p>
-            <NDataTable
-              v-if="filteredAgentProfiles.length"
-              :columns="agentManagementColumns"
-              :data="filteredAgentProfiles"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无代理商账号" />
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminUsers')"
+              @click="toggleConsoleSection('adminUsers')"
+            >
+              <span>
+                <strong>用户清单</strong>
+                <small>公司管理员可读取全部客户余额/流水；普通 User 可以通过“升级为代理”获得 Agent 后台登录权限。</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminUsers') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminUsers')" class="admin-collapse-body">
+              <NDataTable
+                v-if="filteredRegularUserProfiles.length"
+                :columns="customerColumns"
+                :data="filteredRegularUserProfiles"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无客户档案" />
+            </div>
           </section>
 
           <section class="admin-section">
-            <h2>用户清单</h2>
-            <p class="admin-section-note">
-              公司管理员可读取全部客户余额/流水；普通 User 可以通过“升级为代理”获得 Agent 后台登录权限。
-            </p>
-            <NDataTable
-              v-if="filteredRegularUserProfiles.length"
-              :columns="customerColumns"
-              :data="filteredRegularUserProfiles"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无客户档案" />
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminCreditAccounts')"
+              @click="toggleConsoleSection('adminCreditAccounts')"
+            >
+              <span>
+                <strong>积分账户</strong>
+                <small>{{ creditAccounts.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminCreditAccounts') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminCreditAccounts')" class="admin-collapse-body">
+              <NDataTable
+                v-if="creditAccounts.length"
+                :columns="accountColumns"
+                :data="creditAccounts"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无积分账户" />
+            </div>
           </section>
 
           <section class="admin-section">
-            <h2>积分账户</h2>
-            <NDataTable
-              v-if="creditAccounts.length"
-              :columns="accountColumns"
-              :data="creditAccounts"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无积分账户" />
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminRechargeProducts')"
+              @click="toggleConsoleSection('adminRechargeProducts')"
+            >
+              <span>
+                <strong>充值产品</strong>
+                <small>{{ rechargeProducts.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminRechargeProducts') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminRechargeProducts')" class="admin-collapse-body">
+              <NDataTable
+                v-if="rechargeProducts.length"
+                :columns="productColumns"
+                :data="rechargeProducts"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无充值产品" />
+            </div>
           </section>
 
           <section class="admin-section">
-            <h2>充值产品</h2>
-            <NDataTable
-              v-if="rechargeProducts.length"
-              :columns="productColumns"
-              :data="rechargeProducts"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无充值产品" />
-          </section>
-
-          <section class="admin-section">
-            <h2>近期积分流水</h2>
-            <NDataTable
-              v-if="filteredRecentTransactions.length"
-              :columns="transactionColumns"
-              :data="filteredRecentTransactions"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无积分流水" />
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('adminTransactions')"
+              @click="toggleConsoleSection('adminTransactions')"
+            >
+              <span>
+                <strong>近期积分流水</strong>
+                <small>{{ filteredRecentTransactions.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('adminTransactions') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('adminTransactions')" class="admin-collapse-body">
+              <NDataTable
+                v-if="filteredRecentTransactions.length"
+                :columns="transactionColumns"
+                :data="filteredRecentTransactions"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无积分流水" />
+            </div>
           </section>
         </template>
 
         <template v-else>
           <section class="admin-section">
-            <h2>代理商运营视图</h2>
-            <p class="admin-section-note">
-              代理商可创建 User 取决于公司管理员开关；开发者可以禁用该能力。当前状态：{{ agentCreationGateText }}。
-              当前代理：{{ agentOverview?.agent.displayName ?? '未加载' }}。
-            </p>
-            <div class="admin-action-row" aria-label="代理商创建账号">
-              <NButton
-                type="primary"
-                :disabled="!effectiveAccountCreationPolicy.agentCanCreateUsers"
-                @click="openCreateAccountModal('user')"
-              >
-                <template #icon>
-                  <Icon icon="mdi:account-plus-outline" />
-                </template>
-                创建 User
-              </NButton>
-              <NButton @click="openCreateLeadModal">
-                <template #icon>
-                  <Icon icon="mdi:clipboard-plus-outline" />
-                </template>
-                报备线索
-              </NButton>
-              <NButton @click="openCreateTicketModal">
-                <template #icon>
-                  <Icon icon="mdi:lifebuoy" />
-                </template>
-                新建工单
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentOverview')"
+              @click="toggleConsoleSection('agentOverview')"
+            >
+              <span>
+                <strong>代理商运营视图</strong>
+                <small>
+                  当前状态：{{ agentCreationGateText }}；当前代理：{{ agentOverview?.agent.displayName ?? '未加载' }}。
+                </small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentOverview') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentOverview')" class="admin-collapse-body">
+              <div class="admin-action-row" aria-label="代理商创建账号">
+                <NButton
+                  type="primary"
+                  :disabled="!effectiveAccountCreationPolicy.agentCanCreateUsers"
+                  @click="openCreateAccountModal('user')"
+                >
+                  <template #icon>
+                    <Icon icon="mdi:account-plus-outline" />
+                  </template>
+                  创建 User
+                </NButton>
+                <NButton @click="openCreateLeadModal">
+                  <template #icon>
+                    <Icon icon="mdi:clipboard-plus-outline" />
+                  </template>
+                  报备线索
+                </NButton>
+                <NButton @click="openCreateTicketModal">
+                  <template #icon>
+                    <Icon icon="mdi:lifebuoy" />
+                  </template>
+                  新建工单
+                </NButton>
+              </div>
+              <div class="admin-agent-grid" v-if="agentOverview">
+                <article class="admin-agent-card">
+                  <h3>自有客户</h3>
+                  <strong>{{ agentOverview.metrics.customerCount }}</strong>
+                  <p>来自 agent_customer_relations</p>
+                </article>
+                <article class="admin-agent-card">
+                  <h3>活跃线索</h3>
+                  <strong>{{ agentOverview.metrics.activeLeadCount }}</strong>
+                  <p>CRM 报备与跟进</p>
+                </article>
+                <article class="admin-agent-card">
+                  <h3>预计返佣</h3>
+                  <strong>{{ Number(agentOverview.metrics.previewCommissionPoints).toLocaleString('zh-CN') }}</strong>
+                  <p>预览中佣金积分</p>
+                </article>
+                <article class="admin-agent-card">
+                  <h3>待确认账单</h3>
+                  <strong>{{ agentOverview.metrics.draftSettlementCount }}</strong>
+                  <p>结算账单草稿</p>
+                </article>
+                <article class="admin-agent-card">
+                  <h3>开放工单</h3>
+                  <strong>{{ agentOverview.metrics.openTicketCount }}</strong>
+                  <p>支持处理中</p>
+                </article>
+              </div>
+              <NEmpty v-else description="暂无代理商运营数据" />
             </div>
-            <div class="admin-agent-grid" v-if="agentOverview">
-              <article class="admin-agent-card">
-                <h3>自有客户</h3>
-                <strong>{{ agentOverview.metrics.customerCount }}</strong>
-                <p>来自 agent_customer_relations</p>
-              </article>
-              <article class="admin-agent-card">
-                <h3>活跃线索</h3>
-                <strong>{{ agentOverview.metrics.activeLeadCount }}</strong>
-                <p>CRM 报备与跟进</p>
-              </article>
-              <article class="admin-agent-card">
-                <h3>预计返佣</h3>
-                <strong>{{ Number(agentOverview.metrics.previewCommissionPoints).toLocaleString('zh-CN') }}</strong>
-                <p>预览中佣金积分</p>
-              </article>
-              <article class="admin-agent-card">
-                <h3>待确认账单</h3>
-                <strong>{{ agentOverview.metrics.draftSettlementCount }}</strong>
-                <p>结算账单草稿</p>
-              </article>
-              <article class="admin-agent-card">
-                <h3>开放工单</h3>
-                <strong>{{ agentOverview.metrics.openTicketCount }}</strong>
-                <p>支持处理中</p>
-              </article>
-            </div>
-            <NEmpty v-else description="暂无代理商运营数据" />
           </section>
 
           <section class="admin-section">
-            <h2>代理商客户</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-customers', filteredAgentCustomers)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentCustomers')"
+              @click="toggleConsoleSection('agentCustomers')"
+            >
+              <span>
+                <strong>代理商客户</strong>
+                <small>{{ filteredAgentCustomers.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentCustomers') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentCustomers')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-customers', filteredAgentCustomers)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NDataTable
+                v-if="filteredAgentCustomers.length"
+                :columns="agentCustomerColumns"
+                :data="filteredAgentCustomers"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无代理商客户" />
             </div>
-            <NDataTable
-              v-if="filteredAgentCustomers.length"
-              :columns="agentCustomerColumns"
-              :data="filteredAgentCustomers"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无代理商客户" />
           </section>
 
           <section class="admin-section">
-            <h2>线索 / 商机报备</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-leads', filteredAgentLeads)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
-              <NButton size="small" secondary @click="openCreateLeadModal">
-                <template #icon>
-                  <Icon icon="mdi:clipboard-plus-outline" />
-                </template>
-                报备线索
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentLeads')"
+              @click="toggleConsoleSection('agentLeads')"
+            >
+              <span>
+                <strong>线索 / 商机报备</strong>
+                <small>{{ filteredAgentLeads.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentLeads') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentLeads')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-leads', filteredAgentLeads)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+                <NButton size="small" secondary @click="openCreateLeadModal">
+                  <template #icon>
+                    <Icon icon="mdi:clipboard-plus-outline" />
+                  </template>
+                  报备线索
+                </NButton>
+              </div>
+              <NDataTable
+                v-if="filteredAgentLeads.length"
+                :columns="agentLeadColumns"
+                :data="filteredAgentLeads"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无线索" />
             </div>
-            <NDataTable
-              v-if="filteredAgentLeads.length"
-              :columns="agentLeadColumns"
-              :data="filteredAgentLeads"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无线索" />
           </section>
 
           <section class="admin-section">
-            <h2>返佣预览</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-commissions', filteredAgentCommissions)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentCommissions')"
+              @click="toggleConsoleSection('agentCommissions')"
+            >
+              <span>
+                <strong>返佣预览</strong>
+                <small>{{ filteredAgentCommissions.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentCommissions') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentCommissions')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-commissions', filteredAgentCommissions)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <div v-if="commissionPolicy" class="admin-rule-grid" aria-label="返佣与结算规则">
+                <article class="admin-rule-card">
+                  <p>积分汇率</p>
+                  <strong>1 RMB = {{ commissionPolicy.creditsPerRmb }} credits</strong>
+                  <span>{{ commissionPolicy.currency }}</span>
+                </article>
+                <article class="admin-rule-card">
+                  <p>默认返佣</p>
+                  <strong>{{ (commissionPolicy.commissionRate * 100).toFixed(0) }}%</strong>
+                  <span>基于客户实际充值金额</span>
+                </article>
+                <article class="admin-rule-card">
+                  <p>结算日</p>
+                  <strong>每月 {{ commissionPolicy.settlementDayOfMonth }} 日</strong>
+                  <span>结算上一个自然月</span>
+                </article>
+                <article class="admin-rule-card">
+                  <p>退款处理</p>
+                  <strong>追加冲正</strong>
+                  <span>不修改原返佣记录</span>
+                </article>
+              </div>
+              <NDataTable
+                v-if="filteredAgentCommissions.length"
+                :columns="agentCommissionColumns"
+                :data="filteredAgentCommissions"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无返佣预览" />
             </div>
-            <div v-if="commissionPolicy" class="admin-rule-grid" aria-label="返佣与结算规则">
-              <article class="admin-rule-card">
-                <p>积分汇率</p>
-                <strong>1 RMB = {{ commissionPolicy.creditsPerRmb }} credits</strong>
-                <span>{{ commissionPolicy.currency }}</span>
-              </article>
-              <article class="admin-rule-card">
-                <p>固定返佣</p>
-                <strong>{{ (commissionPolicy.commissionRate * 100).toFixed(0) }}%</strong>
-                <span>基于客户实际充值金额</span>
-              </article>
-              <article class="admin-rule-card">
-                <p>结算日</p>
-                <strong>每月 {{ commissionPolicy.settlementDayOfMonth }} 日</strong>
-                <span>结算上一个自然月</span>
-              </article>
-              <article class="admin-rule-card">
-                <p>退款处理</p>
-                <strong>追加冲正</strong>
-                <span>不修改原返佣记录</span>
-              </article>
-            </div>
-            <NDataTable
-              v-if="filteredAgentCommissions.length"
-              :columns="agentCommissionColumns"
-              :data="filteredAgentCommissions"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无返佣预览" />
           </section>
 
           <section class="admin-section">
-            <h2>结算账单</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-settlements', agentSettlements)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentSettlements')"
+              @click="toggleConsoleSection('agentSettlements')"
+            >
+              <span>
+                <strong>结算账单</strong>
+                <small>{{ agentSettlements.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentSettlements') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentSettlements')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-settlements', agentSettlements)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NDataTable
+                v-if="agentSettlements.length"
+                :columns="agentSettlementColumns"
+                :data="agentSettlements"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无结算账单" />
             </div>
-            <NDataTable
-              v-if="agentSettlements.length"
-              :columns="agentSettlementColumns"
-              :data="agentSettlements"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无结算账单" />
           </section>
 
           <section class="admin-section">
-            <h2>营销物料 / 培训资料</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-materials', filteredAgentMaterials)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentMaterials')"
+              @click="toggleConsoleSection('agentMaterials')"
+            >
+              <span>
+                <strong>营销物料 / 培训资料</strong>
+                <small>{{ filteredAgentMaterials.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentMaterials') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentMaterials')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-materials', filteredAgentMaterials)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NDataTable
+                v-if="filteredAgentMaterials.length"
+                :columns="agentMaterialColumns"
+                :data="filteredAgentMaterials"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无资料" />
             </div>
-            <NDataTable
-              v-if="filteredAgentMaterials.length"
-              :columns="agentMaterialColumns"
-              :data="filteredAgentMaterials"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无资料" />
           </section>
 
           <section class="admin-section">
-            <h2>工单支持</h2>
-            <div class="admin-section-actions">
-              <NButton size="small" secondary @click="exportRows('agent-tickets', agentTickets)">
-                <template #icon>
-                  <Icon icon="mdi:download-outline" />
-                </template>
-                导出
-              </NButton>
-              <NButton size="small" secondary @click="openCreateTicketModal">
-                <template #icon>
-                  <Icon icon="mdi:lifebuoy" />
-                </template>
-                新建工单
-              </NButton>
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentTickets')"
+              @click="toggleConsoleSection('agentTickets')"
+            >
+              <span>
+                <strong>工单支持</strong>
+                <small>{{ agentTickets.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentTickets') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentTickets')" class="admin-collapse-body">
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-tickets', agentTickets)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+                <NButton size="small" secondary @click="openCreateTicketModal">
+                  <template #icon>
+                    <Icon icon="mdi:lifebuoy" />
+                  </template>
+                  新建工单
+                </NButton>
+              </div>
+              <NDataTable
+                v-if="agentTickets.length"
+                :columns="agentTicketColumns"
+                :data="agentTickets"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无工单" />
             </div>
-            <NDataTable
-              v-if="agentTickets.length"
-              :columns="agentTicketColumns"
-              :data="agentTickets"
-              :bordered="false"
-              :single-line="false"
-              :pagination="false"
-            />
-            <NEmpty v-else description="暂无工单" />
           </section>
         </template>
       </NSpin>
@@ -2318,6 +2983,74 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
         <template #footer>
           <div class="admin-modal-footer">
             <NButton @click="selectedDetail = null">
+              关闭
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isAgentCustomerLedgerOpen"
+        preset="card"
+        class="admin-create-modal agent-ledger-modal"
+        :title="ledgerModalTitle()"
+        :style="{ width: '920px', maxWidth: '94vw', maxHeight: 'calc(100vh - 80px)' }"
+        @update:show="(show) => {
+          if (!show) {
+            selectedAgentCustomer = null
+            agentCustomerLedger = null
+          }
+        }"
+      >
+        <template #header>
+          <div class="agent-ledger-header">
+            <span class="agent-ledger-header-mark" />
+            <div>
+              <strong>{{ ledgerModalTitle() }}</strong>
+              <small>
+                {{ selectedAgentCustomer?.customerDisplayName ?? '客户' }}
+                <template v-if="agentCustomerLedger?.customer.enterpriseTenantName">
+                  · {{ agentCustomerLedger.customer.enterpriseTenantName }}
+                </template>
+              </small>
+            </div>
+          </div>
+        </template>
+
+        <div class="agent-ledger-toolbar">
+          <div class="agent-ledger-summary">
+            <span>当前余额</span>
+            <strong>{{ Number(agentCustomerLedger?.account?.availableBalance ?? 0).toLocaleString('zh-CN') }}</strong>
+          </div>
+          <NButton
+            size="small"
+            secondary
+            :disabled="!agentCustomerLedger?.transactions.length"
+            @click="exportRows('agent-customer-ledger', agentCustomerLedger?.transactions ?? [])"
+          >
+            <template #icon>
+              <Icon icon="mdi:download-outline" />
+            </template>
+            导出
+          </NButton>
+        </div>
+
+        <NSpin :show="isLoadingAgentCustomerLedger">
+          <NDataTable
+            v-if="agentCustomerLedger?.transactions.length"
+            :columns="agentCustomerLedgerColumns"
+            :data="agentCustomerLedger.transactions"
+            :bordered="false"
+            :single-line="false"
+            :pagination="false"
+            class="agent-ledger-table"
+          />
+          <NEmpty v-else description="暂无积分流水" />
+        </NSpin>
+
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton @click="isAgentCustomerLedgerOpen = false">
               关闭
             </NButton>
           </div>
@@ -2994,7 +3727,8 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
   line-height: 1.6;
 }
 
-.admin-collapse-trigger {
+.admin-collapse-trigger,
+.admin-collapse-head {
   display: flex;
   width: 100%;
   align-items: center;
@@ -3009,26 +3743,38 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
   cursor: pointer;
 }
 
-.admin-collapse-trigger span {
+.admin-collapse-trigger span,
+.admin-collapse-head span {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
-.admin-collapse-trigger strong {
+.admin-collapse-trigger strong,
+.admin-collapse-head strong {
   font-size: 17px;
   font-weight: 900;
 }
 
-.admin-collapse-trigger small {
+.admin-collapse-trigger small,
+.admin-collapse-head small {
   color: var(--app-text-soft);
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.55;
 }
 
-.admin-collapse-trigger svg {
+.admin-collapse-trigger svg,
+.admin-collapse-head svg,
+.admin-collapse-head .iconify {
   flex: 0 0 auto;
   color: var(--app-text-soft);
   font-size: 22px;
+  transition: transform 0.2s ease;
+}
+
+.admin-collapse-head .rotated {
+  transform: rotate(180deg);
 }
 
 .admin-collapse-body {
@@ -3051,6 +3797,12 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 :deep(.admin-function-points-cell .n-input-number) {
   width: 124px;
   flex: 0 0 124px;
+}
+
+.admin-percent-suffix {
+  color: var(--bo-text-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .admin-agent-grid {
@@ -3253,6 +4005,81 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
 :deep(.admin-delta.is-down) {
   color: #e77835;
   font-weight: 800;
+}
+
+.agent-ledger-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agent-ledger-header-mark {
+  width: 5px;
+  height: 24px;
+  border-radius: 999px;
+  background: #e8ae25;
+}
+
+.agent-ledger-header strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.agent-ledger-header small {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agent-ledger-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.agent-ledger-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.agent-ledger-summary strong {
+  color: var(--app-text);
+  font-size: 20px;
+}
+
+:deep(.agent-ledger-table .n-data-table-th) {
+  color: #8da0bc;
+  font-weight: 900;
+}
+
+:deep(.agent-ledger-table .n-data-table-td) {
+  background: #f1f7ff;
+}
+
+:deep(.agent-ledger-status) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #506178;
+  font-weight: 800;
+}
+
+:deep(.agent-ledger-status-dot) {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #23c267;
 }
 
 @media (max-width: 1024px) {

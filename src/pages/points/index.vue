@@ -30,6 +30,19 @@ const pageSizeOptions = [10, 20, 30, 50] as const;
 const appStore = useAppStore();
 const authStore = useAuthStore();
 
+const defaultFilters = (): PointsQueryFilters => ({
+  member: "",
+  txnType: "",
+  dateRange: "90",
+  startDate: "",
+  endDate: "",
+  bizSource: "",
+  status: "",
+});
+
+const filters = ref<PointsQueryFilters>(defaultFilters());
+const currentPage = ref(1);
+
 registerStaticImageUrls(pointsStaticImageUrls);
 
 const pageBackgroundStyle = computed(() => {
@@ -48,6 +61,7 @@ const pageBackgroundStyle = computed(() => {
 const {
   version,
   records: sourceRecords,
+  totalRecords: sourceTotalRecords,
   summaryCards: apiSummaryCards,
   isLoading,
   loadError,
@@ -62,20 +76,11 @@ const {
   teamName,
   setAccountScopeMode,
   selectChildAccount,
-} = usePointsQuery();
-
-const defaultFilters = (): PointsQueryFilters => ({
-  member: "",
-  txnType: "",
-  dateRange: "90",
-  startDate: "",
-  endDate: "",
-  bizSource: "",
-  status: "",
+} = usePointsQuery({
+  filters,
+  currentPage,
+  pageSize,
 });
-
-const filters = ref<PointsQueryFilters>(defaultFilters());
-const currentPage = ref(1);
 const { rechargeSuccessTick, openRechargeModal } = usePointsRechargeModal();
 
 const canRecharge = computed(
@@ -307,6 +312,10 @@ const summaryCards = computed(() => {
 });
 
 const filteredRecords = computed(() => {
+  if (usesLiveApi.value) {
+    return sourceRecords.value;
+  }
+
   const active = filters.value;
   const now = Date.now();
 
@@ -347,9 +356,17 @@ const filteredRecords = computed(() => {
 });
 
 const pagedRecords = computed(() => {
+  if (usesLiveApi.value) {
+    return sourceRecords.value;
+  }
+
   const start = (currentPage.value - 1) * pageSize.value;
   return filteredRecords.value.slice(start, start + pageSize.value);
 });
+
+const totalRecords = computed(() =>
+  usesLiveApi.value ? sourceTotalRecords.value : filteredRecords.value.length,
+);
 
 const txnTypeExportNameMap: Record<"" | PointsTxnType, string> = {
   "": "全部",
@@ -492,10 +509,10 @@ watch(
   },
 );
 
-watch(filteredRecords, () => {
+watch(totalRecords, () => {
   const maxPage = Math.max(
     1,
-    Math.ceil(filteredRecords.value.length / pageSize.value),
+    Math.ceil(totalRecords.value / pageSize.value),
   );
   if (currentPage.value > maxPage) currentPage.value = maxPage;
 });
@@ -559,7 +576,7 @@ onMounted(() => {
           :loading="isLoading && usesLiveApi"
           :page-size-options="pageSizeOptions"
           :records="pagedRecords"
-          :total="filteredRecords.length"
+          :total="totalRecords"
           @export="handleExport"
           @recharge="handleRecharge"
           @select-child-account="selectChildAccount"

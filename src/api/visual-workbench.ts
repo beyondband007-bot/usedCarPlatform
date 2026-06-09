@@ -727,6 +727,13 @@ export async function getGenerationTask(taskId: string) {
   return normalizeGenerationTaskDetail(unwrapApiResponse(response))
 }
 
+export async function deleteRecentGenerationTask(taskId: string) {
+  const response = await request.delete<ApiResponse<{ taskId: string; deleted: boolean }>>(
+    `/tasks/${encodeURIComponent(taskId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function getRecentGenerationTasks(params?: {
   moduleCode?: string
   status?: string
@@ -1099,6 +1106,8 @@ export interface CreditsCustomerProfile {
   enterpriseOwnerDisplayName?: string | null
   enterpriseAccountRole?: 'standalone' | 'mother' | 'child' | string | null
   createdByUserId: string
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
   createdByRole: string
   status: string
   createdAt: string
@@ -1125,6 +1134,50 @@ export interface AgentOperationsCustomer {
   customerDisplayName: string
   customerPhone?: string | null
   customerCreditsUserId: number | string
+  createdByUserId?: string | null
+  createdByUsername?: string | null
+  createdByDisplayName?: string | null
+  createdByRole?: string | null
+  totalTopUpAmount?: number | string
+}
+
+export interface AgentCustomerLedgerTransaction {
+  id: number | string
+  tenantId?: number | string | null
+  userId: number | string
+  accountId: number | string
+  billingTaskId?: number | string | null
+  paymentOrderId?: number | string | null
+  applicationId?: number | string | null
+  applicationCode?: string | null
+  applicationName?: string | null
+  functionId?: number | string | null
+  functionCode?: string | null
+  functionName?: string | null
+  txnType: CreditsTransactionType
+  points: number
+  balanceBefore: number
+  balanceAfter: number
+  bizType?: string | null
+  bizId?: string | null
+  remark?: string | null
+  actorUsername?: string | null
+  actorDisplayName?: string | null
+  actorIdentityLabel?: string | null
+  createdAt: string
+}
+
+export interface AgentCustomerLedger {
+  customer: AgentOperationsCustomer & {
+    accountScope?: 'personal' | 'tenant' | string
+    creditsTenantId?: number | string | null
+    enterpriseTenantId?: string | null
+    enterpriseTenantName?: string | null
+    enterpriseOwnerUserId?: string | null
+    enterpriseAccountRole?: 'personal' | 'team' | string
+  }
+  account: CreditsAccount | null
+  transactions: AgentCustomerLedgerTransaction[]
 }
 
 export interface AgentOperationsLead {
@@ -1248,6 +1301,7 @@ export interface PlatformAgentProfile {
   assignmentStatus: string
   assignedByUserId?: string | null
   assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
   customerCount: number
   leadCount: number
   openTicketCount: number
@@ -1282,6 +1336,10 @@ export interface PlatformAgentPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  assignedByUserId?: string | null
+  assignedByUsername?: string | null
+  assignedByDisplayName?: string | null
+  commissionRate: number
   developerAllowsCreateUsers: boolean
   developerDisabledCreateUsers: boolean
   effectiveCanCreateUsers: boolean
@@ -1414,6 +1472,18 @@ export interface PlatformUserPromotionResult {
   policyDecision: {
     allowed: boolean
     reason: string
+  }
+}
+
+export interface PlatformAgentDisableResult {
+  disabled: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: 'user'
+    creditsUserId: number | string | null
+    status: string
   }
 }
 
@@ -1602,8 +1672,11 @@ export type CreditsTransactionsQuery = {
   accountScope?: 'personal' | 'tenant'
   tenantId?: number | string
   targetCreditsUserId?: number
-  limit?: number
+  page?: number
+  pageSize?: number
   txnType?: CreditsTransactionType
+  status?: 'effective' | 'pending'
+  bizSource?: 'single' | 'batch' | 'package' | 'purchase' | 'fail'
   from?: string
   to?: string
 }
@@ -1612,6 +1685,13 @@ export type CreditsTransactionsResult = {
   account: CreditsAccount | null
   items: CreditsTransaction[]
   total: number
+  page: number
+  pageSize: number
+  summary?: {
+    totalGained: number
+    totalConsumed: number
+    recentNet: number
+  }
 }
 
 export async function getCreditsTransactions(
@@ -1624,6 +1704,13 @@ export async function getCreditsTransactions(
           items?: CreditsTransaction[]
           transactions?: CreditsTransaction[]
           total?: number
+          page?: number
+          pageSize?: number
+          summary?: {
+            totalGained?: number
+            totalConsumed?: number
+            recentNet?: number
+          }
         }
       | CreditsTransaction[]
     >
@@ -1633,7 +1720,13 @@ export async function getCreditsTransactions(
       accountScope: params?.accountScope,
       tenantId: params?.tenantId,
       targetCreditsUserId: params?.targetCreditsUserId,
-      limit: params?.limit,
+      page: params?.page,
+      pageSize: params?.pageSize,
+      txnType: params?.txnType,
+      status: params?.status,
+      bizSource: params?.bizSource,
+      from: params?.from,
+      to: params?.to,
     },
   })
   const payload = unwrapApiResponse(response)
@@ -1641,7 +1734,7 @@ export async function getCreditsTransactions(
     const items = payload.map((item) =>
       normalizeCreditsTransaction(item as CreditsTransaction & Record<string, unknown>),
     )
-    return { account: null, items, total: items.length }
+    return { account: null, items, total: items.length, page: 1, pageSize: items.length }
   }
 
   const items = extractCreditsList<CreditsTransaction & Record<string, unknown>>(
@@ -1657,6 +1750,15 @@ export async function getCreditsTransactions(
     account,
     items,
     total: payload.total ?? items.length,
+    page: Number(payload.page ?? params?.page ?? 1),
+    pageSize: Number(payload.pageSize ?? params?.pageSize ?? items.length),
+    summary: payload.summary
+      ? {
+          totalGained: parseCreditsNumber(payload.summary.totalGained),
+          totalConsumed: parseCreditsNumber(payload.summary.totalConsumed),
+          recentNet: parseCreditsNumber(payload.summary.recentNet),
+        }
+      : undefined,
   }
 }
 
@@ -1723,6 +1825,50 @@ export async function getAgentOperationsOverview(params?: {
   return unwrapApiResponse(response)
 }
 
+export async function getAgentCustomerLedger(
+  relationId: string,
+  params?: { agentUserId?: string },
+): Promise<AgentCustomerLedger> {
+  const response = await request.get<ApiResponse<AgentCustomerLedger>>(
+    `/platform/agent/customers/${encodeURIComponent(relationId)}/ledger`,
+    { params },
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+    account: payload.account
+      ? normalizeCreditsAccount(payload.account as CreditsAccount & Record<string, unknown>)
+      : null,
+  }
+}
+
+export async function getPlatformCustomerLedger(
+  customerProfileId: string,
+): Promise<AgentCustomerLedger> {
+  const response = await request.get<ApiResponse<AgentCustomerLedger>>(
+    `/platform/customers/${encodeURIComponent(customerProfileId)}/ledger`,
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+    account: payload.account
+      ? normalizeCreditsAccount(payload.account as CreditsAccount & Record<string, unknown>)
+      : null,
+  }
+}
+
 export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const response = await request.get<ApiResponse<PlatformDashboard>>('/platform/dashboard')
   return unwrapApiResponse(response)
@@ -1763,7 +1909,7 @@ export async function getPlatformAgentPolicyOverrides(): Promise<PlatformAgentPo
 
 export async function updatePlatformAgentPolicyOverride(
   agentUserId: string,
-  payload: { developerAllowsCreateUsers: boolean },
+  payload: { developerAllowsCreateUsers?: boolean; commissionRate?: number },
 ): Promise<PlatformAgentPolicyOverrideList> {
   const response = await request.patch<ApiResponse<PlatformAgentPolicyOverrideList>>(
     `/platform/agent-policy-overrides/${encodeURIComponent(agentUserId)}`,
@@ -1837,6 +1983,17 @@ export async function promotePlatformUserToAgent(
 ): Promise<PlatformUserPromotionResult> {
   const response = await request.post<ApiResponse<PlatformUserPromotionResult>>(
     `/platform/users/${encodeURIComponent(userId)}/promote-agent`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function disablePlatformAgent(
+  userId: string,
+  payload: { reason?: string } = {},
+): Promise<PlatformAgentDisableResult> {
+  const response = await request.post<ApiResponse<PlatformAgentDisableResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/disable-agent`,
     payload,
   )
   return unwrapApiResponse(response)

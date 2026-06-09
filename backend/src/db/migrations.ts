@@ -245,6 +245,7 @@ export const migrations = [
   `CREATE TABLE IF NOT EXISTS back_office_agent_policy_overrides (
     agent_user_id VARCHAR(64) PRIMARY KEY,
     developer_allows_create_users TINYINT(1) NOT NULL DEFAULT 1,
+    commission_rate DECIMAL(8, 4) NULL,
     updated_by_user_id VARCHAR(64) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),

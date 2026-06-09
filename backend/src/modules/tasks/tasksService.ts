@@ -579,6 +579,17 @@ class TasksService {
     };
     return labels[task.moduleCode] ?? `${task.moduleCode} 生成任务`;
   }
+
+  async deleteRecentTask(taskId: string, userId: string) {
+    const task = await tasksRepository.findById(taskId, userId);
+    if (!task) throw errors.taskNotFound();
+    if (task.moduleCode === "batch-new") {
+      throw errors.invalidParameter("batch-new tasks cannot be deleted from recent list");
+    }
+
+    await tasksRepository.deleteByIds([taskId]);
+    return { taskId, deleted: true };
+  }
 }
 
 export const tasksService = new TasksService();

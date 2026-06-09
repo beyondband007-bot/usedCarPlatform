@@ -33,3 +33,15 @@ tasksRoutes.get(
     ok(res, task);
   }),
 );
+
+tasksRoutes.delete(
+  "/:taskId",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    const result = await tasksService.deleteRecentTask(
+      String(req.params.taskId),
+      current.user.id,
+    );
+    ok(res, result);
+  }),
+);
