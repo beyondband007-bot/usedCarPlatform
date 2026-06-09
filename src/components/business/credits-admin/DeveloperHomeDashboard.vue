@@ -16,6 +16,7 @@ import type {
   CreditsCustomerProfile,
   CreditsTransaction,
   PlatformAdminPolicyOverride,
+  PlatformAgentProfile,
   PlatformAgentPolicyOverride,
   PlatformDashboard,
 } from '@/api/visual-workbench'
@@ -42,12 +43,14 @@ const props = defineProps<{
   customerColumns: DataTableColumns<CreditsCustomerProfile>
   adminPolicyOverrides: PlatformAdminPolicyOverride[]
   agentPolicyOverrides: PlatformAgentPolicyOverride[]
+  filteredAgentProfiles: PlatformAgentProfile[]
   accountCreationPolicyState: AccountCreationPolicyState
   isFunctionBillingOpen: boolean
   selectedApplicationFunctions: CreditsAdminOverview['applicationFunctions']
   functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]>
   adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride>
   agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride>
+  agentManagementColumns: DataTableColumns<PlatformAgentProfile>
   selectedApplicationLabel: string
 }>()
 
@@ -656,6 +659,20 @@ onBeforeUnmount(() => {
               />
               <p v-else class="dev-auth-empty">暂无公司管理员账号</p>
             </div>
+
+            <div class="dev-auth-block dev-auth-block-wide">
+              <h4>代理商管理</h4>
+              <p class="dev-auth-sub">开发者可禁用 Agent，并让该账号回到普通 User 身份。</p>
+              <NDataTable
+                v-if="filteredAgentProfiles.length"
+                :columns="agentManagementColumns"
+                :data="filteredAgentProfiles"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <p v-else class="dev-auth-empty">暂无代理商账号</p>
+            </div>
           </div>
 
           <details class="dev-billing-details">
@@ -1199,6 +1216,10 @@ onBeforeUnmount(() => {
     font-weight: 800;
     color: var(--bo-text);
   }
+}
+
+.dev-auth-block-wide {
+  grid-column: 1 / -1;
 }
 
 .dev-auth-sub {
