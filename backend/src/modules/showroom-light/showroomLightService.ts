@@ -9,7 +9,7 @@ import {
   unsupportedLogoPlacements,
 } from "../../shared/logoPlacements";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
-import type { CreateModuleTaskRequest } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import {
   freezeGenerationBilling,
   markGenerationBillingRefundFailed,
@@ -92,7 +92,7 @@ class ShowroomLightService {
     }
 
     const outputRatio = resolveOutputRatio(body.outputRatio);
-    const resolution = "2K";
+    const resolution = IMAGE_GENERATION_RESOLUTION;
     const prompt = appendOutputRatioPrompt(
       buildShowroomLightPrompt(logoAsset ? logoPlacements : []),
       outputRatio,

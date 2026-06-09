@@ -9,7 +9,9 @@ export type AssetPurpose =
 
 export type OutputRatio = "auto" | "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 
-export type Resolution = "1K" | "2K" | "4K";
+export const IMAGE_GENERATION_RESOLUTION = "1K" as const;
+
+export type Resolution = typeof IMAGE_GENERATION_RESOLUTION;
 
 export type LogoPlacement = "plate" | "wall";
 

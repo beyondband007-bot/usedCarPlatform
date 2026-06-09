@@ -56,7 +56,7 @@ async function testTaskQueriesUseUserFilter() {
       userId: "user_a",
       moduleCode: "creative-image",
       outputRatio: "1:1",
-      resolution: "2K",
+      resolution: "1K",
       prompt: "test",
     });
     assert.match(captured.calls[3].sql, /INSERT INTO generation_tasks\s*\([\s\S]*user_id/);

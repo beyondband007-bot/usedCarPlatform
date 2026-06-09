@@ -12,7 +12,7 @@ import {
   unsupportedLogoPlacements,
 } from "../../shared/logoPlacements";
 import { resolveOutputRatio } from "../../shared/outputRatio";
-import type { OutputRatio } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type OutputRatio } from "../../shared/types";
 import {
   finalizeGenerationBilling,
   freezeGenerationBilling,
@@ -490,7 +490,7 @@ class BatchService {
       inputAssetId: asset.id,
       optionId: input.optionId ?? input.itemKind,
       outputRatio: outputRatioOrDefault(input.config.outputRatio),
-      resolution: "2K",
+      resolution: IMAGE_GENERATION_RESOLUTION,
       logoAssetId: null,
       prompt,
       subscriptionUserKey: input.subscription.userKey,

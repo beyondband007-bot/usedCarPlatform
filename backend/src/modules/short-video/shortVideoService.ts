@@ -2,7 +2,7 @@ import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
-import type { CreateModuleTaskRequest } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
 import type { BillingRequestContext } from "../billing/billingIdentity";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
@@ -69,7 +69,7 @@ class ShortVideoService {
         inputAssetId: asset.id,
         optionId: KIE_KLING_VIDEO_OPTION_ID,
         outputRatio: aspectRatio,
-        resolution: "2K",
+        resolution: IMAGE_GENERATION_RESOLUTION,
         logoAssetId: null,
         prompt: shortVideoPrompt,
         subscriptionUserKey: subscription.userKey,

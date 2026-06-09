@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../../config/env";
+import { IMAGE_GENERATION_RESOLUTION } from "../../shared/types";
 import { errors } from "../../shared/errors";
 import type {
   CreateKieImageToVideoTaskInput,
@@ -266,7 +267,7 @@ const buildImageToImageRequestBody = (model: string, input: CreateKieImageTaskIn
         prompt: input.prompt,
         image_input: input.inputUrls,
         aspect_ratio: input.aspectRatio,
-        resolution: input.resolution,
+        resolution: IMAGE_GENERATION_RESOLUTION,
         output_format: input.outputFormat ?? env.kie.fallbackOutputFormat,
       },
     };
@@ -278,7 +279,7 @@ const buildImageToImageRequestBody = (model: string, input: CreateKieImageTaskIn
       prompt: input.prompt,
       input_urls: input.inputUrls,
       aspect_ratio: input.aspectRatio,
-      resolution: input.resolution,
+      resolution: IMAGE_GENERATION_RESOLUTION,
     },
   };
 };
@@ -344,7 +345,7 @@ class KieClient {
       input: {
         prompt: input.prompt,
         aspect_ratio: input.aspectRatio,
-        resolution: input.resolution,
+        resolution: IMAGE_GENERATION_RESOLUTION,
       },
     };
 

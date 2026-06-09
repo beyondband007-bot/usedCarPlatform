@@ -4,7 +4,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
-import type { CreateModuleTaskRequest } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import {
   freezeGenerationBilling,
   markGenerationBillingRefundFailed,
@@ -75,7 +75,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
       }
 
       const outputRatio = resolveOutputRatio(body.outputRatio);
-      const resolution = "2K";
+      const resolution = IMAGE_GENERATION_RESOLUTION;
       const prompt = appendOutputRatioPrompt(
         logoAsset ? config.logoPrompt : config.defaultPrompt,
         outputRatio,

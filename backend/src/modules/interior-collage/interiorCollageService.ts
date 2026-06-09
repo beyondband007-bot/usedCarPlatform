@@ -3,7 +3,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
-import type { OutputRatio, Resolution } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type OutputRatio, type Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import {
   freezeGenerationBilling,
@@ -81,7 +81,7 @@ class InteriorCollageService {
     }
 
     const outputRatio = resolveOutputRatio(body.outputRatio);
-    const resolution = body.resolution ?? "2K";
+    const resolution = IMAGE_GENERATION_RESOLUTION;
     const prompt = appendOutputRatioPrompt(interiorCollagePrompt, outputRatio);
     const groups = splitAssets(interiorAssets);
     const taskEntries = [];

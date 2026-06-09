@@ -3,7 +3,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { createId } from "../../shared/ids";
 import { errors } from "../../shared/errors";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
-import type { CreateModuleTaskRequest } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
 import {
   freezeGenerationBilling,
@@ -38,7 +38,7 @@ class LightConsistencyService {
     }
 
     const outputRatio = resolveOutputRatio(body.outputRatio);
-    const resolution = "2K";
+    const resolution = IMAGE_GENERATION_RESOLUTION;
     const prompt = appendOutputRatioPrompt(lightConsistencyPrompt, outputRatio);
     const taskId = createId("task");
 

@@ -7,7 +7,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { resolveOutputRatio } from "../../shared/outputRatio";
-import type { OutputRatio, Resolution } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type OutputRatio, type Resolution } from "../../shared/types";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import { assetsService } from "../assets/assetsService";
 import {
@@ -32,7 +32,7 @@ import type {
 
 const resultPublicPrefix = `${env.publicBaseUrl.replace(/\/$/, "")}/results/creative-image/`;
 
-const normalizeResolution = (value: Resolution | undefined): Resolution => value ?? "2K";
+const normalizeResolution = (_value: Resolution | undefined): Resolution => IMAGE_GENERATION_RESOLUTION;
 
 const assertPrompt = (prompt: string | undefined) => {
   const normalized = prompt?.trim();

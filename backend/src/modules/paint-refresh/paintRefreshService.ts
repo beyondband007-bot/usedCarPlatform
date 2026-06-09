@@ -4,7 +4,7 @@ import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { appendOutputRatioPrompt, resolveOutputRatio } from "../../shared/outputRatio";
-import type { CreateModuleTaskRequest } from "../../shared/types";
+import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import {
   freezeGenerationBilling,
   markGenerationBillingRefundFailed,
@@ -54,7 +54,7 @@ class PaintRefreshService {
       colorCode ? buildPaintRefreshColorPrompt(colorCode) : paintRefreshPrompt,
       outputRatio,
     );
-    const resolution = "2K";
+    const resolution = IMAGE_GENERATION_RESOLUTION;
     const taskId = createId("task");
 
     await tasksRepository.createWaitingTask({
