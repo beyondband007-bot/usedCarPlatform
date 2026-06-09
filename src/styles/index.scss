@@ -82,7 +82,16 @@ $theme-vars: (
   --app-header-offset: 72px;
 }
 
+@media (max-width: 767px) {
+  .app-layout--studio-chrome:not([data-subnav="true"]) {
+    --app-header-offset: calc(52px + env(safe-area-inset-top, 0px));
+  }
+}
+
 :root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --app-vh: 1vh;
   color-scheme: dark;
   @include apply-theme-vars(dark);
   --color-bg-primary: #050505;

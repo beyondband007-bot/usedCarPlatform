@@ -727,6 +727,13 @@ export async function getGenerationTask(taskId: string) {
   return normalizeGenerationTaskDetail(unwrapApiResponse(response))
 }
 
+export async function deleteRecentGenerationTask(taskId: string) {
+  const response = await request.delete<ApiResponse<{ taskId: string; deleted: boolean }>>(
+    `/tasks/${encodeURIComponent(taskId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function getRecentGenerationTasks(params?: {
   moduleCode?: string
   status?: string

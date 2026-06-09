@@ -59,7 +59,10 @@ const heroImageStyle = computed(
 
 <template>
   <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
-    <div class="hero-visual" :style="{ aspectRatio: HERO_VIEWPORT_ASPECT }">
+    <div
+      class="hero-visual"
+      :style="{ '--hero-aspect-ratio': HERO_VIEWPORT_ASPECT }"
+    >
       <div
         class="hero-media"
         :style="{ '--hero-car-roof-line': `${HERO_CAR_ROOF_LINE}%` }"
@@ -97,6 +100,7 @@ const heroImageStyle = computed(
 .hero-visual {
   width: 100%;
   height: auto;
+  aspect-ratio: var(--hero-aspect-ratio);
   max-height: calc(100dvh - var(--app-header-offset, 72px));
   overflow: hidden;
   background: var(--home-hero-bg);
@@ -230,22 +234,33 @@ const heroImageStyle = computed(
 }
 
 @media (max-width: 767px) {
+  .hero-visual {
+    --hero-aspect-ratio: 3 / 2;
+    min-height: 240px;
+  }
+
   .hero-copy {
     width: min(100% - (var(--home-space-x, 16px) * 2), 900px);
     max-width: calc(100% - (var(--home-space-x, 16px) * 2));
   }
 
-  .hero h1,
-  .subtitle {
-    white-space: normal;
+  .hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 2px;
+    white-space: nowrap;
   }
 
   .hero h1 {
-    font-size: 45px;
+    font-size: clamp(18px, 5.6vw, 24px);
+    letter-spacing: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   .subtitle {
-    font-size: clamp(13px, 3.6vw, 16px);
+    font-size: clamp(10px, 3vw, 13px);
+    line-height: 1.35;
+    white-space: nowrap;
   }
 }
 

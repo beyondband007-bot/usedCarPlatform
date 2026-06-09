@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { useMessage } from "naive-ui";
+import { useDialog, useMessage } from "naive-ui";
 
 import {
+  deleteRecentGenerationTask,
   getRecentGenerationTasks,
   type RecentGenerationTask,
 } from "@/api/visual-workbench";
@@ -86,6 +87,54 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   saveRecentScrollPosition();
   persistRecentCache();
   emit("pickRecent", item);
+}
+
+function resolveRecentTaskId(item: WorkspaceRecentItem) {
+  return item.taskId ?? item.id;
+}
+
+function isDeletingRecent(item: WorkspaceRecentItem) {
+  const taskId = resolveRecentTaskId(item);
+  return taskId ? deletingRecentIds.value.includes(taskId) : false;
+}
+
+function removeRecentItem(taskId: string) {
+  recentItems.value = recentItems.value.filter(
+    (entry) => resolveRecentTaskId(entry) !== taskId,
+  );
+  persistRecentCache();
+}
+
+function handleDeleteRecent(item: WorkspaceRecentItem) {
+  const taskId = resolveRecentTaskId(item);
+  if (!taskId || isDeletingRecent(item)) return;
+
+  dialog.warning({
+    title: "删除记录",
+    content: `确定删除「${item.title}」吗？删除后不可恢复。`,
+    positiveText: "删除",
+    negativeText: "取消",
+    onPositiveClick: () => {
+      deletingRecentIds.value = [...deletingRecentIds.value, taskId];
+      return deleteRecentGenerationTask(taskId)
+        .then(() => {
+          removeRecentItem(taskId);
+          if (props.generationResult?.taskId === taskId) {
+            emit("backFromResult");
+          }
+          message.success("已删除");
+        })
+        .catch((error: unknown) => {
+          const text = error instanceof Error ? error.message : "删除失败";
+          message.error(text);
+        })
+        .finally(() => {
+          deletingRecentIds.value = deletingRecentIds.value.filter(
+            (id) => id !== taskId,
+          );
+        });
+    },
+  });
 }
 
 const templateDescriptionMap: Record<string, string> = {
@@ -212,6 +261,8 @@ function startFeatureCompareDrag(index: number, event: PointerEvent) {
 }
 
 const appStore = useAppStore();
+const message = useMessage();
+const dialog = useDialog();
 const recentGenerateStore = useRecentGenerateStore();
 const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">(
   "guide",
@@ -320,7 +371,7 @@ const requirementCards = computed(() =>
   })),
 );
 
-const message = useMessage();
+const deletingRecentIds = ref<string[]>([]);
 const isDownloadingDeliveryGroup = ref(false);
 
 watch(
@@ -1378,10 +1429,30 @@ defineExpose({
                 <p v-if="getBatchFailureReason(item)" class="recent-scene">
                   {{ getBatchFailureReason(item) }}
                 </p>
-                <span class="recent-time">
-                  <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-                  {{ item.createdAt }}
-                </span>
+                <div class="recent-foot-actions">
+                  <span class="recent-time">
+                    <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+                    {{ item.createdAt }}
+                  </span>
+                  <button
+                    type="button"
+                    class="recent-delete-btn"
+                    :aria-label="`删除${item.title}`"
+                    :disabled="isDeletingRecent(item)"
+                    @click.stop="handleDeleteRecent(item)"
+                  >
+                    <Icon
+                      :icon="
+                        isDeletingRecent(item)
+                          ? 'mdi:loading'
+                          : 'mdi:trash-can-outline'
+                      "
+                      :class="{
+                        'recent-delete-icon--loading': isDeletingRecent(item),
+                      }"
+                    />
+                  </button>
+                </div>
               </footer>
             </article>
           </section>
@@ -1398,6 +1469,7 @@ defineExpose({
       :recent-loading="recentLoading"
       :initial-view="shortVideoInitialView"
       @pick-recent="handleRecentPick"
+      @delete-recent="handleDeleteRecent"
     />
 
     <section
@@ -1686,10 +1758,30 @@ defineExpose({
                 <p v-if="item.sceneLabel" class="recent-scene">
                   {{ item.sceneLabel }}
                 </p>
-                <span class="recent-time">
-                  <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-                  {{ item.createdAt }}
-                </span>
+                <div class="recent-foot-actions">
+                  <span class="recent-time">
+                    <Icon icon="mdi:clock-outline" class="recent-time-icon" />
+                    {{ item.createdAt }}
+                  </span>
+                  <button
+                    type="button"
+                    class="recent-delete-btn"
+                    :aria-label="`删除${item.title}`"
+                    :disabled="isDeletingRecent(item)"
+                    @click.stop="handleDeleteRecent(item)"
+                  >
+                    <Icon
+                      :icon="
+                        isDeletingRecent(item)
+                          ? 'mdi:loading'
+                          : 'mdi:trash-can-outline'
+                      "
+                      :class="{
+                        'recent-delete-icon--loading': isDeletingRecent(item),
+                      }"
+                    />
+                  </button>
+                </div>
               </footer>
             </article>
           </section>
@@ -3241,11 +3333,20 @@ defineExpose({
   font-weight: 600;
 }
 
+.recent-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
 .recent-time {
   display: inline-flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 4px;
-  margin-top: auto;
   overflow: hidden;
   color: var(--assist-muted);
   font-size: 11px;
@@ -3258,6 +3359,39 @@ defineExpose({
   flex-shrink: 0;
   font-size: 13px;
   opacity: 0.72;
+}
+
+.recent-delete-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.recent-delete-btn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.recent-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.recent-delete-icon--loading {
+  animation: recent-loading-spin 1s linear infinite;
 }
 
 .recent-status {

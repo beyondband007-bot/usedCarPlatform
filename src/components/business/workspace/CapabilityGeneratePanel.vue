@@ -259,6 +259,10 @@ const showroomWallEnabledOptionIds = new Set([
   "soft-top-light",
   "luxury-dark",
   "wide-angle",
+  "warm-beige-studio",
+  "dark-gray-halo",
+  "charcoal-stone-wall",
+  "vertical-light-hall",
 ]);
 
 function resolveShowroomLogoPlacements(optionId?: string | null) {

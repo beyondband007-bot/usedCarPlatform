@@ -90,6 +90,37 @@ const footerBrandLogoSrc = computed(() =>
             </p>
           </div>
         </div>
+
+        <div class="footer-contact-mobile" aria-label="客服联系方式">
+          <div class="qr-codes">
+            <div class="qr-item">
+              <div class="qr-frame">
+                <img
+                  class="qr-image"
+                  :src="contactSupportWechatQr"
+                  alt="客服微信二维码"
+                  width="88"
+                  height="88"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <span class="qr-label">客服微信</span>
+            </div>
+          </div>
+
+          <div class="footer-contact-copy">
+            <h3 class="nav-title">联系我们</h3>
+            <ul class="nav-list">
+              <li v-for="line in homeFooterContactItems" :key="line">
+                <span class="nav-item nav-item--static">{{ line }}</span>
+              </li>
+            </ul>
+            <p class="brand-tip">
+              添加客服微信，了解更多定制服务
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="footer-nav">
@@ -108,10 +139,9 @@ const footerBrandLogoSrc = computed(() =>
                 @click="handleFooterNavClick(item)"
               >
                 {{ item.label }}
-                <span
-                  v-if="item.tag === 'beta'"
-                  class="tag tag-beta"
-                >Beta</span>
+                <span v-if="item.tag === 'beta'" class="tag tag-beta"
+                  >Beta</span
+                >
               </button>
               <span
                 v-else
@@ -119,14 +149,12 @@ const footerBrandLogoSrc = computed(() =>
                 :class="{ 'nav-item--disabled': item.disabled }"
               >
                 {{ item.label }}
-                <span
-                  v-if="item.tag === 'beta'"
-                  class="tag tag-beta"
-                >Beta</span>
-                <span
-                  v-else-if="item.tag === 'plan'"
-                  class="tag tag-plan"
-                >开发中</span>
+                <span v-if="item.tag === 'beta'" class="tag tag-beta"
+                  >Beta</span
+                >
+                <span v-else-if="item.tag === 'plan'" class="tag tag-plan"
+                  >开发中</span
+                >
               </span>
             </li>
           </ul>
@@ -290,6 +318,18 @@ const footerBrandLogoSrc = computed(() =>
   line-height: 1.75;
 }
 
+.footer-contact-mobile {
+  display: none;
+}
+
+.footer-contact-copy .nav-title {
+  margin-bottom: 12px;
+}
+
+.footer-contact-copy .nav-list li:last-child {
+  margin-bottom: 0;
+}
+
 .footer-nav {
   display: flex;
   flex: 1 1 auto;
@@ -423,33 +463,64 @@ const footerBrandLogoSrc = computed(() =>
 }
 
 @media (max-width: 767px) {
-  .brand-body {
-    flex-direction: column;
+  .footer {
+    padding: 28px 0 20px;
   }
 
+  .footer-container {
+    gap: 0;
+    padding-inline: var(--home-space-x, 16px);
+  }
+
+  .footer-brand {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .brand-logo-image {
+    margin-bottom: 20px;
+  }
+
+  .brand-body,
   .footer-nav {
-    flex-direction: column;
-    gap: 24px;
+    display: none;
   }
 
-  .nav-column {
+  .footer-contact-mobile {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
     width: 100%;
   }
 
-  .nav-item--clickable {
-    min-height: 44px;
-    align-items: center;
+  .footer-contact-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .footer-contact-copy .brand-tip {
+    margin-top: 12px;
+  }
+
+  .footer-contact-mobile .qr-frame {
+    width: 80px;
+    height: 80px;
   }
 
   .footer-bottom {
-    gap: 16px;
-    align-items: flex-start;
+    gap: 12px;
+    align-items: center;
     flex-direction: column;
+    margin-top: 24px;
+    padding-inline: var(--home-space-x, 16px);
+    text-align: center;
   }
 
   .footer-bottom-links {
-    flex-direction: column;
-    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 16px;
   }
 }
 </style>

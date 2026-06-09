@@ -126,14 +126,15 @@ onMounted(() => {
     0 12px 34px rgba(244, 200, 64, 0.18);
 }
 
-@media (max-width: 700px) {
-  .final-cta h2,
-  .final-cta p {
-    white-space: normal;
+@media (max-width: 767px) {
+  .final-cta h2 {
+    font-size: clamp(15px, 4.6vw, 22px);
+    white-space: nowrap;
   }
 
-  .final-cta h2 {
-    font-size: clamp(22px, 6vw, 28px);
+  .final-cta p {
+    font-size: clamp(10px, 2.85vw, 14px);
+    white-space: nowrap;
   }
 
   .button {

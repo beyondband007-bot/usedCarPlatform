@@ -377,6 +377,18 @@ const {
 
 }
 
+@media (max-width: 767px) {
+
+  .home-chrome {
+
+    --studio-chrome-header-height: 52px;
+
+    --studio-chrome-pad-x: 16px;
+
+  }
+
+}
+
 
 
 .app-layout--studio-chrome:not(.app-layout--home) .app-layout-main {
