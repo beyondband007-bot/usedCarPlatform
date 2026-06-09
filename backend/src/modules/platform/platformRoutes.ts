@@ -11,6 +11,7 @@ import {
   createAgentTicket,
   getAgentCustomerLedger,
   getAgentOperationsOverview,
+  getPlatformCustomerLedger,
 } from "./agentOperationsService";
 import {
   buildBillingLifecycleExample,
@@ -248,6 +249,17 @@ platformRoutes.get(
       ? req.params.relationId[0]
       : req.params.relationId;
     ok(res, await getAgentCustomerLedger(req, relationId));
+  }),
+);
+
+platformRoutes.get(
+  "/customers/:customerProfileId/ledger",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const customerProfileId = Array.isArray(req.params.customerProfileId)
+      ? req.params.customerProfileId[0]
+      : req.params.customerProfileId;
+    ok(res, await getPlatformCustomerLedger(req, customerProfileId));
   }),
 );
 

@@ -71,12 +71,14 @@ type CreditsTransactionRow = RowDataPacket & {
   created_at: Date;
 };
 
-type EnterpriseMemberIdentityRow = RowDataPacket & {
+type EnterpriseMemberIdentity = {
   credits_user_id: number | null;
   username: string;
   display_name: string;
   member_role: "owner" | "admin" | "member";
 };
+
+type EnterpriseMemberIdentityRow = RowDataPacket & EnterpriseMemberIdentity;
 
 type AgentLeadRow = RowDataPacket & {
   id: string;
@@ -370,8 +372,43 @@ async function loadAgentCustomerForLedger(agentUserId: string, relationId: strin
   return rows[0] ?? null;
 }
 
+async function loadCustomerProfileForLedger(customerProfileId: string) {
+  const [rows] = await pool.query<AgentCustomerLedgerRow[]>(
+    `SELECT
+       acl.id,
+       acl.application_code,
+       'direct' relation_type,
+       acl.status,
+       acl.created_at,
+       u.id customer_user_id,
+       u.username customer_username,
+       u.display_name customer_display_name,
+       u.phone customer_phone,
+       acl.credits_user_id customer_credits_user_id,
+       acl.account_scope customer_account_scope,
+       acl.credits_tenant_id customer_credits_tenant_id,
+       em.tenant_id enterprise_tenant_id,
+       et.name enterprise_tenant_name,
+       et.owner_user_id enterprise_owner_user_id,
+       owner.credits_user_id enterprise_owner_credits_user_id
+     FROM application_customer_links acl
+     JOIN app_users u ON u.id = acl.user_id
+     LEFT JOIN enterprise_members em
+       ON em.user_id = u.id
+      AND em.status = 'active'
+     LEFT JOIN enterprise_tenants et
+       ON et.id = em.tenant_id
+      AND et.status = 'active'
+     LEFT JOIN app_users owner ON owner.id = et.owner_user_id
+     WHERE acl.id = :customerProfileId
+     LIMIT 1`,
+    { customerProfileId },
+  );
+  return rows[0] ?? null;
+}
+
 async function loadEnterpriseMemberIdentityByCreditsUserId(tenantId: string | null) {
-  if (!tenantId) return new Map<number, EnterpriseMemberIdentityRow>();
+  if (!tenantId) return new Map<number, EnterpriseMemberIdentity>();
   const [rows] = await pool.query<EnterpriseMemberIdentityRow[]>(
     `SELECT
        u.credits_user_id,
@@ -437,7 +474,7 @@ async function loadCreditsAccountForCustomer(customer: AgentCustomerLedgerRow) {
 function identityLabelForTransaction(
   transaction: CreditsTransactionRow,
   customer: AgentCustomerLedgerRow,
-  memberByCreditsUserId: Map<number, EnterpriseMemberIdentityRow>,
+  memberByCreditsUserId: Map<number, EnterpriseMemberIdentity>,
 ) {
   if (customer.customer_account_scope !== "tenant") return "客户";
 
@@ -456,6 +493,17 @@ async function listLedgerTransactions(input: {
   const memberByCreditsUserId = await loadEnterpriseMemberIdentityByCreditsUserId(
     input.customer.enterprise_tenant_id,
   );
+  if (
+    input.customer.customer_account_scope !== "tenant" &&
+    input.customer.customer_credits_user_id
+  ) {
+    memberByCreditsUserId.set(input.customer.customer_credits_user_id, {
+      credits_user_id: input.customer.customer_credits_user_id,
+      username: input.customer.customer_username,
+      display_name: input.customer.customer_display_name,
+      member_role: "member",
+    });
+  }
 
   const [rows] = await creditsDb.query<CreditsTransactionRow[]>(
     `SELECT
@@ -516,6 +564,55 @@ async function listLedgerTransactions(input: {
       createdAt: row.created_at.toISOString(),
     };
   });
+}
+
+async function buildCustomerLedgerResponse(customer: AgentCustomerLedgerRow) {
+  const account = await loadCreditsAccountForCustomer(customer);
+  const profile = {
+    id: customer.id,
+    applicationCode: customer.application_code,
+    relationType: customer.relation_type,
+    status: customer.status,
+    createdAt: customer.created_at.toISOString(),
+    customerUserId: customer.customer_user_id,
+    customerUsername: customer.customer_username,
+    customerDisplayName: customer.customer_display_name,
+    customerPhone: customer.customer_phone,
+    customerCreditsUserId: customer.customer_credits_user_id,
+    accountScope: customer.customer_account_scope,
+    creditsTenantId: customer.customer_credits_tenant_id,
+    enterpriseTenantId: customer.enterprise_tenant_id,
+    enterpriseTenantName: customer.enterprise_tenant_name,
+    enterpriseOwnerUserId: customer.enterprise_owner_user_id,
+    enterpriseAccountRole: customer.customer_account_scope === "tenant" ? "team" : "personal",
+  };
+
+  if (!account) {
+    return {
+      customer: profile,
+      account: null,
+      transactions: [],
+    };
+  }
+
+  return {
+    customer: profile,
+    account: {
+      id: account.id,
+      tenantId: account.tenant_id,
+      userId: account.user_id,
+      accountScope: account.account_scope,
+      totalBalance: toNumber(account.total_balance),
+      lockedBalance: toNumber(account.locked_balance),
+      availableBalance: toNumber(account.available_balance),
+      currency: account.currency,
+      status: account.status,
+    },
+    transactions: await listLedgerTransactions({
+      accountId: account.id,
+      customer,
+    }),
+  };
 }
 
 async function listAgentLeads(agentUserId: string) {
@@ -687,62 +784,19 @@ export async function getAgentCustomerLedger(req: Request, relationId: string) {
   const customer = await loadAgentCustomerForLedger(agent.id, relationId);
   if (!customer) throw errors.invalidParameter("agent customer is not available");
 
-  const account = await loadCreditsAccountForCustomer(customer);
-  if (!account) {
-    return {
-      customer: {
-        id: customer.id,
-        applicationCode: customer.application_code,
-        relationType: customer.relation_type,
-        status: customer.status,
-        customerUserId: customer.customer_user_id,
-        customerUsername: customer.customer_username,
-        customerDisplayName: customer.customer_display_name,
-        customerPhone: customer.customer_phone,
-        customerCreditsUserId: customer.customer_credits_user_id,
-        accountScope: customer.customer_account_scope,
-        creditsTenantId: customer.customer_credits_tenant_id,
-        enterpriseAccountRole: customer.customer_account_scope === "tenant" ? "team" : "personal",
-      },
-      account: null,
-      transactions: [],
-    };
+  return buildCustomerLedgerResponse(customer);
+}
+
+export async function getPlatformCustomerLedger(req: Request, customerProfileId: string) {
+  const current = getRequiredCurrentUser(req);
+  if (current.user.role !== "developer" && current.user.role !== "admin") {
+    throw errors.forbidden("customer ledger requires Developer or Admin role");
   }
 
-  return {
-    customer: {
-      id: customer.id,
-      applicationCode: customer.application_code,
-      relationType: customer.relation_type,
-      status: customer.status,
-      customerUserId: customer.customer_user_id,
-      customerUsername: customer.customer_username,
-      customerDisplayName: customer.customer_display_name,
-      customerPhone: customer.customer_phone,
-      customerCreditsUserId: customer.customer_credits_user_id,
-      accountScope: customer.customer_account_scope,
-      creditsTenantId: customer.customer_credits_tenant_id,
-      enterpriseTenantId: customer.enterprise_tenant_id,
-      enterpriseTenantName: customer.enterprise_tenant_name,
-      enterpriseOwnerUserId: customer.enterprise_owner_user_id,
-      enterpriseAccountRole: customer.customer_account_scope === "tenant" ? "team" : "personal",
-    },
-    account: {
-      id: account.id,
-      tenantId: account.tenant_id,
-      userId: account.user_id,
-      accountScope: account.account_scope,
-      totalBalance: toNumber(account.total_balance),
-      lockedBalance: toNumber(account.locked_balance),
-      availableBalance: toNumber(account.available_balance),
-      currency: account.currency,
-      status: account.status,
-    },
-    transactions: await listLedgerTransactions({
-      accountId: account.id,
-      customer,
-    }),
-  };
+  const customer = await loadCustomerProfileForLedger(customerProfileId);
+  if (!customer) throw errors.invalidParameter("customer profile is not available");
+
+  return buildCustomerLedgerResponse(customer);
 }
 
 export async function createAgentLead(req: Request, body: Record<string, unknown>) {

@@ -1805,6 +1805,27 @@ export async function getAgentCustomerLedger(
   }
 }
 
+export async function getPlatformCustomerLedger(
+  customerProfileId: string,
+): Promise<AgentCustomerLedger> {
+  const response = await request.get<ApiResponse<AgentCustomerLedger>>(
+    `/platform/customers/${encodeURIComponent(customerProfileId)}/ledger`,
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+    account: payload.account
+      ? normalizeCreditsAccount(payload.account as CreditsAccount & Record<string, unknown>)
+      : null,
+  }
+}
+
 export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const response = await request.get<ApiResponse<PlatformDashboard>>('/platform/dashboard')
   return unwrapApiResponse(response)
