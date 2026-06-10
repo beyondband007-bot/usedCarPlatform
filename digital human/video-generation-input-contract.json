@@ -1,0 +1,142 @@
+{
+  "contractVersion": 1,
+  "updatedAt": "2026-06-10T16:10:00+08:00",
+  "purpose": "video_generation_pre_backend_contract",
+  "notes": [
+    "本文件用于后端接入前固定业务输入契约，暂不代表已接入路由或数据库。",
+    "视频风格、视频类型、镜头语言必须跟随用户选择的 referenceMaterialId。",
+    "用户上传素材图片作为视频模型参考图，不在风格上覆盖 referenceMaterialId，只补充车辆真实外观、内饰、细节信息。"
+  ],
+  "assetInputs": {
+    "vehicleExteriorImages": {
+      "required": true,
+      "minCount": 1,
+      "maxCount": 6,
+      "currentAssetPurpose": "car_exterior",
+      "futureAssetPurpose": "car_exterior",
+      "acceptedMimeTypes": ["image/jpeg", "image/png", "image/webp"],
+      "minimumRecommendedSize": {
+        "width": 1024,
+        "height": 768
+      },
+      "roles": [
+        "front_45",
+        "rear_45",
+        "side",
+        "front",
+        "rear",
+        "detail"
+      ],
+      "usage": "锁定车辆外观、颜色、车身结构、灯组、轮毂、车牌区域和真实车况。"
+    },
+    "vehicleInteriorImages": {
+      "required": false,
+      "minCount": 0,
+      "maxCount": 6,
+      "currentAssetPurpose": "car_interior",
+      "futureAssetPurpose": "car_interior",
+      "acceptedMimeTypes": ["image/jpeg", "image/png", "image/webp"],
+      "minimumRecommendedSize": {
+        "width": 1024,
+        "height": 768
+      },
+      "roles": [
+        "dashboard",
+        "front_seats",
+        "rear_seats",
+        "trunk",
+        "center_console",
+        "detail"
+      ],
+      "usage": "补充座舱、配置、空间、材质和内饰卖点。"
+    },
+    "userReferenceImages": {
+      "required": false,
+      "minCount": 0,
+      "maxCount": 4,
+      "currentAssetPurpose": null,
+      "futureAssetPurpose": "video_reference_image",
+      "acceptedMimeTypes": ["image/jpeg", "image/png", "image/webp"],
+      "minimumRecommendedSize": {
+        "width": 1024,
+        "height": 768
+      },
+      "roles": [
+        "desired_scene",
+        "desired_composition",
+        "brand_material",
+        "other_reference"
+      ],
+      "usage": "作为用户额外参考素材，可辅助场景、构图或品牌物料，但不能覆盖预设参考视频的风格和类型。"
+    }
+  },
+  "scriptDraftInput": {
+    "vehicleName": {
+      "required": true,
+      "examples": ["丰田凯美瑞运动款2.0T", "比亚迪汉DM-i尊荣型", "福特猛禽F-150"]
+    },
+    "referenceMaterialId": {
+      "required": true,
+      "source": "digital human/reference-materials.json"
+    },
+    "digitalHumanId": {
+      "required": true,
+      "source": "digital human image manifest, to be added when backend asset registry is created"
+    },
+    "durationSeconds": {
+      "required": true,
+      "default": 20,
+      "allowed": [15, 20, 30]
+    },
+    "sellingPointHints": {
+      "required": false,
+      "type": "string[]",
+      "examples": ["省油", "空间大", "运动外观", "准新车", "价格优惠"]
+    },
+    "vehicleImageSummary": {
+      "required": false,
+      "type": "string",
+      "usage": "后端接入视觉识别后，可把用户上传图片识别出的颜色、内饰、配置、瑕疵或亮点摘要放入这里。"
+    }
+  },
+  "scriptDraftOutput": {
+    "scriptDraftId": "string",
+    "vehicleName": "string",
+    "referenceMaterialId": "string",
+    "videoType": "string",
+    "scriptText": "string",
+    "openingHook": "string",
+    "sellingPoints": ["string"],
+    "shotCues": [
+      {
+        "timeRange": "string",
+        "visual": "string",
+        "voiceover": "string",
+        "assetRole": "string"
+      }
+    ],
+    "stylePrompt": "string",
+    "riskNotes": ["string"]
+  },
+  "futureTaskCreateRequest": {
+    "vehicleName": "丰田凯美瑞运动款2.0T",
+    "scriptDraftId": "script_xxx",
+    "scriptText": "这台丰田凯美瑞运动款2.0T...",
+    "digitalHumanId": "dh_female_01",
+    "referenceMaterialId": "ref-video-001",
+    "vehicleExteriorAssetIds": ["asset_exterior_001"],
+    "vehicleInteriorAssetIds": ["asset_interior_001"],
+    "userReferenceAssetIds": [],
+    "outputRatio": "9:16",
+    "durationSeconds": 20,
+    "videoResolution": "720p"
+  },
+  "validationRules": [
+    "vehicleName 必须去除首尾空白，长度建议 2-60 个中文字符或等价英文长度。",
+    "referenceMaterialId 必须存在于 reference-materials.json 且 extractionStatus 为 completed。",
+    "至少上传 1 张 car_exterior 图片，否则不能生成视频。",
+    "内饰图不是必填；如果有内饰图，口播可加入座舱、空间、配置相关卖点。",
+    "用户额外参考图只作为补充参考，最终视频类型和风格必须以 referenceMaterialId 对应的 styleJson/stylePrompt 为准。",
+    "后端接入时需要校验所有 assetId 均属于当前用户，不能跨用户读取。"
+  ]
+}
