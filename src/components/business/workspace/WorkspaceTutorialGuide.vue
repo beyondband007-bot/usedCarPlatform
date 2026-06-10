@@ -32,7 +32,10 @@ const tutorialTemplatePreviewImages = computed(
 <template>
   <section
     class="tutorial-section"
-    :class="theme === 'light' ? 'theme-light' : 'theme-dark'"
+    :class="[
+      theme === 'light' ? 'theme-light' : 'theme-dark',
+      { 'is-variant-batch-new': variant === 'batch-new' },
+    ]"
     aria-label="使用教程流程"
   >
     <div class="tutorial-flow">
@@ -50,7 +53,11 @@ const tutorialTemplatePreviewImages = computed(
       >
         <div class="tutorial-placeholder">
           <template v-if="step.layout === 'mosaic'">
-            <div class="tutorial-mosaic" aria-hidden="true">
+            <div
+              class="tutorial-mosaic"
+              :class="{ 'has-center-check': variant === 'batch-new' }"
+              aria-hidden="true"
+            >
               <PreloadImage
                 v-for="(image, mosaicIndex) in tutorialTemplatePreviewImages"
                 :key="image"
@@ -62,6 +69,13 @@ const tutorialTemplatePreviewImages = computed(
                 :draggable="false"
                 fit="cover"
               />
+              <span
+                v-if="variant === 'batch-new'"
+                class="tutorial-mosaic-check"
+                aria-hidden="true"
+              >
+                <Icon icon="mdi:check" />
+              </span>
             </div>
           </template>
           <template v-else-if="step.layout === 'logo'">
@@ -343,6 +357,38 @@ const tutorialTemplatePreviewImages = computed(
   height: 100%;
   object-fit: cover;
   object-position: top center;
+}
+
+.tutorial-section.is-variant-batch-new .tutorial-mosaic-image,
+.tutorial-section.is-variant-batch-new .tutorial-mosaic-image :deep(.preload-image) {
+  border: 1px solid #ffb800;
+  box-sizing: border-box;
+}
+
+.tutorial-mosaic.has-center-check {
+  position: relative;
+}
+
+.tutorial-mosaic-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #ffb800;
+  color: #000000;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.tutorial-mosaic-check :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 
 .tutorial-step-foot {
