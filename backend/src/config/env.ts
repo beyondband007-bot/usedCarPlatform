@@ -79,6 +79,14 @@ export const env = {
     pollFailureLimit: toNumber(process.env.KIE_POLL_FAILURE_LIMIT, 3),
   },
 
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY ?? "",
+    baseUrl: (process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com").replace(/\/$/, ""),
+    model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-pro",
+    timeoutMs: toNumber(process.env.DEEPSEEK_TIMEOUT_MS, 30_000),
+    maxTokens: toNumber(process.env.DEEPSEEK_MAX_TOKENS, 2000),
+  },
+
   credits: {
     enabled: toBoolean(process.env.CREDITS_PLATFORM_ENABLED, false),
     baseUrl: (process.env.CREDITS_PLATFORM_BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, ""),

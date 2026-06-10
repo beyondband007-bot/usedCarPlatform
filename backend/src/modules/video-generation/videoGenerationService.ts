@@ -4,6 +4,7 @@ import path from "node:path";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import type { AssetPurpose } from "../../shared/types";
+import { deepSeekClient } from "../../providers/deepseek/deepseekClient";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 
 type DigitalHumanGender = "female" | "male";
@@ -175,6 +176,51 @@ const buildScriptPrompt = (input: {
   ].join("\n");
 };
 
+const buildDeepSeekSystemPrompt = () =>
+  [
+    "你是二手车短视频口播文案策划，负责根据车型名称、用户上传图片摘要和参考视频风格生成中文数字人口播文案。",
+    "只输出 JSON，不输出 Markdown，不输出解释。",
+    "文案必须口语化、可信、销售导向，适合 15-30 秒竖屏短视频。",
+    "视频类型、场景氛围、镜头节奏、灯光和表达方式必须跟随用户选择的参考素材。",
+    "不得编造年份以外的新信息，不得编造公里数、价格、事故记录、过户次数、金融政策、官方配置和车况承诺。",
+    "除非用户明确提供，否则禁止出现：几万块、价格实惠、车况精品、准新车、无事故、原版原漆、包过户、金融优惠、老铁、抓紧。",
+    "口播可以有销售感，但必须保持专业克制，不使用夸张直播叫卖口吻。",
+    "如果用户上传图片摘要提供了外观、内饰、颜色、座舱或细节信息，可以用于文案；没有提供的信息不要假设。",
+    "输出 JSON 字段：openingHook, scriptText, sellingPoints, shotCues, riskNotes。",
+    "shotCues 每项包含 timeRange, visual, voiceover, assetRole；assetRole 可包含 digital_human、reference_style、exterior、interior、user_reference。",
+  ].join("\n");
+
+const buildDeepSeekUserPrompt = (input: {
+  vehicleName: string;
+  durationSeconds: number;
+  referenceMaterial: ReferenceMaterialRecord;
+  sellingPointHints: string[];
+  vehicleImageSummary?: string;
+  assetSummary: string;
+}) => {
+  const style = input.referenceMaterial.styleJson;
+  return [
+    `车型名称：${input.vehicleName}`,
+    `视频时长：${input.durationSeconds} 秒`,
+    `用户补充卖点：${input.sellingPointHints.length ? input.sellingPointHints.join("、") : "无"}`,
+    `车辆图片摘要：${input.vehicleImageSummary || "暂无"}`,
+    `上传素材摘要：${input.assetSummary}`,
+    "",
+    "参考素材风格如下，最终文案和镜头必须跟随它：",
+    `参考素材标题：${input.referenceMaterial.title}`,
+    `视频类型：${input.referenceMaterial.videoType}`,
+    `风格标签：${style.styleTags.join("、")}`,
+    `场景风格：${style.sceneStyle}`,
+    `视觉质感：${style.visualTone}`,
+    `灯光：${style.lighting}`,
+    `镜头语言：${style.cameraLanguage}`,
+    `构图：${style.subjectComposition}`,
+    `节奏：${style.pacing}`,
+    `禁用方向：${style.avoid.join("、")}`,
+    `可复用风格 Prompt：${input.referenceMaterial.stylePrompt}`,
+  ].join("\n");
+};
+
 const inferVehicleCategory = (vehicleName: string) => {
   if (/猛禽|F-?150|皮卡|坦途|炮/.test(vehicleName)) return "hardcore_pickup";
   if (/MPV|GL8|奥德赛|赛那|腾势D9|梦想家/.test(vehicleName)) return "mpv";
@@ -211,6 +257,23 @@ const buildScriptText = (input: {
     `整体呈现会跟随「${input.referenceMaterial.title}」的${styleTags}风格，数字人在画面里自然讲解，镜头穿插车辆外观、内饰和细节参考。`,
     "如果你想找一台适合日常使用、又能直观看清真实状态的车，建议到店或联系顾问进一步确认车况。"
   ].join("");
+};
+
+const mergeGeneratedDraft = (fallback: {
+  scriptText: string;
+  openingHook: string;
+  sellingPoints: string[];
+  shotCues: ReturnType<typeof buildShotCues>;
+  riskNotes: string[];
+}, generated: Awaited<ReturnType<typeof deepSeekClient.createScriptDraft>>) => {
+  if (!generated) return fallback;
+  return {
+    scriptText: generated.scriptText || fallback.scriptText,
+    openingHook: generated.openingHook || fallback.openingHook,
+    sellingPoints: generated.sellingPoints.length ? generated.sellingPoints : fallback.sellingPoints,
+    shotCues: generated.shotCues.length ? generated.shotCues : fallback.shotCues,
+    riskNotes: generated.riskNotes.length ? generated.riskNotes : fallback.riskNotes,
+  };
 };
 
 const buildShotCues = (input: {
@@ -416,18 +479,45 @@ class VideoGenerationService {
       sellingPointHints,
       vehicleImageSummary,
     });
-    const scriptText = buildScriptText({
+    const fallbackScriptText = buildScriptText({
       vehicleName,
       referenceMaterial,
       sellingPointHints,
       vehicleImageSummary,
     });
-    const shotCues = buildShotCues({
+    const fallbackShotCues = buildShotCues({
       durationSeconds,
       vehicleName,
       referenceMaterial,
-      scriptText,
+      scriptText: fallbackScriptText,
     });
+    const assetSummary = [
+      `外观图 ${uploadedAssets.vehicleExteriorAssets.length} 张：${uploadedAssets.vehicleExteriorAssets.map((asset) => asset.fileName).join("、")}`,
+      `内饰图 ${uploadedAssets.vehicleInteriorAssets.length} 张：${uploadedAssets.vehicleInteriorAssets.map((asset) => asset.fileName).join("、") || "无"}`,
+      `额外参考图 ${uploadedAssets.userReferenceAssets.length} 张：${uploadedAssets.userReferenceAssets.map((asset) => asset.fileName).join("、") || "无"}`,
+    ].join("\n");
+    const deepSeekDraft = await deepSeekClient.createScriptDraft({
+      systemPrompt: buildDeepSeekSystemPrompt(),
+      userPrompt: buildDeepSeekUserPrompt({
+        vehicleName,
+        durationSeconds,
+        referenceMaterial,
+        sellingPointHints,
+        vehicleImageSummary,
+        assetSummary,
+      }),
+    });
+    const generatedDraft = mergeGeneratedDraft({
+      scriptText: fallbackScriptText,
+      openingHook: fallbackScriptText.split("。")[0] || fallbackScriptText,
+      sellingPoints: sellingPointHints.length ? sellingPointHints : sellingPointFallbacks(vehicleName),
+      shotCues: fallbackShotCues,
+      riskNotes: [
+        "车型名称未提供完整车况、里程和价格时，文案不会编造这些信息。",
+      ],
+    }, deepSeekDraft);
+    const scriptText = generatedDraft.scriptText;
+    const shotCues = generatedDraft.shotCues;
 
     const promptBundle = {
       digitalHumanPrompt: `使用数字人「${digitalHuman.name}」（${digitalHuman.gender}，${digitalHuman.ageStyle}）作为口播主体，参考其四视图与人物特写保持身份一致。`,
@@ -455,9 +545,12 @@ class VideoGenerationService {
         previewUrl: toPublicReferencePreviewUrl(referenceMaterial.id),
       },
       script: {
+        openingHook: generatedDraft.openingHook,
         scriptPrompt,
         scriptText,
+        sellingPoints: generatedDraft.sellingPoints,
         shotCues,
+        generator: deepSeekDraft ? "deepseek" : "local_fallback",
       },
       uploadedReferences: {
         vehicleExteriorAssets: uploadedAssets.vehicleExteriorAssets.map(summarizeAsset),
@@ -481,8 +574,8 @@ class VideoGenerationService {
         "视频生成时必须同时引用数字人、参考视频风格、口播文案、用户上传车辆参考素材。",
       ].join("\n\n"),
       riskNotes: [
-        "当前为后端本地草稿生成器，后续可将 scriptPrompt 交给真实 LLM 替换 scriptText。",
-        "车型名称未提供年份、车况、里程和价格时，文案不会编造这些信息。",
+        ...generatedDraft.riskNotes,
+        deepSeekDraft ? "口播文案由 DeepSeek 生成。" : "当前未配置 DeepSeek API key，口播文案由后端本地草稿生成器生成。",
       ],
     };
   }
