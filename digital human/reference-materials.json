@@ -1,0 +1,121 @@
+{
+  "manifestVersion": 1,
+  "generatedAt": "2026-06-10T15:00:00+08:00",
+  "sourceDirectory": "C:/Users/Administrator/Desktop/digital human",
+  "purpose": "video_reference_style_library",
+  "styleExtraction": {
+    "status": "pending",
+    "mode": "extract_once_reuse_many",
+    "notes": "Each material should be analyzed once by LLM or vision model, then cached as stylePrompt/styleJson for video generation."
+  },
+  "materials": [
+    {
+      "id": "ref-video-001",
+      "title": "Reference Video 001",
+      "fileName": "427d7ced72e9046044e5bd6c1c0f6ba6.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/427d7ced72e9046044e5bd6c1c0f6ba6.mp4",
+      "sha256": "d9d2c7c23edd62ab5578b58d08c07abd327659fa15d68a75249185d22126703c",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 1810196,
+        "duration": "00:00:26",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "30.00"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    },
+    {
+      "id": "ref-video-002",
+      "title": "Reference Video 002",
+      "fileName": "507e74fd9df96aa81a26d6afd6f49d70.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/507e74fd9df96aa81a26d6afd6f49d70.mp4",
+      "sha256": "6cee9f0879a8289aa1b459c382c5d98ee3ba256c1e35d2e201e99c02925201c3",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 3194440,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    },
+    {
+      "id": "ref-video-003",
+      "title": "Reference Video 003",
+      "fileName": "593d5322c325b4759a9ea676e4435156.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/593d5322c325b4759a9ea676e4435156.mp4",
+      "sha256": "5d341511fa3c03f82db5697b03ced59c4fe80aef79d51988ef941b0d9d832be7",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 2523405,
+        "duration": "00:00:17",
+        "width": 576,
+        "height": 1024,
+        "frameRate": "29.88"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    },
+    {
+      "id": "ref-video-004",
+      "title": "Reference Video 004",
+      "fileName": "61ecc5470eb5905c8cda537b4e4b6fe0.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/61ecc5470eb5905c8cda537b4e4b6fe0.mp4",
+      "sha256": "a7dfa4164035c21f9ed03147eccb80a9d795c7c2aa05574560fab3fa90bf1aa6",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 2232802,
+        "duration": "00:00:33",
+        "width": 576,
+        "height": 1024,
+        "frameRate": "30.00"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    },
+    {
+      "id": "ref-video-005",
+      "title": "Reference Video 005",
+      "fileName": "8a04c9ead2d650a6c1b2ad1ee0eb4f93.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/8a04c9ead2d650a6c1b2ad1ee0eb4f93.mp4",
+      "sha256": "a46d3759e4d87334a03a07e581f467da4c271c2f16d33cc2bd8fdd4b1bb8daaa",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 2760354,
+        "duration": "00:00:17",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "30.00"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    },
+    {
+      "id": "ref-video-006",
+      "title": "Reference Video 006",
+      "fileName": "90669bd488966e9e7f7f5c52a9eba342.mp4",
+      "sourcePath": "C:/Users/Administrator/Desktop/digital human/90669bd488966e9e7f7f5c52a9eba342.mp4",
+      "sha256": "d672096429a098b7b3747c712c103cc63450164db2541f45ffb0017705f0fc7d",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 1766961,
+        "duration": "00:00:16",
+        "width": 544,
+        "height": 960,
+        "frameRate": "30.00"
+      },
+      "styleJson": null,
+      "stylePrompt": null,
+      "extractionStatus": "pending"
+    }
+  ]
+}
