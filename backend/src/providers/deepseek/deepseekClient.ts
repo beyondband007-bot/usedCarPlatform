@@ -2,6 +2,17 @@ import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
 
 export interface DeepSeekScriptDraft {
+  vehicleProfile: {
+    brand: string;
+    model: string;
+    modelYear: string;
+    vehicleClass: string;
+    marketPositioning: string;
+    targetUsers: string[];
+    useCases: string[];
+    recognizedHighlights: string[];
+    uncertainItems: string[];
+  };
   openingHook: string;
   scriptText: string;
   sellingPoints: string[];
@@ -42,6 +53,21 @@ const asStringArray = (value: unknown) =>
   Array.isArray(value)
     ? value.map((item) => asString(item)).filter((item) => item.length > 0)
     : [];
+
+const normalizeVehicleProfile = (value: unknown): DeepSeekScriptDraft["vehicleProfile"] => {
+  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    brand: asString(record.brand),
+    model: asString(record.model),
+    modelYear: asString(record.modelYear),
+    vehicleClass: asString(record.vehicleClass),
+    marketPositioning: asString(record.marketPositioning),
+    targetUsers: asStringArray(record.targetUsers),
+    useCases: asStringArray(record.useCases),
+    recognizedHighlights: asStringArray(record.recognizedHighlights),
+    uncertainItems: asStringArray(record.uncertainItems),
+  };
+};
 
 const normalizeShotCues = (value: unknown): DeepSeekScriptDraft["shotCues"] => {
   if (!Array.isArray(value)) return [];
@@ -115,6 +141,7 @@ export class DeepSeekClient {
       }
       const parsed = parseJsonObject(content);
       return {
+        vehicleProfile: normalizeVehicleProfile(parsed.vehicleProfile),
         openingHook: asString(parsed.openingHook),
         scriptText: asString(parsed.scriptText),
         sellingPoints: asStringArray(parsed.sellingPoints),

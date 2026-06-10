@@ -85,8 +85,8 @@
     },
     "durationSeconds": {
       "required": true,
-      "default": 20,
-      "allowed": [15, 20, 30]
+      "default": 15,
+      "allowed": [15]
     },
     "sellingPointHints": {
       "required": false,
@@ -104,6 +104,17 @@
     "vehicleName": "string",
     "referenceMaterialId": "string",
     "videoType": "string",
+    "vehicleProfile": {
+      "brand": "string",
+      "model": "string",
+      "modelYear": "string",
+      "vehicleClass": "string",
+      "marketPositioning": "string",
+      "targetUsers": ["string"],
+      "useCases": ["string"],
+      "recognizedHighlights": ["string"],
+      "uncertainItems": ["string"]
+    },
     "scriptText": "string",
     "openingHook": "string",
     "sellingPoints": ["string"],
@@ -128,7 +139,7 @@
     "vehicleInteriorAssetIds": ["asset_interior_001"],
     "userReferenceAssetIds": [],
     "outputRatio": "9:16",
-    "durationSeconds": 20,
+    "durationSeconds": 15,
     "videoResolution": "720p"
   },
   "validationRules": [

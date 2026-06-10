@@ -78,6 +78,21 @@ interface ValidatedAssets {
   userReferenceAssets: AssetRecord[];
 }
 
+interface VehicleProfile {
+  brand: string;
+  model: string;
+  modelYear: string;
+  vehicleClass: string;
+  marketPositioning: string;
+  targetUsers: string[];
+  useCases: string[];
+  recognizedHighlights: string[];
+  uncertainItems: string[];
+}
+
+const VIDEO_DURATION_SECONDS = 15;
+const FIXED_SHOT_TIME_RANGES = ["0-3s", "3-7s", "7-12s", "12-15s"] as const;
+
 const workspaceRoot = path.resolve(__dirname, "../../../..");
 const digitalHumanRoot = path.join(workspaceRoot, "digital human");
 const digitalHumanManifestPath = path.join(digitalHumanRoot, "digital-humans.json");
@@ -102,9 +117,9 @@ const normalizeVehicleName = (value: unknown) => {
 };
 
 const normalizeDuration = (value: unknown) => {
-  const duration = Number(value ?? 20);
-  if ([15, 20, 30].includes(duration)) return duration as 15 | 20 | 30;
-  throw errors.invalidParameter("durationSeconds must be 15, 20, or 30", { durationSeconds: value });
+  const duration = Number(value ?? VIDEO_DURATION_SECONDS);
+  if (duration === VIDEO_DURATION_SECONDS) return VIDEO_DURATION_SECONDS;
+  throw errors.invalidParameter("durationSeconds must be 15", { durationSeconds: value });
 };
 
 const normalizeSellingPointHints = (value: unknown) => {
@@ -180,13 +195,19 @@ const buildDeepSeekSystemPrompt = () =>
   [
     "你是二手车短视频口播文案策划，负责根据车型名称、用户上传图片摘要和参考视频风格生成中文数字人口播文案。",
     "只输出 JSON，不输出 Markdown，不输出解释。",
-    "文案必须口语化、可信、销售导向，适合 15-30 秒竖屏短视频。",
+    "视频时长固定为 15 秒。scriptText 控制在约 60-90 个中文字符，确保正常语速可以完整口播。",
+    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 15 秒口播的车型级通用卖点。",
+    "可以使用可靠的车型级常识介绍车辆定位、空间取向、舒适取向和典型使用场景；凡是依赖具体配置版本的信息，必须放入 uncertainItems，不能写成确定事实。",
+    "年款不代表新车。二手车口播禁止使用“全新”“新车”；车型名称未明确提供代际时，禁止擅自补充“第几代”。",
+    "禁止使用“公认、标杆、首选、领先、就是答案、闭眼买”等绝对化营销词；未由图片摘要确认时，不要断言座椅软硬、内饰用料或具体车内配置。",
     "视频类型、场景氛围、镜头节奏、灯光和表达方式必须跟随用户选择的参考素材。",
     "不得编造年份以外的新信息，不得编造公里数、价格、事故记录、过户次数、金融政策、官方配置和车况承诺。",
     "除非用户明确提供，否则禁止出现：几万块、价格实惠、车况精品、准新车、无事故、原版原漆、包过户、金融优惠、老铁、抓紧。",
     "口播可以有销售感，但必须保持专业克制，不使用夸张直播叫卖口吻。",
     "如果用户上传图片摘要提供了外观、内饰、颜色、座舱或细节信息，可以用于文案；没有提供的信息不要假设。",
-    "输出 JSON 字段：openingHook, scriptText, sellingPoints, shotCues, riskNotes。",
+    "输出 JSON 字段：vehicleProfile, openingHook, scriptText, sellingPoints, shotCues, riskNotes。",
+    "vehicleProfile 必须包含 brand, model, modelYear, vehicleClass, marketPositioning, targetUsers, useCases, recognizedHighlights, uncertainItems。",
+    "shotCues 必须正好 4 段，时间依次为 0-3s、3-7s、7-12s、12-15s，依次承担车型定位开场、外观卖点、内饰空间及使用场景、数字人收束。",
     "shotCues 每项包含 timeRange, visual, voiceover, assetRole；assetRole 可包含 digital_human、reference_style、exterior、interior、user_reference。",
   ].join("\n");
 
@@ -201,7 +222,7 @@ const buildDeepSeekUserPrompt = (input: {
   const style = input.referenceMaterial.styleJson;
   return [
     `车型名称：${input.vehicleName}`,
-    `视频时长：${input.durationSeconds} 秒`,
+    `视频时长：固定 ${input.durationSeconds} 秒，不得延长或缩短`,
     `用户补充卖点：${input.sellingPointHints.length ? input.sellingPointHints.join("、") : "无"}`,
     `车辆图片摘要：${input.vehicleImageSummary || "暂无"}`,
     `上传素材摘要：${input.assetSummary}`,
@@ -218,6 +239,14 @@ const buildDeepSeekUserPrompt = (input: {
     `节奏：${style.pacing}`,
     `禁用方向：${style.avoid.join("、")}`,
     `可复用风格 Prompt：${input.referenceMaterial.stylePrompt}`,
+    "",
+    "生成要求：",
+    "1. 先在 vehicleProfile 中给出车型级理解，不能只复述车名。",
+    "2. scriptText 必须自然包含车型定位、目标人群或使用场景，并至少讲出 2 个稳妥的车型卖点。",
+    "3. 未提供具体配置版本时，不得写死动力形式、排量、辅助驾驶、屏幕尺寸、座椅功能等配置。",
+    "4. 用户上传图片是车辆外观和内饰的事实依据；参考视频只决定风格、类型、场景和镜头节奏。",
+    "5. 这是二手车视频：禁止使用“全新”“新车”；输入未写明代际时，禁止补充第几代车型。",
+    "6. 避免“公认标杆、同级领先、就是答案、省心耐用、座椅柔软、用料考究”等无法仅凭车名确认的主观结论，优先讲车型定位、空间取向、舒适取向和使用场景。",
   ].join("\n");
 };
 
@@ -238,74 +267,164 @@ const sellingPointFallbacks = (vehicleName: string) => {
   return ["外观状态", "空间表现", "日常通勤", "到店实看"];
 };
 
+const inferVehicleProfile = (vehicleName: string): VehicleProfile => {
+  const modelYear = vehicleName.match(/(\d{2,4})款/)?.[1];
+  if (/凯美瑞/i.test(vehicleName)) {
+    return {
+      brand: "丰田",
+      model: "凯美瑞",
+      modelYear: modelYear ? `${modelYear}款` : "",
+      vehicleClass: "中型轿车",
+      marketPositioning: "兼顾日常通勤和家庭出行的主流中型轿车",
+      targetUsers: ["日常通勤用户", "家庭用车用户", "重视舒适与实用性的轿车用户"],
+      useCases: ["城市通勤", "家庭出行", "中长途驾驶"],
+      recognizedHighlights: ["外观设计年轻利落", "车内空间实用", "乘坐舒适性", "日常使用友好"],
+      uncertainItems: ["具体动力版本", "具体配置", "车辆价格", "里程和车况"],
+    };
+  }
+
+  const category = inferVehicleCategory(vehicleName);
+  const categoryProfiles: Record<string, Pick<VehicleProfile, "vehicleClass" | "marketPositioning" | "targetUsers" | "useCases">> = {
+    hardcore_pickup: {
+      vehicleClass: "皮卡",
+      marketPositioning: "兼顾户外场景、装载能力和个性表达的车型",
+      targetUsers: ["户外活动用户", "重视装载能力的用户"],
+      useCases: ["户外出行", "多用途装载", "日常个性化驾驶"],
+    },
+    mpv: {
+      vehicleClass: "MPV",
+      marketPositioning: "强调多人乘坐、空间和舒适性的车型",
+      targetUsers: ["多成员家庭", "商务接待用户"],
+      useCases: ["家庭多人出行", "商务接待", "中长途乘坐"],
+    },
+    suv: {
+      vehicleClass: "SUV",
+      marketPositioning: "兼顾空间、视野和多场景出行的车型",
+      targetUsers: ["家庭用户", "重视空间和视野的用户"],
+      useCases: ["城市通勤", "家庭出行", "周末近郊出行"],
+    },
+    sedan: {
+      vehicleClass: "轿车",
+      marketPositioning: "兼顾通勤、舒适性和家庭使用的车型",
+      targetUsers: ["日常通勤用户", "家庭用车用户"],
+      useCases: ["城市通勤", "家庭出行", "中长途驾驶"],
+    },
+    general: {
+      vehicleClass: "乘用车",
+      marketPositioning: "满足日常通勤和出行需求的车型",
+      targetUsers: ["日常用车用户"],
+      useCases: ["日常通勤", "家庭出行"],
+    },
+  };
+  const profile = categoryProfiles[category] || categoryProfiles.general;
+  return {
+    brand: "",
+    model: vehicleName,
+    modelYear: modelYear ? `${modelYear}款` : "",
+    ...profile,
+    recognizedHighlights: sellingPointFallbacks(vehicleName),
+    uncertainItems: ["具体动力版本", "具体配置", "车辆价格", "里程和车况"],
+  };
+};
+
 const buildScriptText = (input: {
   vehicleName: string;
   referenceMaterial: ReferenceMaterialRecord;
   sellingPointHints: string[];
   vehicleImageSummary?: string;
 }) => {
-  const points = input.sellingPointHints.length ? input.sellingPointHints : sellingPointFallbacks(input.vehicleName);
-  const styleTags = input.referenceMaterial.styleJson.styleTags.slice(0, 3).join("、");
-  const imageLine = input.vehicleImageSummary
-    ? `结合上传图片来看，${input.vehicleImageSummary}，视频里会重点保留这些真实参考。`
-    : "外观和内饰以你上传的参考图片为准，视频里会尽量锁定真实车身结构、颜色和座舱细节。";
+  const profile = inferVehicleProfile(input.vehicleName);
+  const points = input.sellingPointHints.length ? input.sellingPointHints : profile.recognizedHighlights;
+  return `${input.vehicleName}，是一台${profile.marketPositioning}。${points.slice(0, 2).join("、")}，适合重视舒适与实用性的用户。具体配置和车况，以实车图片和检测为准。`;
+};
 
-  return [
-    `如果你正在看${input.vehicleName}，这台车可以重点了解一下。`,
-    `${points.slice(0, 3).join("、")}是这条视频需要突出的核心卖点。`,
-    imageLine,
-    `整体呈现会跟随「${input.referenceMaterial.title}」的${styleTags}风格，数字人在画面里自然讲解，镜头穿插车辆外观、内饰和细节参考。`,
-    "如果你想找一台适合日常使用、又能直观看清真实状态的车，建议到店或联系顾问进一步确认车况。"
-  ].join("");
+const hasUnsupportedScriptClaims = (scriptText: string, vehicleName: string) => {
+  if (/全新|新车/.test(scriptText)) return true;
+  if (/公认|标杆|首选|领先|就是答案|闭眼买|座椅柔软|省心耐用|用料考究/.test(scriptText)) return true;
+  if (!/第[一二三四五六七八九十0-9]+代/.test(vehicleName) && /第[一二三四五六七八九十0-9]+代/.test(scriptText)) {
+    return true;
+  }
+  return false;
 };
 
 const mergeGeneratedDraft = (fallback: {
+  vehicleName: string;
+  vehicleProfile: VehicleProfile;
   scriptText: string;
   openingHook: string;
   sellingPoints: string[];
   shotCues: ReturnType<typeof buildShotCues>;
   riskNotes: string[];
 }, generated: Awaited<ReturnType<typeof deepSeekClient.createScriptDraft>>) => {
-  if (!generated) return fallback;
+  if (!generated) return { ...fallback, usedGeneratedScript: false };
+  const usedGeneratedScript =
+    Boolean(generated.scriptText) &&
+    !hasUnsupportedScriptClaims(generated.scriptText, fallback.vehicleName);
+  const generatedShotCues = usedGeneratedScript && generated.shotCues.length >= FIXED_SHOT_TIME_RANGES.length
+    ? generated.shotCues.slice(0, FIXED_SHOT_TIME_RANGES.length).map((cue, index) => ({
+        ...cue,
+        timeRange: FIXED_SHOT_TIME_RANGES[index],
+        assetRole: cue.assetRole || fallback.shotCues[index].assetRole,
+      }))
+    : fallback.shotCues;
   return {
-    scriptText: generated.scriptText || fallback.scriptText,
-    openingHook: generated.openingHook || fallback.openingHook,
+    vehicleProfile: {
+      brand: generated.vehicleProfile.brand || fallback.vehicleProfile.brand,
+      model: generated.vehicleProfile.model || fallback.vehicleProfile.model,
+      modelYear: generated.vehicleProfile.modelYear || fallback.vehicleProfile.modelYear,
+      vehicleClass: generated.vehicleProfile.vehicleClass || fallback.vehicleProfile.vehicleClass,
+      marketPositioning: generated.vehicleProfile.marketPositioning || fallback.vehicleProfile.marketPositioning,
+      targetUsers: generated.vehicleProfile.targetUsers.length ? generated.vehicleProfile.targetUsers : fallback.vehicleProfile.targetUsers,
+      useCases: generated.vehicleProfile.useCases.length ? generated.vehicleProfile.useCases : fallback.vehicleProfile.useCases,
+      recognizedHighlights: generated.vehicleProfile.recognizedHighlights.length
+        ? generated.vehicleProfile.recognizedHighlights
+        : fallback.vehicleProfile.recognizedHighlights,
+      uncertainItems: generated.vehicleProfile.uncertainItems.length
+        ? generated.vehicleProfile.uncertainItems
+        : fallback.vehicleProfile.uncertainItems,
+    },
+    scriptText: usedGeneratedScript ? generated.scriptText : fallback.scriptText,
+    openingHook: usedGeneratedScript ? generated.openingHook || fallback.openingHook : fallback.openingHook,
     sellingPoints: generated.sellingPoints.length ? generated.sellingPoints : fallback.sellingPoints,
-    shotCues: generated.shotCues.length ? generated.shotCues : fallback.shotCues,
-    riskNotes: generated.riskNotes.length ? generated.riskNotes : fallback.riskNotes,
+    shotCues: generatedShotCues,
+    riskNotes: [
+      ...(generated.riskNotes.length ? generated.riskNotes : fallback.riskNotes),
+      ...(generated.scriptText && !usedGeneratedScript
+        ? ["模型文案包含未由输入支持的信息或绝对化营销表述，后端已改用安全兜底口播。"]
+        : []),
+    ],
+    usedGeneratedScript,
   };
 };
 
 const buildShotCues = (input: {
-  durationSeconds: number;
   vehicleName: string;
   referenceMaterial: ReferenceMaterialRecord;
   scriptText: string;
 }) => {
-  const middle = input.durationSeconds === 15 ? ["4-9s", "9-13s", "13-15s"] : input.durationSeconds === 20 ? ["4-10s", "10-16s", "16-20s"] : ["5-14s", "14-24s", "24-30s"];
   return [
     {
-      timeRange: input.durationSeconds === 30 ? "0-5s" : "0-4s",
+      timeRange: FIXED_SHOT_TIME_RANGES[0],
       visual: `数字人出场，画面采用${input.referenceMaterial.title}的场景和镜头节奏，车辆外观参考图入画。`,
-      voiceover: `如果你正在看${input.vehicleName}，这台车可以重点了解一下。`,
+      voiceover: `快速点明${input.vehicleName}的车型级别和市场定位。`,
       assetRole: "digital_human|reference_style|exterior",
     },
     {
-      timeRange: middle[0],
+      timeRange: FIXED_SHOT_TIME_RANGES[1],
       visual: "展示车辆外观参考图对应的前45度、侧身、灯组、轮毂或车身线条。",
-      voiceover: "突出车型外观、真实车身状态和用户补充卖点。",
+      voiceover: "突出车型外观取向和用户上传图片能够确认的真实细节。",
       assetRole: "exterior|reference_style",
     },
     {
-      timeRange: middle[1],
+      timeRange: FIXED_SHOT_TIME_RANGES[2],
       visual: "如用户上传内饰图，切入方向盘、中控、座椅和空间；否则继续展示外观细节。",
-      voiceover: "讲解空间、舒适性、配置或适合人群，避免编造未提供信息。",
+      voiceover: "讲解车型空间、舒适取向、目标人群和使用场景，避免编造具体配置。",
       assetRole: "interior|exterior|reference_style",
     },
     {
-      timeRange: middle[2],
+      timeRange: FIXED_SHOT_TIME_RANGES[3],
       visual: "数字人回到车旁收束，保持参考素材的视频类型和节奏。",
-      voiceover: "引导用户到店实看或联系顾问确认车况。",
+      voiceover: "数字人简洁收束，引导用户进一步确认具体配置和车况。",
       assetRole: "digital_human|reference_style",
     },
   ];
@@ -486,28 +605,36 @@ class VideoGenerationService {
       vehicleImageSummary,
     });
     const fallbackShotCues = buildShotCues({
-      durationSeconds,
       vehicleName,
       referenceMaterial,
       scriptText: fallbackScriptText,
     });
+    const fallbackVehicleProfile = inferVehicleProfile(vehicleName);
     const assetSummary = [
       `外观图 ${uploadedAssets.vehicleExteriorAssets.length} 张：${uploadedAssets.vehicleExteriorAssets.map((asset) => asset.fileName).join("、")}`,
       `内饰图 ${uploadedAssets.vehicleInteriorAssets.length} 张：${uploadedAssets.vehicleInteriorAssets.map((asset) => asset.fileName).join("、") || "无"}`,
       `额外参考图 ${uploadedAssets.userReferenceAssets.length} 张：${uploadedAssets.userReferenceAssets.map((asset) => asset.fileName).join("、") || "无"}`,
     ].join("\n");
-    const deepSeekDraft = await deepSeekClient.createScriptDraft({
-      systemPrompt: buildDeepSeekSystemPrompt(),
-      userPrompt: buildDeepSeekUserPrompt({
-        vehicleName,
-        durationSeconds,
-        referenceMaterial,
-        sellingPointHints,
-        vehicleImageSummary,
-        assetSummary,
-      }),
-    });
+    let deepSeekDraft: Awaited<ReturnType<typeof deepSeekClient.createScriptDraft>> = null;
+    let deepSeekFailureNote = "";
+    try {
+      deepSeekDraft = await deepSeekClient.createScriptDraft({
+        systemPrompt: buildDeepSeekSystemPrompt(),
+        userPrompt: buildDeepSeekUserPrompt({
+          vehicleName,
+          durationSeconds,
+          referenceMaterial,
+          sellingPointHints,
+          vehicleImageSummary,
+          assetSummary,
+        }),
+      });
+    } catch (error) {
+      deepSeekFailureNote = error instanceof Error ? error.message : "unknown DeepSeek error";
+    }
     const generatedDraft = mergeGeneratedDraft({
+      vehicleName,
+      vehicleProfile: fallbackVehicleProfile,
       scriptText: fallbackScriptText,
       openingHook: fallbackScriptText.split("。")[0] || fallbackScriptText,
       sellingPoints: sellingPointHints.length ? sellingPointHints : sellingPointFallbacks(vehicleName),
@@ -545,12 +672,19 @@ class VideoGenerationService {
         previewUrl: toPublicReferencePreviewUrl(referenceMaterial.id),
       },
       script: {
+        vehicleProfile: generatedDraft.vehicleProfile,
         openingHook: generatedDraft.openingHook,
         scriptPrompt,
         scriptText,
         sellingPoints: generatedDraft.sellingPoints,
         shotCues,
-        generator: deepSeekDraft ? "deepseek" : "local_fallback",
+        generator: deepSeekDraft
+          ? generatedDraft.usedGeneratedScript
+            ? "deepseek"
+            : "deepseek_safety_fallback"
+          : deepSeekFailureNote
+            ? "local_fallback_after_deepseek_error"
+            : "local_fallback",
       },
       uploadedReferences: {
         vehicleExteriorAssets: uploadedAssets.vehicleExteriorAssets.map(summarizeAsset),
@@ -569,13 +703,28 @@ class VideoGenerationService {
       finalVideoPrompt: [
         promptBundle.digitalHumanPrompt,
         promptBundle.stylePrompt,
+        [
+          "车型介绍重点：",
+          `车型：${vehicleName}`,
+          `车型级别：${generatedDraft.vehicleProfile.vehicleClass}`,
+          `市场定位：${generatedDraft.vehicleProfile.marketPositioning}`,
+          `目标人群：${generatedDraft.vehicleProfile.targetUsers.join("、")}`,
+          `使用场景：${generatedDraft.vehicleProfile.useCases.join("、")}`,
+          `核心卖点：${generatedDraft.vehicleProfile.recognizedHighlights.join("、")}`,
+          `不可写死的信息：${generatedDraft.vehicleProfile.uncertainItems.join("、")}`,
+        ].join("\n"),
         `口播文案：${scriptText}`,
+        `固定时长：${VIDEO_DURATION_SECONDS} 秒；镜头时间轴必须为 ${FIXED_SHOT_TIME_RANGES.join("、")}。`,
         promptBundle.uploadedReferencePrompt,
         "视频生成时必须同时引用数字人、参考视频风格、口播文案、用户上传车辆参考素材。",
       ].join("\n\n"),
       riskNotes: [
         ...generatedDraft.riskNotes,
-        deepSeekDraft ? "口播文案由 DeepSeek 生成。" : "当前未配置 DeepSeek API key，口播文案由后端本地草稿生成器生成。",
+        deepSeekDraft
+          ? "口播文案由 DeepSeek 生成。"
+          : deepSeekFailureNote
+            ? `DeepSeek 本次生成失败，后端已自动使用安全兜底文案：${deepSeekFailureNote}`
+            : "当前未配置 DeepSeek API key，口播文案由后端本地草稿生成器生成。",
       ],
     };
   }
