@@ -743,14 +743,29 @@ const showHeaderRecharge = computed(
   background: var(--color-brand-strong, #e3b53c);
 }
 
+.site-header.is-light .credit-pill-group {
+  background: transparent;
+  border-color: #000000;
+}
+
+.site-header.is-light .credit-pill-group:hover {
+  background: transparent;
+  border-color: #000000;
+}
+
+.site-header.is-light .credit-pill-balance {
+  color: #0f172a;
+}
+
 .site-header.is-light .credit-recharge-btn {
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12) inset;
+  background: #000000;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 .site-header.is-light .credit-recharge-btn:hover {
-  background: #f1f5f9;
+  background: #1a1a1a;
+  color: #ffffff;
 }
 
 .credit-pill-group:hover {

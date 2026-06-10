@@ -277,7 +277,7 @@ const {
 
 .home-chrome--light {
   --studio-chrome-bg: rgb(224, 234, 242);
-  --studio-chrome-header-bg: rgb(224, 234, 242);
+  --studio-chrome-header-bg: rgb(249, 249, 249);
   --studio-chrome-logo: #0f172a;
   --studio-chrome-nav: #475569;
   --studio-chrome-nav-hover: #0f172a;
@@ -285,10 +285,10 @@ const {
   --studio-chrome-nav-underline: #0f172a;
   --studio-chrome-nav-underline-hover: #0f172a;
   --studio-chrome-nav-underline-active: #0f172a;
-  --studio-chrome-credit-bg: #d4a017;
-  --studio-chrome-credit-text: #ffffff;
-  --studio-chrome-credit-border: #d4a017;
-  --studio-chrome-credit-hover: rgba(212, 160, 23, 0.88);
+  --studio-chrome-credit-bg: transparent;
+  --studio-chrome-credit-text: #0f172a;
+  --studio-chrome-credit-border: #000000;
+  --studio-chrome-credit-hover: transparent;
   --studio-chrome-theme-bg: #0f172a;
   --studio-chrome-theme-text: #ffffff;
   --studio-chrome-theme-border: transparent;
@@ -335,10 +335,10 @@ const {
   --studio-chrome-nav-underline: #0f172a;
   --studio-chrome-nav-underline-hover: #0f172a;
   --studio-chrome-nav-underline-active: #0f172a;
-  --studio-chrome-credit-bg: #d4a017;
-  --studio-chrome-credit-text: #ffffff;
-  --studio-chrome-credit-border: #d4a017;
-  --studio-chrome-credit-hover: rgba(212, 160, 23, 0.88);
+  --studio-chrome-credit-bg: transparent;
+  --studio-chrome-credit-text: #0f172a;
+  --studio-chrome-credit-border: #000000;
+  --studio-chrome-credit-hover: transparent;
   --studio-chrome-theme-bg: #0f172a;
   --studio-chrome-theme-text: #ffffff;
   --studio-chrome-theme-border: transparent;

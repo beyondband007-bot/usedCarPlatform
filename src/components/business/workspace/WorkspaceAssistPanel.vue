@@ -2900,21 +2900,24 @@ defineExpose({
 .tab-group button {
   position: relative;
   padding: 0;
-  color: #999999;
+  color: var(--assist-muted, #999999);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 500;
+  transition: color 0.2s ease;
 }
 
-.tab-group button:hover {
+.tab-group button:hover:not(.active) {
+  color: color-mix(in srgb, var(--assist-text) 72%, var(--assist-muted));
+}
+
+.assist-panel.theme-dark .tab-group button.active {
   color: #ffffff;
+  font-weight: 800;
 }
 
-.assist-panel.theme-light .tab-group button:hover {
-  color: #111827;
-}
-
-.tab-group button.active {
-  color: #d4a017;
+.assist-panel.theme-light .tab-group button.active {
+  color: var(--workspace-commercial-strong, #d4a017);
+  font-weight: 800;
 }
 
 .expand-button {
