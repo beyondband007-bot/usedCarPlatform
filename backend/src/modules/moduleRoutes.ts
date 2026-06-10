@@ -18,6 +18,7 @@ import { showroomLightRoutes } from "./showroom-light/showroomLightRoutes";
 import { shortVideoRoutes } from "./short-video/shortVideoRoutes";
 import { skyStudioRoutes } from "./sky-studio/skyStudioRoutes";
 import { tasksService } from "./tasks/tasksService";
+import { videoGenerationRoutes } from "./video-generation/videoGenerationRoutes";
 
 const moduleCodes = [] as const;
 
@@ -34,6 +35,7 @@ moduleRoutes.use("/interior-collage", interiorCollageRoutes);
 moduleRoutes.use("/watermark-remove", watermarkRemoveRoutes);
 moduleRoutes.use("/creative-image", creativeImageRoutes);
 moduleRoutes.use("/short-video", shortVideoRoutes);
+moduleRoutes.use("/video-generation", videoGenerationRoutes);
 moduleRoutes.use("/batch-new", batchRoutes);
 moduleRoutes.use("/delivery", deliveryRoutes);
 

@@ -11,6 +11,7 @@ export const allowedPurposes: AssetPurpose[] = [
   "car_exterior",
   "car_interior",
   "logo",
+  "video_reference_image",
   "batch_package",
   "delivery_asset",
 ];
