@@ -13,6 +13,7 @@ import {
   defaultBackOfficeRolePermissions,
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
+import { ensureAllAgentDepositAccounts } from "../modules/platform/agentDepositService";
 
 const ADMIN_USER_ID = "user_admin";
 
@@ -146,13 +147,17 @@ const ensureSeedPersonalCreditsUser = async (input: { username: string; plan: st
 const seedSubscriptionPlans = async () => {
   await pool.query(
     `INSERT INTO subscription_plans
-      (code, name, price, account_limit, concurrent_task_limit, visual_concurrent_task_limit,
-       batch_concurrent_task_limit, gift_points, status)
+      (code, application_code, name, price, account_limit, concurrent_task_limit, visual_concurrent_task_limit,
+       batch_concurrent_task_limit, gift_points, status, metadata_json)
      VALUES
-      ('basic', '企业基础档', 980.00, 1, 1, 1, 1, 20000, 'active'),
-      ('team', '企业团队档', 3980.00, 5, 5, 5, 5, 100000, 'active'),
-      ('flagship', '企业旗舰档', 9800.00, 20, 20, 20, 20, 800000, 'active')
+      ('basic', 'used-car-platform', '企业基础档', 980.00, 1, 1, 1, 1, 20000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 0)),
+      ('team', 'used-car-platform', '企业团队档', 3980.00, 5, 5, 5, 5, 100000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 0)),
+      ('flagship', 'used-car-platform', '企业旗舰档', 9800.00, 20, 20, 20, 20, 800000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 3))
      ON DUPLICATE KEY UPDATE
+      application_code = VALUES(application_code),
       name = VALUES(name),
       price = VALUES(price),
       account_limit = VALUES(account_limit),
@@ -160,7 +165,8 @@ const seedSubscriptionPlans = async () => {
       visual_concurrent_task_limit = VALUES(visual_concurrent_task_limit),
       batch_concurrent_task_limit = VALUES(batch_concurrent_task_limit),
       gift_points = VALUES(gift_points),
-      status = VALUES(status)`,
+      status = VALUES(status),
+      metadata_json = VALUES(metadata_json)`,
   );
 };
 
@@ -340,9 +346,10 @@ const seedAuthData = async () => {
     }
 
     await pool.query(
-      `INSERT INTO user_subscriptions (user_id, plan_code, status)
-       VALUES (:userId, :planCode, 'active')
+      `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status)
+       VALUES (:userId, 'used-car-platform', :planCode, 'active')
        ON DUPLICATE KEY UPDATE
+        application_code = VALUES(application_code),
         plan_code = VALUES(plan_code),
         status = VALUES(status)`,
       { userId: user.id, planCode: user.plan },
@@ -354,11 +361,12 @@ const migrateMockSubscriptions = async () => {
   if (!(await tableExists("mock_user_subscriptions"))) return;
 
   await pool.query(
-    `INSERT INTO user_subscriptions (user_id, plan_code, status, starts_at, expires_at)
-     SELECT u.id, mus.plan_code, mus.status, mus.starts_at, mus.expires_at
+    `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status, starts_at, expires_at)
+     SELECT u.id, 'used-car-platform', mus.plan_code, mus.status, mus.starts_at, mus.expires_at
      FROM mock_user_subscriptions mus
      JOIN app_users u ON u.username = mus.mock_user_key
      ON DUPLICATE KEY UPDATE
+      application_code = VALUES(application_code),
       plan_code = VALUES(plan_code),
       status = VALUES(status),
       expires_at = VALUES(expires_at)`,
@@ -695,6 +703,27 @@ const run = async () => {
     }
     await addColumnIfMissing("app_users", "phone", "VARCHAR(32) NULL AFTER username");
     await addUniqueIndexIfMissing("app_users", "uk_app_users_phone", "(phone)");
+    await addColumnIfMissing(
+      "subscription_plans",
+      "application_code",
+      "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER code",
+    );
+    await addColumnIfMissing("subscription_plans", "metadata_json", "JSON NULL AFTER status");
+    await addIndexIfMissing(
+      "subscription_plans",
+      "idx_subscription_plans_application_status",
+      "(application_code, status)",
+    );
+    await addColumnIfMissing(
+      "user_subscriptions",
+      "application_code",
+      "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER user_id",
+    );
+    await addIndexIfMissing(
+      "user_subscriptions",
+      "idx_user_subscriptions_application_plan",
+      "(application_code, plan_code)",
+    );
     await addColumnIfMissing("delivery_assets", "local_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_assets", "deleted_at", "DATETIME(3) NULL");
     await addColumnIfMissing("delivery_packages", "task_id", "VARCHAR(64) NULL");
@@ -798,6 +827,7 @@ const run = async () => {
     await migrateMockSubscriptions();
     await seedFlagshipEnterpriseTenant();
     await seedAgentOperationsData();
+    await ensureAllAgentDepositAccounts();
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();

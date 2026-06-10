@@ -6,7 +6,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
-import type { AuthenticatedUser, SubscriptionPlanCode, UserRole } from "../auth/authTypes";
+import type { AuthenticatedUser, UserRole } from "../auth/authTypes";
 import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import {
   ensurePersonalCreditsAccount,
@@ -14,6 +14,11 @@ import {
 } from "../billing/creditsAccountLinkService";
 import type { AccountCreationTargetRole, AccountCreationTargetScope } from "./accountCreationPolicyDefaults";
 import { accountCreationPolicyService } from "./accountCreationPolicyService";
+import {
+  assertAgentDepositCanCoverPlan,
+  deductAgentDepositForUserCreation,
+  ensureAgentDepositAccount,
+} from "./agentDepositService";
 
 export type PlatformUserCreationTargetRole = AccountCreationTargetRole;
 
@@ -40,9 +45,11 @@ export type NormalizedPlatformUserCreationInput = {
   targetRole: PlatformUserCreationTargetRole;
   applicationCode: string;
   accountScope: AccountCreationTargetScope;
-  planCode: SubscriptionPlanCode;
+  planCode: string;
   initialPoints: number;
+  initialPointsProvided: boolean;
   idempotencyKey: string;
+  autoChildAccountCount: number;
 };
 
 export type PlatformUserCreationResponse = {
@@ -127,10 +134,21 @@ type PromotionTargetRow = RowDataPacket & {
 };
 
 const DEFAULT_APPLICATION_CODE = "used-car-platform";
-const defaultInitialPointsByPlan: Record<SubscriptionPlanCode, number> = {
-  basic: 20_000,
-  team: 100_000,
-  flagship: 800_000,
+
+type SubscriptionPlanForCreation = {
+  code: string;
+  applicationCode: string;
+  name: string;
+  giftPoints: number;
+  autoChildAccountCount: number;
+};
+
+type SubscriptionPlanForCreationRow = RowDataPacket & {
+  code: string;
+  application_code: string;
+  name: string;
+  gift_points: number | string;
+  metadata_json: string | Record<string, unknown> | null;
 };
 
 function normalizeString(value: unknown) {
@@ -174,11 +192,13 @@ function normalizeAccountScope(value: unknown): AccountCreationTargetScope {
   throw errors.invalidParameter("accountScope must be personal or tenant");
 }
 
-function normalizePlanCode(value: unknown, targetRole: PlatformUserCreationTargetRole): SubscriptionPlanCode {
-  if (value === "basic" || value === "team" || value === "flagship") return value;
-  if (targetRole === "admin") return "flagship";
-  if (targetRole === "agent") return "team";
-  return "basic";
+function normalizePlanCode(value: unknown) {
+  const planCode = normalizeString(value);
+  if (!planCode) return "";
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}[a-z0-9]$/.test(planCode)) {
+    throw errors.invalidParameter("planCode must be 1-64 lowercase letters, numbers, hyphens, or underscores");
+  }
+  return planCode;
 }
 
 function normalizeInitialPoints(value: unknown, defaultPoints: number) {
@@ -208,7 +228,8 @@ export function normalizePlatformUserCreationInput(
   const phone = normalizeString(input.phone) || null;
   const email = normalizeString(input.email) || `${username}@used-car.local`;
   const applicationCode = normalizeApplicationCode(input.applicationCode);
-  const planCode = normalizePlanCode(input.planCode, targetRole);
+  const planCode = normalizePlanCode(input.planCode);
+  const initialPointsProvided = input.initialPoints !== undefined && input.initialPoints !== null && input.initialPoints !== "";
 
   return {
     username,
@@ -220,8 +241,10 @@ export function normalizePlatformUserCreationInput(
     applicationCode,
     accountScope: normalizeAccountScope(input.accountScope),
     planCode,
-    initialPoints: normalizeInitialPoints(input.initialPoints, defaultInitialPointsByPlan[planCode]),
+    initialPoints: normalizeInitialPoints(input.initialPoints, 0),
+    initialPointsProvided,
     idempotencyKey: normalizeIdempotencyKey(input.idempotencyKey),
+    autoChildAccountCount: 0,
   };
 }
 
@@ -252,17 +275,76 @@ function targetRoleToAppRole(targetRole: PlatformUserCreationTargetRole): UserRo
   return targetRole === "user" ? "enterprise" : targetRole;
 }
 
-function shouldCreateFlagshipTenant(input: NormalizedPlatformUserCreationInput) {
-  return input.targetRole === "user" && input.planCode === "flagship";
+function parsePlanMetadata(value: SubscriptionPlanForCreationRow["metadata_json"]) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
-function flagshipChildUsername(username: string, index: number) {
+function metadataChildAccountCount(metadata: Record<string, unknown>) {
+  const parsed = Number(metadata.autoChildAccountCount ?? 0);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.min(Math.floor(parsed), 20);
+}
+
+async function resolvePlanForCreation(input: NormalizedPlatformUserCreationInput): Promise<SubscriptionPlanForCreation> {
+  const planFilter = input.planCode ? "AND code = :planCode" : "";
+  const [rows] = await pool.query<SubscriptionPlanForCreationRow[]>(
+    `SELECT code, application_code, name, gift_points, metadata_json
+     FROM subscription_plans
+     WHERE application_code = :applicationCode
+       AND status = 'active'
+       ${planFilter}
+     ORDER BY price ASC, code ASC
+     LIMIT 1`,
+    { applicationCode: input.applicationCode, planCode: input.planCode },
+  );
+  const plan = rows[0];
+  if (!plan) {
+    throw errors.invalidParameter("subscription plan is not available for this application", {
+      applicationCode: input.applicationCode,
+      planCode: input.planCode || null,
+    });
+  }
+
+  const metadata = parsePlanMetadata(plan.metadata_json);
+  return {
+    code: plan.code,
+    applicationCode: plan.application_code,
+    name: plan.name,
+    giftPoints: Number(plan.gift_points),
+    autoChildAccountCount: metadataChildAccountCount(metadata),
+  };
+}
+
+function applyResolvedPlan(
+  input: NormalizedPlatformUserCreationInput,
+  plan: SubscriptionPlanForCreation,
+): NormalizedPlatformUserCreationInput {
+  return {
+    ...input,
+    planCode: plan.code,
+    initialPoints: input.initialPointsProvided ? input.initialPoints : plan.giftPoints,
+    autoChildAccountCount: plan.autoChildAccountCount,
+  };
+}
+
+function shouldCreateTenantWithChildren(input: NormalizedPlatformUserCreationInput) {
+  return input.targetRole === "user" && input.autoChildAccountCount > 0;
+}
+
+function childAccountUsername(username: string, index: number) {
   return `${username.slice(0, 24)}_child_${index}`;
 }
 
-function buildFlagshipChildDrafts(input: NormalizedPlatformUserCreationInput) {
-  return [1, 2, 3].map((index) => {
-    const username = flagshipChildUsername(input.username, index);
+function buildAutoChildDrafts(input: NormalizedPlatformUserCreationInput) {
+  return Array.from({ length: input.autoChildAccountCount }, (_, offset) => {
+    const index = offset + 1;
+    const username = childAccountUsername(input.username, index);
     return {
       id: createId("user"),
       username,
@@ -423,9 +505,10 @@ export async function createPlatformUser(
     throw errors.forbidden("back office permission is required");
   }
 
-  const input = normalizePlatformUserCreationInput(payload);
-  const createsFlagshipTenant = shouldCreateFlagshipTenant(input);
-  const effectiveAccountScope: AccountCreationTargetScope = createsFlagshipTenant ? "tenant" : input.accountScope;
+  const normalizedInput = normalizePlatformUserCreationInput(payload);
+  const input = applyResolvedPlan(normalizedInput, await resolvePlanForCreation(normalizedInput));
+  const createsTenantWithChildren = shouldCreateTenantWithChildren(input);
+  const effectiveAccountScope: AccountCreationTargetScope = createsTenantWithChildren ? "tenant" : input.accountScope;
   const requestHash = platformUserCreationRequestHash(input);
   const reservation = await reserveIdempotency(current.user, input.idempotencyKey, requestHash);
   if (reservation.replay) return reservation.replay;
@@ -453,14 +536,19 @@ export async function createPlatformUser(
       });
     }
 
-    const childDrafts = createsFlagshipTenant ? buildFlagshipChildDrafts(input) : [];
+    const childDrafts = createsTenantWithChildren ? buildAutoChildDrafts(input) : [];
     if (await usernamesOrPhoneExist([input.username, ...childDrafts.map((child) => child.username)], input.phone)) {
       throw errors.conflict("username or phone already exists");
     }
 
-    const tenantCredits = createsFlagshipTenant
+    const agentCreatesUser = current.user.role === "agent" && input.targetRole === "user";
+    if (agentCreatesUser) {
+      await assertAgentDepositCanCoverPlan(current.user.id, input.applicationCode, input.planCode);
+    }
+
+    const tenantCredits = createsTenantWithChildren
       ? await ensureTenantCreditsBundle({
-          tenantName: `${input.username} 旗舰共享积分账户`,
+          tenantName: `${input.username} 共享积分账户`,
           initialPoints: input.initialPoints,
           members: [
             { username: input.username, email: input.email, role: "owner" },
@@ -483,10 +571,10 @@ export async function createPlatformUser(
     const tenantMemberUserIds = tenantCredits?.memberUserIds ?? [];
 
     const appUserId = createId("user");
-    const appTenantId = createsFlagshipTenant ? createId("tenant") : null;
+    const appTenantId = createsTenantWithChildren ? createId("tenant") : null;
     const appRole = targetRoleToAppRole(input.targetRole);
     const applicationLinkId = createId("acl");
-    const agentRelationId = current.user.role === "agent" && input.targetRole === "user" ? createId("acr") : null;
+    const agentRelationId = agentCreatesUser ? createId("acr") : null;
 
     const response = await pool.getConnection().then(async (connection) => {
       try {
@@ -518,9 +606,9 @@ export async function createPlatformUser(
         );
 
         await connection.query(
-          `INSERT INTO user_subscriptions (user_id, plan_code, status)
-           VALUES (:userId, :planCode, 'active')`,
-          { userId: appUserId, planCode: input.planCode },
+          `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status)
+           VALUES (:userId, :applicationCode, :planCode, 'active')`,
+          { userId: appUserId, applicationCode: input.applicationCode, planCode: input.planCode },
         );
 
         if (input.targetRole === "admin" || input.targetRole === "agent") {
@@ -537,6 +625,10 @@ export async function createPlatformUser(
               scopeJson: JSON.stringify({ applicationCode: input.applicationCode }),
             },
           );
+
+          if (input.targetRole === "agent") {
+            await ensureAgentDepositAccount(connection, appUserId);
+          }
         }
 
         await connection.query(
@@ -557,7 +649,7 @@ export async function createPlatformUser(
             createdByRoleCode: current.user.role,
             metadataJson: JSON.stringify({
               targetRole: input.targetRole,
-              enterpriseAccountRole: createsFlagshipTenant ? "mother" : "standalone",
+              enterpriseAccountRole: createsTenantWithChildren ? "mother" : "standalone",
             }),
           },
         );
@@ -581,7 +673,18 @@ export async function createPlatformUser(
           );
         }
 
-        if (createsFlagshipTenant && appTenantId && tenantCredits) {
+        if (agentCreatesUser) {
+          await deductAgentDepositForUserCreation({
+            connection,
+            agentUserId: current.user.id,
+            createdByUserId: current.user.id,
+            applicationCode: input.applicationCode,
+            planCode: input.planCode,
+            referenceId: appUserId,
+          });
+        }
+
+        if (createsTenantWithChildren && appTenantId && tenantCredits) {
           await connection.query(
             `INSERT INTO enterprise_tenants
               (id, name, owner_user_id, subscription_user_id, status)
@@ -589,7 +692,7 @@ export async function createPlatformUser(
               (:id, :name, :ownerUserId, :subscriptionUserId, 'active')`,
             {
               id: appTenantId,
-              name: `${input.username} 旗舰共享积分账户`,
+              name: `${input.username} 共享积分账户`,
               ownerUserId: appUserId,
               subscriptionUserId: appUserId,
             },
@@ -709,7 +812,7 @@ export async function createPlatformUser(
             totalBalance: credits.totalBalance,
             availableBalance: credits.availableBalance,
           },
-          childAccounts: createsFlagshipTenant && tenantCredits
+          childAccounts: createsTenantWithChildren && tenantCredits
             ? childDrafts.map((child, index) => ({
                 id: child.id,
                 username: child.username,
@@ -758,7 +861,7 @@ export async function createPlatformUser(
             requestHash,
             metadataJson: JSON.stringify({
               accountScope: effectiveAccountScope,
-              flagshipChildCount: childDrafts.length,
+              childAccountCount: childDrafts.length,
             }),
           },
         );
@@ -876,6 +979,8 @@ export async function promotePlatformUserToAgent(
         scopeJson: JSON.stringify({ applicationCode, promotedFromUser: true }),
       },
     );
+
+    await ensureAgentDepositAccount(connection, userId);
 
     await connection.query(
       `INSERT INTO account_creation_audit_logs

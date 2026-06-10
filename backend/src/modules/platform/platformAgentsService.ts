@@ -4,6 +4,7 @@ import type { RowDataPacket } from "mysql2";
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
+import { listAgentDepositBalances } from "./agentDepositService";
 import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type PlatformAgentRow = RowDataPacket & {
@@ -104,6 +105,7 @@ export async function listPlatformAgents(req: Request) {
       creditsTenantId: row.credits_tenant_id,
     })),
   );
+  const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
 
   return {
     items: rows.map((row) => {
@@ -121,6 +123,8 @@ export async function listPlatformAgents(req: Request) {
         creditsAvailableBalance: balance?.availableBalance ?? null,
         creditsTotalBalance: balance?.totalBalance ?? null,
         creditsCurrency: balance?.currency ?? null,
+        depositBalance: depositBalances.get(row.user_id)?.balance ?? 0,
+        depositCurrency: depositBalances.get(row.user_id)?.currency ?? "CNY",
         status: row.status,
         assignmentStatus: row.assignment_status,
         assignedByUserId: row.assigned_by_user_id,

@@ -187,6 +187,7 @@ const getPlanSeed = async (planCode: string) => {
     `SELECT code, gift_points
      FROM subscription_plans
      WHERE code = :planCode
+       AND application_code = 'used-car-platform'
        AND status = 'active'
      LIMIT 1`,
     { planCode },
@@ -223,6 +224,7 @@ export const getSubscriptionSnapshotForUser = async (userId: string): Promise<Su
       AND (tenant_us.expires_at IS NULL OR tenant_us.expires_at > CURRENT_TIMESTAMP(3))
      JOIN subscription_plans p
        ON p.code = COALESCE(direct_us.plan_code, tenant_us.plan_code)
+      AND p.application_code = COALESCE(direct_us.application_code, tenant_us.application_code, 'used-car-platform')
      WHERE u.id = :userId
        AND p.status = 'active'
      LIMIT 1`,
@@ -361,8 +363,8 @@ export const authService = {
     );
 
     await pool.query(
-      `INSERT INTO user_subscriptions (user_id, plan_code, status)
-       VALUES (:userId, :planCode, 'active')`,
+      `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status)
+       VALUES (:userId, 'used-car-platform', :planCode, 'active')`,
       { userId, planCode },
     );
 

@@ -35,6 +35,7 @@ import {
   getPlatformAgentPolicyOverrides,
   getPlatformAgents,
   getPlatformDashboard,
+  getPlatformSubscriptionPlans,
   promotePlatformUserToAgent,
   updatePlatformAdminPolicyOverride,
   updatePlatformAgentPolicyOverride,
@@ -54,6 +55,7 @@ import {
   type CreditsTransaction,
   type CommissionPolicy,
   type PlatformUserPlanCode,
+  type PlatformSubscriptionPlan,
   type PlatformUserTargetRole,
   type PlatformAdminPolicyOverride,
   type PlatformAgentPolicyOverride,
@@ -127,6 +129,9 @@ const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
 const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
 const isAgentCustomerLedgerOpen = ref(false)
 const isLoadingAgentCustomerLedger = ref(false)
+const subscriptionPlans = ref<PlatformSubscriptionPlan[]>([])
+const isLoadingPlanOptions = ref(false)
+const loadedPlanApplicationCode = ref('')
 const interactionFeedback = ref('')
 const createAccountForm = reactive({
   targetRole: 'user' as PlatformUserTargetRole,
@@ -136,7 +141,7 @@ const createAccountForm = reactive({
   phone: '',
   email: '',
   applicationCode: 'used-car-platform',
-  planCode: 'basic' as PlatformUserPlanCode,
+  planCode: '' as PlatformUserPlanCode,
   initialPoints: 0 as number | null,
 })
 const adjustCreditsForm = reactive({
@@ -230,6 +235,14 @@ function toggleConsoleSection(key: ConsoleSectionKey) {
 }
 
 watch(() => consoleCollapseStorageKey.value, loadConsoleSectionState, { immediate: true })
+watch(
+  () => createAccountForm.applicationCode,
+  (applicationCode) => {
+    if (isCreateAccountModalOpen.value) {
+      void loadCreatePlanOptions(applicationCode)
+    }
+  },
+)
 const functionPointDrafts = reactive<Record<string, number | null>>({})
 
 const detailEntries = computed(() =>
@@ -410,17 +423,12 @@ const applicationSelectOptions = computed(() =>
   })),
 )
 
-const planInitialPoints: Record<PlatformUserPlanCode, number> = {
-  basic: 20_000,
-  team: 100_000,
-  flagship: 800_000,
-}
-
-const planOptions: Array<{ label: string; value: PlatformUserPlanCode }> = [
-  { label: '企业基础档', value: 'basic' },
-  { label: '企业团队档', value: 'team' },
-  { label: '企业旗舰档', value: 'flagship' },
-]
+const planOptions = computed(() =>
+  subscriptionPlans.value.map((plan) => ({
+    label: `${plan.name} / ${formatCurrencyAmount(plan.price)} / ${Number(plan.giftPoints).toLocaleString('zh-CN')} 积分`,
+    value: plan.code,
+  })),
+)
 
 const leadStageOptions = [
   { label: 'New / 新线索', value: 'new' },
@@ -618,25 +626,54 @@ const agentCreationGateText = computed(() => {
   return '公司管理员已允许，开发者未禁用'
 })
 
-function defaultPlanForRole(role: PlatformUserTargetRole): PlatformUserPlanCode {
-  if (role === 'admin') return 'flagship'
-  if (role === 'agent') return 'team'
-  return 'basic'
+function syncPlanInitialPoints(planCode: PlatformUserPlanCode) {
+  const plan = subscriptionPlans.value.find((item) => item.code === planCode)
+  createAccountForm.initialPoints = plan ? Number(plan.giftPoints) : 0
 }
 
-function syncPlanInitialPoints(planCode: PlatformUserPlanCode) {
-  createAccountForm.initialPoints = planInitialPoints[planCode]
+function syncSelectedPlanFromCatalog() {
+  if (!subscriptionPlans.value.length) {
+    createAccountForm.planCode = ''
+    createAccountForm.initialPoints = 0
+    return
+  }
+
+  const selectedPlanExists = subscriptionPlans.value.some((plan) => plan.code === createAccountForm.planCode)
+  if (!selectedPlanExists) {
+    createAccountForm.planCode = subscriptionPlans.value[0].code
+  }
+  syncPlanInitialPoints(createAccountForm.planCode)
+}
+
+async function loadCreatePlanOptions(applicationCode: string) {
+  if (!applicationCode || loadedPlanApplicationCode.value === applicationCode) {
+    syncSelectedPlanFromCatalog()
+    return
+  }
+
+  isLoadingPlanOptions.value = true
+  try {
+    const result = await getPlatformSubscriptionPlans({ applicationCode })
+    subscriptionPlans.value = result.items
+    loadedPlanApplicationCode.value = applicationCode
+    syncSelectedPlanFromCatalog()
+  } catch (error) {
+    subscriptionPlans.value = []
+    loadedPlanApplicationCode.value = ''
+    syncSelectedPlanFromCatalog()
+    message.error(error instanceof Error ? error.message : '订阅计划加载失败')
+  } finally {
+    isLoadingPlanOptions.value = false
+  }
 }
 
 function handleCreateTargetRoleChange(value: string | number | null) {
   const role = value as PlatformUserTargetRole
-  const nextPlan = defaultPlanForRole(role)
-  createAccountForm.planCode = nextPlan
-  syncPlanInitialPoints(nextPlan)
+  if (role) syncSelectedPlanFromCatalog()
 }
 
 function handleCreatePlanChange(value: string | number | null) {
-  syncPlanInitialPoints(value as PlatformUserPlanCode)
+  if (value) syncPlanInitialPoints(value as PlatformUserPlanCode)
 }
 
 function targetRoleLabel(role: PlatformUserTargetRole) {
@@ -724,6 +761,11 @@ type CreditsBalanceLike = {
   creditsTotalBalance?: string | number | null
 }
 
+type DepositBalanceLike = {
+  depositBalance?: string | number | null
+  depositCurrency?: string | null
+}
+
 function formatCreditsBalance(row: CreditsBalanceLike) {
   const value = row.creditsAvailableBalance ?? row.creditsTotalBalance
   if (value === null || value === undefined || value === '') return '-'
@@ -734,6 +776,16 @@ function formatCreditsBalance(row: CreditsBalanceLike) {
     minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 4,
   })
+}
+
+function formatDepositBalance(row: DepositBalanceLike) {
+  const numeric = Number(row.depositBalance ?? 0)
+  if (!Number.isFinite(numeric)) return '-'
+  const currency = row.depositCurrency ?? 'CNY'
+  return `${currency} ${numeric.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 }
 
 function formatCurrencyAmount(value: number | string | null | undefined) {
@@ -854,11 +906,11 @@ function resetCreateAccountForm(role: PlatformUserTargetRole) {
   createAccountForm.phone = ''
   createAccountForm.email = ''
   createAccountForm.applicationCode = defaultApplicationCode()
-  createAccountForm.planCode = defaultPlanForRole(role)
-  syncPlanInitialPoints(createAccountForm.planCode)
+  createAccountForm.planCode = ''
+  createAccountForm.initialPoints = 0
 }
 
-function openCreateAccountModal(role: PlatformUserTargetRole) {
+async function openCreateAccountModal(role: PlatformUserTargetRole) {
   if (!canCreateTargetRole(role)) {
     message.warning('当前账号创建权限已被上级开关关闭')
     return
@@ -866,6 +918,7 @@ function openCreateAccountModal(role: PlatformUserTargetRole) {
 
   resetCreateAccountForm(role)
   isCreateAccountModalOpen.value = true
+  await loadCreatePlanOptions(createAccountForm.applicationCode)
 }
 
 async function handleAdminGateChange(
@@ -996,6 +1049,11 @@ async function handleCreateAccount() {
 
   if (!canCreateTargetRole(createAccountForm.targetRole)) {
     message.error('当前账号创建权限已被上级开关关闭')
+    return
+  }
+
+  if (!createAccountForm.planCode || !subscriptionPlans.value.some((plan) => plan.code === createAccountForm.planCode)) {
+    message.error('请选择当前应用可用的订阅计划')
     return
   }
 
@@ -1835,6 +1893,14 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
     },
   },
   {
+    title: '押金余额',
+    key: 'depositBalance',
+    width: 140,
+    render(row) {
+      return formatDepositBalance(row)
+    },
+  },
+  {
     title: '经办人',
     key: 'assignedByUserId',
     width: 150,
@@ -1972,6 +2038,14 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
     width: 130,
     render(row) {
       return formatCreditsBalance(row)
+    },
+  },
+  {
+    title: '押金余额',
+    key: 'depositBalance',
+    width: 140,
+    render(row) {
+      return formatDepositBalance(row)
     },
   },
   {
@@ -2718,6 +2792,11 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
                   <p>来自 agent_customer_relations</p>
                 </article>
                 <article class="admin-agent-card">
+                  <h3>押金余额</h3>
+                  <strong>{{ formatDepositBalance(agentOverview.agent) }}</strong>
+                  <p>创建 User 时按套餐价格扣减</p>
+                </article>
+                <article class="admin-agent-card">
                   <h3>活跃线索</h3>
                   <strong>{{ agentOverview.metrics.activeLeadCount }}</strong>
                   <p>CRM 报备与跟进</p>
@@ -3155,6 +3234,9 @@ const agentTicketColumns: DataTableColumns<AgentOperationsTicket> = [
               <NSelect
                 v-model:value="createAccountForm.planCode"
                 :options="planOptions"
+                :loading="isLoadingPlanOptions"
+                :disabled="isLoadingPlanOptions || planOptions.length === 0"
+                placeholder="选择当前应用的订阅计划"
                 @update:value="handleCreatePlanChange"
               />
             </NFormItem>

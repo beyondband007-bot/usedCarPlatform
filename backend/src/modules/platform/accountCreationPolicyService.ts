@@ -18,6 +18,7 @@ import {
   defaultBackOfficePermissionPolicies,
   resolveAccountCreationPolicy,
 } from "./accountCreationPolicyDefaults";
+import { listAgentDepositBalances } from "./agentDepositService";
 import { getCommissionPolicy } from "./commissionPolicyService";
 import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
@@ -62,6 +63,8 @@ export type AgentPolicyOverride = {
   creditsAvailableBalance: number | null;
   creditsTotalBalance: number | null;
   creditsCurrency: string | null;
+  depositBalance: number;
+  depositCurrency: string;
   assignedByUserId: string | null;
   assignedByUsername: string | null;
   assignedByDisplayName: string | null;
@@ -291,7 +294,6 @@ async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[
       creditsTenantId: row.credits_tenant_id,
     })),
   );
-
   return {
     items: rows.map((row) => {
       const rowUserGate = row.developer_allows_create_users !== 0;
@@ -407,6 +409,7 @@ async function listAgentPolicyOverrides(
       creditsTenantId: row.credits_tenant_id,
     })),
   );
+  const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
 
   return {
     items: rows.map((row) => {
@@ -424,6 +427,8 @@ async function listAgentPolicyOverrides(
         creditsAvailableBalance: balance?.availableBalance ?? null,
         creditsTotalBalance: balance?.totalBalance ?? null,
         creditsCurrency: balance?.currency ?? null,
+        depositBalance: depositBalances.get(row.user_id)?.balance ?? 0,
+        depositCurrency: depositBalances.get(row.user_id)?.currency ?? "CNY",
         assignedByUserId: row.assigned_by_user_id,
         assignedByUsername: row.assigned_by_username,
         assignedByDisplayName: row.assigned_by_display_name,

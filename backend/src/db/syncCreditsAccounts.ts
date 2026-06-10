@@ -17,7 +17,9 @@ const run = async () => {
     `SELECT u.id, u.username, u.credits_user_id, p.gift_points
      FROM app_users u
      JOIN user_subscriptions us ON us.user_id = u.id
-     JOIN subscription_plans p ON p.code = us.plan_code
+     JOIN subscription_plans p
+       ON p.code = us.plan_code
+      AND p.application_code = us.application_code
      WHERE u.status = 'active'
        AND us.status = 'active'
        AND u.account_scope <> 'tenant'
