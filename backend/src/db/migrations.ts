@@ -97,7 +97,7 @@ export const migrations = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS subscription_plans (
-    code VARCHAR(32) PRIMARY KEY,
+    code VARCHAR(32) NOT NULL,
     application_code VARCHAR(80) NOT NULL DEFAULT 'used-car-platform',
     name VARCHAR(120) NOT NULL,
     price DECIMAL(12, 2) NOT NULL,
@@ -109,8 +109,8 @@ export const migrations = [
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     metadata_json JSON NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-    ,
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (application_code, code),
     INDEX idx_subscription_plans_application_status (application_code, status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
@@ -451,7 +451,8 @@ export const migrations = [
     INDEX idx_user_subscriptions_plan (plan_code),
     CONSTRAINT user_subscriptions_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
       ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT user_subscriptions_plan_fk FOREIGN KEY (plan_code) REFERENCES subscription_plans (code)
+    CONSTRAINT user_subscriptions_plan_fk FOREIGN KEY (application_code, plan_code)
+      REFERENCES subscription_plans (application_code, code)
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
