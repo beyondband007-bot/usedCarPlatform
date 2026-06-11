@@ -95,13 +95,6 @@ const heroImageStyle = computed((): CSSProperties => {
           AI 场景图、精修图、成片交付，让车源展示更专业、更有质感
         </p>
       </div>
-      <button
-        type="button"
-        class="hero-contact-btn"
-        @click="supportModalVisible = true"
-      >
-        获取方案
-      </button>
     </div>
 
     <div
@@ -325,12 +318,7 @@ const heroImageStyle = computed((): CSSProperties => {
     margin-top: 0;
     margin-bottom: 0;
     padding: calc(var(--app-header-offset, 64px) + 24px) 18px 18px;
-    background: linear-gradient(
-      180deg,
-      #0a0c10 0%,
-      #121820 52%,
-      #1a2230 100%
-    );
+    background: linear-gradient(180deg, #0a0c10 0%, #121820 52%, #1a2230 100%);
     pointer-events: auto;
     animation: none;
   }

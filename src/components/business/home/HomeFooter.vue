@@ -175,7 +175,7 @@ const footerBrandLogoSrc = computed(() =>
       <div class="footer-bottom-links">
         <span>隐私政策</span>
         <span>服务条款</span>
-        <span>京ICP备xxxxxxxx号</span>
+        <span>鄂ICP备2021002927号-3</span>
       </div>
     </div>
   </footer>
@@ -463,7 +463,8 @@ const footerBrandLogoSrc = computed(() =>
 
 @media (max-width: 767px) {
   .footer {
-    padding: 28px 0 calc(20px + var(--h5-bottom-inset, env(safe-area-inset-bottom, 0px)));
+    padding: 28px 0
+      calc(20px + var(--h5-bottom-inset, env(safe-area-inset-bottom, 0px)));
   }
 
   .footer-container {
