@@ -133,6 +133,8 @@ onMounted(() => {
   --home-hero-bg: #080808;
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
+  --home-hero-title-light: #1e222b;
+  --home-hero-sub-light: #64748b;
   --home-card-bg: linear-gradient(180deg, #151515, #0b0b0b);
   --home-card-overlay: linear-gradient(
     90deg,
@@ -193,6 +195,8 @@ onMounted(() => {
   --home-hero-bg: #080808;
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
+  --home-hero-title-light: #1e222b;
+  --home-hero-sub-light: #64748b;
   --home-card-bg: linear-gradient(180deg, #ffffff, #f8fafd);
   --home-card-overlay: linear-gradient(
     90deg,

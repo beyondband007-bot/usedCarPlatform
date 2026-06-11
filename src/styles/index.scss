@@ -222,6 +222,11 @@ html {
   scroll-padding-bottom: var(--h5-bottom-inset, 0px);
 }
 
+/* 工作台内部自行滚动，仅取消 html 右侧预留槽位，不影响页面高度布局 */
+html:has(.app-layout--auth) {
+  scrollbar-gutter: auto;
+}
+
 html.is-mobile {
   --h5-bottom-inset: max(env(safe-area-inset-bottom, 0px), 12px);
 }

@@ -57,6 +57,7 @@ import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.v
 import PresetCombobox, {
   type PresetComboboxOption,
 } from "@/components/business/workspace/PresetCombobox.vue";
+import ShortVideoGeneratePanel from "@/components/business/workspace/ShortVideoGeneratePanel.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -1421,6 +1422,13 @@ function validateBatchInteriorAssets(template: BatchVisualTemplate) {
   return true;
 }
 
+function handleShortVideoConfirm(scriptDraftId: string) {
+  emit("generate", {
+    shortVideoAction: "confirm",
+    scriptDraftId,
+  });
+}
+
 function handleGenerate() {
   if (props.capability.code === "interior-stitch") {
     const assetIds = uploadedInteriorCollageAssets.value.map(
@@ -2762,7 +2770,7 @@ defineExpose({
                   v-model="presetInput"
                   :options="presetComboboxOptions"
                   :loading="isLoadingVisualPresets"
-                  :on-delete="deletePresetById"
+                  :delete-preset="deletePresetById"
                   placeholder="输入或选择预设名称"
                   @select="handlePresetComboboxSelect"
                 />
@@ -3093,45 +3101,12 @@ defineExpose({
 
     <template v-else-if="props.capability.code === 'short-video'">
       <div class="generate-panel-body">
-        <section class="batch-card batch-notice short-video-notice">
-          上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
-        </section>
-
-        <UploadTaskCard
+        <ShortVideoGeneratePanel
           :capability="props.capability"
-          :upload-preview-url="uploadedPreviewUrl"
-          :is-uploading="isUploadingVehicle"
-          :upload-disabled="props.isGenerating"
-          @select-file="handleVehicleFileSelected"
-          @remove="handleVehicleImageRemove"
+          :is-generating="props.isGenerating"
+          @confirm-video="handleShortVideoConfirm"
         />
-
-        <CapabilityOptionSelector
-          v-if="hasBlock('selector')"
-          :capability="props.capability"
-          :selected-option-id="props.selectedOptionId"
-          :disabled="props.isGenerating"
-          @select="emit('selectOption', $event)"
-        />
-
-        <section class="workspace-config-module workspace-config-module--logo">
-          <WorkspaceLogoPanel
-            v-model:enabled="useLogo"
-            embedded
-            :disabled="props.isGenerating"
-          />
-        </section>
       </div>
-
-      <GenerateActionFooter
-        v-if="hasBlock('actions')"
-        :action-label="props.capability.actionLabel"
-        :cost="props.capability.cost"
-        cost-unit="条"
-        :loading="props.isGenerating"
-        :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-        @generate="handleGenerate"
-      />
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">

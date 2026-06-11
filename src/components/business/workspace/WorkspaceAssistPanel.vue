@@ -1804,6 +1804,9 @@ defineExpose({
   --assist-blue: var(--workspace-accent, #efc24c);
   --assist-green: var(--workspace-accent-strong, #ffd75a);
   --assist-shadow: var(--workspace-shadow, 0 24px 60px rgba(0, 0, 0, 0.34));
+  --assist-tab-color: #999999;
+  --assist-tab-active-color: #ffffff;
+  --assist-tab-hover-color: #ffffff;
 
   position: relative;
   display: flex;
@@ -1846,8 +1849,11 @@ defineExpose({
     --workspace-shadow,
     0 14px 34px rgba(78, 111, 148, 0.09)
   );
+  --assist-tab-color: #8a95a3;
+  --assist-tab-active-color: #111827;
+  --assist-tab-hover-color: #64748b;
 
-  border-color: #dce6f3;
+  border: 1px solid #dce6f3;
   background:
     radial-gradient(
       circle at 62% 32%,
@@ -2900,24 +2906,23 @@ defineExpose({
 .tab-group button {
   position: relative;
   padding: 0;
-  color: var(--assist-muted, #999999);
+  color: var(--assist-tab-color);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   transition: color 0.2s ease;
 }
 
 .tab-group button:hover:not(.active) {
-  color: color-mix(in srgb, var(--assist-text) 72%, var(--assist-muted));
+  color: var(--assist-tab-hover-color);
 }
 
-.assist-panel.theme-dark .tab-group button.active {
-  color: #ffffff;
+.tab-group button.active {
+  color: var(--assist-tab-active-color);
   font-weight: 800;
 }
 
-.assist-panel.theme-light .tab-group button.active {
-  color: var(--workspace-commercial-strong, #d4a017);
-  font-weight: 800;
+.tab-group button.active:hover {
+  color: var(--assist-tab-active-color);
 }
 
 .expand-button {
@@ -2935,44 +2940,43 @@ defineExpose({
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 6px 20px 0;
+  padding: 0 2px 20px 0;
+}
+
+.assist-panel.theme-dark .guide-layout {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-.guide-layout::-webkit-scrollbar {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar {
   width: 8px;
 }
 
-.guide-layout::-webkit-scrollbar-track {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-track {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.guide-layout::-webkit-scrollbar-thumb {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
 }
 
-.guide-layout::-webkit-scrollbar-thumb:hover {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.42);
 }
 
 .assist-panel.theme-light .guide-layout {
-  scrollbar-color: #cbd5e1 #eef2f7;
+  padding-right: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-track {
-  background: #eef2f7;
-}
-
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.assist-panel.theme-light .guide-layout::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .guide-layout.is-compact-guide {
@@ -3121,44 +3125,43 @@ defineExpose({
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 6px 20px 0;
+  padding: 2px 2px 20px 0;
+}
+
+.assist-panel.theme-dark .recent-layout {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-.recent-layout::-webkit-scrollbar {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar {
   width: 8px;
 }
 
-.recent-layout::-webkit-scrollbar-track {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-track {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.recent-layout::-webkit-scrollbar-thumb {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
 }
 
-.recent-layout::-webkit-scrollbar-thumb:hover {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.42);
 }
 
 .assist-panel.theme-light .recent-layout {
-  scrollbar-color: #cbd5e1 #eef2f7;
+  padding-right: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-track {
-  background: #eef2f7;
-}
-
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.assist-panel.theme-light .recent-layout::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 @container assist (max-width: 480px) {

@@ -241,14 +241,19 @@ const heroImageStyle = computed((): CSSProperties => {
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 
+.hero.is-light .hero-eyebrow {
+  color: var(--home-hero-title-light, #1e222b);
+  text-shadow: none;
+}
+
 .hero.is-light h1 {
-  color: #0f172a;
-  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.78);
+  color: var(--home-hero-title-light, #1e222b);
+  text-shadow: none;
 }
 
 .hero.is-light .subtitle {
-  color: #475569;
-  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.65);
+  color: var(--home-hero-sub-light, #64748b);
+  text-shadow: none;
 }
 
 .hero.is-light .hero-contact-btn {
@@ -449,6 +454,15 @@ const heroImageStyle = computed((): CSSProperties => {
     display: none;
   }
 
+  .hero.is-light .hero-eyebrow {
+    display: block;
+    margin: 0 0 8px;
+    color: var(--home-hero-title-light, #1e222b);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-shadow: none;
+  }
+
   .hero h1 {
     margin-bottom: 4px;
     font-size: clamp(20px, 5.8vw, 26px);
@@ -465,7 +479,7 @@ const heroImageStyle = computed((): CSSProperties => {
 
   .hero.is-light h1 {
     margin: 0 0 8px;
-    color: #071b3a;
+    color: var(--home-hero-title-light, #1e222b);
     font-size: 21px;
     font-weight: 700;
     line-height: 1.3;
@@ -475,7 +489,7 @@ const heroImageStyle = computed((): CSSProperties => {
 
   .hero.is-light .subtitle {
     margin: 0;
-    color: #5e7188;
+    color: var(--home-hero-sub-light, #64748b);
     font-size: 12px;
     line-height: 1.6;
     text-shadow: none;

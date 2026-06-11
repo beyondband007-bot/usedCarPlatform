@@ -4,6 +4,7 @@ import { Icon } from "@iconify/vue";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
+import { VIDEO_OUTPUT_RATIO_LABEL } from "@/constants/short-video";
 import {
   recentStatusIconMap,
   recentStatusLabelMap,
@@ -164,8 +165,8 @@ function handleRecentPick(item: WorkspaceRecentItem) {
     <header class="short-video-head">
       <div class="short-video-head-copy">
         <p class="short-video-eyebrow">短视频生成</p>
-        <h2>上传车辆外观图后生成营销视频</h2>
-        <span>默认使用 16:9、720p、10 秒配置，任务创建后会自动轮询生成结果。</span>
+        <h2>生成口播草稿后输出竖屏营销视频</h2>
+        <span>固定输出 {{ VIDEO_OUTPUT_RATIO_LABEL }}，确认生成后将自动轮询任务结果。</span>
       </div>
     </header>
 
@@ -261,7 +262,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
           </div>
           <footer class="short-video-recent-foot">
             <strong class="short-video-recent-name">{{ item.title }}</strong>
-            <p class="short-video-recent-scene">16:9 · 720p · 10秒</p>
+            <p class="short-video-recent-scene">{{ VIDEO_OUTPUT_RATIO_LABEL }}</p>
             <div class="short-video-recent-foot-actions">
               <span class="short-video-recent-time">{{ item.createdAt }}</span>
               <button
@@ -295,7 +296,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
       <div class="short-video-waiting-copy">
         <p>视频待生成</p>
         <h2>正在生成营销视频</h2>
-        <span>AI 正在分析车辆素材并生成 16:9、720p、10 秒短视频，请稍候。</span>
+        <span>AI 正在生成 {{ VIDEO_OUTPUT_RATIO_LABEL }} 营销短视频，请稍候。</span>
       </div>
 
       <div class="short-video-waiting-progress" aria-hidden="true">
@@ -342,7 +343,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
         <aside class="short-video-side">
           <div class="short-video-spec">
             <span>输出内容</span>
-            <strong>10 秒营销短视频</strong>
+            <strong>15 秒营销短视频</strong>
           </div>
           <div class="short-video-spec">
             <span>适用场景</span>
@@ -350,7 +351,7 @@ function handleRecentPick(item: WorkspaceRecentItem) {
           </div>
           <div class="short-video-spec">
             <span>说明</span>
-            <strong>上传左侧车辆图后点击生成即可开始</strong>
+            <strong>左侧配置素材并生成口播草稿，确认后开始生成视频</strong>
           </div>
         </aside>
       </div>

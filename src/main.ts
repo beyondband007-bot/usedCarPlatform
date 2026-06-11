@@ -10,18 +10,23 @@ import './styles/tailwind.css'
 import './styles/index.scss'
 import './styles/home-wechat.scss'
 
-initBrowserEnv()
+async function bootstrap() {
+  initBrowserEnv()
 
-const app = createApp(App)
-const pinia = createPinia()
+  const app = createApp(App)
+  const pinia = createPinia()
 
-app.use(pinia)
+  app.use(pinia)
 
-const appStore = useAppStore()
-registerViewportThemeSync(() => {
+  const appStore = useAppStore()
+  registerViewportThemeSync(() => {
+    appStore.syncThemeForViewport()
+  })
   appStore.syncThemeForViewport()
-})
-appStore.syncThemeForViewport()
-app.use(router)
+  app.use(router)
 
-app.mount('#app')
+  await router.isReady()
+  app.mount('#app')
+}
+
+void bootstrap()

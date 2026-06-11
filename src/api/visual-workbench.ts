@@ -18,7 +18,11 @@ export interface UploadedAsset {
   size: number
 }
 
-export type AssetPurpose = 'car_exterior' | 'car_interior' | 'logo'
+export type AssetPurpose =
+  | 'car_exterior'
+  | 'car_interior'
+  | 'logo'
+  | 'video_reference_image'
 export type LogoPlacement = 'plate' | 'wall'
 export type LogoPlacementMode = 'none' | 'plate' | 'wall' | 'plate_wall'
 
