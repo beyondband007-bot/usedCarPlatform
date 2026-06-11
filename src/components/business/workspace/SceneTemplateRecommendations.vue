@@ -173,8 +173,8 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light .scene-template-card.is-active {
-  border: 2px solid #60a5fa;
-  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.16);
+  border: 2px solid #ffb800;
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
 }
 
 .scene-template-card:focus-visible {
@@ -185,8 +185,8 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light .scene-template-card:focus-visible {
-  border: 2px solid #60a5fa;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.18);
+  border: 2px solid #ffb800;
+  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.18);
 }
 
 .scene-template-image {
