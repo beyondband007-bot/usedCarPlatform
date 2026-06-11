@@ -157,13 +157,13 @@ npm run dev
 ```bash
 cd "/Users/shenghangwang/Desktop/usedCarPlatform-credits-integration"
 npm install
-npm run dev
+npm run dev:console
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:5173/back-office
+http://127.0.0.1:5174
 ```
 
 Use the local mock admin login:
