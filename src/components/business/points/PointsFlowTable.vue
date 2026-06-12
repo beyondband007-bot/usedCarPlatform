@@ -8,7 +8,6 @@ import type { PointsAccountScopeMode } from "@/utils/points-query-access";
 import type {
   PointsBizSource,
   PointsFlowRecord,
-  PointsFlowStatus,
   PointsQueryFilters,
   PointsQueryViewConfig,
   PointsSubAccountOption,
@@ -86,12 +85,6 @@ const designDateRangeOptions = [
   { value: "custom", label: "自定义" },
 ];
 
-const statusOptions: Array<{ value: "" | PointsFlowStatus; label: string }> = [
-  { value: "", label: "全部状态" },
-  { value: "effective", label: "已生效" },
-  { value: "pending", label: "待生效" },
-];
-
 const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
   [
     { value: "", label: "全部" },
@@ -149,18 +142,64 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(props.total / props.pageSize)),
 );
 
-const pageItems = computed(() =>
-  Array.from({ length: totalPages.value }, (_, index) => index + 1),
+type PointsPaginationItem =
+  | { type: "page"; page: number }
+  | { type: "ellipsis"; key: string };
+
+function buildPaginationItems(
+  currentPage: number,
+  totalPageCount: number,
+): PointsPaginationItem[] {
+  if (totalPageCount <= 1) {
+    return [{ type: "page", page: 1 }];
+  }
+
+  if (totalPageCount <= 9) {
+    return Array.from({ length: totalPageCount }, (_, index) => ({
+      type: "page" as const,
+      page: index + 1,
+    }));
+  }
+
+  const items: PointsPaginationItem[] = [];
+
+  if (currentPage <= 4) {
+    for (let page = 1; page <= Math.min(7, totalPageCount - 1); page += 1) {
+      items.push({ type: "page", page });
+    }
+    items.push({ type: "ellipsis", key: "right" });
+    items.push({ type: "page", page: totalPageCount });
+    return items;
+  }
+
+  if (currentPage >= totalPageCount - 3) {
+    items.push({ type: "page", page: 1 });
+    items.push({ type: "ellipsis", key: "left" });
+    for (
+      let page = Math.max(2, totalPageCount - 6);
+      page <= totalPageCount;
+      page += 1
+    ) {
+      items.push({ type: "page", page });
+    }
+    return items;
+  }
+
+  items.push({ type: "page", page: 1 });
+  items.push({ type: "ellipsis", key: "left" });
+  for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+    items.push({ type: "page", page });
+  }
+  items.push({ type: "ellipsis", key: "right" });
+  items.push({ type: "page", page: totalPageCount });
+  return items;
+}
+
+const paginationItems = computed(() =>
+  buildPaginationItems(props.currentPage, totalPages.value),
 );
 
-const rangeText = computed(() => {
-  if (!props.total) return "共 0 条";
-  if (totalPages.value <= 1) return `共 ${props.total} 条`;
-
-  const start = (props.currentPage - 1) * props.pageSize + 1;
-  const end = Math.min(props.currentPage * props.pageSize, props.total);
-  return `显示第 ${start}-${end} 条，共 ${props.total} 条`;
-});
+const totalCountText = computed(() => `共 ${formatNumber(props.total)} 条数据`);
 
 const showCustomDate = computed(() => props.filters.dateRange === "custom");
 
@@ -213,10 +252,6 @@ function setPageSize(size: number) {
   if (size === props.pageSize) return;
   emit("update:pageSize", size);
   emit("update:currentPage", 1);
-}
-
-function resolveRecordStatus(record: PointsFlowRecord): PointsFlowStatus {
-  return record.status ?? (record.txnType === "gift" ? "pending" : "effective");
 }
 
 function resolveSourceUsage(record: PointsFlowRecord) {
@@ -280,20 +315,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
             (value) =>
               patchFilters({
                 txnType: (value ?? '') as PointsQueryFilters['txnType'],
-              })
-          "
-        />
-
-        <NSelect
-          class="points-toolbar-select"
-          size="medium"
-          :value="filters.status"
-          :options="statusOptions"
-          :menu-props="{ class: 'points-filter-select-menu' }"
-          @update:value="
-            (value) =>
-              patchFilters({
-                status: (value ?? '') as PointsQueryFilters['status'],
               })
           "
         />
@@ -399,7 +420,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
           <col class="col-time" />
           <col class="col-type" />
           <col class="col-change" />
-          <col class="col-status" />
           <col class="col-source" />
           <template v-if="config.showMemberColumns">
             <col class="col-operator" />
@@ -411,7 +431,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
             <th>时间</th>
             <th>积分类型</th>
             <th>积分变动</th>
-            <th>状态</th>
             <th>来源/用途</th>
             <template v-if="config.showMemberColumns">
               <th>操作人</th>
@@ -445,19 +464,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
               </span>
             </td>
             <td>
-              <span
-                class="status-pill"
-                :class="`is-${resolveRecordStatus(record)}`"
-              >
-                <span class="status-dot" aria-hidden="true"></span>
-                {{
-                  resolveRecordStatus(record) === "effective"
-                    ? "已生效"
-                    : "待生效"
-                }}
-              </span>
-            </td>
-            <td>
               <span class="points-source">{{ resolveSourceUsage(record) }}</span>
             </td>
             <td v-if="config.showMemberColumns">
@@ -486,7 +492,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     </div>
 
     <div class="points-pagination-bar">
-      <span>{{ rangeText }}</span>
+      <span class="points-pagination-summary">{{ totalCountText }}</span>
       <div class="points-pagination-controls">
         <div class="points-page-size">
           <span class="points-page-size-label">每页</span>
@@ -504,25 +510,32 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         <div class="points-pagination">
           <button
             type="button"
+            class="points-pagination-nav"
             :disabled="currentPage === 1"
             @click="setPage(currentPage - 1)"
           >
             <Icon icon="mdi:chevron-left" />
           </button>
-          <button
-            v-for="page in pageItems"
-            :key="page"
-            type="button"
-            :class="{
-              active: page === currentPage,
-              'is-admin': config.adminTheme,
-            }"
-            @click="setPage(page)"
+          <template
+            v-for="item in paginationItems"
+            :key="item.type === 'page' ? `page-${item.page}` : item.key"
           >
-            {{ page }}
-          </button>
+            <button
+              v-if="item.type === 'page'"
+              type="button"
+              :class="{
+                active: item.page === currentPage,
+                'is-admin': config.adminTheme,
+              }"
+              @click="setPage(item.page)"
+            >
+              {{ item.page }}
+            </button>
+            <span v-else class="points-pagination-ellipsis">...</span>
+          </template>
           <button
             type="button"
+            class="points-pagination-nav"
             :disabled="currentPage === totalPages"
             @click="setPage(currentPage + 1)"
           >
@@ -753,7 +766,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     </div>
 
     <div class="points-pagination-bar">
-      <span>{{ rangeText }}</span>
+      <span class="points-pagination-summary">{{ totalCountText }}</span>
       <div class="points-pagination-controls">
         <div class="points-page-size">
           <span class="points-page-size-label">每页</span>
@@ -771,25 +784,32 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         <div class="points-pagination">
           <button
             type="button"
+            class="points-pagination-nav"
             :disabled="currentPage === 1"
             @click="setPage(currentPage - 1)"
           >
             <Icon icon="mdi:chevron-left" />
           </button>
-          <button
-            v-for="page in pageItems"
-            :key="page"
-            type="button"
-            :class="{
-              active: page === currentPage,
-              'is-admin': config.adminTheme,
-            }"
-            @click="setPage(page)"
+          <template
+            v-for="item in paginationItems"
+            :key="item.type === 'page' ? `page-${item.page}` : item.key"
           >
-            {{ page }}
-          </button>
+            <button
+              v-if="item.type === 'page'"
+              type="button"
+              :class="{
+                active: item.page === currentPage,
+                'is-admin': config.adminTheme,
+              }"
+              @click="setPage(item.page)"
+            >
+              {{ item.page }}
+            </button>
+            <span v-else class="points-pagination-ellipsis">...</span>
+          </template>
           <button
             type="button"
+            class="points-pagination-nav"
             :disabled="currentPage === totalPages"
             @click="setPage(currentPage + 1)"
           >
@@ -1207,15 +1227,19 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-top: 1px solid #f1f5f9;
 }
 
-.points-pagination-bar > span {
+.points-pagination-summary {
+  flex-shrink: 0;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .points-pagination-controls {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 16px;
+  margin-left: auto;
 }
 
 .points-page-size {
@@ -1244,38 +1268,53 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-pagination {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .points-pagination button {
   display: flex;
-  width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
+  padding: 0 4px;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  background: #ffffff;
+  background: transparent;
   color: #64748b;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   transition:
     border-color 0.2s ease,
     color 0.2s ease;
 }
 
+.points-pagination-ellipsis {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 13px;
+  user-select: none;
+}
+
 .points-pagination button.active {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: #ffffff;
-  font-weight: 500;
+  border-color: #22c55e;
+  background: transparent;
+  color: #22c55e;
+  font-weight: 600;
 }
 
 .points-pagination button.active.is-admin {
   border-color: #7c3aed;
-  background: #7c3aed;
+  background: transparent;
+  color: #7c3aed;
 }
 
 .points-pagination button:disabled {
@@ -1503,7 +1542,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-top-color: #263347;
 }
 
-.points-flow-card.theme-dark .points-pagination-bar > span {
+.points-flow-card.theme-dark .points-pagination-summary {
   color: #9ca3af;
 }
 
@@ -1512,16 +1551,16 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card.theme-dark .points-pagination button {
-  border-color: #263347;
-  background: #1a2436;
-  color: #d1d5db;
+  border-color: rgb(255 255 255 / 14%);
+  background: transparent;
+  color: #9ca3af;
 }
 
 .points-flow-card.theme-dark .points-pagination button.active,
 .points-flow-card.theme-dark .points-pagination button.active.is-admin {
-  border-color: #f5a623;
-  background: #f5a623;
-  color: #111827;
+  border-color: #22c55e;
+  background: transparent;
+  color: #22c55e;
 }
 
 .points-flow-card.theme-dark .points-pagination button:disabled {
@@ -1889,11 +1928,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-table-layout--personal th:nth-child(4),
 .points-flow-card--design .points-table-layout--personal td:nth-child(4) {
-  min-width: 110px;
-}
-
-.points-flow-card--design .points-table-layout--personal th:nth-child(5),
-.points-flow-card--design .points-table-layout--personal td:nth-child(5) {
   min-width: 140px;
 }
 
@@ -1914,21 +1948,16 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-table-layout--member th:nth-child(4),
 .points-flow-card--design .points-table-layout--member td:nth-child(4) {
-  min-width: 110px;
+  min-width: 120px;
 }
 
 .points-flow-card--design .points-table-layout--member th:nth-child(5),
 .points-flow-card--design .points-table-layout--member td:nth-child(5) {
-  min-width: 120px;
+  min-width: 180px;
 }
 
 .points-flow-card--design .points-table-layout--member th:nth-child(6),
 .points-flow-card--design .points-table-layout--member td:nth-child(6) {
-  min-width: 180px;
-}
-
-.points-flow-card--design .points-table-layout--member th:nth-child(7),
-.points-flow-card--design .points-table-layout--member td:nth-child(7) {
   min-width: 92px;
 }
 
@@ -2022,28 +2051,6 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   color: #ef4444;
 }
 
-.points-flow-card--design .status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #334155;
-  font-size: 12px;
-}
-
-.points-flow-card--design .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.points-flow-card--design .status-pill.is-effective .status-dot {
-  background: #22c55e;
-}
-
-.points-flow-card--design .status-pill.is-pending .status-dot {
-  background: #f59e0b;
-}
-
 .points-flow-card--design .points-source,
 .points-flow-card--design .points-time {
   color: #334155;
@@ -2059,14 +2066,40 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-pagination-bar {
   flex-shrink: 0;
+  align-items: center;
   padding-top: 10px;
   border-top: 0;
 }
 
+.points-flow-card--design .points-pagination-summary {
+  color: #64748b;
+  font-size: 13px;
+}
+
 .points-flow-card--design .points-pagination button.active {
-  border-color: #d4a017;
-  background: #d4a017;
-  color: #ffffff;
+  border-color: #22c55e;
+  background: transparent;
+  color: #22c55e;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-pagination-summary {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-pagination button {
+  border-color: rgb(255 255 255 / 14%);
+  background: transparent;
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-pagination button.active {
+  border-color: #22c55e;
+  background: transparent;
+  color: #22c55e;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-pagination-ellipsis {
+  color: #6b7280;
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-subaccount-switch {
@@ -2133,8 +2166,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card.theme-dark.points-flow-card--design .points-section-title h2,
 .points-flow-card.theme-dark.points-flow-card--design .points-source,
-.points-flow-card.theme-dark.points-flow-card--design .points-time,
-.points-flow-card.theme-dark.points-flow-card--design .status-pill {
+.points-flow-card.theme-dark.points-flow-card--design .points-time {
   color: #f3f4f6;
 }
 
@@ -2211,8 +2243,8 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
-  .points-flow-card--design .points-table-layout--member th:nth-child(6),
-  .points-flow-card--design .points-table-layout--member td:nth-child(6) {
+  .points-flow-card--design .points-table-layout--member th:nth-child(5),
+  .points-flow-card--design .points-table-layout--member td:nth-child(5) {
     min-width: 168px;
   }
 }

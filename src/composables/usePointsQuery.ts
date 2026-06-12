@@ -257,7 +257,6 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
           tenantId: identity.tenantId ?? undefined,
           targetCreditsUserId,
           txnType: activeFilters?.txnType || undefined,
-          status: activeFilters?.status || undefined,
           bizSource: activeFilters?.bizSource || undefined,
           from,
           to,
@@ -461,7 +460,6 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
   watch(
     () => [
       options.filters?.value.txnType ?? '',
-      options.filters?.value.status ?? '',
       options.filters?.value.bizSource ?? '',
       options.filters?.value.dateRange ?? '',
       options.filters?.value.startDate ?? '',

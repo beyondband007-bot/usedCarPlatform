@@ -37,7 +37,6 @@ const defaultFilters = (): PointsQueryFilters => ({
   startDate: "",
   endDate: "",
   bizSource: "",
-  status: "",
 });
 
 const filters = ref<PointsQueryFilters>(defaultFilters());
@@ -326,12 +325,6 @@ const filteredRecords = computed(() => {
 
     if (active.txnType && record.txnType !== active.txnType) return false;
     if (active.bizSource && record.bizSource !== active.bizSource) return false;
-
-    if (active.status) {
-      const recordStatus =
-        record.status ?? (record.txnType === "gift" ? "pending" : "effective");
-      if (recordStatus !== active.status) return false;
-    }
 
     const recordDate = new Date(record.createdAt.replace(/-/g, "/")).getTime();
     if (Number.isNaN(recordDate)) return true;
