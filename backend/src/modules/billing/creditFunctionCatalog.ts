@@ -61,6 +61,14 @@ export const creditFunctionCatalog: CreditFunctionCatalogItem[] = [
     status: "active",
   },
   {
+    code: "video-generation",
+    name: "Digital Human Vehicle Video",
+    description: "15-second Seedance 2.0 digital-human vehicle video generation",
+    chargeMode: "estimate_required",
+    defaultPoints: shortVideoGenerationPoints(),
+    status: "active",
+  },
+  {
     code: "batch-new-interior",
     name: "Batch New Interior Item",
     description: "Batch interior image generation item",

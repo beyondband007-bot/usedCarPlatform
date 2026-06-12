@@ -11,8 +11,11 @@ export type AssetPurpose =
 export type OutputRatio = "auto" | "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 
 export const IMAGE_GENERATION_RESOLUTION = "1K" as const;
+export const VIDEO_GENERATION_RESOLUTION = "720p" as const;
 
-export type Resolution = typeof IMAGE_GENERATION_RESOLUTION;
+export type Resolution =
+  | typeof IMAGE_GENERATION_RESOLUTION
+  | typeof VIDEO_GENERATION_RESOLUTION;
 
 export type LogoPlacement = "plate" | "wall";
 

@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../../config/env";
@@ -28,6 +30,15 @@ import {
 const terminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
 const kieTerminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
 const staleWaitingTaskMs = 15 * 60 * 1000;
+
+const taskWorkflowStage = (task: GenerationTaskRecord) => {
+  if (task.status === "waiting") return "preparing_assets";
+  if (task.status === "queued") return "queued";
+  if (task.status === "generating") return "generating";
+  if (task.status === "success") return "completed";
+  if (task.status === "canceled") return "canceled";
+  return "failed";
+};
 
 const getApiKeyByHash = (accountHash: string | null | undefined) => {
   if (!accountHash) return null;
@@ -65,6 +76,31 @@ const extractKieTimeoutErrorCode = (error: unknown) => {
   if (!(error instanceof Error)) return null;
   return kieTimeoutErrorCodes.find((code) => error.message.includes(code)) ?? null;
 };
+
+const runFfmpeg = (args: string[]) =>
+  new Promise<void>((resolve, reject) => {
+    const child = spawn(env.ffmpegPath, args, {
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+      if (stderr.length > 8000) stderr = stderr.slice(-8000);
+    });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          `ffmpeg narration mux failed with exit code ${code}: ${stderr.slice(-2000)}`,
+        ),
+      );
+    });
+  });
 
 class TasksService {
   async listRecentTasks(input: {
@@ -273,7 +309,12 @@ class TasksService {
     const status = detail.status;
     const resultImages =
       status === "success"
-        ? await this.persistResultImages(task.moduleCode, detail.resultUrls)
+        ? task.moduleCode === "video-generation"
+          ? await this.muxVideoNarration(
+              await this.persistResultImages(task.moduleCode, detail.resultUrls),
+              record,
+            )
+          : await this.persistResultImages(task.moduleCode, detail.resultUrls)
         : detail.resultUrls.map((url) => ({ url, sourceUrl: url }));
 
     const current = await tasksRepository.findById(task.id);
@@ -355,7 +396,11 @@ class TasksService {
     records: KieTaskRecord[],
     polledSuccessfully: boolean,
   ) {
-    if (!env.kie.fallbackEnabled || task.moduleCode === "short-video") return false;
+    if (
+      !env.kie.fallbackEnabled ||
+      task.moduleCode === "short-video" ||
+      task.moduleCode === "video-generation"
+    ) return false;
     if (records.some((record) => record.role === "fallback")) return false;
     if (!records.some((record) => getRecordInputUrls(record).length > 0)) return false;
     if (this.isPastDeadline(task)) return false;
@@ -461,19 +506,142 @@ class TasksService {
     return results;
   }
 
+  async cancelTask(
+    taskId: string,
+    userId: string,
+    options: { moduleCode?: string } = {},
+  ) {
+    const task = await tasksRepository.findById(taskId, userId);
+    if (!task) throw errors.taskNotFound();
+    if (options.moduleCode && task.moduleCode !== options.moduleCode) {
+      throw errors.taskNotFound();
+    }
+    if (terminalStatuses.includes(task.status)) {
+      throw errors.conflict("task is already in a terminal status", {
+        taskId,
+        status: task.status,
+      });
+    }
+
+    await tasksRepository.markCanceled(
+      task.id,
+      "TASK_CANCELED_BY_USER",
+      "Task canceled by user",
+    );
+    const records = await tasksRepository.listKieTaskRecords(task.id);
+    for (const record of records) {
+      if (!kieTerminalStatuses.includes(record.status)) {
+        await tasksRepository.updateKieRecord({
+          taskId: task.id,
+          role: record.role,
+          status: "canceled",
+          responseJson: {
+            canceledByUser: true,
+            upstreamCancellationSupported: false,
+            originalKieTaskId: record.kieTaskId,
+          },
+        });
+      }
+      await kieKeyPool.release(record.kieAccountHash);
+    }
+    const canceled = await tasksRepository.findById(task.id, userId);
+    if (!canceled) throw errors.taskNotFound();
+    const finalized = await this.finalizeTaskBilling(canceled, true);
+    return {
+      ...this.toResponse(finalized),
+      cancellation: {
+        accepted: true,
+        upstreamCancellationSupported: false,
+        note: "本地任务已停止跟踪，供应商已提交的任务可能继续运行，但结果不会覆盖已取消状态。",
+      },
+    };
+  }
+
+  private async muxVideoNarration(
+    results: Awaited<ReturnType<TasksService["persistResultImages"]>>,
+    record: KieTaskRecord,
+  ) {
+    const request = asRecord(record.requestJson);
+    const mediaInputs = asRecord(request.mediaInputs);
+    const narrationAudio = asRecord(mediaInputs.narrationAudio);
+    const narrationPath =
+      typeof narrationAudio.localPath === "string"
+        ? narrationAudio.localPath
+        : "";
+    if (!narrationPath) {
+      throw new Error("video-generation narration audio local path is missing");
+    }
+    await fs.access(narrationPath);
+
+    const publicBase = env.publicBaseUrl.replace(/\/$/, "");
+    const muxedResults = [];
+    for (const result of results) {
+      const parsed = path.parse(result.localPath);
+      const outputFileName = `${parsed.name}-with-audio.mp4`;
+      const outputPath = path.join(parsed.dir, outputFileName);
+      await runFfmpeg([
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+        "-y",
+        "-i",
+        result.localPath,
+        "-i",
+        narrationPath,
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-af",
+        "apad=whole_dur=15",
+        "-t",
+        "15",
+        "-movflags",
+        "+faststart",
+        outputPath,
+      ]);
+      const stat = await fs.stat(outputPath);
+      muxedResults.push({
+        ...result,
+        url: `${publicBase}/results/video-generation/${outputFileName}`,
+        localPath: outputPath,
+        contentType: "video/mp4",
+        size: stat.size,
+        narrationAudioUrl:
+          typeof narrationAudio.localUrl === "string"
+            ? narrationAudio.localUrl
+            : null,
+      });
+    }
+    return muxedResults;
+  }
+
   private toResponse(task: GenerationTaskRecord) {
     const results = normalizeTaskResults(task.resultJson);
+    const isVideoTask =
+      task.moduleCode === "short-video" || task.moduleCode === "video-generation";
     return {
       taskId: task.id,
       moduleCode: task.moduleCode,
       status: task.status,
       progress: task.progress,
+      workflowStage: taskWorkflowStage(task),
+      canCancel: !terminalStatuses.includes(task.status),
       kieTaskId: task.kieTaskId,
       inputAssetId: task.inputAssetId,
       optionId: task.optionId,
+      scriptDraftId:
+        task.moduleCode === "video-generation" ? task.optionId : null,
       outputRatio: task.outputRatio,
       resolution: task.resolution,
       resultImages: results,
+      resultVideos: isVideoTask ? results : [],
       billingTaskId: task.billingTaskId ?? null,
       billingStatus: task.billingStatus ?? null,
       estimatedPoints: task.estimatedPoints ?? null,
@@ -492,6 +660,9 @@ class TasksService {
           : null,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
+      pollingRecommendedMs: terminalStatuses.includes(task.status)
+        ? null
+        : 5000,
     };
   }
 
@@ -533,6 +704,8 @@ class TasksService {
       status: task.status,
       uiStatus: task.status === "queued" ? "queue" : task.status,
       progress: task.progress,
+      workflowStage: taskWorkflowStage(task),
+      canCancel: !terminalStatuses.includes(task.status),
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
       thumbnail: coverUrl,
@@ -540,10 +713,16 @@ class TasksService {
       downloadUrl,
       ratioLabel: `主图 ${task.outputRatio}`,
       sceneLabel: this.buildRecentSceneLabel(task),
+      vehicleName: task.videoVehicleName ?? null,
+      templateId: task.videoReferenceMaterialId ?? null,
       outputRatio: task.outputRatio,
       inputAssetId: task.inputAssetId,
       inputAssetThumbnailUrl: task.inputAssetThumbnailUrl ?? null,
-      resultCount: normalizeTaskResults(task.resultJson).length,
+      resultCount: results.length,
+      resultVideos:
+        task.moduleCode === "video-generation" ? results : [],
+      scriptDraftId:
+        task.moduleCode === "video-generation" ? task.optionId : null,
       billingTaskId: task.billingTaskId ?? null,
       billingStatus: task.billingStatus ?? null,
       estimatedPoints: task.estimatedPoints ?? null,
@@ -589,6 +768,10 @@ class TasksService {
       });
     }
 
+    if (task.moduleCode === "video-generation" && task.videoVehicleName) {
+      return `${task.videoVehicleName} 数字人口播视频`;
+    }
+
     const labels: Record<string, string> = {
       "showroom-light": "展厅灯光生成任务",
       "outdoor-scene": "户外场景生成任务",
@@ -601,6 +784,7 @@ class TasksService {
       "watermark-remove": "去水印演示",
       "creative-image": "创意生图任务",
       "short-video": "短视频生成任务",
+      "video-generation": "数字人讲车视频",
       "batch-new": "批量上新子任务",
     };
     return labels[task.moduleCode] ?? `${task.moduleCode} 生成任务`;

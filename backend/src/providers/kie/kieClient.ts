@@ -8,6 +8,7 @@ import type {
   CreateKieImageToVideoTaskInput,
   CreateKieImageTaskInput,
   CreateKieImageTaskResult,
+  CreateKieSeedanceVideoTaskInput,
   CreateKieTextToImageTaskInput,
   KieAccountLease,
   KieTaskDetail,
@@ -74,6 +75,9 @@ const isKnownKieVideoCreateFailure = (error: unknown) =>
     "kie create video task failed",
     "kie video task rejected",
     "kie video response missing taskId",
+    "kie create Seedance video task failed",
+    "kie Seedance video task rejected",
+    "kie Seedance video response missing taskId",
   ].some((message) => error.message.includes(message));
 
 const getKieResponseCode = (raw: unknown) => {
@@ -590,6 +594,83 @@ class KieClient {
         await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieLeaseFailure(error));
       }
       throw toKieProviderError(error, "kie create video task failed");
+    }
+  }
+
+  async createSeedanceVideoTaskWithLease(
+    lease: KieAccountLease,
+    input: CreateKieSeedanceVideoTaskInput,
+  ): Promise<CreateKieImageTaskResult> {
+    const requestBody = {
+      model: env.kie.videoModel,
+      input: {
+        prompt: input.prompt,
+        reference_image_urls: input.referenceImageUrls,
+        reference_video_urls: [],
+        reference_audio_urls: input.referenceAudioUrls,
+        return_last_frame: false,
+        aspect_ratio: input.aspectRatio,
+        resolution: input.resolution,
+        duration: input.duration,
+        generate_audio: input.generateAudio,
+        web_search: false,
+      },
+    };
+
+    try {
+      const response = await fetchWithTimeout(env.kie.createTaskUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lease.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }, env.kie.createTimeoutMs, "kie.createSeedanceVideoTask", "KIE_CREATE_TIMEOUT");
+
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieHttpFailure(response.status));
+        throw withKieHttpStatus(
+          errors.generationFailed("kie create Seedance video task failed", raw),
+          response.status,
+        );
+      }
+
+      const rawRecord = asRecord(raw);
+      const rawCode = getKieResponseCode(raw);
+      if (isKieClientErrorCode(rawCode)) {
+        const message =
+          typeof rawRecord.msg === "string" && rawRecord.msg
+            ? rawRecord.msg
+            : "kie Seedance video task rejected";
+        throw errors.generationFailed(message, raw);
+      }
+
+      const data = asRecord(rawRecord.data ?? rawRecord);
+      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
+      if (typeof kieTaskId !== "string" || !kieTaskId) {
+        await applyKieLeaseFailurePolicy(lease.accountHash, "short-cooldown");
+        throw errors.generationFailed("kie Seedance video response missing taskId", raw);
+      }
+
+      return {
+        kieTaskId,
+        accountHash: lease.accountHash,
+        model: env.kie.videoModel,
+        role: "primary",
+        attemptNo: 1,
+        raw: withKieMeta(raw, {
+          model: env.kie.videoModel,
+          role: "primary",
+          attemptNo: 1,
+          inputUrls: [...input.referenceImageUrls, ...input.referenceAudioUrls],
+        }),
+      };
+    } catch (error) {
+      if (!isKnownKieVideoCreateFailure(error)) {
+        await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieLeaseFailure(error));
+      }
+      throw toKieProviderError(error, "kie create Seedance video task failed");
     }
   }
 

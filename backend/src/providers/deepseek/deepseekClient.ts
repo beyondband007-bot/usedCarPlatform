@@ -49,6 +49,21 @@ const parseJsonObject = (value: string) => {
 
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
+const asMessageContent = (value: unknown) => {
+  if (typeof value === "string") return value.trim();
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (!item || typeof item !== "object") return "";
+      const record = item as Record<string, unknown>;
+      return asString(record.text ?? record.content);
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
 const asStringArray = (value: unknown) =>
   Array.isArray(value)
     ? value.map((item) => asString(item)).filter((item) => item.length > 0)
@@ -109,6 +124,7 @@ export class DeepSeekClient {
           temperature: 0.45,
           max_tokens: env.deepseek.maxTokens,
           response_format: { type: "json_object" },
+          thinking: { type: "disabled" },
           messages: [
             { role: "system", content: input.systemPrompt },
             { role: "user", content: input.userPrompt },
@@ -128,7 +144,7 @@ export class DeepSeekClient {
       const choice = raw?.choices?.[0] ?? {};
       const message = choice?.message ?? {};
       const content =
-        asString(message.content) ||
+        asMessageContent(message.content) ||
         asString(choice.text) ||
         asString(raw?.content) ||
         asString(raw?.output_text);
@@ -136,6 +152,8 @@ export class DeepSeekClient {
         throw errors.generationFailed("deepseek response missing content", {
           finishReason: choice?.finish_reason,
           messageKeys: message && typeof message === "object" ? Object.keys(message) : [],
+          responseKeys: raw && typeof raw === "object" ? Object.keys(raw) : [],
+          reasoningLength: asString(message.reasoning_content).length,
           usage: raw?.usage,
         });
       }
