@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, h, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { NButton, NPopconfirm, NSelect, NSwitch, useMessage } from "naive-ui";
@@ -57,6 +57,7 @@ import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.v
 import PresetCombobox, {
   type PresetComboboxOption,
 } from "@/components/business/workspace/PresetCombobox.vue";
+import ShortVideoMaterialUploadPanel from "@/components/business/workspace/ShortVideoMaterialUploadPanel.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -2366,10 +2367,13 @@ async function refreshActiveDeliveryPreview(options?: { refresh?: boolean }) {
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
+const shortVideoCanSubmit = ref(false);
+const shortVideoPanelRef = ref<InstanceType<
+  typeof ShortVideoMaterialUploadPanel
+> | null>(null);
+
 const supportsLogoForGenerate = computed(
-  () =>
-    props.capability.kind === "scene" ||
-    props.capability.code === "short-video",
+  () => props.capability.kind === "scene",
 );
 
 const showOutputRatioForGenerate = computed(() => {
@@ -3093,34 +3097,13 @@ defineExpose({
 
     <template v-else-if="props.capability.code === 'short-video'">
       <div class="generate-panel-body">
-        <section class="batch-card batch-notice short-video-notice">
-          上传车辆外观图后创建短视频任务，默认生成 10 秒、16:9、720p 营销视频。
-        </section>
-
-        <UploadTaskCard
+        <ShortVideoMaterialUploadPanel
+          ref="shortVideoPanelRef"
           :capability="props.capability"
-          :upload-preview-url="uploadedPreviewUrl"
-          :is-uploading="isUploadingVehicle"
-          :upload-disabled="props.isGenerating"
-          @select-file="handleVehicleFileSelected"
-          @remove="handleVehicleImageRemove"
-        />
-
-        <CapabilityOptionSelector
-          v-if="hasBlock('selector')"
-          :capability="props.capability"
-          :selected-option-id="props.selectedOptionId"
           :disabled="props.isGenerating"
-          @select="emit('selectOption', $event)"
+          @can-submit-change="shortVideoCanSubmit = $event"
+          @generate="emit('generate', $event)"
         />
-
-        <section class="workspace-config-module workspace-config-module--logo">
-          <WorkspaceLogoPanel
-            v-model:enabled="useLogo"
-            embedded
-            :disabled="props.isGenerating"
-          />
-        </section>
       </div>
 
       <GenerateActionFooter
@@ -3129,8 +3112,8 @@ defineExpose({
         :cost="props.capability.cost"
         cost-unit="条"
         :loading="props.isGenerating"
-        :disabled="isUploadingVehicle || props.isGenerating || !uploadedAsset"
-        @generate="handleGenerate"
+        :disabled="!shortVideoCanSubmit || props.isGenerating"
+        @generate="shortVideoPanelRef?.submit()"
       />
     </template>
 

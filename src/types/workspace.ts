@@ -207,6 +207,8 @@ export type WorkspaceMenuTagVariant =
   | 'planned'
   | 'beta'
 
+export type SidebarCapabilityStatus = 'generating' | 'success' | 'fail'
+
 export interface WorkspaceMenuItem {
   code: string
   icon: string

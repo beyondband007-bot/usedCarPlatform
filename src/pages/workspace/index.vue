@@ -43,6 +43,7 @@ import { useCreditsStore } from "@/stores/credits";
 import { useSubscriptionStore } from "@/stores/subscription";
 import type {
   CreativeThreadTurn,
+  SidebarCapabilityStatus,
   WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
   WorkspaceDeliveryTaskPreview,
@@ -168,6 +169,11 @@ let isRefreshingRunningTasks = false;
 const activelyResolvingTaskIds = new Set<string>();
 /** 已弹出过完成提示的任务，避免 resolve 与全局轮询重复 toast */
 const notifiedCompletionTaskIds = new Set<string>();
+const SIDEBAR_TERMINAL_STATUS_MS = 4000;
+const sidebarTerminalStatuses = ref<
+  Partial<Record<string, SidebarCapabilityStatus>>
+>({});
+const sidebarStatusTimers = new Map<string, number>();
 
 function resolveCapabilityCodeFromModule(moduleCode: string) {
   const matched = workspaceCapabilities.find(
@@ -602,6 +608,12 @@ async function refreshBatchJob(batchId: string) {
     );
     if (!wasTerminal && isNowTerminal) {
       refreshCreditsBalance();
+      if (next[index].status === "success") {
+        markSidebarTerminalStatus("delivery", "success");
+        message.success(`${getCapabilityLabel("delivery")}生成图片成功`);
+      } else {
+        markSidebarTerminalStatus("delivery", "fail");
+      }
     }
   } catch {
     // Keep placeholder card visible while polling retries.
@@ -702,6 +714,50 @@ function getCapabilityLabel(code: string) {
   );
 }
 
+function clearSidebarTerminalStatus(code: string) {
+  const timer = sidebarStatusTimers.get(code);
+  if (timer) {
+    window.clearTimeout(timer);
+    sidebarStatusTimers.delete(code);
+  }
+
+  if (!sidebarTerminalStatuses.value[code]) return;
+  const next = { ...sidebarTerminalStatuses.value };
+  delete next[code];
+  sidebarTerminalStatuses.value = next;
+}
+
+function markSidebarTerminalStatus(
+  code: string,
+  status: Extract<SidebarCapabilityStatus, "success" | "fail">,
+) {
+  sidebarTerminalStatuses.value = {
+    ...sidebarTerminalStatuses.value,
+    [code]: status,
+  };
+
+  const existingTimer = sidebarStatusTimers.get(code);
+  if (existingTimer) window.clearTimeout(existingTimer);
+
+  const timer = window.setTimeout(() => {
+    if (sidebarTerminalStatuses.value[code] === status) {
+      clearSidebarTerminalStatus(code);
+    }
+    sidebarStatusTimers.delete(code);
+  }, SIDEBAR_TERMINAL_STATUS_MS);
+
+  sidebarStatusTimers.set(code, timer);
+}
+
+function markSidebarStatusForModule(
+  moduleCode: string | undefined,
+  status: Extract<SidebarCapabilityStatus, "success" | "fail">,
+) {
+  const code = moduleCode ? resolveCapabilityCodeFromModule(moduleCode) : null;
+  if (!code) return;
+  markSidebarTerminalStatus(code, status);
+}
+
 function shouldNotifyGenerationSuccess(moduleCode?: string) {
   return Boolean(moduleCode && !isCreativeImageModuleCode(moduleCode));
 }
@@ -711,7 +767,7 @@ function getGenerationSuccessMessage(moduleCode?: string) {
   if (isShortVideoModuleCode(moduleCode)) return "短视频生成成功";
   const capabilityCode = resolveCapabilityCodeFromModule(moduleCode!);
   const label = capabilityCode ? getCapabilityLabel(capabilityCode) : "图片";
-  return `${label}图片生成成功`;
+  return `${label}生成图片成功`;
 }
 
 function notifyGenerationSuccess(
@@ -724,6 +780,7 @@ function notifyGenerationSuccess(
   if (!text) return;
 
   notifiedCompletionTaskIds.add(task.taskId);
+  markSidebarStatusForModule(task.moduleCode, "success");
   message.success(text);
 }
 
@@ -771,7 +828,11 @@ async function pollTrackedRunningTasks() {
 
     const task = result.value;
     if (isTerminalGenerationStatus(task)) {
-      notifyGenerationSuccess(task);
+      if (task.status === "success") {
+        notifyGenerationSuccess(task);
+      } else {
+        markSidebarStatusForModule(task.moduleCode, "fail");
+      }
       delete next[task.taskId];
       clearActiveGenerationTask(task.taskId);
       hasTerminalTask = true;
@@ -929,6 +990,18 @@ const sidebarGeneratingCodes = computed(() => {
   }
 
   return [...codes];
+});
+
+const sidebarCapabilityStatuses = computed(() => {
+  const statuses: Partial<Record<string, SidebarCapabilityStatus>> = {
+    ...sidebarTerminalStatuses.value,
+  };
+
+  for (const code of sidebarGeneratingCodes.value) {
+    statuses[code] = "generating";
+  }
+
+  return statuses;
 });
 
 const activeCapability = computed(
@@ -1352,6 +1425,7 @@ async function resolveGenerationTask(
     }
 
     if (task.status !== "success") {
+      markSidebarStatusForModule(task.moduleCode, "fail");
       message.error(getViewMediaFailureMessage(task.moduleCode));
       return;
     }
@@ -1393,6 +1467,7 @@ async function resolveGenerationTask(
     await assistPanelRef.value?.refreshRecentItems();
   } catch (error) {
     clearActiveGenerationTask(taskId);
+    markSidebarStatusForModule(taskModuleCode, "fail");
     message.error(getViewMediaFailureMessage(taskModuleCode));
   } finally {
     clearActiveGenerationTask(taskId);
@@ -1884,6 +1959,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     await resolveGenerationTask(created.taskId);
   } catch (error) {
     clearActiveGenerationTask();
+    markSidebarTerminalStatus(startedOnCode, "fail");
     const text = error instanceof Error ? error.message : "生成任务创建失败";
     message.error(text);
   } finally {
@@ -1979,6 +2055,10 @@ onMounted(async () => {
 onUnmounted(() => {
   stopGlobalGenerationPolling();
   stopBatchPolling();
+  for (const timer of sidebarStatusTimers.values()) {
+    window.clearTimeout(timer);
+  }
+  sidebarStatusTimers.clear();
 });
 </script>
 
@@ -2005,7 +2085,7 @@ onUnmounted(() => {
       <div class="workspace-col workspace-col--nav">
         <WorkspaceSidebar
           :active-code="activeCode"
-          :generating-codes="sidebarGeneratingCodes"
+          :capability-statuses="sidebarCapabilityStatuses"
           @select="handleSelectCapability"
         />
       </div>

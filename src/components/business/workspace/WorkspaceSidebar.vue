@@ -2,13 +2,13 @@
 import { Icon } from '@iconify/vue'
 
 import { workspaceMenuGroups } from '@/constants/workspace'
-import type { WorkspaceMenuItem } from '@/types/workspace'
+import type { SidebarCapabilityStatus, WorkspaceMenuItem } from '@/types/workspace'
 
 const STATIC_TAG_GROUP_TITLE = '营销工具'
 
 defineProps<{
   activeCode: string
-  generatingCodes?: string[]
+  capabilityStatuses?: Partial<Record<string, SidebarCapabilityStatus>>
 }>()
 
 const emit = defineEmits<{
@@ -23,14 +23,30 @@ function handleSelect(item: WorkspaceMenuItem) {
   emit('select', item.code)
 }
 
-function isGenerating(item: WorkspaceMenuItem, generatingCodes?: string[]) {
-  return Boolean(generatingCodes?.includes(item.code))
+function getCapabilityStatus(
+  item: WorkspaceMenuItem,
+  capabilityStatuses?: Partial<Record<string, SidebarCapabilityStatus>>,
+): SidebarCapabilityStatus | null {
+  return capabilityStatuses?.[item.code] ?? null
 }
 
-function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, generatingCodes?: string[]) {
+function shouldShowStaticTag(
+  groupTitle: string,
+  item: WorkspaceMenuItem,
+  capabilityStatuses?: Partial<Record<string, SidebarCapabilityStatus>>,
+) {
   if (groupTitle !== STATIC_TAG_GROUP_TITLE) return false
-  if (isGenerating(item, generatingCodes)) return false
+  if (getCapabilityStatus(item, capabilityStatuses)) return false
   return Boolean(item.tag)
+}
+
+function getStatusAriaLabel(
+  item: WorkspaceMenuItem,
+  status: SidebarCapabilityStatus,
+) {
+  if (status === 'generating') return `${item.label}，正在生成中`
+  if (status === 'success') return `${item.label}，生成成功`
+  return `${item.label}，生成失败`
 }
 </script>
 
@@ -52,15 +68,20 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
               :class="{
                 'is-active': item.code === activeCode,
                 'is-disabled': item.disabled,
-                'has-generating-tag': isGenerating(item, generatingCodes),
+                'has-status-dot': Boolean(
+                  getCapabilityStatus(item, capabilityStatuses),
+                ),
                 [`tag-${item.tagVariant ?? 'planned'}`]:
-                  shouldShowStaticTag(group.title, item, generatingCodes),
+                  shouldShowStaticTag(group.title, item, capabilityStatuses),
               }"
               :disabled="item.disabled"
               :aria-label="
-                isGenerating(item, generatingCodes)
-                  ? `${item.label}，正在生成中`
-                  : shouldShowStaticTag(group.title, item, generatingCodes)
+                getCapabilityStatus(item, capabilityStatuses)
+                  ? getStatusAriaLabel(
+                      item,
+                      getCapabilityStatus(item, capabilityStatuses)!,
+                    )
+                  : shouldShowStaticTag(group.title, item, capabilityStatuses)
                     ? `${item.label}，${item.tag}`
                     : item.label
               "
@@ -71,13 +92,13 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
               </span>
               <span class="sidebar-menu-label">{{ item.label }}</span>
               <span
-                v-if="isGenerating(item, generatingCodes)"
-                class="sidebar-menu-tag is-generating"
-              >
-                正在生成中
-              </span>
+                v-if="getCapabilityStatus(item, capabilityStatuses)"
+                class="sidebar-status-dot"
+                :class="`is-${getCapabilityStatus(item, capabilityStatuses)}`"
+                aria-hidden="true"
+              />
               <span
-                v-else-if="shouldShowStaticTag(group.title, item, generatingCodes)"
+                v-else-if="shouldShowStaticTag(group.title, item, capabilityStatuses)"
                 class="sidebar-menu-tag"
               >
                 {{ item.tag }}
@@ -223,6 +244,28 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
   white-space: nowrap;
 }
 
+.sidebar-status-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.sidebar-status-dot.is-generating {
+  background: #ffc000;
+  box-shadow: 0 0 0 3px rgba(255, 192, 0, 0.18);
+}
+
+.sidebar-status-dot.is-success {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+}
+
+.sidebar-status-dot.is-fail {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+}
+
 .sidebar-menu-tag {
   flex-shrink: 0;
   padding: 3px 8px;
@@ -231,19 +274,6 @@ function shouldShowStaticTag(groupTitle: string, item: WorkspaceMenuItem, genera
   font-weight: 800;
   line-height: 1.2;
   white-space: nowrap;
-}
-
-.sidebar-menu-tag.is-generating {
-  background: rgba(255, 255, 255, 0.96);
-  color: #171100;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-:global(.workspace-page.theme-light) .sidebar-menu-tag.is-generating {
-  border: 1px solid #e8edf5;
-  background: #fff;
-  color: #334155;
-  box-shadow: 0 1px 4px rgba(78, 111, 148, 0.08);
 }
 
 .sidebar-menu-item.tag-available .sidebar-menu-tag {
