@@ -111,10 +111,17 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
           />
           <RouterView v-else v-slot="{ Component }">
             <component :is="Component" v-if="Component" />
-            <div v-else class="route-render-fallback">Route view is empty.</div>
+            <div v-else class="route-boot-shell" aria-hidden="true" />
           </RouterView>
         </div>
       </NDialogProvider>
     </NMessageProvider>
   </NConfigProvider>
 </template>
+
+<style scoped lang="scss">
+.route-boot-shell {
+  min-height: 100vh;
+  background: var(--app-bg);
+}
+</style>

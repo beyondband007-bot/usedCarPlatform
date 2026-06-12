@@ -18,7 +18,9 @@ import {
   defaultBackOfficePermissionPolicies,
   resolveAccountCreationPolicy,
 } from "./accountCreationPolicyDefaults";
+import { listAgentDepositBalances } from "./agentDepositService";
 import { getCommissionPolicy } from "./commissionPolicyService";
+import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 export type AccountCreationOperator = {
   userId: string;
@@ -42,6 +44,9 @@ export type AdminPolicyOverride = {
   username: string;
   displayName: string;
   phone: string | null;
+  creditsAvailableBalance: number | null;
+  creditsTotalBalance: number | null;
+  creditsCurrency: string | null;
   developerAllowsCreateUsers: boolean;
   developerAllowsCreateAgents: boolean;
   effectiveCanCreateUsers: boolean;
@@ -55,6 +60,11 @@ export type AgentPolicyOverride = {
   username: string;
   displayName: string;
   phone: string | null;
+  creditsAvailableBalance: number | null;
+  creditsTotalBalance: number | null;
+  creditsCurrency: string | null;
+  depositBalance: number;
+  depositCurrency: string;
   assignedByUserId: string | null;
   assignedByUsername: string | null;
   assignedByDisplayName: string | null;
@@ -71,6 +81,9 @@ type AdminPolicyOverrideRow = RowDataPacket & {
   username: string;
   display_name: string;
   phone: string | null;
+  credits_user_id: number | null;
+  account_scope: string | null;
+  credits_tenant_id: number | null;
   developer_allows_create_users: 0 | 1 | null;
   developer_allows_create_agents: 0 | 1 | null;
   updated_by_user_id: string | null;
@@ -82,6 +95,9 @@ type AgentPolicyOverrideRow = RowDataPacket & {
   username: string;
   display_name: string;
   phone: string | null;
+  credits_user_id: number | null;
+  account_scope: string | null;
+  credits_tenant_id: number | null;
   assigned_by_user_id: string | null;
   assigned_by_username: string | null;
   assigned_by_display_name: string | null;
@@ -256,6 +272,9 @@ async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[
        u.username,
        u.display_name,
        u.phone,
+       u.credits_user_id,
+       u.account_scope,
+       u.credits_tenant_id,
        override.developer_allows_create_users,
        override.developer_allows_create_agents,
        override.updated_by_user_id,
@@ -268,16 +287,30 @@ async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[
        AND u.status = 'active'
      ORDER BY boa.created_at DESC`,
   );
-
+  const balances = await listCreditsBalances(
+    rows.map((row) => ({
+      creditsUserId: row.credits_user_id,
+      accountScope: row.account_scope,
+      creditsTenantId: row.credits_tenant_id,
+    })),
+  );
   return {
     items: rows.map((row) => {
       const rowUserGate = row.developer_allows_create_users !== 0;
       const rowAgentGate = row.developer_allows_create_agents !== 0;
+      const balance = balances.get(creditsBalanceKey({
+        creditsUserId: row.credits_user_id,
+        accountScope: row.account_scope,
+        creditsTenantId: row.credits_tenant_id,
+      }) ?? "");
       return {
         userId: row.user_id,
         username: row.username,
         displayName: row.display_name,
         phone: row.phone,
+        creditsAvailableBalance: balance?.availableBalance ?? null,
+        creditsTotalBalance: balance?.totalBalance ?? null,
+        creditsCurrency: balance?.currency ?? null,
         developerAllowsCreateUsers: rowUserGate,
         developerAllowsCreateAgents: rowAgentGate,
         effectiveCanCreateUsers: globalCreateUserGate && rowUserGate,
@@ -348,6 +381,9 @@ async function listAgentPolicyOverrides(
        u.username,
        u.display_name,
        u.phone,
+       u.credits_user_id,
+       u.account_scope,
+       u.credits_tenant_id,
        boa.assigned_by_user_id,
        assigned_by.username assigned_by_username,
        assigned_by.display_name assigned_by_display_name,
@@ -366,15 +402,33 @@ async function listAgentPolicyOverrides(
      ORDER BY boa.created_at DESC`,
     params,
   );
+  const balances = await listCreditsBalances(
+    rows.map((row) => ({
+      creditsUserId: row.credits_user_id,
+      accountScope: row.account_scope,
+      creditsTenantId: row.credits_tenant_id,
+    })),
+  );
+  const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
 
   return {
     items: rows.map((row) => {
       const rowGate = row.developer_allows_create_users !== 0;
+      const balance = balances.get(creditsBalanceKey({
+        creditsUserId: row.credits_user_id,
+        accountScope: row.account_scope,
+        creditsTenantId: row.credits_tenant_id,
+      }) ?? "");
       return {
         userId: row.user_id,
         username: row.username,
         displayName: row.display_name,
         phone: row.phone,
+        creditsAvailableBalance: balance?.availableBalance ?? null,
+        creditsTotalBalance: balance?.totalBalance ?? null,
+        creditsCurrency: balance?.currency ?? null,
+        depositBalance: depositBalances.get(row.user_id)?.balance ?? 0,
+        depositCurrency: depositBalances.get(row.user_id)?.currency ?? "CNY",
         assignedByUserId: row.assigned_by_user_id,
         assignedByUsername: row.assigned_by_username,
         assignedByDisplayName: row.assigned_by_display_name,

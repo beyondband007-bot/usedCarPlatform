@@ -117,10 +117,12 @@ export interface WorkspaceDeliveryTaskPreview {
   assets: WorkspaceDeliveryTaskPreviewAsset[]
 }
 
+export type ShortVideoGenerateAction = 'confirm'
+
 export interface WorkspaceGeneratePayload {
   inputAssetId?: string
   assetIds?: string[]
-  outputRatio: string
+  outputRatio?: string
   resolution?: string
   optionId?: string
   sceneReferenceImageUrl?: string
@@ -129,6 +131,8 @@ export interface WorkspaceGeneratePayload {
   logoPlacements?: LogoPlacement[]
   colorCode?: string
   prompt?: string
+  shortVideoAction?: ShortVideoGenerateAction
+  scriptDraftId?: string
 }
 
 export type WorkspaceBatchItemKind =
@@ -206,6 +210,8 @@ export type WorkspaceMenuTagVariant =
   | 'package'
   | 'planned'
   | 'beta'
+
+export type SidebarCapabilityStatus = 'generating' | 'success' | 'fail'
 
 export interface WorkspaceMenuItem {
   code: string

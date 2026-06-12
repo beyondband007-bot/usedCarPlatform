@@ -149,18 +149,46 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(props.total / props.pageSize)),
 );
 
+type PaginationItem = number | "ellipsis";
+
+function buildPaginationItems(
+  current: number,
+  total: number,
+  siblingCount = 1,
+): PaginationItem[] {
+  if (total <= 1) return [1];
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+
+  const pages = new Set<number>([1, total, current]);
+  for (let offset = 1; offset <= siblingCount; offset += 1) {
+    pages.add(current - offset);
+    pages.add(current + offset);
+  }
+
+  const sorted = [...pages]
+    .filter((page) => page >= 1 && page <= total)
+    .sort((left, right) => left - right);
+
+  const items: PaginationItem[] = [];
+  for (let index = 0; index < sorted.length; index += 1) {
+    const page = sorted[index];
+    const previous = sorted[index - 1];
+    if (index > 0 && page - previous > 1) {
+      items.push("ellipsis");
+    }
+    items.push(page);
+  }
+
+  return items;
+}
+
 const pageItems = computed(() =>
-  Array.from({ length: totalPages.value }, (_, index) => index + 1),
+  buildPaginationItems(props.currentPage, totalPages.value),
 );
 
-const rangeText = computed(() => {
-  if (!props.total) return "共 0 条";
-  if (totalPages.value <= 1) return `共 ${props.total} 条`;
-
-  const start = (props.currentPage - 1) * props.pageSize + 1;
-  const end = Math.min(props.currentPage * props.pageSize, props.total);
-  return `显示第 ${start}-${end} 条，共 ${props.total} 条`;
-});
+const rangeText = computed(() => `共计${formatNumber(props.total)}条流水`);
 
 const showCustomDate = computed(() => props.filters.dateRange === "custom");
 
@@ -379,7 +407,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         class="points-export-button"
         @click="emit('export')"
       >
-        <Icon icon="mdi:download-outline" />
+        <Icon icon="mdi:tray-arrow-up" />
         导出
       </button>
     </div>
@@ -486,7 +514,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     </div>
 
     <div class="points-pagination-bar">
-      <span>{{ rangeText }}</span>
+      <span class="points-pagination-range">{{ rangeText }}</span>
       <div class="points-pagination-controls">
         <div class="points-page-size">
           <span class="points-page-size-label">每页</span>
@@ -509,18 +537,26 @@ function resolveSourceUsage(record: PointsFlowRecord) {
           >
             <Icon icon="mdi:chevron-left" />
           </button>
-          <button
-            v-for="page in pageItems"
-            :key="page"
-            type="button"
-            :class="{
-              active: page === currentPage,
-              'is-admin': config.adminTheme,
-            }"
-            @click="setPage(page)"
-          >
-            {{ page }}
-          </button>
+          <template v-for="(page, pageIndex) in pageItems" :key="`${page}-${pageIndex}`">
+            <span
+              v-if="page === 'ellipsis'"
+              class="points-pagination-ellipsis"
+              aria-hidden="true"
+            >
+              …
+            </span>
+            <button
+              v-else
+              type="button"
+              :class="{
+                active: page === currentPage,
+                'is-admin': config.adminTheme,
+              }"
+              @click="setPage(page)"
+            >
+              {{ page }}
+            </button>
+          </template>
           <button
             type="button"
             :disabled="currentPage === totalPages"
@@ -667,7 +703,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
         class="points-export-button"
         @click="emit('export')"
       >
-        <Icon icon="mdi:download-outline" />
+        <Icon icon="mdi:tray-arrow-up" />
         导出
       </button>
     </div>
@@ -753,7 +789,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
     </div>
 
     <div class="points-pagination-bar">
-      <span>{{ rangeText }}</span>
+      <span class="points-pagination-range">{{ rangeText }}</span>
       <div class="points-pagination-controls">
         <div class="points-page-size">
           <span class="points-page-size-label">每页</span>
@@ -776,18 +812,26 @@ function resolveSourceUsage(record: PointsFlowRecord) {
           >
             <Icon icon="mdi:chevron-left" />
           </button>
-          <button
-            v-for="page in pageItems"
-            :key="page"
-            type="button"
-            :class="{
-              active: page === currentPage,
-              'is-admin': config.adminTheme,
-            }"
-            @click="setPage(page)"
-          >
-            {{ page }}
-          </button>
+          <template v-for="(page, pageIndex) in pageItems" :key="`${page}-${pageIndex}`">
+            <span
+              v-if="page === 'ellipsis'"
+              class="points-pagination-ellipsis"
+              aria-hidden="true"
+            >
+              …
+            </span>
+            <button
+              v-else
+              type="button"
+              :class="{
+                active: page === currentPage,
+                'is-admin': config.adminTheme,
+              }"
+              @click="setPage(page)"
+            >
+              {{ page }}
+            </button>
+          </template>
           <button
             type="button"
             :disabled="currentPage === totalPages"
@@ -1202,20 +1246,27 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   padding: 12px 20px;
   border-top: 1px solid #f1f5f9;
 }
 
-.points-pagination-bar > span {
+.points-pagination-range {
+  flex: 0 0 auto;
   color: #94a3b8;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .points-pagination-controls {
   display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 16px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px 16px;
 }
 
 .points-page-size {
@@ -1244,8 +1295,21 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-pagination {
   display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+}
+
+.points-pagination-ellipsis {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  user-select: none;
 }
 
 .points-pagination button {
@@ -1503,7 +1567,11 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   border-top-color: #263347;
 }
 
-.points-flow-card.theme-dark .points-pagination-bar > span {
+.points-flow-card.theme-dark .points-pagination-range {
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark .points-pagination-ellipsis {
   color: #9ca3af;
 }
 
@@ -1656,8 +1724,9 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-subaccount-bar {
   display: flex;
+  width: 100%;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: 10px 14px;
   margin-bottom: 4px;
 }
@@ -1695,15 +1764,17 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card--design .points-subaccount-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   align-items: stretch;
   gap: 10px;
 }
 
 .points-flow-card--design .points-subaccount-chip {
   display: inline-flex;
-  min-width: 150px;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
@@ -1775,6 +1846,7 @@ function resolveSourceUsage(record: PointsFlowRecord) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-top: 24px;
   margin-bottom: 10px;
 }
 
@@ -1805,18 +1877,28 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 
 .points-flow-card--design .points-export-button {
   display: inline-flex;
-  height: 32px;
+  height: 28px;
   flex-shrink: 0;
   align-items: center;
   gap: 4px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   color: #64748b;
   cursor: pointer;
   font-family: inherit;
   font-size: 12px;
+  font-weight: 500;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.points-flow-card--design .points-export-button :deep(svg) {
+  width: 14px;
+  height: 14px;
 }
 
 .points-flow-card--design .points-export-button:hover {
@@ -2069,20 +2151,52 @@ function resolveSourceUsage(record: PointsFlowRecord) {
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip {
-  border-color: rgb(255 255 255 / 12%);
-  background: rgb(15 23 42 / 45%);
-  color: #cbd5e1;
+  border-color: rgb(255 255 255 / 10%);
+  background: rgb(27 28 29);
+  color: #f4d36a;
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip.is-active {
   border-color: rgb(239 194 76 / 45%);
-  background: rgb(239 194 76 / 16%);
-  color: #fde68a;
+  background: rgb(239 194 76 / 12%);
+  color: #f4d36a;
 }
 
-.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-copy strong,
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-avatar {
+  background: #d4a017;
+  color: #1a1400;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-copy strong {
+  color: #f7e8c3;
+}
+
 .points-flow-card.theme-dark.points-flow-card--design .points-subaccount-copy span {
-  color: #ffffff;
+  color: #a89560;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip.is-active
+  .points-subaccount-copy
+  strong {
+  color: #f4d36a;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-subaccount-chip.is-active
+  .points-subaccount-copy
+  span {
+  color: #c8b47a;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-export-button {
+  border-color: rgb(255 255 255 / 16%);
+  background: transparent;
+  color: #9ca3af;
+}
+
+.points-flow-card.theme-dark.points-flow-card--design .points-export-button:hover {
+  border-color: rgb(255 255 255 / 24%);
+  background: rgb(255 255 255 / 4%);
+  color: #d1d5db;
 }
 
 .points-flow-card.theme-dark.points-flow-card--design .points-section-title h2,

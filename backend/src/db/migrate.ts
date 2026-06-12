@@ -1,5 +1,7 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 
+import type { RowDataPacket } from "mysql2";
+
 import { pool } from "./mysql";
 import { migrations } from "./migrations";
 import { env } from "../config/env";
@@ -13,8 +15,18 @@ import {
   defaultBackOfficeRolePermissions,
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
+import { ensureAllAgentDepositAccounts } from "../modules/platform/agentDepositService";
 
 const ADMIN_USER_ID = "user_admin";
+
+type ForeignKeyColumnRow = RowDataPacket & {
+  column_name: string;
+  referenced_column_name: string;
+};
+
+type PrimaryKeyColumnRow = RowDataPacket & {
+  column_name: string;
+};
 
 const columnExists = async (tableName: string, columnName: string) => {
   const [rows] = await pool.query<any[]>(
@@ -47,6 +59,41 @@ const indexExists = async (tableName: string, indexName: string) => {
   return rows.length > 0;
 };
 
+const foreignKeyExists = async (tableName: string, constraintName: string) => {
+  const [rows] = await pool.query<any[]>(
+    `SELECT 1
+     FROM information_schema.table_constraints
+     WHERE table_schema = DATABASE()
+       AND table_name = :tableName
+       AND constraint_name = :constraintName
+       AND constraint_type = 'FOREIGN KEY'
+     LIMIT 1`,
+    { tableName, constraintName },
+  );
+  return rows.length > 0;
+};
+
+const getForeignKeyColumns = async (tableName: string, constraintName: string) => {
+  const [rows] = await pool.query<ForeignKeyColumnRow[]>(
+    `SELECT column_name, referenced_column_name
+     FROM information_schema.key_column_usage
+     WHERE table_schema = DATABASE()
+       AND table_name = :tableName
+       AND constraint_name = :constraintName
+     ORDER BY ordinal_position`,
+    { tableName, constraintName },
+  );
+  return rows.map((row) => ({
+    columnName: row.column_name,
+    referencedColumnName: row.referenced_column_name,
+  }));
+};
+
+const dropForeignKeyIfExists = async (tableName: string, constraintName: string) => {
+  if (!(await foreignKeyExists(tableName, constraintName))) return;
+  await pool.query(`ALTER TABLE ${tableName} DROP FOREIGN KEY ${constraintName}`);
+};
+
 const addIndexIfMissing = async (tableName: string, indexName: string, definition: string) => {
   if (await indexExists(tableName, indexName)) return;
   await pool.query(`ALTER TABLE ${tableName} ADD INDEX ${indexName} ${definition}`);
@@ -74,8 +121,67 @@ const tableExists = async (tableName: string) => {
   return rows.length > 0;
 };
 
+const getPrimaryKeyColumns = async (tableName: string) => {
+  const [rows] = await pool.query<PrimaryKeyColumnRow[]>(
+    `SELECT column_name
+     FROM information_schema.key_column_usage
+     WHERE table_schema = DATABASE()
+       AND table_name = :tableName
+       AND constraint_name = 'PRIMARY'
+     ORDER BY ordinal_position`,
+    { tableName },
+  );
+  return rows.map((row) => row.column_name);
+};
+
 const makeColumnNullable = async (tableName: string, columnName: string, definition: string) => {
   await pool.query(`ALTER TABLE ${tableName} MODIFY COLUMN ${columnName} ${definition}`);
+};
+
+const ensureCompositeSubscriptionPlanKey = async () => {
+  await pool.query(
+    `UPDATE subscription_plans
+     SET application_code = 'used-car-platform'
+     WHERE application_code IS NULL OR application_code = ''`,
+  );
+  await pool.query(
+    `UPDATE user_subscriptions
+     SET application_code = 'used-car-platform'
+     WHERE application_code IS NULL OR application_code = ''`,
+  );
+
+  const planForeignKeyColumns = await getForeignKeyColumns("user_subscriptions", "user_subscriptions_plan_fk");
+  const hasCompositePlanForeignKey =
+    planForeignKeyColumns.length === 2 &&
+    planForeignKeyColumns[0]?.columnName === "application_code" &&
+    planForeignKeyColumns[0]?.referencedColumnName === "application_code" &&
+    planForeignKeyColumns[1]?.columnName === "plan_code" &&
+    planForeignKeyColumns[1]?.referencedColumnName === "code";
+
+  if (!hasCompositePlanForeignKey) {
+    await dropForeignKeyIfExists("user_subscriptions", "user_subscriptions_plan_fk");
+  }
+
+  const primaryKeyColumns = await getPrimaryKeyColumns("subscription_plans");
+  const hasCompositePrimaryKey =
+    primaryKeyColumns.length === 2 &&
+    primaryKeyColumns[0] === "application_code" &&
+    primaryKeyColumns[1] === "code";
+
+  if (!hasCompositePrimaryKey) {
+    await pool.query("ALTER TABLE subscription_plans DROP PRIMARY KEY");
+    await pool.query("ALTER TABLE subscription_plans ADD PRIMARY KEY (application_code, code)");
+  }
+
+  if (!hasCompositePlanForeignKey) {
+    await pool.query(
+      `ALTER TABLE user_subscriptions
+       ADD CONSTRAINT user_subscriptions_plan_fk
+       FOREIGN KEY (application_code, plan_code)
+       REFERENCES subscription_plans (application_code, code)
+       ON DELETE RESTRICT ON UPDATE CASCADE`,
+    );
+  }
 };
 
 const backfillGenerationOwnership = async () => {
@@ -135,6 +241,7 @@ const ensureSeedPersonalCreditsUser = async (input: { username: string; plan: st
   if (!env.credits.enabled) return null;
 
   const credits = await ensurePersonalCreditsAccount({
+    username: input.username,
     email: creditsEmailForUsername(input.username),
     initialPoints: await planGiftPoints(input.plan),
   });
@@ -145,13 +252,17 @@ const ensureSeedPersonalCreditsUser = async (input: { username: string; plan: st
 const seedSubscriptionPlans = async () => {
   await pool.query(
     `INSERT INTO subscription_plans
-      (code, name, price, account_limit, concurrent_task_limit, visual_concurrent_task_limit,
-       batch_concurrent_task_limit, gift_points, status)
+      (code, application_code, name, price, account_limit, concurrent_task_limit, visual_concurrent_task_limit,
+       batch_concurrent_task_limit, gift_points, status, metadata_json)
      VALUES
-      ('basic', '企业基础档', 980.00, 1, 1, 1, 1, 20000, 'active'),
-      ('team', '企业团队档', 3980.00, 5, 5, 5, 5, 100000, 'active'),
-      ('flagship', '企业旗舰档', 9800.00, 20, 20, 20, 20, 800000, 'active')
+      ('basic', 'used-car-platform', '企业基础档', 980.00, 1, 1, 1, 1, 20000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 0)),
+      ('team', 'used-car-platform', '企业团队档', 3980.00, 5, 5, 5, 5, 100000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 0)),
+      ('flagship', 'used-car-platform', '企业旗舰档', 9800.00, 20, 20, 20, 20, 800000, 'active',
+       JSON_OBJECT('autoChildAccountCount', 3))
      ON DUPLICATE KEY UPDATE
+      application_code = VALUES(application_code),
       name = VALUES(name),
       price = VALUES(price),
       account_limit = VALUES(account_limit),
@@ -159,7 +270,8 @@ const seedSubscriptionPlans = async () => {
       visual_concurrent_task_limit = VALUES(visual_concurrent_task_limit),
       batch_concurrent_task_limit = VALUES(batch_concurrent_task_limit),
       gift_points = VALUES(gift_points),
-      status = VALUES(status)`,
+      status = VALUES(status),
+      metadata_json = VALUES(metadata_json)`,
   );
 };
 
@@ -339,9 +451,10 @@ const seedAuthData = async () => {
     }
 
     await pool.query(
-      `INSERT INTO user_subscriptions (user_id, plan_code, status)
-       VALUES (:userId, :planCode, 'active')
+      `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status)
+       VALUES (:userId, 'used-car-platform', :planCode, 'active')
        ON DUPLICATE KEY UPDATE
+        application_code = VALUES(application_code),
         plan_code = VALUES(plan_code),
         status = VALUES(status)`,
       { userId: user.id, planCode: user.plan },
@@ -353,11 +466,12 @@ const migrateMockSubscriptions = async () => {
   if (!(await tableExists("mock_user_subscriptions"))) return;
 
   await pool.query(
-    `INSERT INTO user_subscriptions (user_id, plan_code, status, starts_at, expires_at)
-     SELECT u.id, mus.plan_code, mus.status, mus.starts_at, mus.expires_at
+    `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status, starts_at, expires_at)
+     SELECT u.id, 'used-car-platform', mus.plan_code, mus.status, mus.starts_at, mus.expires_at
      FROM mock_user_subscriptions mus
      JOIN app_users u ON u.username = mus.mock_user_key
      ON DUPLICATE KEY UPDATE
+      application_code = VALUES(application_code),
       plan_code = VALUES(plan_code),
       status = VALUES(status),
       expires_at = VALUES(expires_at)`,
@@ -412,8 +526,9 @@ const seedFlagshipEnterpriseTenant = async () => {
         tenantName: "企业旗舰版演示企业",
         initialPoints: await planGiftPoints("flagship"),
         members: [
-          { email: creditsEmailForUsername("flagship"), role: "owner" },
+          { username: "flagship", email: creditsEmailForUsername("flagship"), role: "owner" },
           ...childUsers.map((user) => ({
+            username: user.username,
             email: creditsEmailForUsername(user.username),
             role: user.creditsRole,
           })),
@@ -693,6 +808,28 @@ const run = async () => {
     }
     await addColumnIfMissing("app_users", "phone", "VARCHAR(32) NULL AFTER username");
     await addUniqueIndexIfMissing("app_users", "uk_app_users_phone", "(phone)");
+    await addColumnIfMissing(
+      "subscription_plans",
+      "application_code",
+      "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER code",
+    );
+    await addColumnIfMissing("subscription_plans", "metadata_json", "JSON NULL AFTER status");
+    await addIndexIfMissing(
+      "subscription_plans",
+      "idx_subscription_plans_application_status",
+      "(application_code, status)",
+    );
+    await addColumnIfMissing(
+      "user_subscriptions",
+      "application_code",
+      "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER user_id",
+    );
+    await addIndexIfMissing(
+      "user_subscriptions",
+      "idx_user_subscriptions_application_plan",
+      "(application_code, plan_code)",
+    );
+    await ensureCompositeSubscriptionPlanKey();
     await addColumnIfMissing("delivery_assets", "local_path", "VARCHAR(1024) NULL");
     await addColumnIfMissing("delivery_assets", "deleted_at", "DATETIME(3) NULL");
     await addColumnIfMissing("delivery_packages", "task_id", "VARCHAR(64) NULL");
@@ -796,6 +933,7 @@ const run = async () => {
     await migrateMockSubscriptions();
     await seedFlagshipEnterpriseTenant();
     await seedAgentOperationsData();
+    await ensureAllAgentDepositAccounts();
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();

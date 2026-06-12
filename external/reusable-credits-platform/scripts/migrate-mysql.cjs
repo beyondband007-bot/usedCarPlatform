@@ -362,6 +362,13 @@ const MIGRATIONS = [
         INDEX agent_profiles_approved_by_user_id_idx (approved_by_user_id)
       )`
     ]
+  },
+  {
+    name: "000003_users_username_identity",
+    statements: [
+      `ALTER TABLE users ADD COLUMN username VARCHAR(64) NULL AFTER id`,
+      `CREATE UNIQUE INDEX users_username_idx ON users (username)`
+    ]
   }
 ];
 

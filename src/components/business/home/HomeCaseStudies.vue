@@ -296,8 +296,13 @@ onMounted(() => {
 }
 
 @media (max-width: 767px) {
+  .section-block {
+    padding-bottom: calc(var(--home-section-pb, 86px) + var(--h5-bottom-inset, 0px));
+  }
+
   .section-title {
     width: 100%;
+    margin-bottom: 28px;
   }
 
   .section-title h2,
@@ -306,32 +311,48 @@ onMounted(() => {
   }
 
   .section-title h2 {
-    font-size: clamp(22px, 6vw, 28px);
+    font-size: clamp(18px, 5.2vw, 24px);
+    line-height: 1.25;
+  }
+
+  .section-title p {
+    font-size: clamp(12px, 3.2vw, 14px);
+    line-height: 1.6;
   }
 
   .tabs {
     width: fit-content;
-    max-width: 100%;
-    margin-right: auto;
-    margin-left: auto;
-    margin-bottom: 38px;
+    max-width: calc(100% - var(--home-space-x, 16px) * 2);
+    margin: -16px auto 24px;
     overflow-x: auto;
-    justify-content: center;
+    justify-content: flex-start;
     -webkit-overflow-scrolling: touch;
   }
 
   .tab {
-    min-height: 44px;
+    min-height: 36px;
+    padding: 0 16px;
     flex-shrink: 0;
+    font-size: 13px;
+  }
+
+  .case-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 10px;
   }
 
   .case-image,
   .case-panel {
-    min-height: 280px;
+    min-height: 0;
+    border-radius: var(--home-radius-card, 16px);
+  }
+
+  .case-image {
+    aspect-ratio: 4 / 5;
   }
 
   .case-panel {
-    padding: 28px;
+    padding: 14px 12px;
   }
 
   .case-panel h3,
@@ -341,8 +362,20 @@ onMounted(() => {
   }
 
   .case-panel h3 {
-    margin-bottom: 28px;
-    font-size: clamp(24px, 6vw, 32px);
+    margin-bottom: 12px;
+    font-size: clamp(13px, 3.6vw, 16px);
+    line-height: 1.3;
+  }
+
+  .case-panel strong {
+    margin-bottom: 6px;
+    font-size: clamp(11px, 3vw, 13px);
+  }
+
+  .case-panel p {
+    margin: 0 0 12px;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.55;
   }
 }
 </style>

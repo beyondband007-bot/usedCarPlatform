@@ -18,7 +18,11 @@ export interface UploadedAsset {
   size: number
 }
 
-export type AssetPurpose = 'car_exterior' | 'car_interior' | 'logo'
+export type AssetPurpose =
+  | 'car_exterior'
+  | 'car_interior'
+  | 'logo'
+  | 'video_reference_image'
 export type LogoPlacement = 'plate' | 'wall'
 export type LogoPlacementMode = 'none' | 'plate' | 'wall' | 'plate_wall'
 
@@ -1138,6 +1142,9 @@ export interface AgentOperationsCustomer {
   createdByUsername?: string | null
   createdByDisplayName?: string | null
   createdByRole?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   totalTopUpAmount?: number | string
 }
 
@@ -1245,6 +1252,8 @@ export interface AgentOperationsOverview {
     userId: string
     username: string
     displayName: string
+    depositBalance?: number | string | null
+    depositCurrency?: string | null
   }
   metrics: {
     customerCount: number
@@ -1297,6 +1306,11 @@ export interface PlatformAgentProfile {
   displayName: string
   phone?: string | null
   creditsUserId?: number | string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
+  depositBalance?: number | string | null
+  depositCurrency?: string | null
   status: string
   assignmentStatus: string
   assignedByUserId?: string | null
@@ -1319,6 +1333,9 @@ export interface PlatformAdminPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
   developerAllowsCreateUsers: boolean
   developerAllowsCreateAgents: boolean
   effectiveCanCreateUsers: boolean
@@ -1336,6 +1353,11 @@ export interface PlatformAgentPolicyOverride {
   username: string
   displayName: string
   phone?: string | null
+  creditsAvailableBalance?: number | string | null
+  creditsTotalBalance?: number | string | null
+  creditsCurrency?: string | null
+  depositBalance?: number | string | null
+  depositCurrency?: string | null
   assignedByUserId?: string | null
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null
@@ -1396,7 +1418,21 @@ export interface CommissionPolicy {
 }
 
 export type PlatformUserTargetRole = 'admin' | 'agent' | 'user'
-export type PlatformUserPlanCode = 'basic' | 'team' | 'flagship'
+export type PlatformUserPlanCode = string
+
+export interface PlatformSubscriptionPlan {
+  code: string
+  applicationCode: string
+  name: string
+  price: number
+  accountLimit: number
+  concurrentTaskLimit: number
+  visualConcurrentTaskLimit: number
+  batchConcurrentTaskLimit: number
+  giftPoints: number
+  status: string
+  metadata?: Record<string, unknown>
+}
 
 export interface CreatePlatformUserPayload {
   idempotencyKey: string
@@ -1973,6 +2009,16 @@ export async function createPlatformUser(
   const response = await request.post<ApiResponse<PlatformUserCreationResult>>(
     '/platform/users',
     payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformSubscriptionPlans(params: {
+  applicationCode: string
+}): Promise<{ applicationCode: string; items: PlatformSubscriptionPlan[] }> {
+  const response = await request.get<ApiResponse<{ applicationCode: string; items: PlatformSubscriptionPlan[] }>>(
+    '/platform/subscription-plans',
+    { params },
   )
   return unwrapApiResponse(response)
 }

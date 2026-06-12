@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog, useMessage } from "naive-ui";
 
+import { createVideoGenerationTask } from "@/api/video-generation";
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
@@ -22,6 +23,12 @@ import {
   type GenerationTaskStatus,
   type UploadedAsset,
 } from "@/api/visual-workbench";
+import {
+  SHORT_VIDEO_CAPABILITY_CODE,
+  VIDEO_GENERATION_MODULE_CODE,
+  VIDEO_OUTPUT_RATIO_LABEL,
+  isShortVideoModuleCode,
+} from "@/constants/short-video";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
@@ -43,6 +50,7 @@ import { useCreditsStore } from "@/stores/credits";
 import { useSubscriptionStore } from "@/stores/subscription";
 import type {
   CreativeThreadTurn,
+  SidebarCapabilityStatus,
   WorkspaceBatchActiveJob,
   WorkspaceBatchCreatedPayload,
   WorkspaceDeliveryTaskPreview,
@@ -68,13 +76,7 @@ const authStore = useAuthStore();
 const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
-const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
-
 registerStaticImageUrls(workspaceStaticImageUrls);
-
-function isShortVideoModuleCode(moduleCode?: string) {
-  return moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
-}
 
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
@@ -88,6 +90,7 @@ const generationFailureMessageMap: Record<string, string> = {
   KIE_REQUEST_TIMEOUT: "生成服务网络超时，请重试",
   KIE_NETWORK_TIMEOUT: "生成服务网络异常，请重试",
   KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
+  VIDEO_GENERATION_CREATE_FAILED: "视频任务创建失败，请稍后重试",
 };
 
 function getGenerationFailureMessage(
@@ -168,6 +171,11 @@ let isRefreshingRunningTasks = false;
 const activelyResolvingTaskIds = new Set<string>();
 /** 已弹出过完成提示的任务，避免 resolve 与全局轮询重复 toast */
 const notifiedCompletionTaskIds = new Set<string>();
+const SIDEBAR_TERMINAL_STATUS_MS = 4000;
+const sidebarTerminalStatuses = ref<
+  Partial<Record<string, SidebarCapabilityStatus>>
+>({});
+const sidebarStatusTimers = new Map<string, number>();
 
 function resolveCapabilityCodeFromModule(moduleCode: string) {
   const matched = workspaceCapabilities.find(
@@ -602,6 +610,12 @@ async function refreshBatchJob(batchId: string) {
     );
     if (!wasTerminal && isNowTerminal) {
       refreshCreditsBalance();
+      if (next[index].status === "success") {
+        markSidebarTerminalStatus("delivery", "success");
+        message.success(`${getCapabilityLabel("delivery")}生成图片成功`);
+      } else {
+        markSidebarTerminalStatus("delivery", "fail");
+      }
     }
   } catch {
     // Keep placeholder card visible while polling retries.
@@ -702,6 +716,50 @@ function getCapabilityLabel(code: string) {
   );
 }
 
+function clearSidebarTerminalStatus(code: string) {
+  const timer = sidebarStatusTimers.get(code);
+  if (timer) {
+    window.clearTimeout(timer);
+    sidebarStatusTimers.delete(code);
+  }
+
+  if (!sidebarTerminalStatuses.value[code]) return;
+  const next = { ...sidebarTerminalStatuses.value };
+  delete next[code];
+  sidebarTerminalStatuses.value = next;
+}
+
+function markSidebarTerminalStatus(
+  code: string,
+  status: Extract<SidebarCapabilityStatus, "success" | "fail">,
+) {
+  sidebarTerminalStatuses.value = {
+    ...sidebarTerminalStatuses.value,
+    [code]: status,
+  };
+
+  const existingTimer = sidebarStatusTimers.get(code);
+  if (existingTimer) window.clearTimeout(existingTimer);
+
+  const timer = window.setTimeout(() => {
+    if (sidebarTerminalStatuses.value[code] === status) {
+      clearSidebarTerminalStatus(code);
+    }
+    sidebarStatusTimers.delete(code);
+  }, SIDEBAR_TERMINAL_STATUS_MS);
+
+  sidebarStatusTimers.set(code, timer);
+}
+
+function markSidebarStatusForModule(
+  moduleCode: string | undefined,
+  status: Extract<SidebarCapabilityStatus, "success" | "fail">,
+) {
+  const code = moduleCode ? resolveCapabilityCodeFromModule(moduleCode) : null;
+  if (!code) return;
+  markSidebarTerminalStatus(code, status);
+}
+
 function shouldNotifyGenerationSuccess(moduleCode?: string) {
   return Boolean(moduleCode && !isCreativeImageModuleCode(moduleCode));
 }
@@ -711,7 +769,7 @@ function getGenerationSuccessMessage(moduleCode?: string) {
   if (isShortVideoModuleCode(moduleCode)) return "短视频生成成功";
   const capabilityCode = resolveCapabilityCodeFromModule(moduleCode!);
   const label = capabilityCode ? getCapabilityLabel(capabilityCode) : "图片";
-  return `${label}图片生成成功`;
+  return `${label}生成图片成功`;
 }
 
 function notifyGenerationSuccess(
@@ -724,6 +782,7 @@ function notifyGenerationSuccess(
   if (!text) return;
 
   notifiedCompletionTaskIds.add(task.taskId);
+  markSidebarStatusForModule(task.moduleCode, "success");
   message.success(text);
 }
 
@@ -771,7 +830,11 @@ async function pollTrackedRunningTasks() {
 
     const task = result.value;
     if (isTerminalGenerationStatus(task)) {
-      notifyGenerationSuccess(task);
+      if (task.status === "success") {
+        notifyGenerationSuccess(task);
+      } else {
+        markSidebarStatusForModule(task.moduleCode, "fail");
+      }
       delete next[task.taskId];
       clearActiveGenerationTask(task.taskId);
       hasTerminalTask = true;
@@ -929,6 +992,18 @@ const sidebarGeneratingCodes = computed(() => {
   }
 
   return [...codes];
+});
+
+const sidebarCapabilityStatuses = computed(() => {
+  const statuses: Partial<Record<string, SidebarCapabilityStatus>> = {
+    ...sidebarTerminalStatuses.value,
+  };
+
+  for (const code of sidebarGeneratingCodes.value) {
+    statuses[code] = "generating";
+  }
+
+  return statuses;
 });
 
 const activeCapability = computed(
@@ -1230,7 +1305,7 @@ function buildResultFromTask(
     ? "短视频生成"
     : (option?.title ?? activeCapability.value.label);
   const ratioLabel = isShortVideo
-    ? `${task.outputRatio || "16:9"} · 720p · 10秒`
+    ? VIDEO_OUTPUT_RATIO_LABEL
     : `${task.outputRatio} · ${task.resolution}`;
 
   return {
@@ -1352,6 +1427,7 @@ async function resolveGenerationTask(
     }
 
     if (task.status !== "success") {
+      markSidebarStatusForModule(task.moduleCode, "fail");
       message.error(getViewMediaFailureMessage(task.moduleCode));
       return;
     }
@@ -1393,6 +1469,7 @@ async function resolveGenerationTask(
     await assistPanelRef.value?.refreshRecentItems();
   } catch (error) {
     clearActiveGenerationTask(taskId);
+    markSidebarStatusForModule(taskModuleCode, "fail");
     message.error(getViewMediaFailureMessage(taskModuleCode));
   } finally {
     clearActiveGenerationTask(taskId);
@@ -1763,6 +1840,48 @@ async function handleCreativeGenerate(payload: {
 }
 
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    if (payload.shortVideoAction !== "confirm" || !payload.scriptDraftId) {
+      message.warning("请先生成口播草稿，并在审核后确认生成视频");
+      return;
+    }
+
+    if (!(await canStartGeneration())) {
+      return;
+    }
+
+    isGenerating.value = true;
+    generationResult.value = null;
+    shortVideoSessionPreview.value = null;
+    generatingCapabilityCode.value = SHORT_VIDEO_CAPABILITY_CODE;
+
+    try {
+      const created = await createVideoGenerationTask({
+        scriptDraftId: payload.scriptDraftId,
+      });
+      const moduleCode = created.moduleCode || VIDEO_GENERATION_MODULE_CODE;
+
+      saveActiveGenerationTask({
+        taskId: created.taskId,
+        moduleCode,
+      });
+      trackRunningTask(created.taskId, moduleCode);
+      message.info("视频任务已创建，正在生成", { duration: 3000 });
+      await refreshRunningTaskSummary();
+      await resolveGenerationTask(created.taskId);
+    } catch (error) {
+      clearActiveGenerationTask();
+      const text =
+        error instanceof Error ? error.message : "短视频任务创建失败";
+      message.error(text);
+    } finally {
+      isGenerating.value = false;
+      generatingCapabilityCode.value = null;
+    }
+
+    return;
+  }
+
   if (activeCode.value === INTERIOR_COLLAGE_CAPABILITY_CODE) {
     const assetIds = [...new Set(payload.assetIds ?? [])];
 
@@ -1840,9 +1959,6 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
   isGenerating.value = true;
   generationResult.value = null;
-  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
-    shortVideoSessionPreview.value = null;
-  }
   const startedOnCode = activeCapability.value.code;
   generatingCapabilityCode.value = startedOnCode;
 
@@ -1855,14 +1971,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       logoAssetId: payload.logoAssetId,
       logoPlacements: payload.logoPlacements,
       colorCode: payload.colorCode,
-      outputRatio:
-        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
-          ? "16:9"
-          : payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO,
-      extra:
-        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
-          ? { videoResolution: "720p" }
-          : undefined,
+      outputRatio: payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO,
     };
 
     const created = await createGenerationTask(
@@ -1884,6 +1993,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
     await resolveGenerationTask(created.taskId);
   } catch (error) {
     clearActiveGenerationTask();
+    markSidebarTerminalStatus(startedOnCode, "fail");
     const text = error instanceof Error ? error.message : "生成任务创建失败";
     message.error(text);
   } finally {
@@ -1979,6 +2089,10 @@ onMounted(async () => {
 onUnmounted(() => {
   stopGlobalGenerationPolling();
   stopBatchPolling();
+  for (const timer of sidebarStatusTimers.values()) {
+    window.clearTimeout(timer);
+  }
+  sidebarStatusTimers.clear();
 });
 </script>
 
@@ -2005,7 +2119,7 @@ onUnmounted(() => {
       <div class="workspace-col workspace-col--nav">
         <WorkspaceSidebar
           :active-code="activeCode"
-          :generating-codes="sidebarGeneratingCodes"
+          :capability-statuses="sidebarCapabilityStatuses"
           @select="handleSelectCapability"
         />
       </div>

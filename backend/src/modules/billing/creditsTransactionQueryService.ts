@@ -51,7 +51,8 @@ type QueryCondition = {
 };
 
 const PENDING_TXN_TYPES = ["grant", "bonus", "commission_grant"];
-const CONSUME_TXN_TYPES = ["settle", "freeze", "estimate"];
+const CONSUME_TXN_TYPES = ["settle", "freeze"];
+const CUSTOMER_HIDDEN_TXN_TYPES = ["estimate"];
 
 function toSqlNumber(value: string | number | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -155,9 +156,13 @@ function buildBizSourceCondition(bizSource: string): QueryCondition | null {
 }
 
 function buildWhereClause(input: CreditsTransactionQueryInput) {
-  const clauses = ["ct.account_id = :accountId"];
+  const clauses = [
+    "ct.account_id = :accountId",
+    "ct.txn_type NOT IN (:customerHiddenTxnTypes)",
+  ];
   const params: Record<string, unknown> = {
     accountId: input.account.id,
+    customerHiddenTxnTypes: CUSTOMER_HIDDEN_TXN_TYPES,
   };
 
   const txnTypeCondition =

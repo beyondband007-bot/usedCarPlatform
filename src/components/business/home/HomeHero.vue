@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { CSSProperties } from "vue";
 
+import ContactSupportModal from "@/components/business/home/ContactSupportModal.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import {
+  HOME_HERO_H5_LIGHT_ASPECT,
   homeHeroImageDarkSrc,
+  homeHeroImageLightH5Src,
   homeHeroImageLightSrc,
 } from "@/constants/home-page";
 import { useAppStore } from "@/stores/app";
+import { isH5ViewportRef } from "@/utils/browser-env";
 
 /** 容器宽高比保持原图 25% ~ 100% 区间的比例（不改变 hero 高度） */
 const HERO_IMAGE_WIDTH = 1672;
@@ -38,35 +42,66 @@ const HERO_CAR_ROOF_LINE = (
 ).toFixed(2);
 
 const appStore = useAppStore();
+const supportModalVisible = ref(false);
 
-const homeHeroImageSrc = computed(() =>
-  appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc,
+const isH5LightHero = computed(
+  () => !appStore.isDarkMode && isH5ViewportRef.value,
+);
+
+const homeHeroImageSrc = computed(() => {
+  if (isH5LightHero.value) {
+    return homeHeroImageLightH5Src;
+  }
+
+  return appStore.isDarkMode ? homeHeroImageDarkSrc : homeHeroImageLightSrc;
+});
+
+const heroViewportAspect = computed(() =>
+  isH5LightHero.value ? HOME_HERO_H5_LIGHT_ASPECT : HERO_VIEWPORT_ASPECT,
 );
 
 /**
  * 仅展示原图 25% ~ 75% 高度的区域，且不缩放图片本身：
- * 图片按原始宽高比铺满容器宽度（高度 auto），再向上平移裁掉顶部 25%，
+ * 图片按原始宽高比铺满容器宽度（height auto），再向上平移裁掉顶部 25%，
  * 容器高度负责裁掉底部，从而只露出 25% ~ 75% 的区间。
  */
-const heroImageStyle = computed(
-  (): CSSProperties => ({
+const heroImageStyle = computed((): CSSProperties => {
+  if (isH5LightHero.value) {
+    return {
+      width: "100%",
+      height: "auto",
+      display: "block",
+    };
+  }
+
+  return {
     width: "100%",
     height: "auto",
     transform: `translateY(-${HERO_DISPLAY_CROP_START}%)`,
-  }),
-);
+  };
+});
 </script>
 
 <template>
   <section id="top" class="hero" :class="{ 'is-light': !appStore.isDarkMode }">
     <div
-      class="hero-visual"
-      :style="{ '--hero-aspect-ratio': HERO_VIEWPORT_ASPECT }"
+      class="hero-intro"
+      :style="{ '--hero-car-roof-line': `${HERO_CAR_ROOF_LINE}%` }"
     >
-      <div
-        class="hero-media"
-        :style="{ '--hero-car-roof-line': `${HERO_CAR_ROOF_LINE}%` }"
-      >
+      <div class="hero-copy">
+        <span class="hero-eyebrow">AI CAR STUDIO</span>
+        <h1>每一辆车，都值得被精心呈现</h1>
+        <p class="subtitle">
+          AI 场景图、精修图、成片交付，让车源展示更专业、更有质感
+        </p>
+      </div>
+    </div>
+
+    <div
+      class="hero-visual"
+      :style="{ '--hero-aspect-ratio': heroViewportAspect }"
+    >
+      <div class="hero-media">
         <PreloadImage
           class="hero-image"
           :src="homeHeroImageSrc"
@@ -78,26 +113,45 @@ const heroImageStyle = computed(
           fetchpriority="high"
           decoding="async"
         />
-
-        <div class="hero-copy">
-          <span class="hero-eyebrow">AI CAR STUDIO</span>
-          <h1>每一辆车，都值得被精心呈现</h1>
-          <p class="subtitle">针对汽车电商、出海车商打造的专业内容生产平台</p>
-        </div>
       </div>
     </div>
+
+    <ContactSupportModal v-model:show="supportModalVisible" />
   </section>
 </template>
 
 <style scoped lang="scss">
 .hero {
   position: relative;
+  display: grid;
   width: 100%;
   flex-shrink: 0;
   margin-bottom: 0;
+  grid-template-areas: "visual";
+}
+
+.hero-intro {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  grid-area: visual;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  margin: 0 auto;
+  pointer-events: none;
+  animation: hero-copy-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* 文案占据「菜单栏下方」到「车顶」之间的区域，并在其中垂直居中 */
+  align-self: start;
+  justify-self: center;
+  height: calc(var(--hero-car-roof-line, 42%) - var(--app-header-offset, 72px));
+  margin-top: var(--app-header-offset, 72px);
+  --hero-car-roof-line: 42%;
 }
 
 .hero-visual {
+  grid-area: visual;
   width: 100%;
   height: auto;
   aspect-ratio: var(--hero-aspect-ratio);
@@ -113,8 +167,6 @@ const heroImageStyle = computed(
   width: 100%;
   height: 100%;
   line-height: 0;
-  /* 车顶位置由脚本按裁切区间换算后通过内联样式注入，这里兜底 42% */
-  --hero-car-roof-line: 42%;
 }
 
 .hero-image {
@@ -136,27 +188,18 @@ const heroImageStyle = computed(
 }
 
 .hero-copy {
-  position: absolute;
-  z-index: 2;
-  /* 文案占据「菜单栏下方」到「车顶」之间的区域，并在其中垂直居中，
-     使「顶部间距」与「到车顶间距」自然相等 */
-  top: var(--app-header-offset, 72px);
-  right: 0;
-  left: 0;
-  height: calc(var(--hero-car-roof-line, 42%) - var(--app-header-offset, 72px));
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  width: fit-content;
-  max-width: calc(100% - 40px);
+  width: 100%;
   overflow: hidden;
-  margin: 0 auto;
   padding: 0;
   line-height: normal;
   text-align: center;
-  pointer-events: none;
-  animation: hero-copy-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-contact-btn {
+  display: none;
 }
 
 .hero-eyebrow {
@@ -191,14 +234,25 @@ const heroImageStyle = computed(
   text-shadow: 0 1px 14px rgba(0, 0, 0, 0.38);
 }
 
+.hero.is-light .hero-eyebrow {
+  color: var(--home-hero-title-light, #1e222b);
+  text-shadow: none;
+}
+
 .hero.is-light h1 {
-  color: #0f172a;
-  text-shadow: 0 2px 16px rgba(255, 255, 255, 0.78);
+  color: var(--home-hero-title-light, #1e222b);
+  text-shadow: none;
 }
 
 .hero.is-light .subtitle {
-  color: #475569;
-  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.65);
+  color: var(--home-hero-sub-light, #64748b);
+  text-shadow: none;
+}
+
+.hero.is-light .hero-contact-btn {
+  color: #ffffff;
+  background: #000000;
+  box-shadow: none;
 }
 
 @keyframes hero-copy-in {
@@ -234,33 +288,199 @@ const heroImageStyle = computed(
 }
 
 @media (max-width: 767px) {
-  .hero-visual {
-    --hero-aspect-ratio: 3 / 2;
-    min-height: 240px;
+  .hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--home-hero-bg);
+  }
+
+  .hero.is-light {
+    display: grid;
+    background: transparent;
+    grid-template-areas: "visual";
+  }
+
+  .hero-intro {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    height: auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: calc(var(--app-header-offset, 64px) + 24px) 18px 18px;
+    background: linear-gradient(180deg, #0a0c10 0%, #121820 52%, #1a2230 100%);
+    pointer-events: auto;
+    animation: none;
+  }
+
+  .hero.is-light .hero-intro {
+    grid-area: visual;
+    align-self: start;
+    justify-self: center;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    margin-top: 0;
+    background: transparent;
+  }
+
+  .hero:not(.is-light) .hero-intro::after {
+    position: absolute;
+    right: 0;
+    bottom: -18px;
+    left: 0;
+    height: 18px;
+    content: "";
+    pointer-events: none;
+    background: linear-gradient(to bottom, #1a2230, transparent);
   }
 
   .hero-copy {
-    width: min(100% - (var(--home-space-x, 16px) * 2), 900px);
-    max-width: calc(100% - (var(--home-space-x, 16px) * 2));
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: none;
+    gap: 0;
+  }
+
+  .hero-contact-btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 72px;
+    height: 24px;
+    min-height: 24px;
+    margin-top: 0;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    color: #1b1b1b;
+    background: linear-gradient(135deg, #f6c84f 0%, #e8a91a 100%);
+    box-shadow: 0 4px 10px rgba(232, 169, 26, 0.22);
+    cursor: pointer;
+    font-family: "PingFang SC", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    transition:
+      transform 0.22s ease,
+      filter 0.22s ease;
+  }
+
+  .hero-contact-btn:active {
+    transform: scale(0.98);
+    filter: saturate(1.03);
+  }
+
+  .hero-visual {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    aspect-ratio: var(--hero-aspect-ratio);
+    background: #1a2230;
+  }
+
+  .hero.is-light .hero-visual {
+    grid-area: visual;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    margin-bottom: 8px;
+    aspect-ratio: var(--hero-aspect-ratio);
+    background: transparent;
+  }
+
+  .hero.is-light .hero-media {
+    height: auto;
+  }
+
+  .hero.is-light .hero-image {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+
+  .hero.is-light .hero-image :deep(.preload-image) {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+
+  .hero.is-light .hero-image :deep(.preload-image__img) {
+    position: static;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
   }
 
   .hero-eyebrow {
+    display: none;
+  }
+
+  .hero.is-light .hero-eyebrow {
+    display: block;
+    margin: 0 0 8px;
+    color: var(--home-hero-title-light, #1e222b);
     font-size: 11px;
     letter-spacing: 2px;
-    white-space: nowrap;
+    text-shadow: none;
   }
 
   .hero h1 {
-    font-size: clamp(18px, 5.6vw, 24px);
+    margin-bottom: 4px;
+    font-size: clamp(20px, 5.8vw, 26px);
     letter-spacing: 1px;
-    line-height: 1.2;
-    white-space: nowrap;
+    line-height: 1.25;
+    white-space: normal;
   }
 
   .subtitle {
-    font-size: clamp(10px, 3vw, 13px);
-    line-height: 1.35;
-    white-space: nowrap;
+    font-size: clamp(12px, 3.2vw, 14px);
+    line-height: 1.45;
+    white-space: normal;
+  }
+
+  .hero.is-light h1 {
+    margin: 0 0 8px;
+    color: var(--home-hero-title-light, #1e222b);
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.2px;
+    text-shadow: none;
+  }
+
+  .hero.is-light .subtitle {
+    margin: 0;
+    color: var(--home-hero-sub-light, #64748b);
+    font-size: 12px;
+    line-height: 1.6;
+    text-shadow: none;
   }
 }
 
@@ -285,7 +505,7 @@ const heroImageStyle = computed(
   }
 }
 
-@media (max-height: 820px) {
+@media (max-height: 820px) and (min-width: 768px) {
   .hero h1 {
     font-size: 45px;
   }

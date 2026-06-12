@@ -26,6 +26,7 @@ import {
   buildPersonalSummaryCards,
   buildPersonalSummaryCardsFromAggregate,
   buildTeamSummaryCards,
+  isCustomerVisibleCreditsTransaction,
   mapCreditsTransactionToFlowRecord,
   mapEnterpriseCreditsTransactionToFlowRecord,
 } from '@/utils/points-query-mapper'
@@ -273,7 +274,9 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
         ?? accounts[0]
         ?? null
 
-      records.value = transactionResult.items.map(mapCreditsTransactionToFlowRecord)
+      records.value = transactionResult.items
+        .filter(isCustomerVisibleCreditsTransaction)
+        .map(mapCreditsTransactionToFlowRecord)
       totalRecords.value = transactionResult.total
 
       summaryCards.value = transactionResult.summary

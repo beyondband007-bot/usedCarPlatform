@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { useAuthStore } from '@/stores/auth'
-
-const emit = defineEmits<{
-  enterWorkbench: []
-}>()
-
-const authStore = useAuthStore()
 const ctaRef = ref<HTMLElement | null>(null)
 
 onMounted(() => {
@@ -43,22 +36,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <section
-    ref="ctaRef"
-    class="final-cta"
-    :class="{ 'final-cta--authenticated': authStore.isLoggedIn }"
-    aria-label="预约演示"
-  >
+  <section ref="ctaRef" class="final-cta" aria-label="企业套餐">
     <h2>企业视觉内容生产，从一套车图开始</h2>
     <p>企业套餐，超值优惠中，即开即用，一套车图解锁全渠道营销内容</p>
-    <button
-      v-if="!authStore.isLoggedIn"
-      type="button"
-      class="button gold"
-      @click="emit('enterWorkbench')"
-    >
-      预约演示
-    </button>
   </section>
 </template>
 
@@ -82,7 +62,7 @@ onMounted(() => {
 }
 
 .final-cta p {
-  margin: 0 0 28px;
+  margin: 0;
   color: var(--home-muted);
   font-family: "PingFang SC", sans-serif;
   font-size: 18px;
@@ -90,58 +70,21 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.final-cta--authenticated p {
-  margin-bottom: 0;
-}
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 56px;
-  padding: 0 40px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: "PingFang SC", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  transition:
-    transform 0.22s ease,
-    filter 0.22s ease,
-    box-shadow 0.22s ease;
-}
-
-.button:hover {
-  transform: translateY(-2px);
-  filter: saturate(1.08);
-}
-
-.button.gold {
-  color: #171100;
-  background: linear-gradient(180deg, var(--home-gold-strong), #e9b82c);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 12px 34px rgba(244, 200, 64, 0.18);
-}
-
 @media (max-width: 767px) {
+  .final-cta {
+    padding-bottom: calc(var(--home-section-pb, 86px) + var(--h5-bottom-inset, 0px));
+  }
+
   .final-cta h2 {
-    font-size: clamp(15px, 4.6vw, 22px);
-    white-space: nowrap;
+    font-size: clamp(18px, 5.2vw, 22px);
+    line-height: 1.3;
+    white-space: normal;
   }
 
   .final-cta p {
-    font-size: clamp(10px, 2.85vw, 14px);
-    white-space: nowrap;
-  }
-
-  .button {
-    width: 100%;
-    min-height: 44px;
-    padding: 0 32px;
-    font-size: 15px;
+    font-size: clamp(12px, 3.2vw, 14px);
+    line-height: 1.5;
+    white-space: normal;
   }
 }
 </style>

@@ -1,4 +1,5 @@
 import homeHeroImageDark from '@/assets/media/home/home-hero-bg-dark.png'
+import homeHeroImageLightH5 from '@/assets/media/home/home-hero-bg-light-h5.png'
 import homeCapabilitySceneBgLocal from '@/assets/media/home/home-capability-scene-bg.png'
 import techBadgeIconColor from '@/assets/img/icon/调色.svg'
 import techBadgeIconCutout from '@/assets/img/icon/抠图.svg'
@@ -59,6 +60,10 @@ export interface HomeCaseTab {
 
 export const homeHeroImageDarkSrc = homeHeroImageDark
 export const homeHeroImageLightSrc = homeHeroImageLight
+export const homeHeroImageLightH5Src = homeHeroImageLightH5
+export const HOME_HERO_H5_LIGHT_WIDTH = 430
+export const HOME_HERO_H5_LIGHT_HEIGHT = 395
+export const HOME_HERO_H5_LIGHT_ASPECT = `${HOME_HERO_H5_LIGHT_WIDTH} / ${HOME_HERO_H5_LIGHT_HEIGHT}`
 export const homeHeroImageSrc = homeHeroImageDark
 export const homeHeroPosterSrc = homeHeroImageDark
 
@@ -235,6 +240,7 @@ export const homeFooterContactItems = [
 export const homeStaticImageUrls = [
   homeHeroImageDarkSrc,
   homeHeroImageLightSrc,
+  homeHeroImageLightH5Src,
   ...homeQuickEntries.flatMap((entry) => [entry.imageDark, entry.imageLight]),
   ...homeMainCapabilities.flatMap((item) => [item.image, item.fallbackImage]),
   ...homeCaseTabs.map((tab) => tab.image),

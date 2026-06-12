@@ -476,7 +476,7 @@ onBeforeUnmount(() => {
     <section id="developer-dashboard" class="dev-screen dev-screen-welcome">
       <article class="dev-card dev-hero-card">
         <div class="dev-hero-copy">
-          <h2>欢迎使用 积分中台</h2>
+          <h2>欢迎使用 积分后台</h2>
           <p>统一管理积分平台的应用、客户、账户、订单与结算</p>
         </div>
         <div class="dev-hero-art" aria-hidden="true">

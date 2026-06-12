@@ -1,55 +1,32 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { Icon } from "@iconify/vue";
 import { motion } from "motion-v";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
-import { mediaUrls } from "@/constants/media-urls";
+import {
+  workspaceTutorialConfigs,
+  type WorkspaceTutorialVariant,
+} from "@/constants/workspace-tutorial";
 
-const {
-  showroom: {
-    tutorialStepUpload: tutorialUploadCarImage,
-    tutorialStepTemplate01: tutorialShowroomTemplate1,
-    tutorialStepTemplate02: tutorialShowroomTemplate2,
-    tutorialStepTemplate03: tutorialShowroomTemplate3,
-    tutorialStepResult: tutorialResultImage,
-    tutorialLogoSample: tutorialLogoImage,
+const props = withDefaults(
+  defineProps<{
+    animationKey?: string;
+    theme?: "light" | "dark";
+    variant?: WorkspaceTutorialVariant;
+  }>(),
+  {
+    variant: "showroom",
   },
-} = mediaUrls.workspace;
+);
 
-defineProps<{
-  animationKey?: string;
-  theme?: "light" | "dark";
-}>();
-
-const tutorialSteps = [
-  {
-    title: "上传车图",
-    icon: "mdi:cloud-upload-outline",
-    image: tutorialUploadCarImage,
-  },
-  {
-    title: "选择展厅模板",
-    icon: "mdi:view-gallery-outline",
-    image: "",
-  },
-  {
-    title: "选择 Logo",
-    icon: "mdi:badge-account-horizontal-outline",
-    image: tutorialLogoImage,
-  },
-  {
-    title: "生成效果",
-    icon: "mdi:car-select",
-    image: tutorialResultImage,
-  },
-] as const;
-
-const tutorialTemplatePreviewImages = [
-  tutorialShowroomTemplate1,
-  tutorialShowroomTemplate2,
-  tutorialShowroomTemplate3,
-  tutorialUploadCarImage,
-] as const;
+const tutorialConfig = computed(
+  () => workspaceTutorialConfigs[props.variant] ?? workspaceTutorialConfigs.showroom,
+);
+const tutorialSteps = computed(() => tutorialConfig.value.steps);
+const tutorialTemplatePreviewImages = computed(
+  () => tutorialConfig.value.templatePreviewImages ?? [],
+);
 </script>
 
 <template>
@@ -61,15 +38,18 @@ const tutorialTemplatePreviewImages = [
     <div class="tutorial-flow">
       <motion.article
         v-for="(step, index) in tutorialSteps"
-        :key="`${animationKey ?? 'tutorial'}-${step.title}`"
+        :key="`${animationKey ?? 'tutorial'}-${variant}-${step.title}`"
         :initial="{ opacity: 0, y: 14 }"
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.32, delay: index * 0.04 }"
         class="tutorial-step"
-        :class="`is-step-${index + 1}`"
+        :class="[
+          `is-step-${index + 1}`,
+          `is-layout-${step.layout}`,
+        ]"
       >
         <div class="tutorial-placeholder">
-          <template v-if="index === 1">
+          <template v-if="step.layout === 'mosaic'">
             <div class="tutorial-mosaic" aria-hidden="true">
               <PreloadImage
                 v-for="(image, mosaicIndex) in tutorialTemplatePreviewImages"
@@ -82,9 +62,12 @@ const tutorialTemplatePreviewImages = [
                 :draggable="false"
                 fit="cover"
               />
+              <span class="tutorial-mosaic-select" aria-hidden="true">
+                <Icon icon="mdi:check" />
+              </span>
             </div>
           </template>
-          <template v-else-if="index === 2">
+          <template v-else-if="step.layout === 'logo'">
             <PreloadImage
               class="tutorial-image tutorial-logo-image"
               :src="step.image"
@@ -209,10 +192,8 @@ const tutorialTemplatePreviewImages = [
   background: #f8fafc;
 }
 
-.tutorial-step.is-step-1 .tutorial-placeholder,
-.tutorial-step.is-step-2 .tutorial-placeholder,
-.tutorial-step.is-step-3 .tutorial-placeholder,
-.tutorial-step.is-step-4 .tutorial-placeholder {
+.tutorial-step.is-layout-cover .tutorial-placeholder,
+.tutorial-step.is-layout-mosaic .tutorial-placeholder {
   align-items: flex-start;
   justify-content: center;
   padding: 8px;
@@ -220,45 +201,26 @@ const tutorialTemplatePreviewImages = [
   background: transparent;
 }
 
-.tutorial-step.is-step-3 .tutorial-placeholder {
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-}
-
-.tutorial-section.theme-light .tutorial-step.is-step-1 .tutorial-placeholder,
-.tutorial-section.theme-light .tutorial-step.is-step-2 .tutorial-placeholder,
-.tutorial-section.theme-light .tutorial-step.is-step-4 .tutorial-placeholder {
+.tutorial-section.theme-light .tutorial-step.is-layout-cover .tutorial-placeholder,
+.tutorial-section.theme-light .tutorial-step.is-layout-mosaic .tutorial-placeholder {
   background: #f8fafc;
 }
 
-.tutorial-section.theme-light .tutorial-step.is-step-3 .tutorial-placeholder {
-  background: transparent;
-}
-
-.tutorial-step.is-step-1 :deep(.tutorial-image),
-.tutorial-step.is-step-4 :deep(.tutorial-image) {
+.tutorial-step.is-layout-cover :deep(.tutorial-image) {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
   background: transparent !important;
 }
 
-.tutorial-step.is-step-1 :deep(.tutorial-image),
-.tutorial-step.is-step-4 :deep(.tutorial-image) {
-  overflow: hidden;
-  border-radius: 10px;
-  background: #f8fafc !important;
-}
-
-.tutorial-section.theme-dark .tutorial-step.is-step-1 :deep(.tutorial-image),
-.tutorial-section.theme-dark .tutorial-step.is-step-4 :deep(.tutorial-image) {
+.tutorial-section.theme-dark .tutorial-step.is-layout-cover :deep(.tutorial-image) {
   background: rgba(255, 255, 255, 0.04) !important;
 }
 
-.tutorial-step.is-step-1 :deep(.tutorial-image .preload-image__img),
-.tutorial-step.is-step-4 :deep(.tutorial-image .preload-image__img) {
+.tutorial-step.is-layout-cover :deep(.tutorial-image .preload-image__img) {
   display: block;
   width: 100%;
   height: 100%;
@@ -267,16 +229,21 @@ const tutorialTemplatePreviewImages = [
   border-radius: 0;
 }
 
-.tutorial-step.is-step-3 .tutorial-placeholder {
+.tutorial-step.is-layout-logo .tutorial-placeholder {
   align-items: center;
   justify-content: center;
+  background: transparent;
 }
 
-.tutorial-step.is-step-3 {
+.tutorial-section.theme-light .tutorial-step.is-layout-logo .tutorial-placeholder {
+  background: transparent;
+}
+
+.tutorial-step.is-layout-logo {
   --tutorial-logo-surface: #ffffff;
 }
 
-.tutorial-step.is-step-3 :deep(.tutorial-logo-image) {
+.tutorial-step.is-layout-logo :deep(.tutorial-logo-image) {
   display: inline-flex;
   overflow: hidden;
   width: auto;
@@ -291,7 +258,7 @@ const tutorialTemplatePreviewImages = [
   box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
 }
 
-.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image) {
+.tutorial-step.is-layout-logo :deep(.tutorial-logo-image .preload-image) {
   --preload-image-surface: #ffffff;
   --preload-image-line: rgb(15 23 42 / 12%);
 
@@ -307,11 +274,11 @@ const tutorialTemplatePreviewImages = [
   background: var(--tutorial-logo-surface) !important;
 }
 
-.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image__placeholder) {
+.tutorial-step.is-layout-logo :deep(.tutorial-logo-image .preload-image__placeholder) {
   background: var(--tutorial-logo-surface) !important;
 }
 
-.tutorial-step.is-step-3 :deep(.tutorial-logo-image .preload-image__img) {
+.tutorial-step.is-layout-logo :deep(.tutorial-logo-image .preload-image__img) {
   display: block;
   width: auto;
   height: auto;
@@ -322,24 +289,25 @@ const tutorialTemplatePreviewImages = [
   border-radius: inherit;
 }
 
-.tutorial-section.theme-dark .tutorial-step.is-step-3 :deep(.tutorial-logo-image),
+.tutorial-section.theme-dark .tutorial-step.is-layout-logo :deep(.tutorial-logo-image),
 .tutorial-section.theme-dark
-  .tutorial-step.is-step-3
+  .tutorial-step.is-layout-logo
   :deep(.tutorial-logo-image .preload-image),
 .tutorial-section.theme-dark
-  .tutorial-step.is-step-3
+  .tutorial-step.is-layout-logo
   :deep(.tutorial-logo-image .preload-image__placeholder),
-.tutorial-section.theme-light .tutorial-step.is-step-3 :deep(.tutorial-logo-image),
+.tutorial-section.theme-light .tutorial-step.is-layout-logo :deep(.tutorial-logo-image),
 .tutorial-section.theme-light
-  .tutorial-step.is-step-3
+  .tutorial-step.is-layout-logo
   :deep(.tutorial-logo-image .preload-image),
 .tutorial-section.theme-light
-  .tutorial-step.is-step-3
+  .tutorial-step.is-layout-logo
   :deep(.tutorial-logo-image .preload-image__placeholder) {
   background: #ffffff !important;
 }
 
 .tutorial-mosaic {
+  position: relative;
   display: grid;
   width: 100%;
   height: 100%;
@@ -362,8 +330,32 @@ const tutorialTemplatePreviewImages = [
   width: 100%;
   height: 100%;
   min-height: 0;
+  border: 0.5px solid rgb(255, 192, 0);
   border-radius: 8px;
   background: transparent;
+  box-sizing: border-box;
+}
+
+.tutorial-mosaic-select {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0.5px solid rgb(255, 192, 0);
+  border-radius: 999px;
+  background: rgb(255, 192, 0);
+  color: #000000;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(255, 192, 0, 0.28);
+}
+
+.tutorial-mosaic-select > .iconify {
+  font-size: 16px;
 }
 
 .tutorial-mosaic-image :deep(.preload-image) {

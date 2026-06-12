@@ -12,6 +12,7 @@ import SceneTemplateRecommendations, {
   type SceneTemplateRecommendationItem,
 } from "@/components/business/workspace/SceneTemplateRecommendations.vue";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
+import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
 import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTutorialGuide.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
@@ -32,9 +33,11 @@ import {
   isInteriorBatchItemKind,
 } from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
+import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
 import {
   recentStatusIconMap,
   recentStatusLabelMap,
+  resolveRecentDisplayImage,
   resolveWorkspaceOptionTitle,
 } from "@/utils/workspace-recent";
 import {
@@ -78,12 +81,13 @@ const emit = defineEmits<{
 function canOpenRecent(item: WorkspaceRecentItem) {
   return (
     Boolean(item.taskId) ||
-    (item.status === "success" && Boolean(item.previewImage))
+    (item.status === "success" && Boolean(resolveRecentDisplayImage(item)))
   );
 }
 
 function handleRecentPick(item: WorkspaceRecentItem) {
   if (!canOpenRecent(item)) return;
+  selectedRecentItemId.value = item.id;
   saveRecentScrollPosition();
   persistRecentCache();
   emit("pickRecent", item);
@@ -265,15 +269,16 @@ const message = useMessage();
 const dialog = useDialog();
 const recentGenerateStore = useRecentGenerateStore();
 const activeTab = ref<"guide" | "generating" | "batchProcessing" | "recent">(
-  "guide",
+  "recent",
 );
 const recentItems = ref<WorkspaceRecentItem[]>([]);
+const selectedRecentItemId = ref("");
 const recentLoading = ref(false);
 const recentLoaded = ref(false);
 const recentLayoutRef = ref<HTMLElement | null>(null);
 const shortVideoInitialView = ref<
-  "guide" | "preview" | "generating" | "recent"
->("guide");
+  "templates" | "preview" | "generating" | "recent"
+>("recent");
 let recentRefreshTimer: number | null = null;
 
 const isBatchCapability = computed(() => props.capability.kind === "batch");
@@ -468,14 +473,29 @@ async function handleDownloadDeliveryGroup() {
 const statusLabelMap = recentStatusLabelMap;
 const statusIconMap = recentStatusIconMap;
 
-const generationFailureMessageMap: Record<string, string> = {
-  KIE_UPLOAD_TIMEOUT: "图片上传超时，请重试",
-  KIE_CREATE_TIMEOUT: "生成服务连接超时，请重试",
-  KIE_DETAIL_TIMEOUT: "生成状态查询超时，请稍后刷新",
-  KIE_REQUEST_TIMEOUT: "生成服务网络超时，请重试",
-  KIE_NETWORK_TIMEOUT: "生成服务网络异常，请重试",
-  KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
-};
+function shouldShowRecentStatus(item: WorkspaceRecentItem) {
+  return item.status !== "success";
+}
+
+const recentDisplayItems = computed(() =>
+  normalizeDisplayOrder(recentItems.value),
+);
+
+function syncSelectedRecentItem() {
+  const displayItems = recentDisplayItems.value;
+  if (!displayItems.length) {
+    selectedRecentItemId.value = "";
+    return;
+  }
+
+  if (
+    !displayItems.some((item) => item.id === selectedRecentItemId.value)
+  ) {
+    selectedRecentItemId.value = displayItems[0].id;
+  }
+}
+
+watch(recentDisplayItems, syncSelectedRecentItem, { immediate: true });
 
 function getRecentStatusLabel(item: WorkspaceRecentItem) {
   if (item.status === "fail" && item.errorCode === "KIE_TASK_TIMEOUT") {
@@ -484,14 +504,6 @@ function getRecentStatusLabel(item: WorkspaceRecentItem) {
   return statusLabelMap[item.status];
 }
 
-function getBatchFailureReason(item: BatchDisplayCard) {
-  if (item.status !== "fail") return "";
-  if (item.errorCode === "KIE_TASK_TIMEOUT") return "生成超时，请重试";
-  if (item.errorCode && generationFailureMessageMap[item.errorCode]) {
-    return generationFailureMessageMap[item.errorCode];
-  }
-  return item.error || item.errorCode || "生成失败，请重试";
-}
 const recentTaskModuleCodes = new Set([
   "showroom-light",
   "outdoor-scene",
@@ -619,8 +631,10 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
   );
   const isShortVideo = item.moduleCode === "short-video";
   const coverUrl =
-    item.inputAssetThumbnailUrl ??
+    item.previewImage ??
     item.thumbnail ??
+    item.downloadUrl ??
+    item.inputAssetThumbnailUrl ??
     item.inputAssetUrl ??
     undefined;
 
@@ -636,6 +650,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
       : undefined,
     thumbnail: coverUrl,
     previewImage: coverUrl,
+    downloadUrl: item.downloadUrl ?? undefined,
     ratioLabel: isShortVideo
       ? "16:9 · 720p · 10秒"
       : (item.ratioLabel ??
@@ -812,7 +827,7 @@ function syncShortVideoInitialView() {
     shortVideoInitialView.value = "preview";
     return;
   }
-  shortVideoInitialView.value = "guide";
+  shortVideoInitialView.value = "recent";
 }
 
 function focusShortVideoGeneratingView() {
@@ -878,7 +893,7 @@ watch(
         featureCompareActiveView.value = "features";
       }
     } else if (!isBatchCapability.value && activeTab.value === "generating") {
-      activeTab.value = "guide";
+      activeTab.value = "recent";
     }
 
     if (wasGenerating && !isBatchCapability.value) {
@@ -949,7 +964,7 @@ watch(
     } else if (props.capability.code === "short-video") {
       syncShortVideoInitialView();
     } else {
-      activeTab.value = props.isGenerating ? "generating" : "guide";
+      activeTab.value = props.isGenerating ? "generating" : "recent";
     }
 
     if (
@@ -1288,7 +1303,7 @@ defineExpose({
                     loading="lazy"
                     decoding="async"
                     :draggable="false"
-                    fit="cover"
+                    fit="none"
                     object-position="center"
                   />
                 </div>
@@ -1369,7 +1384,7 @@ defineExpose({
           <section
             v-show="featureCompareActiveView === 'recent'"
             ref="recentLayoutRef"
-            class="recent-layout"
+            class="recent-layout recent-layout--flow"
             aria-label="最近生成"
           >
             <div
@@ -1383,94 +1398,38 @@ defineExpose({
               <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
               <span>暂无最近生成记录</span>
             </div>
-            <article
-              v-for="item in recentItems"
+            <WorkspaceRecentImageCard
+              v-for="item in recentDisplayItems"
               :key="item.id"
-              class="recent-card"
-              :class="{ 'is-clickable': canOpenRecent(item) }"
-              :role="canOpenRecent(item) ? 'button' : undefined"
-              :tabindex="canOpenRecent(item) ? 0 : undefined"
-              :aria-label="
-                canOpenRecent(item) ? `查看${item.title}` : item.title
-              "
-              @click="handleRecentPick(item)"
-              @keydown.enter.prevent="handleRecentPick(item)"
-              @keydown.space.prevent="handleRecentPick(item)"
-            >
-              <div class="recent-media">
-                <PreloadImage
-                  v-if="item.thumbnail"
-                  class="recent-image"
-                  :src="item.thumbnail"
-                  :alt="item.title"
-                  loading="lazy"
-                  decoding="async"
-                  fetchpriority="low"
-                  :draggable="false"
-                  fit="cover"
-                  object-position="center"
-                />
-                <div v-else class="recent-empty">
-                  <Icon icon="mdi:image-outline" />
-                </div>
-                <span class="recent-status" :class="`is-${item.status}`">
-                  <Icon
-                    :icon="statusIconMap[item.status]"
-                    class="recent-status-icon"
-                  />
-                  {{ getRecentStatusLabel(item) }}
-                </span>
-              </div>
-              <footer class="recent-foot">
-                <strong class="recent-name">{{ item.title }}</strong>
-                <p v-if="item.sceneLabel" class="recent-scene">
-                  {{ item.sceneLabel }}
-                </p>
-                <p v-if="getBatchFailureReason(item)" class="recent-scene">
-                  {{ getBatchFailureReason(item) }}
-                </p>
-                <div class="recent-foot-actions">
-                  <span class="recent-time">
-                    <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-                    {{ item.createdAt }}
-                  </span>
-                  <button
-                    type="button"
-                    class="recent-delete-btn"
-                    :aria-label="`删除${item.title}`"
-                    :disabled="isDeletingRecent(item)"
-                    @click.stop="handleDeleteRecent(item)"
-                  >
-                    <Icon
-                      :icon="
-                        isDeletingRecent(item)
-                          ? 'mdi:loading'
-                          : 'mdi:trash-can-outline'
-                      "
-                      :class="{
-                        'recent-delete-icon--loading': isDeletingRecent(item),
-                      }"
-                    />
-                  </button>
-                </div>
-              </footer>
-            </article>
+              :item="item"
+              :selected="item.id === selectedRecentItemId"
+              :clickable="canOpenRecent(item)"
+              :deleting="isDeletingRecent(item)"
+              :show-status="shouldShowRecentStatus(item)"
+              :status-label="getRecentStatusLabel(item)"
+              @pick="handleRecentPick"
+              @delete="handleDeleteRecent"
+            />
           </section>
         </div>
       </div>
     </template>
-    <ShortVideoBetaPanel
+    <div
       v-else-if="capability.code === 'short-video'"
-      :play-request="shortVideoPlayRequest"
-      :is-generating="props.isGenerating"
-      :session-preview="props.shortVideoSessionPreview"
-      :generation-result="props.generationResult"
-      :recent-items="recentItems"
-      :recent-loading="recentLoading"
-      :initial-view="shortVideoInitialView"
-      @pick-recent="handleRecentPick"
-      @delete-recent="handleDeleteRecent"
-    />
+      class="assist-short-video-shell"
+    >
+      <ShortVideoBetaPanel
+        :play-request="shortVideoPlayRequest"
+        :is-generating="props.isGenerating"
+        :session-preview="props.shortVideoSessionPreview"
+        :generation-result="props.generationResult"
+        :recent-items="recentItems"
+        :recent-loading="recentLoading"
+        :initial-view="shortVideoInitialView"
+        @pick-recent="handleRecentPick"
+        @delete-recent="handleDeleteRecent"
+      />
+    </div>
 
     <section
       v-else-if="isDeliveryCapability && !isBatchProcessingView"
@@ -1538,20 +1497,20 @@ defineExpose({
               <button
                 type="button"
                 role="tab"
-                :aria-selected="activeTab === 'guide'"
-                :class="{ active: activeTab === 'guide' }"
-                @click="activeTab = 'guide'"
-              >
-                使用教程
-              </button>
-              <button
-                type="button"
-                role="tab"
                 :aria-selected="activeTab === 'recent'"
                 :class="{ active: activeTab === 'recent' }"
                 @click="activeTab = 'recent'"
               >
                 最近生成
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'guide'"
+                :class="{ active: activeTab === 'guide' }"
+                @click="activeTab = 'guide'"
+              >
+                使用教程
               </button>
             </template>
           </div>
@@ -1648,6 +1607,7 @@ defineExpose({
             <WorkspaceTutorialGuide
               :animation-key="capability.code"
               :theme="appStore.isDarkMode ? 'dark' : 'light'"
+              :variant="isBatchCapability ? 'batch-new' : 'showroom'"
             />
 
             <SceneTemplateRecommendations
@@ -1701,7 +1661,7 @@ defineExpose({
           <section
             v-show="!isBatchCapability && activeTab === 'recent'"
             ref="recentLayoutRef"
-            class="recent-layout"
+            class="recent-layout recent-layout--flow"
             aria-label="最近生成"
           >
             <div
@@ -1715,75 +1675,18 @@ defineExpose({
               <Icon icon="mdi:image-off-outline" class="recent-loading-icon" />
               <span>暂无最近生成记录</span>
             </div>
-            <article
-              v-for="item in recentItems"
+            <WorkspaceRecentImageCard
+              v-for="item in recentDisplayItems"
               :key="item.id"
-              class="recent-card"
-              :class="{ 'is-clickable': canOpenRecent(item) }"
-              :role="canOpenRecent(item) ? 'button' : undefined"
-              :tabindex="canOpenRecent(item) ? 0 : undefined"
-              :aria-label="
-                canOpenRecent(item) ? `查看${item.title}` : item.title
-              "
-              @click="handleRecentPick(item)"
-              @keydown.enter.prevent="handleRecentPick(item)"
-              @keydown.space.prevent="handleRecentPick(item)"
-            >
-              <div class="recent-media">
-                <PreloadImage
-                  v-if="item.thumbnail"
-                  class="recent-image"
-                  :src="item.thumbnail"
-                  :alt="item.title"
-                  loading="lazy"
-                  decoding="async"
-                  fetchpriority="low"
-                  :draggable="false"
-                  fit="cover"
-                  object-position="center"
-                />
-                <div v-else class="recent-empty">
-                  <Icon icon="mdi:image-outline" />
-                </div>
-                <span class="recent-status" :class="`is-${item.status}`">
-                  <Icon
-                    :icon="statusIconMap[item.status]"
-                    class="recent-status-icon"
-                  />
-                  {{ getRecentStatusLabel(item) }}
-                </span>
-              </div>
-              <footer class="recent-foot">
-                <strong class="recent-name">{{ item.title }}</strong>
-                <p v-if="item.sceneLabel" class="recent-scene">
-                  {{ item.sceneLabel }}
-                </p>
-                <div class="recent-foot-actions">
-                  <span class="recent-time">
-                    <Icon icon="mdi:clock-outline" class="recent-time-icon" />
-                    {{ item.createdAt }}
-                  </span>
-                  <button
-                    type="button"
-                    class="recent-delete-btn"
-                    :aria-label="`删除${item.title}`"
-                    :disabled="isDeletingRecent(item)"
-                    @click.stop="handleDeleteRecent(item)"
-                  >
-                    <Icon
-                      :icon="
-                        isDeletingRecent(item)
-                          ? 'mdi:loading'
-                          : 'mdi:trash-can-outline'
-                      "
-                      :class="{
-                        'recent-delete-icon--loading': isDeletingRecent(item),
-                      }"
-                    />
-                  </button>
-                </div>
-              </footer>
-            </article>
+              :item="item"
+              :selected="item.id === selectedRecentItemId"
+              :clickable="canOpenRecent(item)"
+              :deleting="isDeletingRecent(item)"
+              :show-status="shouldShowRecentStatus(item)"
+              :status-label="getRecentStatusLabel(item)"
+              @pick="handleRecentPick"
+              @delete="handleDeleteRecent"
+            />
           </section>
         </div>
       </div>
@@ -1803,6 +1706,9 @@ defineExpose({
   --assist-blue: var(--workspace-accent, #efc24c);
   --assist-green: var(--workspace-accent-strong, #ffd75a);
   --assist-shadow: var(--workspace-shadow, 0 24px 60px rgba(0, 0, 0, 0.34));
+  --assist-tab-color: #999999;
+  --assist-tab-active-color: #ffffff;
+  --assist-tab-hover-color: #ffffff;
 
   position: relative;
   display: flex;
@@ -1845,8 +1751,11 @@ defineExpose({
     --workspace-shadow,
     0 14px 34px rgba(78, 111, 148, 0.09)
   );
+  --assist-tab-color: #8a95a3;
+  --assist-tab-active-color: #111827;
+  --assist-tab-hover-color: #64748b;
 
-  border-color: #dce6f3;
+  border: 1px solid #dce6f3;
   background:
     radial-gradient(
       circle at 62% 32%,
@@ -1857,6 +1766,13 @@ defineExpose({
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.72),
     0 18px 42px rgba(78, 111, 148, 0.1);
+}
+
+.assist-short-video-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  margin: -18px -20px -20px;
 }
 
 .delivery-group-preview {
@@ -2899,21 +2815,23 @@ defineExpose({
 .tab-group button {
   position: relative;
   padding: 0;
-  color: #999999;
+  color: var(--assist-tab-color);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
+  transition: color 0.2s ease;
 }
 
-.tab-group button:hover {
-  color: #ffffff;
-}
-
-.assist-panel.theme-light .tab-group button:hover {
-  color: #111827;
+.tab-group button:hover:not(.active) {
+  color: var(--assist-tab-hover-color);
 }
 
 .tab-group button.active {
-  color: #d4a017;
+  color: var(--assist-tab-active-color);
+  font-weight: 800;
+}
+
+.tab-group button.active:hover {
+  color: var(--assist-tab-active-color);
 }
 
 .expand-button {
@@ -2931,44 +2849,43 @@ defineExpose({
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 6px 20px 0;
+  padding: 0 2px 20px 0;
+}
+
+.assist-panel.theme-dark .guide-layout {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-.guide-layout::-webkit-scrollbar {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar {
   width: 8px;
 }
 
-.guide-layout::-webkit-scrollbar-track {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-track {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.guide-layout::-webkit-scrollbar-thumb {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
 }
 
-.guide-layout::-webkit-scrollbar-thumb:hover {
+.assist-panel.theme-dark .guide-layout::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.42);
 }
 
 .assist-panel.theme-light .guide-layout {
-  scrollbar-color: #cbd5e1 #eef2f7;
+  padding-right: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-track {
-  background: #eef2f7;
-}
-
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-.assist-panel.theme-light .guide-layout::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.assist-panel.theme-light .guide-layout::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .guide-layout.is-compact-guide {
@@ -3107,76 +3024,144 @@ defineExpose({
 }
 
 .recent-layout {
-  display: grid;
   flex: 1;
   min-height: 0;
-  align-content: start;
-  gap: 10px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-auto-rows: max-content;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 6px 20px 0;
+  padding: 2px 2px 20px 0;
+}
+
+.assist-panel.theme-dark .recent-layout {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-.recent-layout::-webkit-scrollbar {
+.recent-layout.recent-layout--flow {
+  overflow-x: visible;
+  overflow-y: auto;
+  padding: 12px 10px 24px;
+}
+
+.recent-layout--flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  gap: 14px;
+  align-content: start;
+  align-items: start;
+  padding: 0;
+}
+
+.recent-layout--flow :deep(.recent-flow-item) {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+}
+
+.recent-layout--flow :deep(.recent-flow-item:hover) {
+  z-index: 30;
+}
+
+/* 按列调整放大锚点，避免左右被裁切 */
+.recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 1):hover) {
+  transform-origin: left center;
+}
+
+.recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 2):hover) {
+  transform-origin: center center;
+}
+
+.recent-layout--flow :deep(.recent-flow-item:nth-child(3n):hover) {
+  transform-origin: right center;
+}
+
+@container assist (max-width: 640px) {
+  .recent-layout--flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 1):hover),
+  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 2):hover),
+  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n):hover) {
+    transform-origin: center center;
+  }
+
+  .recent-layout--flow :deep(.recent-flow-item:nth-child(2n + 1):hover) {
+    transform-origin: left center;
+  }
+
+  .recent-layout--flow :deep(.recent-flow-item:nth-child(2n):hover) {
+    transform-origin: right center;
+  }
+}
+
+@container assist (max-width: 400px) {
+  .recent-layout--flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recent-layout--flow :deep(.recent-flow-item:hover) {
+    transform-origin: center center;
+  }
+}
+
+.recent-layout.batch-processing-layout {
+  display: grid;
+  align-content: start;
+  align-items: start;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+}
+
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar {
   width: 8px;
 }
 
-.recent-layout::-webkit-scrollbar-track {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-track {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.recent-layout::-webkit-scrollbar-thumb {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
 }
 
-.recent-layout::-webkit-scrollbar-thumb:hover {
+.assist-panel.theme-dark .recent-layout::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.42);
 }
 
 .assist-panel.theme-light .recent-layout {
-  scrollbar-color: #cbd5e1 #eef2f7;
+  padding-right: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-track {
-  background: #eef2f7;
-}
-
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-.assist-panel.theme-light .recent-layout::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.assist-panel.theme-light .recent-layout::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 @container assist (max-width: 480px) {
-  .recent-layout {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@container assist (max-width: 360px) {
-  .recent-layout {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@container assist (max-width: 280px) {
-  .recent-layout {
+  .recent-layout.batch-processing-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+@container assist (max-width: 400px) {
+  .recent-layout.batch-processing-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .recent-empty-state {
-  grid-column: 1 / -1;
   display: grid;
   min-height: 180px;
   place-items: center;
@@ -3223,26 +3208,6 @@ defineExpose({
 
 .recent-card.is-clickable {
   cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.recent-card.is-clickable:hover {
-  transform: translateY(-1px);
-  border-color: var(
-    --workspace-accent-border,
-    color-mix(in srgb, var(--assist-blue) 45%, var(--assist-border))
-  );
-  background: var(--workspace-hover-bg, inherit);
-  box-shadow:
-    0 0 0 2px
-      var(
-        --workspace-accent-glow,
-        color-mix(in srgb, var(--workspace-accent, #efc24c) 12%, transparent)
-      ),
-    var(--assist-shadow);
 }
 
 .recent-card.is-clickable:focus-visible {
@@ -3250,11 +3215,17 @@ defineExpose({
   outline-offset: 2px;
 }
 
-.recent-media {
+.recent-card--image-only {
+  overflow: hidden;
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.batch-processing-layout .recent-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
   flex-shrink: 0;
+  aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 10px 10px 0 0;
   background:
@@ -3273,12 +3244,15 @@ defineExpose({
   }
 }
 
-.recent-image {
-  display: block;
+.recent-card--image-only .recent-media--adaptive :deep(.preload-image) {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  border-radius: 10px 10px 0 0;
-  background: var(--assist-card-strong);
+}
+
+.recent-media--adaptive {
+  height: auto;
 }
 
 .recent-empty {
@@ -3288,6 +3262,14 @@ defineExpose({
   place-items: center;
   color: var(--assist-muted);
   font-size: 26px;
+}
+
+.batch-processing-layout .recent-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px 10px 0 0;
+  background: var(--assist-card-strong);
 }
 
 .recent-pending-slot {
@@ -3390,8 +3372,48 @@ defineExpose({
   opacity: 0.72;
 }
 
+.recent-card--image-only .recent-delete-btn--overlay {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(239, 68, 68, 0.72);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.recent-card--image-only:hover .recent-delete-btn--overlay,
+.recent-card--image-only:focus-within .recent-delete-btn--overlay {
+  opacity: 1;
+}
+
+.recent-card--image-only .recent-delete-btn--overlay:hover:not(:disabled) {
+  background: transparent;
+  color: rgba(220, 38, 38, 0.88);
+}
+
 .recent-delete-icon--loading {
   animation: recent-loading-spin 1s linear infinite;
+}
+
+.recent-status--subtle {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.92;
 }
 
 .recent-status {
@@ -3460,9 +3482,8 @@ defineExpose({
     min-height: 32px;
   }
 
-  .recent-layout {
-    gap: 8px;
-    padding-bottom: 16px;
+  .recent-layout--flow {
+    gap: 12px;
   }
 
   .recent-foot {
@@ -3470,8 +3491,8 @@ defineExpose({
     padding: 7px 8px 9px;
   }
 
-  .recent-media {
-    aspect-ratio: 4 / 3;
+  .batch-processing-layout .recent-media {
+    aspect-ratio: 3 / 4;
   }
 
   .recent-name {

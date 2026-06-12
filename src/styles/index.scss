@@ -84,13 +84,14 @@ $theme-vars: (
 
 @media (max-width: 767px) {
   .app-layout--studio-chrome:not([data-subnav="true"]) {
-    --app-header-offset: calc(52px + env(safe-area-inset-top, 0px));
+    --app-header-offset: calc(64px + env(safe-area-inset-top, 0px));
   }
 }
 
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --h5-bottom-inset: 0px;
   --app-vh: 1vh;
   color-scheme: dark;
   @include apply-theme-vars(dark);
@@ -218,6 +219,20 @@ html {
   scrollbar-gutter: stable;
   background: var(--app-bg);
   color: var(--app-text);
+  scroll-padding-bottom: var(--h5-bottom-inset, 0px);
+}
+
+/* 工作台内部自行滚动，仅取消 html 右侧预留槽位，不影响页面高度布局 */
+html:has(.app-layout--auth) {
+  scrollbar-gutter: auto;
+}
+
+html.is-mobile {
+  --h5-bottom-inset: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
+html.is-mobile.is-wechat {
+  --h5-bottom-inset: max(env(safe-area-inset-bottom, 0px), 34px);
 }
 
 body,

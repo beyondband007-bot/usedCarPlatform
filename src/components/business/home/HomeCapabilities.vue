@@ -333,9 +333,13 @@ onMounted(() => {
 }
 
 @media (max-width: 767px) {
+  .section-block {
+    padding-bottom: calc(var(--home-section-pb, 86px) + var(--h5-bottom-inset, 0px));
+  }
+
   .section-title {
     width: 100%;
-    margin-bottom: 34px;
+    margin-bottom: 28px;
   }
 
   .section-title h2,
@@ -344,30 +348,61 @@ onMounted(() => {
   }
 
   .section-title h2 {
-    font-size: clamp(22px, 6vw, 28px);
+    font-size: clamp(18px, 5.2vw, 24px);
+    line-height: 1.25;
+  }
+
+  .section-title p {
+    font-size: clamp(12px, 3.2vw, 14px);
+    line-height: 1.6;
   }
 
   .feature-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--home-grid-gap, 12px);
   }
 
-  .feature-card h3,
+  .feature-card {
+    padding: 8px 8px 14px;
+    border-radius: var(--home-radius-card, 16px);
+  }
+
+  .feature-card-image {
+    border-radius: var(--home-radius-media, 12px);
+  }
+
+  .feature-card h3 {
+    margin: 10px 6px 4px;
+    font-size: clamp(12px, 3.4vw, 14px);
+    line-height: 1.35;
+    white-space: normal;
+  }
+
   .feature-card p {
+    margin: 0 6px;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.45;
     white-space: normal;
   }
 
   .badge-row {
-    gap: 10px;
+    gap: 8px;
+    margin-top: 24px;
   }
 
   .tech-badge {
-    min-height: 36px;
-    padding: 7px 14px;
+    min-height: 32px;
+    padding: 6px 12px;
+    gap: 6px;
   }
 
   .tech-badge-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
+  }
+
+  .tech-badge-label {
+    font-size: 12px;
   }
 }
 </style>

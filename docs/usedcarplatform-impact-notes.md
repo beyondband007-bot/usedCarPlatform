@@ -24,8 +24,10 @@ Console-owned files added:
 Behavior impact:
 
 - Product login remains `/login`.
+- Product frontend remains available through `npm run dev` on `http://localhost:5173`.
 - Back-office login is now `/back-office/login`.
 - Back-office console is now `/back-office`.
+- Back-office can also run as a console-only local frontend through `npm run dev:console` on `http://localhost:5174`; its root path redirects to `/back-office`.
 - `/reusable-credits-console` redirects to `/back-office`.
 - `/credits-admin` redirects to `/back-office`.
 - Unauthenticated back-office visits redirect to `/back-office/login`, not the product login.

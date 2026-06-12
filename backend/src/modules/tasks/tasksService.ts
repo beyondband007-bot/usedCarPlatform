@@ -666,10 +666,35 @@ class TasksService {
     };
   }
 
-  private toRecentResponse(task: RecentGenerationRecord) {
-    const coverUrl =
+  private resolveRecentCover(task: RecentGenerationRecord) {
+    const inputCover =
       task.inputAssetThumbnailUrl ?? task.inputAssetUrl ?? null;
     const results = normalizeTaskResults(task.resultJson);
+    const firstResult = results.find((item) => item.thumbnailUrl || item.url);
+
+    if (!firstResult) {
+      return {
+        coverUrl: inputCover,
+        downloadUrl: null as string | null,
+      };
+    }
+
+    const resultCover = firstResult.thumbnailUrl ?? firstResult.url ?? null;
+    if (!resultCover) {
+      return {
+        coverUrl: inputCover,
+        downloadUrl: null as string | null,
+      };
+    }
+
+    return {
+      coverUrl: resultCover,
+      downloadUrl: firstResult.url ?? null,
+    };
+  }
+
+  private toRecentResponse(task: RecentGenerationRecord) {
+    const { coverUrl, downloadUrl } = this.resolveRecentCover(task);
 
     return {
       id: task.id,
@@ -685,7 +710,7 @@ class TasksService {
       updatedAt: task.updatedAt.toISOString(),
       thumbnail: coverUrl,
       previewImage: coverUrl,
-      downloadUrl: results[0]?.url ?? null,
+      downloadUrl,
       ratioLabel: `主图 ${task.outputRatio}`,
       sceneLabel: this.buildRecentSceneLabel(task),
       vehicleName: task.videoVehicleName ?? null,

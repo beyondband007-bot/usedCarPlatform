@@ -92,33 +92,32 @@ const footerBrandLogoSrc = computed(() =>
         </div>
 
         <div class="footer-contact-mobile" aria-label="客服联系方式">
+          <div class="footer-contact-copy">
+            <p class="brand-desc">
+              面向汽车电商、二手车商和企业<br />
+              运营团队的<span class="nowrap">AI SaaS 工作台</span>
+            </p>
+            <p class="brand-tip">
+              添加客服微信，了解更多定制服务<br />
+              关注脸谱AI公众号，获取产品更新
+            </p>
+          </div>
+
           <div class="qr-codes">
             <div class="qr-item">
-              <div class="qr-frame">
+              <div class="qr-frame qr-frame--large">
                 <img
                   class="qr-image"
                   :src="contactSupportWechatQr"
                   alt="客服微信二维码"
-                  width="88"
-                  height="88"
+                  width="120"
+                  height="120"
                   loading="lazy"
                   decoding="async"
                 />
               </div>
               <span class="qr-label">客服微信</span>
             </div>
-          </div>
-
-          <div class="footer-contact-copy">
-            <h3 class="nav-title">联系我们</h3>
-            <ul class="nav-list">
-              <li v-for="line in homeFooterContactItems" :key="line">
-                <span class="nav-item nav-item--static">{{ line }}</span>
-              </li>
-            </ul>
-            <p class="brand-tip">
-              添加客服微信，了解更多定制服务
-            </p>
           </div>
         </div>
       </div>
@@ -176,7 +175,7 @@ const footerBrandLogoSrc = computed(() =>
       <div class="footer-bottom-links">
         <span>隐私政策</span>
         <span>服务条款</span>
-        <span>京ICP备xxxxxxxx号</span>
+        <span>鄂ICP备2021002927号-3</span>
       </div>
     </div>
   </footer>
@@ -322,12 +321,12 @@ const footerBrandLogoSrc = computed(() =>
   display: none;
 }
 
-.footer-contact-copy .nav-title {
-  margin-bottom: 12px;
+.footer-contact-copy .brand-desc {
+  margin: 0 0 10px;
 }
 
-.footer-contact-copy .nav-list li:last-child {
-  margin-bottom: 0;
+.footer-contact-copy .brand-tip {
+  margin: 0;
 }
 
 .footer-nav {
@@ -464,7 +463,8 @@ const footerBrandLogoSrc = computed(() =>
 
 @media (max-width: 767px) {
   .footer {
-    padding: 28px 0 20px;
+    padding: 28px 0
+      calc(20px + var(--h5-bottom-inset, env(safe-area-inset-bottom, 0px)));
   }
 
   .footer-container {
@@ -489,23 +489,37 @@ const footerBrandLogoSrc = computed(() =>
 
   .footer-contact-mobile {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     align-items: flex-start;
+    justify-content: space-between;
     width: 100%;
   }
 
   .footer-contact-copy {
     min-width: 0;
     flex: 1;
+    padding-top: 2px;
+  }
+
+  .footer-contact-copy .brand-desc {
+    font-size: 12px;
+    line-height: 1.65;
   }
 
   .footer-contact-copy .brand-tip {
-    margin-top: 12px;
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.65;
   }
 
-  .footer-contact-mobile .qr-frame {
-    width: 80px;
-    height: 80px;
+  .footer-contact-mobile .qr-codes {
+    flex-shrink: 0;
+  }
+
+  .footer-contact-mobile .qr-frame--large {
+    width: 112px;
+    height: 112px;
+    margin-bottom: 6px;
   }
 
   .footer-bottom {
@@ -514,6 +528,7 @@ const footerBrandLogoSrc = computed(() =>
     flex-direction: column;
     margin-top: 24px;
     padding-inline: var(--home-space-x, 16px);
+    padding-bottom: var(--h5-bottom-inset, env(safe-area-inset-bottom, 0px));
     text-align: center;
   }
 

@@ -7,7 +7,9 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
+import { listAgentDepositBalances } from "./agentDepositService";
 import { getCommissionPolicy } from "./commissionPolicyService";
+import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type AgentUserRow = RowDataPacket & {
   id: string;
@@ -273,6 +275,13 @@ async function listAgentCustomers(agentUserId: string) {
   );
 
   const totalTopUpAmountByCustomer = await listCustomerTopUpAmounts(rows);
+  const balances = await listCreditsBalances(
+    rows.map((row) => ({
+      creditsUserId: row.customer_credits_user_id,
+      accountScope: row.customer_account_scope,
+      creditsTenantId: row.customer_credits_tenant_id,
+    })),
+  );
 
   return rows.map((row) => ({
     id: row.id,
@@ -289,6 +298,18 @@ async function listAgentCustomers(agentUserId: string) {
     customerDisplayName: row.customer_display_name,
     customerPhone: row.customer_phone,
     customerCreditsUserId: row.customer_credits_user_id,
+    creditsAvailableBalance:
+      balances.get(creditsBalanceKey({
+        creditsUserId: row.customer_credits_user_id,
+        accountScope: row.customer_account_scope,
+        creditsTenantId: row.customer_credits_tenant_id,
+      }) ?? "")?.availableBalance ?? null,
+    creditsTotalBalance:
+      balances.get(creditsBalanceKey({
+        creditsUserId: row.customer_credits_user_id,
+        accountScope: row.customer_account_scope,
+        creditsTenantId: row.customer_credits_tenant_id,
+      }) ?? "")?.totalBalance ?? null,
     totalTopUpAmount:
       totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
   }));
@@ -780,7 +801,7 @@ async function listAgentTickets(agentUserId: string) {
 
 export async function getAgentOperationsOverview(req: Request) {
   const agent = await resolveAgentUser(req, req.query.agentUserId);
-  const [customers, leads, commissionPreviews, settlementBills, materials, tickets] =
+  const [customers, leads, commissionPreviews, settlementBills, materials, tickets, depositBalances] =
     await Promise.all([
       listAgentCustomers(agent.id),
       listAgentLeads(agent.id),
@@ -788,13 +809,17 @@ export async function getAgentOperationsOverview(req: Request) {
       listAgentSettlementBills(agent.id),
       listAgentMaterials(),
       listAgentTickets(agent.id),
+      listAgentDepositBalances([agent.id]),
     ]);
+  const depositBalance = depositBalances.get(agent.id);
 
   return {
     agent: {
       userId: agent.id,
       username: agent.username,
       displayName: agent.display_name,
+      depositBalance: depositBalance?.balance ?? 0,
+      depositCurrency: depositBalance?.currency ?? "CNY",
     },
     metrics: {
       customerCount: customers.filter((item) => item.status === "active").length,

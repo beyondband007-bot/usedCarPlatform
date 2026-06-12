@@ -6,7 +6,8 @@ This document is for frontend integration on the `feature` branch.
 
 | Service | Base URL | Purpose |
 | --- | --- | --- |
-| Frontend | `http://127.0.0.1:5173` | Vite app |
+| usedCar frontend | `http://127.0.0.1:5173` | Vite app for the usedCarPlatform product |
+| Reusable Credits Platform Console frontend | `http://127.0.0.1:5174` | Console-only Vite app; root redirects to the back-office shell |
 | usedCar backend | `http://127.0.0.1:3101` | Frontend should call this service |
 | Reusable Credits Platform | `http://127.0.0.1:3000` | Credits/payment service; normally called through usedCar backend proxy |
 
@@ -14,6 +15,18 @@ Frontend API base URL:
 
 ```ts
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3101/api/v1";
+```
+
+Console local dev:
+
+```bash
+npm run dev:console
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5174
 ```
 
 ## Common Rules
