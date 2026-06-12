@@ -39,6 +39,10 @@ import {
   resolveBatchExteriorPrompt,
   resolveBatchExteriorPromptWithBrandedScene,
 } from "./batchPrompts";
+import {
+  isKieAccessibleSceneUrl,
+  resolveBatchBrandedSceneInputUrl,
+} from "./batchBrandedScene";
 import { batchRepository, type BatchTaskRecord } from "./batchRepository";
 import {
   resolveBatchScene,
@@ -600,7 +604,7 @@ class BatchService {
     }
 
     if (detail.status === "success") {
-      const url = detail.resultImages[0]?.url;
+      const url = resolveBatchBrandedSceneInputUrl(detail.resultImages[0]);
       if (url) {
         await batchRepository.markBrandedSceneSuccess({ batchId: batch.id, url });
         return true;
@@ -634,7 +638,7 @@ class BatchService {
 
   private async ensureWallLogoSceneReady(batch: BatchTaskRecord) {
     if (!requiresBatchWallLogoScene(batch.visualConfig)) return true;
-    if (batch.brandedSceneUrl) return true;
+    if (isKieAccessibleSceneUrl(batch.brandedSceneUrl)) return true;
     if (batch.brandedSceneErrorCode) return false;
 
     const taskId = batch.brandedSceneTaskId ?? (await this.createWallLogoSceneTask(batch));
@@ -665,8 +669,12 @@ class BatchService {
     }
 
     const results = normalizeTaskResults(task.resultJson);
-    if (task.status === "success" && results[0]?.url) {
-      await batchRepository.markBrandedSceneSuccess({ batchId: batch.id, url: results[0].url });
+    const brandedSceneInputUrl = resolveBatchBrandedSceneInputUrl(results[0]);
+    if (task.status === "success" && brandedSceneInputUrl) {
+      await batchRepository.markBrandedSceneSuccess({
+        batchId: batch.id,
+        url: brandedSceneInputUrl,
+      });
       if (shouldFinalizeGenerationBilling(task)) {
         await finalizeGenerationBilling(task, batchWallLogoSceneBillingScope(batch.id));
       }
