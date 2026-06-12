@@ -124,17 +124,10 @@ function handlePick() {
   );
   box-shadow: var(--assist-shadow, 0 8px 24px rgba(15, 23, 42, 0.08));
   overflow: hidden;
-  transform-origin: center center;
-  transition: transform 0.35s ease, z-index 0s;
 }
 
 .recent-card.is-clickable {
   cursor: pointer;
-}
-
-.recent-card.is-clickable:hover {
-  transform: scale(1.1);
-  z-index: 30;
 }
 
 .recent-card.is-clickable:focus-visible {
@@ -209,7 +202,7 @@ function handlePick() {
   bottom: 0;
   z-index: 2;
   margin: 0;
-  padding: 10px 12px 8px;
+  padding: 10px 36px 8px 12px;
   overflow: hidden;
   background: linear-gradient(
     180deg,
@@ -226,8 +219,8 @@ function handlePick() {
 
 .recent-delete-btn--overlay {
   position: absolute;
-  top: 16px;
   right: 12px;
+  bottom: 8px;
   z-index: 3;
   display: inline-flex;
   align-items: center;

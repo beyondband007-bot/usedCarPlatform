@@ -50,6 +50,7 @@ import { usePointsStore } from "@/stores/points";
 import { useAuthStore } from "@/stores/auth";
 import { useCreditsStore } from "@/stores/credits";
 import { useSubscriptionStore } from "@/stores/subscription";
+import { useRecentGenerateStore } from "@/stores/recentGenerate";
 import type {
   CreativeThreadTurn,
   SidebarCapabilityStatus,
@@ -70,6 +71,8 @@ import {
 } from "@/utils/static-image-cache";
 import { buildWorkspaceResultFromVideoTask } from "@/utils/video-generation-result";
 import { resolveVideoGenerationErrorMessage } from "@/utils/video-generation-errors";
+import { attachPreviewGallery } from "@/utils/workspace-image-preview";
+import { resolveRecentGenerateCacheKey } from "@/utils/recent-generate-cache";
 
 const route = useRoute();
 const router = useRouter();
@@ -80,6 +83,7 @@ const authStore = useAuthStore();
 const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
+const recentGenerateStore = useRecentGenerateStore();
 registerStaticImageUrls(workspaceStaticImageUrls);
 
 const videoFlowOwnerKey = computed(
@@ -90,6 +94,39 @@ const videoFlowOwnerKey = computed(
 );
 const videoFlow = useVideoGenerationFlow(videoFlowOwnerKey.value);
 provide(VIDEO_GENERATION_FLOW_KEY, videoFlow);
+
+function getCachedRecentItemsForActiveModule(): WorkspaceRecentItem[] {
+  const key = resolveRecentGenerateCacheKey({
+    capabilityCode: activeCode.value,
+    capabilityKind: activeCapability.value.kind,
+  });
+  if (!key) {
+    return assistPanelRef.value?.getRecentItems?.() ?? [];
+  }
+
+  const cachedItems = recentGenerateStore.getCache(key).taskList;
+  if (cachedItems.length) {
+    return cachedItems;
+  }
+
+  return assistPanelRef.value?.getRecentItems?.() ?? [];
+}
+
+function setGenerationResultWithGallery(result: WorkspaceGenerateResult | null) {
+  if (!result) {
+    generationResult.value = null;
+    return;
+  }
+
+  if (result.mediaType === "video" || result.previewGallery?.length) {
+    generationResult.value = result;
+    return;
+  }
+
+  generationResult.value = attachPreviewGallery(result, {
+    recentItems: getCachedRecentItemsForActiveModule(),
+  });
+}
 
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
@@ -1172,7 +1209,7 @@ function handleDeliveryListLoadingChange(loading: boolean) {
 }
 
 function handleOpenDeliveryAssetResult(result: WorkspaceGenerateResult) {
-  generationResult.value = result;
+  setGenerationResultWithGallery(result);
   deliveryImagePreview.value = null;
 }
 
@@ -1405,13 +1442,13 @@ async function resolveInteriorCollageTasks(
       return;
     }
 
-    generationResult.value = result;
-    clearActiveGenerationTask(result.taskId);
     if (!options.restored && successTasks[0]) {
       notifyGenerationSuccess(successTasks[0]);
     }
     refreshCreditsBalance();
     await assistPanelRef.value?.refreshRecentItems();
+    setGenerationResultWithGallery(result);
+    clearActiveGenerationTask(result.taskId);
   } finally {
     untrackRunningTasks(taskIds);
   }
@@ -1457,11 +1494,8 @@ async function resolveVideoGenerationModuleTask(
     if (
       shouldSyncWorkspaceForTask({ moduleCode: VIDEO_GENERATION_MODULE_CODE })
     ) {
-      generationResult.value = null;
       if (!options.restored) {
-        shortVideoSessionPreview.value = result;
-        shortVideoPlayRequest.value += 1;
-        assistPanelRef.value?.focusShortVideoPreviewView?.();
+        generationResult.value = result;
       }
     }
 
@@ -1536,19 +1570,6 @@ async function resolveGenerationTask(
     }
 
     const shouldShowResultOnPage = shouldSyncWorkspaceForTask(task);
-    if (shouldShowResultOnPage) {
-      applyTaskOptionIfOnActivePage(task);
-      if (isShortVideoModuleCode(task.moduleCode)) {
-        generationResult.value = null;
-        if (!options.restored) {
-          shortVideoSessionPreview.value = result;
-          shortVideoPlayRequest.value += 1;
-          assistPanelRef.value?.focusShortVideoPreviewView?.();
-        }
-      } else {
-        generationResult.value = result;
-      }
-    }
     if (
       task.moduleCode === "creative-image" &&
       activeCreativeConversationId.value
@@ -1556,6 +1577,17 @@ async function resolveGenerationTask(
       await refreshCreativeConversations();
     }
     await assistPanelRef.value?.refreshRecentItems();
+
+    if (shouldShowResultOnPage) {
+      applyTaskOptionIfOnActivePage(task);
+      if (isShortVideoModuleCode(task.moduleCode)) {
+        if (!options.restored) {
+          generationResult.value = result;
+        }
+      } else {
+        setGenerationResultWithGallery(result);
+      }
+    }
   } catch (error) {
     clearActiveGenerationTask(taskId);
     markSidebarStatusForModule(taskModuleCode, "fail");
@@ -1607,7 +1639,8 @@ async function resolveCreativeGenerationTask(
       activeCode.value === "creative-image" &&
       activeCreativeConversationId.value === conversationId
     ) {
-      generationResult.value = result;
+      await assistPanelRef.value?.refreshRecentItems();
+      setGenerationResultWithGallery(result);
     }
   } catch {
     if (!options.restored) {
@@ -2113,9 +2146,7 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
         videoFlow.currentTask.value = task;
         const result = buildWorkspaceResultFromVideoTask(task);
         if (result) {
-          shortVideoSessionPreview.value = result;
           generationResult.value = result;
-          assistPanelRef.value?.focusShortVideoPreviewView?.();
           return;
         }
       } catch (error) {
@@ -2135,12 +2166,7 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
       const task = await getGenerationTask(item.taskId);
       const result = buildResultFromTask(task);
       if (result) {
-        if (isShortVideoModuleCode(item.moduleCode)) {
-          generationResult.value = result;
-          assistPanelRef.value?.focusShortVideoPreviewView?.();
-        } else {
-          generationResult.value = result;
-        }
+        setGenerationResultWithGallery(result);
         return;
       }
     } catch (error) {

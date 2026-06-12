@@ -4,8 +4,10 @@ import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
+import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import VehicleLookupField from "@/components/business/workspace/VehicleLookupField.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
+import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
 import {
   MAX_DEALERSHIP_IMAGES,
   MAX_VIDEO_EXTERIOR_IMAGES,
@@ -272,6 +274,21 @@ const tipBannerText = computed(() => {
   return `系统将自动注入该模板对应的内置专业提示词，生成匹配「${styleLabel}」风格的口播文案`;
 });
 
+const selectedTemplatePosterUrl = computed(() => {
+  if (!selectedTemplate.value) return null;
+  return resolveTemplatePosterUrl(selectedTemplate.value);
+});
+
+const selectedTemplateVideoUrl = computed(() => {
+  if (!selectedTemplate.value) return null;
+  return resolveTemplatePreviewUrl(selectedTemplate.value);
+});
+
+const selectedTemplateUseVideoCover = computed(() => {
+  if (!selectedTemplate.value) return false;
+  return shouldPreferVideoCover(selectedTemplate.value);
+});
+
 const canGenerateDraft = computed(
   () =>
     currentStep.value === "form" &&
@@ -432,11 +449,20 @@ async function confirmVideo() {
     <template v-else-if="currentStep === 'form' && selectedTemplate">
       <article class="sv-template-summary">
         <PreloadImage
-          v-if="selectedTemplate.thumbnailUrl"
+          v-if="selectedTemplatePosterUrl && !selectedTemplateUseVideoCover"
+          :key="selectedTemplate.templateId"
           class="sv-template-summary-cover"
-          :src="selectedTemplate.thumbnailUrl"
+          :src="selectedTemplatePosterUrl"
           :alt="selectedTemplate.title"
           fit="cover"
+        />
+        <HoverPreviewVideo
+          v-else-if="selectedTemplateVideoUrl"
+          :key="selectedTemplate.templateId"
+          class="sv-template-summary-cover"
+          :src="selectedTemplateVideoUrl"
+          :alt="selectedTemplate.title"
+          :interactive="false"
         />
         <div v-else class="sv-template-summary-cover sv-template-summary-cover--placeholder">
           <Icon icon="mdi:movie-open-outline" />
@@ -449,9 +475,6 @@ async function confirmVideo() {
           </div>
           <p>{{ selectedTemplate.stylePrompt }}</p>
         </div>
-        <button type="button" class="sv-template-summary-action" @click="goBackToTemplate">
-          更换模板
-        </button>
       </article>
 
       <section class="sv-section">
@@ -1001,7 +1024,7 @@ async function confirmVideo() {
 
 .sv-template-summary {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) auto;
+  grid-template-columns: 88px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 14px 16px;
@@ -1016,6 +1039,12 @@ async function confirmVideo() {
   border-radius: 10px;
   overflow: hidden;
   background: #111;
+}
+
+.sv-template-summary-cover.hover-preview-video,
+.sv-template-summary-cover :deep(.hover-preview-video) {
+  width: 88px;
+  height: 112px;
 }
 
 .sv-template-summary-cover--placeholder {
@@ -1640,11 +1669,6 @@ async function confirmVideo() {
 
   .sv-template-summary {
     grid-template-columns: 72px minmax(0, 1fr);
-  }
-
-  .sv-template-summary-action {
-    grid-column: 1 / -1;
-    justify-self: flex-start;
   }
 }
 

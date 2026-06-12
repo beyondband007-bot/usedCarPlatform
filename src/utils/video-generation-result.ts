@@ -39,7 +39,7 @@ export function buildWorkspaceResultFromVideoTask(
 
   return {
     createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
-    statusText: `已完成 · ${title} · 营销视频`,
+    statusText: `已完成 · ${title} · 短视频生成结果`,
     ratioLabel: VIDEO_OUTPUT_RATIO_LABEL,
     mediaType: 'video',
     previewImage: videoItem?.thumbnail ?? task.thumbnail ?? '',

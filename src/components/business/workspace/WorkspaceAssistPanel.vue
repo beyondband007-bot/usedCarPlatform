@@ -33,6 +33,7 @@ import {
   isInteriorBatchItemKind,
 } from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
+import { buildImagePreviewFromDeliveryAsset } from "@/utils/workspace-image-preview";
 import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
 import {
   recentStatusIconMap,
@@ -391,6 +392,18 @@ function openDeliveryGroupAssetPreview(
 ) {
   if (asset.status !== "ready" || !asset.imageUrl) return;
 
+  const task = props.deliveryTaskPreview;
+  const readyAssets =
+    task?.assets.filter(
+      (item) => item.status === "ready" && Boolean(item.imageUrl),
+    ) ?? [];
+  const previewGallery = readyAssets.map((item) =>
+    buildImagePreviewFromDeliveryAsset(item),
+  );
+  const previewGalleryIndex = readyAssets.findIndex(
+    (item) => item.id === asset.id,
+  );
+
   persistRecentCache();
 
   emit("openDeliveryAssetResult", {
@@ -403,6 +416,10 @@ function openDeliveryGroupAssetPreview(
     downloadUrl: asset.imageUrl,
     imageWidth: asset.width,
     imageHeight: asset.height,
+    previewGallery:
+      previewGallery.length > 1 ? previewGallery : undefined,
+    previewGalleryIndex:
+      previewGalleryIndex >= 0 ? previewGalleryIndex : 0,
   });
 }
 
@@ -597,9 +614,8 @@ function handleReturnToRecentList() {
   }
 }
 
-const showGenerationResultOverlay = computed(
-  () =>
-    Boolean(props.generationResult) && props.capability.code !== "short-video",
+const showGenerationResultOverlay = computed(() =>
+  Boolean(props.generationResult),
 );
 
 const showDeliveryImageOverlay = computed(
@@ -823,10 +839,6 @@ function syncShortVideoInitialView() {
     shortVideoInitialView.value = "generating";
     return;
   }
-  if (props.shortVideoSessionPreview?.previewVideo) {
-    shortVideoInitialView.value = "preview";
-    return;
-  }
   shortVideoInitialView.value = "recent";
 }
 
@@ -860,7 +872,7 @@ function focusGeneratingView() {
 
 function focusShortVideoPreviewView() {
   if (props.capability.code !== "short-video") return;
-  shortVideoInitialView.value = "preview";
+  shortVideoInitialView.value = "recent";
 }
 
 function focusDeliveryBatchProcessingView() {
@@ -1028,6 +1040,7 @@ onUnmounted(() => {
 
 defineExpose({
   refreshRecentItems: () => loadRecentItems({ force: true }),
+  getRecentItems: () => recentItems.value,
   focusGeneratingView,
   focusShortVideoGeneratingView,
   focusShortVideoPreviewView,
@@ -1042,7 +1055,7 @@ defineExpose({
   >
     <div v-show="showGenerationResultOverlay" class="assist-detail-layer">
       <WorkspaceGenerateResultPanel
-        v-if="generationResult && capability.code !== 'short-video'"
+        v-if="generationResult"
         :result="generationResult"
         @back="handleResultBack"
       />
@@ -1417,6 +1430,7 @@ defineExpose({
     <div
       v-else-if="capability.code === 'short-video'"
       class="assist-short-video-shell"
+      :class="{ 'is-under-detail': isRecentListUnderDetail }"
     >
       <ShortVideoBetaPanel
         :play-request="shortVideoPlayRequest"
@@ -1425,6 +1439,7 @@ defineExpose({
         :generation-result="props.generationResult"
         :recent-items="recentItems"
         :recent-loading="recentLoading"
+        :deleting-recent-task-ids="deletingRecentIds"
         :initial-view="shortVideoInitialView"
         @pick-recent="handleRecentPick"
         @delete-recent="handleDeleteRecent"
@@ -3063,50 +3078,15 @@ defineExpose({
   height: auto;
 }
 
-.recent-layout--flow :deep(.recent-flow-item:hover) {
-  z-index: 30;
-}
-
-/* 按列调整放大锚点，避免左右被裁切 */
-.recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 1):hover) {
-  transform-origin: left center;
-}
-
-.recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 2):hover) {
-  transform-origin: center center;
-}
-
-.recent-layout--flow :deep(.recent-flow-item:nth-child(3n):hover) {
-  transform-origin: right center;
-}
-
 @container assist (max-width: 640px) {
   .recent-layout--flow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 1):hover),
-  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n + 2):hover),
-  .recent-layout--flow :deep(.recent-flow-item:nth-child(3n):hover) {
-    transform-origin: center center;
-  }
-
-  .recent-layout--flow :deep(.recent-flow-item:nth-child(2n + 1):hover) {
-    transform-origin: left center;
-  }
-
-  .recent-layout--flow :deep(.recent-flow-item:nth-child(2n):hover) {
-    transform-origin: right center;
   }
 }
 
 @container assist (max-width: 400px) {
   .recent-layout--flow {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .recent-layout--flow :deep(.recent-flow-item:hover) {
-    transform-origin: center center;
   }
 }
 
@@ -3374,8 +3354,8 @@ defineExpose({
 
 .recent-card--image-only .recent-delete-btn--overlay {
   position: absolute;
-  top: 16px;
   right: 12px;
+  bottom: 8px;
   z-index: 3;
   display: inline-flex;
   align-items: center;
