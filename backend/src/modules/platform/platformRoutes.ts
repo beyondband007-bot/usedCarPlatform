@@ -29,6 +29,7 @@ import {
 import { creditsClient } from "../billing/creditsClient";
 import { listPlatformAgents } from "./platformAgentsService";
 import { getPlatformDashboard } from "./platformDashboardService";
+import { listPlatformSubscriptionPlans } from "./platformSubscriptionPlanService";
 import { createPlatformUser, promotePlatformUserToAgent } from "./platformUserCreation";
 
 export const platformRoutes = Router();
@@ -121,6 +122,14 @@ platformRoutes.get(
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await listPlatformAgents(req));
+  }),
+);
+
+platformRoutes.get(
+  "/subscription-plans",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await listPlatformSubscriptionPlans(req));
   }),
 );
 

@@ -22,6 +22,7 @@
     "video-task-lifecycle-test": "tsx src/modules/video-generation/videoTaskLifecycle.test.ts",
     "deepseek-script-contract-test": "tsx src/providers/deepseek/deepseekClient.test.ts",
     "video-prompt-assembly-test": "tsx src/modules/video-generation/videoPromptAssembly.test.ts",
+    "batch-branded-scene-url-test": "tsx src/modules/batch-new/batchBrandedScene.test.ts",
     "print:application-contract-seed": "tsx scripts/print-application-contract-seed.ts",
     "phase11:smoke": "node scripts/phase11-e2e-smoke.mjs"
   },

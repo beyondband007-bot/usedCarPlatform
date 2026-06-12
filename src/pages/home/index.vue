@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, onMounted } from "vue";
+import { onMounted } from "vue";
 
 import HomeBottomCta from "@/components/business/home/HomeBottomCta.vue";
 import HomeCapabilities from "@/components/business/home/HomeCapabilities.vue";
@@ -9,7 +9,6 @@ import HomeHero from "@/components/business/home/HomeHero.vue";
 import HomeQuickAccess from "@/components/business/home/HomeQuickAccess.vue";
 import { homePromoBannerImageUrls } from "@/constants/home-promo-banners";
 import { homeStaticImageUrls } from "@/constants/home-page";
-import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import { useAppStore } from "@/stores/app";
 import {
   registerStaticImageUrls,
@@ -17,14 +16,9 @@ import {
 } from "@/utils/static-image-cache";
 
 const appStore = useAppStore();
-const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
 const staticHomeImageUrls = [...homeStaticImageUrls, ...homePromoBannerImageUrls];
 
 registerStaticImageUrls(staticHomeImageUrls);
-
-function openWorkbench() {
-  workbenchEntry?.openWorkbench();
-}
 
 onMounted(() => {
   void warmStaticImages(staticHomeImageUrls);
@@ -42,7 +36,7 @@ onMounted(() => {
     </div>
     <HomeCapabilities />
     <HomeCaseStudies />
-    <HomeBottomCta @enter-workbench="openWorkbench" />
+    <HomeBottomCta />
     <HomeFooter />
   </main>
 </template>
@@ -103,13 +97,13 @@ onMounted(() => {
   .home-page {
     --home-space-x: 16px;
     --home-grid-gap: var(--grid-gap-sm, 12px);
-    --home-suite-card-height: 210px;
-    --home-section-pb: 86px;
-    --home-suite-shell-pb: 24px;
-    --home-suite-margin-top: 16px;
-    --home-engine-top-gap: 32px;
-    --home-radius-card: 20px;
-    --home-radius-media: 16px;
+    --home-suite-card-height: 140px;
+    --home-section-pb: 64px;
+    --home-suite-shell-pb: 16px;
+    --home-suite-margin-top: 12px;
+    --home-engine-top-gap: 28px;
+    --home-radius-card: 16px;
+    --home-radius-media: 12px;
   }
 }
 
@@ -139,6 +133,8 @@ onMounted(() => {
   --home-hero-bg: #080808;
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
+  --home-hero-title-light: #1e222b;
+  --home-hero-sub-light: #64748b;
   --home-card-bg: linear-gradient(180deg, #151515, #0b0b0b);
   --home-card-overlay: linear-gradient(
     90deg,
@@ -199,6 +195,8 @@ onMounted(() => {
   --home-hero-bg: #080808;
   --home-hero-title: #f3f3f3;
   --home-hero-sub: #d5d5d5;
+  --home-hero-title-light: #1e222b;
+  --home-hero-sub-light: #64748b;
   --home-card-bg: linear-gradient(180deg, #ffffff, #f8fafd);
   --home-card-overlay: linear-gradient(
     90deg,

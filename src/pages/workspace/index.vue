@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog, useMessage } from "naive-ui";
 
+import { createVideoGenerationTask } from "@/api/video-generation";
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
@@ -22,6 +23,12 @@ import {
   type GenerationTaskStatus,
   type UploadedAsset,
 } from "@/api/visual-workbench";
+import {
+  SHORT_VIDEO_CAPABILITY_CODE,
+  VIDEO_GENERATION_MODULE_CODE,
+  VIDEO_OUTPUT_RATIO_LABEL,
+  isShortVideoModuleCode,
+} from "@/constants/short-video";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
@@ -69,13 +76,7 @@ const authStore = useAuthStore();
 const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
-const SHORT_VIDEO_CAPABILITY_CODE = "short-video";
-
 registerStaticImageUrls(workspaceStaticImageUrls);
-
-function isShortVideoModuleCode(moduleCode?: string) {
-  return moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
-}
 
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
@@ -89,6 +90,7 @@ const generationFailureMessageMap: Record<string, string> = {
   KIE_REQUEST_TIMEOUT: "生成服务网络超时，请重试",
   KIE_NETWORK_TIMEOUT: "生成服务网络异常，请重试",
   KIE_KEY_UNAVAILABLE: "生成服务繁忙，请稍后重试",
+  VIDEO_GENERATION_CREATE_FAILED: "视频任务创建失败，请稍后重试",
 };
 
 function getGenerationFailureMessage(
@@ -1303,7 +1305,7 @@ function buildResultFromTask(
     ? "短视频生成"
     : (option?.title ?? activeCapability.value.label);
   const ratioLabel = isShortVideo
-    ? `${task.outputRatio || "16:9"} · 720p · 10秒`
+    ? VIDEO_OUTPUT_RATIO_LABEL
     : `${task.outputRatio} · ${task.resolution}`;
 
   return {
@@ -1838,6 +1840,48 @@ async function handleCreativeGenerate(payload: {
 }
 
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    if (payload.shortVideoAction !== "confirm" || !payload.scriptDraftId) {
+      message.warning("请先生成口播草稿，并在审核后确认生成视频");
+      return;
+    }
+
+    if (!(await canStartGeneration())) {
+      return;
+    }
+
+    isGenerating.value = true;
+    generationResult.value = null;
+    shortVideoSessionPreview.value = null;
+    generatingCapabilityCode.value = SHORT_VIDEO_CAPABILITY_CODE;
+
+    try {
+      const created = await createVideoGenerationTask({
+        scriptDraftId: payload.scriptDraftId,
+      });
+      const moduleCode = created.moduleCode || VIDEO_GENERATION_MODULE_CODE;
+
+      saveActiveGenerationTask({
+        taskId: created.taskId,
+        moduleCode,
+      });
+      trackRunningTask(created.taskId, moduleCode);
+      message.info("视频任务已创建，正在生成", { duration: 3000 });
+      await refreshRunningTaskSummary();
+      await resolveGenerationTask(created.taskId);
+    } catch (error) {
+      clearActiveGenerationTask();
+      const text =
+        error instanceof Error ? error.message : "短视频任务创建失败";
+      message.error(text);
+    } finally {
+      isGenerating.value = false;
+      generatingCapabilityCode.value = null;
+    }
+
+    return;
+  }
+
   if (activeCode.value === INTERIOR_COLLAGE_CAPABILITY_CODE) {
     const assetIds = [...new Set(payload.assetIds ?? [])];
 
@@ -1915,9 +1959,6 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
   isGenerating.value = true;
   generationResult.value = null;
-  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
-    shortVideoSessionPreview.value = null;
-  }
   const startedOnCode = activeCapability.value.code;
   generatingCapabilityCode.value = startedOnCode;
 
@@ -1930,14 +1971,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       logoAssetId: payload.logoAssetId,
       logoPlacements: payload.logoPlacements,
       colorCode: payload.colorCode,
-      outputRatio:
-        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
-          ? "16:9"
-          : payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO,
-      extra:
-        activeCode.value === SHORT_VIDEO_CAPABILITY_CODE
-          ? { videoResolution: "720p" }
-          : undefined,
+      outputRatio: payload.outputRatio || DEFAULT_GENERATION_OUTPUT_RATIO,
     };
 
     const created = await createGenerationTask(

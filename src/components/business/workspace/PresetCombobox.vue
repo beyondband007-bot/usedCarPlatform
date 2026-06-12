@@ -15,12 +15,12 @@ const props = withDefaults(
     options: PresetComboboxOption[]
     loading?: boolean
     placeholder?: string
-    onDelete?: (presetId: string) => Promise<unknown>
+    deletePreset?: (presetId: string) => Promise<unknown>
   }>(),
   {
     loading: false,
     placeholder: '输入或选择预设名称',
-    onDelete: undefined,
+    deletePreset: undefined,
   },
 )
 
@@ -41,10 +41,16 @@ const inputValue = computed({
   set: (value: string) => emit('update:modelValue', value),
 })
 
-onClickOutside(rootRef, () => {
-  if (isSelecting.value) return
-  isOpen.value = false
-})
+onClickOutside(
+  rootRef,
+  () => {
+    if (isSelecting.value) return
+    isOpen.value = false
+  },
+  {
+    ignore: ['.n-popconfirm', '.n-popover', '.n-popconfirm-panel'],
+  },
+)
 
 function openDropdown() {
   isOpen.value = true
@@ -81,19 +87,23 @@ async function handleSelect(option: PresetComboboxOption) {
 }
 
 async function handleDeleteConfirm(option: PresetComboboxOption) {
-  if (!props.onDelete || deletingId.value) return
+  if (!props.deletePreset || deletingId.value) {
+    return false
+  }
 
   deletingId.value = option.id
   try {
-    await props.onDelete(option.id)
+    await props.deletePreset(option.id)
     message.success('预设已删除')
     if (props.modelValue.trim() === option.name) {
       emit('update:modelValue', '')
     }
+    return true
   } catch (error) {
     const text =
       error instanceof Error ? error.message : '预设删除失败，请重试'
     message.error(text)
+    return false
   } finally {
     deletingId.value = null
   }
@@ -143,19 +153,21 @@ async function handleDeleteConfirm(option: PresetComboboxOption) {
         暂无预设
       </div>
 
-      <button
+      <div
         v-for="option in options"
         v-else
         :key="option.id"
-        type="button"
         class="preset-combobox-option"
         role="option"
+        tabindex="0"
         @mousedown.prevent
         @click="handleSelect(option)"
+        @keydown.enter.prevent="handleSelect(option)"
+        @keydown.space.prevent="handleSelect(option)"
       >
         <span class="preset-combobox-option-name">{{ option.name }}</span>
         <span
-          v-if="onDelete"
+          v-if="deletePreset"
           class="preset-combobox-option-delete-anchor"
           @click.stop
           @mousedown.stop
@@ -164,7 +176,7 @@ async function handleDeleteConfirm(option: PresetComboboxOption) {
             positive-text="删除"
             negative-text="取消"
             placement="right"
-            @positive-click="handleDeleteConfirm(option)"
+            :on-positive-click="() => handleDeleteConfirm(option)"
           >
             <template #trigger>
               <button
@@ -189,7 +201,7 @@ async function handleDeleteConfirm(option: PresetComboboxOption) {
             删除预设「{{ option.name }}」？删除后不可恢复。
           </NPopconfirm>
         </span>
-      </button>
+      </div>
     </div>
   </div>
 </template>

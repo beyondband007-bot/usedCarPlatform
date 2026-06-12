@@ -16,12 +16,12 @@ const props = withDefaults(
     variant?: WorkspaceTutorialVariant;
   }>(),
   {
-    variant: "showroom",
+    variant: "batch-new",
   },
 );
 
 const tutorialConfig = computed(
-  () => workspaceTutorialConfigs[props.variant] ?? workspaceTutorialConfigs.showroom,
+  () => workspaceTutorialConfigs[props.variant] ?? workspaceTutorialConfigs["batch-new"],
 );
 const tutorialSteps = computed(() => tutorialConfig.value.steps);
 const tutorialTemplatePreviewImages = computed(
@@ -43,10 +43,7 @@ const tutorialTemplatePreviewImages = computed(
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.32, delay: index * 0.04 }"
         class="tutorial-step"
-        :class="[
-          `is-step-${index + 1}`,
-          `is-layout-${step.layout}`,
-        ]"
+        :class="[`is-step-${index + 1}`, `is-layout-${step.layout}`]"
       >
         <div class="tutorial-placeholder">
           <template v-if="step.layout === 'mosaic'">

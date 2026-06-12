@@ -48,13 +48,20 @@ export function mapCreditsTxnType(
   if (txnType === 'recharge') return 'recharge'
   if (txnType === 'refund') return 'refund'
   if (['grant', 'bonus', 'commission_grant'].includes(txnType)) return 'gift'
-  if (['settle', 'freeze', 'estimate'].includes(txnType)) {
+  if (['settle', 'freeze'].includes(txnType)) {
     return points >= 0 ? 'refund' : 'consume'
   }
+  if (txnType === 'estimate') return 'consume'
   if (txnType === 'adjustment' || txnType === 'adjust') {
     return points >= 0 ? 'gift' : 'consume'
   }
   return points >= 0 ? 'gift' : 'consume'
+}
+
+export function isCustomerVisibleCreditsTransaction(
+  transaction: Pick<CreditsTransaction, 'txnType'>,
+) {
+  return String(transaction.txnType) !== 'estimate'
 }
 
 export function mapCreditsBizSource(

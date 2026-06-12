@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue";
-
 import PreloadImage from "@/components/common/PreloadImage.vue";
 
 export interface SceneTemplateRecommendationItem {
@@ -59,13 +57,6 @@ const emit = defineEmits<{
           fit="cover"
           object-position="center"
         />
-        <span
-          v-if="theme === 'light' && item.id === activeId"
-          class="scene-template-check"
-          aria-hidden="true"
-        >
-          <Icon icon="mdi:check" />
-        </span>
         <div class="scene-template-title">
           <strong>{{ item.title }}</strong>
           <span>{{ item.description }}</span>
@@ -182,8 +173,8 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light .scene-template-card.is-active {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  border: 2px solid #ffb800;
+  box-shadow: 0 4px 12px rgba(255, 184, 0, 0.16);
 }
 
 .scene-template-card:focus-visible {
@@ -194,29 +185,8 @@ const emit = defineEmits<{
 }
 
 .scene-template-section.theme-light .scene-template-card:focus-visible {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-}
-
-.scene-template-check {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
-  pointer-events: none;
-}
-
-.scene-template-check :deep(svg) {
-  width: 14px;
-  height: 14px;
+  border: 2px solid #ffb800;
+  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.18);
 }
 
 .scene-template-image {

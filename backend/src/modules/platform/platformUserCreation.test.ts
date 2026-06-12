@@ -22,8 +22,8 @@ const second = normalizePlatformUserCreationInput({
 assert.equal(first.username, "new_user");
 assert.equal(first.applicationCode, "used-car-platform");
 assert.equal(first.accountScope, "personal");
-assert.equal(first.planCode, "basic");
-assert.equal(first.initialPoints, 20000);
+assert.equal(first.planCode, "");
+assert.equal(first.initialPoints, 0);
 assert.equal(platformUserCreationRequestHash(first), platformUserCreationRequestHash(second));
 
 const agent = normalizePlatformUserCreationInput({
@@ -32,8 +32,8 @@ const agent = normalizePlatformUserCreationInput({
   targetRole: "agent",
   idempotencyKey: "agent-key",
 });
-assert.equal(agent.planCode, "team");
-assert.equal(agent.initialPoints, 100000);
+assert.equal(agent.planCode, "");
+assert.equal(agent.initialPoints, 0);
 
 const admin = normalizePlatformUserCreationInput({
   username: "admin_created",
@@ -41,8 +41,8 @@ const admin = normalizePlatformUserCreationInput({
   targetRole: "admin",
   idempotencyKey: "admin-key",
 });
-assert.equal(admin.planCode, "flagship");
-assert.equal(admin.initialPoints, 800000);
+assert.equal(admin.planCode, "");
+assert.equal(admin.initialPoints, 0);
 
 assert.throws(
   () =>

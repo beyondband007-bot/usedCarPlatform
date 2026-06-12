@@ -404,22 +404,37 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) {
+  .promo-banner,
+  .promo-banner-track,
+  .promo-banner-slide {
+    height: 160px;
+    min-height: 160px;
+    max-height: 160px;
+  }
+
   .promo-banner-copy {
+    box-sizing: border-box;
+    min-height: 0;
+    height: 100%;
     max-width: 72%;
-    padding: 95px 20px 24px;
+    padding: 20px 16px 32px;
+    justify-content: center;
   }
 
   .promo-banner-copy.is-elevated {
-    padding: 34px 20px 20px;
+    padding: 20px 16px 32px;
   }
 
   .promo-banner-copy h2 {
-    font-size: 22px;
+    margin-bottom: 4px;
+    font-size: clamp(15px, 4.2vw, 18px);
+    line-height: 1.25;
     white-space: normal;
   }
 
   .promo-banner-copy p {
-    font-size: 14px;
+    font-size: clamp(11px, 3vw, 13px);
+    line-height: 1.35;
     white-space: normal;
   }
 

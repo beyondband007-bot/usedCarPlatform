@@ -133,7 +133,8 @@ export const migrations = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS subscription_plans (
-    code VARCHAR(32) PRIMARY KEY,
+    code VARCHAR(32) NOT NULL,
+    application_code VARCHAR(80) NOT NULL DEFAULT 'used-car-platform',
     name VARCHAR(120) NOT NULL,
     price DECIMAL(12, 2) NOT NULL,
     account_limit INT NOT NULL,
@@ -142,8 +143,11 @@ export const migrations = [
     batch_concurrent_task_limit INT NOT NULL,
     gift_points INT NOT NULL,
     status VARCHAR(24) NOT NULL DEFAULT 'active',
+    metadata_json JSON NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (application_code, code),
+    INDEX idx_subscription_plans_application_status (application_code, status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS app_roles (
@@ -297,6 +301,38 @@ export const migrations = [
       ON DELETE SET NULL ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS agent_deposit_accounts (
+    agent_user_id VARCHAR(64) PRIMARY KEY,
+    balance DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
+    currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+    status VARCHAR(24) NOT NULL DEFAULT 'active',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    CONSTRAINT agent_deposit_accounts_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS agent_deposit_transactions (
+    id VARCHAR(64) PRIMARY KEY,
+    agent_user_id VARCHAR(64) NOT NULL,
+    txn_type VARCHAR(32) NOT NULL,
+    amount DECIMAL(18, 2) NOT NULL,
+    balance_before DECIMAL(18, 2) NOT NULL,
+    balance_after DECIMAL(18, 2) NOT NULL,
+    currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+    reference_type VARCHAR(64) NULL,
+    reference_id VARCHAR(64) NULL,
+    remark VARCHAR(255) NULL,
+    created_by_user_id VARCHAR(64) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_agent_deposit_txn_agent_created (agent_user_id, created_at),
+    INDEX idx_agent_deposit_txn_reference (reference_type, reference_id),
+    CONSTRAINT agent_deposit_txn_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT agent_deposit_txn_created_by_fk FOREIGN KEY (created_by_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS platform_user_creation_idempotency (
     id VARCHAR(64) PRIMARY KEY,
     operator_user_id VARCHAR(64) NOT NULL,
@@ -440,16 +476,19 @@ export const migrations = [
 
   `CREATE TABLE IF NOT EXISTS user_subscriptions (
     user_id VARCHAR(64) PRIMARY KEY,
+    application_code VARCHAR(80) NOT NULL DEFAULT 'used-car-platform',
     plan_code VARCHAR(32) NOT NULL,
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     starts_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     expires_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_user_subscriptions_application_plan (application_code, plan_code),
     INDEX idx_user_subscriptions_plan (plan_code),
     CONSTRAINT user_subscriptions_user_fk FOREIGN KEY (user_id) REFERENCES app_users (id)
       ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT user_subscriptions_plan_fk FOREIGN KEY (plan_code) REFERENCES subscription_plans (code)
+    CONSTRAINT user_subscriptions_plan_fk FOREIGN KEY (application_code, plan_code)
+      REFERENCES subscription_plans (application_code, code)
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 

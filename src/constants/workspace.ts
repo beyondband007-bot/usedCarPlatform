@@ -557,7 +557,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
   }),
   createCapability({
     code: 'short-video',
-    apiCode: 'short-video',
+    apiCode: 'video-generation',
     kind: 'future',
     groupTitle: '营销工具',
     icon: 'mdi:movie-open-outline',
@@ -565,12 +565,13 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     tag: 'Beta',
     tagType: 'info',
     title: '短视频生成',
-    description: '由静态车图生成 10 秒营销短视频素材，默认输出 16:9、720p。',
+    description:
+      '上传车辆素材并生成口播草稿，确认后输出 15 秒竖屏营销短视频（9:16、720p、含口播音频）。',
     uploadTitle: '车辆外观图',
     uploadHint: '点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB',
     middleBlocks: onlyActions,
     options: showroomOptions,
-    actionLabel: '生成短视频',
+    actionLabel: '确认生成视频',
     cost: 4000,
   }),
 ]

@@ -103,6 +103,7 @@ const RECHARGE_PRODUCTS = [
 ];
 
 const DEMO = {
+  username: "used_car_demo",
   email: "used-car-demo@example.com",
   tenantName: "Used Car Demo Tenant",
   startingBalance: "1250.0000"
@@ -250,16 +251,18 @@ async function upsertRechargeProducts(client) {
 async function ensureDemoUser(client) {
   const [userInsert] = await client.execute(
     `
-      insert into users (email, status)
-      values (?, 'active')
+      insert into users (username, email, status)
+      values (?, ?, 'active')
       on duplicate key update
         id = LAST_INSERT_ID(id),
+        username = values(username),
+        email = values(email),
         status = values(status),
         updated_at = CURRENT_TIMESTAMP
     `,
-    [DEMO.email]
+    [DEMO.username, DEMO.email]
   );
-  const user = await selectOne(client, "select id, email from users where id = ? limit 1", [
+  const user = await selectOne(client, "select id, username, email from users where id = ? limit 1", [
     userInsert.insertId
   ]);
 
