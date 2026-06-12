@@ -1206,6 +1206,7 @@ export interface AgentOperationsCommissionPreview {
   applicationCode: string
   period: string
   consumedPoints: number
+  topUpCredits?: number
   commissionRate: number
   commissionPoints: number
   status: string
@@ -1213,7 +1214,19 @@ export interface AgentOperationsCommissionPreview {
   customerUserId?: string | null
   customerUsername?: string | null
   customerDisplayName?: string | null
+  topUpTransactions?: AgentOperationsTopUpTransaction[]
   createdAt: string
+}
+
+export interface AgentOperationsTopUpTransaction {
+  id: number | string
+  createdAt: string
+  txnType: string
+  points: number
+  paymentOrderId?: number | null
+  bizType?: string | null
+  bizId?: string | null
+  remark?: string | null
 }
 
 export interface AgentOperationsSettlementBill {
@@ -1270,13 +1283,35 @@ export interface AgentOperationsOverview {
   tickets: AgentOperationsTicket[]
 }
 
+export interface PlatformSettlementApplication {
+  id: string
+  agentUserId: string
+  agentUsername: string
+  agentDisplayName: string
+  period: string
+  totalCommissionPoints: number
+  status: string
+  requestedAt: string
+  confirmedAt?: string | null
+  paidAt?: string | null
+}
+
+export interface PlatformSettlementApplicationList {
+  items: PlatformSettlementApplication[]
+}
+
 export interface PlatformDashboardMetricSet {
   linkedCustomerCount: number
+  customerAccountCount: number
   activeAgentCount: number
   activeLeadCount: number
   openTicketCount: number
   draftSettlementCount: number
+  pendingSettlementCount: number
   applicationCount: number
+  platformApplicationCount: number
+  todayOrderAmount: number
+  todayConsumedCredits: number
   applications: string[]
 }
 
@@ -1287,11 +1322,18 @@ export interface PlatformDashboardSection {
   access: string
 }
 
+export interface PlatformDashboardTrendEvent {
+  metric: 'recharge' | 'consume'
+  occurredAt: string
+  value: number
+}
+
 export interface PlatformDashboard {
   role: 'developer' | 'admin' | 'agent' | string
   scope: 'global_back_office_scope' | 'own_agent_scope' | string
   generatedAt: string
   metrics: PlatformDashboardMetricSet
+  trends: PlatformDashboardTrendEvent[]
   sections: PlatformDashboardSection[]
   sourceOfTruth: {
     reusableCreditsPlatform: string[]
@@ -1371,6 +1413,16 @@ export interface PlatformAgentPolicyOverride {
 
 export interface PlatformAgentPolicyOverrideList {
   items: PlatformAgentPolicyOverride[]
+}
+
+export interface AgentDepositAdjustmentResult {
+  agentUserId: string
+  direction: 'increase' | 'decrease'
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  currency: string
+  transactionId: string
 }
 
 export interface CreateAgentLeadPayload {
@@ -1858,7 +1910,25 @@ export async function getAgentOperationsOverview(params?: {
     '/platform/agent/overview',
     { params },
   )
-  return unwrapApiResponse(response)
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    commissionPreviews: (payload.commissionPreviews ?? []).map((item) => ({
+      ...item,
+      consumedPoints: parseCreditsNumber(item.consumedPoints),
+      topUpCredits: parseCreditsNumber(item.topUpCredits ?? item.consumedPoints),
+      commissionRate: Number(item.commissionRate ?? 0),
+      commissionPoints: parseCreditsNumber(item.commissionPoints),
+      topUpTransactions: (item.topUpTransactions ?? []).map((transaction) => ({
+        ...transaction,
+        points: parseCreditsNumber(transaction.points),
+      })),
+    })),
+    settlementBills: (payload.settlementBills ?? []).map((item) => ({
+      ...item,
+      totalCommissionPoints: parseCreditsNumber(item.totalCommissionPoints),
+    })),
+  }
 }
 
 export async function getAgentCustomerLedger(
@@ -1954,6 +2024,17 @@ export async function updatePlatformAgentPolicyOverride(
   return unwrapApiResponse(response)
 }
 
+export async function adjustPlatformAgentDeposit(
+  agentUserId: string,
+  payload: { amount: number; direction: 'increase' | 'decrease'; remark?: string },
+): Promise<AgentDepositAdjustmentResult> {
+  const response = await request.post<ApiResponse<AgentDepositAdjustmentResult>>(
+    `/platform/agent-deposits/${encodeURIComponent(agentUserId)}/adjustments`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function updateApplicationFunctionDefaultPoints(
   applicationCode: string,
   functionCode: string,
@@ -1991,16 +2072,29 @@ export async function createAgentTicket(
   return unwrapApiResponse(response)
 }
 
-export async function confirmAgentSettlement(
+export async function applyAgentSettlement(
   settlementId: string,
   params?: { agentUserId?: string },
 ): Promise<AgentOperationMutationResult> {
   const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
-    `/platform/agent/settlements/${encodeURIComponent(settlementId)}/confirm`,
+    `/platform/agent/settlements/${encodeURIComponent(settlementId)}/apply`,
     null,
     { params },
   )
   return unwrapApiResponse(response)
+}
+
+export async function getPlatformSettlementApplications(): Promise<PlatformSettlementApplicationList> {
+  const response = await request.get<ApiResponse<PlatformSettlementApplicationList>>(
+    '/platform/settlement-applications',
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    items: (payload.items ?? []).map((item) => ({
+      ...item,
+      totalCommissionPoints: parseCreditsNumber(item.totalCommissionPoints),
+    })),
+  }
 }
 
 export async function createPlatformUser(

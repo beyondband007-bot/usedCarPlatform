@@ -6,13 +6,15 @@ import { ok } from "../../shared/response";
 import { getRequiredCurrentUser, requirePermission } from "../auth/authMiddleware";
 import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import {
-  confirmAgentSettlement,
+  applyAgentSettlement,
   createAgentLead,
   createAgentTicket,
   getAgentCustomerLedger,
   getAgentOperationsOverview,
   getPlatformCustomerLedger,
+  listSettlementApplications,
 } from "./agentOperationsService";
+import { adjustAgentDepositBalance } from "./agentDepositService";
 import {
   buildBillingLifecycleExample,
   buildFunctionSeedPayloads,
@@ -254,11 +256,53 @@ platformRoutes.patch(
   }),
 );
 
+platformRoutes.post(
+  "/agent-deposits/:agentUserId/adjustments",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    if (current.user.role !== "developer") {
+      throw errors.forbidden("only Developer can adjust Agent deposit balances");
+    }
+
+    const agentUserId = Array.isArray(req.params.agentUserId)
+      ? req.params.agentUserId[0]
+      : req.params.agentUserId;
+    const body = req.body as {
+      amount?: unknown;
+      direction?: unknown;
+      remark?: unknown;
+    };
+    const amount = Number(body.amount);
+    const direction = body.direction === "decrease" ? "decrease" : "increase";
+    const remark = typeof body.remark === "string" ? body.remark.trim().slice(0, 255) : null;
+
+    ok(
+      res,
+      await adjustAgentDepositBalance({
+        developerUserId: current.user.id,
+        agentUserId,
+        amount,
+        direction,
+        remark,
+      }),
+    );
+  }),
+);
+
 platformRoutes.get(
   "/commission-policy",
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (_req, res) => {
     ok(res, getCommissionPolicy());
+  }),
+);
+
+platformRoutes.get(
+  "/settlement-applications",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await listSettlementApplications(req));
   }),
 );
 
@@ -368,12 +412,12 @@ platformRoutes.post(
 );
 
 platformRoutes.post(
-  "/agent/settlements/:settlementId/confirm",
+  "/agent/settlements/:settlementId/apply",
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     const settlementId = Array.isArray(req.params.settlementId)
       ? req.params.settlementId[0]
       : req.params.settlementId;
-    ok(res, await confirmAgentSettlement(req, settlementId));
+    ok(res, await applyAgentSettlement(req, settlementId));
   }),
 );

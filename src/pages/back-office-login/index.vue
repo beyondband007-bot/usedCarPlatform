@@ -4,9 +4,6 @@ import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
-import type { UserRole } from '@/types/auth'
-
-type BackOfficeLoginRole = Extract<UserRole, 'developer' | 'admin' | 'agent'>
 
 const route = useRoute()
 const router = useRouter()
@@ -15,55 +12,13 @@ const authStore = useAuthStore()
 const isSubmitting = ref(false)
 const errorText = ref('')
 const form = reactive({
-  role: 'developer' as BackOfficeLoginRole,
-  username: 'developer',
-  password: '123456',
+  username: '',
+  password: '',
 })
-
-const accounts: Array<{
-  role: BackOfficeLoginRole
-  title: string
-  description: string
-  badge: string
-  username: string
-}> = [
-  {
-    role: 'developer',
-    title: '开发者账号',
-    description: '全平台配置、充值档位、积分调账、应用接入',
-    badge: 'Developer',
-    username: 'developer',
-  },
-  {
-    role: 'admin',
-    title: '公司管理员账号',
-    description: '销售运营、代理商管理、工单与结算审批',
-    badge: 'Admin',
-    username: 'admin',
-  },
-  {
-    role: 'agent',
-    title: '代理商账号',
-    description: '名下客户、线索报备、客户消费、返佣结算',
-    badge: 'Agent',
-    username: 'agent',
-  },
-]
 
 const submitText = computed(() => {
-  if (form.role === 'developer') return '登录开发者后台'
-  if (form.role === 'admin') return '登录公司管理员后台'
-  return '登录代理商后台'
+  return isSubmitting.value ? '登录中...' : '登录积分后台'
 })
-
-function selectAccount(role: BackOfficeLoginRole) {
-  const account = accounts.find((item) => item.role === role)
-  if (!account) return
-  form.role = role
-  form.username = account.username
-  form.password = '123456'
-  errorText.value = ''
-}
 
 async function handleSubmit() {
   isSubmitting.value = true
@@ -107,7 +62,7 @@ async function handleSubmit() {
         </div>
         <h1>独立积分后台控制台</h1>
         <p>
-          用后台角色进入 Reusable Credits Platform Console。usedCarPlatform 是当前接入应用之一，未来应用将共用同一积分账户与余额。
+          用后台角色进入 Reusable Credits Platform Console。AI Carxen(车新新) 是当前接入应用之一，未来应用将共用同一积分账户与余额。
         </p>
       </div>
       <div class="login-brand-foot">
@@ -119,29 +74,12 @@ async function handleSubmit() {
     <section class="login-panel" aria-label="积分后台登录">
       <div class="login-card">
         <h2>登录</h2>
-        <p>选择演示账号后登录。真实环境由后端返回角色、菜单和数据边界。</p>
-
-        <div class="account-list">
-          <button
-            v-for="account in accounts"
-            :key="account.role"
-            type="button"
-            class="account-option"
-            :class="{ active: form.role === account.role }"
-            @click="selectAccount(account.role)"
-          >
-            <span>
-              <strong>{{ account.title }}</strong>
-              <small>{{ account.description }}</small>
-            </span>
-            <em>{{ account.badge }}</em>
-          </button>
-        </div>
+        <p>输入账号密码后，系统会自动识别 Developer / Admin / Agent 后台角色。</p>
 
         <form class="login-form" @submit.prevent="handleSubmit">
           <label>
             <span>账号</span>
-            <input v-model="form.username" autocomplete="username" />
+            <input v-model="form.username" autocomplete="username" placeholder="developer / admin / agent" />
           </label>
           <label>
             <span>密码</span>
@@ -150,12 +88,12 @@ async function handleSubmit() {
           <p v-if="errorText" class="login-error">{{ errorText }}</p>
           <button type="submit" class="login-submit" :disabled="isSubmitting">
             <Icon icon="mdi:login" />
-            {{ isSubmitting ? '登录中...' : submitText }}
+            {{ submitText }}
           </button>
         </form>
 
         <p class="login-hint">
-          普通产品用户请继续使用 usedCarPlatform 产品登录；未成为 Agent 的 User 不能进入本控制台。
+          普通产品用户请继续使用 AI Carxen(车新新) 产品登录；未成为 Agent 的 User 不能进入本控制台。
         </p>
       </div>
     </section>
@@ -247,58 +185,6 @@ async function handleSubmit() {
   margin: 0 0 24px;
   color: #64748b;
   line-height: 1.65;
-}
-
-.account-list {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.account-option {
-  display: grid;
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  padding: 16px;
-  text-align: left;
-  font: inherit;
-}
-
-.account-option:hover,
-.account-option.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.account-option strong,
-.account-option small {
-  display: block;
-}
-
-.account-option strong {
-  margin-bottom: 5px;
-  font-size: 16px;
-}
-
-.account-option small {
-  color: #64748b;
-  line-height: 1.45;
-}
-
-.account-option em {
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 900;
 }
 
 .login-form {

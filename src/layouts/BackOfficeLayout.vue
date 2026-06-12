@@ -9,6 +9,12 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 const router = useRouter()
 
+const roleThemeClass = computed(() => {
+  if (authStore.role === 'admin') return 'role-theme-admin'
+  if (authStore.role === 'agent') return 'role-theme-agent'
+  return 'role-theme-developer'
+})
+
 const roleLabel = computed(() => {
   if (authStore.role === 'developer') return '开发者后台'
   if (authStore.role === 'admin') return '公司管理员后台'
@@ -19,7 +25,7 @@ const roleLabel = computed(() => {
 const roleScope = computed(() => {
   if (authStore.role === 'developer') return '全平台 / 全应用 / 全客户'
   if (authStore.role === 'admin') return '销售部 / 全平台只读 / 代理商运营'
-  if (authStore.role === 'agent') return '本人名下客户 / 线索 / 返佣结算'
+  if (authStore.role === 'agent') return '本人名下客户 / 返佣结算'
   return '需要后台账号'
 })
 
@@ -27,13 +33,11 @@ const navItems = computed(() => {
   if (authStore.role === 'developer') {
     return [
       { label: '系统总览', anchor: 'developer-dashboard', icon: 'mdi:view-dashboard-outline' },
-      { label: '租户/客户管理', anchor: 'developer-customers', icon: 'mdi:office-building-outline' },
       { label: '用户/账户管理', anchor: 'developer-permissions', icon: 'mdi:account-cog-outline' },
       { label: '充值与订单', anchor: 'developer-customers', icon: 'mdi:credit-card-outline' },
       { label: '代理商管理', anchor: 'developer-permissions', icon: 'mdi:handshake-outline' },
       { label: '运营记录', anchor: 'developer-trends', icon: 'mdi:chart-timeline-variant' },
       { label: '结算管理', anchor: 'developer-customers', icon: 'mdi:cash-multiple' },
-      { label: '系统配置', anchor: 'developer-resources', icon: 'mdi:cog-outline' },
     ]
   }
 
@@ -43,16 +47,13 @@ const navItems = computed(() => {
       { label: '代理商管理', anchor: 'admin-agents', icon: 'mdi:handshake-outline' },
       { label: '用户清单', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
       { label: '充值记录', anchor: 'admin-recharge', icon: 'mdi:credit-card-outline' },
-      { label: '工单处理', anchor: 'admin-tickets', icon: 'mdi:lifebuoy' },
       { label: '结算审批', anchor: 'admin-settlements', icon: 'mdi:cash-check' },
-      { label: '线索/报备', anchor: 'admin-leads', icon: 'mdi:clipboard-text-outline' },
     ]
   }
 
   if (authStore.role === 'agent') {
     return [
       { label: '代理工作台', anchor: 'agent-dashboard', icon: 'mdi:view-dashboard-outline' },
-      { label: '线索/报备', anchor: 'agent-leads', icon: 'mdi:clipboard-text-outline' },
       { label: '我的客户', anchor: 'agent-customers', icon: 'mdi:account-group-outline' },
       { label: '客户消费', anchor: 'agent-consumption', icon: 'mdi:chart-line' },
       { label: '返佣结算', anchor: 'agent-settlements', icon: 'mdi:cash-multiple' },
@@ -69,7 +70,7 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="back-office-layout">
+  <div class="back-office-layout" :class="roleThemeClass">
     <aside class="back-office-sidebar">
       <RouterLink class="back-office-brand" to="/back-office">
         <span class="back-office-logo">积</span>
@@ -120,7 +121,7 @@ async function handleLogout() {
           </button>
           <div class="back-office-app-signal">
             <Icon icon="mdi:apps" />
-            <span>usedCarPlatform</span>
+            <span>AI Carxen(车新新)</span>
           </div>
           <div class="back-office-user">
             <span class="back-office-user-avatar">{{ authStore.userName?.slice(0, 1) || 'U' }}</span>
@@ -141,8 +142,41 @@ async function handleLogout() {
   display: grid;
   min-height: 100vh;
   grid-template-columns: 220px minmax(0, 1fr);
-  background: #f5f7fa;
+  --bo-role-bg: #f5f7ff;
+  --bo-role-sidebar: #0f172a;
+  --bo-role-sidebar-soft: rgba(255, 255, 255, 0.06);
+  --bo-role-accent: #2f6bff;
+  --bo-role-accent-strong: #1d4ed8;
+  --bo-role-accent-soft: #eaf1ff;
+  background: var(--bo-role-bg);
   color: #0f172a;
+}
+
+.back-office-layout.role-theme-developer {
+  --bo-role-bg: #f5f7ff;
+  --bo-role-sidebar: #0f172a;
+  --bo-role-sidebar-soft: rgba(47, 107, 255, 0.14);
+  --bo-role-accent: #2f6bff;
+  --bo-role-accent-strong: #1d4ed8;
+  --bo-role-accent-soft: #eaf1ff;
+}
+
+.back-office-layout.role-theme-admin {
+  --bo-role-bg: #f3faf7;
+  --bo-role-sidebar: #063f32;
+  --bo-role-sidebar-soft: rgba(16, 185, 129, 0.14);
+  --bo-role-accent: #059669;
+  --bo-role-accent-strong: #047857;
+  --bo-role-accent-soft: #dcfce7;
+}
+
+.back-office-layout.role-theme-agent {
+  --bo-role-bg: #fff8ed;
+  --bo-role-sidebar: #422006;
+  --bo-role-sidebar-soft: rgba(245, 158, 11, 0.16);
+  --bo-role-accent: #d97706;
+  --bo-role-accent-strong: #b45309;
+  --bo-role-accent-soft: #fef3c7;
 }
 
 .back-office-sidebar {
@@ -152,7 +186,7 @@ async function handleLogout() {
   height: 100vh;
   flex-direction: column;
   overflow-y: auto;
-  background: #0f172a;
+  background: var(--bo-role-sidebar);
   color: #fff;
   padding: 24px 20px;
 }
@@ -171,7 +205,7 @@ async function handleLogout() {
   height: 44px;
   place-items: center;
   border-radius: 8px;
-  background: #2563eb;
+  background: var(--bo-role-accent);
   font-size: 18px;
   font-weight: 900;
 }
@@ -194,7 +228,7 @@ async function handleLogout() {
   margin: 6px 0 18px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bo-role-sidebar-soft);
 }
 
 .back-office-profile strong {
@@ -241,7 +275,7 @@ async function handleLogout() {
 }
 
 .back-office-nav-link.active {
-  background: #2563eb;
+  background: var(--bo-role-accent);
   color: #fff;
 }
 
@@ -322,7 +356,7 @@ async function handleLogout() {
 }
 
 .back-office-icon-btn:hover {
-  color: #2563eb;
+  color: var(--bo-role-accent);
 }
 
 .back-office-app-signal {
@@ -356,7 +390,7 @@ async function handleLogout() {
   height: 30px;
   place-items: center;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--bo-role-accent);
   color: #fff;
   font-size: 13px;
   font-weight: 900;

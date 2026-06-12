@@ -87,6 +87,19 @@ type EnterpriseMemberIdentity = {
 
 type EnterpriseMemberIdentityRow = RowDataPacket & EnterpriseMemberIdentity;
 
+type BackOfficeOperatorRow = RowDataPacket & {
+  id: string;
+  username: string;
+  display_name: string;
+  role_code: string | null;
+};
+
+type BackOfficeAdjustmentRemark = {
+  reason?: string;
+  operatorUserId?: string;
+  operatorRole?: string;
+};
+
 type AgentLeadRow = RowDataPacket & {
   id: string;
   application_code: string;
@@ -116,14 +129,44 @@ type AgentCommissionRow = RowDataPacket & {
   created_at: Date;
 };
 
+type AgentCommissionTopUpRow = RowDataPacket & {
+  id: number;
+  tenant_id: number | null;
+  user_id: number;
+  account_id: number;
+  payment_order_id: number | null;
+  application_code: string | null;
+  txn_type: string;
+  points: string | number;
+  biz_type: string | null;
+  biz_id: string | null;
+  remark: string | null;
+  created_at: Date;
+  period: string;
+};
+
 type AgentSettlementRow = RowDataPacket & {
   id: string;
+  agent_user_id?: string;
+  agent_username?: string;
+  agent_display_name?: string;
   period: string;
   total_commission_points: string | number;
   status: string;
   confirmed_at: Date | null;
   paid_at: Date | null;
   created_at: Date;
+};
+
+type AgentCommissionTopUpTransaction = {
+  id: number;
+  createdAt: string;
+  txnType: string;
+  points: number;
+  paymentOrderId: number | null;
+  bizType: string | null;
+  bizId: string | null;
+  remark: string | null;
 };
 
 type AgentMaterialRow = RowDataPacket & {
@@ -298,6 +341,8 @@ async function listAgentCustomers(agentUserId: string) {
     customerDisplayName: row.customer_display_name,
     customerPhone: row.customer_phone,
     customerCreditsUserId: row.customer_credits_user_id,
+    customerAccountScope: row.customer_account_scope,
+    creditsTenantId: row.customer_credits_tenant_id,
     creditsAvailableBalance:
       balances.get(creditsBalanceKey({
         creditsUserId: row.customer_credits_user_id,
@@ -523,6 +568,63 @@ function identityLabelForTransaction(
   return "团队成员";
 }
 
+function roleIdentityLabel(role: string | null | undefined) {
+  if (role === "developer") return "开发者";
+  if (role === "admin") return "管理员";
+  if (role === "agent") return "代理商";
+  if (role === "user" || role === "enterprise") return "客户";
+  return null;
+}
+
+function parseBackOfficeAdjustmentRemark(remark: string | null): BackOfficeAdjustmentRemark | null {
+  if (!remark) return null;
+
+  try {
+    const parsed = JSON.parse(remark) as Record<string, unknown>;
+    const operatorUserId =
+      typeof parsed.operatorUserId === "string" ? parsed.operatorUserId : undefined;
+    if (!operatorUserId) return null;
+
+    return {
+      operatorUserId,
+      operatorRole: typeof parsed.operatorRole === "string" ? parsed.operatorRole : undefined,
+      reason: typeof parsed.reason === "string" ? parsed.reason : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadBackOfficeOperatorsByUserId(userIds: string[]) {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  const result = new Map<string, BackOfficeOperatorRow>();
+  if (!uniqueIds.length) return result;
+
+  const [rows] = await pool.query<BackOfficeOperatorRow[]>(
+    `SELECT
+       u.id,
+       u.username,
+       u.display_name,
+       MAX(boa.role_code) role_code
+     FROM app_users u
+     LEFT JOIN back_office_role_assignments boa
+       ON boa.user_id = u.id
+      AND boa.status = 'active'
+      AND boa.role_code IN ('developer', 'admin', 'agent')
+     WHERE u.id IN (:userIds)
+     GROUP BY u.id, u.username, u.display_name`,
+    { userIds: uniqueIds },
+  );
+
+  for (const row of rows) result.set(row.id, row);
+  return result;
+}
+
+function remarkTextForTransaction(row: CreditsTransactionRow) {
+  const adjustmentRemark = parseBackOfficeAdjustmentRemark(row.remark);
+  return adjustmentRemark?.reason ?? row.remark;
+}
+
 async function listLedgerTransactions(input: {
   accountId: number;
   customer: AgentCustomerLedgerRow;
@@ -574,8 +676,26 @@ async function listLedgerTransactions(input: {
     { accountId: input.accountId },
   );
 
+  const operatorUserIds = rows
+    .filter((row) => row.biz_type === "back-office-adjustment")
+    .map((row) => parseBackOfficeAdjustmentRemark(row.remark)?.operatorUserId)
+    .filter((userId): userId is string => Boolean(userId));
+  const operatorByUserId = await loadBackOfficeOperatorsByUserId(operatorUserIds);
+
   return rows.map((row) => {
     const member = memberByCreditsUserId.get(row.user_id);
+    const adjustmentRemark =
+      row.biz_type === "back-office-adjustment"
+        ? parseBackOfficeAdjustmentRemark(row.remark)
+        : null;
+    const operator = adjustmentRemark?.operatorUserId
+      ? operatorByUserId.get(adjustmentRemark.operatorUserId)
+      : null;
+    const operatorUsername = operator?.username ?? adjustmentRemark?.operatorUserId ?? null;
+    const operatorRoleLabel = adjustmentRemark
+      ? roleIdentityLabel(adjustmentRemark.operatorRole ?? operator?.role_code)
+      : null;
+
     return {
       id: row.id,
       tenantId: row.tenant_id,
@@ -595,10 +715,11 @@ async function listLedgerTransactions(input: {
       balanceAfter: toNumber(row.balance_after),
       bizType: row.biz_type,
       bizId: row.biz_id,
-      remark: row.remark,
-      actorUsername: member?.username ?? null,
-      actorDisplayName: member?.display_name ?? null,
-      actorIdentityLabel: identityLabelForTransaction(row, input.customer, memberByCreditsUserId),
+      remark: remarkTextForTransaction(row),
+      actorUsername: operatorUsername ?? member?.username ?? null,
+      actorDisplayName: operatorUsername ?? member?.display_name ?? null,
+      actorIdentityLabel:
+        operatorRoleLabel ?? identityLabelForTransaction(row, input.customer, memberByCreditsUserId),
       createdAt: row.created_at.toISOString(),
     };
   });
@@ -693,8 +814,182 @@ async function getEffectiveAgentCommissionRate(agentUserId: string) {
     : toNumber(overrideRate);
 }
 
-async function listAgentCommissionPreviews(agentUserId: string) {
-  const commissionRate = await getEffectiveAgentCommissionRate(agentUserId);
+type AgentCustomerListItem = Awaited<ReturnType<typeof listAgentCustomers>>[number];
+
+function commissionCustomerKey(customer: AgentCustomerListItem) {
+  if (customer.customerAccountScope === "tenant" && customer.creditsTenantId) {
+    return `tenant:${customer.creditsTenantId}`;
+  }
+  return `user:${customer.customerCreditsUserId}`;
+}
+
+function topUpTransactionKey(row: AgentCommissionTopUpRow) {
+  if (row.tenant_id) return `tenant:${row.tenant_id}`;
+  return `user:${row.user_id}`;
+}
+
+async function listCommissionTopUpTransactions(customers: AgentCustomerListItem[]) {
+  const personalUserIds = Array.from(
+    new Set(
+      customers
+        .filter((customer) => customer.status === "active" && customer.customerAccountScope !== "tenant")
+        .map((customer) => customer.customerCreditsUserId)
+        .filter(Boolean),
+    ),
+  );
+  const tenantIds = Array.from(
+    new Set(
+      customers
+        .filter((customer) => customer.status === "active" && customer.customerAccountScope === "tenant")
+        .map((customer) => customer.creditsTenantId)
+        .filter((tenantId): tenantId is number => Boolean(tenantId)),
+    ),
+  );
+
+  if (!personalUserIds.length && !tenantIds.length) return [];
+
+  const clauses: string[] = [];
+  const params: any = {
+    topUpTxnTypes: ["recharge", "bonus", "grant", "adjustment"],
+  };
+
+  if (personalUserIds.length) {
+    clauses.push("(ct.tenant_id IS NULL AND ct.user_id IN (:personalUserIds))");
+    params.personalUserIds = personalUserIds;
+  }
+  if (tenantIds.length) {
+    clauses.push("ct.tenant_id IN (:tenantIds)");
+    params.tenantIds = tenantIds;
+  }
+
+  const [rows] = await getCreditsPool().query<AgentCommissionTopUpRow[]>(
+    `SELECT
+       ct.id,
+       ct.tenant_id,
+       ct.user_id,
+       ct.account_id,
+       ct.payment_order_id,
+       app.code application_code,
+       ct.txn_type,
+       ct.points,
+       ct.biz_type,
+       ct.biz_id,
+       ct.remark,
+       ct.created_at,
+       DATE_FORMAT(ct.created_at, '%Y-%m') period
+     FROM credit_transactions ct
+     LEFT JOIN applications app ON app.id = ct.application_id
+     WHERE ct.points > 0
+       AND ct.txn_type IN (:topUpTxnTypes)
+       AND (${clauses.join(" OR ")})
+     ORDER BY ct.created_at DESC, ct.id DESC
+     LIMIT 500`,
+    params,
+  );
+
+  return rows;
+}
+
+async function loadAgentSettlementBillsByPeriod(agentUserId: string) {
+  const [rows] = await pool.query<AgentSettlementRow[]>(
+    `SELECT id, period, total_commission_points, status, confirmed_at, paid_at, created_at
+     FROM agent_settlement_bills
+     WHERE agent_user_id = :agentUserId
+     ORDER BY period DESC
+     LIMIT 50`,
+    { agentUserId },
+  );
+
+  return new Map(rows.map((row) => [row.period, row]));
+}
+
+async function buildAgentCommissionPreviews(agentUserId: string) {
+  const [commissionRate, customers] = await Promise.all([
+    getEffectiveAgentCommissionRate(agentUserId),
+    listAgentCustomers(agentUserId),
+  ]);
+  const customerByKey = new Map(customers.map((customer) => [commissionCustomerKey(customer), customer]));
+  const transactions = await listCommissionTopUpTransactions(customers);
+  const grouped = new Map<string, {
+    applicationCode: string;
+    period: string;
+    customer: AgentCustomerListItem;
+    topUpCredits: number;
+    transactions: AgentCommissionTopUpTransaction[];
+  }>();
+
+  for (const transaction of transactions) {
+    const customer = customerByKey.get(topUpTransactionKey(transaction));
+    if (!customer) continue;
+    const applicationCode = transaction.application_code ?? customer.applicationCode;
+    const key = `${transaction.period}:${applicationCode}:${customer.customerUserId}`;
+    const group = grouped.get(key) ?? {
+      applicationCode,
+      period: transaction.period,
+      customer,
+      topUpCredits: 0,
+      transactions: [],
+    };
+    const points = toNumber(transaction.points);
+    group.topUpCredits += points;
+    group.transactions.push({
+      id: transaction.id,
+      createdAt: transaction.created_at.toISOString(),
+      txnType: transaction.txn_type,
+      points,
+      paymentOrderId: transaction.payment_order_id,
+      bizType: transaction.biz_type,
+      bizId: transaction.biz_id,
+      remark: parseBackOfficeAdjustmentRemark(transaction.remark)?.reason ?? transaction.remark,
+    });
+    grouped.set(key, group);
+  }
+
+  const settlementsByPeriod = await loadAgentSettlementBillsByPeriod(agentUserId);
+  const computedPreviews = Array.from(grouped.values())
+    .map((group) => {
+      const topUpCredits = Number(group.topUpCredits.toFixed(4));
+      const settlement = settlementsByPeriod.get(group.period);
+      return {
+        id: `acp:${agentUserId}:${group.period}:${group.applicationCode}:${group.customer.customerUserId}`,
+        applicationCode: group.applicationCode,
+        period: group.period,
+        consumedPoints: topUpCredits,
+        topUpCredits,
+        commissionRate,
+        commissionPoints: Number((topUpCredits * commissionRate).toFixed(4)),
+        status: settlement?.status ?? "preview",
+        settlementId: settlement?.id ?? null,
+        customerUserId: group.customer.customerUserId,
+        customerUsername: group.customer.customerUsername,
+        customerDisplayName: group.customer.customerDisplayName,
+        topUpTransactions: group.transactions,
+        createdAt: group.transactions[0]?.createdAt ?? new Date().toISOString(),
+      };
+    })
+    .sort((a, b) => b.period.localeCompare(a.period) || b.createdAt.localeCompare(a.createdAt));
+
+  const existingKeys = new Set(
+    computedPreviews.map((preview) =>
+      `${preview.period}:${preview.applicationCode}:${preview.customerUserId ?? ""}`,
+    ),
+  );
+  const fallbackRows = await listStoredAgentCommissionPreviews(agentUserId, commissionRate, settlementsByPeriod);
+  return [
+    ...computedPreviews,
+    ...fallbackRows.filter((preview) =>
+      !existingKeys.has(`${preview.period}:${preview.applicationCode}:${preview.customerUserId ?? ""}`),
+    ),
+  ]
+    .sort((a, b) => b.period.localeCompare(a.period) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 100);
+}
+
+async function listStoredAgentCommissionPreviews(
+  agentUserId: string,
+  commissionRate: number,
+  settlementsByPeriod: Map<string, AgentSettlementRow>,
+) {
   const [rows] = await pool.query<AgentCommissionRow[]>(
     `SELECT
        acp.id,
@@ -718,35 +1013,63 @@ async function listAgentCommissionPreviews(agentUserId: string) {
   );
 
   return rows.map((row) => {
-    const consumedPoints = toNumber(row.consumed_points);
+    const topUpCredits = toNumber(row.consumed_points);
+    const effectiveRate = commissionRate;
+    const settlement = settlementsByPeriod.get(row.period);
     return {
       id: row.id,
       applicationCode: row.application_code,
       period: row.period,
-      consumedPoints,
-      commissionRate,
-      commissionPoints: Number((consumedPoints * commissionRate).toFixed(4)),
-      status: row.status,
-      settlementId: row.settlement_id,
+      consumedPoints: topUpCredits,
+      topUpCredits,
+      commissionRate: effectiveRate,
+      commissionPoints: Number((topUpCredits * effectiveRate).toFixed(4)),
+      status: settlement?.status ?? row.status,
+      settlementId: settlement?.id ?? row.settlement_id,
       customerUserId: row.customer_user_id,
       customerUsername: row.customer_username,
       customerDisplayName: row.customer_display_name,
+      topUpTransactions: [],
       createdAt: row.created_at.toISOString(),
     };
   });
 }
 
-async function listAgentSettlementBills(agentUserId: string) {
-  const [rows] = await pool.query<AgentSettlementRow[]>(
-    `SELECT id, period, total_commission_points, status, confirmed_at, paid_at, created_at
-     FROM agent_settlement_bills
-     WHERE agent_user_id = :agentUserId
-     ORDER BY period DESC
-     LIMIT 50`,
-    { agentUserId },
-  );
+async function syncAgentSettlementBills(agentUserId: string, previews: Awaited<ReturnType<typeof buildAgentCommissionPreviews>>) {
+  const totals = new Map<string, number>();
+  for (const preview of previews) {
+    totals.set(preview.period, (totals.get(preview.period) ?? 0) + preview.commissionPoints);
+  }
 
-  return rows.map((row) => ({
+  for (const [period, totalCommissionPoints] of totals) {
+    await pool.query(
+      `INSERT INTO agent_settlement_bills
+        (id, agent_user_id, period, total_commission_points, status)
+       VALUES
+        (:id, :agentUserId, :period, :totalCommissionPoints, 'draft')
+       ON DUPLICATE KEY UPDATE
+        total_commission_points = IF(status IN ('draft', 'requested'), VALUES(total_commission_points), total_commission_points)`,
+      {
+        id: createId("asb"),
+        agentUserId,
+        period,
+        totalCommissionPoints: totalCommissionPoints.toFixed(4),
+      },
+    );
+  }
+}
+
+async function listAgentCommissionPreviews(agentUserId: string) {
+  const previews = await buildAgentCommissionPreviews(agentUserId);
+  await syncAgentSettlementBills(agentUserId, previews);
+  return buildAgentCommissionPreviews(agentUserId);
+}
+
+async function listAgentSettlementBills(agentUserId: string) {
+  const previews = await buildAgentCommissionPreviews(agentUserId);
+  await syncAgentSettlementBills(agentUserId, previews);
+  const settlementsByPeriod = await loadAgentSettlementBillsByPeriod(agentUserId);
+  return Array.from(settlementsByPeriod.values()).map((row) => ({
     id: row.id,
     period: row.period,
     totalCommissionPoints: toNumber(row.total_commission_points),
@@ -906,12 +1229,11 @@ export async function createAgentTicket(req: Request, body: Record<string, unkno
   return { id, agentUserId: agent.id };
 }
 
-export async function confirmAgentSettlement(req: Request, settlementId: string) {
+export async function applyAgentSettlement(req: Request, settlementId: string) {
   const agent = await resolveAgentUser(req, req.query.agentUserId);
   const [result] = await pool.query<any>(
     `UPDATE agent_settlement_bills
-     SET status = 'confirmed',
-         confirmed_at = COALESCE(confirmed_at, CURRENT_TIMESTAMP(3))
+     SET status = 'requested'
      WHERE id = :settlementId
        AND agent_user_id = :agentUserId
        AND status = 'draft'`,
@@ -919,8 +1241,49 @@ export async function confirmAgentSettlement(req: Request, settlementId: string)
   );
 
   if (!result.affectedRows) {
-    throw errors.invalidParameter("settlement bill is not available for confirmation");
+    throw errors.invalidParameter("settlement bill is not available for application");
   }
 
-  return { id: settlementId, agentUserId: agent.id, status: "confirmed" };
+  return { id: settlementId, agentUserId: agent.id, status: "requested" };
+}
+
+export async function listSettlementApplications(req: Request) {
+  const current = getRequiredCurrentUser(req);
+  if (current.user.role !== "developer" && current.user.role !== "admin") {
+    throw errors.forbidden("settlement applications require Admin or Developer role");
+  }
+
+  const [rows] = await pool.query<AgentSettlementRow[]>(
+    `SELECT
+       asb.id,
+       asb.agent_user_id,
+       agent.username agent_username,
+       agent.display_name agent_display_name,
+       asb.period,
+       asb.total_commission_points,
+       asb.status,
+       asb.confirmed_at,
+       asb.paid_at,
+       asb.created_at
+     FROM agent_settlement_bills asb
+     JOIN app_users agent ON agent.id = asb.agent_user_id
+     WHERE asb.status = 'requested'
+     ORDER BY asb.created_at DESC
+     LIMIT 100`,
+  );
+
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      agentUserId: row.agent_user_id,
+      agentUsername: row.agent_username,
+      agentDisplayName: row.agent_display_name,
+      period: row.period,
+      totalCommissionPoints: toNumber(row.total_commission_points),
+      status: row.status,
+      requestedAt: row.created_at.toISOString(),
+      confirmedAt: row.confirmed_at?.toISOString() ?? null,
+      paidAt: row.paid_at?.toISOString() ?? null,
+    })),
+  };
 }

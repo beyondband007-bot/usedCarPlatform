@@ -95,7 +95,7 @@ export const accountCreationPolicies: AccountCreationPolicy[] = [
 export const reusableCreditsApplicationCatalog = [
   {
     code: 'used-car-platform',
-    name: 'usedCarPlatform',
+    name: 'AI Carxen(车新新)',
     status: 'integrated',
     functions: ['single_image_generate', 'batch_item_generate'],
   },
@@ -106,3 +106,13 @@ export const reusableCreditsApplicationCatalog = [
     functions: ['model_generate', 'try_on_generate', 'lifestyle_photo'],
   },
 ] as const
+
+export function formatReusableCreditsApplicationName(value?: string | null) {
+  if (!value) return ''
+
+  if (value === 'used-car-platform' || value === 'usedCarPlatform' || value === 'Used Car Platform') {
+    return 'AI Carxen(车新新)'
+  }
+
+  return value
+}

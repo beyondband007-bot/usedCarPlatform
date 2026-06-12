@@ -37,6 +37,7 @@ const defaultFilters = (): PointsQueryFilters => ({
   startDate: "",
   endDate: "",
   bizSource: "",
+  status: "",
 });
 
 const filters = ref<PointsQueryFilters>(defaultFilters());
