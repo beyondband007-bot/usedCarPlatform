@@ -32,7 +32,10 @@ const tutorialTemplatePreviewImages = computed(
 <template>
   <section
     class="tutorial-section"
-    :class="theme === 'light' ? 'theme-light' : 'theme-dark'"
+    :class="[
+      theme === 'light' ? 'theme-light' : 'theme-dark',
+      `is-variant-${variant}`,
+    ]"
     aria-label="使用教程流程"
   >
     <div class="tutorial-flow">
@@ -62,7 +65,11 @@ const tutorialTemplatePreviewImages = computed(
                 :draggable="false"
                 fit="cover"
               />
-              <span class="tutorial-mosaic-select" aria-hidden="true">
+              <span
+                v-if="variant === 'batch-new'"
+                class="tutorial-mosaic-select"
+                aria-hidden="true"
+              >
                 <Icon icon="mdi:check" />
               </span>
             </div>
@@ -330,10 +337,24 @@ const tutorialTemplatePreviewImages = computed(
   width: 100%;
   height: 100%;
   min-height: 0;
-  border: 0.5px solid rgb(255, 192, 0);
-  border-radius: 8px;
   background: transparent;
   box-sizing: border-box;
+}
+
+/* 场景更换：模板预览四宫格无边框，靠间距区分 */
+.tutorial-section.is-variant-showroom .tutorial-mosaic {
+  gap: 2px;
+}
+
+.tutorial-section.is-variant-showroom .tutorial-mosaic-image {
+  border: none;
+  border-radius: 4px;
+}
+
+/* 批量上新：保留黄色描边卡片 */
+.tutorial-section.is-variant-batch-new .tutorial-mosaic-image {
+  border: 0.5px solid rgb(255, 192, 0);
+  border-radius: 8px;
 }
 
 .tutorial-mosaic-select {

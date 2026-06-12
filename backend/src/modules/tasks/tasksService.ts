@@ -695,6 +695,7 @@ class TasksService {
 
   private toRecentResponse(task: RecentGenerationRecord) {
     const { coverUrl, downloadUrl } = this.resolveRecentCover(task);
+    const results = normalizeTaskResults(task.resultJson);
 
     return {
       id: task.id,

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog, useMessage } from "naive-ui";
 
-import { createVideoGenerationTask } from "@/api/video-generation";
+import { createVideoGenerationTask, getVideoGenerationTask } from "@/api/video-generation";
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
@@ -29,6 +29,8 @@ import {
   VIDEO_OUTPUT_RATIO_LABEL,
   isShortVideoModuleCode,
 } from "@/constants/short-video";
+import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
+import { useVideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
@@ -66,6 +68,8 @@ import {
   registerStaticImageUrls,
   warmStaticImages,
 } from "@/utils/static-image-cache";
+import { buildWorkspaceResultFromVideoTask } from "@/utils/video-generation-result";
+import { resolveVideoGenerationErrorMessage } from "@/utils/video-generation-errors";
 
 const route = useRoute();
 const router = useRouter();
@@ -77,6 +81,15 @@ const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
 registerStaticImageUrls(workspaceStaticImageUrls);
+
+const videoFlowOwnerKey = computed(
+  () =>
+    authStore.userInfo?.id ??
+    authStore.userInfo?.username ??
+    "guest",
+);
+const videoFlow = useVideoGenerationFlow(videoFlowOwnerKey.value);
+provide(VIDEO_GENERATION_FLOW_KEY, videoFlow);
 
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
@@ -1287,14 +1300,16 @@ async function pollMultipleGenerationTasks(taskIds: string[]) {
 function buildResultFromTask(
   task: GenerationTaskDetail,
 ): WorkspaceGenerateResult | null {
-  const isShortVideo = task.moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
+  const isShortVideo = isShortVideoModuleCode(task.moduleCode);
+  const videoItem = task.resultVideos?.[0];
   const image = task.resultImages[0];
-  const videoUrl =
-    task.resultVideos?.[0]?.url ??
-    task.videoUrl ??
-    task.previewVideo ??
-    task.downloadUrl ??
-    image?.url;
+  const videoUrl = isShortVideo
+    ? videoItem?.url ??
+      task.videoUrl ??
+      task.previewVideo ??
+      task.downloadUrl ??
+      image?.url
+    : undefined;
   const resultUrl = isShortVideo ? videoUrl : image?.url;
   if (!resultUrl) return null;
 
@@ -1315,14 +1330,16 @@ function buildResultFromTask(
       : `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel,
     mediaType: isShortVideo ? "video" : "image",
-    previewImage: isShortVideo ? "" : resultUrl,
+    previewImage: isShortVideo ? resultUrl : resultUrl,
     previewVideo: isShortVideo ? resultUrl : undefined,
     previewAlt: `${sceneTitle}生成结果`,
-    downloadUrl: resultUrl,
+    downloadUrl: isShortVideo
+      ? task.downloadUrl ?? videoItem?.url ?? resultUrl
+      : resultUrl,
     resultImages: task.resultImages,
     taskId: task.taskId,
-    imageWidth: 1600,
-    imageHeight: 900,
+    imageWidth: isShortVideo ? 900 : 1600,
+    imageHeight: isShortVideo ? 1600 : 900,
   };
 }
 
@@ -1400,10 +1417,82 @@ async function resolveInteriorCollageTasks(
   }
 }
 
+async function resolveVideoGenerationModuleTask(
+  taskId: string,
+  options: { restored?: boolean } = {},
+) {
+  isGenerating.value = true;
+  generationResult.value = null;
+  generatingCapabilityCode.value = SHORT_VIDEO_CAPABILITY_CODE;
+
+  try {
+    const task = await videoFlow.waitForTaskCompletion(taskId);
+
+    if (task.status !== "success") {
+      markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "fail");
+      const failureMessage =
+        task.error?.message ??
+        resolveVideoGenerationErrorMessage(task.error?.code ?? task.status);
+      message.error(
+        failureMessage ||
+          getViewMediaFailureMessage(VIDEO_GENERATION_MODULE_CODE),
+      );
+      return;
+    }
+
+    const result = buildWorkspaceResultFromVideoTask(task);
+    if (!result) {
+      message.warning("任务完成，但没有返回视频");
+      return;
+    }
+
+    if (!options.restored) {
+      notifyGenerationSuccess({
+        moduleCode: VIDEO_GENERATION_MODULE_CODE,
+        status: "success",
+        taskId: task.taskId,
+      });
+    }
+
+    if (
+      shouldSyncWorkspaceForTask({ moduleCode: VIDEO_GENERATION_MODULE_CODE })
+    ) {
+      generationResult.value = null;
+      if (!options.restored) {
+        shortVideoSessionPreview.value = result;
+        shortVideoPlayRequest.value += 1;
+        assistPanelRef.value?.focusShortVideoPreviewView?.();
+      }
+    }
+
+    await assistPanelRef.value?.refreshRecentItems();
+    void videoFlow.loadHistory();
+  } catch (error) {
+    clearActiveGenerationTask(taskId);
+    markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "fail");
+    message.error(
+      error instanceof Error
+        ? error.message
+        : getViewMediaFailureMessage(VIDEO_GENERATION_MODULE_CODE),
+    );
+  } finally {
+    clearActiveGenerationTask(taskId);
+    untrackRunningTask(taskId);
+    isGenerating.value = false;
+    generatingCapabilityCode.value = null;
+    refreshCreditsBalance();
+    void refreshRunningTaskSummary();
+  }
+}
+
 async function resolveGenerationTask(
   taskId: string,
   options: { restored?: boolean } = {},
 ) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    return resolveVideoGenerationModuleTask(taskId, options);
+  }
+
   isGenerating.value = true;
   generationResult.value = null;
   let taskModuleCode: string | undefined;
@@ -1868,7 +1957,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       trackRunningTask(created.taskId, moduleCode);
       message.info("视频任务已创建，正在生成", { duration: 3000 });
       await refreshRunningTaskSummary();
-      await resolveGenerationTask(created.taskId);
+      await resolveVideoGenerationModuleTask(created.taskId);
     } catch (error) {
       clearActiveGenerationTask();
       const text =
@@ -2018,6 +2107,30 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
   }
 
   if (item.status === "success") {
+    if (isShortVideoModuleCode(item.moduleCode)) {
+      try {
+        const task = await getVideoGenerationTask(item.taskId);
+        videoFlow.currentTask.value = task;
+        const result = buildWorkspaceResultFromVideoTask(task);
+        if (result) {
+          shortVideoSessionPreview.value = result;
+          generationResult.value = result;
+          assistPanelRef.value?.focusShortVideoPreviewView?.();
+          return;
+        }
+      } catch (error) {
+        const text =
+          error instanceof Error
+            ? error.message
+            : getViewMediaFailureMessage(item.moduleCode);
+        message.error(text);
+        return;
+      }
+
+      message.error(getViewMediaFailureMessage(item.moduleCode));
+      return;
+    }
+
     try {
       const task = await getGenerationTask(item.taskId);
       const result = buildResultFromTask(task);
@@ -2040,6 +2153,11 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
     }
 
     message.error(getViewMediaFailureMessage(item.moduleCode));
+    return;
+  }
+
+  if (isShortVideoModuleCode(item.moduleCode)) {
+    void resolveVideoGenerationModuleTask(item.taskId, { restored: true });
     return;
   }
 
@@ -2080,6 +2198,11 @@ onMounted(async () => {
       conversationId ?? "",
       { restored: true },
     );
+    return;
+  }
+
+  if (isShortVideoModuleCode(activeTask.moduleCode)) {
+    void resolveVideoGenerationModuleTask(activeTask.taskId, { restored: true });
     return;
   }
 

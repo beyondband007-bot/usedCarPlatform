@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, h, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { NButton, NPopconfirm, NSelect, NSwitch, useMessage } from "naive-ui";
@@ -57,7 +57,7 @@ import PaintColorPicker from "@/components/business/workspace/PaintColorPicker.v
 import PresetCombobox, {
   type PresetComboboxOption,
 } from "@/components/business/workspace/PresetCombobox.vue";
-import ShortVideoMaterialUploadPanel from "@/components/business/workspace/ShortVideoMaterialUploadPanel.vue";
+import VideoGenerationPanel from "@/components/business/workspace/VideoGenerationPanel.vue";
 import UploadTaskCard from "@/components/business/workspace/UploadTaskCard.vue";
 import WorkspaceLogoPanel from "@/components/business/workspace/WorkspaceLogoPanel.vue";
 
@@ -2367,11 +2367,6 @@ async function refreshActiveDeliveryPreview(options?: { refresh?: boolean }) {
 const hasBlock = (block: WorkspaceCapabilityBlock) =>
   props.capability.middleBlocks?.includes(block) ?? false;
 
-const shortVideoCanSubmit = ref(false);
-const shortVideoPanelRef = ref<InstanceType<
-  typeof ShortVideoMaterialUploadPanel
-> | null>(null);
-
 const supportsLogoForGenerate = computed(
   () => props.capability.kind === "scene",
 );
@@ -3097,24 +3092,18 @@ defineExpose({
 
     <template v-else-if="props.capability.code === 'short-video'">
       <div class="generate-panel-body">
-        <ShortVideoMaterialUploadPanel
-          ref="shortVideoPanelRef"
+        <VideoGenerationPanel
           :capability="props.capability"
           :disabled="props.isGenerating"
-          @can-submit-change="shortVideoCanSubmit = $event"
-          @generate="emit('generate', $event)"
+          :is-generating="props.isGenerating"
+          @confirm-video="
+            emit('generate', {
+              shortVideoAction: 'confirm',
+              scriptDraftId: $event,
+            })
+          "
         />
       </div>
-
-      <GenerateActionFooter
-        v-if="hasBlock('actions')"
-        :action-label="props.capability.actionLabel"
-        :cost="props.capability.cost"
-        cost-unit="条"
-        :loading="props.isGenerating"
-        :disabled="!shortVideoCanSubmit || props.isGenerating"
-        @generate="shortVideoPanelRef?.submit()"
-      />
     </template>
 
     <template v-else-if="props.capability.kind === 'delivery'">

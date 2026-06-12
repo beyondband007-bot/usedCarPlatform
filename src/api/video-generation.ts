@@ -1,97 +1,43 @@
 import { normalizeApiErrorMessage, request } from '@/api/http'
-import type { ApiResponse, GenerationTaskStatus } from '@/api/visual-workbench'
+import type { ApiResponse } from '@/api/visual-workbench'
+import type {
+  CreateVideoScriptDraftPayload,
+  DigitalHuman,
+  DigitalHumanVoice,
+  ValidateTemplateInputsResult,
+  VideoGenerationTask,
+  VideoHistoryListResult,
+  VideoScriptDraft,
+  VideoTemplate,
+  VideoWorkflowContract,
+} from '@/types/video-generation'
 
-export interface VideoDigitalHuman {
-  id: string
-  previewUrl: string
-  title?: string
-}
-
-export interface VideoReferenceMaterial {
-  id: string
-  title: string
-  previewUrl: string
-  styleTags?: string[]
-}
-
-export interface VideoScriptShotCue {
-  startSecond?: number
-  endSecond?: number
-  label?: string
-  description?: string
-  [key: string]: unknown
-}
-
-export interface VideoScriptVehicleProfile {
-  [key: string]: unknown
-}
-
-export interface VideoScriptDraftScript {
-  vehicleProfile?: VideoScriptVehicleProfile
-  scriptText?: string
-  shotCues?: VideoScriptShotCue[]
-  generator?: string
-}
-
-export interface VideoScriptDraftRequiredInputs {
-  digitalHuman?: Record<string, unknown>
-  referenceMaterial?: Record<string, unknown>
-  script?: VideoScriptDraftScript
-  uploadedReferences?: Record<string, unknown>
-}
-
-export interface CreateVideoScriptDraftPayload {
-  vehicleName: string
-  digitalHumanId: string
-  referenceMaterialId: string
-  vehicleExteriorAssetIds: string[]
-  vehicleInteriorAssetIds?: string[]
-  userReferenceAssetIds?: string[]
-  durationSeconds?: number
-  sellingPointHints?: string[]
-  vehicleImageSummary?: string
-}
-
-export interface VideoScriptDraft {
-  scriptDraftId: string
-  status: string
-  vehicleName: string
-  durationSeconds: number
-  outputRatio: string
-  videoResolution: string
-  requiredInputs: VideoScriptDraftRequiredInputs
-  finalVideoPrompt: string
-  riskNotes: string[]
-}
+export type {
+  CreateVideoScriptDraftPayload,
+  DigitalHuman,
+  DigitalHumanVoice,
+  VideoGenerationTask,
+  VideoHistoryListResult,
+  VideoScriptDraft,
+  VideoTemplate,
+  VideoWorkflowContract,
+} from '@/types/video-generation'
 
 export interface CreatedVideoGenerationTask {
   taskId: string
   scriptDraftId: string
   moduleCode: string
-  status: GenerationTaskStatus
+  status: VideoGenerationTask['status']
   progress: number
-  kieTaskId?: string
-  model?: string
-  durationSeconds?: number
-  outputRatio?: string
-  videoResolution?: string
-  generateAudio?: boolean
-  inputReferenceCount?: number
-  mediaSummary?: {
-    digitalHumanCount?: number
-    styleVideoCount?: number
-    exteriorImageCount?: number
-    interiorImageCount?: number
-    userReferenceImageCount?: number
-  }
+  pollingRecommendedMs?: number
   pollingUrl?: string
+  templateId?: string | null
 }
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
     throw new Error(normalizeApiErrorMessage(response.message || 'request failed'))
   }
-
   return response.data
 }
 
@@ -99,17 +45,54 @@ const generationRequestConfig = {
   timeout: 0,
 }
 
-export async function getVideoDigitalHumans() {
-  const response = await request.get<ApiResponse<{ items: VideoDigitalHuman[] }>>(
-    '/modules/video-generation/digital-humans',
+export async function getVideoWorkflowContract() {
+  const response = await request.get<ApiResponse<VideoWorkflowContract>>(
+    '/modules/video-generation/workflow-contract',
   )
   return unwrapApiResponse(response)
 }
 
-export async function getVideoReferenceMaterials() {
+export async function getVideoTemplates(params?: {
+  type?: string
+  style?: string
+  search?: string
+}) {
   const response = await request.get<
-    ApiResponse<{ items: VideoReferenceMaterial[] }>
-  >('/modules/video-generation/reference-materials')
+    ApiResponse<{ items: VideoTemplate[]; total: number }>
+  >('/modules/video-generation/templates', { params })
+  return unwrapApiResponse(response)
+}
+
+export async function getVideoTemplate(templateId: string) {
+  const response = await request.get<ApiResponse<VideoTemplate>>(
+    `/modules/video-generation/templates/${encodeURIComponent(templateId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function validateTemplateInputs(
+  templateId: string,
+  payload: Record<string, unknown>,
+) {
+  const response = await request.post<ApiResponse<ValidateTemplateInputsResult>>(
+    `/modules/video-generation/templates/${encodeURIComponent(templateId)}/validate-inputs`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getVideoDigitalHumans() {
+  const response = await request.get<ApiResponse<DigitalHuman[]>>(
+    '/modules/video-generation/digital-humans',
+  )
+  const data = unwrapApiResponse(response)
+  return Array.isArray(data) ? data : (data as { items?: DigitalHuman[] }).items ?? []
+}
+
+export async function getDigitalHumanVoice(digitalHumanId: string) {
+  const response = await request.get<ApiResponse<DigitalHumanVoice>>(
+    `/modules/video-generation/digital-humans/${encodeURIComponent(digitalHumanId)}/voice`,
+  )
   return unwrapApiResponse(response)
 }
 
@@ -142,4 +125,58 @@ export async function createVideoGenerationTask(payload: { scriptDraftId: string
     generationRequestConfig,
   )
   return unwrapApiResponse(response)
+}
+
+export async function getVideoGenerationTask(taskId: string) {
+  const response = await request.get<ApiResponse<VideoGenerationTask>>(
+    `/modules/video-generation/tasks/${encodeURIComponent(taskId)}`,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getVideoGenerationTasks(params?: {
+  page?: number
+  pageSize?: number
+  status?: string
+}) {
+  const response = await request.get<ApiResponse<VideoHistoryListResult>>(
+    '/modules/video-generation/tasks',
+    { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function cancelVideoGenerationTask(taskId: string) {
+  const response = await request.post<ApiResponse<VideoGenerationTask>>(
+    `/modules/video-generation/tasks/${encodeURIComponent(taskId)}/cancel`,
+    {},
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function regenerateVideoGenerationTask(taskId: string) {
+  const response = await request.post<ApiResponse<CreatedVideoGenerationTask>>(
+    `/modules/video-generation/tasks/${encodeURIComponent(taskId)}/regenerate`,
+    {},
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}
+
+/** @deprecated Legacy panel compatibility — new flow uses templateId instead. */
+export type VideoDigitalHuman = DigitalHuman & { title?: string }
+
+/** @deprecated Legacy panel compatibility — reference materials are no longer used. */
+export interface VideoReferenceMaterial {
+  id: string
+  title?: string
+  thumbnailUrl?: string
+  previewUrl?: string
+  styleTags?: string[]
+}
+
+/** @deprecated Legacy panel compatibility — returns an empty list. */
+export async function getVideoReferenceMaterials() {
+  return [] as VideoReferenceMaterial[]
 }

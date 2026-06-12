@@ -222,8 +222,8 @@ async function loadBaseOptions() {
       getVideoDigitalHumans(),
       getVideoReferenceMaterials(),
     ]);
-    digitalHumans.value = humans.items ?? [];
-    referenceMaterials.value = materials.items ?? [];
+    digitalHumans.value = Array.isArray(humans) ? humans : [];
+    referenceMaterials.value = Array.isArray(materials) ? materials : [];
     if (!selectedDigitalHumanId.value && digitalHumans.value[0]) {
       selectedDigitalHumanId.value = digitalHumans.value[0].id;
     }
@@ -415,6 +415,8 @@ async function handleGenerateDraft() {
   isDraftGenerating.value = true;
   try {
     const draft = await createVideoScriptDraft({
+      templateId: selectedReferenceMaterialId.value ?? "legacy",
+      language: "zh-CN",
       vehicleName: vehicleName.value.trim(),
       digitalHumanId: selectedDigitalHumanId.value!,
       referenceMaterialId: selectedReferenceMaterialId.value!,
@@ -505,11 +507,11 @@ onMounted(() => {
           <PreloadImage
             class="sv-picker-media"
             :src="item.previewUrl"
-            :alt="item.title || '数字人'"
+            :alt="item.name || '数字人'"
             loading="lazy"
             decoding="async"
           />
-          <span>{{ item.title || item.id }}</span>
+          <span>{{ item.name || item.id }}</span>
         </button>
       </div>
       <p v-else class="sv-empty">暂无数字人选项</p>

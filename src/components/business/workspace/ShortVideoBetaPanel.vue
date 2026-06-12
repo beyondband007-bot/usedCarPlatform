@@ -1,21 +1,33 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
+import { useMessage } from "naive-ui";
 
 import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
+import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
+import {
+  getVideoTaskStatusLabel,
+  getVideoWorkflowStageLabel,
+  VIDEO_OUTPUT_RATIO_LABEL,
+} from "@/constants/short-video";
+import type { VideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
+import { useAppStore } from "@/stores/app";
+import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
 import {
   shortVideoTemplateCategories,
-  shortVideoTemplateItems,
   shortVideoTemplateStyles,
   type ShortVideoTemplateCategory,
-  type ShortVideoTemplateItem,
 } from "@/constants/short-video-templates";
-import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
+import type { VideoHistoryItem, VideoTemplate } from "@/types/video-generation";
 import {
   recentStatusLabelMap,
 } from "@/utils/workspace-recent";
 import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
+import {
+  resolveVideoTaskDownloadUrl,
+  resolveVideoTaskMediaUrl,
+} from "@/utils/video-generation-result";
 
 const props = defineProps<{
   playRequest?: number;
@@ -27,7 +39,7 @@ const props = defineProps<{
   initialView?: "templates" | "preview" | "generating" | "recent";
 }>();
 
-type ShortVideoView = "templates" | "preview" | "generating" | "recent";
+type ShortVideoView = "templates" | "history" | "preview" | "generating";
 
 const PENDING_RECENT_STATUSES = new Set([
   "waiting",
@@ -39,23 +51,126 @@ const PENDING_RECENT_STATUSES = new Set([
 const emit = defineEmits<{
   pickRecent: [item: WorkspaceRecentItem];
   deleteRecent: [item: WorkspaceRecentItem];
-  selectTemplate: [item: ShortVideoTemplateItem];
 }>();
 
+const message = useMessage();
+const appStore = useAppStore();
+const flow = inject<VideoGenerationFlow | null>(VIDEO_GENERATION_FLOW_KEY, null);
+
 const videoRef = ref<HTMLVideoElement | null>(null);
-const activeView = ref<ShortVideoView>("recent");
+const activeView = ref<ShortVideoView>("templates");
 const activeCategory = ref<ShortVideoTemplateCategory>("all");
 const activeStyle = ref("all");
 const searchQuery = ref("");
-const selectedTemplateId = ref<string | null>(null);
-
+const historyStatusFilter = ref("");
+const selectedHistoryTaskId = ref("");
 const selectedRecentItemId = ref("");
+const previewTask = ref<VideoHistoryItem | null>(null);
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const recentDisplayItems = computed(() =>
   normalizeDisplayOrder(recentVideoItems.value),
 );
 const statusLabelMap = recentStatusLabelMap;
+
+const currentTask = computed(() => flow?.currentTask.value ?? null);
+const templateList = computed(() => flow?.templateList.value ?? []);
+const selectedTemplateId = computed(
+  () => flow?.selectedTemplate.value?.templateId ?? "",
+);
+const templatesLoading = computed(() => flow?.isLoading("bootstrap") ?? false);
+const historyList = computed(() => flow?.historyList.value ?? []);
+const historyLoading = computed(() => flow?.isLoading("history") ?? false);
+
+const filteredHistoryList = computed(() => {
+  if (!historyStatusFilter.value) return historyList.value;
+  return historyList.value.filter(
+    (item) => item.status === historyStatusFilter.value,
+  );
+});
+
+const categoryTypeMap: Record<Exclude<ShortVideoTemplateCategory, "all">, string> = {
+  showroom: "dealership",
+  "single-car": "single-car",
+  promotion: "promotion",
+  market: "market",
+};
+
+const filteredTemplates = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase();
+
+  return templateList.value.filter((item) => {
+    if (activeCategory.value !== "all") {
+      const mappedType = categoryTypeMap[activeCategory.value];
+      if (item.type !== mappedType) return false;
+    }
+
+    if (activeStyle.value !== "all" && item.style !== activeStyle.value) {
+      return false;
+    }
+
+    if (!keyword) return true;
+
+    const haystack = [
+      item.title,
+      item.typeLabel,
+      item.styleLabel,
+      item.stylePrompt,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(keyword);
+  });
+});
+
+const activePreviewVideo = computed(() => {
+  if (activeView.value !== "preview") return "";
+  return (
+    props.generationResult?.previewVideo ??
+    props.sessionPreview?.previewVideo ??
+    (previewTask.value ? resolveVideoTaskMediaUrl(previewTask.value) : "")
+  );
+});
+
+const activePreviewDownloadUrl = computed(() => {
+  if (previewTask.value) {
+    return resolveVideoTaskDownloadUrl(previewTask.value);
+  }
+  return (
+    props.generationResult?.downloadUrl ??
+    props.sessionPreview?.downloadUrl ??
+    activePreviewVideo.value
+  );
+});
+
+const generatingProgress = computed(() => {
+  const task = currentTask.value;
+  if (!task) return props.isGenerating ? 8 : 0;
+  return Math.max(0, Math.min(100, task.progress ?? 0));
+});
+
+const generatingStatusLabel = computed(() => {
+  const task = currentTask.value;
+  if (!task) return "正在准备视频任务";
+  const stageLabel = getVideoWorkflowStageLabel(task.workflowStage ?? undefined);
+  if (stageLabel) return stageLabel;
+  return getVideoTaskStatusLabel(task.status);
+});
+
+const generatingErrorMessage = computed(() => {
+  const task = currentTask.value;
+  if (task?.status !== "fail") return "";
+  return task.error?.message ?? "视频生成失败，请稍后重试";
+});
+
+const showSessionPreviewTab = computed(() =>
+  Boolean(
+    props.sessionPreview?.previewVideo ||
+      props.generationResult?.previewVideo ||
+      previewTask.value,
+  ),
+);
 
 function syncSelectedRecentItem() {
   const displayItems = recentDisplayItems.value;
@@ -73,48 +188,42 @@ function syncSelectedRecentItem() {
 
 watch(recentDisplayItems, syncSelectedRecentItem, { immediate: true });
 
-const showSessionPreviewTab = computed(() =>
-  Boolean(props.sessionPreview?.previewVideo),
-);
+function resolveShortVideoView(
+  preferred?: ShortVideoView | "recent" | "templates",
+): ShortVideoView {
+  if (props.isGenerating || isPendingTask(currentTask.value)) return "generating";
+  if (preferred === "preview") return "preview";
+  if (preferred === "generating") return "generating";
+  if (preferred === "history" || preferred === "recent") return "history";
+  if (preferred === "templates") return "templates";
+  if (flow?.currentStep.value === "template") return "templates";
+  return "templates";
+}
 
-const activePreviewVideo = computed(() => {
-  if (activeView.value !== "preview") return "";
+function isTemplateDisabled(template: VideoTemplate) {
   return (
-    props.generationResult?.previewVideo ??
-    props.sessionPreview?.previewVideo ??
-    ""
+    template.status === "coming_soon" ||
+    template.generationReadiness === "unavailable" ||
+    template.type === "market"
   );
-});
+}
 
-const filteredTemplates = computed(() => {
-  const keyword = searchQuery.value.trim().toLowerCase();
-
-  return shortVideoTemplateItems.filter((item) => {
-    if (activeCategory.value !== "all" && item.category !== activeCategory.value) {
-      return false;
-    }
-
-    if (activeStyle.value !== "all" && item.style !== activeStyle.value) {
-      return false;
-    }
-
-    if (!keyword) return true;
-
-    const haystack = [item.title, item.creator, ...item.keywords]
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(keyword);
-  });
-});
-
-function resolveShortVideoView(preferred?: ShortVideoView): ShortVideoView {
-  if (props.isGenerating) return "generating";
-  if (preferred === "recent" || preferred === "preview" || preferred === "templates") {
-    return preferred;
+function handleTemplatePick(item: VideoTemplate) {
+  if (isTemplateDisabled(item)) {
+    message.info("该模板即将开放");
+    return;
   }
-  if (showSessionPreviewTab.value) return "preview";
-  return "recent";
+  flow?.selectTemplate(item);
+  message.success(`已选择「${item.title}」`);
+}
+
+function openTemplatesView() {
+  activeView.value = "templates";
+}
+
+function isPendingTask(task?: VideoHistoryItem | null) {
+  if (!task) return false;
+  return PENDING_RECENT_STATUSES.has(task.status);
 }
 
 async function playGeneratedVideo() {
@@ -132,28 +241,20 @@ async function playGeneratedVideo() {
   }
 }
 
-function openTemplatesView() {
-  activeView.value = "templates";
+function openHistoryView() {
+  activeView.value = "history";
 }
 
-function openPreviewView() {
+function openPreviewView(task?: VideoHistoryItem | null) {
+  previewTask.value = task ?? currentTask.value;
   activeView.value = "preview";
   if (activePreviewVideo.value) {
     void playGeneratedVideo();
   }
 }
 
-function openRecentView() {
-  activeView.value = "recent";
-}
-
 function shouldShowRecentStatus(item: WorkspaceRecentItem) {
   return item.status !== "success";
-}
-
-function handleTemplatePick(item: ShortVideoTemplateItem) {
-  selectedTemplateId.value = item.id;
-  emit("selectTemplate", item);
 }
 
 function canOpenRecentVideo(item: WorkspaceRecentItem) {
@@ -172,6 +273,62 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   }
 
   emit("pickRecent", item);
+}
+
+function handleHistoryPick(item: VideoHistoryItem) {
+  selectedHistoryTaskId.value = item.taskId;
+
+  if (isPendingTask(item)) {
+    activeView.value = "generating";
+    void flow?.trackTask(item.taskId);
+    return;
+  }
+
+  if (item.status === "success") {
+    openPreviewView(item);
+    return;
+  }
+
+  if (item.status === "fail") {
+    message.error(item.error?.message ?? "视频生成失败");
+  }
+}
+
+async function handleCancelTask(taskId?: string) {
+  if (!flow) return;
+  if (taskId && flow.currentTask.value?.taskId !== taskId) {
+    await flow.trackTask(taskId);
+  }
+  const task = await flow.cancelCurrentTask();
+  if (task) {
+    message.info("任务已取消");
+    void flow.loadHistory();
+  } else if (flow.errorMessage.value) {
+    message.error(flow.errorMessage.value);
+  }
+}
+
+async function handleRegenerateTask(taskId?: string) {
+  if (!flow) return;
+  const targetId = taskId ?? currentTask.value?.taskId;
+  if (!targetId) return;
+  activeView.value = "generating";
+  const task = await flow.regenerateTask(targetId);
+  if (task) {
+    message.info("已重新提交视频生成");
+  } else if (flow.errorMessage.value) {
+    message.error(flow.errorMessage.value);
+  }
+}
+
+function canCancelTask(task?: VideoHistoryItem | null) {
+  if (!task || !flow) return false;
+  return flow.CANCELABLE_STATUSES.has(task.status);
+}
+
+function canRegenerateTask(task?: VideoHistoryItem | null) {
+  if (!task || !flow) return false;
+  return flow.REGENERATABLE_STATUSES.has(task.status);
 }
 
 watch(
@@ -217,15 +374,50 @@ watch(
     }
 
     if (activeView.value === "generating") {
-      activeView.value = showSessionPreviewTab.value ? "preview" : "recent";
+      if (currentTask.value?.status === "success") {
+        openPreviewView(currentTask.value);
+        return;
+      }
+      activeView.value = showSessionPreviewTab.value ? "preview" : "history";
     }
   },
   { immediate: true },
 );
+
+watch(currentTask, (task) => {
+  if (!task) return;
+  if (isPendingTask(task)) {
+    activeView.value = "generating";
+    return;
+  }
+  if (task.status === "success" && !props.isGenerating) {
+    openPreviewView(task);
+  }
+});
+
+onMounted(() => {
+  void flow?.loadHistory();
+  if (flow?.currentStep.value === "template") {
+    activeView.value = "templates";
+  }
+});
+
+watch(
+  () => flow?.currentStep.value,
+  (step) => {
+    if (step === "template") {
+      activeView.value = "templates";
+    }
+  },
+);
 </script>
 
 <template>
-  <section class="sv-beta-panel" aria-label="短视频模板库">
+  <section
+    class="sv-beta-panel"
+    :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
+    aria-label="短视频模板库"
+  >
     <section
       v-if="activeView === 'generating'"
       class="sv-state-panel sv-state-panel--generating"
@@ -233,15 +425,36 @@ watch(
     >
       <div class="sv-generating-visual" aria-hidden="true">
         <span class="sv-generating-scan"></span>
-        <Icon icon="mdi:image-sync-outline" />
+        <Icon icon="mdi:video-outline" />
       </div>
       <div class="sv-generating-copy">
-        <p>视频待生成</p>
-        <h2>正在生成营销视频</h2>
-        <span>AI 正在分析车辆素材并生成 16:9、720p、10 秒短视频，请稍候。</span>
+        <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成中" }}</p>
+        <h2>{{ generatingStatusLabel }}</h2>
+        <span>固定输出 {{ VIDEO_OUTPUT_RATIO_LABEL }}，请稍候。</span>
+        <p v-if="generatingErrorMessage" class="sv-generating-error">
+          {{ generatingErrorMessage }}
+        </p>
       </div>
-      <div class="sv-generating-progress" aria-hidden="true">
-        <span></span>
+      <div class="sv-generating-progress" role="progressbar" :aria-valuenow="generatingProgress">
+        <span :style="{ width: `${generatingProgress}%` }"></span>
+      </div>
+      <div class="sv-generating-actions">
+        <button
+          v-if="canCancelTask(currentTask)"
+          type="button"
+          class="sv-action-button sv-action-button--ghost"
+          @click="handleCancelTask(currentTask?.taskId)"
+        >
+          取消生成
+        </button>
+        <button
+          v-if="canRegenerateTask(currentTask)"
+          type="button"
+          class="sv-action-button"
+          @click="handleRegenerateTask()"
+        >
+          重新生成
+        </button>
       </div>
     </section>
 
@@ -250,10 +463,19 @@ watch(
       class="sv-state-panel sv-state-panel--preview"
     >
       <header class="sv-preview-head">
-        <button type="button" class="sv-back-button" @click="openRecentView">
+        <button type="button" class="sv-back-button" @click="openHistoryView">
           <Icon icon="mdi:arrow-left" />
-          返回最近生成
+          返回历史任务
         </button>
+        <a
+          v-if="activePreviewDownloadUrl"
+          class="sv-download-link"
+          :href="activePreviewDownloadUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          下载视频
+        </a>
       </header>
       <video
         ref="videoRef"
@@ -277,21 +499,21 @@ watch(
           type="button"
           role="tab"
           class="sv-primary-tab"
-          :class="{ 'is-active': activeView === 'recent' }"
-          :aria-selected="activeView === 'recent'"
-          @click="openRecentView"
-        >
-          最近生成
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="sv-primary-tab"
           :class="{ 'is-active': activeView === 'templates' }"
           :aria-selected="activeView === 'templates'"
           @click="openTemplatesView"
         >
           模板库
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="sv-primary-tab"
+          :class="{ 'is-active': activeView === 'history' }"
+          :aria-selected="activeView === 'history'"
+          @click="openHistoryView"
+        >
+          历史任务
         </button>
         <button
           v-if="showSessionPreviewTab"
@@ -300,129 +522,219 @@ watch(
           class="sv-primary-tab sv-primary-tab--accent"
           :class="{ 'is-active': activeView === 'preview' }"
           :aria-selected="activeView === 'preview'"
-          @click="openPreviewView"
+          @click="openPreviewView()"
         >
           预览视频
         </button>
       </header>
 
       <section
-        v-if="activeView === 'recent'"
-        class="sv-recent-panel"
-        aria-label="最近生成"
+        v-if="activeView === 'templates'"
+        class="sv-gallery"
+        aria-label="短视频模板"
       >
-        <div v-if="props.recentLoading && !recentVideoItems.length" class="sv-empty-state">
+        <header class="sv-gallery-toolbar">
+          <div class="sv-gallery-tabs" role="tablist" aria-label="模板分类">
+            <button
+              v-for="category in shortVideoTemplateCategories"
+              :key="category.id"
+              type="button"
+              role="tab"
+              class="sv-gallery-tab"
+              :class="{ 'is-active': activeCategory === category.id }"
+              :aria-selected="activeCategory === category.id"
+              @click="activeCategory = category.id"
+            >
+              {{ category.label }}
+            </button>
+          </div>
+
+          <div class="sv-gallery-actions">
+            <label class="sv-style-filter">
+              <span class="sv-style-filter-label">风格筛选</span>
+              <select v-model="activeStyle">
+                <option
+                  v-for="style in shortVideoTemplateStyles"
+                  :key="style.id"
+                  :value="style.id"
+                >
+                  {{ style.label }}
+                </option>
+              </select>
+              <Icon icon="mdi:chevron-down" aria-hidden="true" />
+            </label>
+
+            <label class="sv-search">
+              <Icon icon="mdi:magnify" aria-hidden="true" />
+              <input
+                v-model="searchQuery"
+                type="search"
+                placeholder="搜索模板名称或关键词..."
+              />
+            </label>
+          </div>
+        </header>
+
+        <div v-if="templatesLoading && !templateList.length" class="sv-empty-state sv-empty-state--inline">
           <Icon icon="mdi:loading" class="sv-spin" />
-          <span>正在加载最近生成</span>
+          <span>正在加载模板库</span>
         </div>
-        <div v-else-if="!recentVideoItems.length" class="sv-empty-state">
-          <Icon icon="mdi:video-off-outline" />
-          <span>暂无最近生成视频</span>
+        <div v-else-if="!filteredTemplates.length" class="sv-empty-state sv-empty-state--inline">
+          <Icon icon="mdi:movie-search-outline" />
+          <span>未找到匹配模板，请调整筛选条件</span>
         </div>
-        <div
-          v-else
-          class="sv-recent-flow"
-        >
-          <WorkspaceRecentImageCard
-            v-for="item in recentDisplayItems"
-            :key="item.id"
-            :item="item"
-            :selected="item.id === selectedRecentItemId"
-            :clickable="canOpenRecentVideo(item)"
-            :show-status="shouldShowRecentStatus(item)"
-            :status-label="statusLabelMap[item.status]"
-            @pick="handleRecentPick"
-          />
+        <div v-else class="sv-template-grid">
+          <article
+            v-for="item in filteredTemplates"
+            :key="item.templateId"
+            class="sv-template-card"
+            :class="{
+              'is-selected': selectedTemplateId === item.templateId,
+              'is-disabled': isTemplateDisabled(item),
+            }"
+            @click="handleTemplatePick(item)"
+          >
+            <div class="sv-template-media">
+              <PreloadImage
+                v-if="item.thumbnailUrl"
+                class="sv-template-cover"
+                :src="item.thumbnailUrl"
+                :alt="item.title"
+                loading="lazy"
+                decoding="async"
+                fit="cover"
+              />
+              <div v-else class="sv-template-cover sv-template-cover--placeholder">
+                <Icon icon="mdi:image-outline" />
+              </div>
+              <span class="sv-template-duration">{{ item.durationSeconds }}秒</span>
+              <span v-if="isTemplateDisabled(item)" class="sv-template-badge is-soon">即将开放</span>
+              <span v-else-if="item.badge === 'hot'" class="sv-template-badge">热门</span>
+              <span v-else-if="item.badge === 'new'" class="sv-template-badge is-new">新品</span>
+            </div>
+            <footer class="sv-template-foot">
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.typeLabel }} · {{ item.styleLabel }}</span>
+              <p>{{ item.stylePrompt }}</p>
+            </footer>
+          </article>
         </div>
       </section>
 
       <section
-        v-else-if="activeView === 'templates'"
-        class="sv-gallery"
-        aria-label="短视频模板"
+        v-else-if="activeView === 'history'"
+        class="sv-recent-panel"
+        aria-label="历史任务"
       >
-      <header class="sv-gallery-toolbar">
-        <div class="sv-gallery-tabs" role="tablist" aria-label="模板分类">
-          <button
-            v-for="category in shortVideoTemplateCategories"
-            :key="category.id"
-            type="button"
-            role="tab"
-            class="sv-gallery-tab"
-            :class="{ 'is-active': activeCategory === category.id }"
-            :aria-selected="activeCategory === category.id"
-            @click="activeCategory = category.id"
-          >
-            {{ category.label }}
-          </button>
-        </div>
-
-        <div class="sv-gallery-actions">
+        <div class="sv-history-toolbar">
           <label class="sv-style-filter">
-            <span class="sv-style-filter-label">风格筛选</span>
-            <select v-model="activeStyle">
-              <option
-                v-for="style in shortVideoTemplateStyles"
-                :key="style.id"
-                :value="style.id"
-              >
-                {{ style.label }}
-              </option>
+            <span class="sv-style-filter-label">状态筛选</span>
+            <select v-model="historyStatusFilter">
+              <option value="">全部状态</option>
+              <option value="waiting">正在准备素材</option>
+              <option value="queued">已进入生成队列</option>
+              <option value="generating">正在生成视频</option>
+              <option value="success">生成完成</option>
+              <option value="fail">生成失败</option>
+              <option value="canceled">任务已取消</option>
             </select>
             <Icon icon="mdi:chevron-down" aria-hidden="true" />
           </label>
-
-          <label class="sv-search">
-            <Icon icon="mdi:magnify" aria-hidden="true" />
-            <input
-              v-model="searchQuery"
-              type="search"
-              placeholder="搜索模板名称或关键词..."
-            />
-          </label>
         </div>
-      </header>
 
-      <div v-if="!filteredTemplates.length" class="sv-empty-state sv-empty-state--inline">
-        <Icon icon="mdi:movie-search-outline" />
-        <span>未找到匹配模板，请调整筛选条件</span>
-      </div>
+        <div v-if="historyLoading && !filteredHistoryList.length" class="sv-empty-state">
+          <Icon icon="mdi:loading" class="sv-spin" />
+          <span>正在加载历史任务</span>
+        </div>
+        <div v-else-if="!filteredHistoryList.length" class="sv-empty-state">
+          <Icon icon="mdi:video-off-outline" />
+          <span>暂无历史视频任务</span>
+        </div>
+        <div v-else class="sv-history-list">
+          <article
+            v-for="item in filteredHistoryList"
+            :key="item.taskId"
+            class="sv-history-card"
+            :class="{ 'is-selected': selectedHistoryTaskId === item.taskId }"
+            @click="handleHistoryPick(item)"
+          >
+            <div class="sv-history-media">
+              <PreloadImage
+                v-if="item.thumbnail || item.resultVideos?.[0]?.thumbnail"
+                class="sv-history-cover"
+                :src="item.thumbnail || item.resultVideos?.[0]?.thumbnail || ''"
+                :alt="item.title || item.vehicleName || '视频封面'"
+                loading="lazy"
+                decoding="async"
+                fit="cover"
+              />
+              <div v-else class="sv-history-cover sv-history-cover--placeholder">
+                <Icon icon="mdi:video-outline" />
+              </div>
+            </div>
+            <div class="sv-history-body">
+              <h3>{{ item.title || item.vehicleName || "短视频任务" }}</h3>
+              <p v-if="item.vehicleName && item.title">{{ item.vehicleName }}</p>
+              <div class="sv-history-meta">
+                <span>{{ getVideoTaskStatusLabel(item.status) }}</span>
+                <span v-if="item.workflowStage">
+                  {{ getVideoWorkflowStageLabel(item.workflowStage) }}
+                </span>
+                <span v-if="item.progress">{{ item.progress }}%</span>
+              </div>
+              <p v-if="item.status === 'fail' && item.error?.message" class="sv-history-error">
+                {{ item.error.message }}
+              </p>
+              <div class="sv-history-actions" @click.stop>
+                <button
+                  v-if="canCancelTask(item)"
+                  type="button"
+                  class="sv-action-button sv-action-button--ghost"
+                  @click="handleCancelTask(item.taskId)"
+                >
+                  取消
+                </button>
+                <button
+                  v-if="canRegenerateTask(item)"
+                  type="button"
+                  class="sv-action-button"
+                  @click="handleRegenerateTask(item.taskId)"
+                >
+                  重新生成
+                </button>
+                <a
+                  v-if="item.status === 'success' && resolveVideoTaskDownloadUrl(item)"
+                  class="sv-download-link"
+                  :href="resolveVideoTaskDownloadUrl(item)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  下载
+                </a>
+              </div>
+            </div>
+          </article>
+        </div>
 
-      <div v-else class="sv-template-grid">
-        <article
-          v-for="item in filteredTemplates"
-          :key="item.id"
-          class="sv-template-card"
-          :class="{ 'is-selected': selectedTemplateId === item.id }"
-          @click="handleTemplatePick(item)"
+        <div
+          v-if="recentDisplayItems.length"
+          class="sv-recent-fallback"
+          aria-label="最近生成"
         >
-          <div class="sv-template-media">
-            <PreloadImage
-              class="sv-template-cover"
-              :src="item.cover"
-              :alt="item.title"
-              loading="lazy"
-              decoding="async"
-              fit="cover"
+          <h4>最近生成</h4>
+          <div class="sv-recent-flow">
+            <WorkspaceRecentImageCard
+              v-for="item in recentDisplayItems"
+              :key="item.id"
+              :item="item"
+              :selected="item.id === selectedRecentItemId"
+              :clickable="canOpenRecentVideo(item)"
+              :show-status="shouldShowRecentStatus(item)"
+              :status-label="statusLabelMap[item.status]"
+              @pick="handleRecentPick"
             />
-            <span class="sv-template-duration">{{ item.duration }}</span>
-            <span class="sv-template-likes">
-              <Icon icon="mdi:heart-outline" aria-hidden="true" />
-              {{ item.likes }}
-            </span>
           </div>
-
-          <footer class="sv-template-foot">
-            <strong>{{ item.title }}</strong>
-            <span class="sv-template-creator">
-              <span class="sv-template-avatar" aria-hidden="true">
-                <Icon icon="mdi:account-circle-outline" />
-              </span>
-              {{ item.creator }}
-            </span>
-          </footer>
-        </article>
-      </div>
+        </div>
       </section>
     </section>
   </section>
@@ -450,11 +762,60 @@ watch(
   color: var(--sv-text);
 }
 
-:global(.theme-light) .sv-beta-panel,
-:global(.workspace-page.theme-light) .sv-beta-panel {
-  --sv-bg: #0d1117;
-  --sv-surface: #151922;
-  --sv-border: rgba(255, 255, 255, 0.1);
+.sv-beta-panel.theme-light {
+  --sv-bg: transparent;
+  --sv-surface: #ffffff;
+  --sv-border: #e1eaf5;
+  --sv-text: #111827;
+  --sv-text-soft: #64748b;
+  --sv-accent: var(--workspace-accent, #2f6bff);
+  --sv-accent-soft: color-mix(
+    in srgb,
+    var(--workspace-accent, #2f6bff) 12%,
+    transparent
+  );
+  --sv-input-bg: #ffffff;
+  background: transparent;
+  color: var(--sv-text);
+}
+
+.sv-beta-panel.theme-light .sv-primary-tabs {
+  gap: 34px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.sv-beta-panel.theme-light .sv-primary-tab {
+  padding: 0;
+  border-radius: 0;
+  color: #8a95a3;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sv-beta-panel.theme-light .sv-primary-tab.is-active {
+  background: transparent;
+  color: #111827;
+  font-weight: 800;
+}
+
+.sv-beta-panel.theme-light .sv-empty-state {
+  border-color: #e1eaf5;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.sv-beta-panel.theme-light .sv-generating-visual {
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+}
+
+.sv-beta-panel.theme-light .sv-generating-progress {
+  background: rgba(47, 107, 255, 0.08);
+}
+
+.sv-beta-panel.theme-light .sv-preview-player {
+  background: #0f172a;
 }
 
 .sv-main-shell {
@@ -725,6 +1086,40 @@ watch(
   box-shadow: 0 0 0 2px var(--sv-accent);
 }
 
+.sv-template-card.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sv-template-cover--placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--sv-text-soft);
+  font-size: 28px;
+}
+
+.sv-template-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.88);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sv-template-badge.is-soon {
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.sv-template-badge.is-new {
+  background: rgba(34, 197, 94, 0.88);
+}
+
 .sv-template-media {
   position: relative;
   overflow: hidden;
@@ -781,6 +1176,22 @@ watch(
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sv-template-foot span {
+  color: var(--sv-text-soft);
+  font-size: 12px;
+}
+
+.sv-template-foot p {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .sv-template-creator {
@@ -1047,5 +1458,150 @@ watch(
 .sv-template-cover {
   width: 100%;
   height: 100%;
+}
+
+.sv-generating-error {
+  margin: 8px 0 0;
+  color: #f87171;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sv-generating-actions,
+.sv-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sv-action-button {
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--sv-accent) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sv-accent) 16%, transparent);
+  color: var(--sv-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sv-action-button--ghost {
+  border-color: var(--sv-border);
+  background: transparent;
+  color: var(--sv-text-soft);
+}
+
+.sv-download-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sv-accent) 20%, transparent);
+  color: var(--sv-accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sv-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sv-history-toolbar {
+  margin-bottom: 12px;
+}
+
+.sv-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sv-history-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--sv-border);
+  border-radius: 12px;
+  background: var(--sv-surface);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.sv-history-card.is-selected,
+.sv-history-card:hover {
+  border-color: color-mix(in srgb, var(--sv-accent) 45%, transparent);
+}
+
+.sv-history-cover {
+  width: 72px;
+  height: 96px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sv-history-cover--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sv-text-soft);
+  font-size: 24px;
+}
+
+.sv-history-body h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--sv-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-history-body p {
+  margin: 4px 0 0;
+  color: var(--sv-text-soft);
+  font-size: 12px;
+}
+
+.sv-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--sv-text-soft);
+  font-size: 11px;
+}
+
+.sv-history-meta span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sv-history-error {
+  margin: 8px 0 0;
+  color: #f87171;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sv-recent-fallback {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sv-border);
+}
+
+.sv-recent-fallback h4 {
+  margin: 0 0 12px;
+  color: var(--sv-text-soft);
+  font-size: 13px;
+  font-weight: 700;
 }
 </style>
