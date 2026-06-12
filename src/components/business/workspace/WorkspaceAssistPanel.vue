@@ -3038,7 +3038,6 @@ defineExpose({
   scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-<<<<<<< HEAD
 .recent-layout.recent-layout--flow {
   overflow-x: visible;
   overflow-y: auto;
@@ -3120,10 +3119,7 @@ defineExpose({
   grid-auto-rows: max-content;
 }
 
-.recent-layout::-webkit-scrollbar {
-=======
 .assist-panel.theme-dark .recent-layout::-webkit-scrollbar {
->>>>>>> origin/feature
   width: 8px;
 }
 

@@ -12,7 +12,6 @@ import {
   type ShortVideoTemplateItem,
 } from "@/constants/short-video-templates";
 import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
-import { VIDEO_OUTPUT_RATIO_LABEL } from "@/constants/short-video";
 import {
   recentStatusLabelMap,
 } from "@/utils/workspace-recent";
@@ -227,124 +226,6 @@ watch(
 
 <template>
   <section class="sv-beta-panel" aria-label="短视频模板库">
-  <section class="short-video-panel" aria-label="短视频生成说明">
-    <header class="short-video-head">
-      <div class="short-video-head-copy">
-        <p class="short-video-eyebrow">短视频生成</p>
-        <h2>生成口播草稿后输出竖屏营销视频</h2>
-        <span>固定输出 {{ VIDEO_OUTPUT_RATIO_LABEL }}，确认生成后将自动轮询任务结果。</span>
-      </div>
-    </header>
-
-    <div class="short-video-tabs" role="tablist" aria-label="short video views">
-      <button
-        v-if="props.isGenerating"
-        type="button"
-        role="tab"
-        :aria-selected="activeView === 'generating'"
-        :class="{ active: activeView === 'generating' }"
-        @click="activeView = 'generating'"
-      >
-        正在生成
-      </button>
-      <button
-        v-else-if="showSessionPreviewTab"
-        type="button"
-        role="tab"
-        :aria-selected="activeView === 'preview'"
-        :class="{ active: activeView === 'preview' }"
-        @click="openPreviewView"
-      >
-        预览视频
-      </button>
-      <button
-        v-else
-        type="button"
-        role="tab"
-        :aria-selected="activeView === 'guide'"
-        :class="{ active: activeView === 'guide' }"
-        @click="activeView = 'guide'"
-      >
-        使用教程
-      </button>
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="activeView === 'recent'"
-        :class="{ active: activeView === 'recent' }"
-        @click="openRecentView"
-      >
-        最近生成
-      </button>
-    </div>
-
-    <section v-if="activeView === 'recent'" class="short-video-recent" aria-label="recent videos">
-      <div v-if="props.recentLoading && !recentVideoItems.length" class="short-video-recent-empty">
-        <Icon icon="mdi:loading" class="short-video-loading-icon" />
-        <span>正在加载最近生成</span>
-      </div>
-      <div v-else-if="!recentVideoItems.length" class="short-video-recent-empty">
-        <Icon icon="mdi:video-off-outline" />
-        <span>暂无最近生成视频</span>
-      </div>
-      <template v-else>
-        <article
-          v-for="item in recentVideoItems"
-          :key="item.id"
-          class="short-video-recent-card"
-          :class="{ 'is-clickable': canOpenRecentVideo(item) }"
-          :role="canOpenRecentVideo(item) ? 'button' : undefined"
-          :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
-          :aria-label="canOpenRecentVideo(item) ? `查看${item.title}` : item.title"
-          @click="handleRecentPick(item)"
-          @keydown.enter.prevent="handleRecentPick(item)"
-          @keydown.space.prevent="handleRecentPick(item)"
-        >
-          <div class="short-video-recent-media">
-            <PreloadImage
-              v-if="item.thumbnail || item.previewImage || item.inputAssetUrl"
-              class="short-video-recent-image"
-              :src="item.thumbnail || item.previewImage || item.inputAssetUrl"
-              :alt="item.title"
-              loading="lazy"
-              decoding="async"
-              :draggable="false"
-              fit="cover"
-              object-position="center"
-            />
-            <div v-else class="short-video-recent-placeholder">
-              <Icon icon="mdi:video-outline" />
-            </div>
-            <span class="short-video-recent-status" :class="`is-${item.status}`">
-              <Icon
-                :icon="statusIconMap[item.status]"
-                class="short-video-recent-status-icon"
-              />
-              {{ statusLabelMap[item.status] }}
-            </span>
-            <span v-if="item.status === 'success'" class="short-video-play-badge">
-              <Icon icon="mdi:play" />
-            </span>
-          </div>
-          <footer class="short-video-recent-foot">
-            <strong class="short-video-recent-name">{{ item.title }}</strong>
-            <p class="short-video-recent-scene">{{ VIDEO_OUTPUT_RATIO_LABEL }}</p>
-            <div class="short-video-recent-foot-actions">
-              <span class="short-video-recent-time">{{ item.createdAt }}</span>
-              <button
-                type="button"
-                class="short-video-recent-delete"
-                :aria-label="`删除${item.title}`"
-                @click.stop="emit('deleteRecent', item)"
-              >
-                <Icon icon="mdi:trash-can-outline" />
-              </button>
-            </div>
-          </footer>
-        </article>
-      </template>
-    </section>
-
     <section
       v-if="activeView === 'generating'"
       class="sv-state-panel sv-state-panel--generating"
@@ -357,7 +238,7 @@ watch(
       <div class="sv-generating-copy">
         <p>视频待生成</p>
         <h2>正在生成营销视频</h2>
-        <span>AI 正在生成 {{ VIDEO_OUTPUT_RATIO_LABEL }} 营销短视频，请稍候。</span>
+        <span>AI 正在分析车辆素材并生成 16:9、720p、10 秒短视频，请稍候。</span>
       </div>
       <div class="sv-generating-progress" aria-hidden="true">
         <span></span>
@@ -505,20 +386,6 @@ watch(
       <div v-if="!filteredTemplates.length" class="sv-empty-state sv-empty-state--inline">
         <Icon icon="mdi:movie-search-outline" />
         <span>未找到匹配模板，请调整筛选条件</span>
-        <aside class="short-video-side">
-          <div class="short-video-spec">
-            <span>输出内容</span>
-            <strong>15 秒营销短视频</strong>
-          </div>
-          <div class="short-video-spec">
-            <span>适用场景</span>
-            <strong>车辆外观展示、社媒投放、详情页动效</strong>
-          </div>
-          <div class="short-video-spec">
-            <span>说明</span>
-            <strong>左侧配置素材并生成口播草稿，确认后开始生成视频</strong>
-          </div>
-        </aside>
       </div>
 
       <div v-else class="sv-template-grid">
