@@ -1,10 +1,14 @@
 node_modules/
 dist/
+tmp/
 .DS_Store
 *.local
 
 docs/*
 !docs/three-role-back-office-phase-8-handoff.md
+!docs/视频生成前端接口协作说明.md
+digital human/*-three-view.png
+digital human/male-02-four-view.png
 .env
 .env.*
 !.env.example

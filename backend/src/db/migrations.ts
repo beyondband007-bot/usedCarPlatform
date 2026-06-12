@@ -65,6 +65,42 @@ export const migrations = [
     INDEX idx_generation_tasks_billing_status (billing_status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS video_script_drafts (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    vehicle_name VARCHAR(255) NOT NULL,
+    digital_human_id VARCHAR(80) NOT NULL,
+    reference_material_id VARCHAR(80) NOT NULL,
+    duration_seconds INT NOT NULL DEFAULT 15,
+    output_ratio VARCHAR(16) NOT NULL DEFAULT '9:16',
+    video_resolution VARCHAR(16) NOT NULL DEFAULT '720p',
+    script_text TEXT NOT NULL,
+    final_video_prompt MEDIUMTEXT NOT NULL,
+    required_inputs_json JSON NOT NULL,
+    prompt_bundle_json JSON NOT NULL,
+    risk_notes_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_video_script_drafts_user_created (user_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS digital_human_voices (
+    digital_human_id VARCHAR(80) PRIMARY KEY,
+    voice_id VARCHAR(128) NOT NULL,
+    source_file_id BIGINT NOT NULL,
+    source_file_name VARCHAR(255) NOT NULL,
+    source_mime_type VARCHAR(120) NOT NULL,
+    source_local_path VARCHAR(1024) NOT NULL,
+    model VARCHAR(80) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'ready',
+    created_by_user_id VARCHAR(64) NOT NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_digital_human_voices_voice_id (voice_id),
+    INDEX idx_digital_human_voices_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS batch_tasks (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',

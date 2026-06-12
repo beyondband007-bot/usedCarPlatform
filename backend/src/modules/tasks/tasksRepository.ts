@@ -71,6 +71,8 @@ export interface RecentGenerationRecord extends GenerationTaskRecord {
   batchSortOrder?: number | null;
   batchExteriorCount?: number | null;
   batchInteriorCollage?: boolean;
+  videoVehicleName?: string | null;
+  videoReferenceMaterialId?: string | null;
 }
 
 interface GenerationTaskRow extends RowDataPacket {
@@ -138,6 +140,8 @@ interface RecentGenerationRow extends GenerationTaskRow {
   batch_sort_order: number | null;
   batch_exterior_count: number | null;
   batch_interior_collage: number | null;
+  video_vehicle_name: string | null;
+  video_reference_material_id: string | null;
 }
 
 const mapRow = (row: GenerationTaskRow): GenerationTaskRecord => ({
@@ -202,7 +206,7 @@ const getKieMeta = (responseJson: unknown) => {
   return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : {};
 };
 
-const imageTaskDeadline = (moduleCode: string) => {
+const generationTaskDeadline = (moduleCode: string) => {
   if (moduleCode === "short-video") {
     return {
       deadlineAt: null,
@@ -211,6 +215,12 @@ const imageTaskDeadline = (moduleCode: string) => {
   }
 
   const now = Date.now();
+  if (moduleCode === "video-generation") {
+    return {
+      deadlineAt: new Date(now + env.kie.videoDeadlineMs),
+      softTimeoutAt: null,
+    };
+  }
   return {
     deadlineAt: new Date(now + env.kie.imageDeadlineMs),
     softTimeoutAt: new Date(now + env.kie.imageSoftTimeoutMs),
@@ -250,6 +260,8 @@ const mapRecentRow = (row: RecentGenerationRow): RecentGenerationRecord => ({
       ? null
       : Number(row.batch_exterior_count),
   batchInteriorCollage: parseInteriorCollageFlag(row.batch_interior_collage),
+  videoVehicleName: row.video_vehicle_name,
+  videoReferenceMaterialId: row.video_reference_material_id,
 });
 
 export class TasksRepository extends Repository {
@@ -321,6 +333,8 @@ export class TasksRepository extends Repository {
           bti.item_kind AS batch_item_kind,
           bti.sort_order AS batch_sort_order,
           bt.visual_config_json AS batch_interior_collage,
+          vsd.vehicle_name AS video_vehicle_name,
+          vsd.reference_material_id AS video_reference_material_id,
           (
             SELECT COUNT(*)
             FROM batch_task_items exterior_items
@@ -331,6 +345,9 @@ export class TasksRepository extends Repository {
        LEFT JOIN assets a ON a.id = gt.input_asset_id
        LEFT JOIN batch_task_items bti ON bti.generation_task_id = gt.id
        LEFT JOIN batch_tasks bt ON bt.id = bti.batch_id
+       LEFT JOIN video_script_drafts vsd
+         ON gt.module_code = 'video-generation'
+        AND vsd.id = gt.option_id
        ${where}
        ORDER BY gt.created_at DESC
        LIMIT :limit OFFSET :offset`,
@@ -424,7 +441,7 @@ export class TasksRepository extends Repository {
       input.role ??
       (meta.role === "fallback" ? "fallback" : "primary");
     const attemptNo = input.attemptNo ?? (typeof meta.attemptNo === "number" ? meta.attemptNo : role === "fallback" ? 2 : 1);
-    const deadlines = imageTaskDeadline(
+    const deadlines = generationTaskDeadline(
       (await this.findById(input.id))?.moduleCode ?? "",
     );
 

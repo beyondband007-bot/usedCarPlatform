@@ -40,6 +40,7 @@ export const env = {
   packagesDir: path.resolve(rootDir, process.env.PACKAGES_DIR ?? "storage/packages"),
   sceneRefsDir: path.resolve(rootDir, process.env.SCENE_REFS_DIR ?? "storage/scene-refs"),
   maxUploadMb: toNumber(process.env.MAX_UPLOAD_MB, 20),
+  ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
 
   mysql: {
     host: process.env.MYSQL_HOST ?? "127.0.0.1",
@@ -65,6 +66,7 @@ export const env = {
     model: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
     primaryImageModel: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
     fallbackImageModel: process.env.KIE_FALLBACK_IMAGE_MODEL ?? "nano-banana-2",
+    videoModel: process.env.KIE_VIDEO_MODEL ?? "bytedance/seedance-2",
     fallbackOutputFormat: process.env.KIE_FALLBACK_OUTPUT_FORMAT ?? "jpg",
     fallbackEnabled: toBoolean(process.env.KIE_FALLBACK_ENABLED, true),
     uploadTimeoutMs: toNumber(process.env.KIE_UPLOAD_TIMEOUT_MS, 30_000),
@@ -76,6 +78,7 @@ export const env = {
     networkRetryMaxMs: toNumber(process.env.KIE_NETWORK_RETRY_MAX_MS, 4_000),
     imageDeadlineMs: toNumber(process.env.KIE_IMAGE_DEADLINE_MS, 480_000),
     imageSoftTimeoutMs: toNumber(process.env.KIE_IMAGE_SOFT_TIMEOUT_MS, 180_000),
+    videoDeadlineMs: toNumber(process.env.KIE_VIDEO_DEADLINE_MS, 1_200_000),
     pollFailureLimit: toNumber(process.env.KIE_POLL_FAILURE_LIMIT, 3),
   },
 
@@ -85,6 +88,15 @@ export const env = {
     model: process.env.DEEPSEEK_MODEL ?? "deepseek-v4-pro",
     timeoutMs: toNumber(process.env.DEEPSEEK_TIMEOUT_MS, 30_000),
     maxTokens: toNumber(process.env.DEEPSEEK_MAX_TOKENS, 2000),
+  },
+
+  minimax: {
+    apiKey: process.env.MINIMAX_API_KEY ?? "",
+    baseUrl: (process.env.MINIMAX_BASE_URL ?? "https://api.minimaxi.com").replace(/\/$/, ""),
+    speechModel: process.env.MINIMAX_SPEECH_MODEL ?? "speech-2.8-hd",
+    timeoutMs: toNumber(process.env.MINIMAX_TIMEOUT_MS, 60_000),
+    maxCloneAudioMb: toNumber(process.env.MINIMAX_MAX_CLONE_AUDIO_MB, 20),
+    targetAudioDurationMs: toNumber(process.env.MINIMAX_TARGET_AUDIO_DURATION_MS, 14_500),
   },
 
   credits: {

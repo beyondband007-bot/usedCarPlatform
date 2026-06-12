@@ -28,6 +28,7 @@ export const errors = {
   batchNotFound: () => new AppError(404, 40403, "batch task not found"),
   packageNotFound: () => new AppError(404, 40404, "delivery package not found"),
   creativeConversationNotFound: () => new AppError(404, 40405, "creative conversation not found"),
+  videoScriptDraftNotFound: () => new AppError(404, 40406, "video script draft not found"),
   billingUnavailable: (message = "credits platform is unavailable", details?: unknown) =>
     new AppError(502, 50201, message, details),
   billingRejected: (statusCode: number, message = "credits platform rejected the request", details?: unknown) =>
