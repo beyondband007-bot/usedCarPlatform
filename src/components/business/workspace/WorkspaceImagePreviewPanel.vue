@@ -34,6 +34,19 @@ const stripRef = ref<HTMLElement | null>(null);
 const isImageLoading = ref(true);
 const currentIndex = ref(0);
 let wheelLockTimer: number | null = null;
+const isThumbSelectSuppressed = ref(false);
+let thumbSelectSuppressTimer: number | null = null;
+
+function suppressThumbSelection(durationMs = 280) {
+  isThumbSelectSuppressed.value = true;
+  if (thumbSelectSuppressTimer !== null) {
+    window.clearTimeout(thumbSelectSuppressTimer);
+  }
+  thumbSelectSuppressTimer = window.setTimeout(() => {
+    isThumbSelectSuppressed.value = false;
+    thumbSelectSuppressTimer = null;
+  }, durationMs);
+}
 
 const galleryItems = computed(() =>
   props.gallery?.length ? props.gallery : [props.preview],
@@ -172,10 +185,12 @@ function handleStripWheel(event: WheelEvent) {
 
   event.preventDefault();
   event.stopPropagation();
+  suppressThumbSelection(360);
   strip.scrollLeft += delta;
 }
 
 function handleThumbHover(index: number) {
+  if (isThumbSelectSuppressed.value) return;
   goToImage(index);
 }
 
@@ -194,6 +209,8 @@ function handleGalleryWheel(event: WheelEvent) {
   event.preventDefault();
 
   if (wheelLockTimer !== null) return;
+
+  suppressThumbSelection();
 
   if (delta > 0) {
     showNextImage();
@@ -234,6 +251,9 @@ onUnmounted(() => {
   previewBodyRef.value?.removeEventListener("wheel", handleGalleryWheel);
   if (wheelLockTimer !== null) {
     window.clearTimeout(wheelLockTimer);
+  }
+  if (thumbSelectSuppressTimer !== null) {
+    window.clearTimeout(thumbSelectSuppressTimer);
   }
 });
 

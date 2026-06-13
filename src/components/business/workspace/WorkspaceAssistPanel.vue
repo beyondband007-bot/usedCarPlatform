@@ -13,6 +13,7 @@ import SceneTemplateRecommendations, {
 } from "@/components/business/workspace/SceneTemplateRecommendations.vue";
 import ShortVideoBetaPanel from "@/components/business/workspace/ShortVideoBetaPanel.vue";
 import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
+import WorkspaceDeliveryAssetCard from "@/components/business/workspace/WorkspaceDeliveryAssetCard.vue";
 import WorkspaceTutorialGuide from "@/components/business/workspace/WorkspaceTutorialGuide.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import WorkspaceGenerateResultPanel from "@/components/business/workspace/WorkspaceGenerateResultPanel.vue";
@@ -1116,89 +1117,16 @@ defineExpose({
         </div>
       </header>
 
-      <div class="delivery-group-grid">
-        <article
+      <div class="delivery-group-grid recent-layout recent-layout--flow">
+        <WorkspaceDeliveryAssetCard
           v-for="asset in deliveryTaskPreview.assets"
           :key="asset.id"
-          class="delivery-group-card"
-          :class="{
-            'is-clickable':
-              asset.status === 'ready' || Boolean(asset.generationTaskId),
-          }"
-          :role="
-            asset.status === 'ready' || asset.generationTaskId
-              ? 'button'
-              : undefined
+          :asset="asset"
+          :clickable="
+            asset.status === 'ready' || Boolean(asset.generationTaskId)
           "
-          :tabindex="
-            asset.status === 'ready' || asset.generationTaskId ? 0 : undefined
-          "
-          :aria-label="
-            asset.status === 'ready'
-              ? `查看大图：${asset.title}`
-              : asset.generationTaskId
-                ? `查看生成进度：${asset.title}`
-                : `${asset.title}，${asset.pendingStatusText ?? '生成中'}`
-          "
-          @click="handleDeliveryGroupAssetPick(asset)"
-          @keydown.enter.prevent="handleDeliveryGroupAssetPick(asset)"
-          @keydown.space.prevent="handleDeliveryGroupAssetPick(asset)"
-        >
-          <div
-            class="delivery-group-media"
-            :class="{ 'is-pending': asset.status === 'pending' }"
-          >
-            <PreloadImage
-              v-if="asset.thumbnailUrl"
-              class="delivery-group-image"
-              :src="asset.thumbnailUrl"
-              :alt="asset.title"
-              loading="lazy"
-              decoding="async"
-              fetchpriority="low"
-              :draggable="false"
-              fit="cover"
-              object-position="center"
-            />
-            <div v-else class="delivery-group-pending" aria-hidden="true">
-              <span class="delivery-group-pending-scan"></span>
-              <Icon icon="mdi:image-sync-outline" />
-              <strong>{{ asset.pendingStatusText ?? "生成中" }}</strong>
-            </div>
-            <span
-              v-if="asset.status === 'pending'"
-              class="delivery-slot-status"
-            >
-              {{ asset.pendingStatusText ?? "生成中" }}
-            </span>
-          </div>
-          <footer class="delivery-group-foot">
-            <div>
-              <strong
-                class="delivery-ellipsis-text"
-                :data-tooltip="asset.title"
-                :title="asset.title"
-                >{{ asset.title }}</strong
-              >
-              <span>{{ asset.ratio }}</span>
-              <span v-if="asset.createdAt" class="delivery-group-time">{{
-                asset.createdAt
-              }}</span>
-            </div>
-            <a
-              v-if="asset.status === 'ready' && asset.imageUrl"
-              class="delivery-group-download"
-              :href="asset.imageUrl"
-              download
-              target="_blank"
-              rel="noreferrer"
-              aria-label="下载成片"
-              @click.stop
-            >
-              <Icon icon="mdi:download" />
-            </a>
-          </footer>
-        </article>
+          @pick="handleDeliveryGroupAssetPick"
+        />
       </div>
     </section>
 
@@ -1760,8 +1688,8 @@ defineExpose({
     --workspace-muted,
     var(--app-text-muted, var(--app-text-soft))
   );
-  --assist-blue: var(--workspace-accent, #2f6bff);
-  --assist-green: var(--workspace-accent-strong, #2f6bff);
+  --assist-blue: var(--workspace-accent, #d4a017);
+  --assist-green: var(--workspace-accent-strong, #ffb800);
   --assist-shadow: var(
     --workspace-shadow,
     0 14px 34px rgba(78, 111, 148, 0.09)
@@ -1785,9 +1713,17 @@ defineExpose({
 
 .assist-short-video-shell {
   display: flex;
+  width: 100%;
   min-height: 0;
   flex: 1;
+  flex-direction: column;
   margin: -18px -20px -20px;
+}
+
+.assist-short-video-shell > :deep(*) {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
 }
 
 .delivery-group-preview {
@@ -1917,96 +1853,16 @@ defineExpose({
 }
 
 .delivery-group-grid {
-  --delivery-group-columns: 4;
-  display: grid;
   flex: 1;
   min-height: 0;
-  align-content: start;
-  gap: 16px;
-  grid-template-columns: repeat(var(--delivery-group-columns), minmax(0, 1fr));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 6px 20px 0;
+  padding: 2px 2px 20px 0;
 }
 
-@media (max-width: 1180px) {
-  .delivery-group-grid {
-    --delivery-group-columns: 3;
-  }
-}
-
-@media (max-width: 860px) {
-  .delivery-group-grid {
-    --delivery-group-columns: 2;
-  }
-}
-
-.delivery-group-card {
-  display: flex;
-  min-width: 0;
-  overflow: hidden;
-  flex-direction: column;
-  border: 1px solid var(--assist-border);
-  border-radius: 12px;
-  background: var(--assist-card);
-  box-shadow: var(--assist-shadow);
-}
-
-.delivery-group-card.is-clickable {
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-
-.delivery-group-card.is-clickable:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--assist-blue) 42%,
-    var(--assist-border)
-  );
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--assist-blue) 12%, transparent),
-    var(--assist-shadow);
-  transform: translateY(-1px);
-}
-
-.delivery-group-card.is-clickable:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--assist-blue) 55%, transparent);
-  outline-offset: 2px;
-}
-
-.delivery-group-media {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  background: var(--assist-card-strong);
-}
-
-.delivery-group-media.is-pending {
-  border-bottom: 1px dashed
-    color-mix(in srgb, var(--assist-border) 88%, transparent);
-}
-
-.delivery-slot-status {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, #111 72%, transparent);
-  color: #ffd75a;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  backdrop-filter: blur(6px);
+.delivery-group-grid.recent-layout--flow {
+  align-content: start;
 }
 
 .delivery-group-pending {
@@ -2053,79 +1909,6 @@ defineExpose({
   100% {
     transform: translateY(100%);
   }
-}
-
-.delivery-group-time {
-  display: block;
-  margin-top: 4px;
-  color: var(--assist-muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.delivery-group-image,
-.delivery-group-image :deep(.preload-image),
-.delivery-group-image :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-}
-
-.delivery-group-foot {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px 12px;
-}
-
-.delivery-group-foot div {
-  min-width: 0;
-  position: relative;
-}
-
-.delivery-group-foot strong.delivery-ellipsis-text {
-  color: var(--assist-text);
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1.35;
-}
-
-.delivery-group-foot span {
-  display: block;
-  margin-top: 4px;
-  color: var(--assist-muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.delivery-group-download {
-  display: grid;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 10px;
-  background: color-mix(
-    in srgb,
-    var(--assist-blue) 10%,
-    var(--assist-card-strong)
-  );
-  color: var(--assist-blue);
-  font-size: 18px;
-  text-decoration: none;
-  transition:
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-
-.delivery-group-download:hover {
-  background: color-mix(
-    in srgb,
-    var(--assist-blue) 16%,
-    var(--assist-card-strong)
-  );
-  transform: translateY(-1px);
 }
 
 .assist-tabs {

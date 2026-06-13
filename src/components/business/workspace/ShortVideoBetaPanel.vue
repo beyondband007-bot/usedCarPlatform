@@ -835,10 +835,10 @@ watch(
   --sv-border: #e1eaf5;
   --sv-text: #111827;
   --sv-text-soft: #64748b;
-  --sv-accent: var(--workspace-accent, #2f6bff);
+  --sv-accent: var(--workspace-accent, #d4a017);
   --sv-accent-soft: color-mix(
     in srgb,
-    var(--workspace-accent, #2f6bff) 12%,
+    var(--workspace-accent, #d4a017) 12%,
     transparent
   );
   --sv-input-bg: #ffffff;
@@ -891,16 +891,18 @@ watch(
   flex: 1;
   flex-direction: column;
   gap: 12px;
-  padding-top: 16px;
+  padding-top: 12px;
 }
 
 .sv-primary-tabs {
   display: inline-flex;
   flex-shrink: 0;
   gap: 6px;
+  align-items: center;
   align-self: flex-start;
+  min-height: 32px;
   margin-inline: 16px;
-  padding: 4px;
+  padding: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
 }
@@ -910,7 +912,7 @@ watch(
   border-radius: 999px;
   background: transparent;
   color: var(--sv-text-soft);
-  padding: 8px 14px;
+  padding: 6px 14px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 800;
@@ -1067,6 +1069,25 @@ watch(
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.sv-template-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sv-template-grid::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.sv-beta-panel.theme-dark .sv-template-grid {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.sv-beta-panel.theme-dark .sv-template-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .sv-recent-panel {
@@ -1075,6 +1096,25 @@ watch(
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 16px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.sv-recent-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sv-recent-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.sv-beta-panel.theme-dark .sv-recent-panel {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.sv-beta-panel.theme-dark .sv-recent-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .sv-recent-flow {

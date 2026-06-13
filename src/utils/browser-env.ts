@@ -8,12 +8,6 @@ export const isH5ViewportRef = ref(
   typeof window !== 'undefined' ? window.matchMedia(H5_MEDIA_QUERY).matches : false,
 )
 
-let viewportThemeSync: (() => void) | null = null
-
-export function registerViewportThemeSync(sync: () => void) {
-  viewportThemeSync = sync
-}
-
 export function isWeChatBrowser(userAgent = navigator.userAgent) {
   return WECHAT_UA.test(userAgent)
 }
@@ -39,7 +33,6 @@ function updateMobileClass() {
   const isMobile = isH5Viewport()
   isH5ViewportRef.value = isMobile
   document.documentElement.classList.toggle('is-mobile', isMobile)
-  viewportThemeSync?.()
 }
 
 function resumeWeChatAutoplayVideos() {

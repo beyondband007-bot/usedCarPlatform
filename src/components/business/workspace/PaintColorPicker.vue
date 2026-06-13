@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { NPopover } from "naive-ui";
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import {
   findPaintColorByHex,
   paintColorOptions,
 } from "@/constants/paint-colors";
+import { useAppStore } from "@/stores/app";
+import { isH5ViewportRef } from "@/utils/browser-env";
 
 const props = defineProps<{
   modelValue?: string;
@@ -14,6 +16,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:modelValue": [value: string];
 }>();
+
+const appStore = useAppStore();
 
 function normalizeHex(value: string) {
   const trimmed = value.trim();
@@ -49,6 +53,20 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => appStore.isDarkMode,
+  () => {
+    showPanel.value = false;
+  },
+);
+
+watch(
+  () => isH5ViewportRef.value,
+  () => {
+    showPanel.value = false;
+  },
+);
+
 function handleColorUpdate(value: string) {
   colorValue.value = value ? normalizeHex(value) : "";
   emit("update:modelValue", colorValue.value);
@@ -67,6 +85,18 @@ function handleClear() {
 function isSelected(optionHex: string) {
   return normalizeHex(optionHex) === displayHex.value;
 }
+
+function handleViewportChange() {
+  showPanel.value = false;
+}
+
+onMounted(() => {
+  window.addEventListener("resize", handleViewportChange, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleViewportChange);
+});
 </script>
 
 <template>
@@ -99,6 +129,7 @@ function isSelected(optionHex: string) {
         trigger="click"
         placement="bottom-start"
         :show-arrow="false"
+        :animated="false"
         raw
         class="paint-color-popover"
       >
@@ -151,16 +182,40 @@ function isSelected(optionHex: string) {
 </template>
 
 <style scoped lang="scss">
-.paint-color-card {
-  padding: 16px 18px 18px;
-  border: 1px solid var(--workspace-line, var(--app-border));
-  border-radius: 12px;
-  background: var(--workspace-panel, var(--app-surface));
-  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(15, 23, 42, 0.08));
+:global(html[data-theme="light"]) .paint-color-card,
+:global(html[data-theme="light"]) .paint-color-panel {
+  --paint-picker-surface: #ffffff;
+  --paint-picker-border: #d6e0ed;
+  --paint-picker-text: #172033;
+  --paint-picker-text-soft: #64748b;
+  --paint-picker-hover-bg: rgba(15, 23, 42, 0.04);
+  --paint-picker-selected-border: #d4a017;
+  --paint-picker-selected-bg: rgba(212, 160, 23, 0.08);
+  --paint-picker-focus-ring: rgba(212, 160, 23, 0.16);
 }
 
-:global([data-theme="dark"]) .paint-color-card {
-  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(0, 0, 0, 0.28));
+:global(html[data-theme="dark"]) .paint-color-card,
+:global(html[data-theme="dark"]) .paint-color-panel {
+  --paint-picker-surface: #151515;
+  --paint-picker-border: rgba(255, 255, 255, 0.12);
+  --paint-picker-text: #f8fafc;
+  --paint-picker-text-soft: #94a3b8;
+  --paint-picker-hover-bg: rgba(255, 255, 255, 0.05);
+  --paint-picker-selected-border: rgba(255, 255, 255, 0.72);
+  --paint-picker-selected-bg: rgba(255, 255, 255, 0.08);
+  --paint-picker-focus-ring: rgba(255, 255, 255, 0.14);
+}
+
+:global(html[data-theme="dark"]) .paint-color-panel {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.paint-color-card {
+  padding: 16px 18px 18px;
+  border: 1px solid var(--paint-picker-border, var(--workspace-line, var(--app-border)));
+  border-radius: 12px;
+  background: var(--paint-picker-surface, var(--workspace-panel, var(--app-surface)));
+  box-shadow: var(--workspace-shadow, 0 18px 60px rgba(15, 23, 42, 0.08));
 }
 
 .paint-color-head {
@@ -169,7 +224,7 @@ function isSelected(optionHex: string) {
 
 .paint-color-title {
   margin: 0;
-  color: var(--app-text);
+  color: var(--paint-picker-text, var(--app-text));
   font-size: 17px;
   font-weight: 900;
   line-height: 1.3;
@@ -178,7 +233,7 @@ function isSelected(optionHex: string) {
 .paint-color-subtitle {
   margin: 6px 0 0;
   max-width: 420px;
-  color: var(--app-text-soft);
+  color: var(--paint-picker-text-soft, var(--app-text-soft));
   font-size: 12px;
   font-weight: 600;
   line-height: 1.55;
@@ -198,7 +253,7 @@ function isSelected(optionHex: string) {
 
 .paint-color-field-label {
   margin: 0;
-  color: var(--app-text);
+  color: var(--paint-picker-text, var(--app-text));
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
@@ -208,7 +263,7 @@ function isSelected(optionHex: string) {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--app-text-soft);
+  color: var(--paint-picker-text-soft, var(--app-text-soft));
   font: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -219,7 +274,7 @@ function isSelected(optionHex: string) {
 }
 
 .paint-color-clear:hover {
-  color: var(--app-text);
+  color: var(--paint-picker-text, var(--app-text));
 }
 
 .paint-color-trigger {
@@ -227,25 +282,17 @@ function isSelected(optionHex: string) {
   width: 100%;
   min-height: 34px;
   padding: 0;
-  border: 1px solid var(--workspace-line, var(--app-border));
+  border: 1px solid var(--paint-picker-border, var(--workspace-line, var(--app-border)));
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
   overflow: hidden;
-  transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
 }
 
 .paint-color-trigger:hover,
 .paint-color-trigger:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--workspace-accent, #efc24c) 55%,
-    var(--workspace-line, var(--app-border))
-  );
-  box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, transparent);
+  border-color: var(--paint-picker-selected-border);
+  box-shadow: 0 0 0 3px var(--paint-picker-focus-ring);
   outline: none;
 }
 
@@ -271,15 +318,11 @@ function isSelected(optionHex: string) {
   width: min(420px, calc(100vw - 32px));
   max-height: min(420px, calc(100vh - 120px));
   padding: 14px;
-  border: 1px solid var(--workspace-line, #e1eaf5);
+  border: 1px solid var(--paint-picker-border, #d6e0ed);
   border-radius: 12px;
-  background: var(--workspace-panel, #ffffff);
+  background: var(--paint-picker-surface, #ffffff);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
   overflow: hidden;
-}
-
-:global([data-theme="dark"]) .paint-color-panel {
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
 }
 
 .paint-color-panel-head {
@@ -289,11 +332,11 @@ function isSelected(optionHex: string) {
   gap: 12px;
   margin-bottom: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--workspace-line, #e1eaf5);
+  border-bottom: 1px solid var(--paint-picker-border, #d6e0ed);
 }
 
 .paint-color-panel-head strong {
-  color: var(--app-text);
+  color: var(--paint-picker-text, var(--app-text));
   font-size: 14px;
   font-weight: 900;
 }
@@ -317,28 +360,15 @@ function isSelected(optionHex: string) {
   background: transparent;
   cursor: pointer;
   text-align: center;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.2s ease;
 }
 
 .paint-color-option:hover {
-  background: color-mix(
-    in srgb,
-    var(--workspace-accent, #efc24c) 8%,
-    transparent
-  );
-  transform: translateY(-1px);
+  background: var(--paint-picker-hover-bg);
 }
 
 .paint-color-option.is-selected {
-  border-color: var(--workspace-accent, #efc24c);
-  background: color-mix(
-    in srgb,
-    var(--workspace-accent, #efc24c) 12%,
-    transparent
-  );
+  border-color: var(--paint-picker-selected-border);
+  background: var(--paint-picker-selected-bg);
 }
 
 .paint-color-option-swatch {
@@ -351,14 +381,14 @@ function isSelected(optionHex: string) {
 }
 
 .paint-color-option-name {
-  color: var(--app-text);
+  color: var(--paint-picker-text, var(--app-text));
   font-size: 11px;
   font-weight: 800;
   line-height: 1.25;
 }
 
 .paint-color-option-hex {
-  color: var(--app-text-soft);
+  color: var(--paint-picker-text-soft, var(--app-text-soft));
   font-size: 10px;
   font-weight: 700;
   line-height: 1.2;
