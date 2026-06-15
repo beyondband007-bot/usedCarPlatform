@@ -18,21 +18,21 @@ function createEmptyEntry(): RecentGenerateCacheEntry {
   }
 }
 
-export const useRecentGenerateStore = defineStore('recentGenerate', () => {
-  const caches = ref<Record<RecentGenerateModuleKey, RecentGenerateCacheEntry>>(
-    {
-      showroom: createEmptyEntry(),
-      outdoor: createEmptyEntry(),
-      motion: createEmptyEntry(),
-      sky: createEmptyEntry(),
-      polish: createEmptyEntry(),
-      clean: createEmptyEntry(),
-      batch: createEmptyEntry(),
-      delivery: createEmptyEntry(),
-    },
-  )
+function createEmptyCaches(): Record<RecentGenerateModuleKey, RecentGenerateCacheEntry> {
+  return {
+    showroom: createEmptyEntry(),
+    outdoor: createEmptyEntry(),
+    motion: createEmptyEntry(),
+    sky: createEmptyEntry(),
+    polish: createEmptyEntry(),
+    clean: createEmptyEntry(),
+    batch: createEmptyEntry(),
+    delivery: createEmptyEntry(),
+  }
+}
 
-  const returningFromDetail = ref<Record<RecentGenerateModuleKey, boolean>>({
+function createReturningState(): Record<RecentGenerateModuleKey, boolean> {
+  return {
     showroom: false,
     outdoor: false,
     motion: false,
@@ -41,7 +41,17 @@ export const useRecentGenerateStore = defineStore('recentGenerate', () => {
     clean: false,
     batch: false,
     delivery: false,
-  })
+  }
+}
+
+export const useRecentGenerateStore = defineStore('recentGenerate', () => {
+  const caches = ref<Record<RecentGenerateModuleKey, RecentGenerateCacheEntry>>(
+    createEmptyCaches(),
+  )
+
+  const returningFromDetail = ref<Record<RecentGenerateModuleKey, boolean>>(
+    createReturningState(),
+  )
 
   function getCache(key: RecentGenerateModuleKey) {
     return caches.value[key]
@@ -93,6 +103,11 @@ export const useRecentGenerateStore = defineStore('recentGenerate', () => {
     return Date.now() - entry.lastFetchTime > staleMs
   }
 
+  function reset() {
+    caches.value = createEmptyCaches()
+    returningFromDetail.value = createReturningState()
+  }
+
   return {
     caches,
     getCache,
@@ -102,5 +117,6 @@ export const useRecentGenerateStore = defineStore('recentGenerate', () => {
     markReturningFromDetail,
     consumeReturningFromDetail,
     isCacheStale,
+    reset,
   }
 })

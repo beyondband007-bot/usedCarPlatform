@@ -7,15 +7,20 @@ import {
   logout as apiLogout,
   type LoginWithCodeRequest,
 } from '@/api/auth'
-import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
+import { readMockStorage, writeMockStorage } from '@/mock/mock-storage'
 import { clearWorkspaceLogoCache } from '@/composables/useWorkspaceLogo'
+import { useCreditsStore } from '@/stores/credits'
+import { usePointsStore } from '@/stores/points'
+import { useRecentGenerateStore } from '@/stores/recentGenerate'
+import { useRechargeStore } from '@/stores/recharge'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
 import { resetCreditsIdentity, setCreditsIdentity } from '@/utils/credits-identity'
+import { clearAccountPersistentCache } from '@/utils/workspace-session-cache'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
 const USER_KEY = 'ai-car-studio:user-info'
-const SUBSCRIPTION_STATE_KEY = 'ai-car-studio:subscription-state'
+const POINTS_SUMMARY_KEY = 'ai-car-studio:points-summary'
 
 interface AuthState {
   token: string
@@ -29,7 +34,7 @@ interface AuthState {
 function readPointsText() {
   if (typeof window === 'undefined') return '100,000'
 
-  const raw = window.localStorage.getItem('ai-car-studio:points-summary')
+  const raw = window.localStorage.getItem(POINTS_SUMMARY_KEY)
   if (!raw) return '100,000'
 
   try {
@@ -48,11 +53,6 @@ function readToken() {
 function writeToken(token: string) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(TOKEN_KEY, token)
-}
-
-function removeToken() {
-  if (typeof window === 'undefined') return
-  window.localStorage.removeItem(TOKEN_KEY)
 }
 
 function syncCreditsIdentity(userInfo: UserInfo) {
@@ -163,11 +163,14 @@ export const useAuthStore = defineStore('auth', {
       this.role = null
       this.permissions = []
 
-      removeToken()
-      removeMockStorage(USER_KEY)
-      removeMockStorage(SUBSCRIPTION_STATE_KEY)
+      clearAccountPersistentCache()
       clearWorkspaceLogoCache()
       resetCreditsIdentity()
+      useRecentGenerateStore().reset()
+      useSubscriptionStore().reset()
+      usePointsStore().reset()
+      useRechargeStore().reset()
+      useCreditsStore().reset()
     },
     async refreshUserInfo() {
       if (!this.token) return null

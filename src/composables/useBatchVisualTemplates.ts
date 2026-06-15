@@ -13,9 +13,6 @@ import { resolveSceneReferenceImageUrl } from '@/utils/scene-reference-url'
 
 const NEW_PRESET_VALUE = '__new__'
 
-const templates = ref<BatchVisualTemplate[]>([])
-const isLoading = ref(false)
-const isReady = ref(false)
 const allLogoPlacements: LogoPlacement[] = ['plate', 'wall']
 
 function normalizeLogoPlacements(
@@ -69,38 +66,41 @@ function mapInteriorFlags(config: BatchVisualConfig) {
   }
 }
 
-async function ensureLoaded() {
-  if (isReady.value || isLoading.value) return
-  isLoading.value = true
-
-  try {
-    const result = await getBatchPresets()
-    templates.value = result.items.map((item) => ({
-      id: item.presetId,
-      name: item.name,
-      enableSceneChange: item.visualConfig.enableSceneChange,
-      sceneIndex: item.visualConfig.sceneIndex,
-      sceneCategory: item.visualConfig.sceneCategory,
-      outputRatio: item.visualConfig.outputRatio,
-      useRecentLogo: item.visualConfig.useRecentLogo,
-      logoPlacements: normalizeLogoPlacements(
-        item.visualConfig.logoPlacements,
-        item.visualConfig.useRecentLogo,
-      ),
-      lightConsistency: item.visualConfig.enableLightConsistency,
-      paintRefresh: item.visualConfig.enablePaintRefresh,
-      colorCode: item.visualConfig.colorCode ?? null,
-      ...mapInteriorFlags(item.visualConfig),
-      updatedAt: item.updatedAt,
-    }))
-    isReady.value = true
-  } finally {
-    isLoading.value = false
-  }
-}
-
 export function useBatchVisualTemplates() {
+  const templates = ref<BatchVisualTemplate[]>([])
+  const isLoading = ref(false)
+  const isReady = ref(false)
   const presetOptions = computed(() => templates.value)
+
+  async function ensureLoaded() {
+    if (isReady.value || isLoading.value) return
+    isLoading.value = true
+
+    try {
+      const result = await getBatchPresets()
+      templates.value = result.items.map((item) => ({
+        id: item.presetId,
+        name: item.name,
+        enableSceneChange: item.visualConfig.enableSceneChange,
+        sceneIndex: item.visualConfig.sceneIndex,
+        sceneCategory: item.visualConfig.sceneCategory,
+        outputRatio: item.visualConfig.outputRatio,
+        useRecentLogo: item.visualConfig.useRecentLogo,
+        logoPlacements: normalizeLogoPlacements(
+          item.visualConfig.logoPlacements,
+          item.visualConfig.useRecentLogo,
+        ),
+        lightConsistency: item.visualConfig.enableLightConsistency,
+        paintRefresh: item.visualConfig.enablePaintRefresh,
+        colorCode: item.visualConfig.colorCode ?? null,
+        ...mapInteriorFlags(item.visualConfig),
+        updatedAt: item.updatedAt,
+      }))
+      isReady.value = true
+    } finally {
+      isLoading.value = false
+    }
+  }
 
   function getTemplateById(id: string) {
     return templates.value.find((item) => item.id === id)

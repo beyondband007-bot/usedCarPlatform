@@ -1,10 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { AUTH_ROUTE } from '@/constants/app-flow'
-import {
-  hasPlayedIntroVideoThisSession,
-  resetIntroVideoOnHardReload,
-} from '@/constants/intro-video'
 import { useAuthStore } from '@/stores/auth'
 
 import { routes } from './routes'
@@ -27,7 +23,7 @@ function resolveRedirectPath(redirect: unknown, fallback: string) {
 function resolveAuthenticatedRedirectPath(redirect: unknown, fallback: string) {
   const path = resolveRedirectPath(redirect, fallback)
 
-  if (path === AUTH_ROUTE || path === '/enterprise' || path === '/intro-video') {
+  if (path === AUTH_ROUTE || path === '/enterprise') {
     return fallback
   }
 
@@ -56,10 +52,6 @@ router.beforeEach(async (to) => {
     .find((permission): permission is string => typeof permission === 'string')
 
   if (authStore.isLoggedIn) {
-    if (to.path === '/intro-video') {
-      return resolveAuthenticatedRedirectPath(to.query.redirect, '/workspace')
-    }
-
     if (guestOnly) {
       if (isBackOfficeRoute) {
         return authStore.permissions.includes('menu:admin') ? '/back-office' : true
@@ -82,8 +74,6 @@ router.beforeEach(async (to) => {
     return true
   }
 
-  resetIntroVideoOnHardReload()
-
   if (requiresAuth) {
     if (isBackOfficeRoute) {
       return {
@@ -100,13 +90,6 @@ router.beforeEach(async (to) => {
         redirect: to.fullPath,
       },
     }
-  }
-
-  const hasPlayedIntroVideo = hasPlayedIntroVideoThisSession()
-  const hideIntroVideo = to.matched.some((record) => record.meta.hideIntroVideo)
-
-  if (!hasPlayedIntroVideo && !hideIntroVideo) {
-    return '/intro-video'
   }
 
   if (!requiresAuth) {

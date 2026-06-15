@@ -54,6 +54,13 @@ export const useRechargeStore = defineStore('recharge', () => {
     return result
   }
 
+  function reset() {
+    orders.value = []
+    activeOrder.value = null
+    qrCodeUrl.value = ''
+    polling.value = false
+  }
+
   return {
     orders,
     activeOrder,
@@ -63,5 +70,6 @@ export const useRechargeStore = defineStore('recharge', () => {
     hydrate,
     createRechargeOrder,
     pollActiveOrder,
+    reset,
   }
 })

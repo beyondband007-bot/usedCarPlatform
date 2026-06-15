@@ -75,6 +75,14 @@ export const mediaUrls = {
   },
   workspace: {
     showroom: {
+      sceneClassicWhite:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmzldg3i4pn8kbxDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneGlassHall:
+        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7w2k4md85k7mx2kDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneLuxuryDark:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmt5my1lmpn5lygDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneSoftTopLight:
+        'https://vip.123pan.cn/1849524247/ymjew503t0n000ddy7w8j8l064k7o12vDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialStepUpload:
         'https://vip.123pan.cn/1849524247/ymjew503t0l000ddyguyv3gyhoofvz1jDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialStepTemplate01:
@@ -132,6 +140,14 @@ export const mediaUrls = {
         'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjy8iz5j9xtvtxneDIYxBIJvAdixAvxzBIUzAIr=.png',
     },
     outdoor: {
+      sceneTreePark:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneMountainLake:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyboa0qamynpnt1z8DIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneCityBlock:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybo4mc19qipnsx41DIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneCoastCity:
+        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7xb5scpo6k88m3eDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialTreePark:
         'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygup71wh4gofpofgDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialMountainLake:
@@ -142,6 +158,14 @@ export const mediaUrls = {
         'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjwvc8sy5ptv7iqyDIYxBIJvAdixAvxzBIUzAIr=.png',
     },
     sky: {
+      sceneMirrorField:
+        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7wt7tz9adk7y9bsDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneSunsetDrive:
+        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7wwfo8bmfk7z8blDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneCloudSeaStage:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybnnhxeyk0pnkuvcDIYxBIJvAdixAvxzBIUzAIr=.png',
+      sceneCloudParking:
+        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddybnoit1y2xpnlni5DIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialMirrorField:
         'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjx9ld3ftjtvfaxaDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialSunsetDrive:

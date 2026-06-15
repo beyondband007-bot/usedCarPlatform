@@ -158,7 +158,6 @@ const paintColorCode = ref("");
 const batchPaintColorCode = ref("");
 const outputRatio = ref<string>(DEFAULT_GENERATION_OUTPUT_RATIO);
 const batchTab = ref<"create" | "visual">("create");
-const DRAFT_CREATE_PRESET_VALUE = "__draft__";
 const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
   name: "",
   enableSceneChange: false,
@@ -173,7 +172,6 @@ const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
   interiorEnhance: false,
   interiorCollage: false,
 };
-const draftCreateTemplate = ref<BatchVisualTemplate | null>(null);
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
 const batchSceneIndex = ref(0);
@@ -550,21 +548,7 @@ const presetComboboxOptions = computed<PresetComboboxOption[]>(() =>
 );
 
 const createPresetOptions = computed(() => {
-  const options = visualTemplates.value.map(toPresetSelectOption);
-  if (
-    draftCreateTemplate.value &&
-    createTaskPresetId.value === DRAFT_CREATE_PRESET_VALUE
-  ) {
-    return [
-      {
-        label: `${draftCreateTemplate.value.name}（未保存）`,
-        value: DRAFT_CREATE_PRESET_VALUE,
-        template: draftCreateTemplate.value,
-      },
-      ...options,
-    ];
-  }
-  return options;
+  return visualTemplates.value.map(toPresetSelectOption);
 });
 
 function setPresetDeleting(id: string, deleting: boolean) {
@@ -643,7 +627,7 @@ function renderPresetOptionLabel(option: {
   const template = option.template;
   const label = String(option.label ?? "");
 
-  if (!template || template.id === DRAFT_CREATE_PRESET_VALUE) {
+  if (!template) {
     return h("span", { class: "preset-select-option-name" }, label);
   }
 
@@ -696,19 +680,11 @@ function renderPresetOptionLabel(option: {
   ]);
 }
 
-const activeCreateTemplate = computed(() =>
-  createTaskPresetId.value &&
-  createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE
+const effectiveCreateTemplate = computed(() =>
+  createTaskPresetId.value
     ? getTemplateById(createTaskPresetId.value)
     : undefined,
 );
-
-const effectiveCreateTemplate = computed(() => {
-  if (createTaskPresetId.value === DRAFT_CREATE_PRESET_VALUE) {
-    return draftCreateTemplate.value;
-  }
-  return activeCreateTemplate.value;
-});
 
 const showCreateInteriorUpload = computed(() =>
   Boolean(effectiveCreateTemplate.value?.interiorCollage),
@@ -855,42 +831,8 @@ const isVisualConfigDirty = computed(() => {
   return !isSameTemplateInput(current, saved);
 });
 
-function buildDraftTemplate(): BatchVisualTemplate {
-  const input = buildTemplateInput();
-
-  return {
-    id: DRAFT_CREATE_PRESET_VALUE,
-    name: input.name || "未保存配置",
-    enableSceneChange: input.enableSceneChange,
-    sceneIndex: input.sceneIndex,
-    sceneCategory: input.sceneCategory,
-    outputRatio: input.outputRatio,
-    useRecentLogo: input.useRecentLogo,
-    logoPlacements: input.logoPlacements,
-    lightConsistency: input.lightConsistency,
-    paintRefresh: input.paintRefresh,
-    colorCode: input.colorCode ?? null,
-    interiorEnhance: input.interiorEnhance,
-    interiorCollage: input.interiorCollage,
-    updatedAt: "",
-  };
-}
-
-function syncVisualConfigToCreateTab() {
-  draftCreateTemplate.value = buildDraftTemplate();
-  createTaskPresetId.value = DRAFT_CREATE_PRESET_VALUE;
-}
-
 function resolveBatchTaskPresetId() {
-  if (createTaskPresetId.value !== DRAFT_CREATE_PRESET_VALUE) {
-    return createTaskPresetId.value;
-  }
-
-  if (visualPreset.value !== NEW_PRESET_VALUE) {
-    return visualPreset.value;
-  }
-
-  return visualTemplates.value[0]?.id ?? DRAFT_CREATE_PRESET_VALUE;
+  return createTaskPresetId.value;
 }
 
 function mapBatchVisualConfigFromTemplate(
@@ -1061,7 +1003,6 @@ async function handleSaveVisualPreset() {
     }
 
     message.success("视觉配置保存成功");
-    draftCreateTemplate.value = null;
     resetVisualConfigSelection();
   } catch (error) {
     const text =
@@ -1875,15 +1816,13 @@ watch(batchTab, (tab, previousTab) => {
   }
 
   if (tab === "create" && previousTab === "visual") {
-    if (isVisualConfigDirty.value) {
-      syncVisualConfigToCreateTab();
-      return;
-    }
-
-    draftCreateTemplate.value = null;
-    if (visualPreset.value !== NEW_PRESET_VALUE) {
+    if (
+      !isVisualConfigDirty.value &&
+      visualPreset.value !== NEW_PRESET_VALUE
+    ) {
       createTaskPresetId.value = visualPreset.value;
     }
+    resetVisualConfigSelection();
   }
 });
 
@@ -2470,11 +2409,7 @@ defineExpose({
                 </span>
                 <div class="preset-summary-copy">
                   <p>
-                    {{
-                      createTaskPresetId === DRAFT_CREATE_PRESET_VALUE
-                        ? "已套用未保存配置"
-                        : "已套用视觉配置"
-                    }}
+                    已套用视觉配置
                   </p>
                   <strong>{{ effectiveCreateTemplate.name }}</strong>
                 </div>
@@ -2777,15 +2712,6 @@ defineExpose({
                   placeholder="输入或选择预设名称"
                   @select="handlePresetComboboxSelect"
                 />
-                <NButton
-                  type="primary"
-                  size="large"
-                  class="batch-primary-btn"
-                  :loading="isSavingVisualPreset"
-                  @click="handleSaveVisualPreset"
-                >
-                  保存
-                </NButton>
               </div>
             </section>
 
@@ -2948,7 +2874,11 @@ defineExpose({
             size="large"
             block
             class="batch-primary-btn"
-            :loading="batchTab === 'create' && isCreatingBatchTask"
+            :loading="
+              batchTab === 'create'
+                ? isCreatingBatchTask
+                : isSavingVisualPreset
+            "
             :disabled="
               batchTab === 'create' &&
               (!projectName.trim() ||
@@ -4014,7 +3944,7 @@ defineExpose({
 
 .preset-save-row {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
 }

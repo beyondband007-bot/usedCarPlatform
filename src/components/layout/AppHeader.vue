@@ -101,10 +101,10 @@ async function handleRechargeSuccess() {
   await creditsStore.hydrateAccounts();
 }
 
-function handleLogout() {
+async function handleLogout() {
   userMenuOpen.value = false;
-  authStore.logout();
-  router.push("/home");
+  await authStore.logout();
+  await router.push("/home");
 }
 
 function resolveNavPermission(path: string) {

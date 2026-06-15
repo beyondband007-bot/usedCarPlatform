@@ -6,14 +6,18 @@ import type { PointRecord, PointsSummary } from '@/types/points'
 
 import { useSubscriptionStore } from './subscription'
 
-export const usePointsStore = defineStore('points', () => {
-  const summary = ref<PointsSummary>({
+function createEmptySummary(): PointsSummary {
+  return {
     currentPoints: 0,
     freezePoints: 0,
     totalConsume: 0,
     totalRecharge: 0,
     currentRunningTasks: 0,
-  })
+  }
+}
+
+export const usePointsStore = defineStore('points', () => {
+  const summary = ref<PointsSummary>(createEmptySummary())
   const records = ref<PointRecord[]>([])
   const initialized = ref(false)
 
@@ -46,6 +50,12 @@ export const usePointsStore = defineStore('points', () => {
     summary.value.currentRunningTasks = count
   }
 
+  function reset() {
+    summary.value = createEmptySummary()
+    records.value = []
+    initialized.value = false
+  }
+
   return {
     summary,
     records,
@@ -55,5 +65,6 @@ export const usePointsStore = defineStore('points', () => {
     applyRecharge,
     applyConsume,
     setRunningTasks,
+    reset,
   }
 })

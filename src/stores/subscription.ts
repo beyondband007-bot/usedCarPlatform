@@ -69,6 +69,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     writeState(next)
   }
 
+  function reset() {
+    snapshot.value = null
+    initialized.value = false
+  }
+
   return {
     snapshot,
     initialized,
@@ -83,5 +88,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     hydrate,
     activatePlan,
     applySubscriptionSnapshot,
+    reset,
   }
 })

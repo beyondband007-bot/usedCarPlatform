@@ -8,15 +8,6 @@ import CreditsAdminPage from '@/pages/credits-admin/index.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
-    path: '/intro-video',
-    name: 'IntroVideo',
-    component: () => import('@/pages/intro-video/index.vue'),
-    meta: {
-      title: '首页视频',
-      hideIntroVideo: true,
-    },
-  },
-  {
     path: '/',
     component: BasicLayout,
     redirect: '/home',
@@ -46,7 +37,6 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: '企业账号登录',
           guestOnly: true,
-          hideIntroVideo: true,
         },
       },
       {
@@ -119,7 +109,6 @@ export const routes: RouteRecordRaw[] = [
     meta: {
       title: '积分后台登录',
       guestOnly: true,
-      hideIntroVideo: true,
       backOffice: true,
     },
   },
