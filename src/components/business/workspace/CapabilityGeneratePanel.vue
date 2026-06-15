@@ -1934,28 +1934,37 @@ function buildDeliveryTaskMetrics(
 ) {
   const snapshotTotal = getSnapshotDisplayTotal(snapshot);
   const deliveryTotal = Math.max(snapshotTotal ?? item.total, 0);
-  const deliveryCompleted =
-    item.status === "fail" || item.status === "canceled"
-      ? Math.min(
-          deliveryTotal,
-          Math.max(item.completed + item.failed, item.total),
-        )
-      : Math.min(deliveryTotal, Math.max(item.assetCount, 0));
+  const deliveryCompleted = Math.min(
+    deliveryTotal,
+    Math.max(item.assetCount, item.completed, 0),
+  );
   const deliveryProgress =
     deliveryTotal > 0
       ? Math.round((deliveryCompleted / deliveryTotal) * 100)
       : Math.round(item.progress);
   const failedText = item.failed > 0 ? `，失败 ${item.failed}` : "";
+  const isPureFailure =
+    (item.status === "fail" || item.status === "canceled") &&
+    deliveryCompleted === 0;
 
   return {
     deliveryTotal,
     deliveryCompleted,
     deliveryProgress,
     meta:
-      item.status === "fail"
+      isPureFailure
         ? `失败 ${item.failed}/${deliveryTotal} · ${formatDate(item.updatedAt)}`
         : `${deliveryCompleted}/${deliveryTotal}${failedText} · ${formatDate(item.updatedAt)}`,
   };
+}
+
+function isDeliveryTaskPureFailure(
+  task: Pick<DeliveryTask, "status" | "deliveryCompleted">,
+) {
+  return (
+    (task.status === "fail" || task.status === "canceled") &&
+    task.deliveryCompleted === 0
+  );
 }
 
 function isDeliveryTaskComplete(
@@ -1974,7 +1983,7 @@ function isDeliveryTaskPreviewable(task: Pick<DeliveryTask, "deliveryTotal">) {
 }
 
 function getDeliveryPendingSlotLabel(task: DeliveryTask) {
-  if (task.status === "fail" || task.status === "canceled") {
+  if (isDeliveryTaskPureFailure(task)) {
     return "生成失败";
   }
 
@@ -2230,7 +2239,10 @@ const isDeliveryBatchDownloading = ref(false);
 const deliverySelectedImages = computed(() =>
   deliveryTasks.value
     .filter((task) => task.selected && isDeliveryTaskSelectable(task))
-    .reduce((total, task) => total + task.imageCount, 0),
+    .reduce(
+      (total, task) => total + Math.max(task.downloadableAssetCount, 0),
+      0,
+    ),
 );
 
 const isAllDeliverySelected = computed(
@@ -3189,9 +3201,7 @@ defineExpose({
                 </div>
 
                 <div class="delivery-status">
-                  <template
-                    v-if="task.status === 'fail' || task.status === 'canceled'"
-                  >
+                  <template v-if="isDeliveryTaskPureFailure(task)">
                     <span
                       class="delivery-status-ring is-fail"
                       aria-hidden="true"
