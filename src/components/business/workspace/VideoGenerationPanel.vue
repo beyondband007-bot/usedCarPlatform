@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, inject, onMounted, ref } from "vue";
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
@@ -388,13 +388,14 @@ function resolveHumanTone(index: number) {
 }
 
 function resolveHumanSubtitle(human: DigitalHuman) {
+  if (human.voiceStatus !== "ready") return "音色待配置";
   if (human.ageStyle) return human.ageStyle;
   if (human.gender === "female") return "优雅干练";
   return "专业稳重";
 }
 
 function selectDigitalHuman(human: DigitalHuman) {
-  if (props.disabled || human.voiceStatus !== "ready") return;
+  if (props.disabled) return;
   activeDigitalHumanId.value = human.id;
 }
 
@@ -695,7 +696,7 @@ async function confirmVideo() {
               resolveHumanTone(index),
               { 'is-active': activeDigitalHumanId === human.id },
             ]"
-            :disabled="disabled || human.voiceStatus !== 'ready'"
+            :disabled="disabled"
             @click="selectDigitalHuman(human)"
           >
             <span class="sv-human-avatar">
@@ -748,11 +749,11 @@ async function confirmVideo() {
             />
           </label>
           <label class="sv-field">
-            <span class="sv-field-label">排量 <em>*</em></span>
+            <span class="sv-field-label">排量/动力 <em>*</em></span>
             <input
               v-model="activeDisplacement"
               type="text"
-              placeholder="如：2.0T、1.5L"
+              placeholder="如：2.0T、1.5L、纯电"
               :disabled="disabled"
             />
           </label>

@@ -42,6 +42,11 @@ import type {
 } from '@/types/video-generation'
 import { resolveVideoGenerationErrorMessage } from '@/utils/video-generation-errors'
 import { getFallbackVideoTemplates } from '@/constants/video-generation-fallback-templates'
+import {
+  getLocalDigitalHumans,
+  getLocalVideoSceneTemplates,
+  isLocalOnlyDigitalHumanId,
+} from '@/constants/video-generation-local-assets'
 
 const TERMINAL_STATUSES = new Set(['success', 'fail', 'canceled'])
 const CANCELABLE_STATUSES = new Set(['waiting', 'queued', 'generating'])
@@ -277,12 +282,13 @@ export function useVideoGenerationFlow(ownerKey: string) {
         getVideoTemplates(),
         getVideoDigitalHumans(),
       ])
-      templateList.value = mergeComingSoonTemplates(
+      const apiTemplates = mergeComingSoonTemplates(
         templates.items ?? [],
         undefined,
         contract.templateCapabilities ?? [],
       )
-      digitalHumanList.value = humans.filter((item) => item.voiceStatus === 'ready')
+      templateList.value = getLocalVideoSceneTemplates(apiTemplates)
+      digitalHumanList.value = getLocalDigitalHumans(humans)
 
       const draftId = readPersistedDraftId()
       if (draftId) {
@@ -303,6 +309,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     } catch (error) {
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
       templateList.value = getFallbackVideoTemplates()
+      digitalHumanList.value = getLocalDigitalHumans([])
     } finally {
       setLoading('bootstrap', false)
       autoSelectDefaultTemplate()
@@ -426,6 +433,9 @@ export function useVideoGenerationFlow(ownerKey: string) {
   }
 
   async function ensureDigitalHumanVoiceReady(digitalHumanId: string) {
+    if (isLocalOnlyDigitalHumanId(digitalHumanId)) {
+      throw new Error('当前数字人仅用于界面预览，请刷新页面后重新选择')
+    }
     const voice = await getDigitalHumanVoice(digitalHumanId)
     if (voice.status === 'not_configured') {
       throw new Error('该数字人音色未配置，暂不可生成视频')

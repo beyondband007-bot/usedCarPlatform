@@ -1,42 +1,30 @@
 import type { VideoTemplate } from '@/types/video-generation'
 
-import previewDealership from '@/assets/video/WeChat_20260612164649.mp4'
-import previewSingleCar from '@/assets/video/WeChat_20260612164538.mp4'
-import previewPromotion from '@/assets/video/WeChat_20260612164627.mp4'
-import previewMarket from '@/assets/video/WeChat_20260612164711.mp4'
-import previewSpareA from '@/assets/video/WeChat_20260612164637.mp4'
-import previewSpareB from '@/assets/video/WeChat_20260612164659.mp4'
+import {
+  getLocalScenePreviewById,
+  getLocalScenePreviewByType,
+  localSceneBasementVideo,
+  localSceneOutdoorVideo,
+} from '@/constants/video-generation-local-assets'
 
 /** 按模板 type 映射本地 preview 视频 */
-export const localTemplatePreviewByType: Partial<
-  Record<VideoTemplate['type'], string>
-> = {
-  dealership: previewDealership,
-  'single-car': previewSingleCar,
-  promotion: previewPromotion,
-  market: previewMarket,
-}
+export const localTemplatePreviewByType = getLocalScenePreviewByType()
 
 /** 按 templateId 精确映射（优先级高于 type） */
 export const localTemplatePreviewById: Record<string, string> = {
-  'ref-video-006': previewDealership,
-  'ref-video-001': previewSingleCar,
-  'ref-video-003': previewPromotion,
-  'coming-soon-market': previewMarket,
-  'showroom-luxury': previewDealership,
-  'benz-e300l': previewSingleCar,
-  'autumn-sale': previewPromotion,
-  'market-october': previewMarket,
+  ...getLocalScenePreviewById(),
+  'ref-video-006': localSceneBasementVideo,
+  'ref-video-001': localSceneOutdoorVideo,
+  'ref-video-003': localSceneOutdoorVideo,
+  'coming-soon-market': localSceneBasementVideo,
+  'showroom-luxury': localSceneBasementVideo,
+  'benz-e300l': localSceneOutdoorVideo,
+  'autumn-sale': localSceneOutdoorVideo,
+  'market-october': localSceneBasementVideo,
 }
 
 /** 默认 preview（API / 映射均缺失时使用） */
-export const defaultTemplatePreviewUrl = previewDealership
-
-/** 备用 preview，供后续扩展或 A/B 替换 */
-export const spareTemplatePreviewUrls = {
-  a: previewSpareA,
-  b: previewSpareB,
-} as const
+export const defaultTemplatePreviewUrl = localSceneBasementVideo
 
 const VIDEO_PREVIEW_PATTERN = /\.(mp4|webm|mov|m4v)(\?|#|$)/i
 
