@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 import { env } from "../../config/env";
-import { kieClient } from "../../providers/kie/kieClient";
+import { arkClient } from "../../providers/ark/arkClient";
 import { minimaxClient } from "../../providers/minimax/minimaxClient";
 
 const requests: Array<{
@@ -42,10 +42,10 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
       base_resp: { status_code: 0, status_msg: "success" },
     });
   }
-  if (url === env.kie.createTaskUrl) {
+  if (url === `${env.ark.baseUrl}/contents/generations/tasks`) {
     return Response.json({
-      code: 200,
-      data: { taskId: "kie_voice_contract_task" },
+      id: "ark_voice_contract_task",
+      status: "queued",
     });
   }
   throw new Error(`Unexpected contract-test request: ${url}`);
@@ -86,18 +86,16 @@ const run = async () => {
   assert.equal(englishSpeech.languageBoost, "English");
   assert.equal(cantoneseSpeech.languageBoost, "Chinese,Yue");
 
-  await kieClient.createSeedanceVideoTaskWithLease(
-    { apiKey: "kie-contract-key", accountHash: "contract-account" },
-    {
-      prompt: "#image1 使用固定数字人，口型严格跟随 #audio1。",
-      referenceImageUrls: ["https://example.com/digital-human.png"],
-      referenceAudioUrls: ["https://example.com/narration.mp3"],
-      aspectRatio: "9:16",
-      resolution: "720p",
-      duration: 15,
-      generateAudio: false,
-    },
-  );
+  env.ark.apiKey = env.ark.apiKey || "ark-contract-key";
+  await arkClient.createSeedanceVideoTask({
+    prompt: "#image1 使用固定数字人，口型严格跟随 #audio1。",
+    referenceImageUrls: ["https://example.com/digital-human.png"],
+    referenceAudioUrls: ["https://example.com/narration.mp3"],
+    ratio: "9:16",
+    resolution: "720p",
+    duration: 15,
+    generateAudio: false,
+  });
 
   const cloneRequest = requests.find((request) =>
     request.url.endsWith("/v1/voice_clone"),
@@ -123,15 +121,22 @@ const run = async () => {
     ["Chinese", "English", "Chinese,Yue"],
   );
 
-  const kieRequest = requests.find(
-    (request) => request.url === env.kie.createTaskUrl,
+  const arkRequest = requests.find(
+    (request) => request.url === `${env.ark.baseUrl}/contents/generations/tasks`,
   );
-  assert.deepEqual(
-    (kieRequest?.body as any).input.reference_audio_urls,
-    ["https://example.com/narration.mp3"],
-  );
-  assert.deepEqual((kieRequest?.body as any).input.reference_video_urls, []);
-  assert.equal((kieRequest?.body as any).input.generate_audio, false);
+  const arkContent = (arkRequest?.body as any).content;
+  assert.equal((arkRequest?.body as any).model, env.ark.videoModel);
+  assert.deepEqual(arkContent[1], {
+    type: "image_url",
+    role: "reference_image",
+    image_url: { url: "https://example.com/digital-human.png" },
+  });
+  assert.deepEqual(arkContent[2], {
+    type: "audio_url",
+    role: "reference_audio",
+    audio_url: { url: "https://example.com/narration.mp3" },
+  });
+  assert.equal((arkRequest?.body as any).generate_audio, false);
 
   console.log(
     JSON.stringify(
@@ -141,8 +146,8 @@ const run = async () => {
         minimaxSpeechModel: speech.model,
         narrationDurationMs: speech.durationMs,
         supportedLanguages: ["zh-CN", "en", "yue"],
-        kieReferenceAudioCount: 1,
-        kieGenerateAudio: false,
+        arkReferenceAudioCount: 1,
+        arkGenerateAudio: false,
         status: "passed",
       },
       null,

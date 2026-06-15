@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../../config/env";
+import { arkClient } from "../../providers/ark/arkClient";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
@@ -1737,6 +1738,9 @@ class VideoGenerationService {
         narrationAudio.localPath,
         "used-car-platform/video-generation/narration-audio",
       );
+      await kieKeyPool.release(acquiredLease.accountHash);
+      lease = null;
+
       const inputUrls = [
         uploadedDigitalHuman.fileUrl,
         ...uploadedVehicleAssets.map((item) => item.fileUrl),
@@ -1748,14 +1752,14 @@ class VideoGenerationService {
         });
       }
 
-      const kieTask = await kieClient.createSeedanceVideoTaskWithLease(acquiredLease, {
+      const arkTask = await arkClient.createSeedanceVideoTask({
         prompt: seedancePrompt,
         referenceImageUrls: [
           uploadedDigitalHuman.fileUrl,
           ...uploadedVehicleAssets.map((item) => item.fileUrl),
         ],
         referenceAudioUrls: [uploadedNarrationAudio.fileUrl],
-        aspectRatio: "9:16",
+        ratio: "9:16",
         resolution: VIDEO_GENERATION_RESOLUTION,
         duration: VIDEO_DURATION_SECONDS,
         generateAudio: false,
@@ -1763,13 +1767,14 @@ class VideoGenerationService {
 
       await tasksRepository.markSubmitted({
         id: taskId,
-        kieTaskId: kieTask.kieTaskId,
-        kieAccountHash: kieTask.accountHash,
-        model: env.kie.videoModel,
+        kieTaskId: arkTask.taskId,
+        kieAccountHash: "ark",
+        model: env.ark.videoModel,
         role: "primary",
         attemptNo: 1,
         requestJson: {
-          model: env.kie.videoModel,
+          provider: "ark",
+          model: env.ark.videoModel,
           moduleCode: "video-generation",
           scriptDraftId,
           vehicleName: draft.vehicleName,
@@ -1823,7 +1828,7 @@ class VideoGenerationService {
           duration: VIDEO_DURATION_SECONDS,
           generateAudio: false,
         },
-        responseJson: kieTask.raw,
+        responseJson: arkTask.raw,
       });
 
       return {
@@ -1832,8 +1837,8 @@ class VideoGenerationService {
         moduleCode: "video-generation",
         status: "queued",
         progress: 5,
-        kieTaskId: kieTask.kieTaskId,
-        model: env.kie.videoModel,
+        kieTaskId: arkTask.taskId,
+        model: env.ark.videoModel,
         durationSeconds: VIDEO_DURATION_SECONDS,
         templateId: draft.referenceMaterialId,
         templateType,

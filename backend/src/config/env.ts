@@ -66,7 +66,6 @@ export const env = {
     model: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
     primaryImageModel: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
     fallbackImageModel: process.env.KIE_FALLBACK_IMAGE_MODEL ?? "nano-banana-2",
-    videoModel: process.env.KIE_VIDEO_MODEL ?? "bytedance/seedance-2",
     fallbackOutputFormat: process.env.KIE_FALLBACK_OUTPUT_FORMAT ?? "jpg",
     fallbackEnabled: toBoolean(process.env.KIE_FALLBACK_ENABLED, true),
     uploadTimeoutMs: toNumber(process.env.KIE_UPLOAD_TIMEOUT_MS, 30_000),
@@ -80,6 +79,22 @@ export const env = {
     imageSoftTimeoutMs: toNumber(process.env.KIE_IMAGE_SOFT_TIMEOUT_MS, 180_000),
     videoDeadlineMs: toNumber(process.env.KIE_VIDEO_DEADLINE_MS, 1_200_000),
     pollFailureLimit: toNumber(process.env.KIE_POLL_FAILURE_LIMIT, 3),
+  },
+
+  ark: {
+    apiKey: process.env.ARK_API_KEY ?? "",
+    baseUrl: (process.env.ARK_API_BASE_URL ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, ""),
+    videoModel: process.env.ARK_VIDEO_MODEL ?? "doubao-seedance-2-0-260128",
+    projectName: process.env.ARK_PROJECT_NAME ?? "",
+    accessKeyId: process.env.VOLC_ACCESS_KEY_ID ?? "",
+    secretAccessKey: process.env.VOLC_SECRET_ACCESS_KEY ?? "",
+    region: process.env.VOLC_REGION ?? "cn-beijing",
+    openApiEndpoint: (process.env.VOLC_OPENAPI_ENDPOINT ?? "https://open.volcengineapi.com").replace(/\/$/, ""),
+    virtualAssetGroupName: process.env.ARK_VIRTUAL_ASSET_GROUP_NAME ?? "used-car-platform-virtual-assets",
+    virtualAssetPollIntervalMs: toNumber(process.env.ARK_VIRTUAL_ASSET_POLL_INTERVAL_MS, 10_000),
+    virtualAssetPollAttempts: toNumber(process.env.ARK_VIRTUAL_ASSET_POLL_ATTEMPTS, 18),
+    createTimeoutMs: toNumber(process.env.ARK_CREATE_TIMEOUT_MS, 30_000),
+    detailTimeoutMs: toNumber(process.env.ARK_DETAIL_TIMEOUT_MS, 10_000),
   },
 
   deepseek: {

@@ -20,24 +20,6 @@ export interface CreateKieTextToImageTaskInput {
   resolution: Resolution;
 }
 
-export interface CreateKieImageToVideoTaskInput {
-  prompt: string;
-  imageUrl: string;
-  aspectRatio: "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
-  resolution: "480p" | "720p" | "1080p";
-  duration: 5 | 10;
-}
-
-export interface CreateKieSeedanceVideoTaskInput {
-  prompt: string;
-  referenceImageUrls: string[];
-  referenceAudioUrls: string[];
-  aspectRatio: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9";
-  resolution: "720p";
-  duration: 15;
-  generateAudio: boolean;
-}
-
 export interface CreateKieImageTaskResult {
   kieTaskId: string;
   accountHash: string;

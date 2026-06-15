@@ -1,3 +1,5 @@
+import { env } from "../../config/env";
+import { arkClient } from "../../providers/ark/arkClient";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { errors } from "../../shared/errors";
@@ -9,8 +11,7 @@ import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
 
-const KIE_KLING_VIDEO_MODEL = "kling-3.0/video";
-const KIE_KLING_VIDEO_OPTION_ID = "kling-3.0-video-10s";
+const ARK_SEEDANCE_VIDEO_OPTION_ID = "doubao-seedance-2-0-10s";
 
 const allowedRatios = ["16:9", "9:16", "1:1"] as const;
 const allowedVideoResolutions = ["480p", "720p", "1080p"] as const;
@@ -67,7 +68,7 @@ class ShortVideoService {
         userId: subscription.userKey,
         moduleCode: "short-video",
         inputAssetId: asset.id,
-        optionId: KIE_KLING_VIDEO_OPTION_ID,
+        optionId: ARK_SEEDANCE_VIDEO_OPTION_ID,
         outputRatio: aspectRatio,
         resolution: IMAGE_GENERATION_RESOLUTION,
         logoAssetId: null,
@@ -82,29 +83,34 @@ class ShortVideoService {
         asset.localPath,
         "used-car-platform/short-video",
       );
+      await kieKeyPool.release(lease.accountHash);
 
-      const kieTask = await kieClient.createImageToVideoTaskWithLease(lease, {
+      const arkTask = await arkClient.createSeedanceVideoTask({
         prompt: shortVideoPrompt,
-        imageUrl: uploadedVehicle.fileUrl,
-        aspectRatio,
+        referenceImageUrls: [uploadedVehicle.fileUrl],
+        ratio: aspectRatio,
         resolution: videoResolution,
-        duration,
+        duration: duration as 10,
+        generateAudio: false,
       });
 
       await tasksRepository.markSubmitted({
         id: taskId,
-        kieTaskId: kieTask.kieTaskId,
-        kieAccountHash: kieTask.accountHash,
+        kieTaskId: arkTask.taskId,
+        kieAccountHash: "ark",
+        model: env.ark.videoModel,
         requestJson: {
-          model: KIE_KLING_VIDEO_MODEL,
+          provider: "ark",
+          model: env.ark.videoModel,
           moduleCode: "short-video",
           prompt: shortVideoPrompt,
-          startFrameUrls: [uploadedVehicle.fileUrl],
+          referenceImageUrls: [uploadedVehicle.fileUrl],
           aspectRatio,
           videoResolution,
           duration,
+          generateAudio: false,
         },
-        responseJson: kieTask.raw,
+        responseJson: arkTask.raw,
       });
 
       return {
@@ -112,8 +118,8 @@ class ShortVideoService {
         moduleCode: "short-video",
         status: "queued",
         progress: 5,
-        kieTaskId: kieTask.kieTaskId,
-        model: KIE_KLING_VIDEO_MODEL,
+        kieTaskId: arkTask.taskId,
+        model: env.ark.videoModel,
         duration,
         aspectRatio,
         videoResolution,

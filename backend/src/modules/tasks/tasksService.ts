@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../../config/env";
+import { arkClient } from "../../providers/ark/arkClient";
+import type { ArkTaskDetail } from "../../providers/ark/arkTypes";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
 import { downloadFile } from "../../shared/downloadFile";
@@ -63,6 +65,15 @@ const getRecordInputUrls = (record: KieTaskRecord) => {
   const response = asRecord(record.responseJson);
   const meta = asRecord(response._usedCarPlatform);
   return stringArray(meta.inputUrls);
+};
+
+const isArkVideoRecord = (record: KieTaskRecord) => {
+  if (record.kieAccountHash === "ark") return true;
+  if (record.model === env.ark.videoModel) return true;
+  const request = asRecord(record.requestJson);
+  const response = asRecord(record.responseJson);
+  const responseMeta = asRecord(response._usedCarPlatform);
+  return request.provider === "ark" || responseMeta.provider === "ark";
 };
 
 const kieTimeoutErrorCodes = [
@@ -258,11 +269,10 @@ class TasksService {
     for (const record of records) {
       if (kieTerminalStatuses.includes(record.status)) continue;
 
-      const apiKey = getApiKeyByHash(record.kieAccountHash);
-      if (!apiKey) continue;
-
       try {
-        const detail = await kieClient.getTaskDetail(record.kieTaskId, apiKey);
+        const detail = isArkVideoRecord(record)
+          ? await arkClient.getTaskDetail(record.kieTaskId)
+          : await this.getKieTaskDetail(record);
         polledSuccessfully = true;
         await tasksRepository.markPollSuccess(task.id);
         await this.applyKieDetail(task, record, detail);
@@ -296,15 +306,30 @@ class TasksService {
     ) {
       await tasksRepository.markFailed(task.id, "KIE_TASK_FAILED", "Kie task failed");
       for (const record of refreshedRecords) {
-        await kieKeyPool.release(record.kieAccountHash);
+        await this.releaseProviderRecord(record);
       }
     }
+  }
+
+  private async getKieTaskDetail(record: KieTaskRecord) {
+    const apiKey = getApiKeyByHash(record.kieAccountHash);
+    if (!apiKey) {
+      throw errors.generationFailed("kie api key is not configured for task record", {
+        accountHash: record.kieAccountHash,
+      });
+    }
+    return kieClient.getTaskDetail(record.kieTaskId, apiKey);
+  }
+
+  private async releaseProviderRecord(record: KieTaskRecord) {
+    if (isArkVideoRecord(record)) return;
+    await kieKeyPool.release(record.kieAccountHash);
   }
 
   private async applyKieDetail(
     task: GenerationTaskRecord,
     record: KieTaskRecord,
-    detail: Awaited<ReturnType<typeof kieClient.getTaskDetail>>,
+    detail: Awaited<ReturnType<typeof kieClient.getTaskDetail>> | ArkTaskDetail,
   ) {
     const status = detail.status;
     const resultImages =
@@ -329,7 +354,7 @@ class TasksService {
           late: status === "success",
         },
       });
-      if (terminalStatuses.includes(status)) await kieKeyPool.release(record.kieAccountHash);
+      if (terminalStatuses.includes(status)) await this.releaseProviderRecord(record);
       return;
     }
 
@@ -342,7 +367,7 @@ class TasksService {
     });
 
     if (status === "fail") {
-      await kieKeyPool.release(record.kieAccountHash);
+      await this.releaseProviderRecord(record);
       return;
     }
 
@@ -368,7 +393,7 @@ class TasksService {
     }
 
     if (terminalStatuses.includes(status)) {
-      await kieKeyPool.release(record.kieAccountHash);
+      await this.releaseProviderRecord(record);
     }
   }
 
@@ -387,7 +412,7 @@ class TasksService {
           model: record.model,
         },
       });
-      await kieKeyPool.release(record.kieAccountHash);
+      await this.releaseProviderRecord(record);
     }
   }
 
@@ -483,7 +508,7 @@ class TasksService {
           },
         });
       }
-      await kieKeyPool.release(record.kieAccountHash);
+      await this.releaseProviderRecord(record);
     }
   }
 
@@ -542,7 +567,7 @@ class TasksService {
           },
         });
       }
-      await kieKeyPool.release(record.kieAccountHash);
+      await this.releaseProviderRecord(record);
     }
     const canceled = await tasksRepository.findById(task.id, userId);
     if (!canceled) throw errors.taskNotFound();
@@ -694,6 +719,7 @@ class TasksService {
   }
 
   private toRecentResponse(task: RecentGenerationRecord) {
+    const results = normalizeTaskResults(task.resultJson);
     const { coverUrl, downloadUrl } = this.resolveRecentCover(task);
 
     return {
