@@ -764,7 +764,7 @@ function renderAgentConsumerBarChart() {
 
   const rows = agentTopTopUpCustomers.value
   const labels = rows.map((item) => item.customerDisplayName || item.customerUsername).reverse()
-  const values = rows.map((item) => Number(item.totalTopUpAmount ?? 0)).reverse()
+  const values = rows.map((item) => Number(item.totalTopUpCredits ?? 0)).reverse()
 
   agentConsumerBarChartInstance.resize()
   agentConsumerBarChartInstance.setOption({
@@ -783,7 +783,7 @@ function renderAgentConsumerBarChart() {
         const row = [...rows].reverse()[point.dataIndex]
         return [
           point.axisValue,
-          `累计充值金额：${formatCurrencyAmount(point.data)}`,
+          `累计充值积分：${Number(point.data).toLocaleString('zh-CN')} 积分`,
           `当前余额：${formatCreditsBalance(row)}`,
         ].join('<br/>')
       },
@@ -812,7 +812,7 @@ function renderAgentConsumerBarChart() {
     },
     series: [
       {
-        name: '累计充值金额',
+        name: '累计充值积分',
         type: 'bar',
         barMaxWidth: 18,
         itemStyle: { borderRadius: [0, 6, 6, 0] },
@@ -822,7 +822,8 @@ function renderAgentConsumerBarChart() {
           color: '#334155',
           fontSize: 12,
           fontWeight: 800,
-          formatter: (params: { value: number }) => formatCurrencyAmount(params.value),
+          formatter: (params: { value: number }) =>
+            Number(params.value).toLocaleString('zh-CN'),
         },
         data: values,
       },
@@ -1378,9 +1379,9 @@ function normalizeAgentUserTypeCode(value?: string | null) {
 
 const agentTopTopUpCustomers = computed(() =>
   [...filteredAgentCustomers.value]
-    .filter((item) => Number(item.totalTopUpAmount ?? 0) > 0)
+    .filter((item) => Number(item.totalTopUpCredits ?? 0) > 0)
     .sort((a, b) => {
-      const topUpDiff = Number(b.totalTopUpAmount ?? 0) - Number(a.totalTopUpAmount ?? 0)
+      const topUpDiff = Number(b.totalTopUpCredits ?? 0) - Number(a.totalTopUpCredits ?? 0)
       if (topUpDiff !== 0) return topUpDiff
       return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
     })
@@ -2854,11 +2855,11 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
     },
   },
   {
-    title: '累计充值金额',
-    key: 'totalTopUpAmount',
+    title: '累计充值积分',
+    key: 'totalTopUpCredits',
     width: 140,
     render(row) {
-      return formatCurrencyAmount(row.totalTopUpAmount)
+      return Number(row.totalTopUpCredits ?? 0).toLocaleString('zh-CN')
     },
   },
   { title: '关系', key: 'relationType', width: 100 },
@@ -3705,9 +3706,9 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </button>
             <div v-if="isConsoleSectionOpen('agentCustomers')" class="admin-collapse-body">
               <div v-if="filteredAgentCustomers.length" class="agent-customer-insights-grid">
-                <section class="agent-customer-chart-panel" aria-label="客户充值金额排行">
+                <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
                   <div class="admin-trend-head">
-                    <h2>Top 5 充值金额客户</h2>
+                    <h2>Top 5 积分充值客户</h2>
                   </div>
                   <div ref="agentConsumerBarChartRef" class="agent-customer-bar-chart" />
                 </section>

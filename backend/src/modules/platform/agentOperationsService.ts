@@ -219,7 +219,7 @@ type AgentTicketRow = RowDataPacket & {
 type CustomerTopUpRow = RowDataPacket & {
   user_id?: number;
   tenant_id?: number;
-  total_amount: string | number;
+  total_points: string | number;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -404,7 +404,7 @@ async function listAgentCustomers(agentUserId: string) {
     { agentUserId },
   );
 
-  const totalTopUpAmountByCustomer = await listCustomerTopUpAmounts(rows);
+  const totalTopUpCreditsByCustomer = await listCustomerTopUpCredits(rows);
   const usageStatsByCustomer = await listAgentCustomerUsageStats(rows);
   const balances = await listCreditsBalances(
     rows.map((row) => ({
@@ -441,8 +441,8 @@ async function listAgentCustomers(agentUserId: string) {
       creditsTenantId: row.customer_credits_tenant_id,
       creditsAvailableBalance: balances.get(balanceKey)?.availableBalance ?? null,
       creditsTotalBalance: balances.get(balanceKey)?.totalBalance ?? null,
-      totalTopUpAmount:
-        totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
+      totalTopUpCredits:
+        totalTopUpCreditsByCustomer.get(customerTopUpKey(row)) ?? 0,
       totalConsumedCredits: usageStats.totalConsumedCredits,
       consumptionTransactionCount: usageStats.consumptionTransactionCount,
       lastConsumedAt: usageStats.lastConsumedAt,
@@ -459,7 +459,7 @@ function customerTopUpKey(row: AgentCustomerRow) {
   return `user:${row.customer_credits_user_id}`;
 }
 
-async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
+async function listCustomerTopUpCredits(rows: AgentCustomerRow[]) {
   const result = new Map<string, number>();
   const personalCreditsUserIds = Array.from(
     new Set(
@@ -481,7 +481,7 @@ async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
 
   if (personalCreditsUserIds.length) {
     const [personalRows] = await creditsDb.query<CustomerTopUpRow[]>(
-      `SELECT user_id, COALESCE(SUM(amount), 0) total_amount
+      `SELECT user_id, COALESCE(SUM(points + bonus_points), 0) total_points
        FROM payment_orders
        WHERE status = 'paid'
          AND tenant_id IS NULL
@@ -490,13 +490,13 @@ async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
       { userIds: personalCreditsUserIds },
     );
     for (const row of personalRows) {
-      if (row.user_id) result.set(`user:${row.user_id}`, toNumber(row.total_amount));
+      if (row.user_id) result.set(`user:${row.user_id}`, toNumber(row.total_points));
     }
   }
 
   if (tenantIds.length) {
     const [tenantRows] = await creditsDb.query<CustomerTopUpRow[]>(
-      `SELECT tenant_id, COALESCE(SUM(amount), 0) total_amount
+      `SELECT tenant_id, COALESCE(SUM(points + bonus_points), 0) total_points
        FROM payment_orders
        WHERE status = 'paid'
          AND tenant_id IN (:tenantIds)
@@ -504,7 +504,7 @@ async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
       { tenantIds },
     );
     for (const row of tenantRows) {
-      if (row.tenant_id) result.set(`tenant:${row.tenant_id}`, toNumber(row.total_amount));
+      if (row.tenant_id) result.set(`tenant:${row.tenant_id}`, toNumber(row.total_points));
     }
   }
 
@@ -1544,9 +1544,9 @@ function buildAgentCustomerInsights(customers: AgentCustomerOverviewItem[]) {
     count: activeCustomers.filter((item) => item.userType.code === definition.code).length,
   }));
   const topTopUpCustomers = activeCustomers
-    .filter((item) => item.totalTopUpAmount > 0)
+    .filter((item) => item.totalTopUpCredits > 0)
     .sort((a, b) => {
-      const topUpDiff = b.totalTopUpAmount - a.totalTopUpAmount;
+      const topUpDiff = b.totalTopUpCredits - a.totalTopUpCredits;
       if (topUpDiff !== 0) return topUpDiff;
       return b.createdAt.localeCompare(a.createdAt);
     })
@@ -1558,7 +1558,7 @@ function buildAgentCustomerInsights(customers: AgentCustomerOverviewItem[]) {
       customerDisplayName: item.customerDisplayName,
       customerPhone: item.customerPhone,
       applicationCode: item.applicationCode,
-      totalTopUpAmount: item.totalTopUpAmount,
+      totalTopUpCredits: item.totalTopUpCredits,
     }));
 
   return {

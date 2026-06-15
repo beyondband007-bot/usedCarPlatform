@@ -1145,7 +1145,7 @@ export interface AgentOperationsCustomer {
   creditsAvailableBalance?: number | string | null
   creditsTotalBalance?: number | string | null
   creditsCurrency?: string | null
-  totalTopUpAmount?: number | string
+  totalTopUpCredits?: number | string
   totalConsumedCredits?: number | string
   consumptionTransactionCount?: number | string
   lastConsumedAt?: string | null
@@ -1327,7 +1327,7 @@ export interface AgentOperationsOverview {
       customerDisplayName: string
       customerPhone?: string | null
       applicationCode: string
-      totalTopUpAmount: number | string
+      totalTopUpCredits: number | string
     }>
     userTypeDistribution: Array<{
       code: 'active' | 'potential' | 'low_frequency' | string
@@ -1990,7 +1990,7 @@ export async function getAgentOperationsOverview(params?: {
     ...payload,
     customers: (payload.customers ?? []).map((item) => ({
       ...item,
-      totalTopUpAmount: parseCreditsNumber(item.totalTopUpAmount ?? 0),
+      totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits ?? 0),
       totalConsumedCredits: parseCreditsNumber(item.totalConsumedCredits ?? 0),
       consumptionTransactionCount: parseCreditsNumber(item.consumptionTransactionCount ?? 0),
     })),
@@ -1999,7 +1999,7 @@ export async function getAgentOperationsOverview(params?: {
           ...payload.customerInsights,
           topTopUpCustomers: (payload.customerInsights.topTopUpCustomers ?? []).map((item) => ({
             ...item,
-            totalTopUpAmount: parseCreditsNumber(item.totalTopUpAmount),
+            totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits),
           })),
         }
       : undefined,
