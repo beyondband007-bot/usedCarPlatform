@@ -25,6 +25,7 @@ import {
   adjustPlatformCredits,
   applyAgentSettlement,
   approvePlatformSettlementPayment,
+  connectPlatformUserApplication,
   createPlatformUser,
   deletePlatformUser,
   disablePlatformAgent,
@@ -38,11 +39,15 @@ import {
   getPlatformAgentPolicyOverrides,
   getPlatformAgents,
   getPlatformDashboard,
+  getPlatformTransactionsLedger,
   getPlatformSettlementApplications,
   getPlatformSubscriptionPlans,
   promotePlatformUserToAgent,
+  resetPlatformUserPassword,
+  updateAgentCustomerProfile,
   updatePlatformAdminPolicyOverride,
   updatePlatformAgentPolicyOverride,
+  updatePlatformUserProfile,
   updateApplicationFunctionDefaultPoints,
   type AgentCustomerLedger,
   type AgentCustomerLedgerTransaction,
@@ -55,6 +60,7 @@ import {
   type CreditsAdminOverview,
   type CreditsCustomerProfile,
   type CommissionPolicy,
+  type PlatformTransactionsLedger,
   type PlatformUserPlanCode,
   type PlatformSubscriptionPlan,
   type PlatformUserTargetRole,
@@ -71,11 +77,20 @@ import {
   reusableCreditsApplicationCatalog,
   type BackOfficeRole,
 } from '@/policies/accountProvisioning'
-import DeveloperHomeDashboard from '@/components/business/credits-admin/DeveloperHomeDashboard.vue'
 import { useAuthStore } from '@/stores/auth'
 
 type RoleTab = BackOfficeRole
 type DetailRecord = Record<string, unknown>
+type PasswordResetTableRow = {
+  userId: string
+  username: string
+  displayName: string
+}
+type PlatformEditableProfileRole = PlatformUserTargetRole | 'developer'
+type PlatformEditableProfileRow = PasswordResetTableRow & {
+  phone?: string | null
+  status?: string | null
+}
 type TrendPeriod = 'today' | '7d' | '30d'
 type TrendMetric = 'consume' | 'recharge'
 type AgentConsolePage =
@@ -83,6 +98,20 @@ type AgentConsolePage =
   | 'agent-customers'
   | 'agent-consumption'
   | 'agent-settlements'
+type AdminConsolePage =
+  | 'admin-dashboard'
+  | 'admin-agents'
+  | 'admin-users'
+  | 'admin-transactions'
+  | 'admin-settlements'
+type DeveloperConsolePage =
+  | 'developer-dashboard'
+  | 'developer-admins'
+  | 'developer-agents'
+  | 'developer-customers'
+  | 'developer-transactions'
+  | 'developer-settlements'
+  | 'developer-billing'
 type ConsoleSectionKey =
   | 'adminAccountCreation'
   | 'adminAgents'
@@ -94,8 +123,26 @@ type ConsoleSectionKey =
   | 'agentCommissions'
   | 'agentSettlements'
 
+type ApplicationFilterOption = {
+  code: string
+  name: string
+  statusText: string
+}
+
 const props = defineProps<{
+  activeConsolePage?: string
   activeAgentPage?: AgentConsolePage | string
+  passwordResetRequestKey?: number
+  selectedApplicationCode?: string
+}>()
+
+const emit = defineEmits<{
+  'update:selectedApplicationCode': [code: string]
+  'application-context-change': [context: {
+    selectedCode: string
+    selectedLabel: string
+    options: ApplicationFilterOption[]
+  }]
 }>()
 
 const authStore = useAuthStore()
@@ -112,11 +159,18 @@ const commissionPolicy = ref<CommissionPolicy | null>(null)
 const isLoading = ref(false)
 const lastError = ref<string | null>(null)
 const activeRole = ref<RoleTab>('developer')
-const selectedApplicationCode = ref('all')
+const selectedApplicationCode = computed({
+  get: () => props.selectedApplicationCode || 'all',
+  set: (code: string) => emit('update:selectedApplicationCode', code),
+})
 const dashboardTrendPeriod = ref<TrendPeriod>('today')
 const dashboardTrendMetric = ref<TrendMetric>('recharge')
 const dashboardTrendChartRef = ref<HTMLElement | null>(null)
 const dashboardPlanPieChartRef = ref<HTMLElement | null>(null)
+const globalCustomerBarChartRef = ref<HTMLElement | null>(null)
+const globalCustomerPieChartRef = ref<HTMLElement | null>(null)
+const globalLedgerConsumerBarChartRef = ref<HTMLElement | null>(null)
+const globalFunctionUsagePieChartRef = ref<HTMLElement | null>(null)
 const agentConsumerBarChartRef = ref<HTMLElement | null>(null)
 const agentUserTypePieChartRef = ref<HTMLElement | null>(null)
 const agentLedgerConsumerBarChartRef = ref<HTMLElement | null>(null)
@@ -128,7 +182,10 @@ const isAdjustCreditsModalOpen = ref(false)
 const isAdjustingCredits = ref(false)
 const isDeleteAccountModalOpen = ref(false)
 const isDeletingAccount = ref(false)
-const isFunctionBillingOpen = ref(false)
+const isPasswordResetModalOpen = ref(false)
+const isResettingPassword = ref(false)
+const isConnectApplicationModalOpen = ref(false)
+const isConnectingApplication = ref(false)
 const consoleSectionOpen = ref<Record<string, boolean>>({})
 const promotingUserId = ref<string | null>(null)
 const disablingAgentUserId = ref<string | null>(null)
@@ -147,12 +204,21 @@ const selectedCommissionDetail = ref<AgentOperationsCommissionPreview | null>(nu
 const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
 const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
 const agentTransactionsLedger = ref<AgentTransactionsLedger | null>(null)
+const platformTransactionsLedger = ref<PlatformTransactionsLedger | null>(null)
 const isAgentCustomerLedgerOpen = ref(false)
 const isLoadingAgentCustomerLedger = ref(false)
 const isLoadingAgentTransactionsLedger = ref(false)
+const isLoadingPlatformTransactionsLedger = ref(false)
+const isEditAgentCustomerOpen = ref(false)
+const isUpdatingAgentCustomer = ref(false)
+const isEditPlatformUserProfileOpen = ref(false)
+const isUpdatingPlatformUserProfile = ref(false)
 const subscriptionPlans = ref<PlatformSubscriptionPlan[]>([])
 const isLoadingPlanOptions = ref(false)
 const loadedPlanApplicationCode = ref('')
+const connectSubscriptionPlans = ref<PlatformSubscriptionPlan[]>([])
+const isLoadingConnectPlanOptions = ref(false)
+const loadedConnectPlanApplicationCode = ref('')
 const interactionFeedback = ref('')
 const createAccountForm = reactive({
   targetRole: 'user' as PlatformUserTargetRole,
@@ -165,6 +231,18 @@ const createAccountForm = reactive({
   planCode: '' as PlatformUserPlanCode,
   initialPoints: 0 as number | null,
 })
+const editAgentCustomerForm = reactive({
+  relationId: '',
+  displayName: '',
+  phone: '',
+})
+const editPlatformUserProfileForm = reactive({
+  userId: '',
+  username: '',
+  targetRole: 'user' as PlatformEditableProfileRole,
+  displayName: '',
+  phone: '',
+})
 const adjustCreditsForm = reactive({
   points: 0 as number | null,
   reason: '',
@@ -173,11 +251,31 @@ const adjustCreditsForm = reactive({
 const deleteAccountForm = reactive({
   reason: '',
 })
+const passwordResetForm = reactive({
+  userId: '',
+  username: '',
+  displayName: '',
+  password: '',
+  confirmPassword: '',
+})
+const connectApplicationForm = reactive({
+  userId: '',
+  username: '',
+  displayName: '',
+  targetRole: 'user' as 'agent' | 'user',
+  applicationCode: '',
+  planCode: '',
+  existingApplications: [] as string[],
+})
 const agentCommissionRateDrafts = reactive<Record<string, number | null>>({})
 const agentDepositAdjustmentDrafts = reactive<Record<string, number | null>>({})
 
 let dashboardTrendChartInstance: echarts.ECharts | null = null
 let dashboardPlanPieChartInstance: echarts.ECharts | null = null
+let globalCustomerBarChartInstance: echarts.ECharts | null = null
+let globalCustomerPieChartInstance: echarts.ECharts | null = null
+let globalLedgerConsumerBarChartInstance: echarts.ECharts | null = null
+let globalFunctionUsagePieChartInstance: echarts.ECharts | null = null
 let agentConsumerBarChartInstance: echarts.ECharts | null = null
 let agentUserTypePieChartInstance: echarts.ECharts | null = null
 let agentLedgerConsumerBarChartInstance: echarts.ECharts | null = null
@@ -254,6 +352,14 @@ watch(
     }
   },
 )
+watch(
+  () => connectApplicationForm.applicationCode,
+  (applicationCode) => {
+    if (isConnectApplicationModalOpen.value) {
+      void loadConnectPlanOptions(applicationCode)
+    }
+  },
+)
 const functionPointDrafts = reactive<Record<string, number | null>>({})
 
 const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon: string }> = [
@@ -266,7 +372,7 @@ const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon
   {
     value: 'admin',
     label: '公司管理员',
-    description: '销售运营、代理商管理、全平台只读',
+    description: '销售运营、代理商表、全平台只读',
     icon: 'mdi:shield-account-outline',
   },
   {
@@ -290,6 +396,14 @@ watchEffect(() => {
     activeRole.value = visibleRoleTabs.value[0]?.value ?? 'agent'
   }
 })
+
+watch(
+  () => props.passwordResetRequestKey,
+  (requestKey, previousRequestKey) => {
+    if (!requestKey || requestKey === previousRequestKey) return
+    openCurrentBackOfficePasswordResetModal()
+  },
+)
 
 async function refreshOverview() {
   isLoading.value = true
@@ -378,6 +492,14 @@ onBeforeUnmount(() => {
   dashboardTrendChartInstance = null
   dashboardPlanPieChartInstance?.dispose()
   dashboardPlanPieChartInstance = null
+  globalCustomerBarChartInstance?.dispose()
+  globalCustomerBarChartInstance = null
+  globalCustomerPieChartInstance?.dispose()
+  globalCustomerPieChartInstance = null
+  globalLedgerConsumerBarChartInstance?.dispose()
+  globalLedgerConsumerBarChartInstance = null
+  globalFunctionUsagePieChartInstance?.dispose()
+  globalFunctionUsagePieChartInstance = null
   agentConsumerBarChartInstance?.dispose()
   agentConsumerBarChartInstance = null
   agentUserTypePieChartInstance?.dispose()
@@ -397,8 +519,38 @@ const agentSettlements = computed(() =>
   (agentOverview.value?.settlementBills ?? []).filter((item) => item.status !== 'draft'),
 )
 const dashboardMetrics = computed(() => platformDashboard.value?.metrics ?? null)
+const activeDeveloperConsolePage = computed<DeveloperConsolePage>(() => {
+  const value = props.activeConsolePage
+  if (
+    value === 'developer-dashboard' ||
+    value === 'developer-admins' ||
+    value === 'developer-agents' ||
+    value === 'developer-customers' ||
+    value === 'developer-transactions' ||
+    value === 'developer-settlements' ||
+    value === 'developer-billing'
+  ) {
+    return value
+  }
+  return 'developer-dashboard'
+})
+
+const activeAdminConsolePage = computed<AdminConsolePage>(() => {
+  const value = props.activeConsolePage
+  if (
+    value === 'admin-dashboard' ||
+    value === 'admin-agents' ||
+    value === 'admin-users' ||
+    value === 'admin-transactions' ||
+    value === 'admin-settlements'
+  ) {
+    return value
+  }
+  return 'admin-dashboard'
+})
+
 const activeAgentConsolePage = computed<AgentConsolePage>(() => {
-  const value = props.activeAgentPage
+  const value = props.activeConsolePage ?? props.activeAgentPage
   if (
     value === 'agent-dashboard' ||
     value === 'agent-customers' ||
@@ -408,6 +560,12 @@ const activeAgentConsolePage = computed<AgentConsolePage>(() => {
     return value
   }
   return 'agent-dashboard'
+})
+
+const activeRoleDashboardPage = computed(() => {
+  if (activeRole.value === 'developer') return activeDeveloperConsolePage.value === 'developer-dashboard'
+  if (activeRole.value === 'admin') return activeAdminConsolePage.value === 'admin-dashboard'
+  return activeAgentConsolePage.value === 'agent-dashboard'
 })
 
 const registeredApplicationsByCode = computed(
@@ -463,38 +621,78 @@ const planOptions = computed(() =>
   })),
 )
 
+const connectPlanOptions = computed(() =>
+  connectSubscriptionPlans.value.map((plan) => ({
+    label: `${plan.name} / ${formatCurrencyAmount(plan.price)} / ${Number(plan.giftPoints).toLocaleString('zh-CN')} 积分`,
+    value: plan.code,
+  })),
+)
+
 const dashboardTrendTitle = computed(() => '积分充值&消费')
 
 const dashboardTrendEvents = computed(() => platformDashboard.value?.trends ?? [])
 
+const scopedDashboardTrendEvents = computed(() =>
+  dashboardTrendEvents.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
 const adminSystemOverviewList = computed(() => {
   const metrics = dashboardMetrics.value
   const platformApplications = applications.value.filter((item) => item.status !== 'planned').length
+  const appScoped = selectedApplicationCode.value !== 'all'
+  const dashboardTime = new Date(platformDashboard.value?.generatedAt ?? '')
+  const todayEnd = Number.isNaN(dashboardTime.getTime()) ? new Date() : dashboardTime
+  todayEnd.setHours(23, 59, 59, 999)
+  const todayStart = new Date(todayEnd)
+  todayStart.setHours(0, 0, 0, 0)
+  const scopedTodayEvents = scopedDashboardTrendEvents.value.filter((item) => {
+    const time = new Date(item.occurredAt).getTime()
+    return time >= todayStart.getTime() && time <= todayEnd.getTime()
+  })
+  const scopedTodayRecharge = scopedTodayEvents
+    .filter((item) => item.metric === 'recharge')
+    .reduce((sum, item) => sum + Math.abs(Number(item.value ?? 0)), 0)
+  const scopedTodayConsume = scopedTodayEvents
+    .filter((item) => item.metric === 'consume')
+    .reduce((sum, item) => sum + Math.abs(Number(item.value ?? 0)), 0)
+  const uniqueRegularUserCount = new Set(filteredRegularUserProfiles.value.map((item) => item.userId)).size
+  const uniqueAgentCount = new Set(filteredAgentProfiles.value.map((item) => item.userId)).size
+  const scopedCustomerCount = activeRole.value === 'agent'
+    ? filteredAgentCustomers.value.length
+    : uniqueRegularUserCount + uniqueAgentCount
   return [
     {
       key: 'platform-applications',
       label: '平台应用',
-      value: String(metrics?.platformApplicationCount ?? platformApplications),
+      value: String(appScoped ? 1 : metrics?.platformApplicationCount ?? platformApplications),
     },
     {
       key: 'customer-accounts',
       label: activeRole.value === 'agent' ? '客户数量' : '客户数量(含代理)',
-      value: String(metrics?.customerAccountCount ?? filteredCustomerProfiles.value.length),
+      value: String(
+        activeRole.value === 'agent'
+          ? (appScoped ? scopedCustomerCount : metrics?.customerAccountCount ?? scopedCustomerCount)
+          : scopedCustomerCount,
+      ),
     },
     {
       key: 'pending-settlement',
       label: '待结算',
-      value: String(metrics?.pendingSettlementCount ?? metrics?.draftSettlementCount ?? 0),
+      value: String(
+        appScoped && activeRole.value === 'agent'
+          ? filteredAgentDraftSettlementCount.value
+          : metrics?.pendingSettlementCount ?? metrics?.draftSettlementCount ?? 0,
+      ),
     },
     {
       key: 'today-orders',
-      label: '今日订单金额',
-      value: formatCurrencyAmount(metrics?.todayOrderAmount ?? 0),
+      label: '今日充值积分',
+      value: Number(appScoped ? scopedTodayRecharge : metrics?.todayRechargedCredits ?? metrics?.todayOrderAmount ?? 0).toLocaleString('zh-CN'),
     },
     {
       key: 'today-consume',
       label: '今日消耗积分',
-      value: Number(metrics?.todayConsumedCredits ?? 0).toLocaleString('zh-CN'),
+      value: Number(appScoped ? scopedTodayConsume : metrics?.todayConsumedCredits ?? 0).toLocaleString('zh-CN'),
     },
   ]
 })
@@ -528,7 +726,7 @@ function getTrendPeriodRange(period: TrendPeriod) {
 
 function buildDashboardTrendSeries() {
   const { start, end } = getTrendPeriodRange(dashboardTrendPeriod.value)
-  const filtered = dashboardTrendEvents.value.filter((item) => {
+  const filtered = scopedDashboardTrendEvents.value.filter((item) => {
     const time = new Date(item.occurredAt).getTime()
     return (
       item.metric === dashboardTrendMetric.value &&
@@ -591,7 +789,7 @@ const dashboardPlanPieData = computed(() => {
 })
 
 function renderDashboardPlanPieChart() {
-  if (activeRole.value === 'developer' || !dashboardPlanPieChartRef.value) {
+  if (!activeRoleDashboardPage.value || !dashboardPlanPieChartRef.value) {
     if (!dashboardPlanPieChartRef.value && dashboardPlanPieChartInstance) {
       dashboardPlanPieChartInstance.dispose()
       dashboardPlanPieChartInstance = null
@@ -657,7 +855,7 @@ function renderDashboardPlanPieChart() {
 }
 
 function renderDashboardTrendChart() {
-  if (activeRole.value === 'developer' || !dashboardTrendChartRef.value) {
+  if (!activeRoleDashboardPage.value || !dashboardTrendChartRef.value) {
     if (!dashboardTrendChartRef.value && dashboardTrendChartInstance) {
       dashboardTrendChartInstance.dispose()
       dashboardTrendChartInstance = null
@@ -832,6 +1030,304 @@ function renderAgentConsumerBarChart() {
   requestAnimationFrame(() => {
     agentConsumerBarChartInstance?.resize()
   })
+}
+
+function isGlobalCustomerChartsVisible() {
+  return (
+    (activeRole.value === 'developer' && activeDeveloperConsolePage.value === 'developer-customers') ||
+    (activeRole.value === 'admin' && activeAdminConsolePage.value === 'admin-users')
+  )
+}
+
+function isGlobalLedgerChartsVisible() {
+  return (
+    (activeRole.value === 'developer' && activeDeveloperConsolePage.value === 'developer-transactions') ||
+    (activeRole.value === 'admin' && activeAdminConsolePage.value === 'admin-transactions')
+  )
+}
+
+function renderGlobalCustomerBarChart() {
+  if (!isGlobalCustomerChartsVisible() || !globalCustomerBarChartRef.value) {
+    if (!globalCustomerBarChartRef.value && globalCustomerBarChartInstance) {
+      globalCustomerBarChartInstance.dispose()
+      globalCustomerBarChartInstance = null
+    }
+    return
+  }
+
+  if (
+    globalCustomerBarChartInstance &&
+    globalCustomerBarChartInstance.getDom() !== globalCustomerBarChartRef.value
+  ) {
+    globalCustomerBarChartInstance.dispose()
+    globalCustomerBarChartInstance = null
+  }
+
+  if (!globalCustomerBarChartInstance) {
+    globalCustomerBarChartInstance = echarts.init(globalCustomerBarChartRef.value)
+  }
+
+  const rows = globalTopTopUpCustomers.value
+  const labels = rows.map((item) => item.displayName || item.username).reverse()
+  const values = rows.map((item) => Number(item.totalTopUpCredits ?? 0)).reverse()
+
+  globalCustomerBarChartInstance.resize()
+  globalCustomerBarChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff'],
+    grid: { left: 16, right: 20, top: 16, bottom: 8, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: Array<{ axisValue: string; data: number }>) => {
+        const point = params[0]
+        return point ? `${point.axisValue}<br/>累计充值积分：${Number(point.data).toLocaleString('zh-CN')} 积分` : ''
+      },
+    },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.14)' } },
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: 11,
+        formatter: (value: number) => (value >= 10000 ? `${Number(value / 10000).toFixed(1)}万` : String(value)),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#475569', fontSize: 12, fontWeight: 800, width: 96, overflow: 'truncate' },
+    },
+    series: [
+      {
+        name: '累计充值积分',
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { borderRadius: [0, 6, 6, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#334155',
+          fontSize: 12,
+          fontWeight: 800,
+          formatter: (params: { value: number }) => Number(params.value).toLocaleString('zh-CN'),
+        },
+        data: values,
+      },
+    ],
+  })
+  requestAnimationFrame(() => globalCustomerBarChartInstance?.resize())
+}
+
+function renderGlobalCustomerPieChart() {
+  if (!isGlobalCustomerChartsVisible() || !globalCustomerPieChartRef.value) {
+    if (!globalCustomerPieChartRef.value && globalCustomerPieChartInstance) {
+      globalCustomerPieChartInstance.dispose()
+      globalCustomerPieChartInstance = null
+    }
+    return
+  }
+
+  if (
+    globalCustomerPieChartInstance &&
+    globalCustomerPieChartInstance.getDom() !== globalCustomerPieChartRef.value
+  ) {
+    globalCustomerPieChartInstance.dispose()
+    globalCustomerPieChartInstance = null
+  }
+
+  if (!globalCustomerPieChartInstance) {
+    globalCustomerPieChartInstance = echarts.init(globalCustomerPieChartRef.value)
+  }
+
+  const data = globalCustomerUserTypePieData.value
+  const hasData = data.some((item) => item.value > 0)
+
+  globalCustomerPieChartInstance.resize()
+  globalCustomerPieChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#18b77d', '#f59e0b', '#94a3b8'],
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: { name: string; value: number; percent: number }) =>
+        `${params.name}<br/>客户数：${Number(params.value).toLocaleString('zh-CN')}<br/>占比：${params.percent}%`,
+    },
+    legend: {
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 12, fontWeight: 800 },
+    },
+    series: [
+      {
+        name: '用户类型',
+        type: 'pie',
+        radius: hasData ? ['44%', '76%'] : ['0%', '0%'],
+        center: ['50%', '43%'],
+        label: { formatter: '{d}%', color: '#334155', fontSize: 13, fontWeight: 800 },
+        labelLine: { length: 8, length2: 6 },
+        data: hasData ? data : [{ name: '暂无客户', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      },
+    ],
+  })
+  requestAnimationFrame(() => globalCustomerPieChartInstance?.resize())
+}
+
+function renderGlobalLedgerConsumerBarChart() {
+  if (!isGlobalLedgerChartsVisible() || !globalLedgerConsumerBarChartRef.value) {
+    if (!globalLedgerConsumerBarChartRef.value && globalLedgerConsumerBarChartInstance) {
+      globalLedgerConsumerBarChartInstance.dispose()
+      globalLedgerConsumerBarChartInstance = null
+    }
+    return
+  }
+
+  if (
+    globalLedgerConsumerBarChartInstance &&
+    globalLedgerConsumerBarChartInstance.getDom() !== globalLedgerConsumerBarChartRef.value
+  ) {
+    globalLedgerConsumerBarChartInstance.dispose()
+    globalLedgerConsumerBarChartInstance = null
+  }
+
+  if (!globalLedgerConsumerBarChartInstance) {
+    globalLedgerConsumerBarChartInstance = echarts.init(globalLedgerConsumerBarChartRef.value)
+  }
+
+  const rows = globalLedgerTopCreditConsumers.value
+  const labels = rows.map((item) => item.customerDisplayName || item.customerUsername || '客户').reverse()
+  const values = rows.map((item) => item.consumedCredits).reverse()
+
+  globalLedgerConsumerBarChartInstance.resize()
+  globalLedgerConsumerBarChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff'],
+    grid: { left: 16, right: 20, top: 16, bottom: 8, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: Array<{ axisValue: string; data: number; dataIndex: number }>) => {
+        const point = params[0]
+        if (!point) return ''
+        const row = [...rows].reverse()[point.dataIndex]
+        return [
+          point.axisValue,
+          `累计消费：${Number(point.data).toLocaleString('zh-CN')} 积分`,
+          `消费次数：${Number(row?.transactionCount ?? 0).toLocaleString('zh-CN')}`,
+        ].join('<br/>')
+      },
+    },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.14)' } },
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: 11,
+        formatter: (value: number) => (value >= 10000 ? `${value / 10000}万` : String(value)),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#475569', fontSize: 12, fontWeight: 800, width: 96, overflow: 'truncate' },
+    },
+    series: [
+      {
+        name: '累计消费',
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { borderRadius: [0, 6, 6, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#334155',
+          fontSize: 12,
+          fontWeight: 800,
+          formatter: (params: { value: number }) => Number(params.value).toLocaleString('zh-CN'),
+        },
+        data: values,
+      },
+    ],
+  })
+  requestAnimationFrame(() => globalLedgerConsumerBarChartInstance?.resize())
+}
+
+function renderGlobalFunctionUsagePieChart() {
+  if (!isGlobalLedgerChartsVisible() || !globalFunctionUsagePieChartRef.value) {
+    if (!globalFunctionUsagePieChartRef.value && globalFunctionUsagePieChartInstance) {
+      globalFunctionUsagePieChartInstance.dispose()
+      globalFunctionUsagePieChartInstance = null
+    }
+    return
+  }
+
+  if (
+    globalFunctionUsagePieChartInstance &&
+    globalFunctionUsagePieChartInstance.getDom() !== globalFunctionUsagePieChartRef.value
+  ) {
+    globalFunctionUsagePieChartInstance.dispose()
+    globalFunctionUsagePieChartInstance = null
+  }
+
+  if (!globalFunctionUsagePieChartInstance) {
+    globalFunctionUsagePieChartInstance = echarts.init(globalFunctionUsagePieChartRef.value)
+  }
+
+  const data = globalFunctionUsagePieData.value.map((item) => ({
+    name: item.name,
+    value: item.value,
+    consumedCredits: item.consumedCredits,
+  }))
+  const hasData = data.some((item) => item.value > 0)
+
+  globalFunctionUsagePieChartInstance.resize()
+  globalFunctionUsagePieChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff', '#27c4b9', '#f7c948', '#f97316', '#8b5cf6'],
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: { name: string; value: number; percent: number; data?: { consumedCredits?: number } }) =>
+        `${params.name}<br/>次数：${Number(params.value).toLocaleString('zh-CN')}<br/>消费：${Number(params.data?.consumedCredits ?? 0).toLocaleString('zh-CN')} 积分<br/>占比：${params.percent}%`,
+    },
+    legend: {
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 12, fontWeight: 800 },
+    },
+    series: [
+      {
+        name: '功能使用',
+        type: 'pie',
+        radius: hasData ? ['44%', '76%'] : ['0%', '0%'],
+        center: ['50%', '43%'],
+        label: { formatter: '{d}%', color: '#334155', fontSize: 13, fontWeight: 800 },
+        labelLine: { length: 8, length2: 6 },
+        data: hasData ? data : [{ name: '暂无功能使用', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      },
+    ],
+  })
+  requestAnimationFrame(() => globalFunctionUsagePieChartInstance?.resize())
 }
 
 function renderAgentUserTypePieChart() {
@@ -1077,6 +1573,10 @@ function renderAgentFunctionUsagePieChart() {
 function resizeConsoleCharts() {
   dashboardTrendChartInstance?.resize()
   dashboardPlanPieChartInstance?.resize()
+  globalCustomerBarChartInstance?.resize()
+  globalCustomerPieChartInstance?.resize()
+  globalLedgerConsumerBarChartInstance?.resize()
+  globalFunctionUsagePieChartInstance?.resize()
   agentConsumerBarChartInstance?.resize()
   agentUserTypePieChartInstance?.resize()
   agentLedgerConsumerBarChartInstance?.resize()
@@ -1091,12 +1591,18 @@ watch(
     dashboardPlanPieData,
     selectedApplicationCode,
     activeRole,
+    activeDeveloperConsolePage,
+    activeAdminConsolePage,
     activeAgentConsolePage,
   ],
   async () => {
     await nextTick()
     renderDashboardTrendChart()
     renderDashboardPlanPieChart()
+    renderGlobalCustomerBarChart()
+    renderGlobalCustomerPieChart()
+    renderGlobalLedgerConsumerBarChart()
+    renderGlobalFunctionUsagePieChart()
     renderAgentConsumerBarChart()
     renderAgentUserTypePieChart()
     renderAgentLedgerConsumerBarChart()
@@ -1110,6 +1616,19 @@ watch(
   ([role, page]) => {
     if (role === 'agent' && page === 'agent-consumption') {
       void loadAgentTransactionsLedger()
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  [activeRole, activeDeveloperConsolePage, activeAdminConsolePage],
+  ([role, developerPage, adminPage]) => {
+    if (
+      (role === 'developer' && developerPage === 'developer-transactions') ||
+      (role === 'admin' && adminPage === 'admin-transactions')
+    ) {
+      void loadPlatformTransactionsLedger()
     }
   },
   { immediate: true },
@@ -1151,6 +1670,23 @@ const createTargetOptions = computed(() => {
 const selectedApplicationLabel = computed(() =>
   applicationFilterOptions.value.find((item) => item.code === selectedApplicationCode.value)?.name ??
   '全部应用',
+)
+
+watch(
+  [selectedApplicationCode, selectedApplicationLabel, applicationFilterOptions],
+  ([selectedCode, selectedLabel, options]) => {
+    if (!options.some((item) => item.code === selectedCode)) {
+      emit('update:selectedApplicationCode', 'all')
+      return
+    }
+
+    emit('application-context-change', {
+      selectedCode,
+      selectedLabel,
+      options: options.map((item) => ({ ...item })),
+    })
+  },
+  { immediate: true, deep: true },
 )
 
 function matchesSelectedApplication(applicationCode?: string | null) {
@@ -1217,6 +1753,12 @@ const filteredCustomerProfiles = computed(() =>
   customerProfiles.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
 )
 
+const globalLedgerTransactions = computed(() =>
+  (platformTransactionsLedger.value?.transactions ?? []).filter((item) =>
+    matchesSelectedApplication(item.applicationCode),
+  ),
+)
+
 const filteredAgentProfiles = computed(() =>
   platformAgents.value.filter((item) =>
     selectedApplicationCode.value === 'all' || item.applications.includes(selectedApplicationCode.value),
@@ -1229,6 +1771,12 @@ const searchedAdminAgentProfiles = computed(() =>
   ),
 )
 
+const searchedAgentPolicyOverrides = computed(() =>
+  agentPolicyOverrides.value.filter((item) =>
+    matchesUsernameOrPhone(adminAgentSearchQuery.value, item.username, item.phone),
+  ),
+)
+
 const filteredRegularUserProfiles = computed(() =>
   filteredCustomerProfiles.value.filter((item) => matrixTargetRole(item.role) === 'user'),
 )
@@ -1237,6 +1785,140 @@ const searchedRegularUserProfiles = computed(() =>
   filteredRegularUserProfiles.value.filter((item) =>
     matchesUsernameOrPhone(adminCustomerSearchQuery.value, item.username, item.phone),
   ),
+)
+
+const globalTopTopUpCustomers = computed(() =>
+  [...filteredRegularUserProfiles.value]
+    .filter((item) => Number(item.totalTopUpCredits ?? 0) > 0)
+    .sort((a, b) => {
+      const topUpDiff = Number(b.totalTopUpCredits ?? 0) - Number(a.totalTopUpCredits ?? 0)
+      if (topUpDiff !== 0) return topUpDiff
+      return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+    })
+    .slice(0, 5),
+)
+
+const agentUserTypeDefinitions = [
+  {
+    code: 'active',
+    label: '活跃用户',
+    description: '1月内有充值且有积分消费的平台使用记录',
+  },
+  {
+    code: 'potential',
+    label: '潜力用户',
+    description: '1-3月内有充值，但近期消费/使用频率未达到活跃标准',
+  },
+  {
+    code: 'low_frequency',
+    label: '低频用户',
+    description: '6月内或更早曾充值/消费，但近期使用较少',
+  },
+] as const
+
+function normalizeAgentUserTypeCode(value?: string | null) {
+  if (value === 'active' || value === 'potential' || value === 'low_frequency') return value
+  return 'low_frequency'
+}
+
+const globalCustomerUserTypePieData = computed(() =>
+  agentUserTypeDefinitions.map((definition) => ({
+    name: definition.label,
+    value: filteredRegularUserProfiles.value.filter(
+      (item) => normalizeAgentUserTypeCode(item.userType?.code) === definition.code,
+    ).length,
+    description: definition.description,
+  })),
+)
+
+const globalLedgerTopCreditConsumers = computed(() => {
+  const grouped = new Map<string, {
+    customerUserId: string
+    customerUsername: string | null
+    customerDisplayName: string | null
+    customerPhone: string | null
+    consumedCredits: number
+    transactionCount: number
+    lastConsumedAt: string | null
+  }>()
+
+  for (const item of globalLedgerTransactions.value) {
+    if (item.txnType !== 'settle') continue
+    const consumedCredits = Math.abs(Number(item.points ?? 0))
+    if (consumedCredits <= 0) continue
+    const customerUserId = String(item.customerUserId ?? item.userId)
+    const existing = grouped.get(customerUserId) ?? {
+      customerUserId,
+      customerUsername: item.customerUsername ?? null,
+      customerDisplayName: item.customerDisplayName ?? null,
+      customerPhone: item.customerPhone ?? null,
+      consumedCredits: 0,
+      transactionCount: 0,
+      lastConsumedAt: null,
+    }
+    existing.consumedCredits += consumedCredits
+    existing.transactionCount += 1
+    if (!existing.lastConsumedAt || item.createdAt > existing.lastConsumedAt) {
+      existing.lastConsumedAt = item.createdAt
+    }
+    grouped.set(customerUserId, existing)
+  }
+
+  return Array.from(grouped.values())
+    .sort((a, b) => {
+      const consumedDiff = b.consumedCredits - a.consumedCredits
+      if (consumedDiff !== 0) return consumedDiff
+      return (b.lastConsumedAt ?? '').localeCompare(a.lastConsumedAt ?? '')
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      ...item,
+      consumedCredits: Number(item.consumedCredits.toFixed(4)),
+    }))
+})
+
+const globalFunctionUsagePieData = computed(() => {
+  const grouped = new Map<string, {
+    name: string
+    value: number
+    consumedCredits: number
+  }>()
+
+  for (const item of globalLedgerTransactions.value) {
+    if (item.txnType !== 'settle') continue
+    const name = item.functionName ?? item.functionCode ?? '未标记功能'
+    const existing = grouped.get(name) ?? {
+      name,
+      value: 0,
+      consumedCredits: 0,
+    }
+    existing.value += 1
+    existing.consumedCredits += Math.abs(Number(item.points ?? 0))
+    grouped.set(name, existing)
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    const countDiff = b.value - a.value
+    if (countDiff !== 0) return countDiff
+    return b.consumedCredits - a.consumedCredits
+  })
+})
+
+watch(
+  [
+    globalTopTopUpCustomers,
+    globalCustomerUserTypePieData,
+    globalLedgerTopCreditConsumers,
+    globalFunctionUsagePieData,
+  ],
+  async () => {
+    await nextTick()
+    renderGlobalCustomerBarChart()
+    renderGlobalCustomerPieChart()
+    renderGlobalLedgerConsumerBarChart()
+    renderGlobalFunctionUsagePieChart()
+  },
+  { deep: true },
 )
 
 const agentCustomerCountByUserId = computed(
@@ -1354,29 +2036,6 @@ const searchedAgentCustomers = computed(() =>
   ),
 )
 
-const agentUserTypeDefinitions = [
-  {
-    code: 'active',
-    label: '活跃用户',
-    description: '1月内有充值且有积分消费的平台使用记录',
-  },
-  {
-    code: 'potential',
-    label: '潜力用户',
-    description: '1-3月内有充值，但近期消费/使用频率未达到活跃标准',
-  },
-  {
-    code: 'low_frequency',
-    label: '低频用户',
-    description: '6月内或更早曾充值/消费，但近期使用较少',
-  },
-] as const
-
-function normalizeAgentUserTypeCode(value?: string | null) {
-  if (value === 'active' || value === 'potential' || value === 'low_frequency') return value
-  return 'low_frequency'
-}
-
 const agentTopTopUpCustomers = computed(() =>
   [...filteredAgentCustomers.value]
     .filter((item) => Number(item.totalTopUpCredits ?? 0) > 0)
@@ -1420,6 +2079,14 @@ watch(
 
 const filteredAgentCommissions = computed(() =>
   agentCommissions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const filteredAgentPreviewCommissionPoints = computed(() =>
+  filteredAgentCommissions.value.reduce((sum, item) => sum + Number(item.commissionPoints ?? 0), 0),
+)
+
+const filteredAgentDraftSettlementCount = computed(
+  () => filteredAgentCommissions.value.filter((item) => item.status === 'preview' || item.status === 'draft').length,
 )
 
 const effectiveAccountCreationPolicy = computed(() => {
@@ -1466,6 +2133,18 @@ function syncSelectedPlanFromCatalog() {
   syncPlanInitialPoints(createAccountForm.planCode)
 }
 
+function syncSelectedConnectPlanFromCatalog() {
+  if (!connectSubscriptionPlans.value.length) {
+    connectApplicationForm.planCode = ''
+    return
+  }
+
+  const selectedPlanExists = connectSubscriptionPlans.value.some((plan) => plan.code === connectApplicationForm.planCode)
+  if (!selectedPlanExists) {
+    connectApplicationForm.planCode = connectSubscriptionPlans.value[0].code
+  }
+}
+
 async function loadCreatePlanOptions(applicationCode: string) {
   if (!applicationCode || loadedPlanApplicationCode.value === applicationCode) {
     syncSelectedPlanFromCatalog()
@@ -1485,6 +2164,28 @@ async function loadCreatePlanOptions(applicationCode: string) {
     message.error(error instanceof Error ? error.message : '订阅计划加载失败')
   } finally {
     isLoadingPlanOptions.value = false
+  }
+}
+
+async function loadConnectPlanOptions(applicationCode: string) {
+  if (!applicationCode || loadedConnectPlanApplicationCode.value === applicationCode) {
+    syncSelectedConnectPlanFromCatalog()
+    return
+  }
+
+  isLoadingConnectPlanOptions.value = true
+  try {
+    const result = await getPlatformSubscriptionPlans({ applicationCode })
+    connectSubscriptionPlans.value = result.items
+    loadedConnectPlanApplicationCode.value = applicationCode
+    syncSelectedConnectPlanFromCatalog()
+  } catch (error) {
+    connectSubscriptionPlans.value = []
+    loadedConnectPlanApplicationCode.value = ''
+    syncSelectedConnectPlanFromCatalog()
+    message.error(error instanceof Error ? error.message : '订阅计划加载失败')
+  } finally {
+    isLoadingConnectPlanOptions.value = false
   }
 }
 
@@ -1538,6 +2239,31 @@ function canMutateCustomer(row: CreditsCustomerProfile) {
   return false
 }
 
+function canEditPlatformProfile(
+  targetRole: PlatformEditableProfileRole | null,
+  userId?: string,
+  status?: string | null,
+) {
+  if (!targetRole || targetRole === 'developer') return false
+  if (userId && authStore.userInfo?.id === userId) return false
+  if (status && status !== 'active') return false
+
+  if (activeRole.value === 'developer' && authStore.role === 'developer') {
+    return targetRole === 'admin' || targetRole === 'agent' || targetRole === 'user'
+  }
+
+  if (activeRole.value === 'admin' && authStore.role === 'admin') {
+    return targetRole === 'agent' || targetRole === 'user'
+  }
+
+  return false
+}
+
+function platformProfileRoleLabel(role: PlatformEditableProfileRole) {
+  if (role === 'developer') return '开发者'
+  return targetRoleLabel(role)
+}
+
 function canAdjustCustomer(row: CreditsCustomerProfile) {
   return (
     activeRole.value === 'developer' &&
@@ -1555,6 +2281,98 @@ function canDeleteCustomer(row: CreditsCustomerProfile) {
     targetRole !== 'developer' &&
     authStore.permissions.includes(`account:delete:${targetRole}`)
   )
+}
+
+function canResetPlatformPassword(targetUserId?: string) {
+  const isSelfReset = !!targetUserId && targetUserId === authStore.userInfo?.id
+  if (
+    isSelfReset &&
+    (authStore.role === 'developer' || authStore.role === 'admin' || authStore.role === 'agent')
+  ) {
+    return true
+  }
+  return activeRole.value === 'developer' && authStore.role === 'developer'
+}
+
+function openPasswordResetModal(row: PasswordResetTableRow) {
+  if (!canResetPlatformPassword(row.userId)) {
+    message.warning('只能修改自己的登录密码；Developer 可重置其他后台账号')
+    return
+  }
+  passwordResetForm.userId = row.userId
+  passwordResetForm.username = row.username
+  passwordResetForm.displayName = row.displayName
+  passwordResetForm.password = ''
+  passwordResetForm.confirmPassword = ''
+  isPasswordResetModalOpen.value = true
+}
+
+function openCurrentBackOfficePasswordResetModal() {
+  const user = authStore.userInfo
+  if (!user || (authStore.role !== 'developer' && authStore.role !== 'admin' && authStore.role !== 'agent')) {
+    message.warning('只有后台账号可以修改登录密码')
+    return
+  }
+  openPasswordResetModal({
+    userId: user.id,
+    username: user.username,
+    displayName: user.displayName,
+  })
+}
+
+function renderPasswordManagementCell(row: PasswordResetTableRow) {
+  return h(
+    'div',
+    { class: 'admin-password-cell' },
+    [
+      h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: 'default',
+        },
+        { default: () => '已加密' },
+      ),
+      h(
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          disabled: !canResetPlatformPassword(row.userId),
+          onClick: () => openPasswordResetModal(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:lock-reset' }),
+          default: () => '重置',
+        },
+      ),
+    ],
+  )
+}
+
+function passwordManagementColumn<T extends PasswordResetTableRow>(): DataTableColumns<T>[number] {
+  return {
+    title: '登陆密码',
+    key: 'loginPassword',
+    width: 170,
+    render(row) {
+      return renderPasswordManagementCell(row)
+    },
+  }
+}
+
+function withPasswordManagementColumn<T extends PasswordResetTableRow>(
+  columns: DataTableColumns<T>,
+): DataTableColumns<T> {
+  const column = passwordManagementColumn<T>()
+  const actionIndex = columns.findIndex((item) => 'key' in item && item.key === 'actions')
+  if (actionIndex < 0) return [...columns, column]
+  return [
+    ...columns.slice(0, actionIndex),
+    column,
+    ...columns.slice(actionIndex),
+  ]
 }
 
 function canPromoteCustomer(row: CreditsCustomerProfile) {
@@ -1677,6 +2495,26 @@ function formatSignedPoints(value: number | string | null | undefined) {
   return `${sign}${numeric.toLocaleString('zh-CN')}`
 }
 
+function displayPointsForLedgerTransaction(row: AgentCustomerLedgerTransaction) {
+  const points = Number(row.points ?? 0)
+  if (!Number.isFinite(points)) return 0
+  if (row.txnType === 'estimate' || row.txnType === 'freeze' || row.txnType === 'settle') {
+    return -Math.abs(points)
+  }
+  if (row.txnType === 'refund' || row.txnType === 'recharge' || row.txnType === 'bonus' || row.txnType === 'grant') {
+    return Math.abs(points)
+  }
+  return points
+}
+
+function ledgerPointsClass(row: AgentCustomerLedgerTransaction) {
+  return displayPointsForLedgerTransaction(row) >= 0 ? 'admin-delta is-up' : 'admin-delta is-down'
+}
+
+function formatLedgerSignedPoints(row: AgentCustomerLedgerTransaction) {
+  return formatSignedPoints(displayPointsForLedgerTransaction(row))
+}
+
 function ledgerSourceText(row: AgentCustomerLedgerTransaction) {
   return row.functionName ?? row.functionCode ?? row.remark ?? row.bizType ?? row.txnType
 }
@@ -1739,6 +2577,96 @@ function canCreateTargetRole(role: PlatformUserTargetRole) {
 function defaultApplicationCode() {
   if (selectedApplicationCode.value !== 'all') return selectedApplicationCode.value
   return applicationCatalog.value[0]?.code ?? 'used-car-platform'
+}
+
+function targetConnectableApplication(existingApplications: readonly string[]) {
+  const existing = new Set(existingApplications)
+  const selected = selectedApplicationCode.value !== 'all' ? selectedApplicationCode.value : ''
+  if (selected && !existing.has(selected)) return selected
+  return applicationCatalog.value.find((item) => !existing.has(item.code))?.code ?? applicationCatalog.value[0]?.code ?? 'used-car-platform'
+}
+
+function customerApplicationsForUser(userId: string) {
+  const applications = new Set<string>()
+  for (const row of overview.value?.customerProfiles ?? []) {
+    if (row.userId === userId && row.status === 'active') {
+      applications.add(row.applicationCode)
+    }
+  }
+  return [...applications].sort()
+}
+
+function agentApplicationsForUser(userId: string) {
+  return platformAgents.value.find((row) => row.userId === userId)?.applications ?? []
+}
+
+function canConnectApplicationToTarget(targetRole: 'agent' | 'user', userId: string, status?: string | null) {
+  if (activeRole.value !== 'developer' && activeRole.value !== 'admin') return false
+  if (authStore.userInfo?.id === userId) return false
+  if (status && status !== 'active') return false
+  return targetRole === 'agent' || targetRole === 'user'
+}
+
+async function openConnectApplicationModal(params: {
+  userId: string
+  username: string
+  displayName: string
+  targetRole: 'agent' | 'user'
+  existingApplications: readonly string[]
+  status?: string | null
+}) {
+  if (!canConnectApplicationToTarget(params.targetRole, params.userId, params.status)) {
+    message.warning('当前账号无权为该对象接入应用')
+    return
+  }
+
+  connectApplicationForm.userId = params.userId
+  connectApplicationForm.username = params.username
+  connectApplicationForm.displayName = params.displayName
+  connectApplicationForm.targetRole = params.targetRole
+  connectApplicationForm.existingApplications = [...params.existingApplications]
+  connectApplicationForm.applicationCode = targetConnectableApplication(params.existingApplications)
+  connectApplicationForm.planCode = ''
+  connectSubscriptionPlans.value = []
+  loadedConnectPlanApplicationCode.value = ''
+  isConnectApplicationModalOpen.value = true
+  await loadConnectPlanOptions(connectApplicationForm.applicationCode)
+}
+
+async function handleConnectApplication() {
+  if (!connectApplicationForm.userId) {
+    message.error('请选择需要接入应用的账号')
+    return
+  }
+  if (!connectApplicationForm.applicationCode) {
+    message.error('请选择接入应用')
+    return
+  }
+  if (
+    !connectApplicationForm.planCode ||
+    !connectSubscriptionPlans.value.some((plan) => plan.code === connectApplicationForm.planCode)
+  ) {
+    message.error('请选择当前应用可用的订阅计划')
+    return
+  }
+
+  isConnectingApplication.value = true
+  try {
+    const result = await connectPlatformUserApplication(connectApplicationForm.userId, {
+      applicationCode: connectApplicationForm.applicationCode,
+      planCode: connectApplicationForm.planCode,
+      reason: `${activeRole.value} 接入应用`,
+    })
+    message.success(
+      `已为 ${result.user.displayName} 接入 ${formatApplicationDisplayName(result.applicationCode)}`,
+    )
+    isConnectApplicationModalOpen.value = false
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '接入应用失败')
+  } finally {
+    isConnectingApplication.value = false
+  }
 }
 
 function resetCreateAccountForm(role: PlatformUserTargetRole) {
@@ -2019,7 +2947,7 @@ async function handleDisableAgent(row: PlatformAgentProfile) {
     const result = await disablePlatformAgent(row.userId, {
       reason: 'back-office disabled Agent role',
     })
-    message.success(`已禁用代理商：${result.user.displayName}，账号已回到客户目录`)
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到客户表`)
     await refreshOverview()
   } catch (error) {
     message.error(error instanceof Error ? error.message : '禁用代理商失败')
@@ -2039,7 +2967,7 @@ async function handleDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
     const result = await disablePlatformAgent(row.userId, {
       reason: 'back-office disabled Agent role',
     })
-    message.success(`已禁用代理商：${result.user.displayName}，账号已回到客户目录`)
+    message.success(`已禁用代理商：${result.user.displayName}，账号已回到客户表`)
     await refreshOverview()
   } catch (error) {
     message.error(error instanceof Error ? error.message : '禁用代理商失败')
@@ -2176,6 +3104,46 @@ async function handleDeleteAccount() {
   }
 }
 
+async function handleResetPlatformPassword() {
+  if (!canResetPlatformPassword(passwordResetForm.userId)) {
+    message.error('只能修改自己的登录密码；Developer 可重置其他后台账号')
+    return
+  }
+  const password = passwordResetForm.password
+  const confirmPassword = passwordResetForm.confirmPassword
+  if (!passwordResetForm.userId) {
+    message.error('请选择要重置密码的账号')
+    return
+  }
+  if (password.length < 6) {
+    message.error('新密码至少 6 位')
+    return
+  }
+  if (password !== confirmPassword) {
+    message.error('两次输入的密码不一致')
+    return
+  }
+
+  isResettingPassword.value = true
+  try {
+    const result = await resetPlatformUserPassword(passwordResetForm.userId, {
+      password,
+      reason: passwordResetForm.userId === authStore.userInfo?.id
+        ? 'Back-office user reset own login password from console'
+        : 'Developer reset login password from console',
+    })
+    message.success(`已重置 ${result.user.displayName} 的登录密码`)
+    isPasswordResetModalOpen.value = false
+    passwordResetForm.password = ''
+    passwordResetForm.confirmPassword = ''
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '重置登录密码失败')
+  } finally {
+    isResettingPassword.value = false
+  }
+}
+
 async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
   selectedAgentCustomer.value = row
   agentCustomerLedger.value = null
@@ -2190,6 +3158,96 @@ async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
   }
 }
 
+function openEditAgentCustomer(row: AgentOperationsCustomer) {
+  selectedAgentCustomer.value = row
+  editAgentCustomerForm.relationId = row.id
+  editAgentCustomerForm.displayName = row.customerDisplayName || row.customerUsername
+  editAgentCustomerForm.phone = row.customerPhone ?? ''
+  isEditAgentCustomerOpen.value = true
+}
+
+async function handleUpdateAgentCustomerProfile() {
+  const relationId = editAgentCustomerForm.relationId
+  const displayName = editAgentCustomerForm.displayName.trim()
+  const phone = editAgentCustomerForm.phone.trim()
+  if (!relationId || !selectedAgentCustomer.value) {
+    message.error('请选择要编辑的客户')
+    return
+  }
+  if (!displayName) {
+    message.error('显示名称不能为空')
+    return
+  }
+
+  isUpdatingAgentCustomer.value = true
+  try {
+    const result = await updateAgentCustomerProfile(relationId, {
+      displayName,
+      phone: phone || null,
+    })
+    message.success(`已更新 ${result.customerDisplayName} 的客户资料`)
+    isEditAgentCustomerOpen.value = false
+    await refreshOverview()
+    if (isAgentCustomerLedgerOpen.value && agentCustomerLedger.value?.customer.id === relationId) {
+      agentCustomerLedger.value = await getAgentCustomerLedger(relationId)
+    }
+    await loadAgentTransactionsLedger()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新客户资料失败')
+  } finally {
+    isUpdatingAgentCustomer.value = false
+  }
+}
+
+function openEditPlatformUserProfile(row: PlatformEditableProfileRow, targetRole: PlatformEditableProfileRole) {
+  if (!canEditPlatformProfile(targetRole, row.userId, row.status)) {
+    message.warning('当前角色不能编辑该账号资料')
+    return
+  }
+
+  editPlatformUserProfileForm.userId = row.userId
+  editPlatformUserProfileForm.username = row.username
+  editPlatformUserProfileForm.targetRole = targetRole
+  editPlatformUserProfileForm.displayName = row.displayName || row.username
+  editPlatformUserProfileForm.phone = row.phone ?? ''
+  isEditPlatformUserProfileOpen.value = true
+}
+
+async function handleUpdatePlatformUserProfile() {
+  const userId = editPlatformUserProfileForm.userId
+  const targetRole = editPlatformUserProfileForm.targetRole
+  const displayName = editPlatformUserProfileForm.displayName.trim()
+  const phone = editPlatformUserProfileForm.phone.trim()
+  if (!userId) {
+    message.error('请选择要编辑的账号')
+    return
+  }
+  if (!displayName) {
+    message.error('显示名称不能为空')
+    return
+  }
+  if (!canEditPlatformProfile(targetRole, userId)) {
+    message.error('当前角色不能编辑该账号资料')
+    return
+  }
+
+  isUpdatingPlatformUserProfile.value = true
+  try {
+    const result = await updatePlatformUserProfile(userId, {
+      displayName,
+      phone: phone || null,
+      reason: 'Back-office updated platform user profile from console',
+    })
+    message.success(`已更新 ${result.user.displayName} 的账号资料`)
+    isEditPlatformUserProfileOpen.value = false
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新账号资料失败')
+  } finally {
+    isUpdatingPlatformUserProfile.value = false
+  }
+}
+
 async function loadAgentTransactionsLedger() {
   if (activeRole.value !== 'agent') return
   isLoadingAgentTransactionsLedger.value = true
@@ -2199,6 +3257,18 @@ async function loadAgentTransactionsLedger() {
     message.error(error instanceof Error ? error.message : '加载流水表失败')
   } finally {
     isLoadingAgentTransactionsLedger.value = false
+  }
+}
+
+async function loadPlatformTransactionsLedger() {
+  if (activeRole.value !== 'developer' && activeRole.value !== 'admin') return
+  isLoadingPlatformTransactionsLedger.value = true
+  try {
+    platformTransactionsLedger.value = await getPlatformTransactionsLedger()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载全平台流水表失败')
+  } finally {
+    isLoadingPlatformTransactionsLedger.value = false
   }
 }
 
@@ -2381,13 +3451,20 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   {
     title: '能力操作',
     key: 'actions',
-    width: 300,
+    width: 420,
     render(row) {
       const canViewLedger = canViewCustomerLedger()
+      const targetRole = matrixTargetRole(row.role)
+      const canEditProfile =
+        targetRole === 'user' &&
+        canEditPlatformProfile(targetRole, row.userId, row.status)
       const canAdjust = canAdjustCustomer(row)
       const canDelete = canDeleteCustomer(row)
       const canPromote = canPromoteCustomer(row)
-      if (!canViewLedger && !canAdjust && !canDelete && !canPromote) return '-'
+      const canConnectApplication =
+        targetRole === 'user' &&
+        canConnectApplicationToTarget('user', row.userId, row.status)
+      if (!canViewLedger && !canEditProfile && !canAdjust && !canDelete && !canPromote && !canConnectApplication) return '-'
 
       const actions = []
       if (canViewLedger) {
@@ -2402,6 +3479,22 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
             {
               icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
               default: () => '查看详情',
+            },
+          ),
+        )
+      }
+      if (canEditProfile) {
+        actions.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => openEditPlatformUserProfile(row, 'user'),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑资料',
             },
           ),
         )
@@ -2421,6 +3514,30 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
             {
               icon: () => h(Icon, { icon: 'mdi:account-arrow-up-outline' }),
               default: () => '升级为代理',
+            },
+          ),
+        )
+      }
+      if (canConnectApplication) {
+        actions.push(
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              onClick: () => void openConnectApplicationModal({
+                userId: row.userId,
+                username: row.username,
+                displayName: row.displayName,
+                targetRole: 'user',
+                existingApplications: customerApplicationsForUser(row.userId),
+                status: row.status,
+              }),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:apps' }),
+              default: () => '接入应用',
             },
           ),
         )
@@ -2544,7 +3661,37 @@ const adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride> =
       )
     },
   },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 130,
+    render(row) {
+      return h(
+        'div',
+        { class: 'admin-table-actions' },
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              disabled: !canEditPlatformProfile('admin', row.userId),
+              onClick: () => openEditPlatformUserProfile(row, 'admin'),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑资料',
+            },
+          ),
+        ],
+      )
+    },
+  },
 ]
+
+const developerAdminAuthorizationColumns = computed<DataTableColumns<PlatformAdminPolicyOverride>>(() =>
+  withPasswordManagementColumn(adminAuthorizationColumns),
+)
 
 const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> = [
   {
@@ -2714,27 +3861,70 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
   {
     title: '管理动作',
     key: 'actions',
-    width: 150,
+    width: 360,
     render(row) {
       const isBusy = disablingAgentUserId.value === row.userId
       return h(
-        NButton,
-        {
-          size: 'small',
-          type: 'error',
-          secondary: true,
-          loading: isBusy,
-          disabled: isBusy || !canDisableAgentPolicy(row),
-          onClick: () => handleDisableAgentPolicy(row),
-        },
-        {
-          icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
-          default: () => '禁用代理商',
-        },
+        'div',
+        { class: 'admin-table-actions' },
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              disabled: !canEditPlatformProfile('agent', row.userId),
+              onClick: () => openEditPlatformUserProfile(row, 'agent'),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑资料',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              disabled: !canConnectApplicationToTarget('agent', row.userId),
+              onClick: () => void openConnectApplicationModal({
+                userId: row.userId,
+                username: row.username,
+                displayName: row.displayName,
+                targetRole: 'agent',
+                existingApplications: agentApplicationsForUser(row.userId),
+              }),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:apps' }),
+              default: () => '接入应用',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'error',
+              secondary: true,
+              loading: isBusy,
+              disabled: isBusy || !canDisableAgentPolicy(row),
+              onClick: () => handleDisableAgentPolicy(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
+              default: () => '禁用代理商',
+            },
+          ),
+        ],
       )
     },
   },
 ]
+
+const developerAgentAuthorizationColumns = computed<DataTableColumns<PlatformAgentPolicyOverride>>(() =>
+  withPasswordManagementColumn(agentAuthorizationColumns),
+)
 
 const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
   {
@@ -2798,27 +3988,71 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
   {
     title: '管理动作',
     key: 'actions',
-    width: 150,
+    width: 360,
     render(row) {
       const isBusy = disablingAgentUserId.value === row.userId
       return h(
-        NButton,
-        {
-          size: 'small',
-          type: 'error',
-          secondary: true,
-          loading: isBusy,
-          disabled: isBusy || !canDisableAgent(row),
-          onClick: () => handleDisableAgent(row),
-        },
-        {
-          icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
-          default: () => '禁用代理商',
-        },
+        'div',
+        { class: 'admin-table-actions' },
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              disabled: !canEditPlatformProfile('agent', row.userId, row.status),
+              onClick: () => openEditPlatformUserProfile(row, 'agent'),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑资料',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              disabled: !canConnectApplicationToTarget('agent', row.userId, row.status),
+              onClick: () => void openConnectApplicationModal({
+                userId: row.userId,
+                username: row.username,
+                displayName: row.displayName,
+                targetRole: 'agent',
+                existingApplications: row.applications,
+                status: row.status,
+              }),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:apps' }),
+              default: () => '接入应用',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'error',
+              secondary: true,
+              loading: isBusy,
+              disabled: isBusy || !canDisableAgent(row),
+              onClick: () => handleDisableAgent(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:account-cancel-outline' }),
+              default: () => '禁用代理商',
+            },
+          ),
+        ],
       )
     },
   },
 ]
+
+const developerCustomerColumns = computed<DataTableColumns<CreditsCustomerProfile>>(() =>
+  withPasswordManagementColumn(customerColumns),
+)
 
 const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
   {
@@ -2882,19 +4116,37 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
   {
     title: '操作',
     key: 'actions',
-    width: 130,
+    width: 200,
     render(row) {
       return h(
-        NButton,
-        {
-          size: 'small',
-          secondary: true,
-          onClick: () => void openAgentCustomerLedger(row),
-        },
-        {
-          icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
-          default: () => '查看详情',
-        },
+        'div',
+        { class: 'admin-table-actions' },
+        [
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => openEditAgentCustomer(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => void openAgentCustomerLedger(row),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+              default: () => '详情',
+            },
+          ),
+        ],
       )
     },
   },
@@ -2932,8 +4184,8 @@ const agentCustomerLedgerColumns: DataTableColumns<AgentCustomerLedgerTransactio
     render(row) {
       return h(
         'span',
-        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
-        formatSignedPoints(row.points),
+        { class: ledgerPointsClass(row) },
+        formatLedgerSignedPoints(row),
       )
     },
   },
@@ -3026,8 +4278,8 @@ const agentTransactionsColumns: DataTableColumns<AgentCustomerLedgerTransaction>
     render(row) {
       return h(
         'span',
-        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
-        formatSignedPoints(row.points),
+        { class: ledgerPointsClass(row) },
+        formatLedgerSignedPoints(row),
       )
     },
   },
@@ -3334,190 +4586,412 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
         <p v-if="lastError" class="admin-error">{{ lastError }}</p>
         <p v-if="interactionFeedback" class="admin-feedback">{{ interactionFeedback }}</p>
 
-        <template v-if="activeRole !== 'developer'">
-          <section
-            v-if="platformDashboard && (activeRole !== 'agent' || activeAgentConsolePage === 'agent-dashboard')"
-            :id="activeRole === 'agent' ? 'agent-dashboard-insights' : 'admin-dashboard'"
-            class="admin-dashboard-insights"
-            aria-label="系统概览、积分趋势与套餐占比"
-          >
-            <article class="admin-system-overview-card">
-              <div class="admin-trend-head">
-                <h2>系统概览</h2>
-              </div>
-              <ul class="admin-system-overview-list">
-                <li v-for="item in adminSystemOverviewList" :key="item.key">
-                  <span>{{ item.label }}</span>
-                  <strong>{{ item.value }}</strong>
-                </li>
-              </ul>
-            </article>
+        <section
+          v-if="platformDashboard && activeRoleDashboardPage"
+          :id="activeRole === 'developer' ? 'developer-dashboard' : activeRole === 'admin' ? 'admin-dashboard' : 'agent-dashboard-insights'"
+          class="admin-dashboard-insights"
+          aria-label="系统概览、积分趋势与套餐占比"
+        >
+          <article class="admin-system-overview-card">
+            <div class="admin-trend-head">
+              <h2>系统概览</h2>
+            </div>
+            <ul class="admin-system-overview-list">
+              <li v-for="item in adminSystemOverviewList" :key="item.key">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </li>
+            </ul>
+          </article>
 
-            <article class="admin-trend-card" aria-label="积分趋势">
-              <div class="admin-trend-head">
-                <h2>{{ dashboardTrendTitle }}</h2>
-                <div class="admin-chip-group">
-                  <button
-                    v-for="option in trendPeriodOptions"
-                    :key="option.value"
-                    type="button"
-                    class="admin-chip"
-                    :class="{ active: dashboardTrendPeriod === option.value }"
-                    @click="dashboardTrendPeriod = option.value"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
-              </div>
-              <div class="admin-chip-group admin-chip-group-metric">
+          <article class="admin-trend-card" aria-label="积分趋势">
+            <div class="admin-trend-head">
+              <h2>{{ dashboardTrendTitle }}</h2>
+              <div class="admin-chip-group">
                 <button
-                  v-for="option in trendMetricOptions"
+                  v-for="option in trendPeriodOptions"
                   :key="option.value"
                   type="button"
                   class="admin-chip"
-                  :class="{ active: dashboardTrendMetric === option.value }"
-                  @click="dashboardTrendMetric = option.value"
+                  :class="{ active: dashboardTrendPeriod === option.value }"
+                  @click="dashboardTrendPeriod = option.value"
                 >
                   {{ option.label }}
                 </button>
               </div>
-              <div ref="dashboardTrendChartRef" class="admin-trend-chart" />
-            </article>
+            </div>
+            <div class="admin-chip-group admin-chip-group-metric">
+              <button
+                v-for="option in trendMetricOptions"
+                :key="option.value"
+                type="button"
+                class="admin-chip"
+                :class="{ active: dashboardTrendMetric === option.value }"
+                @click="dashboardTrendMetric = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+            <div ref="dashboardTrendChartRef" class="admin-trend-chart" />
+          </article>
 
-            <article class="admin-plan-pie-card" aria-label="套餐占比">
-              <div class="admin-trend-head">
-                <h2>套餐占比</h2>
-              </div>
-              <div ref="dashboardPlanPieChartRef" class="admin-plan-pie-chart" />
-            </article>
+          <article class="admin-plan-pie-card" aria-label="套餐占比">
+            <div class="admin-trend-head">
+              <h2>套餐占比</h2>
+            </div>
+            <div ref="dashboardPlanPieChartRef" class="admin-plan-pie-chart" />
+          </article>
 
-            <article class="admin-filter-band" aria-label="应用筛选">
-              <div class="admin-filter-current">
-                <p>当前筛选</p>
-                <strong>{{ selectedApplicationLabel }}</strong>
-                <span v-if="selectedApplicationCode === 'all'">跨应用平台视图</span>
-              </div>
-              <div class="admin-filter-options">
-                <button
-                  v-for="item in applicationFilterOptions"
-                  :key="item.code"
-                  type="button"
-                  class="admin-filter-chip"
-                  :class="{ active: selectedApplicationCode === item.code }"
-                  @click="selectedApplicationCode = item.code"
-                >
-                  <span>{{ item.name }}</span>
-                  <small>{{ item.statusText }}</small>
-                </button>
-              </div>
-            </article>
-          </section>
-        </template>
+          <article class="admin-filter-band" aria-label="应用筛选">
+            <div class="admin-filter-current">
+              <p>当前筛选</p>
+              <strong>{{ selectedApplicationLabel }}</strong>
+              <span v-if="selectedApplicationCode === 'all'">跨应用平台视图</span>
+            </div>
+            <div class="admin-filter-options">
+              <button
+                v-for="item in applicationFilterOptions"
+                :key="item.code"
+                type="button"
+                class="admin-filter-chip"
+                :class="{ active: selectedApplicationCode === item.code }"
+                @click="selectedApplicationCode = item.code"
+              >
+                <span>{{ item.name }}</span>
+                <small>{{ item.statusText }}</small>
+              </button>
+            </div>
+          </article>
+        </section>
 
-        <DeveloperHomeDashboard
-          v-if="activeRole === 'developer'"
-          :is-loading="isLoading"
-          :overview="overview"
-          :platform-dashboard="platformDashboard"
-          :selected-application-code="selectedApplicationCode"
-          :application-catalog="applicationCatalog"
-          :filtered-customer-profiles="filteredRegularUserProfiles"
-          :customer-columns="customerColumns"
-          :admin-policy-overrides="adminPolicyOverrides"
-          :agent-policy-overrides="agentPolicyOverrides"
-          :account-creation-policy-state="accountCreationPolicyState"
-          :is-function-billing-open="isFunctionBillingOpen"
-          :selected-application-functions="selectedApplicationFunctions"
-          :function-columns="functionColumns"
-          :admin-authorization-columns="adminAuthorizationColumns"
-          :agent-authorization-columns="agentAuthorizationColumns"
-          :selected-application-label="selectedApplicationLabel"
-          :collapse-storage-key="`credits-admin:developer-management-collapse:${authStore.userInfo?.id ?? 'anonymous'}`"
-          @refresh="refreshOverview"
-          @create-account="openCreateAccountModal"
-          @update:selected-application-code="selectedApplicationCode = $event"
-          @update:is-function-billing-open="isFunctionBillingOpen = $event"
-        />
+        <section
+          v-if="activeRole === 'developer' && activeDeveloperConsolePage === 'developer-dashboard'"
+          id="developer-account-controls"
+          class="admin-section"
+        >
+          <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <span>
+              <strong>账号与权限</strong>
+              <small>开发者可创建 Admin、Agent 和 User，并配置全局创建权限。</small>
+            </span>
+          </button>
+          <div class="admin-collapse-body">
+            <div class="admin-action-row" aria-label="开发者创建账号">
+              <NButton type="primary" @click="openCreateAccountModal('admin')">
+                <template #icon>
+                  <Icon icon="mdi:account-tie-outline" />
+                </template>
+                创建 Admin
+              </NButton>
+              <NButton @click="openCreateAccountModal('agent')">
+                <template #icon>
+                  <Icon icon="mdi:handshake-outline" />
+                </template>
+                创建 Agent
+              </NButton>
+              <NButton @click="openCreateAccountModal('user')">
+                <template #icon>
+                  <Icon icon="mdi:account-plus-outline" />
+                </template>
+                创建 User
+              </NButton>
+            </div>
+            <div class="admin-toggle-grid">
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许公司管理员创建 User</h3>
+                  <p>一级总开关；关闭后所有 Admin 不能创建 User。</p>
+                </div>
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateUsers" />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许公司管理员创建 Agent</h3>
+                  <p>一级总开关；关闭后所有 Admin 不能创建 Agent，也不能让 User 成为 Agent。</p>
+                </div>
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers" />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许代理商创建 User</h3>
+                  <p>一级覆盖开关；关闭后所有 Agent 不能创建 User。</p>
+                </div>
+                <NSwitch v-model:value="accountCreationPolicyState.developerAllowsAgentCreateUsers" />
+              </article>
+            </div>
+          </div>
+        </section>
 
-        <template v-else-if="activeRole === 'admin'">
-          <section id="admin-agents" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminAccountCreation')"
-              @click="toggleConsoleSection('adminAccountCreation')"
-            >
+        <section
+          v-if="activeRole === 'admin' && activeAdminConsolePage === 'admin-dashboard'"
+          id="admin-account-creation"
+          class="admin-section"
+        >
+          <button
+            type="button"
+            class="admin-collapse-head"
+            :aria-expanded="isConsoleSectionOpen('adminAccountCreation')"
+            @click="toggleConsoleSection('adminAccountCreation')"
+          >
+            <span>
+              <strong>账号创建权限</strong>
+              <small>公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。</small>
+            </span>
+            <Icon
+              icon="mdi:chevron-down"
+              :class="{ rotated: isConsoleSectionOpen('adminAccountCreation') }"
+            />
+          </button>
+          <div v-if="isConsoleSectionOpen('adminAccountCreation')" class="admin-collapse-body">
+            <div class="admin-action-row" aria-label="公司管理员创建账号">
+              <NButton
+                type="primary"
+                :disabled="!effectiveAccountCreationPolicy.adminCanCreateUsers"
+                @click="openCreateAccountModal('user')"
+              >
+                <template #icon>
+                  <Icon icon="mdi:account-plus-outline" />
+                </template>
+                创建 User
+              </NButton>
+              <NButton
+                :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
+                @click="openCreateAccountModal('agent')"
+              >
+                <template #icon>
+                  <Icon icon="mdi:handshake-outline" />
+                </template>
+                创建 Agent
+              </NButton>
+            </div>
+            <div class="admin-toggle-grid">
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>公司管理员创建 User</h3>
+                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
+                </div>
+                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>公司管理员创建 Agent</h3>
+                  <p>{{ effectiveAccountCreationPolicy.adminCanCreateAgents ? '开发者已开启' : '开发者已关闭' }}</p>
+                </div>
+                <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateAgents" disabled />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许代理商创建 User</h3>
+                  <p>公司管理员主开关；若开发者禁用代理商权限，此开关不会生效。</p>
+                </div>
+                <NSwitch
+                  v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
+                  :disabled="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
+                />
+              </article>
+              <article class="admin-toggle-card">
+                <div>
+                  <h3>允许 User 成为 Agent</h3>
+                  <p>公司管理员开关；若开发者关闭公司管理员创建 Agent，此开关不会生效。</p>
+                </div>
+                <NSwitch
+                  v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
+                  :disabled="!accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers"
+                />
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <template v-if="activeRole === 'developer'">
+          <section v-if="activeDeveloperConsolePage === 'developer-admins'" id="developer-admins" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
               <span>
-                <strong>账号创建权限</strong>
-                <small>公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。</small>
+                <strong>管理员表</strong>
+                <small>{{ adminPolicyOverrides.length }} 条记录；查看 Admin 信息并配置公司管理员创建权限。</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminAccountCreation') }"
-              />
             </button>
-            <div v-if="isConsoleSectionOpen('adminAccountCreation')" class="admin-collapse-body">
-              <div class="admin-action-row" aria-label="公司管理员创建账号">
-                <NButton
-                  type="primary"
-                  :disabled="!effectiveAccountCreationPolicy.adminCanCreateUsers"
-                  @click="openCreateAccountModal('user')"
-                >
-                  <template #icon>
-                    <Icon icon="mdi:account-plus-outline" />
-                  </template>
-                  创建 User
-                </NButton>
-                <NButton
-                  :disabled="!effectiveAccountCreationPolicy.adminCanCreateAgents"
-                  @click="openCreateAccountModal('agent')"
-                >
-                  <template #icon>
-                    <Icon icon="mdi:handshake-outline" />
-                  </template>
-                  创建 Agent
-                </NButton>
-              </div>
-              <div class="admin-toggle-grid">
-                <article class="admin-toggle-card">
-                  <div>
-                    <h3>公司管理员创建 User</h3>
-                    <p>{{ effectiveAccountCreationPolicy.adminCanCreateUsers ? '开发者已开启' : '开发者已关闭' }}</p>
-                  </div>
-                  <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateUsers" disabled />
-                </article>
-                <article class="admin-toggle-card">
-                  <div>
-                    <h3>公司管理员创建 Agent</h3>
-                    <p>{{ effectiveAccountCreationPolicy.adminCanCreateAgents ? '开发者已开启' : '开发者已关闭' }}</p>
-                  </div>
-                  <NSwitch :value="effectiveAccountCreationPolicy.adminCanCreateAgents" disabled />
-                </article>
-                <article class="admin-toggle-card">
-                  <div>
-                    <h3>允许代理商创建 User</h3>
-                    <p>公司管理员主开关；若开发者禁用代理商权限，此开关不会生效。</p>
-                  </div>
-                  <NSwitch
-                    v-model:value="accountCreationPolicyState.adminAllowsAgentCreateUsers"
-                    :disabled="!accountCreationPolicyState.developerAllowsAgentCreateUsers"
-                  />
-                </article>
-                <article class="admin-toggle-card">
-                  <div>
-                    <h3>允许 User 成为 Agent</h3>
-                    <p>公司管理员开关；若开发者关闭公司管理员创建 Agent，此开关不会生效。</p>
-                  </div>
-                  <NSwitch
-                    v-model:value="accountCreationPolicyState.adminAllowsUserBecomeAgent"
-                    :disabled="!accountCreationPolicyState.developerAllowsAdminCreateAgentsAndUsers"
-                  />
-                </article>
-              </div>
+            <div class="admin-collapse-body">
+              <NDataTable
+                v-if="adminPolicyOverrides.length"
+                :columns="developerAdminAuthorizationColumns"
+                :data="adminPolicyOverrides"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无公司管理员账号" />
             </div>
           </section>
 
-          <section id="admin-users" class="admin-section">
+          <section v-if="activeDeveloperConsolePage === 'developer-agents'" id="developer-agents" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>代理商表</strong>
+                <small>{{ searchedAgentPolicyOverrides.length }} 条记录；全平台 Agent 创建权限、押金、返佣比例与禁用管理。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <div class="admin-table-toolbar">
+                <NInput
+                  v-model:value="adminAgentSearchQuery"
+                  clearable
+                  placeholder="按 username 或手机号搜索代理商"
+                  class="admin-table-search"
+                >
+                  <template #prefix>
+                    <Icon icon="mdi:magnify" />
+                  </template>
+                </NInput>
+              </div>
+              <NDataTable
+                v-if="searchedAgentPolicyOverrides.length"
+                :columns="developerAgentAuthorizationColumns"
+                :data="searchedAgentPolicyOverrides"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else :description="agentPolicyOverrides.length ? '没有匹配的代理商账号' : '暂无代理商账号'" />
+            </div>
+          </section>
+
+          <section v-if="activeDeveloperConsolePage === 'developer-customers'" id="developer-customers" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>客户表</strong>
+                <small>{{ searchedRegularUserProfiles.length }} 条记录；开发者可读取全平台客户余额/流水。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <div v-if="filteredRegularUserProfiles.length" class="agent-customer-insights-grid">
+                <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 积分充值客户</h2>
+                  </div>
+                  <div ref="globalCustomerBarChartRef" class="agent-customer-bar-chart" />
+                </section>
+                <section class="agent-customer-chart-panel" aria-label="客户用户类型分布">
+                  <div class="admin-trend-head">
+                    <h2>用户类型分布</h2>
+                  </div>
+                  <div ref="globalCustomerPieChartRef" class="agent-customer-pie-chart" />
+                </section>
+              </div>
+              <div class="admin-table-toolbar">
+                <NInput
+                  v-model:value="adminCustomerSearchQuery"
+                  clearable
+                  placeholder="按 username 或手机号搜索客户"
+                  class="admin-table-search"
+                >
+                  <template #prefix>
+                    <Icon icon="mdi:magnify" />
+                  </template>
+                </NInput>
+              </div>
+              <NDataTable
+                v-if="searchedRegularUserProfiles.length"
+                :columns="developerCustomerColumns"
+                :data="searchedRegularUserProfiles"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else :description="filteredRegularUserProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
+            </div>
+          </section>
+
+          <section v-if="activeDeveloperConsolePage === 'developer-transactions'" id="developer-transactions" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>流水表</strong>
+                <small>{{ globalLedgerTransactions.length }} 条记录；开发者查看全平台积分流水。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <div v-if="globalLedgerTransactions.length" class="agent-ledger-insights-grid">
+                <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 积分消费客户</h2>
+                  </div>
+                  <div ref="globalLedgerConsumerBarChartRef" class="agent-ledger-bar-chart" />
+                </section>
+                <section class="agent-ledger-chart-panel" aria-label="功能使用分布">
+                  <div class="admin-trend-head">
+                    <h2>功能使用分布</h2>
+                  </div>
+                  <div ref="globalFunctionUsagePieChartRef" class="agent-ledger-pie-chart" />
+                </section>
+              </div>
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('developer-global-ledger', globalLedgerTransactions)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NSpin :show="isLoadingPlatformTransactionsLedger">
+                <NDataTable
+                  v-if="globalLedgerTransactions.length"
+                  :columns="agentTransactionsColumns"
+                  :data="globalLedgerTransactions"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="{ pageSize: 20 }"
+                />
+                <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
+              </NSpin>
+            </div>
+          </section>
+
+          <section v-if="activeDeveloperConsolePage === 'developer-settlements'" id="developer-settlements" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>结算审批</strong>
+                <small>{{ settlementApplications.length }} 条记录；开发者查看全平台结算申请。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <NDataTable
+                v-if="settlementApplications.length"
+                :columns="settlementApplicationColumns"
+                :data="settlementApplications"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty v-else description="暂无结算申请" />
+            </div>
+          </section>
+
+          <section v-if="activeDeveloperConsolePage === 'developer-billing'" id="developer-billing" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>跨应用功能计费配置 · {{ selectedApplicationLabel }}</strong>
+                <small>按当前应用筛选功能编码、计费模式、默认积分与状态。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <NDataTable
+                v-if="selectedApplicationFunctions.length"
+                :columns="functionColumns"
+                :data="selectedApplicationFunctions"
+                :bordered="false"
+                :single-line="false"
+                :pagination="false"
+              />
+              <NEmpty
+                v-else
+                :description="selectedApplicationCode === 'all' ? '请先选择一个应用后查看功能计费配置' : '暂无功能计费配置'"
+              />
+            </div>
+          </section>
+        </template>
+
+        <template v-else-if="activeRole === 'admin'">
+          <section v-if="activeAdminConsolePage === 'admin-agents'" id="admin-agents" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -3525,7 +4999,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('adminAgents')"
             >
               <span>
-                <strong>代理商管理</strong>
+                <strong>代理商表</strong>
                 <small>{{ searchedAdminAgentProfiles.length }} 条记录；公司管理员可以创建 Agent，并可禁用 Agent。</small>
               </span>
               <Icon
@@ -3558,7 +5032,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </div>
           </section>
 
-          <section id="admin-settlements" class="admin-section">
+          <section v-if="activeAdminConsolePage === 'admin-users'" id="admin-users" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -3566,7 +5040,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('adminUsers')"
             >
               <span>
-                <strong>客户目录</strong>
+                <strong>客户表</strong>
                 <small>{{ searchedRegularUserProfiles.length }} 条记录；公司管理员可读取全部客户余额/流水。</small>
               </span>
               <Icon
@@ -3575,6 +5049,20 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               />
             </button>
             <div v-if="isConsoleSectionOpen('adminUsers')" class="admin-collapse-body">
+              <div v-if="filteredRegularUserProfiles.length" class="agent-customer-insights-grid">
+                <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 积分充值客户</h2>
+                  </div>
+                  <div ref="globalCustomerBarChartRef" class="agent-customer-bar-chart" />
+                </section>
+                <section class="agent-customer-chart-panel" aria-label="客户用户类型分布">
+                  <div class="admin-trend-head">
+                    <h2>用户类型分布</h2>
+                  </div>
+                  <div ref="globalCustomerPieChartRef" class="agent-customer-pie-chart" />
+                </section>
+              </div>
               <div class="admin-table-toolbar">
                 <NInput
                   v-model:value="adminCustomerSearchQuery"
@@ -3599,7 +5087,51 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </div>
           </section>
 
-          <section class="admin-section">
+          <section v-if="activeAdminConsolePage === 'admin-transactions'" id="admin-transactions" class="admin-section">
+            <button type="button" class="admin-collapse-head" aria-expanded="true">
+              <span>
+                <strong>流水表</strong>
+                <small>{{ globalLedgerTransactions.length }} 条记录；公司管理员查看全平台积分流水。</small>
+              </span>
+            </button>
+            <div class="admin-collapse-body">
+              <div v-if="globalLedgerTransactions.length" class="agent-ledger-insights-grid">
+                <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 积分消费客户</h2>
+                  </div>
+                  <div ref="globalLedgerConsumerBarChartRef" class="agent-ledger-bar-chart" />
+                </section>
+                <section class="agent-ledger-chart-panel" aria-label="功能使用分布">
+                  <div class="admin-trend-head">
+                    <h2>功能使用分布</h2>
+                  </div>
+                  <div ref="globalFunctionUsagePieChartRef" class="agent-ledger-pie-chart" />
+                </section>
+              </div>
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('admin-global-ledger', globalLedgerTransactions)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NSpin :show="isLoadingPlatformTransactionsLedger">
+                <NDataTable
+                  v-if="globalLedgerTransactions.length"
+                  :columns="agentTransactionsColumns"
+                  :data="globalLedgerTransactions"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="{ pageSize: 20 }"
+                />
+                <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
+              </NSpin>
+            </div>
+          </section>
+
+          <section v-if="activeAdminConsolePage === 'admin-settlements'" id="admin-settlements" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -3665,7 +5197,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               <div class="admin-agent-grid" v-if="agentOverview">
                 <article class="admin-agent-card">
                   <h3>自有客户</h3>
-                  <strong>{{ agentOverview.metrics.customerCount }}</strong>
+                  <strong>{{ filteredAgentCustomers.length }}</strong>
                   <p>来自 agent_customer_relations</p>
                 </article>
                 <article class="admin-agent-card">
@@ -3675,12 +5207,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 </article>
                 <article class="admin-agent-card">
                   <h3>预计返佣</h3>
-                  <strong>{{ Number(agentOverview.metrics.previewCommissionPoints).toLocaleString('zh-CN') }}</strong>
+                  <strong>{{ Number(filteredAgentPreviewCommissionPoints).toLocaleString('zh-CN') }}</strong>
                   <p>预览中佣金积分</p>
                 </article>
                 <article class="admin-agent-card">
                   <h3>待确认账单</h3>
-                  <strong>{{ agentOverview.metrics.draftSettlementCount }}</strong>
+                  <strong>{{ filteredAgentDraftSettlementCount }}</strong>
                   <p>待申请返佣账单</p>
                 </article>
               </div>
@@ -3923,6 +5455,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           :bordered="false"
           :single-line="false"
           :pagination="false"
+          :scroll-x="760"
           class="agent-ledger-table"
         />
         <NEmpty v-else description="暂无充值积分流水" />
@@ -3930,6 +5463,109 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           <div class="admin-modal-footer">
             <NButton @click="selectedCommissionDetail = null">
               关闭
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isEditAgentCustomerOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="编辑客户资料"
+        :style="{ width: '520px', maxWidth: '92vw' }"
+        :mask-closable="!isUpdatingAgentCustomer"
+        @update:show="(show) => {
+          if (!show && !isUpdatingAgentCustomer) {
+            selectedAgentCustomer = null
+          }
+        }"
+      >
+        <NForm label-placement="top" class="admin-create-form" :show-feedback="false">
+          <NFormItem label="用户名">
+            <NInput
+              :value="selectedAgentCustomer?.customerUsername ?? '-'"
+              disabled
+            />
+          </NFormItem>
+          <NFormItem label="显示名称" required>
+            <NInput
+              v-model:value="editAgentCustomerForm.displayName"
+              maxlength="120"
+              placeholder="请输入显示名称"
+            />
+          </NFormItem>
+          <NFormItem label="手机号">
+            <NInput
+              v-model:value="editAgentCustomerForm.phone"
+              maxlength="32"
+              placeholder="可留空"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isUpdatingAgentCustomer" @click="isEditAgentCustomerOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isUpdatingAgentCustomer" @click="handleUpdateAgentCustomerProfile">
+              保存
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isEditPlatformUserProfileOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="编辑账号资料"
+        :style="{ width: '520px', maxWidth: '92vw' }"
+        :mask-closable="!isUpdatingPlatformUserProfile"
+        @update:show="(show) => {
+          if (!show && !isUpdatingPlatformUserProfile) {
+            editPlatformUserProfileForm.userId = ''
+            editPlatformUserProfileForm.username = ''
+            editPlatformUserProfileForm.displayName = ''
+            editPlatformUserProfileForm.phone = ''
+          }
+        }"
+      >
+        <NForm label-placement="top" class="admin-create-form" :show-feedback="false">
+          <NFormItem label="用户名">
+            <NInput
+              :value="editPlatformUserProfileForm.username || '-'"
+              disabled
+            />
+          </NFormItem>
+          <NFormItem label="账号角色">
+            <NInput
+              :value="platformProfileRoleLabel(editPlatformUserProfileForm.targetRole)"
+              disabled
+            />
+          </NFormItem>
+          <NFormItem label="显示名称" required>
+            <NInput
+              v-model:value="editPlatformUserProfileForm.displayName"
+              maxlength="120"
+              placeholder="请输入显示名称"
+            />
+          </NFormItem>
+          <NFormItem label="手机号">
+            <NInput
+              v-model:value="editPlatformUserProfileForm.phone"
+              maxlength="32"
+              placeholder="可留空"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isUpdatingPlatformUserProfile" @click="isEditPlatformUserProfileOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isUpdatingPlatformUserProfile" @click="handleUpdatePlatformUserProfile">
+              保存
             </NButton>
           </div>
         </template>
@@ -3989,6 +5625,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             :bordered="false"
             :single-line="false"
             :pagination="false"
+            :scroll-x="980"
             class="agent-ledger-table"
           />
           <NEmpty v-else description="暂无积分流水" />
@@ -3998,6 +5635,50 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           <div class="admin-modal-footer">
             <NButton @click="isAgentCustomerLedgerOpen = false">
               关闭
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isPasswordResetModalOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="重置登陆密码"
+        :style="{ width: '520px', maxWidth: '92vw' }"
+        :mask-closable="!isResettingPassword"
+      >
+        <div class="admin-modal-context">
+          <strong>{{ passwordResetForm.displayName || passwordResetForm.username }}</strong>
+          <span>{{ passwordResetForm.username }} · 密码以加密哈希保存，不能查看原密码</span>
+        </div>
+        <NForm label-placement="top" class="admin-create-form" :show-feedback="false">
+          <NFormItem label="新密码" required>
+            <NInput
+              v-model:value="passwordResetForm.password"
+              type="password"
+              show-password-on="click"
+              maxlength="64"
+              placeholder="至少 6 位"
+            />
+          </NFormItem>
+          <NFormItem label="确认新密码" required>
+            <NInput
+              v-model:value="passwordResetForm.confirmPassword"
+              type="password"
+              show-password-on="click"
+              maxlength="64"
+              placeholder="再次输入新密码"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton :disabled="isResettingPassword" @click="isPasswordResetModalOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isResettingPassword" @click="handleResetPlatformPassword">
+              保存新密码
             </NButton>
           </div>
         </template>
@@ -4091,6 +5772,50 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 <Icon icon="mdi:check" />
               </template>
               创建账号
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
+        v-model:show="isConnectApplicationModalOpen"
+        preset="card"
+        class="admin-create-modal account-create-modal"
+        :style="{ width: '560px', maxWidth: '92vw', maxHeight: 'calc(100vh - 80px)' }"
+        title="接入应用"
+        :mask-closable="!isConnectingApplication"
+      >
+        <div class="admin-modal-context">
+          <strong>{{ connectApplicationForm.displayName }}</strong>
+          <span>{{ connectApplicationForm.username }} · {{ targetRoleLabel(connectApplicationForm.targetRole) }}</span>
+        </div>
+        <NForm label-placement="top" class="admin-create-form account-create-form" :show-feedback="false">
+          <NFormItem label="接入应用" required>
+            <NSelect
+              v-model:value="connectApplicationForm.applicationCode"
+              :options="applicationSelectOptions"
+            />
+          </NFormItem>
+          <NFormItem label="订阅计划" required>
+            <NSelect
+              v-model:value="connectApplicationForm.planCode"
+              :options="connectPlanOptions"
+              :loading="isLoadingConnectPlanOptions"
+              :disabled="isLoadingConnectPlanOptions || connectPlanOptions.length === 0"
+              placeholder="选择当前应用的订阅计划"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer account-create-footer">
+            <NButton :disabled="isConnectingApplication" @click="isConnectApplicationModalOpen = false">
+              取消
+            </NButton>
+            <NButton type="primary" :loading="isConnectingApplication" @click="handleConnectApplication">
+              <template #icon>
+                <Icon icon="mdi:check" />
+              </template>
+              确认接入
             </NButton>
           </div>
         </template>
@@ -4993,6 +6718,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   gap: 8px;
 }
 
+:deep(.admin-password-cell) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 :deep(.admin-auth-switch-cell) {
   display: inline-flex;
   align-items: center;
@@ -5014,6 +6746,21 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
 :deep(.admin-create-modal.n-modal) {
   width: min(720px, calc(100vw - 32px));
+}
+
+:deep(.agent-ledger-modal.n-modal) {
+  width: min(920px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+
+:deep(.agent-ledger-modal .n-card) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+:deep(.agent-ledger-modal .n-card__content) {
+  min-width: 0;
+  overflow: hidden;
 }
 
 :deep(.admin-delta.is-up) {
@@ -5051,6 +6798,77 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   --n-ripple-color: var(--role-accent) !important;
 }
 
+.credits-admin-page :deep(.n-button.n-button--primary-type),
+.credits-admin-page :deep(.n-button.n-button--success-type),
+.credits-admin-page :deep(.n-button.n-button--warning-type),
+.credits-admin-page :deep(.n-button.n-button--error-type) {
+  --n-text-color: #ffffff !important;
+  --n-text-color-hover: #ffffff !important;
+  --n-text-color-pressed: #ffffff !important;
+  --n-text-color-focus: #ffffff !important;
+  --n-text-color-disabled: #64748b !important;
+  --n-icon-color: #ffffff !important;
+  --n-icon-color-hover: #ffffff !important;
+  --n-icon-color-pressed: #ffffff !important;
+  --n-icon-color-focus: #ffffff !important;
+  --n-icon-color-disabled: #64748b !important;
+}
+
+.credits-admin-page :deep(.n-button.n-button--primary-type.n-button--secondary:not(.n-button--disabled):not(:disabled)) {
+  --n-color: var(--role-accent) !important;
+  --n-color-hover: var(--role-accent-strong) !important;
+  --n-color-pressed: var(--role-accent-strong) !important;
+  --n-color-focus: var(--role-accent) !important;
+  --n-border: 1px solid var(--role-accent) !important;
+  --n-border-hover: 1px solid var(--role-accent-strong) !important;
+  --n-border-pressed: 1px solid var(--role-accent-strong) !important;
+  --n-border-focus: 1px solid var(--role-accent) !important;
+}
+
+.credits-admin-page :deep(.n-button.n-button--success-type.n-button--secondary:not(.n-button--disabled):not(:disabled)) {
+  --n-color: #059669 !important;
+  --n-color-hover: #047857 !important;
+  --n-color-pressed: #047857 !important;
+  --n-color-focus: #059669 !important;
+  --n-border: 1px solid #059669 !important;
+  --n-border-hover: 1px solid #047857 !important;
+  --n-border-pressed: 1px solid #047857 !important;
+  --n-border-focus: 1px solid #059669 !important;
+}
+
+.credits-admin-page :deep(.n-button.n-button--warning-type.n-button--secondary:not(.n-button--disabled):not(:disabled)) {
+  --n-color: #d97706 !important;
+  --n-color-hover: #b45309 !important;
+  --n-color-pressed: #b45309 !important;
+  --n-color-focus: #d97706 !important;
+  --n-border: 1px solid #d97706 !important;
+  --n-border-hover: 1px solid #b45309 !important;
+  --n-border-pressed: 1px solid #b45309 !important;
+  --n-border-focus: 1px solid #d97706 !important;
+}
+
+.credits-admin-page :deep(.n-button.n-button--error-type.n-button--secondary:not(.n-button--disabled):not(:disabled)) {
+  --n-color: #dc2626 !important;
+  --n-color-hover: #b91c1c !important;
+  --n-color-pressed: #b91c1c !important;
+  --n-color-focus: #dc2626 !important;
+  --n-border: 1px solid #dc2626 !important;
+  --n-border-hover: 1px solid #b91c1c !important;
+  --n-border-pressed: 1px solid #b91c1c !important;
+  --n-border-focus: 1px solid #dc2626 !important;
+}
+
+.credits-admin-page :deep(.n-button.n-button--primary-type:not(.n-button--disabled):not(:disabled) .n-button__content),
+.credits-admin-page :deep(.n-button.n-button--success-type:not(.n-button--disabled):not(:disabled) .n-button__content),
+.credits-admin-page :deep(.n-button.n-button--warning-type:not(.n-button--disabled):not(:disabled) .n-button__content),
+.credits-admin-page :deep(.n-button.n-button--error-type:not(.n-button--disabled):not(:disabled) .n-button__content),
+.credits-admin-page :deep(.n-button.n-button--primary-type:not(.n-button--disabled):not(:disabled) .iconify),
+.credits-admin-page :deep(.n-button.n-button--success-type:not(.n-button--disabled):not(:disabled) .iconify),
+.credits-admin-page :deep(.n-button.n-button--warning-type:not(.n-button--disabled):not(:disabled) .iconify),
+.credits-admin-page :deep(.n-button.n-button--error-type:not(.n-button--disabled):not(:disabled) .iconify) {
+  color: #ffffff !important;
+}
+
 .credits-admin-page :deep(.n-switch) {
   --n-rail-color-active: var(--role-accent) !important;
   --n-loading-color: var(--role-accent) !important;
@@ -5078,6 +6896,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+  min-width: 0;
 }
 
 .agent-ledger-summary {
@@ -5097,6 +6916,18 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 :deep(.agent-ledger-table .n-data-table-th) {
   color: #8da0bc;
   font-weight: 900;
+}
+
+:deep(.agent-ledger-table) {
+  max-width: 100%;
+}
+
+:deep(.agent-ledger-table .n-data-table-wrapper) {
+  max-width: 100%;
+}
+
+:deep(.agent-ledger-table .n-data-table-td) {
+  overflow-wrap: anywhere;
 }
 
 :deep(.agent-ledger-table .n-data-table-td) {

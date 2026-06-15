@@ -14,7 +14,9 @@ import {
   getAgentOperationsOverview,
   getAgentTransactionsLedger,
   getPlatformCustomerLedger,
+  getPlatformTransactionsLedger,
   listSettlementApplications,
+  updateAgentCustomerProfile,
 } from "./agentOperationsService";
 import { adjustAgentDepositBalance } from "./agentDepositService";
 import {
@@ -27,8 +29,11 @@ import { getCommissionPolicy } from "./commissionPolicyService";
 import { accountCreationPolicyService } from "./accountCreationPolicyService";
 import {
   adjustPlatformUserCredits,
+  connectPlatformUserApplicationByCapability,
   disablePlatformAgentByCapability,
   deletePlatformUserByCapability,
+  resetPlatformUserPasswordByDeveloper,
+  updatePlatformUserProfileByCapability,
 } from "./platformAccountCapabilities";
 import { creditsClient } from "../billing/creditsClient";
 import { listPlatformAgents } from "./platformAgentsService";
@@ -96,6 +101,24 @@ platformRoutes.delete(
 );
 
 platformRoutes.post(
+  "/users/:userId/applications",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await connectPlatformUserApplicationByCapability(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.patch(
+  "/users/:userId/profile",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await updatePlatformUserProfileByCapability(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.post(
   "/users/:userId/promote-agent",
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
@@ -110,6 +133,15 @@ platformRoutes.post(
   asyncHandler(async (req, res) => {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     ok(res, await disablePlatformAgentByCapability(req, userId, req.body ?? {}));
+  }),
+);
+
+platformRoutes.patch(
+  "/users/:userId/password",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    ok(res, await resetPlatformUserPasswordByDeveloper(req, userId, req.body ?? {}));
   }),
 );
 
@@ -146,6 +178,18 @@ platformRoutes.get(
       throw errors.forbidden("admin policy overrides require Developer or Admin role");
     }
     ok(res, await accountCreationPolicyService.listAdminPolicyOverrides());
+  }),
+);
+
+platformRoutes.get(
+  "/developer-accounts",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    if (current.user.role !== "developer") {
+      throw errors.forbidden("developer accounts require Developer role");
+    }
+    ok(res, await accountCreationPolicyService.listDeveloperAccounts());
   }),
 );
 
@@ -336,6 +380,14 @@ platformRoutes.get(
 );
 
 platformRoutes.get(
+  "/transactions",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await getPlatformTransactionsLedger(req));
+  }),
+);
+
+platformRoutes.get(
   "/agent/customers/:relationId/ledger",
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
@@ -343,6 +395,17 @@ platformRoutes.get(
       ? req.params.relationId[0]
       : req.params.relationId;
     ok(res, await getAgentCustomerLedger(req, relationId));
+  }),
+);
+
+platformRoutes.patch(
+  "/agent/customers/:relationId/profile",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const relationId = Array.isArray(req.params.relationId)
+      ? req.params.relationId[0]
+      : req.params.relationId;
+    ok(res, await updateAgentCustomerProfile(req, relationId, req.body ?? {}));
   }),
 );
 

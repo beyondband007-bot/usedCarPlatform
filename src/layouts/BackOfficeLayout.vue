@@ -9,6 +9,10 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 const router = useRouter()
 const activeNavAnchor = ref('')
+const selectedApplicationCode = ref('all')
+const applicationOptions = ref<Array<{ code: string; name: string; statusText: string }>>([])
+const selectedApplicationLabel = ref('全部应用')
+const passwordResetRequestKey = ref(0)
 
 const roleThemeClass = computed(() => {
   if (authStore.role === 'admin') return 'role-theme-admin'
@@ -34,19 +38,21 @@ const navItems = computed(() => {
   if (authStore.role === 'developer') {
     return [
       { label: '系统总览', anchor: 'developer-dashboard', icon: 'mdi:view-dashboard-outline' },
-      { label: '用户/账户管理', anchor: 'developer-permissions', icon: 'mdi:account-cog-outline' },
-      { label: '充值与订单', anchor: 'developer-customers', icon: 'mdi:credit-card-outline' },
-      { label: '代理商管理', anchor: 'developer-permissions', icon: 'mdi:handshake-outline' },
-      { label: '运营记录', anchor: 'developer-trends', icon: 'mdi:chart-timeline-variant' },
-      { label: '结算管理', anchor: 'developer-customers', icon: 'mdi:cash-multiple' },
+      { label: '管理员表', anchor: 'developer-admins', icon: 'mdi:shield-account-outline' },
+      { label: '代理商表', anchor: 'developer-agents', icon: 'mdi:handshake-outline' },
+      { label: '客户表', anchor: 'developer-customers', icon: 'mdi:account-group-outline' },
+      { label: '流水表', anchor: 'developer-transactions', icon: 'mdi:chart-line' },
+      { label: '结算审批', anchor: 'developer-settlements', icon: 'mdi:cash-check' },
+      { label: '功能计费', anchor: 'developer-billing', icon: 'mdi:tune-variant' },
     ]
   }
 
   if (authStore.role === 'admin') {
     return [
       { label: '系统总览', anchor: 'admin-dashboard', icon: 'mdi:view-dashboard-outline' },
-      { label: '代理商管理', anchor: 'admin-agents', icon: 'mdi:handshake-outline' },
-      { label: '客户目录', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
+      { label: '代理商表', anchor: 'admin-agents', icon: 'mdi:handshake-outline' },
+      { label: '客户表', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
+      { label: '流水表', anchor: 'admin-transactions', icon: 'mdi:chart-line' },
       { label: '结算审批', anchor: 'admin-settlements', icon: 'mdi:cash-check' },
     ]
   }
@@ -65,6 +71,13 @@ const navItems = computed(() => {
 
 const activeNavKey = computed(() => activeNavAnchor.value || navItems.value[0]?.anchor)
 
+const appSignalStatus = computed(() => {
+  if (selectedApplicationCode.value === 'all') return '平台视图'
+  return applicationOptions.value.find((item) => item.code === selectedApplicationCode.value)?.statusText ?? '应用视图'
+})
+
+const appSignalLabel = computed(() => selectedApplicationLabel.value || '全部应用')
+
 function getHashNavAnchor() {
   if (typeof window === 'undefined') return ''
   const hash = window.location.hash.replace(/^#/, '')
@@ -74,35 +87,37 @@ function getHashNavAnchor() {
 watch(
   () => authStore.role,
   () => {
-    activeNavAnchor.value = authStore.role === 'agent' ? getHashNavAnchor() : ''
+    activeNavAnchor.value = getHashNavAnchor()
   },
 )
 
 onMounted(() => {
-  if (authStore.role === 'agent') {
-    activeNavAnchor.value = getHashNavAnchor()
-  }
+  activeNavAnchor.value = getHashNavAnchor()
 })
 
 async function handleNavClick(anchor: string) {
   activeNavAnchor.value = anchor
   await nextTick()
-  if (authStore.role === 'agent') {
-    window.history.replaceState(null, '', `#${anchor}`)
-    return
-  }
-  window.requestAnimationFrame(() => {
-    document.getElementById(anchor)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
-    window.history.replaceState(null, '', `#${anchor}`)
-  })
+  window.history.replaceState(null, '', `#${anchor}`)
 }
 
 async function handleLogout() {
   await authStore.logout()
   router.push('/back-office/login')
+}
+
+function handlePasswordResetClick() {
+  passwordResetRequestKey.value += 1
+}
+
+function handleApplicationContextChange(context: {
+  selectedCode: string
+  selectedLabel: string
+  options: Array<{ code: string; name: string; statusText: string }>
+}) {
+  selectedApplicationCode.value = context.selectedCode
+  selectedApplicationLabel.value = context.selectedLabel
+  applicationOptions.value = context.options
 }
 </script>
 
@@ -138,10 +153,21 @@ async function handleLogout() {
         </button>
       </nav>
 
-      <button type="button" class="back-office-logout" @click="handleLogout">
-        <Icon icon="mdi:logout" />
-        退出后台
-      </button>
+      <div class="back-office-bottom-actions">
+        <button
+          v-if="authStore.role === 'developer' || authStore.role === 'admin' || authStore.role === 'agent'"
+          type="button"
+          class="back-office-password-reset"
+          @click="handlePasswordResetClick"
+        >
+          <Icon icon="mdi:lock-reset" />
+          修改登陆密码
+        </button>
+        <button type="button" class="back-office-logout" @click="handleLogout">
+          <Icon icon="mdi:logout" />
+          退出后台
+        </button>
+      </div>
     </aside>
 
     <main class="back-office-main">
@@ -159,7 +185,8 @@ async function handleLogout() {
           </button>
           <div class="back-office-app-signal">
             <Icon icon="mdi:apps" />
-            <span>AI Carxen(车新新)</span>
+            <span>{{ appSignalLabel }}</span>
+            <small>{{ appSignalStatus }}</small>
           </div>
           <div class="back-office-user">
             <span class="back-office-user-avatar">{{ authStore.userName?.slice(0, 1) || 'U' }}</span>
@@ -169,7 +196,13 @@ async function handleLogout() {
       </header>
 
       <div class="back-office-content">
-        <CreditsAdminPage :active-agent-page="authStore.role === 'agent' ? activeNavKey : undefined" />
+        <CreditsAdminPage
+          :active-console-page="activeNavKey"
+          :password-reset-request-key="passwordResetRequestKey"
+          :selected-application-code="selectedApplicationCode"
+          @update:selected-application-code="selectedApplicationCode = $event"
+          @application-context-change="handleApplicationContextChange"
+        />
       </div>
     </main>
   </div>
@@ -322,11 +355,17 @@ async function handleLogout() {
   color: #fff;
 }
 
-.back-office-logout {
+.back-office-bottom-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.back-office-logout,
+.back-office-password-reset {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: auto;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   background: transparent;
@@ -335,6 +374,10 @@ async function handleLogout() {
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.back-office-password-reset {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .back-office-main {
@@ -407,13 +450,31 @@ async function handleLogout() {
   align-items: center;
   gap: 8px;
   min-height: 40px;
+  max-width: 260px;
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  padding: 9px 12px;
+  padding: 7px 12px;
   color: #334155;
   font-size: 13px;
   font-weight: 800;
+}
+
+.back-office-app-signal span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.back-office-app-signal small {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--bo-role-accent-soft);
+  color: var(--bo-role-accent-strong);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .back-office-user {

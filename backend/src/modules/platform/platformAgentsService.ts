@@ -77,6 +77,10 @@ export async function listPlatformAgents(req: Request) {
        SELECT agent_user_id, application_code
        FROM agent_leads
        WHERE status = 'active'
+       UNION
+       SELECT user_id agent_user_id, application_code
+       FROM application_customer_links
+       WHERE status = 'active'
      ) agent_apps ON agent_apps.agent_user_id = u.id
      WHERE boa.role_code = 'agent'
        AND boa.status = 'active'

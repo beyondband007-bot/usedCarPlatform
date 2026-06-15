@@ -76,6 +76,22 @@ export type AgentPolicyOverride = {
   updatedAt: string | null;
 };
 
+export type DeveloperAccount = {
+  userId: string;
+  username: string;
+  displayName: string;
+  phone: string | null;
+  status: string;
+};
+
+type DeveloperAccountRow = RowDataPacket & {
+  user_id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  status: string;
+};
+
 type AdminPolicyOverrideRow = RowDataPacket & {
   user_id: string;
   username: string;
@@ -260,6 +276,33 @@ async function setPolicyEnabled(policyCode: AccountCreationPolicyCode, enabled: 
   }
 
   return getPolicySnapshot();
+}
+
+async function listDeveloperAccounts(): Promise<{ items: DeveloperAccount[] }> {
+  const [rows] = await pool.query<DeveloperAccountRow[]>(
+    `SELECT
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       u.status
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     WHERE boa.role_code = 'developer'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     ORDER BY boa.created_at DESC`,
+  );
+
+  return {
+    items: rows.map((row) => ({
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      phone: row.phone,
+      status: row.status,
+    })),
+  };
 }
 
 async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[] }> {
@@ -533,6 +576,7 @@ export const accountCreationPolicyService = {
   canCreateUser,
   canPromoteUserToAgent,
   getPolicySnapshot,
+  listDeveloperAccounts,
   listAdminPolicyOverrides,
   listAgentPolicyOverrides,
   resolveAccountCreationPolicy,

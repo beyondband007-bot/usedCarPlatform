@@ -7,6 +7,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
+import { normalizePhone, toLocalChinaPhone } from "../auth/verificationService";
 import { listAgentDepositBalances } from "./agentDepositService";
 import { getCommissionPolicy } from "./commissionPolicyService";
 import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
@@ -37,6 +38,10 @@ type AgentCustomerRow = RowDataPacket & {
 };
 
 type AgentCustomerUserType = "active" | "potential" | "low_frequency";
+
+type CountRow = RowDataPacket & {
+  count: number | string;
+};
 
 type AgentCustomerUsageStatsRow = RowDataPacket & {
   account_key: string;
@@ -113,6 +118,17 @@ type BackOfficeOperatorRow = RowDataPacket & {
   username: string;
   display_name: string;
   role_code: string | null;
+};
+
+type PlatformLedgerCustomerRow = RowDataPacket & {
+  credits_user_id: number;
+  application_code: string | null;
+  user_id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  role_code: string | null;
+  account_scope: string | null;
 };
 
 type BackOfficeAdjustmentRemark = {
@@ -324,6 +340,15 @@ const optionalText = (value: unknown, maxLength: number) => {
   return normalized.slice(0, maxLength);
 };
 
+const optionalProfilePhone = (value: unknown) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return null;
+  if (!value.trim()) return null;
+  const normalized = normalizePhone(value);
+  if (!normalized) throw errors.invalidParameter("phone must be a valid mobile number");
+  return normalized;
+};
+
 async function getFirstActiveAgent() {
   const [rows] = await pool.query<AgentUserRow[]>(
     `SELECT u.id, u.username, u.display_name
@@ -481,9 +506,10 @@ async function listCustomerTopUpCredits(rows: AgentCustomerRow[]) {
 
   if (personalCreditsUserIds.length) {
     const [personalRows] = await creditsDb.query<CustomerTopUpRow[]>(
-      `SELECT user_id, COALESCE(SUM(points + bonus_points), 0) total_points
-       FROM payment_orders
-       WHERE status = 'paid'
+      `SELECT user_id, COALESCE(SUM(points), 0) total_points
+       FROM credit_transactions
+       WHERE points > 0
+         AND txn_type IN ('recharge', 'bonus')
          AND tenant_id IS NULL
          AND user_id IN (:userIds)
        GROUP BY user_id`,
@@ -496,9 +522,10 @@ async function listCustomerTopUpCredits(rows: AgentCustomerRow[]) {
 
   if (tenantIds.length) {
     const [tenantRows] = await creditsDb.query<CustomerTopUpRow[]>(
-      `SELECT tenant_id, COALESCE(SUM(points + bonus_points), 0) total_points
-       FROM payment_orders
-       WHERE status = 'paid'
+      `SELECT tenant_id, COALESCE(SUM(points), 0) total_points
+       FROM credit_transactions
+       WHERE points > 0
+         AND txn_type IN ('recharge', 'bonus')
          AND tenant_id IN (:tenantIds)
        GROUP BY tenant_id`,
       { tenantIds },
@@ -776,6 +803,10 @@ function parseBackOfficeAdjustmentRemark(remark: string | null): BackOfficeAdjus
   }
 }
 
+function isBackOfficeManualCreditsTransaction(row: Pick<CreditsTransactionRow, "biz_type">) {
+  return row.biz_type === "back-office-adjustment" || row.biz_type === "back-office-recharge";
+}
+
 async function loadBackOfficeOperatorsByUserId(userIds: string[]) {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
   const result = new Map<string, BackOfficeOperatorRow>();
@@ -858,7 +889,7 @@ async function listLedgerTransactions(input: {
   );
 
   const operatorUserIds = rows
-    .filter((row) => row.biz_type === "back-office-adjustment")
+    .filter(isBackOfficeManualCreditsTransaction)
     .map((row) => parseBackOfficeAdjustmentRemark(row.remark)?.operatorUserId)
     .filter((userId): userId is string => Boolean(userId));
   const operatorByUserId = await loadBackOfficeOperatorsByUserId(operatorUserIds);
@@ -866,7 +897,7 @@ async function listLedgerTransactions(input: {
   return rows.map((row) => {
     const member = memberByCreditsUserId.get(row.user_id);
     const adjustmentRemark =
-      row.biz_type === "back-office-adjustment"
+      isBackOfficeManualCreditsTransaction(row)
         ? parseBackOfficeAdjustmentRemark(row.remark)
         : null;
     const operator = adjustmentRemark?.operatorUserId
@@ -904,6 +935,166 @@ async function listLedgerTransactions(input: {
       createdAt: row.created_at.toISOString(),
     };
   });
+}
+
+async function loadPlatformLedgerCustomers(creditsUserIds: number[]) {
+  const uniqueCreditsUserIds = Array.from(new Set(creditsUserIds.filter(Boolean)));
+  const result = new Map<string, PlatformLedgerCustomerRow>();
+  if (!uniqueCreditsUserIds.length) return result;
+
+  const [linkedRows] = await pool.query<PlatformLedgerCustomerRow[]>(
+    `SELECT
+       acl.credits_user_id,
+       acl.application_code,
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       COALESCE(MIN(aur.role_code), 'user') role_code,
+       acl.account_scope
+     FROM application_customer_links acl
+     JOIN app_users u ON u.id = acl.user_id
+     LEFT JOIN app_user_roles aur ON aur.user_id = u.id
+     WHERE acl.credits_user_id IN (:creditsUserIds)
+     GROUP BY acl.credits_user_id, acl.application_code, u.id, u.username,
+              u.display_name, u.phone, acl.account_scope`,
+    { creditsUserIds: uniqueCreditsUserIds },
+  );
+
+  for (const row of linkedRows) {
+    result.set(`${row.credits_user_id}:${row.application_code ?? ""}`, row);
+    if (!result.has(`${row.credits_user_id}:`)) result.set(`${row.credits_user_id}:`, row);
+  }
+
+  const missingCreditsUserIds = uniqueCreditsUserIds.filter(
+    (creditsUserId) => !result.has(`${creditsUserId}:`),
+  );
+  if (!missingCreditsUserIds.length) return result;
+
+  const [userRows] = await pool.query<PlatformLedgerCustomerRow[]>(
+    `SELECT
+       u.credits_user_id,
+       NULL application_code,
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       COALESCE(MIN(boa.role_code), MIN(aur.role_code), 'user') role_code,
+       u.account_scope
+     FROM app_users u
+     LEFT JOIN app_user_roles aur ON aur.user_id = u.id
+     LEFT JOIN back_office_role_assignments boa
+       ON boa.user_id = u.id
+      AND boa.status = 'active'
+      AND boa.role_code IN ('developer', 'admin', 'agent')
+     WHERE u.credits_user_id IN (:creditsUserIds)
+     GROUP BY u.credits_user_id, u.id, u.username, u.display_name, u.phone, u.account_scope`,
+    { creditsUserIds: missingCreditsUserIds },
+  );
+
+  for (const row of userRows) result.set(`${row.credits_user_id}:`, row);
+  return result;
+}
+
+export async function getPlatformTransactionsLedger(req: Request) {
+  const current = getRequiredCurrentUser(req);
+  if (current.user.role !== "developer" && current.user.role !== "admin") {
+    throw errors.forbidden("only Developer or Admin can view global platform transactions");
+  }
+
+  const creditsDb = getCreditsPool();
+  const [rows] = await creditsDb.query<CreditsTransactionRow[]>(
+    `SELECT
+       ct.id,
+       ct.tenant_id,
+       ct.user_id,
+       ct.account_id,
+       ct.billing_task_id,
+       ct.payment_order_id,
+       ct.application_id,
+       app.code application_code,
+       app.name application_name,
+       ct.function_id,
+       fn.code function_code,
+       fn.name function_name,
+       ct.txn_type,
+       ct.points,
+       ct.balance_before,
+       ct.balance_after,
+       ct.biz_type,
+       ct.biz_id,
+       ct.remark,
+       ct.created_at
+     FROM credit_transactions ct
+     LEFT JOIN applications app ON app.id = ct.application_id
+     LEFT JOIN application_functions fn ON fn.id = ct.function_id
+     ORDER BY ct.created_at DESC, ct.id DESC
+     LIMIT 300`,
+  );
+
+  const customerByCreditsUserId = await loadPlatformLedgerCustomers(rows.map((row) => row.user_id));
+  const operatorUserIds = rows
+    .filter(isBackOfficeManualCreditsTransaction)
+    .map((row) => parseBackOfficeAdjustmentRemark(row.remark)?.operatorUserId)
+    .filter((userId): userId is string => Boolean(userId));
+  const operatorByUserId = await loadBackOfficeOperatorsByUserId(operatorUserIds);
+
+  const transactions = rows.map((row) => {
+    const customer =
+      customerByCreditsUserId.get(`${row.user_id}:${row.application_code ?? ""}`) ??
+      customerByCreditsUserId.get(`${row.user_id}:`) ??
+      null;
+    const adjustmentRemark =
+      isBackOfficeManualCreditsTransaction(row)
+        ? parseBackOfficeAdjustmentRemark(row.remark)
+        : null;
+    const operator = adjustmentRemark?.operatorUserId
+      ? operatorByUserId.get(adjustmentRemark.operatorUserId)
+      : null;
+    const operatorUsername = operator?.username ?? adjustmentRemark?.operatorUserId ?? null;
+    const operatorRoleLabel = adjustmentRemark
+      ? roleIdentityLabel(adjustmentRemark.operatorRole ?? operator?.role_code)
+      : null;
+    const customerRoleLabel = roleIdentityLabel(customer?.role_code);
+
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      userId: row.user_id,
+      accountId: row.account_id,
+      billingTaskId: row.billing_task_id,
+      paymentOrderId: row.payment_order_id,
+      applicationId: row.application_id,
+      applicationCode: row.application_code,
+      applicationName: row.application_name,
+      functionId: row.function_id,
+      functionCode: row.function_code,
+      functionName: row.function_name,
+      txnType: row.txn_type,
+      points: toNumber(row.points),
+      balanceBefore: toNumber(row.balance_before),
+      balanceAfter: toNumber(row.balance_after),
+      bizType: row.biz_type,
+      bizId: row.biz_id,
+      remark: remarkTextForTransaction(row),
+      actorUsername: operatorUsername ?? customer?.username ?? null,
+      actorDisplayName: operatorUsername ?? customer?.display_name ?? null,
+      actorIdentityLabel: operatorRoleLabel ?? customerRoleLabel ?? "客户",
+      createdAt: row.created_at.toISOString(),
+      relationId: customer ? `${customer.application_code ?? row.application_code ?? "platform"}:${customer.user_id}` : undefined,
+      customerUserId: customer?.user_id ?? `credits:${row.user_id}`,
+      customerUsername: customer?.username ?? `Credits User ${row.user_id}`,
+      customerDisplayName: customer?.display_name ?? null,
+      customerPhone: customer?.phone ?? null,
+      accountScope: customer?.account_scope ?? null,
+    };
+  });
+
+  return {
+    scope: "global",
+    transactions,
+    transactionInsights: buildAgentTransactionInsights(transactions),
+  };
 }
 
 async function buildCustomerLedgerResponse(customer: AgentCustomerLedgerRow) {
@@ -1004,9 +1195,9 @@ type AgentLedgerTransactionItem = Awaited<ReturnType<typeof listLedgerTransactio
   relationId?: string;
   customerUserId?: string;
   customerUsername?: string;
-  customerDisplayName?: string;
+  customerDisplayName?: string | null;
   customerPhone?: string | null;
-  accountScope?: string;
+  accountScope?: string | null;
 };
 
 function buildAgentTransactionInsights(transactions: AgentLedgerTransactionItem[]) {
@@ -1615,6 +1806,58 @@ export async function getAgentCustomerLedger(req: Request, relationId: string) {
   if (!customer) throw errors.invalidParameter("agent customer is not available");
 
   return buildCustomerLedgerResponse(customer);
+}
+
+export async function updateAgentCustomerProfile(
+  req: Request,
+  relationId: string,
+  body: Record<string, unknown>,
+) {
+  const agent = await resolveAgentUser(req, body.agentUserId);
+  const customer = await loadAgentCustomerForLedger(agent.id, relationId);
+  if (!customer) throw errors.invalidParameter("agent customer is not available");
+  if (customer.status !== "active") {
+    throw errors.invalidParameter("only active agent customers can be updated");
+  }
+
+  const displayName = requiredText(body.displayName, "displayName", 120);
+  const phone = optionalProfilePhone(body.phone);
+
+  if (phone) {
+    const phoneCandidates = Array.from(new Set([phone, toLocalChinaPhone(phone)].filter(Boolean)));
+    const [phoneRows] = await pool.query<CountRow[]>(
+      `SELECT COUNT(*) count
+       FROM app_users
+       WHERE phone IN (:phoneCandidates)
+         AND id <> :customerUserId`,
+      { phoneCandidates, customerUserId: customer.customer_user_id },
+    );
+    if (Number(phoneRows[0]?.count ?? 0) > 0) {
+      throw errors.conflict("phone already belongs to another user");
+    }
+  }
+
+  await pool.query(
+    `UPDATE app_users
+     SET display_name = :displayName,
+         phone = :phone,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = :customerUserId`,
+    {
+      displayName,
+      phone,
+      customerUserId: customer.customer_user_id,
+    },
+  );
+
+  return {
+    relationId,
+    customerUserId: customer.customer_user_id,
+    customerUsername: customer.customer_username,
+    customerDisplayName: displayName,
+    customerPhone: phone,
+    applicationCode: customer.application_code,
+  };
 }
 
 export async function getPlatformCustomerLedger(req: Request, customerProfileId: string) {

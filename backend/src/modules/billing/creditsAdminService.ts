@@ -9,9 +9,13 @@ import {
   type CreditsApplicationResponse,
   type CreditsFunctionResponse,
 } from "./creditsClient";
+import { getCreditsPool } from "./creditsAccountLookupService";
+import { classifyAgentCustomerUserType } from "../platform/agentOperationsService";
 
 const transactionTime = (transaction: CreditTransactionResponse) =>
   new Date(transaction.createdAt).getTime() || 0;
+
+type CustomerUserTypeCode = "active" | "potential" | "low_frequency";
 
 type CustomerProfileRow = RowDataPacket & {
   id: string;
@@ -39,6 +43,27 @@ type CustomerProfileRow = RowDataPacket & {
   created_at: Date;
 };
 
+type CustomerUsageStatsRow = RowDataPacket & {
+  account_key: string;
+  total_top_up_credits: string | number;
+  total_consumed_credits: string | number;
+  consumption_transaction_count: string | number;
+  last_consumed_at: Date | null;
+  last_top_up_at: Date | null;
+};
+
+type CustomerUsageStats = {
+  totalTopUpCredits: number;
+  totalConsumedCredits: number;
+  consumptionTransactionCount: number;
+  lastConsumedAt: string | null;
+  lastTopUpAt: string | null;
+  userType: {
+    code: CustomerUserTypeCode;
+    label: string;
+  };
+};
+
 const FALLBACK_APPLICATIONS: CreditsApplicationResponse[] = [
   {
     id: 0,
@@ -55,6 +80,54 @@ const FALLBACK_APPLICATIONS: CreditsApplicationResponse[] = [
     status: "planned",
   },
 ];
+
+const customerUserTypeDefinitions: Record<CustomerUserTypeCode, string> = {
+  active: "活跃用户",
+  potential: "潜力用户",
+  low_frequency: "低频用户",
+};
+
+const toNumber = (value: string | number | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+function toTimestamp(value: Date | string | null | undefined) {
+  if (!value) return 0;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function toIsoString(value: Date | string | null | undefined) {
+  const time = toTimestamp(value);
+  return time > 0 ? new Date(time).toISOString() : null;
+}
+
+function userTypeLabel(code: CustomerUserTypeCode) {
+  return customerUserTypeDefinitions[code] ?? customerUserTypeDefinitions.low_frequency;
+}
+
+function customerUsageKey(row: Pick<CustomerProfileRow, "account_scope" | "credits_tenant_id" | "credits_user_id">) {
+  if (row.account_scope === "tenant" && row.credits_tenant_id) {
+    return `tenant:${row.credits_tenant_id}`;
+  }
+  return `user:${row.credits_user_id}`;
+}
+
+function emptyCustomerUsageStats(): CustomerUsageStats {
+  const code = classifyAgentCustomerUserType({});
+  return {
+    totalTopUpCredits: 0,
+    totalConsumedCredits: 0,
+    consumptionTransactionCount: 0,
+    lastConsumedAt: null,
+    lastTopUpAt: null,
+    userType: {
+      code,
+      label: userTypeLabel(code),
+    },
+  };
+}
 
 const PLANNED_FUNCTIONS: CreditsFunctionResponse[] = [
   {
@@ -162,6 +235,86 @@ function enrichTransactions(
   });
 }
 
+async function listCustomerUsageStats(rows: CustomerProfileRow[]) {
+  const result = new Map<string, CustomerUsageStats>();
+  const personalCreditsUserIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.account_scope !== "tenant")
+        .map((row) => row.credits_user_id)
+        .filter(Boolean),
+    ),
+  );
+  const tenantIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.account_scope === "tenant" && row.credits_tenant_id)
+        .map((row) => row.credits_tenant_id as number),
+    ),
+  );
+
+  if (!personalCreditsUserIds.length && !tenantIds.length) return result;
+
+  const clauses: string[] = [];
+  const params: any = {
+    insightTxnTypes: ["settle", "recharge", "bonus", "grant", "adjustment"],
+    topUpTxnTypes: ["recharge", "bonus", "grant", "adjustment"],
+  };
+
+  if (personalCreditsUserIds.length) {
+    clauses.push("(ct.tenant_id IS NULL AND ct.user_id IN (:personalCreditsUserIds))");
+    params.personalCreditsUserIds = personalCreditsUserIds;
+  }
+  if (tenantIds.length) {
+    clauses.push("ct.tenant_id IN (:tenantIds)");
+    params.tenantIds = tenantIds;
+  }
+
+  const [statsRows] = await getCreditsPool().query<CustomerUsageStatsRow[]>(
+    `SELECT
+       CASE
+         WHEN ct.tenant_id IS NOT NULL THEN CONCAT('tenant:', ct.tenant_id)
+         ELSE CONCAT('user:', ct.user_id)
+       END account_key,
+       COALESCE(SUM(CASE
+         WHEN ct.txn_type IN (:topUpTxnTypes) AND ct.points > 0 THEN ct.points
+         ELSE 0
+       END), 0) total_top_up_credits,
+       COALESCE(SUM(CASE WHEN ct.txn_type = 'settle' THEN ABS(ct.points) ELSE 0 END), 0) total_consumed_credits,
+       COALESCE(SUM(CASE WHEN ct.txn_type = 'settle' THEN 1 ELSE 0 END), 0) consumption_transaction_count,
+       MAX(CASE WHEN ct.txn_type = 'settle' THEN ct.created_at ELSE NULL END) last_consumed_at,
+       MAX(CASE
+         WHEN ct.txn_type IN (:topUpTxnTypes) AND ct.points > 0 THEN ct.created_at
+         ELSE NULL
+       END) last_top_up_at
+     FROM credit_transactions ct
+     WHERE ct.txn_type IN (:insightTxnTypes)
+       AND (${clauses.join(" OR ")})
+     GROUP BY account_key`,
+    params,
+  );
+
+  for (const row of statsRows) {
+    const code = classifyAgentCustomerUserType({
+      lastTopUpAt: row.last_top_up_at,
+      lastConsumedAt: row.last_consumed_at,
+    });
+    result.set(row.account_key, {
+      totalTopUpCredits: toNumber(row.total_top_up_credits),
+      totalConsumedCredits: toNumber(row.total_consumed_credits),
+      consumptionTransactionCount: toNumber(row.consumption_transaction_count),
+      lastConsumedAt: toIsoString(row.last_consumed_at),
+      lastTopUpAt: toIsoString(row.last_top_up_at),
+      userType: {
+        code,
+        label: userTypeLabel(code),
+      },
+    });
+  }
+
+  return result;
+}
+
 async function listCustomerProfiles() {
   const [rows] = await pool.query<CustomerProfileRow[]>(
     `SELECT
@@ -239,35 +392,45 @@ async function listCustomerProfiles() {
       }
     }),
   );
+  const usageStatsByCustomer = await listCustomerUsageStats(rows);
 
-  return rows.map((row) => ({
-    id: row.id,
-    applicationCode: row.application_code,
-    userId: row.user_id,
-    username: row.username,
-    displayName: row.display_name,
-    phone: row.phone,
-    role: normalizeBackOfficeCustomerRole(row.role_code),
-    creditsUserId: row.credits_user_id,
-    creditsTotalBalance: balanceByCreditsUserId.get(row.credits_user_id)?.totalBalance ?? null,
-    creditsAvailableBalance: balanceByCreditsUserId.get(row.credits_user_id)?.availableBalance ?? null,
-    creditsCurrency: balanceByCreditsUserId.get(row.credits_user_id)?.currency ?? null,
-    accountScope: row.account_scope,
-    creditsTenantId: row.credits_tenant_id,
-    enterpriseTenantId: row.enterprise_tenant_id,
-    enterpriseTenantName: row.enterprise_tenant_name,
-    enterpriseMemberRole: row.enterprise_member_role,
-    enterpriseOwnerUserId: row.enterprise_owner_user_id,
-    enterpriseOwnerUsername: row.enterprise_owner_username,
-    enterpriseOwnerDisplayName: row.enterprise_owner_display_name,
-    enterpriseAccountRole: resolveEnterpriseAccountRole(row),
-    createdByUserId: row.created_by_user_id,
-    createdByUsername: row.created_by_username,
-    createdByDisplayName: row.created_by_display_name,
-    createdByRole: row.created_by_role_code,
-    status: row.status,
-    createdAt: row.created_at.toISOString(),
-  }));
+  return rows.map((row) => {
+    const usageStats = usageStatsByCustomer.get(customerUsageKey(row)) ?? emptyCustomerUsageStats();
+    return {
+      id: row.id,
+      applicationCode: row.application_code,
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      phone: row.phone,
+      role: normalizeBackOfficeCustomerRole(row.role_code),
+      creditsUserId: row.credits_user_id,
+      creditsTotalBalance: balanceByCreditsUserId.get(row.credits_user_id)?.totalBalance ?? null,
+      creditsAvailableBalance: balanceByCreditsUserId.get(row.credits_user_id)?.availableBalance ?? null,
+      creditsCurrency: balanceByCreditsUserId.get(row.credits_user_id)?.currency ?? null,
+      accountScope: row.account_scope,
+      creditsTenantId: row.credits_tenant_id,
+      enterpriseTenantId: row.enterprise_tenant_id,
+      enterpriseTenantName: row.enterprise_tenant_name,
+      enterpriseMemberRole: row.enterprise_member_role,
+      enterpriseOwnerUserId: row.enterprise_owner_user_id,
+      enterpriseOwnerUsername: row.enterprise_owner_username,
+      enterpriseOwnerDisplayName: row.enterprise_owner_display_name,
+      enterpriseAccountRole: resolveEnterpriseAccountRole(row),
+      totalTopUpCredits: usageStats.totalTopUpCredits,
+      totalConsumedCredits: usageStats.totalConsumedCredits,
+      consumptionTransactionCount: usageStats.consumptionTransactionCount,
+      lastConsumedAt: usageStats.lastConsumedAt,
+      lastTopUpAt: usageStats.lastTopUpAt,
+      userType: usageStats.userType,
+      createdByUserId: row.created_by_user_id,
+      createdByUsername: row.created_by_username,
+      createdByDisplayName: row.created_by_display_name,
+      createdByRole: row.created_by_role_code,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+    };
+  });
 }
 
 export const getCreditsAdminOverview = async (identity: BillingIdentity) => {

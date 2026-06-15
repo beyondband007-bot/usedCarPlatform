@@ -1109,6 +1109,15 @@ export interface CreditsCustomerProfile {
   enterpriseOwnerUsername?: string | null
   enterpriseOwnerDisplayName?: string | null
   enterpriseAccountRole?: 'standalone' | 'mother' | 'child' | string | null
+  totalTopUpCredits?: number | string
+  totalConsumedCredits?: number | string
+  consumptionTransactionCount?: number | string
+  lastConsumedAt?: string | null
+  lastTopUpAt?: string | null
+  userType?: {
+    code: 'active' | 'potential' | 'low_frequency' | string
+    label: string
+  }
   createdByUserId: string
   createdByUsername?: string | null
   createdByDisplayName?: string | null
@@ -1154,6 +1163,21 @@ export interface AgentOperationsCustomer {
     code: 'active' | 'potential' | 'low_frequency' | string
     label: string
   }
+}
+
+export interface UpdateAgentCustomerProfilePayload {
+  displayName: string
+  phone?: string | null
+  agentUserId?: string
+}
+
+export interface UpdateAgentCustomerProfileResult {
+  relationId: string
+  customerUserId: string
+  customerUsername: string
+  customerDisplayName: string
+  customerPhone: string | null
+  applicationCode: string
 }
 
 export interface AgentCustomerLedgerTransaction {
@@ -1227,6 +1251,12 @@ export interface AgentTransactionsLedger {
     }>
     generatedAt: string
   }
+}
+
+export interface PlatformTransactionsLedger {
+  scope: 'global'
+  transactions: AgentCustomerLedgerTransaction[]
+  transactionInsights?: AgentTransactionsLedger['transactionInsights']
 }
 
 export interface AgentOperationsLead {
@@ -1375,6 +1405,7 @@ export interface PlatformDashboardMetricSet {
   pendingSettlementCount: number
   applicationCount: number
   platformApplicationCount: number
+  todayRechargedCredits?: number
   todayOrderAmount: number
   todayConsumedCredits: number
   applications: string[]
@@ -1389,6 +1420,7 @@ export interface PlatformDashboardSection {
 
 export interface PlatformDashboardTrendEvent {
   metric: 'recharge' | 'consume'
+  applicationCode?: string | null
   occurredAt: string
   value: number
 }
@@ -1457,6 +1489,18 @@ export interface PlatformAdminPolicyOverride {
   effectiveCanCreateAgents: boolean
   updatedByUserId?: string | null
   updatedAt?: string | null
+}
+
+export interface PlatformDeveloperAccount {
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  status: string
+}
+
+export interface PlatformDeveloperAccountList {
+  items: PlatformDeveloperAccount[]
 }
 
 export interface PlatformAdminPolicyOverrideList {
@@ -1614,6 +1658,43 @@ export interface PlatformUserCreationResult {
   }
 }
 
+export interface PlatformUserPasswordResetResult {
+  updated: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+    status: string
+  }
+}
+
+export interface PlatformUserProfileUpdateResult {
+  updated: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    phone: string | null
+    role: string
+    status: string
+  }
+}
+
+export interface PlatformUserApplicationConnectResult {
+  updated: boolean
+  applicationCode: string
+  planCode: string
+  applications: string[]
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+    status: string
+  }
+}
+
 export interface PlatformUserPromotionResult {
   user: {
     id: string
@@ -1645,6 +1726,7 @@ export interface PlatformAgentDisableResult {
     role: 'user'
     creditsUserId: number | string | null
     status: string
+    applications?: string[]
   }
 }
 
@@ -1965,7 +2047,12 @@ export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
   const customerProfiles = extractCreditsList<CreditsCustomerProfile>(
     payload,
     ['customerProfiles', 'customers'],
-  )
+  ).map((item) => ({
+    ...item,
+    totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits ?? 0),
+    totalConsumedCredits: parseCreditsNumber(item.totalConsumedCredits ?? 0),
+    consumptionTransactionCount: parseCreditsNumber(item.consumptionTransactionCount ?? 0),
+  }))
 
   return {
     application: payload.application ?? applications[0] ?? null,
@@ -2044,6 +2131,17 @@ export async function getAgentCustomerLedger(
   }
 }
 
+export async function updateAgentCustomerProfile(
+  relationId: string,
+  payload: UpdateAgentCustomerProfilePayload,
+): Promise<UpdateAgentCustomerProfileResult> {
+  const response = await request.patch<ApiResponse<UpdateAgentCustomerProfileResult>>(
+    `/platform/agent/customers/${encodeURIComponent(relationId)}/profile`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function getAgentTransactionsLedger(params?: {
   agentUserId?: string
 }): Promise<AgentTransactionsLedger> {
@@ -2078,6 +2176,42 @@ export async function getAgentTransactionsLedger(params?: {
       balanceAfter: parseCreditsNumber(item.balanceAfter),
     })),
   }
+}
+
+function normalizeTransactionsLedgerPayload<T extends { transactions?: AgentCustomerLedgerTransaction[]; transactionInsights?: AgentTransactionsLedger['transactionInsights'] }>(
+  payload: T,
+): T {
+  return {
+    ...payload,
+    transactionInsights: payload.transactionInsights
+      ? {
+          ...payload.transactionInsights,
+          topCreditConsumers: (payload.transactionInsights.topCreditConsumers ?? []).map((item) => ({
+            ...item,
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+            transactionCount: parseCreditsNumber(item.transactionCount),
+          })),
+          functionUsageDistribution: (
+            payload.transactionInsights.functionUsageDistribution ?? []
+          ).map((item) => ({
+            ...item,
+            usageCount: parseCreditsNumber(item.usageCount),
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+          })),
+        }
+      : undefined,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+  }
+}
+
+export async function getPlatformTransactionsLedger(): Promise<PlatformTransactionsLedger> {
+  const response = await request.get<ApiResponse<PlatformTransactionsLedger>>('/platform/transactions')
+  return normalizeTransactionsLedgerPayload(unwrapApiResponse(response))
 }
 
 export async function getPlatformCustomerLedger(
@@ -2125,6 +2259,13 @@ export async function getPlatformAgents(): Promise<PlatformAgentList> {
 export async function getPlatformAdminPolicyOverrides(): Promise<PlatformAdminPolicyOverrideList> {
   const response = await request.get<ApiResponse<PlatformAdminPolicyOverrideList>>(
     '/platform/admin-policy-overrides',
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformDeveloperAccounts(): Promise<PlatformDeveloperAccountList> {
+  const response = await request.get<ApiResponse<PlatformDeveloperAccountList>>(
+    '/platform/developer-accounts',
   )
   return unwrapApiResponse(response)
 }
@@ -2254,6 +2395,17 @@ export async function createPlatformUser(
   return unwrapApiResponse(response)
 }
 
+export async function connectPlatformUserApplication(
+  userId: string,
+  payload: { applicationCode: string; planCode: string; reason?: string },
+): Promise<PlatformUserApplicationConnectResult> {
+  const response = await request.post<ApiResponse<PlatformUserApplicationConnectResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/applications`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function getPlatformSubscriptionPlans(params: {
   applicationCode: string
 }): Promise<{ applicationCode: string; items: PlatformSubscriptionPlan[] }> {
@@ -2291,6 +2443,28 @@ export async function adjustPlatformCredits(
 ): Promise<PlatformCreditsAdjustmentResult> {
   const response = await request.post<ApiResponse<PlatformCreditsAdjustmentResult>>(
     '/platform/credits/adjustments',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function resetPlatformUserPassword(
+  userId: string,
+  payload: { password: string; reason?: string },
+): Promise<PlatformUserPasswordResetResult> {
+  const response = await request.patch<ApiResponse<PlatformUserPasswordResetResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/password`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function updatePlatformUserProfile(
+  userId: string,
+  payload: { displayName: string; phone?: string | null; reason?: string },
+): Promise<PlatformUserProfileUpdateResult> {
+  const response = await request.patch<ApiResponse<PlatformUserProfileUpdateResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/profile`,
     payload,
   )
   return unwrapApiResponse(response)

@@ -150,8 +150,10 @@ const overviewList = computed(() => {
     },
     {
       key: 'today-orders',
-      label: '今日订单金额',
-      value: `¥ ${Number(dashboardMetrics.value?.todayOrderAmount ?? 0).toLocaleString('zh-CN')}`,
+      label: '今日充值积分',
+      value: Number(
+        dashboardMetrics.value?.todayRechargedCredits ?? dashboardMetrics.value?.todayOrderAmount ?? 0,
+      ).toLocaleString('zh-CN'),
     },
     {
       key: 'today-consume',

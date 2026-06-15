@@ -28,9 +28,18 @@ type SumRow = RowDataPacket & {
 
 type TrendTransactionRow = RowDataPacket & {
   id: number | string;
+  tenant_id: number | null;
+  user_id: number | null;
+  application_code: string | null;
   txn_type: string;
   points: number | string;
   created_at: Date | string;
+};
+
+type CustomerApplicationLinkRow = RowDataPacket & {
+  credits_user_id: number;
+  credits_tenant_id: number | null;
+  application_code: string;
 };
 
 type PlanDistributionRow = RowDataPacket & {
@@ -187,6 +196,7 @@ function transactionToTrendEvent(transaction: TrendTransactionRow) {
   if (transaction.txn_type === "recharge") {
     return {
       metric: "recharge" as const,
+      applicationCode: transaction.application_code,
       occurredAt,
       value: Math.abs(Number(transaction.points ?? 0)),
     };
@@ -195,12 +205,69 @@ function transactionToTrendEvent(transaction: TrendTransactionRow) {
   if (transaction.txn_type === "settle") {
     return {
       metric: "consume" as const,
+      applicationCode: transaction.application_code,
       occurredAt,
       value: Math.abs(Number(transaction.points ?? 0)),
     };
   }
 
   return null;
+}
+
+function trendAccountKey(input: { user_id: number | null; tenant_id: number | null }) {
+  return input.tenant_id ? `tenant:${input.tenant_id}` : `user:${input.user_id ?? 0}`;
+}
+
+async function loadApplicationCodeByCreditsAccount(rows: TrendTransactionRow[]) {
+  const result = new Map<string, string>();
+  const personalUserIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => !row.application_code && !row.tenant_id && row.user_id)
+        .map((row) => row.user_id as number),
+    ),
+  );
+  const tenantIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => !row.application_code && row.tenant_id)
+        .map((row) => row.tenant_id as number),
+    ),
+  );
+
+  if (!personalUserIds.length && !tenantIds.length) return result;
+
+  const clauses: string[] = [];
+  const params: any = {};
+  if (personalUserIds.length) {
+    clauses.push("(credits_tenant_id IS NULL AND credits_user_id IN (:personalUserIds))");
+    params.personalUserIds = personalUserIds;
+  }
+  if (tenantIds.length) {
+    clauses.push("credits_tenant_id IN (:tenantIds)");
+    params.tenantIds = tenantIds;
+  }
+
+  const [linkRows] = await pool.query<CustomerApplicationLinkRow[]>(
+    `SELECT
+       credits_user_id,
+       credits_tenant_id,
+       MIN(application_code) application_code
+     FROM application_customer_links
+     WHERE status = 'active'
+       AND (${clauses.join(" OR ")})
+     GROUP BY credits_user_id, credits_tenant_id`,
+    params,
+  );
+
+  for (const row of linkRows) {
+    result.set(
+      row.credits_tenant_id ? `tenant:${row.credits_tenant_id}` : `user:${row.credits_user_id}`,
+      row.application_code,
+    );
+  }
+
+  return result;
 }
 
 async function listTrendEvents(role: string, agentUserId: string) {
@@ -211,18 +278,26 @@ async function listTrendEvents(role: string, agentUserId: string) {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const scopeSql = role === "agent"
     ? `AND (
-         (:hasUserIds = 1 AND user_id IN (:userIds))
-         OR (:hasTenantIds = 1 AND tenant_id IN (:tenantIds))
+         (:hasUserIds = 1 AND ct.user_id IN (:userIds))
+         OR (:hasTenantIds = 1 AND ct.tenant_id IN (:tenantIds))
        )`
     : "";
 
   const [rows] = await getCreditsPool().query<TrendTransactionRow[]>(
-    `SELECT id, txn_type, points, created_at
-     FROM credit_transactions
-     WHERE txn_type IN ('recharge', 'settle')
-       AND created_at >= :cutoff
+    `SELECT
+       ct.id,
+       ct.tenant_id,
+       ct.user_id,
+       app.code application_code,
+       ct.txn_type,
+       ct.points,
+       ct.created_at
+     FROM credit_transactions ct
+     LEFT JOIN applications app ON app.id = ct.application_id
+     WHERE ct.txn_type IN ('recharge', 'settle')
+       AND ct.created_at >= :cutoff
        ${scopeSql}
-     ORDER BY created_at ASC`,
+     ORDER BY ct.created_at ASC`,
     {
       cutoff,
       hasUserIds: creditsUserIds.length ? 1 : 0,
@@ -231,10 +306,20 @@ async function listTrendEvents(role: string, agentUserId: string) {
       tenantIds: creditsTenantIds.length ? creditsTenantIds : [0],
     },
   );
+  const applicationCodeByAccount = await loadApplicationCodeByCreditsAccount(rows);
 
   return rows
+    .map((row) => ({
+      ...row,
+      application_code: row.application_code ?? applicationCodeByAccount.get(trendAccountKey(row)) ?? null,
+    }))
     .map(transactionToTrendEvent)
-    .filter((event): event is { metric: "recharge" | "consume"; occurredAt: string; value: number } => Boolean(event))
+    .filter((event): event is {
+      metric: "recharge" | "consume";
+      applicationCode: string | null;
+      occurredAt: string;
+      value: number;
+    } => Boolean(event))
     .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 }
 
@@ -317,13 +402,14 @@ async function countPlatformCustomerAccounts() {
   );
 }
 
-async function sumTodayOrderAmount(role: string, agentUserId: string) {
+async function sumTodayRechargedCredits(role: string, agentUserId: string) {
   if (role !== "agent") {
     return sumCreditsRows(
-      `SELECT COALESCE(SUM(amount), 0) total
-       FROM payment_orders
-       WHERE status = 'paid'
-         AND DATE(COALESCE(paid_at, created_at)) = CURRENT_DATE()`,
+      `SELECT COALESCE(SUM(points), 0) total
+       FROM credit_transactions
+       WHERE points > 0
+         AND txn_type IN ('recharge', 'bonus')
+         AND DATE(created_at) = CURRENT_DATE()`,
     );
   }
 
@@ -332,10 +418,11 @@ async function sumTodayOrderAmount(role: string, agentUserId: string) {
   if (!userIds.length && !tenantIds.length) return 0;
 
   return sumCreditsRows(
-    `SELECT COALESCE(SUM(amount), 0) total
-     FROM payment_orders
-     WHERE status = 'paid'
-       AND DATE(COALESCE(paid_at, created_at)) = CURRENT_DATE()
+    `SELECT COALESCE(SUM(points), 0) total
+     FROM credit_transactions
+     WHERE points > 0
+       AND txn_type IN ('recharge', 'bonus')
+       AND DATE(created_at) = CURRENT_DATE()
        AND (
          (:hasUserIds = 1 AND user_id IN (:userIds))
          OR (:hasTenantIds = 1 AND tenant_id IN (:tenantIds))
@@ -390,7 +477,7 @@ async function getGlobalMetrics() {
     openTicketCount,
     draftSettlementCount,
     applications,
-    todayOrderAmount,
+    todayRechargedCredits,
     todayConsumedCredits,
   ] = await Promise.all([
     countRows(
@@ -423,7 +510,7 @@ async function getGlobalMetrics() {
        WHERE status = 'draft'`,
     ),
     listPlatformApplications(),
-    sumTodayOrderAmount("developer", ""),
+    sumTodayRechargedCredits("developer", ""),
     sumTodayConsumedCredits("developer", ""),
   ]);
 
@@ -437,7 +524,8 @@ async function getGlobalMetrics() {
     pendingSettlementCount: draftSettlementCount,
     applicationCount: applications.length,
     platformApplicationCount: applications.length,
-    todayOrderAmount,
+    todayRechargedCredits,
+    todayOrderAmount: todayRechargedCredits,
     todayConsumedCredits,
     applications,
   };
@@ -450,7 +538,7 @@ async function getAgentMetrics(agentUserId: string) {
     openTicketCount,
     draftSettlementCount,
     applications,
-    todayOrderAmount,
+    todayRechargedCredits,
     todayConsumedCredits,
   ] = await Promise.all([
     countRows(
@@ -482,7 +570,7 @@ async function getAgentMetrics(agentUserId: string) {
       { agentUserId },
     ),
     listApplicationsForAgentScope(agentUserId),
-    sumTodayOrderAmount("agent", agentUserId),
+    sumTodayRechargedCredits("agent", agentUserId),
     sumTodayConsumedCredits("agent", agentUserId),
   ]);
 
@@ -496,7 +584,8 @@ async function getAgentMetrics(agentUserId: string) {
     pendingSettlementCount: draftSettlementCount,
     applicationCount: applications.length,
     platformApplicationCount: applications.length,
-    todayOrderAmount,
+    todayRechargedCredits,
+    todayOrderAmount: todayRechargedCredits,
     todayConsumedCredits,
     applications,
   };
