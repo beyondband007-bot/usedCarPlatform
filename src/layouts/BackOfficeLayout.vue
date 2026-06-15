@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import CreditsAdminPage from '@/pages/credits-admin/index.vue'
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const activeNavAnchor = ref('')
 
 const roleThemeClass = computed(() => {
   if (authStore.role === 'admin') return 'role-theme-admin'
@@ -45,8 +46,7 @@ const navItems = computed(() => {
     return [
       { label: '系统总览', anchor: 'admin-dashboard', icon: 'mdi:view-dashboard-outline' },
       { label: '代理商管理', anchor: 'admin-agents', icon: 'mdi:handshake-outline' },
-      { label: '用户清单', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
-      { label: '充值记录', anchor: 'admin-recharge', icon: 'mdi:credit-card-outline' },
+      { label: '客户目录', anchor: 'admin-users', icon: 'mdi:account-group-outline' },
       { label: '结算审批', anchor: 'admin-settlements', icon: 'mdi:cash-check' },
     ]
   }
@@ -54,14 +54,51 @@ const navItems = computed(() => {
   if (authStore.role === 'agent') {
     return [
       { label: '代理工作台', anchor: 'agent-dashboard', icon: 'mdi:view-dashboard-outline' },
-      { label: '我的客户', anchor: 'agent-customers', icon: 'mdi:account-group-outline' },
-      { label: '客户消费', anchor: 'agent-consumption', icon: 'mdi:chart-line' },
+      { label: '客户表', anchor: 'agent-customers', icon: 'mdi:account-group-outline' },
+      { label: '流水表', anchor: 'agent-consumption', icon: 'mdi:chart-line' },
       { label: '返佣结算', anchor: 'agent-settlements', icon: 'mdi:cash-multiple' },
     ]
   }
 
   return []
 })
+
+const activeNavKey = computed(() => activeNavAnchor.value || navItems.value[0]?.anchor)
+
+function getHashNavAnchor() {
+  if (typeof window === 'undefined') return ''
+  const hash = window.location.hash.replace(/^#/, '')
+  return navItems.value.some((item) => item.anchor === hash) ? hash : ''
+}
+
+watch(
+  () => authStore.role,
+  () => {
+    activeNavAnchor.value = authStore.role === 'agent' ? getHashNavAnchor() : ''
+  },
+)
+
+onMounted(() => {
+  if (authStore.role === 'agent') {
+    activeNavAnchor.value = getHashNavAnchor()
+  }
+})
+
+async function handleNavClick(anchor: string) {
+  activeNavAnchor.value = anchor
+  await nextTick()
+  if (authStore.role === 'agent') {
+    window.history.replaceState(null, '', `#${anchor}`)
+    return
+  }
+  window.requestAnimationFrame(() => {
+    document.getElementById(anchor)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+    window.history.replaceState(null, '', `#${anchor}`)
+  })
+}
 
 async function handleLogout() {
   await authStore.logout()
@@ -88,16 +125,17 @@ async function handleLogout() {
 
       <p class="back-office-nav-label">功能</p>
       <nav class="back-office-nav" aria-label="后台菜单">
-        <a
+        <button
           v-for="(item, index) in navItems"
           :key="`${item.anchor}-${index}`"
-          :href="`#${item.anchor}`"
+          type="button"
           class="back-office-nav-link"
-          :class="{ active: index === 0 }"
+          :class="{ active: activeNavKey === item.anchor }"
+          @click="handleNavClick(item.anchor)"
         >
           <Icon :icon="item.icon" />
           <span>{{ item.label }}</span>
-        </a>
+        </button>
       </nav>
 
       <button type="button" class="back-office-logout" @click="handleLogout">
@@ -131,7 +169,7 @@ async function handleLogout() {
       </header>
 
       <div class="back-office-content">
-        <CreditsAdminPage />
+        <CreditsAdminPage :active-agent-page="authStore.role === 'agent' ? activeNavKey : undefined" />
       </div>
     </main>
   </div>
@@ -256,12 +294,17 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 11px;
+  width: 100%;
+  border: 0;
   border-radius: 8px;
+  background: transparent;
   color: #cbd5e1;
   padding: 10px 12px;
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
+  text-align: left;
+  cursor: pointer;
   transition: background 0.18s ease, color 0.18s ease;
 }
 

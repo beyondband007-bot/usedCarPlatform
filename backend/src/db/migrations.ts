@@ -399,14 +399,20 @@ export const migrations = [
     period VARCHAR(16) NOT NULL,
     total_commission_points DECIMAL(18, 4) NOT NULL DEFAULT 0,
     status VARCHAR(24) NOT NULL DEFAULT 'draft',
+    requested_at DATETIME(3) NULL,
+    approved_by_user_id VARCHAR(64) NULL,
+    approved_by_role_code VARCHAR(32) NULL,
     confirmed_at DATETIME(3) NULL,
     paid_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    UNIQUE KEY uk_agent_settlement_agent_period (agent_user_id, period),
+    INDEX idx_agent_settlement_agent_period (agent_user_id, period),
     INDEX idx_agent_settlement_status (status, created_at),
+    INDEX idx_agent_settlement_approved_by (approved_by_user_id),
     CONSTRAINT agent_settlement_bills_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
-      ON DELETE CASCADE ON UPDATE CASCADE
+      ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT agent_settlement_bills_approved_by_fk FOREIGN KEY (approved_by_user_id) REFERENCES app_users (id)
+      ON DELETE SET NULL ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `CREATE TABLE IF NOT EXISTS agent_materials (

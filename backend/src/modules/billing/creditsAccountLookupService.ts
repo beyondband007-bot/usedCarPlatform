@@ -25,6 +25,7 @@ export function getCreditsPool() {
       database: env.credits.mysql.database,
       user: env.credits.mysql.user,
       password: env.credits.mysql.password,
+      timezone: "Z",
       waitForConnections: true,
       connectionLimit: env.credits.mysql.connectionLimit,
       namedPlaceholders: true,

@@ -4,6 +4,7 @@ import * as echarts from 'echarts'
 import { Icon } from '@iconify/vue'
 import {
   NButton,
+  NCheckbox,
   NDataTable,
   NEmpty,
   NForm,
@@ -23,10 +24,12 @@ import {
   adjustPlatformAgentDeposit,
   adjustPlatformCredits,
   applyAgentSettlement,
+  approvePlatformSettlementPayment,
   createPlatformUser,
   deletePlatformUser,
   disablePlatformAgent,
   getAgentCustomerLedger,
+  getAgentTransactionsLedger,
   getCommissionPolicy,
   getAgentOperationsOverview,
   getCreditsAdminOverview,
@@ -43,15 +46,14 @@ import {
   updateApplicationFunctionDefaultPoints,
   type AgentCustomerLedger,
   type AgentCustomerLedgerTransaction,
+  type AgentTransactionsLedger,
   type AgentOperationsCommissionPreview,
   type AgentOperationsTopUpTransaction,
   type AgentOperationsCustomer,
   type AgentOperationsOverview,
   type AgentOperationsSettlementBill,
-  type CreditsAccount,
   type CreditsAdminOverview,
   type CreditsCustomerProfile,
-  type CreditsTransaction,
   type CommissionPolicy,
   type PlatformUserPlanCode,
   type PlatformSubscriptionPlan,
@@ -76,17 +78,25 @@ type RoleTab = BackOfficeRole
 type DetailRecord = Record<string, unknown>
 type TrendPeriod = 'today' | '7d' | '30d'
 type TrendMetric = 'consume' | 'recharge'
+type AgentConsolePage =
+  | 'agent-dashboard'
+  | 'agent-customers'
+  | 'agent-consumption'
+  | 'agent-settlements'
 type ConsoleSectionKey =
   | 'adminAccountCreation'
   | 'adminAgents'
   | 'adminUsers'
   | 'adminSettlementApplications'
-  | 'adminCreditAccounts'
-  | 'adminTransactions'
   | 'agentOverview'
   | 'agentCustomers'
+  | 'agentTransactions'
   | 'agentCommissions'
   | 'agentSettlements'
+
+const props = defineProps<{
+  activeAgentPage?: AgentConsolePage | string
+}>()
 
 const authStore = useAuthStore()
 const message = useMessage()
@@ -106,6 +116,11 @@ const selectedApplicationCode = ref('all')
 const dashboardTrendPeriod = ref<TrendPeriod>('today')
 const dashboardTrendMetric = ref<TrendMetric>('recharge')
 const dashboardTrendChartRef = ref<HTMLElement | null>(null)
+const dashboardPlanPieChartRef = ref<HTMLElement | null>(null)
+const agentConsumerBarChartRef = ref<HTMLElement | null>(null)
+const agentUserTypePieChartRef = ref<HTMLElement | null>(null)
+const agentLedgerConsumerBarChartRef = ref<HTMLElement | null>(null)
+const agentFunctionUsagePieChartRef = ref<HTMLElement | null>(null)
 const accountCreationPolicyState = reactive({ ...defaultAccountCreationPolicyState })
 const isCreateAccountModalOpen = ref(false)
 const isCreatingAccount = ref(false)
@@ -118,18 +133,23 @@ const consoleSectionOpen = ref<Record<string, boolean>>({})
 const promotingUserId = ref<string | null>(null)
 const disablingAgentUserId = ref<string | null>(null)
 const confirmingSettlementId = ref<string | null>(null)
+const approvingSettlementId = ref<string | null>(null)
 const updatingAdminPolicyUserId = ref<string | null>(null)
 const updatingAgentPolicyUserId = ref<string | null>(null)
 const updatingAgentCommissionUserId = ref<string | null>(null)
 const updatingAgentDepositUserId = ref<string | null>(null)
 const updatingFunctionKey = ref<string | null>(null)
+const adminAgentSearchQuery = ref('')
+const adminCustomerSearchQuery = ref('')
+const agentCustomerSearchQuery = ref('')
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
-const selectedDetail = ref<{ title: string; row: DetailRecord } | null>(null)
 const selectedCommissionDetail = ref<AgentOperationsCommissionPreview | null>(null)
 const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
 const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
+const agentTransactionsLedger = ref<AgentTransactionsLedger | null>(null)
 const isAgentCustomerLedgerOpen = ref(false)
 const isLoadingAgentCustomerLedger = ref(false)
+const isLoadingAgentTransactionsLedger = ref(false)
 const subscriptionPlans = ref<PlatformSubscriptionPlan[]>([])
 const isLoadingPlanOptions = ref(false)
 const loadedPlanApplicationCode = ref('')
@@ -148,6 +168,7 @@ const createAccountForm = reactive({
 const adjustCreditsForm = reactive({
   points: 0 as number | null,
   reason: '',
+  classifyAsRecharge: true,
 })
 const deleteAccountForm = reactive({
   reason: '',
@@ -156,6 +177,11 @@ const agentCommissionRateDrafts = reactive<Record<string, number | null>>({})
 const agentDepositAdjustmentDrafts = reactive<Record<string, number | null>>({})
 
 let dashboardTrendChartInstance: echarts.ECharts | null = null
+let dashboardPlanPieChartInstance: echarts.ECharts | null = null
+let agentConsumerBarChartInstance: echarts.ECharts | null = null
+let agentUserTypePieChartInstance: echarts.ECharts | null = null
+let agentLedgerConsumerBarChartInstance: echarts.ECharts | null = null
+let agentFunctionUsagePieChartInstance: echarts.ECharts | null = null
 
 const defaultConsoleSectionState: Record<RoleTab, Partial<Record<ConsoleSectionKey, boolean>>> = {
   developer: {},
@@ -164,12 +190,11 @@ const defaultConsoleSectionState: Record<RoleTab, Partial<Record<ConsoleSectionK
     adminAgents: true,
     adminUsers: true,
     adminSettlementApplications: true,
-    adminCreditAccounts: true,
-    adminTransactions: true,
   },
   agent: {
     agentOverview: true,
     agentCustomers: true,
+    agentTransactions: true,
     agentCommissions: true,
     agentSettlements: true,
   },
@@ -230,15 +255,6 @@ watch(
   },
 )
 const functionPointDrafts = reactive<Record<string, number | null>>({})
-
-const detailEntries = computed(() =>
-  selectedDetail.value
-    ? Object.entries(selectedDetail.value.row).map(([key, value]) => ({
-      key,
-      value: formatDetailValue(value),
-    }))
-    : [],
-)
 
 const roleTabs: Array<{ value: RoleTab; label: string; description: string; icon: string }> = [
   {
@@ -353,22 +369,46 @@ async function refreshOverview() {
 
 onMounted(() => {
   void refreshOverview()
+  window.addEventListener('resize', resizeConsoleCharts)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeConsoleCharts)
   dashboardTrendChartInstance?.dispose()
   dashboardTrendChartInstance = null
+  dashboardPlanPieChartInstance?.dispose()
+  dashboardPlanPieChartInstance = null
+  agentConsumerBarChartInstance?.dispose()
+  agentConsumerBarChartInstance = null
+  agentUserTypePieChartInstance?.dispose()
+  agentUserTypePieChartInstance = null
+  agentLedgerConsumerBarChartInstance?.dispose()
+  agentLedgerConsumerBarChartInstance = null
+  agentFunctionUsagePieChartInstance?.dispose()
+  agentFunctionUsagePieChartInstance = null
 })
 
 const applications = computed(() => overview.value?.applications ?? [])
 const applicationFunctions = computed(() => overview.value?.applicationFunctions ?? [])
-const creditAccounts = computed(() => overview.value?.creditAccounts ?? [])
-const recentTransactions = computed(() => overview.value?.recentTransactions ?? [])
 const customerProfiles = computed(() => overview.value?.customerProfiles ?? [])
 const agentCustomers = computed(() => agentOverview.value?.customers ?? [])
 const agentCommissions = computed(() => agentOverview.value?.commissionPreviews ?? [])
-const agentSettlements = computed(() => agentOverview.value?.settlementBills ?? [])
+const agentSettlements = computed(() =>
+  (agentOverview.value?.settlementBills ?? []).filter((item) => item.status !== 'draft'),
+)
 const dashboardMetrics = computed(() => platformDashboard.value?.metrics ?? null)
+const activeAgentConsolePage = computed<AgentConsolePage>(() => {
+  const value = props.activeAgentPage
+  if (
+    value === 'agent-dashboard' ||
+    value === 'agent-customers' ||
+    value === 'agent-consumption' ||
+    value === 'agent-settlements'
+  ) {
+    return value
+  }
+  return 'agent-dashboard'
+})
 
 const registeredApplicationsByCode = computed(
   () => new Map(applications.value.map((item) => [item.code, item])),
@@ -412,8 +452,8 @@ const trendPeriodOptions: Array<{ value: TrendPeriod; label: string }> = [
 ]
 
 const trendMetricOptions: Array<{ value: TrendMetric; label: string }> = [
-  { value: 'consume', label: '积分消费趋势' },
-  { value: 'recharge', label: '积分充值趋势' },
+  { value: 'consume', label: '积分消费' },
+  { value: 'recharge', label: '积分充值' },
 ]
 
 const planOptions = computed(() =>
@@ -423,9 +463,7 @@ const planOptions = computed(() =>
   })),
 )
 
-const dashboardTrendTitle = computed(
-  () => trendMetricOptions.find((item) => item.value === dashboardTrendMetric.value)?.label ?? '积分充值趋势',
-)
+const dashboardTrendTitle = computed(() => '积分充值&消费')
 
 const dashboardTrendEvents = computed(() => platformDashboard.value?.trends ?? [])
 
@@ -470,9 +508,10 @@ function formatApplicationList(values?: readonly string[] | null) {
 }
 
 function getTrendPeriodRange(period: TrendPeriod) {
-  const end = new Date()
+  const dashboardTime = new Date(platformDashboard.value?.generatedAt ?? '')
+  const end = Number.isNaN(dashboardTime.getTime()) ? new Date() : dashboardTime
   end.setHours(23, 59, 59, 999)
-  const start = new Date()
+  const start = new Date(end)
 
   if (period === 'today') {
     start.setHours(0, 0, 0, 0)
@@ -512,7 +551,7 @@ function buildDashboardTrendSeries() {
           const time = new Date(item.occurredAt).getTime()
           return time >= hourStart.getTime() && time <= hourEnd.getTime()
         })
-        .reduce((sum, item) => sum + Number(item.value ?? 0), 0)
+        .reduce((sum, item) => sum + Math.abs(Number(item.value ?? 0)), 0)
       values.push(total)
     }
     return { labels, values }
@@ -530,7 +569,7 @@ function buildDashboardTrendSeries() {
         const time = new Date(item.occurredAt).getTime()
         return time >= dayStart.getTime() && time <= dayEnd.getTime()
       })
-      .reduce((sum, item) => sum + Number(item.value ?? 0), 0)
+      .reduce((sum, item) => sum + Math.abs(Number(item.value ?? 0)), 0)
     values.push(total)
     cursor.setDate(cursor.getDate() + 1)
   }
@@ -538,8 +577,101 @@ function buildDashboardTrendSeries() {
   return { labels, values }
 }
 
+const dashboardPlanPieData = computed(() => {
+  const rows = platformDashboard.value?.planDistribution ?? []
+  return rows
+    .filter((item) => selectedApplicationCode.value === 'all' || item.applicationCode === selectedApplicationCode.value)
+    .filter((item) => Number(item.count ?? 0) > 0)
+    .map((item) => ({
+      name: selectedApplicationCode.value === 'all'
+        ? `${formatApplicationDisplayName(item.applicationCode)} · ${item.planName}`
+        : item.planName,
+      value: Number(item.count ?? 0),
+    }))
+})
+
+function renderDashboardPlanPieChart() {
+  if (activeRole.value === 'developer' || !dashboardPlanPieChartRef.value) {
+    if (!dashboardPlanPieChartRef.value && dashboardPlanPieChartInstance) {
+      dashboardPlanPieChartInstance.dispose()
+      dashboardPlanPieChartInstance = null
+    }
+    return
+  }
+
+  if (
+    dashboardPlanPieChartInstance &&
+    dashboardPlanPieChartInstance.getDom() !== dashboardPlanPieChartRef.value
+  ) {
+    dashboardPlanPieChartInstance.dispose()
+    dashboardPlanPieChartInstance = null
+  }
+
+  if (!dashboardPlanPieChartInstance) {
+    dashboardPlanPieChartInstance = echarts.init(dashboardPlanPieChartRef.value)
+  }
+
+  const data = dashboardPlanPieData.value
+  dashboardPlanPieChartInstance.resize()
+  dashboardPlanPieChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff', '#28c7b7', '#f6c343', '#ef7d00', '#7c3aed', '#14b8a6'],
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: { name: string; value: number; percent: number }) =>
+        `${params.name}<br/>账号数：${Number(params.value).toLocaleString('zh-CN')}<br/>占比：${params.percent}%`,
+    },
+    legend: {
+      type: 'scroll',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 12, fontWeight: 800 },
+    },
+    series: [
+      {
+        name: '套餐占比',
+        type: 'pie',
+        radius: data.length ? ['42%', '86%'] : ['0%', '0%'],
+        center: ['50%', '47%'],
+        avoidLabelOverlap: true,
+        label: {
+          formatter: '{d}%',
+          color: '#334155',
+          fontSize: 13,
+          fontWeight: 800,
+        },
+        labelLine: { length: 8, length2: 6 },
+        data: data.length ? data : [{ name: '暂无套餐数据', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      },
+    ],
+  })
+  requestAnimationFrame(() => {
+    dashboardPlanPieChartInstance?.resize()
+  })
+}
+
 function renderDashboardTrendChart() {
-  if (activeRole.value === 'developer' || !dashboardTrendChartRef.value) return
+  if (activeRole.value === 'developer' || !dashboardTrendChartRef.value) {
+    if (!dashboardTrendChartRef.value && dashboardTrendChartInstance) {
+      dashboardTrendChartInstance.dispose()
+      dashboardTrendChartInstance = null
+    }
+    return
+  }
+
+  if (
+    dashboardTrendChartInstance &&
+    dashboardTrendChartInstance.getDom() !== dashboardTrendChartRef.value
+  ) {
+    dashboardTrendChartInstance.dispose()
+    dashboardTrendChartInstance = null
+  }
 
   if (!dashboardTrendChartInstance) {
     dashboardTrendChartInstance = echarts.init(dashboardTrendChartRef.value)
@@ -549,6 +681,7 @@ function renderDashboardTrendChart() {
   const accent = dashboardTrendMetric.value === 'consume' ? '#2f6bff' : '#18b77d'
   const valueLabel = dashboardTrendMetric.value === 'consume' ? '消费积分' : '充值积分'
 
+  dashboardTrendChartInstance.resize()
   dashboardTrendChartInstance.setOption({
     animationDuration: 480,
     grid: { left: 12, right: 16, top: 28, bottom: 8, containLabel: true },
@@ -599,15 +732,386 @@ function renderDashboardTrendChart() {
       },
     ],
   })
+  requestAnimationFrame(() => {
+    dashboardTrendChartInstance?.resize()
+  })
+}
+
+function renderAgentConsumerBarChart() {
+  if (
+    activeRole.value !== 'agent' ||
+    activeAgentConsolePage.value !== 'agent-customers' ||
+    !agentConsumerBarChartRef.value
+  ) {
+    if (!agentConsumerBarChartRef.value && agentConsumerBarChartInstance) {
+      agentConsumerBarChartInstance.dispose()
+      agentConsumerBarChartInstance = null
+    }
+    return
+  }
+
+  if (
+    agentConsumerBarChartInstance &&
+    agentConsumerBarChartInstance.getDom() !== agentConsumerBarChartRef.value
+  ) {
+    agentConsumerBarChartInstance.dispose()
+    agentConsumerBarChartInstance = null
+  }
+
+  if (!agentConsumerBarChartInstance) {
+    agentConsumerBarChartInstance = echarts.init(agentConsumerBarChartRef.value)
+  }
+
+  const rows = agentTopTopUpCustomers.value
+  const labels = rows.map((item) => item.customerDisplayName || item.customerUsername).reverse()
+  const values = rows.map((item) => Number(item.totalTopUpAmount ?? 0)).reverse()
+
+  agentConsumerBarChartInstance.resize()
+  agentConsumerBarChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff'],
+    grid: { left: 16, right: 20, top: 16, bottom: 8, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: Array<{ axisValue: string; data: number; dataIndex: number }>) => {
+        const point = params[0]
+        if (!point) return ''
+        const row = [...rows].reverse()[point.dataIndex]
+        return [
+          point.axisValue,
+          `累计充值金额：${formatCurrencyAmount(point.data)}`,
+          `当前余额：${formatCreditsBalance(row)}`,
+        ].join('<br/>')
+      },
+    },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.14)' } },
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: 11,
+        formatter: (value: number) => (value >= 10000 ? `${Number(value / 10000).toFixed(1)}万` : String(value)),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: '#475569',
+        fontSize: 12,
+        fontWeight: 800,
+        width: 96,
+        overflow: 'truncate',
+      },
+    },
+    series: [
+      {
+        name: '累计充值金额',
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { borderRadius: [0, 6, 6, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#334155',
+          fontSize: 12,
+          fontWeight: 800,
+          formatter: (params: { value: number }) => formatCurrencyAmount(params.value),
+        },
+        data: values,
+      },
+    ],
+  })
+  requestAnimationFrame(() => {
+    agentConsumerBarChartInstance?.resize()
+  })
+}
+
+function renderAgentUserTypePieChart() {
+  if (
+    activeRole.value !== 'agent' ||
+    activeAgentConsolePage.value !== 'agent-customers' ||
+    !agentUserTypePieChartRef.value
+  ) {
+    if (!agentUserTypePieChartRef.value && agentUserTypePieChartInstance) {
+      agentUserTypePieChartInstance.dispose()
+      agentUserTypePieChartInstance = null
+    }
+    return
+  }
+
+  if (
+    agentUserTypePieChartInstance &&
+    agentUserTypePieChartInstance.getDom() !== agentUserTypePieChartRef.value
+  ) {
+    agentUserTypePieChartInstance.dispose()
+    agentUserTypePieChartInstance = null
+  }
+
+  if (!agentUserTypePieChartInstance) {
+    agentUserTypePieChartInstance = echarts.init(agentUserTypePieChartRef.value)
+  }
+
+  const data = agentUserTypePieData.value
+  const hasData = data.some((item) => item.value > 0)
+
+  agentUserTypePieChartInstance.resize()
+  agentUserTypePieChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#18b77d', '#f6c343', '#64748b'],
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: { name: string; value: number; percent: number }) =>
+        `${params.name}<br/>人数：${Number(params.value).toLocaleString('zh-CN')}<br/>占比：${params.percent}%`,
+    },
+    legend: {
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 12, fontWeight: 800 },
+    },
+    series: [
+      {
+        name: '用户类型',
+        type: 'pie',
+        radius: hasData ? ['44%', '76%'] : ['0%', '0%'],
+        center: ['50%', '43%'],
+        avoidLabelOverlap: true,
+        label: {
+          formatter: '{d}%',
+          color: '#334155',
+          fontSize: 13,
+          fontWeight: 800,
+        },
+        labelLine: { length: 8, length2: 6 },
+        data: hasData ? data : [{ name: '暂无客户', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      },
+    ],
+  })
+  requestAnimationFrame(() => {
+    agentUserTypePieChartInstance?.resize()
+  })
+}
+
+function renderAgentLedgerConsumerBarChart() {
+  if (
+    activeRole.value !== 'agent' ||
+    activeAgentConsolePage.value !== 'agent-consumption' ||
+    !agentLedgerConsumerBarChartRef.value
+  ) {
+    if (!agentLedgerConsumerBarChartRef.value && agentLedgerConsumerBarChartInstance) {
+      agentLedgerConsumerBarChartInstance.dispose()
+      agentLedgerConsumerBarChartInstance = null
+    }
+    return
+  }
+
+  if (
+    agentLedgerConsumerBarChartInstance &&
+    agentLedgerConsumerBarChartInstance.getDom() !== agentLedgerConsumerBarChartRef.value
+  ) {
+    agentLedgerConsumerBarChartInstance.dispose()
+    agentLedgerConsumerBarChartInstance = null
+  }
+
+  if (!agentLedgerConsumerBarChartInstance) {
+    agentLedgerConsumerBarChartInstance = echarts.init(agentLedgerConsumerBarChartRef.value)
+  }
+
+  const rows = agentLedgerTopCreditConsumers.value
+  const labels = rows.map((item) => item.customerDisplayName || item.customerUsername || '客户').reverse()
+  const values = rows.map((item) => item.consumedCredits).reverse()
+
+  agentLedgerConsumerBarChartInstance.resize()
+  agentLedgerConsumerBarChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff'],
+    grid: { left: 16, right: 20, top: 16, bottom: 8, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: Array<{ axisValue: string; data: number; dataIndex: number }>) => {
+        const point = params[0]
+        if (!point) return ''
+        const row = [...rows].reverse()[point.dataIndex]
+        return [
+          point.axisValue,
+          `累计消费：${Number(point.data).toLocaleString('zh-CN')} 积分`,
+          `消费次数：${Number(row?.transactionCount ?? 0).toLocaleString('zh-CN')}`,
+        ].join('<br/>')
+      },
+    },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.14)' } },
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: 11,
+        formatter: (value: number) => (value >= 10000 ? `${value / 10000}万` : String(value)),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: '#475569',
+        fontSize: 12,
+        fontWeight: 800,
+        width: 96,
+        overflow: 'truncate',
+      },
+    },
+    series: [
+      {
+        name: '累计消费',
+        type: 'bar',
+        barMaxWidth: 18,
+        itemStyle: { borderRadius: [0, 6, 6, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#334155',
+          fontSize: 12,
+          fontWeight: 800,
+          formatter: (params: { value: number }) =>
+            Number(params.value).toLocaleString('zh-CN'),
+        },
+        data: values,
+      },
+    ],
+  })
+  requestAnimationFrame(() => {
+    agentLedgerConsumerBarChartInstance?.resize()
+  })
+}
+
+function renderAgentFunctionUsagePieChart() {
+  if (
+    activeRole.value !== 'agent' ||
+    activeAgentConsolePage.value !== 'agent-consumption' ||
+    !agentFunctionUsagePieChartRef.value
+  ) {
+    if (!agentFunctionUsagePieChartRef.value && agentFunctionUsagePieChartInstance) {
+      agentFunctionUsagePieChartInstance.dispose()
+      agentFunctionUsagePieChartInstance = null
+    }
+    return
+  }
+
+  if (
+    agentFunctionUsagePieChartInstance &&
+    agentFunctionUsagePieChartInstance.getDom() !== agentFunctionUsagePieChartRef.value
+  ) {
+    agentFunctionUsagePieChartInstance.dispose()
+    agentFunctionUsagePieChartInstance = null
+  }
+
+  if (!agentFunctionUsagePieChartInstance) {
+    agentFunctionUsagePieChartInstance = echarts.init(agentFunctionUsagePieChartRef.value)
+  }
+
+  const data = agentFunctionUsagePieData.value
+  const hasData = data.some((item) => item.value > 0)
+
+  agentFunctionUsagePieChartInstance.resize()
+  agentFunctionUsagePieChartInstance.setOption({
+    animationDuration: 480,
+    color: ['#2f6bff', '#18b77d', '#f6c343', '#ef7d00', '#7c3aed', '#14b8a6'],
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+      formatter: (params: { name: string; value: number; percent: number }) =>
+        `${params.name}<br/>使用次数：${Number(params.value).toLocaleString('zh-CN')}<br/>占比：${params.percent}%`,
+    },
+    legend: {
+      type: 'scroll',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 12, fontWeight: 800 },
+    },
+    series: [
+      {
+        name: '功能使用',
+        type: 'pie',
+        radius: hasData ? ['44%', '76%'] : ['0%', '0%'],
+        center: ['50%', '43%'],
+        avoidLabelOverlap: true,
+        label: {
+          formatter: '{d}%',
+          color: '#334155',
+          fontSize: 13,
+          fontWeight: 800,
+        },
+        labelLine: { length: 8, length2: 6 },
+        data: hasData ? data : [{ name: '暂无功能使用', value: 1, itemStyle: { color: '#e2e8f0' } }],
+      },
+    ],
+  })
+  requestAnimationFrame(() => {
+    agentFunctionUsagePieChartInstance?.resize()
+  })
+}
+
+function resizeConsoleCharts() {
+  dashboardTrendChartInstance?.resize()
+  dashboardPlanPieChartInstance?.resize()
+  agentConsumerBarChartInstance?.resize()
+  agentUserTypePieChartInstance?.resize()
+  agentLedgerConsumerBarChartInstance?.resize()
+  agentFunctionUsagePieChartInstance?.resize()
 }
 
 watch(
-  [dashboardTrendPeriod, dashboardTrendMetric, dashboardTrendEvents, activeRole],
+  [
+    dashboardTrendPeriod,
+    dashboardTrendMetric,
+    dashboardTrendEvents,
+    dashboardPlanPieData,
+    selectedApplicationCode,
+    activeRole,
+    activeAgentConsolePage,
+  ],
   async () => {
     await nextTick()
     renderDashboardTrendChart()
+    renderDashboardPlanPieChart()
+    renderAgentConsumerBarChart()
+    renderAgentUserTypePieChart()
+    renderAgentLedgerConsumerBarChart()
+    renderAgentFunctionUsagePieChart()
   },
   { deep: true },
+)
+
+watch(
+  [activeRole, activeAgentConsolePage],
+  ([role, page]) => {
+    if (role === 'agent' && page === 'agent-consumption') {
+      void loadAgentTransactionsLedger()
+    }
+  },
+  { immediate: true },
 )
 
 const createTargetOptions = computed(() => {
@@ -652,18 +1156,25 @@ function matchesSelectedApplication(applicationCode?: string | null) {
   return selectedApplicationCode.value === 'all' || applicationCode === selectedApplicationCode.value
 }
 
+function normalizeSearchText(value?: string | number | null) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function matchesUsernameOrPhone(
+  query: string,
+  username?: string | null,
+  phone?: string | null,
+) {
+  const keyword = normalizeSearchText(query)
+  if (!keyword) return true
+  return [username, phone].some((value) => normalizeSearchText(value).includes(keyword))
+}
+
 function formatDetailValue(value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
   if (Array.isArray(value)) return value.length ? value.join(' / ') : '-'
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
-}
-
-function openRowDetail(title: string, row: unknown) {
-  selectedDetail.value = {
-    title,
-    row: { ...(row as DetailRecord) },
-  }
 }
 
 function exportRows(filename: string, rows: unknown[]) {
@@ -701,10 +1212,6 @@ const selectedApplicationFunctions = computed(() => {
   return applicationFunctions.value.filter((item) => item.applicationCode === selectedApplicationCode.value)
 })
 
-const filteredRecentTransactions = computed(() =>
-  recentTransactions.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
-)
-
 const filteredCustomerProfiles = computed(() =>
   customerProfiles.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
 )
@@ -715,8 +1222,20 @@ const filteredAgentProfiles = computed(() =>
   ),
 )
 
+const searchedAdminAgentProfiles = computed(() =>
+  filteredAgentProfiles.value.filter((item) =>
+    matchesUsernameOrPhone(adminAgentSearchQuery.value, item.username, item.phone),
+  ),
+)
+
 const filteredRegularUserProfiles = computed(() =>
   filteredCustomerProfiles.value.filter((item) => matrixTargetRole(item.role) === 'user'),
+)
+
+const searchedRegularUserProfiles = computed(() =>
+  filteredRegularUserProfiles.value.filter((item) =>
+    matchesUsernameOrPhone(adminCustomerSearchQuery.value, item.username, item.phone),
+  ),
 )
 
 const agentCustomerCountByUserId = computed(
@@ -747,6 +1266,155 @@ const currentAgentDeveloperGate = computed(() => {
 
 const filteredAgentCustomers = computed(() =>
   agentCustomers.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+)
+
+const agentLedgerTransactions = computed(() =>
+  (agentTransactionsLedger.value?.transactions ?? []).filter((item) =>
+    matchesSelectedApplication(item.applicationCode),
+  ),
+)
+
+const agentLedgerTopCreditConsumers = computed(() => {
+  const grouped = new Map<string, {
+    customerUserId: string
+    customerUsername: string | null
+    customerDisplayName: string | null
+    customerPhone: string | null
+    consumedCredits: number
+    transactionCount: number
+    lastConsumedAt: string | null
+  }>()
+
+  for (const item of agentLedgerTransactions.value) {
+    if (item.txnType !== 'settle') continue
+    const consumedCredits = Math.abs(Number(item.points ?? 0))
+    if (consumedCredits <= 0) continue
+    const customerUserId = String(item.customerUserId ?? item.userId)
+    const existing = grouped.get(customerUserId) ?? {
+      customerUserId,
+      customerUsername: item.customerUsername ?? null,
+      customerDisplayName: item.customerDisplayName ?? null,
+      customerPhone: item.customerPhone ?? null,
+      consumedCredits: 0,
+      transactionCount: 0,
+      lastConsumedAt: null,
+    }
+    existing.consumedCredits += consumedCredits
+    existing.transactionCount += 1
+    if (!existing.lastConsumedAt || item.createdAt > existing.lastConsumedAt) {
+      existing.lastConsumedAt = item.createdAt
+    }
+    grouped.set(customerUserId, existing)
+  }
+
+  return Array.from(grouped.values())
+    .sort((a, b) => {
+      const consumedDiff = b.consumedCredits - a.consumedCredits
+      if (consumedDiff !== 0) return consumedDiff
+      return (b.lastConsumedAt ?? '').localeCompare(a.lastConsumedAt ?? '')
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      ...item,
+      consumedCredits: Number(item.consumedCredits.toFixed(4)),
+    }))
+})
+
+const agentFunctionUsagePieData = computed(() => {
+  const grouped = new Map<string, {
+    name: string
+    value: number
+    consumedCredits: number
+  }>()
+
+  for (const item of agentLedgerTransactions.value) {
+    if (item.txnType !== 'settle') continue
+    const name = item.functionName ?? item.functionCode ?? '未标记功能'
+    const existing = grouped.get(name) ?? {
+      name,
+      value: 0,
+      consumedCredits: 0,
+    }
+    existing.value += 1
+    existing.consumedCredits += Math.abs(Number(item.points ?? 0))
+    grouped.set(name, existing)
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    const countDiff = b.value - a.value
+    if (countDiff !== 0) return countDiff
+    return b.consumedCredits - a.consumedCredits
+  })
+})
+
+const searchedAgentCustomers = computed(() =>
+  filteredAgentCustomers.value.filter((item) =>
+    matchesUsernameOrPhone(agentCustomerSearchQuery.value, item.customerUsername, item.customerPhone),
+  ),
+)
+
+const agentUserTypeDefinitions = [
+  {
+    code: 'active',
+    label: '活跃用户',
+    description: '1月内有充值且有积分消费的平台使用记录',
+  },
+  {
+    code: 'potential',
+    label: '潜力用户',
+    description: '1-3月内有充值，但近期消费/使用频率未达到活跃标准',
+  },
+  {
+    code: 'low_frequency',
+    label: '低频用户',
+    description: '6月内或更早曾充值/消费，但近期使用较少',
+  },
+] as const
+
+function normalizeAgentUserTypeCode(value?: string | null) {
+  if (value === 'active' || value === 'potential' || value === 'low_frequency') return value
+  return 'low_frequency'
+}
+
+const agentTopTopUpCustomers = computed(() =>
+  [...filteredAgentCustomers.value]
+    .filter((item) => Number(item.totalTopUpAmount ?? 0) > 0)
+    .sort((a, b) => {
+      const topUpDiff = Number(b.totalTopUpAmount ?? 0) - Number(a.totalTopUpAmount ?? 0)
+      if (topUpDiff !== 0) return topUpDiff
+      return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+    })
+    .slice(0, 5),
+)
+
+const agentUserTypePieData = computed(() =>
+  agentUserTypeDefinitions.map((definition) => ({
+    name: definition.label,
+    value: filteredAgentCustomers.value.filter(
+      (item) => normalizeAgentUserTypeCode(item.userType?.code) === definition.code,
+    ).length,
+    description: definition.description,
+  })),
+)
+
+watch(
+  [agentTopTopUpCustomers, agentUserTypePieData],
+  async () => {
+    await nextTick()
+    renderAgentConsumerBarChart()
+    renderAgentUserTypePieChart()
+  },
+  { deep: true },
+)
+
+watch(
+  [agentLedgerTopCreditConsumers, agentFunctionUsagePieData],
+  async () => {
+    await nextTick()
+    renderAgentLedgerConsumerBarChart()
+    renderAgentFunctionUsagePieChart()
+  },
+  { deep: true },
 )
 
 const filteredAgentCommissions = computed(() =>
@@ -832,6 +1500,18 @@ function targetRoleLabel(role: PlatformUserTargetRole) {
   if (role === 'admin') return 'Admin'
   if (role === 'agent') return 'Agent'
   return 'User'
+}
+
+function backOfficeRoleLabel(role?: string | null) {
+  if (role === 'developer') return '开发者'
+  if (role === 'admin') return '公司管理员'
+  if (role === 'agent') return '代理商'
+  return role ?? '-'
+}
+
+function settlementApproverText(row: PlatformSettlementApplication) {
+  if (!row.approvedByUsername) return '-'
+  return `${row.approvedByUsername} · ${backOfficeRoleLabel(row.approvedByRole)}`
 }
 
 function matrixTargetRole(role?: string | null): PlatformUserTargetRole | 'developer' | null {
@@ -956,9 +1636,19 @@ function formatDateTime(value: string) {
   return `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`
 }
 
+function settlementStatusLabel(status: string | null | undefined) {
+  const labels: Record<string, string> = {
+    draft: '草稿',
+    requested: '已提交',
+    confirmed: '已确认',
+    paid: '已批准',
+  }
+  return labels[status ?? ''] ?? formatDetailValue(status)
+}
+
 function transactionTypeLabel(type: string) {
   const labels: Record<string, string> = {
-    recharge: '充值',
+    recharge: '积分充值',
     bonus: '赠送',
     settle: '消费',
     freeze: '冻结',
@@ -1357,21 +2047,43 @@ async function handleDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
   }
 }
 
-async function handleApplySettlement(row: AgentOperationsSettlementBill) {
-  if (row.status !== 'draft') {
-    message.warning('只有草稿结算单可以申请')
+async function handleApplySettlement(settlementId: string | null | undefined, period: string, status: string) {
+  if (!settlementId) {
+    message.warning('当前返佣结算还没有生成账单')
+    return
+  }
+  if (status !== 'draft') {
+    message.warning('只有草稿账单可以申请结算')
     return
   }
 
-  confirmingSettlementId.value = row.id
+  confirmingSettlementId.value = settlementId
   try {
-    await applyAgentSettlement(row.id)
-    message.success(`已提交结算申请：${row.period}`)
+    await applyAgentSettlement(settlementId)
+    message.success(`已提交结算申请：${period}`)
     await refreshOverview()
   } catch (error) {
     message.error(error instanceof Error ? error.message : '申请结算失败')
   } finally {
     confirmingSettlementId.value = null
+  }
+}
+
+async function handleApproveSettlementPayment(row: PlatformSettlementApplication) {
+  if (row.status !== 'requested') {
+    message.warning('只有已提交的结算申请可以批准支付')
+    return
+  }
+
+  approvingSettlementId.value = row.id
+  try {
+    await approvePlatformSettlementPayment(row.id)
+    message.success(`已批准支付：${row.period}`)
+    await refreshOverview()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '批准支付失败')
+  } finally {
+    approvingSettlementId.value = null
   }
 }
 
@@ -1383,6 +2095,7 @@ function openAdjustCreditsModal(row: CreditsCustomerProfile) {
   selectedCapabilityUser.value = row
   adjustCreditsForm.points = 0
   adjustCreditsForm.reason = ''
+  adjustCreditsForm.classifyAsRecharge = true
   isAdjustCreditsModalOpen.value = true
 }
 
@@ -1412,6 +2125,7 @@ async function handleAdjustCredits() {
       targetUserId: target.userId,
       points,
       reason: adjustCreditsForm.reason.trim() || undefined,
+      classifyAsRecharge: adjustCreditsForm.classifyAsRecharge,
     })
 
     message.success(
@@ -1461,21 +2175,6 @@ async function handleDeleteAccount() {
   }
 }
 
-function renderDetailButton(title: string, row: unknown) {
-  return h(
-    NButton,
-    {
-      size: 'small',
-      secondary: true,
-      onClick: () => openRowDetail(title, row),
-    },
-    {
-      icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
-      default: () => '查看详情',
-    },
-  )
-}
-
 async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
   selectedAgentCustomer.value = row
   agentCustomerLedger.value = null
@@ -1487,6 +2186,18 @@ async function openAgentCustomerLedger(row: AgentOperationsCustomer) {
     message.error(error instanceof Error ? error.message : '加载积分流水失败')
   } finally {
     isLoadingAgentCustomerLedger.value = false
+  }
+}
+
+async function loadAgentTransactionsLedger() {
+  if (activeRole.value !== 'agent') return
+  isLoadingAgentTransactionsLedger.value = true
+  try {
+    agentTransactionsLedger.value = await getAgentTransactionsLedger()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '加载流水表失败')
+  } finally {
+    isLoadingAgentTransactionsLedger.value = false
   }
 }
 
@@ -1603,138 +2314,6 @@ const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctio
         },
         { default: () => row.status },
       )
-    },
-  },
-]
-
-const accountColumns: DataTableColumns<CreditsAccount> = [
-  { title: '账户 ID', key: 'id', width: 140 },
-  { title: '用户 ID', key: 'userId', width: 100 },
-  { title: '租户 ID', key: 'tenantId', width: 100, render(row) { return row.tenantId ?? '-' } },
-  { title: '范围', key: 'accountScope', width: 120 },
-  {
-    title: '可用积分',
-    key: 'availableBalance',
-    width: 140,
-    render(row) {
-      return Number(row.availableBalance ?? 0).toLocaleString('zh-CN')
-    },
-  },
-  {
-    title: '冻结积分',
-    key: 'lockedBalance',
-    width: 140,
-    render(row) {
-      return Number(row.lockedBalance ?? 0).toLocaleString('zh-CN')
-    },
-  },
-  {
-    title: '账户总额',
-    key: 'totalBalance',
-    width: 140,
-    render(row) {
-      return Number(row.totalBalance ?? 0).toLocaleString('zh-CN')
-    },
-  },
-  {
-    title: '状态',
-    key: 'status',
-    width: 100,
-    render(row) {
-      return h(
-        NTag,
-        {
-          round: true,
-          bordered: false,
-          type: row.status === 'active' ? 'success' : 'warning',
-        },
-        { default: () => row.status },
-      )
-    },
-  },
-]
-
-const transactionColumns: DataTableColumns<CreditsTransaction> = [
-  {
-    title: '时间',
-    key: 'createdAt',
-    width: 200,
-    render(row) {
-      const time = new Date(row.createdAt)
-      const pad = (n: number) => String(n).padStart(2, '0')
-      return `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}`
-    },
-  },
-  {
-    title: '应用',
-    key: 'applicationCode',
-    width: 150,
-    render(row) {
-      return formatApplicationDisplayName(row.applicationName ?? row.applicationCode)
-    },
-  },
-  {
-    title: '功能',
-    key: 'functionCode',
-    width: 170,
-    render(row) {
-      return row.functionName ?? row.functionCode ?? '-'
-    },
-  },
-  {
-    title: '类型',
-    key: 'txnType',
-    width: 120,
-    render(row) {
-      const colorMap: Record<string, 'success' | 'info' | 'warning' | 'default'> = {
-        recharge: 'success',
-        settle: 'info',
-        freeze: 'warning',
-        refund: 'success',
-        estimate: 'default',
-        adjustment: 'warning',
-        adjust: 'warning',
-      }
-      return h(
-        NTag,
-        {
-          round: true,
-          bordered: false,
-          type: colorMap[row.txnType] ?? 'default',
-        },
-        { default: () => row.txnType },
-      )
-    },
-  },
-  {
-    title: '积分变动',
-    key: 'points',
-    width: 140,
-    render(row) {
-      const sign = row.points > 0 ? '+' : ''
-      return h(
-        'span',
-        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
-        `${sign}${Number(row.points).toLocaleString('zh-CN')}`,
-      )
-    },
-  },
-  {
-    title: '业务 ID',
-    key: 'bizId',
-    minWidth: 220,
-    ellipsis: { tooltip: true },
-    render(row) {
-      return row.bizId ?? '-'
-    },
-  },
-  {
-    title: '计费任务',
-    key: 'billingTaskId',
-    width: 180,
-    ellipsis: { tooltip: true },
-    render(row) {
-      return row.billingTaskId ?? '-'
     },
   },
 ]
@@ -2394,6 +2973,100 @@ const agentCustomerLedgerColumns: DataTableColumns<AgentCustomerLedgerTransactio
   },
 ]
 
+const agentTransactionsColumns: DataTableColumns<AgentCustomerLedgerTransaction> = [
+  {
+    title: '时间',
+    key: 'createdAt',
+    width: 190,
+    render(row) {
+      return formatDateTime(row.createdAt)
+    },
+  },
+  {
+    title: '客户',
+    key: 'customerDisplayName',
+    minWidth: 220,
+    render(row) {
+      const username = row.customerUsername ?? '-'
+      const displayName = row.customerDisplayName && row.customerDisplayName !== username
+        ? `${row.customerDisplayName} (${username})`
+        : username
+      return displayName
+    },
+  },
+  {
+    title: '应用',
+    key: 'applicationCode',
+    width: 160,
+    render(row) {
+      return formatApplicationDisplayName(row.applicationCode)
+    },
+  },
+  {
+    title: '积分类型',
+    key: 'txnType',
+    width: 130,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: transactionTagType(row.txnType),
+        },
+        { default: () => transactionTypeLabel(row.txnType) },
+      )
+    },
+  },
+  {
+    title: '积分变动',
+    key: 'points',
+    width: 130,
+    render(row) {
+      return h(
+        'span',
+        { class: row.points >= 0 ? 'admin-delta is-up' : 'admin-delta is-down' },
+        formatSignedPoints(row.points),
+      )
+    },
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 120,
+    render() {
+      return h('span', { class: 'agent-ledger-status' }, [
+        h('span', { class: 'agent-ledger-status-dot' }),
+        '已生效',
+      ])
+    },
+  },
+  {
+    title: '来源/用途',
+    key: 'source',
+    minWidth: 170,
+    render(row) {
+      return ledgerSourceText(row)
+    },
+  },
+  {
+    title: '操作人',
+    key: 'actorIdentityLabel',
+    minWidth: 180,
+    render(row) {
+      return h(
+        NTag,
+        {
+          round: true,
+          bordered: false,
+          type: row.actorIdentityLabel === '主账号' ? 'warning' : 'default',
+        },
+        { default: () => ledgerActorText(row) },
+      )
+    },
+  },
+]
+
 const commissionTopUpTransactionColumns: DataTableColumns<AgentOperationsTopUpTransaction> = [
   {
     title: '时间',
@@ -2464,42 +3137,14 @@ const agentCommissionColumns: DataTableColumns<AgentOperationsCommissionPreview>
       return Number(row.commissionPoints ?? 0).toLocaleString('zh-CN')
     },
   },
-  { title: '状态', key: 'status', width: 100 },
   {
-    title: '操作',
-    key: 'actions',
-    width: 130,
+    title: '状态',
+    key: 'status',
+    width: 100,
     render(row) {
-      return h(
-        NButton,
-        {
-          size: 'small',
-          secondary: true,
-          onClick: () => {
-            selectedCommissionDetail.value = row
-          },
-        },
-        {
-          icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
-          default: () => '查看详情',
-        },
-      )
+      return settlementStatusLabel(row.status)
     },
   },
-]
-
-const agentSettlementColumns: DataTableColumns<AgentOperationsSettlementBill> = [
-  { title: '周期', key: 'period', width: 110 },
-  {
-    title: '返佣积分',
-    key: 'totalCommissionPoints',
-    width: 140,
-    render(row) {
-      return Number(row.totalCommissionPoints ?? 0).toLocaleString('zh-CN')
-    },
-  },
-  { title: '状态', key: 'status', width: 120 },
-  { title: '确认时间', key: 'confirmedAt', minWidth: 180, render(row) { return row.confirmedAt ?? '-' } },
   {
     title: '操作',
     key: 'actions',
@@ -2509,20 +3154,33 @@ const agentSettlementColumns: DataTableColumns<AgentOperationsSettlementBill> = 
         'div',
         { class: 'admin-table-actions' },
         [
-          renderDetailButton('结算账单详情', row),
+          h(
+            NButton,
+            {
+              size: 'small',
+              secondary: true,
+              onClick: () => {
+                selectedCommissionDetail.value = row
+              },
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+              default: () => '查看详情',
+            },
+          ),
           h(
             NButton,
             {
               size: 'small',
               secondary: true,
               type: 'primary',
-              disabled: row.status !== 'draft',
-              loading: confirmingSettlementId.value === row.id,
-              onClick: () => handleApplySettlement(row),
+              disabled: row.status !== 'draft' || !row.settlementId,
+              loading: confirmingSettlementId.value === row.settlementId,
+              onClick: () => handleApplySettlement(row.settlementId, row.period, row.status),
             },
             {
               icon: () => h(Icon, { icon: 'mdi:check-decagram-outline' }),
-              default: () => row.status === 'draft' ? '申请结算' : '已提交',
+              default: () => row.status === 'draft' ? '申请结算' : settlementStatusLabel(row.status),
             },
           ),
         ],
@@ -2531,7 +3189,49 @@ const agentSettlementColumns: DataTableColumns<AgentOperationsSettlementBill> = 
   },
 ]
 
+const agentSettlementColumns: DataTableColumns<AgentOperationsSettlementBill> = [
+  { title: '账单编号', key: 'id', minWidth: 180 },
+  { title: '结算周期', key: 'period', width: 120 },
+  {
+    title: '返佣积分',
+    key: 'totalCommissionPoints',
+    width: 140,
+    render(row) {
+      return Number(row.totalCommissionPoints ?? 0).toLocaleString('zh-CN')
+    },
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 120,
+    render(row) {
+      return settlementStatusLabel(row.status)
+    },
+  },
+  {
+    title: '申请时间',
+    key: 'requestedAt',
+    minWidth: 180,
+    render(row) {
+      return row.requestedAt ? formatDateTime(row.requestedAt) : '-'
+    },
+  },
+  {
+    title: '批准时间',
+    key: 'approvedAt',
+    minWidth: 180,
+    render(row) {
+      return row.paidAt
+        ? formatDateTime(row.paidAt)
+        : row.confirmedAt
+          ? formatDateTime(row.confirmedAt)
+          : '-'
+    },
+  },
+]
+
 const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplication> = [
+  { title: '账单编号', key: 'id', minWidth: 180 },
   {
     title: '代理商',
     key: 'agentDisplayName',
@@ -2549,8 +3249,49 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
       return Number(row.totalCommissionPoints ?? 0).toLocaleString('zh-CN')
     },
   },
-  { title: '状态', key: 'status', width: 110 },
-  { title: '申请时间', key: 'requestedAt', minWidth: 180 },
+  {
+    title: '状态',
+    key: 'status',
+    width: 110,
+    render(row) {
+      return settlementStatusLabel(row.status)
+    },
+  },
+  {
+    title: '申请时间',
+    key: 'requestedAt',
+    minWidth: 180,
+    render(row) {
+      return row.requestedAt ? formatDateTime(row.requestedAt) : '-'
+    },
+  },
+  {
+    title: '审批人',
+    key: 'approvedByUsername',
+    minWidth: 160,
+    render(row) {
+      return settlementApproverText(row)
+    },
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 130,
+    render(row) {
+      return h(
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          type: 'primary',
+          disabled: row.status !== 'requested',
+          loading: approvingSettlementId.value === row.id,
+          onClick: () => handleApproveSettlementPayment(row),
+        },
+        { default: () => row.status === 'requested' ? '批准支付' : settlementStatusLabel(row.status) },
+      )
+    },
+  },
 ]
 
 </script>
@@ -2594,10 +3335,10 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
         <template v-if="activeRole !== 'developer'">
           <section
-            v-if="platformDashboard"
-            :id="activeRole === 'agent' ? 'agent-consumption' : undefined"
+            v-if="platformDashboard && (activeRole !== 'agent' || activeAgentConsolePage === 'agent-dashboard')"
+            :id="activeRole === 'agent' ? 'agent-dashboard-insights' : 'admin-dashboard'"
             class="admin-dashboard-insights"
-            aria-label="系统概览与积分趋势"
+            aria-label="系统概览、积分趋势与套餐占比"
           >
             <article class="admin-system-overview-card">
               <div class="admin-trend-head">
@@ -2640,6 +3381,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 </button>
               </div>
               <div ref="dashboardTrendChartRef" class="admin-trend-chart" />
+            </article>
+
+            <article class="admin-plan-pie-card" aria-label="套餐占比">
+              <div class="admin-trend-head">
+                <h2>套餐占比</h2>
+              </div>
+              <div ref="dashboardPlanPieChartRef" class="admin-plan-pie-chart" />
             </article>
 
             <article class="admin-filter-band" aria-label="应用筛选">
@@ -2691,7 +3439,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
         />
 
         <template v-else-if="activeRole === 'admin'">
-          <section class="admin-section">
+          <section id="admin-agents" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -2768,7 +3516,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </div>
           </section>
 
-          <section class="admin-section">
+          <section id="admin-users" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -2777,7 +3525,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             >
               <span>
                 <strong>代理商管理</strong>
-                <small>公司管理员可以创建 Agent，并可禁用 Agent；不能调整 Agent 或 User 的积分。</small>
+                <small>{{ searchedAdminAgentProfiles.length }} 条记录；公司管理员可以创建 Agent，并可禁用 Agent。</small>
               </span>
               <Icon
                 icon="mdi:chevron-down"
@@ -2785,19 +3533,31 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               />
             </button>
             <div v-if="isConsoleSectionOpen('adminAgents')" class="admin-collapse-body">
+              <div class="admin-table-toolbar">
+                <NInput
+                  v-model:value="adminAgentSearchQuery"
+                  clearable
+                  placeholder="按 username 或手机号搜索代理商"
+                  class="admin-table-search"
+                >
+                  <template #prefix>
+                    <Icon icon="mdi:magnify" />
+                  </template>
+                </NInput>
+              </div>
               <NDataTable
-                v-if="filteredAgentProfiles.length"
+                v-if="searchedAdminAgentProfiles.length"
                 :columns="agentManagementColumns"
-                :data="filteredAgentProfiles"
+                :data="searchedAdminAgentProfiles"
                 :bordered="false"
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else description="暂无代理商账号" />
+              <NEmpty v-else :description="filteredAgentProfiles.length ? '没有匹配的代理商账号' : '暂无代理商账号'" />
             </div>
           </section>
 
-          <section class="admin-section">
+          <section id="admin-settlements" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -2806,7 +3566,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             >
               <span>
                 <strong>客户目录</strong>
-                <small>公司管理员可读取全部客户余额/流水；普通 User 可以通过“升级为代理”获得 Agent 后台登录权限。</small>
+                <small>{{ searchedRegularUserProfiles.length }} 条记录；公司管理员可读取全部客户余额/流水。</small>
               </span>
               <Icon
                 icon="mdi:chevron-down"
@@ -2814,15 +3574,27 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               />
             </button>
             <div v-if="isConsoleSectionOpen('adminUsers')" class="admin-collapse-body">
+              <div class="admin-table-toolbar">
+                <NInput
+                  v-model:value="adminCustomerSearchQuery"
+                  clearable
+                  placeholder="按 username 或手机号搜索客户"
+                  class="admin-table-search"
+                >
+                  <template #prefix>
+                    <Icon icon="mdi:magnify" />
+                  </template>
+                </NInput>
+              </div>
               <NDataTable
-                v-if="filteredRegularUserProfiles.length"
+                v-if="searchedRegularUserProfiles.length"
                 :columns="customerColumns"
-                :data="filteredRegularUserProfiles"
+                :data="searchedRegularUserProfiles"
                 :bordered="false"
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else description="暂无客户档案" />
+              <NEmpty v-else :description="filteredRegularUserProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
             </div>
           </section>
 
@@ -2834,8 +3606,8 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('adminSettlementApplications')"
             >
               <span>
-                <strong>结算申请</strong>
-                <small>{{ settlementApplications.length }} 条待审批记录</small>
+                <strong>结算审批</strong>
+                <small>{{ settlementApplications.length }} 条记录</small>
               </span>
               <Icon
                 icon="mdi:chevron-down"
@@ -2855,67 +3627,10 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </div>
           </section>
 
-          <section class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminCreditAccounts')"
-              @click="toggleConsoleSection('adminCreditAccounts')"
-            >
-              <span>
-                <strong>积分账户</strong>
-                <small>{{ creditAccounts.length }} 条记录</small>
-              </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminCreditAccounts') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('adminCreditAccounts')" class="admin-collapse-body">
-              <NDataTable
-                v-if="creditAccounts.length"
-                :columns="accountColumns"
-                :data="creditAccounts"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <NEmpty v-else description="暂无积分账户" />
-            </div>
-          </section>
-
-          <section class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminTransactions')"
-              @click="toggleConsoleSection('adminTransactions')"
-            >
-              <span>
-                <strong>近期积分流水</strong>
-                <small>{{ filteredRecentTransactions.length }} 条记录</small>
-              </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminTransactions') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('adminTransactions')" class="admin-collapse-body">
-              <NDataTable
-                v-if="filteredRecentTransactions.length"
-                :columns="transactionColumns"
-                :data="filteredRecentTransactions"
-                :bordered="false"
-                :single-line="false"
-                :pagination="false"
-              />
-              <NEmpty v-else description="暂无积分流水" />
-            </div>
-          </section>
         </template>
 
         <template v-else>
-          <section id="agent-dashboard" class="admin-section">
+          <section v-if="activeAgentConsolePage === 'agent-dashboard'" id="agent-dashboard" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -2965,14 +3680,14 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 <article class="admin-agent-card">
                   <h3>待确认账单</h3>
                   <strong>{{ agentOverview.metrics.draftSettlementCount }}</strong>
-                  <p>结算账单草稿</p>
+                  <p>待申请返佣账单</p>
                 </article>
               </div>
               <NEmpty v-else description="暂无代理商运营数据" />
             </div>
           </section>
 
-          <section id="agent-customers" class="admin-section">
+          <section v-if="activeAgentConsolePage === 'agent-customers'" id="agent-customers" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -2980,8 +3695,8 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('agentCustomers')"
             >
               <span>
-                <strong>客户目录</strong>
-                <small>{{ filteredAgentCustomers.length }} 条记录</small>
+                <strong>客户表</strong>
+                <small>{{ searchedAgentCustomers.length }} 条记录</small>
               </span>
               <Icon
                 icon="mdi:chevron-down"
@@ -2989,8 +3704,32 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               />
             </button>
             <div v-if="isConsoleSectionOpen('agentCustomers')" class="admin-collapse-body">
+              <div v-if="filteredAgentCustomers.length" class="agent-customer-insights-grid">
+                <section class="agent-customer-chart-panel" aria-label="客户充值金额排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 充值金额客户</h2>
+                  </div>
+                  <div ref="agentConsumerBarChartRef" class="agent-customer-bar-chart" />
+                </section>
+                <section class="agent-customer-chart-panel" aria-label="客户类型分布">
+                  <div class="admin-trend-head">
+                    <h2>客户类型分布</h2>
+                  </div>
+                  <div ref="agentUserTypePieChartRef" class="agent-customer-pie-chart" />
+                </section>
+              </div>
               <div class="admin-section-actions">
-                <NButton size="small" secondary @click="exportRows('agent-customers', filteredAgentCustomers)">
+                <NInput
+                  v-model:value="agentCustomerSearchQuery"
+                  clearable
+                  placeholder="按 username 或手机号搜索客户"
+                  class="admin-table-search"
+                >
+                  <template #prefix>
+                    <Icon icon="mdi:magnify" />
+                  </template>
+                </NInput>
+                <NButton size="small" secondary @click="exportRows('agent-customers', searchedAgentCustomers)">
                   <template #icon>
                     <Icon icon="mdi:download-outline" />
                   </template>
@@ -2998,18 +3737,71 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 </NButton>
               </div>
               <NDataTable
-                v-if="filteredAgentCustomers.length"
+                v-if="searchedAgentCustomers.length"
                 :columns="agentCustomerColumns"
-                :data="filteredAgentCustomers"
+                :data="searchedAgentCustomers"
                 :bordered="false"
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else description="暂无客户档案" />
+              <NEmpty v-else :description="filteredAgentCustomers.length ? '没有匹配的客户档案' : '暂无客户档案'" />
             </div>
           </section>
 
-          <section id="agent-settlements" class="admin-section">
+          <section v-if="activeAgentConsolePage === 'agent-consumption'" id="agent-consumption" class="admin-section">
+            <button
+              type="button"
+              class="admin-collapse-head"
+              :aria-expanded="isConsoleSectionOpen('agentTransactions')"
+              @click="toggleConsoleSection('agentTransactions')"
+            >
+              <span>
+                <strong>流水表</strong>
+                <small>{{ agentLedgerTransactions.length }} 条记录</small>
+              </span>
+              <Icon
+                icon="mdi:chevron-down"
+                :class="{ rotated: isConsoleSectionOpen('agentTransactions') }"
+              />
+            </button>
+            <div v-if="isConsoleSectionOpen('agentTransactions')" class="admin-collapse-body">
+              <div v-if="agentLedgerTransactions.length" class="agent-ledger-insights-grid">
+                <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
+                  <div class="admin-trend-head">
+                    <h2>Top 5 积分消费客户</h2>
+                  </div>
+                  <div ref="agentLedgerConsumerBarChartRef" class="agent-ledger-bar-chart" />
+                </section>
+                <section class="agent-ledger-chart-panel" aria-label="功能使用分布">
+                  <div class="admin-trend-head">
+                    <h2>功能使用分布</h2>
+                  </div>
+                  <div ref="agentFunctionUsagePieChartRef" class="agent-ledger-pie-chart" />
+                </section>
+              </div>
+              <div class="admin-section-actions">
+                <NButton size="small" secondary @click="exportRows('agent-bound-customer-ledger', agentLedgerTransactions)">
+                  <template #icon>
+                    <Icon icon="mdi:download-outline" />
+                  </template>
+                  导出
+                </NButton>
+              </div>
+              <NSpin :show="isLoadingAgentTransactionsLedger">
+                <NDataTable
+                  v-if="agentLedgerTransactions.length"
+                  :columns="agentTransactionsColumns"
+                  :data="agentLedgerTransactions"
+                  :bordered="false"
+                  :single-line="false"
+                  :pagination="{ pageSize: 20 }"
+                />
+                <NEmpty v-else :description="isLoadingAgentTransactionsLedger ? '正在加载流水表' : '暂无绑定客户积分流水'" />
+              </NSpin>
+            </div>
+          </section>
+
+          <section v-if="activeAgentConsolePage === 'agent-settlements'" id="agent-settlements" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -3017,7 +3809,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('agentCommissions')"
             >
               <span>
-                <strong>返佣预览</strong>
+                <strong>返佣结算</strong>
                 <small>{{ filteredAgentCommissions.length }} 条记录</small>
               </span>
               <Icon
@@ -3027,7 +3819,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </button>
             <div v-if="isConsoleSectionOpen('agentCommissions')" class="admin-collapse-body">
               <div class="admin-section-actions">
-                <NButton size="small" secondary @click="exportRows('agent-commissions', filteredAgentCommissions)">
+                <NButton size="small" secondary @click="exportRows('agent-commission-settlements', filteredAgentCommissions)">
                   <template #icon>
                     <Icon icon="mdi:download-outline" />
                   </template>
@@ -3037,7 +3829,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               <div v-if="commissionPolicy" class="admin-rule-grid" aria-label="返佣与结算规则">
                 <article class="admin-rule-card">
                   <p>积分汇率</p>
-                  <strong>1 RMB = {{ commissionPolicy.creditsPerRmb }} credits</strong>
+                  <strong>1 RMB = {{ commissionPolicy.creditsPerRmb }} 积分</strong>
                   <span>{{ commissionPolicy.currency }}</span>
                 </article>
                 <article class="admin-rule-card">
@@ -3050,11 +3842,6 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   <strong>每月 {{ commissionPolicy.settlementDayOfMonth }} 日</strong>
                   <span>结算上一个自然月</span>
                 </article>
-                <article class="admin-rule-card">
-                  <p>退款处理</p>
-                  <strong>追加冲正</strong>
-                  <span>不修改原返佣记录</span>
-                </article>
               </div>
               <NDataTable
                 v-if="filteredAgentCommissions.length"
@@ -3064,11 +3851,11 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else description="暂无返佣预览" />
+              <NEmpty v-else description="暂无返佣结算" />
             </div>
           </section>
 
-          <section class="admin-section">
+          <section v-if="activeAgentConsolePage === 'agent-settlements'" class="admin-section">
             <button
               type="button"
               class="admin-collapse-head"
@@ -3076,7 +3863,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               @click="toggleConsoleSection('agentSettlements')"
             >
               <span>
-                <strong>结算账单</strong>
+                <strong>历史账单</strong>
                 <small>{{ agentSettlements.length }} 条记录</small>
               </span>
               <Icon
@@ -3086,7 +3873,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             </button>
             <div v-if="isConsoleSectionOpen('agentSettlements')" class="admin-collapse-body">
               <div class="admin-section-actions">
-                <NButton size="small" secondary @click="exportRows('agent-settlements', agentSettlements)">
+                <NButton size="small" secondary @click="exportRows('agent-settlement-history', agentSettlements)">
                   <template #icon>
                     <Icon icon="mdi:download-outline" />
                   </template>
@@ -3101,38 +3888,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else description="暂无结算账单" />
+              <NEmpty v-else description="暂无历史账单" />
             </div>
           </section>
 
         </template>
       </NSpin>
-
-      <NModal
-        :show="!!selectedDetail"
-        preset="card"
-        class="admin-create-modal"
-        :title="selectedDetail?.title ?? '详情'"
-        @update:show="(show) => { if (!show) selectedDetail = null }"
-      >
-        <div class="admin-detail-grid">
-          <article
-            v-for="item in detailEntries"
-            :key="item.key"
-            class="admin-detail-item"
-          >
-            <span>{{ item.key }}</span>
-            <strong>{{ item.value }}</strong>
-          </article>
-        </div>
-        <template #footer>
-          <div class="admin-modal-footer">
-            <NButton @click="selectedDetail = null">
-              关闭
-            </NButton>
-          </div>
-        </template>
-      </NModal>
 
       <NModal
         :show="!!selectedCommissionDetail"
@@ -3355,6 +4116,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               class="admin-create-number"
               placeholder="正数增加，负数扣减"
             />
+          </NFormItem>
+          <NFormItem label="积分类型">
+            <NCheckbox v-model:checked="adjustCreditsForm.classifyAsRecharge">
+              积分充值
+            </NCheckbox>
+            <p class="admin-form-hint">勾选后，正数增加会计入“积分充值”趋势；取消勾选则记录为“调整”。</p>
           </NFormItem>
           <NFormItem label="原因">
             <NInput
@@ -3607,7 +4374,11 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
 .admin-dashboard-insights {
   display: grid;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1.65fr) minmax(220px, 300px);
+  grid-template-columns:
+    minmax(190px, 240px)
+    minmax(360px, 1fr)
+    minmax(280px, 360px)
+    minmax(190px, 240px);
   gap: 12px;
   margin-top: 12px;
   align-items: stretch;
@@ -3615,6 +4386,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
 .admin-system-overview-card,
 .admin-trend-card,
+.admin-plan-pie-card,
 .admin-filter-band {
   padding: 20px 24px;
   border: 0;
@@ -3699,10 +4471,62 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   color: var(--color-accent-blue, #2f6bff);
 }
 
-.admin-trend-chart {
+.admin-trend-chart,
+.admin-plan-pie-chart,
+.agent-customer-bar-chart,
+.agent-customer-pie-chart,
+.agent-ledger-bar-chart,
+.agent-ledger-pie-chart {
   width: 100%;
-  height: 320px;
+}
+
+.admin-trend-chart {
+  min-height: 320px;
   margin-top: 12px;
+}
+
+.admin-plan-pie-card {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr);
+  min-height: 100%;
+}
+
+.admin-plan-pie-chart {
+  height: 100%;
+  min-height: 420px;
+  margin-top: 8px;
+}
+
+.agent-customer-insights-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.agent-ledger-insights-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.agent-customer-chart-panel,
+.agent-ledger-chart-panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--app-surface-soft) 72%, white);
+}
+
+.agent-customer-bar-chart,
+.agent-customer-pie-chart,
+.agent-ledger-bar-chart,
+.agent-ledger-pie-chart {
+  height: 300px;
+  min-height: 300px;
+  margin-top: 8px;
 }
 
 .admin-filter-band {
@@ -3715,8 +4539,8 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   display: grid;
   align-content: center;
   gap: 4px;
-  min-height: 74px;
-  padding: 14px 16px;
+  min-height: 66px;
+  padding: 12px 14px;
   border-left: 4px solid var(--role-accent);
   border-radius: 10px;
   background: var(--app-surface-soft);
@@ -3730,8 +4554,9 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 }
 
 .admin-filter-current strong {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 900;
+  line-height: 1.18;
 }
 
 .admin-filter-current span {
@@ -3754,7 +4579,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   gap: 2px;
   width: 100%;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border: 2px solid transparent;
   border-radius: 10px;
   background: var(--app-surface-soft);
@@ -3771,7 +4596,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 }
 
 .admin-filter-chip span {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
 }
 
@@ -3951,11 +4776,26 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   margin-top: 14px;
 }
 
+.admin-table-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin: -2px 0 12px;
+}
+
+.admin-table-search {
+  width: min(360px, 100%);
+}
+
 .admin-section-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 10px;
   margin: -4px 0 12px;
+}
+
+.admin-section-actions .admin-table-search {
+  margin-right: auto;
 }
 
 :deep(.admin-function-points-cell) {
@@ -4080,6 +4920,14 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
 .admin-create-number {
   width: 100%;
+}
+
+.admin-form-hint {
+  margin: 6px 0 0;
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .admin-modal-footer {
@@ -4272,6 +5120,8 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 @media (max-width: 1024px) {
   .admin-tabs,
   .admin-dashboard-insights,
+  .agent-customer-insights-grid,
+  .agent-ledger-insights-grid,
   .admin-filter-band,
   .admin-rule-grid {
     grid-template-columns: minmax(0, 1fr);

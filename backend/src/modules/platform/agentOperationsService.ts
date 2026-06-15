@@ -36,6 +36,27 @@ type AgentCustomerRow = RowDataPacket & {
   customer_credits_tenant_id: number | null;
 };
 
+type AgentCustomerUserType = "active" | "potential" | "low_frequency";
+
+type AgentCustomerUsageStatsRow = RowDataPacket & {
+  account_key: string;
+  total_consumed_credits: string | number;
+  consumption_transaction_count: string | number;
+  last_consumed_at: Date | null;
+  last_top_up_at: Date | null;
+};
+
+type AgentCustomerUsageStats = {
+  totalConsumedCredits: number;
+  consumptionTransactionCount: number;
+  lastConsumedAt: string | null;
+  lastTopUpAt: string | null;
+  userType: {
+    code: AgentCustomerUserType;
+    label: string;
+  };
+};
+
 type AgentCustomerLedgerRow = AgentCustomerRow & {
   enterprise_tenant_id: string | null;
   enterprise_tenant_name: string | null;
@@ -153,13 +174,18 @@ type AgentSettlementRow = RowDataPacket & {
   period: string;
   total_commission_points: string | number;
   status: string;
+  requested_at: Date | null;
+  approved_by_user_id?: string | null;
+  approved_by_username?: string | null;
+  approved_by_display_name?: string | null;
+  approved_by_role_code?: string | null;
   confirmed_at: Date | null;
   paid_at: Date | null;
   created_at: Date;
 };
 
 type AgentCommissionTopUpTransaction = {
-  id: number;
+  id: number | string;
   createdAt: string;
   txnType: string;
   points: number;
@@ -196,6 +222,29 @@ type CustomerTopUpRow = RowDataPacket & {
   total_amount: string | number;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const customerUserTypeDefinitions: Array<{
+  code: AgentCustomerUserType;
+  label: string;
+  description: string;
+}> = [
+  {
+    code: "active",
+    label: "活跃用户",
+    description: "1月内有充值且有积分消费的平台使用记录",
+  },
+  {
+    code: "potential",
+    label: "潜力用户",
+    description: "1-3月内有充值，但近期消费/使用频率未达到活跃标准",
+  },
+  {
+    code: "low_frequency",
+    label: "低频用户",
+    description: "6月内或更早曾充值/消费，但近期使用较少",
+  },
+];
+
 let creditsPool: Pool | null = null;
 
 function getCreditsPool() {
@@ -206,6 +255,7 @@ function getCreditsPool() {
       database: env.credits.mysql.database,
       user: env.credits.mysql.user,
       password: env.credits.mysql.password,
+      timezone: "Z",
       waitForConnections: true,
       connectionLimit: env.credits.mysql.connectionLimit,
       namedPlaceholders: true,
@@ -218,6 +268,43 @@ const toNumber = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+function toTimestamp(value: Date | string | null | undefined) {
+  if (!value) return 0;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function toIsoString(value: Date | string | null | undefined) {
+  const time = toTimestamp(value);
+  return time > 0 ? new Date(time).toISOString() : null;
+}
+
+export function classifyAgentCustomerUserType(input: {
+  lastTopUpAt?: Date | string | null;
+  lastConsumedAt?: Date | string | null;
+  now?: Date;
+}): AgentCustomerUserType {
+  const now = input.now ?? new Date();
+  const activeSince = now.getTime() - 30 * DAY_MS;
+  const potentialSince = now.getTime() - 90 * DAY_MS;
+  const lastTopUpTime = toTimestamp(input.lastTopUpAt);
+  const lastConsumedTime = toTimestamp(input.lastConsumedAt);
+
+  if (lastTopUpTime >= activeSince && lastConsumedTime >= activeSince) {
+    return "active";
+  }
+
+  if (lastTopUpTime >= potentialSince) {
+    return "potential";
+  }
+
+  return "low_frequency";
+}
+
+function userTypeLabel(code: AgentCustomerUserType) {
+  return customerUserTypeDefinitions.find((item) => item.code === code)?.label ?? "低频用户";
+}
 
 const requiredText = (value: unknown, field: string, maxLength: number) => {
   if (typeof value !== "string") throw errors.invalidParameter(`${field} is required`);
@@ -318,6 +405,7 @@ async function listAgentCustomers(agentUserId: string) {
   );
 
   const totalTopUpAmountByCustomer = await listCustomerTopUpAmounts(rows);
+  const usageStatsByCustomer = await listAgentCustomerUsageStats(rows);
   const balances = await listCreditsBalances(
     rows.map((row) => ({
       creditsUserId: row.customer_credits_user_id,
@@ -326,38 +414,42 @@ async function listAgentCustomers(agentUserId: string) {
     })),
   );
 
-  return rows.map((row) => ({
-    id: row.id,
-    applicationCode: row.application_code,
-    relationType: row.relation_type,
-    status: row.status,
-    createdAt: row.created_at.toISOString(),
-    createdByUserId: row.created_by_user_id,
-    createdByUsername: row.created_by_username,
-    createdByDisplayName: row.created_by_display_name,
-    createdByRole: row.created_by_role_code,
-    customerUserId: row.customer_user_id,
-    customerUsername: row.customer_username,
-    customerDisplayName: row.customer_display_name,
-    customerPhone: row.customer_phone,
-    customerCreditsUserId: row.customer_credits_user_id,
-    customerAccountScope: row.customer_account_scope,
-    creditsTenantId: row.customer_credits_tenant_id,
-    creditsAvailableBalance:
-      balances.get(creditsBalanceKey({
-        creditsUserId: row.customer_credits_user_id,
-        accountScope: row.customer_account_scope,
-        creditsTenantId: row.customer_credits_tenant_id,
-      }) ?? "")?.availableBalance ?? null,
-    creditsTotalBalance:
-      balances.get(creditsBalanceKey({
-        creditsUserId: row.customer_credits_user_id,
-        accountScope: row.customer_account_scope,
-        creditsTenantId: row.customer_credits_tenant_id,
-      }) ?? "")?.totalBalance ?? null,
-    totalTopUpAmount:
-      totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
-  }));
+  return rows.map((row) => {
+    const balanceKey = creditsBalanceKey({
+      creditsUserId: row.customer_credits_user_id,
+      accountScope: row.customer_account_scope,
+      creditsTenantId: row.customer_credits_tenant_id,
+    }) ?? "";
+    const usageStats = usageStatsByCustomer.get(customerTopUpKey(row)) ?? emptyCustomerUsageStats();
+
+    return {
+      id: row.id,
+      applicationCode: row.application_code,
+      relationType: row.relation_type,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      createdByUserId: row.created_by_user_id,
+      createdByUsername: row.created_by_username,
+      createdByDisplayName: row.created_by_display_name,
+      createdByRole: row.created_by_role_code,
+      customerUserId: row.customer_user_id,
+      customerUsername: row.customer_username,
+      customerDisplayName: row.customer_display_name,
+      customerPhone: row.customer_phone,
+      customerCreditsUserId: row.customer_credits_user_id,
+      customerAccountScope: row.customer_account_scope,
+      creditsTenantId: row.customer_credits_tenant_id,
+      creditsAvailableBalance: balances.get(balanceKey)?.availableBalance ?? null,
+      creditsTotalBalance: balances.get(balanceKey)?.totalBalance ?? null,
+      totalTopUpAmount:
+        totalTopUpAmountByCustomer.get(customerTopUpKey(row)) ?? 0,
+      totalConsumedCredits: usageStats.totalConsumedCredits,
+      consumptionTransactionCount: usageStats.consumptionTransactionCount,
+      lastConsumedAt: usageStats.lastConsumedAt,
+      lastTopUpAt: usageStats.lastTopUpAt,
+      userType: usageStats.userType,
+    };
+  });
 }
 
 function customerTopUpKey(row: AgentCustomerRow) {
@@ -414,6 +506,95 @@ async function listCustomerTopUpAmounts(rows: AgentCustomerRow[]) {
     for (const row of tenantRows) {
       if (row.tenant_id) result.set(`tenant:${row.tenant_id}`, toNumber(row.total_amount));
     }
+  }
+
+  return result;
+}
+
+function emptyCustomerUsageStats(): AgentCustomerUsageStats {
+  const code = classifyAgentCustomerUserType({});
+  return {
+    totalConsumedCredits: 0,
+    consumptionTransactionCount: 0,
+    lastConsumedAt: null,
+    lastTopUpAt: null,
+    userType: {
+      code,
+      label: userTypeLabel(code),
+    },
+  };
+}
+
+async function listAgentCustomerUsageStats(rows: AgentCustomerRow[]) {
+  const result = new Map<string, AgentCustomerUsageStats>();
+  const personalCreditsUserIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.customer_account_scope !== "tenant")
+        .map((row) => row.customer_credits_user_id)
+        .filter(Boolean),
+    ),
+  );
+  const tenantIds = Array.from(
+    new Set(
+      rows
+        .filter((row) => row.customer_account_scope === "tenant" && row.customer_credits_tenant_id)
+        .map((row) => row.customer_credits_tenant_id as number),
+    ),
+  );
+
+  if (!personalCreditsUserIds.length && !tenantIds.length) return result;
+
+  const clauses: string[] = [];
+  const params: any = {
+    insightTxnTypes: ["settle", "recharge", "bonus", "grant", "adjustment"],
+    topUpTxnTypes: ["recharge", "bonus", "grant", "adjustment"],
+  };
+
+  if (personalCreditsUserIds.length) {
+    clauses.push("(ct.tenant_id IS NULL AND ct.user_id IN (:personalCreditsUserIds))");
+    params.personalCreditsUserIds = personalCreditsUserIds;
+  }
+  if (tenantIds.length) {
+    clauses.push("ct.tenant_id IN (:tenantIds)");
+    params.tenantIds = tenantIds;
+  }
+
+  const [statsRows] = await getCreditsPool().query<AgentCustomerUsageStatsRow[]>(
+    `SELECT
+       CASE
+         WHEN ct.tenant_id IS NOT NULL THEN CONCAT('tenant:', ct.tenant_id)
+         ELSE CONCAT('user:', ct.user_id)
+       END account_key,
+       COALESCE(SUM(CASE WHEN ct.txn_type = 'settle' THEN ABS(ct.points) ELSE 0 END), 0) total_consumed_credits,
+       COALESCE(SUM(CASE WHEN ct.txn_type = 'settle' THEN 1 ELSE 0 END), 0) consumption_transaction_count,
+       MAX(CASE WHEN ct.txn_type = 'settle' THEN ct.created_at ELSE NULL END) last_consumed_at,
+       MAX(CASE
+         WHEN ct.txn_type IN (:topUpTxnTypes) AND ct.points > 0 THEN ct.created_at
+         ELSE NULL
+       END) last_top_up_at
+     FROM credit_transactions ct
+     WHERE ct.txn_type IN (:insightTxnTypes)
+       AND (${clauses.join(" OR ")})
+     GROUP BY account_key`,
+    params,
+  );
+
+  for (const row of statsRows) {
+    const code = classifyAgentCustomerUserType({
+      lastTopUpAt: row.last_top_up_at,
+      lastConsumedAt: row.last_consumed_at,
+    });
+    result.set(row.account_key, {
+      totalConsumedCredits: toNumber(row.total_consumed_credits),
+      consumptionTransactionCount: toNumber(row.consumption_transaction_count),
+      lastConsumedAt: toIsoString(row.last_consumed_at),
+      lastTopUpAt: toIsoString(row.last_top_up_at),
+      userType: {
+        code,
+        label: userTypeLabel(code),
+      },
+    });
   }
 
   return result;
@@ -774,6 +955,141 @@ async function buildCustomerLedgerResponse(customer: AgentCustomerLedgerRow) {
   };
 }
 
+export async function getAgentTransactionsLedger(req: Request) {
+  const agent = await resolveAgentUser(req, req.query.agentUserId);
+  const customers = (await listAgentCustomers(agent.id)).filter((customer) => customer.status === "active");
+  const rows = await Promise.all(
+    customers.map(async (customer) => {
+      const ledgerCustomer = await loadAgentCustomerForLedger(agent.id, customer.id);
+      if (!ledgerCustomer) return [];
+      const account = await loadCreditsAccountForCustomer(ledgerCustomer);
+      if (!account) return [];
+      const transactions = await listLedgerTransactions({
+        accountId: account.id,
+        customer: ledgerCustomer,
+      });
+      return transactions.map((transaction) => ({
+        ...transaction,
+        relationId: customer.id,
+        customerUserId: customer.customerUserId,
+        customerUsername: customer.customerUsername,
+        customerDisplayName: customer.customerDisplayName,
+        customerPhone: customer.customerPhone,
+        applicationCode: transaction.applicationCode ?? customer.applicationCode,
+        accountScope: customer.customerAccountScope,
+      }));
+    }),
+  );
+  const transactions = rows
+    .flat()
+    .sort((a, b) => {
+      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return String(b.id).localeCompare(String(a.id));
+    })
+    .slice(0, 300);
+
+  return {
+    agent: {
+      userId: agent.id,
+      username: agent.username,
+      displayName: agent.display_name,
+    },
+    transactions,
+    transactionInsights: buildAgentTransactionInsights(transactions),
+  };
+}
+
+type AgentLedgerTransactionItem = Awaited<ReturnType<typeof listLedgerTransactions>>[number] & {
+  relationId?: string;
+  customerUserId?: string;
+  customerUsername?: string;
+  customerDisplayName?: string;
+  customerPhone?: string | null;
+  accountScope?: string;
+};
+
+function buildAgentTransactionInsights(transactions: AgentLedgerTransactionItem[]) {
+  const settledTransactions = transactions.filter((item) => item.txnType === "settle");
+  const consumersByUserId = new Map<string, {
+    relationId?: string;
+    customerUserId: string;
+    customerUsername: string | null;
+    customerDisplayName: string | null;
+    customerPhone: string | null;
+    consumedCredits: number;
+    transactionCount: number;
+    lastConsumedAt: string | null;
+  }>();
+  const functionsByKey = new Map<string, {
+    functionCode: string | null;
+    functionName: string;
+    usageCount: number;
+    consumedCredits: number;
+  }>();
+
+  for (const transaction of settledTransactions) {
+    const consumedCredits = Math.abs(toNumber(transaction.points));
+    if (consumedCredits <= 0) continue;
+
+    const customerUserId = String(transaction.customerUserId ?? transaction.userId);
+    const consumer = consumersByUserId.get(customerUserId) ?? {
+      relationId: transaction.relationId,
+      customerUserId,
+      customerUsername: transaction.customerUsername ?? null,
+      customerDisplayName: transaction.customerDisplayName ?? null,
+      customerPhone: transaction.customerPhone ?? null,
+      consumedCredits: 0,
+      transactionCount: 0,
+      lastConsumedAt: null,
+    };
+    consumer.consumedCredits += consumedCredits;
+    consumer.transactionCount += 1;
+    if (!consumer.lastConsumedAt || transaction.createdAt > consumer.lastConsumedAt) {
+      consumer.lastConsumedAt = transaction.createdAt;
+    }
+    consumersByUserId.set(customerUserId, consumer);
+
+    const functionCode = transaction.functionCode ?? null;
+    const functionName = transaction.functionName ?? functionCode ?? "未标记功能";
+    const functionKey = functionCode ?? functionName;
+    const functionUsage = functionsByKey.get(functionKey) ?? {
+      functionCode,
+      functionName,
+      usageCount: 0,
+      consumedCredits: 0,
+    };
+    functionUsage.usageCount += 1;
+    functionUsage.consumedCredits += consumedCredits;
+    functionsByKey.set(functionKey, functionUsage);
+  }
+
+  return {
+    topCreditConsumers: Array.from(consumersByUserId.values())
+      .sort((a, b) => {
+        const consumedDiff = b.consumedCredits - a.consumedCredits;
+        if (consumedDiff !== 0) return consumedDiff;
+        return (b.lastConsumedAt ?? "").localeCompare(a.lastConsumedAt ?? "");
+      })
+      .slice(0, 5)
+      .map((item) => ({
+        ...item,
+        consumedCredits: Number(item.consumedCredits.toFixed(4)),
+      })),
+    functionUsageDistribution: Array.from(functionsByKey.values())
+      .sort((a, b) => {
+        const countDiff = b.usageCount - a.usageCount;
+        if (countDiff !== 0) return countDiff;
+        return b.consumedCredits - a.consumedCredits;
+      })
+      .map((item) => ({
+        ...item,
+        consumedCredits: Number(item.consumedCredits.toFixed(4)),
+      })),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 async function listAgentLeads(agentUserId: string) {
   const [rows] = await pool.query<AgentLeadRow[]>(
     `SELECT id, application_code, customer_name, phone, source, stage,
@@ -890,17 +1206,48 @@ async function listCommissionTopUpTransactions(customers: AgentCustomerListItem[
   return rows;
 }
 
-async function loadAgentSettlementBillsByPeriod(agentUserId: string) {
+async function loadAgentSettlementBills(agentUserId: string) {
   const [rows] = await pool.query<AgentSettlementRow[]>(
-    `SELECT id, period, total_commission_points, status, confirmed_at, paid_at, created_at
+    `SELECT id, period, total_commission_points, status, requested_at, confirmed_at, paid_at, created_at
      FROM agent_settlement_bills
      WHERE agent_user_id = :agentUserId
-     ORDER BY period DESC
-     LIMIT 50`,
+     ORDER BY period DESC, created_at DESC
+     LIMIT 200`,
     { agentUserId },
   );
 
-  return new Map(rows.map((row) => [row.period, row]));
+  return rows;
+}
+
+function groupSettlementBillsByPeriod(rows: AgentSettlementRow[]) {
+  const grouped = new Map<string, AgentSettlementRow[]>();
+  for (const row of rows) {
+    grouped.set(row.period, [...(grouped.get(row.period) ?? []), row]);
+  }
+  return grouped;
+}
+
+function settlementCutoffAt(row: AgentSettlementRow) {
+  return row.requested_at ?? row.paid_at ?? row.confirmed_at ?? row.created_at;
+}
+
+function isTopUpCoveredBySubmittedSettlement(
+  transaction: { period: string; created_at: Date },
+  settlementsByPeriod: Map<string, AgentSettlementRow[]>,
+) {
+  const rows = settlementsByPeriod.get(transaction.period) ?? [];
+  return rows
+    .filter((row) => row.status !== "draft")
+    .some((row) => transaction.created_at.getTime() <= settlementCutoffAt(row).getTime());
+}
+
+function latestDraftSettlementForPeriod(
+  period: string,
+  settlementsByPeriod: Map<string, AgentSettlementRow[]>,
+) {
+  return (settlementsByPeriod.get(period) ?? [])
+    .filter((row) => row.status === "draft")
+    .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0] ?? null;
 }
 
 async function buildAgentCommissionPreviews(agentUserId: string) {
@@ -910,6 +1257,8 @@ async function buildAgentCommissionPreviews(agentUserId: string) {
   ]);
   const customerByKey = new Map(customers.map((customer) => [commissionCustomerKey(customer), customer]));
   const transactions = await listCommissionTopUpTransactions(customers);
+  const settlementRows = await loadAgentSettlementBills(agentUserId);
+  const settlementsByPeriod = groupSettlementBillsByPeriod(settlementRows);
   const grouped = new Map<string, {
     applicationCode: string;
     period: string;
@@ -919,6 +1268,8 @@ async function buildAgentCommissionPreviews(agentUserId: string) {
   }>();
 
   for (const transaction of transactions) {
+    if (isTopUpCoveredBySubmittedSettlement(transaction, settlementsByPeriod)) continue;
+
     const customer = customerByKey.get(topUpTransactionKey(transaction));
     if (!customer) continue;
     const applicationCode = transaction.application_code ?? customer.applicationCode;
@@ -945,11 +1296,10 @@ async function buildAgentCommissionPreviews(agentUserId: string) {
     grouped.set(key, group);
   }
 
-  const settlementsByPeriod = await loadAgentSettlementBillsByPeriod(agentUserId);
   const computedPreviews = Array.from(grouped.values())
     .map((group) => {
       const topUpCredits = Number(group.topUpCredits.toFixed(4));
-      const settlement = settlementsByPeriod.get(group.period);
+      const settlement = latestDraftSettlementForPeriod(group.period, settlementsByPeriod);
       return {
         id: `acp:${agentUserId}:${group.period}:${group.applicationCode}:${group.customer.customerUserId}`,
         applicationCode: group.applicationCode,
@@ -988,7 +1338,7 @@ async function buildAgentCommissionPreviews(agentUserId: string) {
 async function listStoredAgentCommissionPreviews(
   agentUserId: string,
   commissionRate: number,
-  settlementsByPeriod: Map<string, AgentSettlementRow>,
+  settlementsByPeriod: Map<string, AgentSettlementRow[]>,
 ) {
   const [rows] = await pool.query<AgentCommissionRow[]>(
     `SELECT
@@ -1015,7 +1365,7 @@ async function listStoredAgentCommissionPreviews(
   return rows.map((row) => {
     const topUpCredits = toNumber(row.consumed_points);
     const effectiveRate = commissionRate;
-    const settlement = settlementsByPeriod.get(row.period);
+    const settlement = latestDraftSettlementForPeriod(row.period, settlementsByPeriod);
     return {
       id: row.id,
       applicationCode: row.application_code,
@@ -1029,9 +1379,27 @@ async function listStoredAgentCommissionPreviews(
       customerUserId: row.customer_user_id,
       customerUsername: row.customer_username,
       customerDisplayName: row.customer_display_name,
-      topUpTransactions: [],
+      topUpTransactions: topUpCredits > 0
+        ? [{
+            id: row.id,
+            createdAt: row.created_at.toISOString(),
+            txnType: "commission_preview",
+            points: topUpCredits,
+            paymentOrderId: null,
+            bizType: "stored_commission_preview",
+            bizId: row.settlement_id,
+            remark: "历史返佣预览汇总（无单笔充值流水）",
+          }]
+        : [],
       createdAt: row.created_at.toISOString(),
     };
+  }).filter((preview) => {
+    const createdAt = rows.find((row) => row.id === preview.id)?.created_at;
+    if (!createdAt) return true;
+    return !isTopUpCoveredBySubmittedSettlement(
+      { period: preview.period, created_at: createdAt },
+      settlementsByPeriod,
+    );
   });
 }
 
@@ -1041,21 +1409,65 @@ async function syncAgentSettlementBills(agentUserId: string, previews: Awaited<R
     totals.set(preview.period, (totals.get(preview.period) ?? 0) + preview.commissionPoints);
   }
 
-  for (const [period, totalCommissionPoints] of totals) {
-    await pool.query(
-      `INSERT INTO agent_settlement_bills
-        (id, agent_user_id, period, total_commission_points, status)
-       VALUES
-        (:id, :agentUserId, :period, :totalCommissionPoints, 'draft')
-       ON DUPLICATE KEY UPDATE
-        total_commission_points = IF(status IN ('draft', 'requested'), VALUES(total_commission_points), total_commission_points)`,
-      {
-        id: createId("asb"),
-        agentUserId,
-        period,
-        totalCommissionPoints: totalCommissionPoints.toFixed(4),
-      },
-    );
+  const connection = await pool.getConnection();
+  const lockName = `agent_settlement_sync:${agentUserId}`;
+  try {
+    await connection.query(`SELECT GET_LOCK(:lockName, 5)`, { lockName });
+
+    for (const [period, totalCommissionPoints] of totals) {
+      const [draftRows] = await connection.query<AgentSettlementRow[]>(
+        `SELECT id, period, total_commission_points, status, requested_at, confirmed_at, paid_at, created_at
+         FROM agent_settlement_bills
+         WHERE agent_user_id = :agentUserId
+           AND period = :period
+           AND status = 'draft'
+         ORDER BY created_at DESC, id DESC`,
+        { agentUserId, period },
+      );
+
+      const draft = draftRows[0];
+      if (draft) {
+        if (draftRows.length > 1) {
+          await connection.query(
+            `DELETE FROM agent_settlement_bills
+             WHERE id IN (:duplicateIds)
+               AND status = 'draft'`,
+            { duplicateIds: draftRows.slice(1).map((row) => row.id) },
+          );
+        }
+
+        await connection.query(
+          `UPDATE agent_settlement_bills
+           SET total_commission_points = :totalCommissionPoints
+           WHERE id = :id
+             AND status = 'draft'`,
+          {
+            id: draft.id,
+            totalCommissionPoints: totalCommissionPoints.toFixed(4),
+          },
+        );
+        continue;
+      }
+
+      await connection.query(
+        `INSERT INTO agent_settlement_bills
+          (id, agent_user_id, period, total_commission_points, status)
+         VALUES
+          (:id, :agentUserId, :period, :totalCommissionPoints, 'draft')`,
+        {
+          id: createId("asb"),
+          agentUserId,
+          period,
+          totalCommissionPoints: totalCommissionPoints.toFixed(4),
+        },
+      );
+    }
+  } finally {
+    try {
+      await connection.query(`SELECT RELEASE_LOCK(:lockName)`, { lockName });
+    } finally {
+      connection.release();
+    }
   }
 }
 
@@ -1068,12 +1480,13 @@ async function listAgentCommissionPreviews(agentUserId: string) {
 async function listAgentSettlementBills(agentUserId: string) {
   const previews = await buildAgentCommissionPreviews(agentUserId);
   await syncAgentSettlementBills(agentUserId, previews);
-  const settlementsByPeriod = await loadAgentSettlementBillsByPeriod(agentUserId);
-  return Array.from(settlementsByPeriod.values()).map((row) => ({
+  const settlementRows = await loadAgentSettlementBills(agentUserId);
+  return settlementRows.map((row) => ({
     id: row.id,
     period: row.period,
     totalCommissionPoints: toNumber(row.total_commission_points),
     status: row.status,
+    requestedAt: row.requested_at?.toISOString() ?? null,
     confirmedAt: row.confirmed_at?.toISOString() ?? null,
     paidAt: row.paid_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
@@ -1122,6 +1535,39 @@ async function listAgentTickets(agentUserId: string) {
   }));
 }
 
+type AgentCustomerOverviewItem = Awaited<ReturnType<typeof listAgentCustomers>>[number];
+
+function buildAgentCustomerInsights(customers: AgentCustomerOverviewItem[]) {
+  const activeCustomers = customers.filter((item) => item.status === "active");
+  const distribution = customerUserTypeDefinitions.map((definition) => ({
+    ...definition,
+    count: activeCustomers.filter((item) => item.userType.code === definition.code).length,
+  }));
+  const topTopUpCustomers = activeCustomers
+    .filter((item) => item.totalTopUpAmount > 0)
+    .sort((a, b) => {
+      const topUpDiff = b.totalTopUpAmount - a.totalTopUpAmount;
+      if (topUpDiff !== 0) return topUpDiff;
+      return b.createdAt.localeCompare(a.createdAt);
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      relationId: item.id,
+      customerUserId: item.customerUserId,
+      customerUsername: item.customerUsername,
+      customerDisplayName: item.customerDisplayName,
+      customerPhone: item.customerPhone,
+      applicationCode: item.applicationCode,
+      totalTopUpAmount: item.totalTopUpAmount,
+    }));
+
+  return {
+    topTopUpCustomers,
+    userTypeDistribution: distribution,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 export async function getAgentOperationsOverview(req: Request) {
   const agent = await resolveAgentUser(req, req.query.agentUserId);
   const [customers, leads, commissionPreviews, settlementBills, materials, tickets, depositBalances] =
@@ -1154,6 +1600,7 @@ export async function getAgentOperationsOverview(req: Request) {
       openTicketCount: tickets.filter((item) => item.status !== "closed").length,
     },
     customers,
+    customerInsights: buildAgentCustomerInsights(customers),
     leads,
     commissionPreviews,
     settlementBills,
@@ -1233,7 +1680,8 @@ export async function applyAgentSettlement(req: Request, settlementId: string) {
   const agent = await resolveAgentUser(req, req.query.agentUserId);
   const [result] = await pool.query<any>(
     `UPDATE agent_settlement_bills
-     SET status = 'requested'
+     SET status = 'requested',
+         requested_at = COALESCE(requested_at, CURRENT_TIMESTAMP(3))
      WHERE id = :settlementId
        AND agent_user_id = :agentUserId
        AND status = 'draft'`,
@@ -1245,6 +1693,43 @@ export async function applyAgentSettlement(req: Request, settlementId: string) {
   }
 
   return { id: settlementId, agentUserId: agent.id, status: "requested" };
+}
+
+export async function approveSettlementPayment(req: Request, settlementId: string) {
+  const current = getRequiredCurrentUser(req);
+  if (current.user.role !== "developer" && current.user.role !== "admin") {
+    throw errors.forbidden("settlement payment approval requires Admin or Developer role");
+  }
+
+  const [result] = await pool.query<any>(
+    `UPDATE agent_settlement_bills
+     SET status = 'paid',
+         approved_by_user_id = :approvedByUserId,
+         approved_by_role_code = :approvedByRoleCode,
+         confirmed_at = COALESCE(confirmed_at, CURRENT_TIMESTAMP(3)),
+         paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP(3))
+     WHERE id = :settlementId
+       AND status = 'requested'`,
+    {
+      settlementId,
+      approvedByUserId: current.user.id,
+      approvedByRoleCode: current.user.role,
+    },
+  );
+
+  if (!result.affectedRows) {
+    throw errors.invalidParameter("settlement application is not available for payment approval");
+  }
+
+  return {
+    id: settlementId,
+    agentUserId: "",
+    status: "paid",
+    approvedByUserId: current.user.id,
+    approvedByUsername: current.user.username,
+    approvedByDisplayName: current.user.displayName,
+    approvedByRole: current.user.role,
+  };
 }
 
 export async function listSettlementApplications(req: Request) {
@@ -1262,13 +1747,19 @@ export async function listSettlementApplications(req: Request) {
        asb.period,
        asb.total_commission_points,
        asb.status,
+       asb.requested_at,
+       asb.approved_by_user_id,
+       approver.username approved_by_username,
+       approver.display_name approved_by_display_name,
+       asb.approved_by_role_code,
        asb.confirmed_at,
        asb.paid_at,
        asb.created_at
      FROM agent_settlement_bills asb
      JOIN app_users agent ON agent.id = asb.agent_user_id
-     WHERE asb.status = 'requested'
-     ORDER BY asb.created_at DESC
+     LEFT JOIN app_users approver ON approver.id = asb.approved_by_user_id
+     WHERE asb.status IN ('requested', 'paid')
+     ORDER BY COALESCE(asb.requested_at, asb.created_at) DESC
      LIMIT 100`,
   );
 
@@ -1281,7 +1772,11 @@ export async function listSettlementApplications(req: Request) {
       period: row.period,
       totalCommissionPoints: toNumber(row.total_commission_points),
       status: row.status,
-      requestedAt: row.created_at.toISOString(),
+      requestedAt: row.requested_at?.toISOString() ?? null,
+      approvedByUserId: row.approved_by_user_id ?? null,
+      approvedByUsername: row.approved_by_username ?? null,
+      approvedByDisplayName: row.approved_by_display_name ?? null,
+      approvedByRole: row.approved_by_role_code ?? null,
       confirmedAt: row.confirmed_at?.toISOString() ?? null,
       paidAt: row.paid_at?.toISOString() ?? null,
     })),

@@ -6,11 +6,13 @@ import { ok } from "../../shared/response";
 import { getRequiredCurrentUser, requirePermission } from "../auth/authMiddleware";
 import { BACK_OFFICE_PERMISSION } from "../auth/rbac";
 import {
+  approveSettlementPayment,
   applyAgentSettlement,
   createAgentLead,
   createAgentTicket,
   getAgentCustomerLedger,
   getAgentOperationsOverview,
+  getAgentTransactionsLedger,
   getPlatformCustomerLedger,
   listSettlementApplications,
 } from "./agentOperationsService";
@@ -306,11 +308,30 @@ platformRoutes.get(
   }),
 );
 
+platformRoutes.post(
+  "/settlement-applications/:settlementId/approve-payment",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    const settlementId = Array.isArray(req.params.settlementId)
+      ? req.params.settlementId[0]
+      : req.params.settlementId;
+    ok(res, await approveSettlementPayment(req, settlementId));
+  }),
+);
+
 platformRoutes.get(
   "/agent/overview",
   requirePermission(BACK_OFFICE_PERMISSION),
   asyncHandler(async (req, res) => {
     ok(res, await getAgentOperationsOverview(req));
+  }),
+);
+
+platformRoutes.get(
+  "/agent/transactions",
+  requirePermission(BACK_OFFICE_PERMISSION),
+  asyncHandler(async (req, res) => {
+    ok(res, await getAgentTransactionsLedger(req));
   }),
 );
 

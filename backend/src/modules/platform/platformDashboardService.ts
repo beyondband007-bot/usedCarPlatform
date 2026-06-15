@@ -5,7 +5,6 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { getCreditsPool } from "../billing/creditsAccountLookupService";
-import { creditsClient, type CreditTransactionResponse } from "../billing/creditsClient";
 
 type CountRow = RowDataPacket & {
   count: number | string;
@@ -25,6 +24,20 @@ type CreditsTenantRow = RowDataPacket & {
 
 type SumRow = RowDataPacket & {
   total: number | string | null;
+};
+
+type TrendTransactionRow = RowDataPacket & {
+  id: number | string;
+  txn_type: string;
+  points: number | string;
+  created_at: Date | string;
+};
+
+type PlanDistributionRow = RowDataPacket & {
+  application_code: string;
+  plan_code: string;
+  plan_name: string;
+  count: number | string;
 };
 
 const countFromRows = (rows: CountRow[]) => Number(rows[0]?.count ?? 0);
@@ -166,19 +179,23 @@ async function listScopedCreditsTenantIds(role: string, agentUserId: string) {
     .filter((id) => Number.isFinite(id) && id > 0);
 }
 
-function transactionToTrendEvent(transaction: CreditTransactionResponse) {
-  if (transaction.txnType === "recharge") {
+function transactionToTrendEvent(transaction: TrendTransactionRow) {
+  const occurredAt = transaction.created_at instanceof Date
+    ? transaction.created_at.toISOString()
+    : new Date(transaction.created_at).toISOString();
+
+  if (transaction.txn_type === "recharge") {
     return {
       metric: "recharge" as const,
-      occurredAt: transaction.createdAt,
+      occurredAt,
       value: Math.abs(Number(transaction.points ?? 0)),
     };
   }
 
-  if (transaction.txnType === "settle") {
+  if (transaction.txn_type === "settle") {
     return {
       metric: "consume" as const,
-      occurredAt: transaction.createdAt,
+      occurredAt,
       value: Math.abs(Number(transaction.points ?? 0)),
     };
   }
@@ -188,39 +205,80 @@ function transactionToTrendEvent(transaction: CreditTransactionResponse) {
 
 async function listTrendEvents(role: string, agentUserId: string) {
   const creditsUserIds = await listScopedCreditsUserIds(role, agentUserId);
-  const seenTransactionKeys = new Set<string>();
-  const events: Array<{ metric: "recharge" | "consume"; occurredAt: string; value: number }> = [];
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const creditsTenantIds = await listScopedCreditsTenantIds(role, agentUserId);
+  if (role === "agent" && !creditsUserIds.length && !creditsTenantIds.length) return [];
 
-  await Promise.all(
-    creditsUserIds.map(async (creditsUserId) => {
-      const accounts = await creditsClient.listAccounts({ userId: creditsUserId });
-      await Promise.all(
-        accounts.accounts.map(async (account) => {
-          const result = await creditsClient.listAccountTransactions({
-            accountId: account.id,
-            userId: creditsUserId,
-            limit: 100,
-          });
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const scopeSql = role === "agent"
+    ? `AND (
+         (:hasUserIds = 1 AND user_id IN (:userIds))
+         OR (:hasTenantIds = 1 AND tenant_id IN (:tenantIds))
+       )`
+    : "";
 
-          for (const transaction of result.transactions) {
-            const time = new Date(transaction.createdAt).getTime();
-            if (!Number.isFinite(time) || time < cutoff) continue;
-
-            const event = transactionToTrendEvent(transaction);
-            if (!event) continue;
-
-            const key = `${transaction.id}:${event.metric}`;
-            if (seenTransactionKeys.has(key)) continue;
-            seenTransactionKeys.add(key);
-            events.push(event);
-          }
-        }),
-      );
-    }),
+  const [rows] = await getCreditsPool().query<TrendTransactionRow[]>(
+    `SELECT id, txn_type, points, created_at
+     FROM credit_transactions
+     WHERE txn_type IN ('recharge', 'settle')
+       AND created_at >= :cutoff
+       ${scopeSql}
+     ORDER BY created_at ASC`,
+    {
+      cutoff,
+      hasUserIds: creditsUserIds.length ? 1 : 0,
+      userIds: creditsUserIds.length ? creditsUserIds : [0],
+      hasTenantIds: creditsTenantIds.length ? 1 : 0,
+      tenantIds: creditsTenantIds.length ? creditsTenantIds : [0],
+    },
   );
 
-  return events.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+  return rows
+    .map(transactionToTrendEvent)
+    .filter((event): event is { metric: "recharge" | "consume"; occurredAt: string; value: number } => Boolean(event))
+    .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
+}
+
+async function listPlanDistribution(role: string, agentUserId: string) {
+  const scopeSql = role === "agent"
+    ? `AND us.user_id IN (
+         SELECT acr.customer_user_id
+         FROM agent_customer_relations acr
+         WHERE acr.agent_user_id = :agentUserId
+           AND acr.status = 'active'
+       )`
+    : `AND NOT EXISTS (
+         SELECT 1
+         FROM back_office_role_assignments boa
+         WHERE boa.user_id = us.user_id
+           AND boa.role_code IN ('developer', 'admin')
+           AND boa.status = 'active'
+       )`;
+
+  const [rows] = await pool.query<PlanDistributionRow[]>(
+    `SELECT
+       us.application_code,
+       us.plan_code,
+       sp.name plan_name,
+       COUNT(DISTINCT us.user_id) count
+     FROM user_subscriptions us
+     JOIN app_users u ON u.id = us.user_id
+     JOIN subscription_plans sp
+       ON sp.application_code = us.application_code
+      AND sp.code = us.plan_code
+     WHERE us.status = 'active'
+       AND u.status = 'active'
+       ${scopeSql}
+     GROUP BY us.application_code, us.plan_code, sp.name
+     ORDER BY count DESC, us.application_code ASC, sp.name ASC`,
+    { agentUserId },
+  );
+
+  return rows.map((row) => ({
+    applicationCode: row.application_code,
+    planCode: row.plan_code,
+    planName: row.plan_name,
+    count: Number(row.count ?? 0),
+  }));
 }
 
 async function countPlatformCustomerAccounts() {
@@ -457,6 +515,7 @@ export async function getPlatformDashboard(req: Request) {
     ? await getAgentMetrics(current.user.id)
     : await getGlobalMetrics();
   const trends = await listTrendEvents(role, current.user.id);
+  const planDistribution = await listPlanDistribution(role, current.user.id);
 
   return {
     role,
@@ -464,6 +523,7 @@ export async function getPlatformDashboard(req: Request) {
     generatedAt: new Date().toISOString(),
     metrics,
     trends,
+    planDistribution,
     sections: buildSections(role),
     sourceOfTruth: buildSourceOfTruth(),
     notes: [

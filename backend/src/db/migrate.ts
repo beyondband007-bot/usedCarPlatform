@@ -726,8 +726,7 @@ const seedAgentOperationsData = async () => {
       VALUES
       ('asb_agent_2026_06', 'user_agent', '2026-06', 1800.0000, 'draft')
      ON DUPLICATE KEY UPDATE
-      total_commission_points = VALUES(total_commission_points),
-      status = VALUES(status)`,
+      total_commission_points = VALUES(total_commission_points)`,
   );
 
   await pool.query(
@@ -814,6 +813,12 @@ const run = async () => {
       "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER code",
     );
     await addColumnIfMissing("subscription_plans", "metadata_json", "JSON NULL AFTER status");
+    await addColumnIfMissing("agent_settlement_bills", "requested_at", "DATETIME(3) NULL AFTER status");
+    await addColumnIfMissing("agent_settlement_bills", "approved_by_user_id", "VARCHAR(64) NULL AFTER requested_at");
+    await addColumnIfMissing("agent_settlement_bills", "approved_by_role_code", "VARCHAR(32) NULL AFTER approved_by_user_id");
+    await addIndexIfMissing("agent_settlement_bills", "idx_agent_settlement_agent_period", "(agent_user_id, period)");
+    await dropIndexIfExists("agent_settlement_bills", "uk_agent_settlement_agent_period");
+    await addIndexIfMissing("agent_settlement_bills", "idx_agent_settlement_approved_by", "(approved_by_user_id)");
     await addIndexIfMissing(
       "subscription_plans",
       "idx_subscription_plans_application_status",

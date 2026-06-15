@@ -6,6 +6,7 @@ import {
   NButton,
   NDataTable,
   NEmpty,
+  NInput,
   NSwitch,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -68,6 +69,8 @@ const emit = defineEmits<{
 const chartPeriod = ref<ChartPeriod>('7d')
 const chartMetric = ref<ChartMetric>('recharge')
 const chartRef = ref<HTMLElement | null>(null)
+const developerAgentSearchQuery = ref('')
+const developerCustomerSearchQuery = ref('')
 const managementSectionOpen = ref<Record<ManagementSectionKey, boolean>>({
   adminAuthorization: true,
   agentAuthorization: true,
@@ -157,6 +160,28 @@ const overviewList = computed(() => {
     },
   ]
 })
+
+function normalizeSearchText(value?: string | number | null) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function matchesUsernameOrPhone(query: string, username?: string | null, phone?: string | null) {
+  const keyword = normalizeSearchText(query)
+  if (!keyword) return true
+  return [username, phone].some((value) => normalizeSearchText(value).includes(keyword))
+}
+
+const searchedAgentPolicyOverrides = computed(() =>
+  props.agentPolicyOverrides.filter((item) =>
+    matchesUsernameOrPhone(developerAgentSearchQuery.value, item.username, item.phone),
+  ),
+)
+
+const searchedCustomerProfiles = computed(() =>
+  props.filteredCustomerProfiles.filter((item) =>
+    matchesUsernameOrPhone(developerCustomerSearchQuery.value, item.username, item.phone),
+  ),
+)
 
 function isConsumeTxn(transaction: CreditsTransaction) {
   return ['settle', 'freeze', 'estimate'].includes(transaction.txnType)
@@ -629,7 +654,7 @@ onBeforeUnmount(() => {
               >
                 <span>
                   <strong>代理商授权与管理</strong>
-                  <small>控制 Agent 创建 User，并可禁用 Agent 使账号回到普通 User 身份。</small>
+                  <small>{{ searchedAgentPolicyOverrides.length }} 条记录；控制 Agent 创建 User，并可禁用 Agent。</small>
                 </span>
                 <Icon
                   icon="mdi:chevron-down"
@@ -637,15 +662,29 @@ onBeforeUnmount(() => {
                 />
               </button>
               <div v-if="isManagementSectionOpen('agentAuthorization')" class="dev-collapse-body">
+                <div class="dev-table-toolbar">
+                  <NInput
+                    v-model:value="developerAgentSearchQuery"
+                    clearable
+                    placeholder="按 username 或手机号搜索代理商"
+                    class="dev-table-search"
+                  >
+                    <template #prefix>
+                      <Icon icon="mdi:magnify" />
+                    </template>
+                  </NInput>
+                </div>
                 <NDataTable
-                  v-if="agentPolicyOverrides.length"
+                  v-if="searchedAgentPolicyOverrides.length"
                   :columns="agentAuthorizationColumns"
-                  :data="agentPolicyOverrides"
+                  :data="searchedAgentPolicyOverrides"
                   :bordered="false"
                   :single-line="false"
                   :pagination="false"
                 />
-                <p v-else class="dev-auth-empty">暂无代理商账号</p>
+                <p v-else class="dev-auth-empty">
+                  {{ agentPolicyOverrides.length ? '没有匹配的代理商账号' : '暂无代理商账号' }}
+                </p>
               </div>
             </section>
 
@@ -658,7 +697,7 @@ onBeforeUnmount(() => {
               >
                 <span>
                   <strong>客户目录</strong>
-                  <small>{{ filteredCustomerProfiles.length }} 条记录</small>
+                  <small>{{ searchedCustomerProfiles.length }} 条记录</small>
                 </span>
                 <Icon
                   icon="mdi:chevron-down"
@@ -666,16 +705,28 @@ onBeforeUnmount(() => {
                 />
               </button>
               <div v-if="isManagementSectionOpen('customers')" class="dev-collapse-body">
+                <div class="dev-table-toolbar">
+                  <NInput
+                    v-model:value="developerCustomerSearchQuery"
+                    clearable
+                    placeholder="按 username 或手机号搜索客户"
+                    class="dev-table-search"
+                  >
+                    <template #prefix>
+                      <Icon icon="mdi:magnify" />
+                    </template>
+                  </NInput>
+                </div>
                 <NDataTable
-                  v-if="filteredCustomerProfiles.length"
+                  v-if="searchedCustomerProfiles.length"
                   class="dev-customer-table"
                   :columns="customerColumns"
-                  :data="filteredCustomerProfiles"
+                  :data="searchedCustomerProfiles"
                   :bordered="false"
                   :single-line="false"
                   :pagination="false"
                 />
-                <NEmpty v-else description="暂无客户档案" />
+                <NEmpty v-else :description="filteredCustomerProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
               </div>
             </section>
 
@@ -1175,6 +1226,16 @@ onBeforeUnmount(() => {
 
 .dev-collapse-body {
   margin-top: 12px;
+}
+
+.dev-table-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin: 0 0 12px;
+}
+
+.dev-table-search {
+  width: min(360px, 100%);
 }
 
 .dev-auth-sub {

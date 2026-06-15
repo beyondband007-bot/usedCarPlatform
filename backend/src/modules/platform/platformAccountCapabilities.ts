@@ -38,6 +38,7 @@ const getCreditsPool = () => {
       database: env.credits.mysql.database,
       user: env.credits.mysql.user,
       password: env.credits.mysql.password,
+      timezone: "Z",
       waitForConnections: true,
       connectionLimit: env.credits.mysql.connectionLimit,
       namedPlaceholders: true,
@@ -175,6 +176,9 @@ export async function adjustPlatformUserCredits(
   const points = normalizePoints(payload.points);
   const reason = normalizeText(payload.reason, 240) || "back-office manual adjustment";
   const idempotencyKey = normalizeText(payload.idempotencyKey, 160);
+  const classifyAsRecharge = payload.classifyAsRecharge === true && points > 0;
+  const transactionType = classifyAsRecharge ? "recharge" : "adjustment";
+  const bizType = classifyAsRecharge ? "back-office-recharge" : "back-office-adjustment";
   const account = await findPersonalCreditsAccount(target.credits_user_id);
   const balanceBefore = Number(account.total_balance);
   const balanceAfter = Number((balanceBefore + points).toFixed(4));
@@ -230,16 +234,18 @@ export async function adjustPlatformUserCredits(
        )
        VALUES (
          :tenantId, :creditsUserId, :accountId, NULL, NULL,
-         NULL, NULL, 'adjustment', :points, :balanceBefore,
-         :balanceAfter, 'back-office-adjustment', :bizId, NULL, :remark
+         NULL, NULL, :transactionType, :points, :balanceBefore,
+         :balanceAfter, :bizType, :bizId, NULL, :remark
        )`,
       {
         tenantId: locked.tenant_id,
         creditsUserId: locked.user_id,
         accountId: locked.id,
+        transactionType,
         points: points.toFixed(4),
         balanceBefore: lockedBalanceBefore.toFixed(4),
         balanceAfter: lockedBalanceAfter.toFixed(4),
+        bizType,
         bizId: idempotencyKey || createId("adjust"),
         remark: JSON.stringify({
           reason,
@@ -247,6 +253,7 @@ export async function adjustPlatformUserCredits(
           operatorRole: current.user.role,
           targetAppUserId: target.id,
           targetRole,
+          classifyAsRecharge,
         }),
       },
     );
@@ -264,6 +271,7 @@ export async function adjustPlatformUserCredits(
       adjustment: {
         transactionId: Number(transactionResult.insertId),
         points,
+        txnType: transactionType,
         balanceBefore: lockedBalanceBefore.toFixed(4),
         balanceAfter: lockedBalanceAfter.toFixed(4),
         reason,
