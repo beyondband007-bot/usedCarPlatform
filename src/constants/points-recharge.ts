@@ -11,35 +11,35 @@ export interface PointsRechargeOrderItem {
   createdAt: string;
 }
 
-export const POINTS_PER_YUAN = 10;
+export const POINTS_PER_YUAN = 100;
 
 export const pointsRechargePresets: PointsRechargePreset[] = [
-  { amount: 100, points: 1000 },
-  { amount: 200, points: 2000 },
-  { amount: 500, points: 5000 },
-  { amount: 1000, points: 10000 },
-  { amount: 2000, points: 20000 },
+  { amount: 100, points: 10000 },
+  { amount: 200, points: 20000 },
+  { amount: 500, points: 50000 },
+  { amount: 1000, points: 100000 },
+  { amount: 2000, points: 200000 },
 ];
 
 export const defaultRecentRechargeOrders: PointsRechargeOrderItem[] = [
   {
     orderNo: "RC178040364972419F6139C",
     amountYuan: 100,
-    points: 1000,
+    points: 10000,
     status: "pending",
     createdAt: "2025-05-28 14:10:02",
   },
   {
     orderNo: "RC178040364972419F6138",
     amountYuan: 200,
-    points: 2000,
+    points: 20000,
     status: "pending",
     createdAt: "2025-05-27 09:22:18",
   },
   {
     orderNo: "RC178040364972419F6137",
     amountYuan: 500,
-    points: 5000,
+    points: 50000,
     status: "pending",
     createdAt: "2025-05-26 16:05:44",
   },

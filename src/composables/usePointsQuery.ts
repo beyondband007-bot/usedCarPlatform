@@ -13,7 +13,6 @@ import {
   type EnterpriseCreditsMember,
 } from '@/api/enterprise'
 import { flagshipSubAccountFallback } from '@/constants/flagship-sub-accounts'
-import { memberRecords, adminRecords } from '@/constants/points-query-mock'
 import { useAuthStore } from '@/stores/auth'
 import { useCreditsStore } from '@/stores/credits'
 import { useSubscriptionStore } from '@/stores/subscription'
@@ -161,7 +160,7 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
   const activeAccount = ref<CreditsAccount | null>(null)
   const isLoading = ref(false)
   const loadError = ref<string | null>(null)
-  const dataSource = ref<'api' | 'mock'>('mock')
+  const dataSource = ref<'api'>('api')
 
   const accountScopeMode = ref<PointsAccountScopeMode>('self')
   const selectedChildId = ref<string | null>(null)
@@ -185,7 +184,7 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
   )
 
   const usesTeamDashboard = computed(() => showSubAccountScope.value)
-  const usesLiveApi = computed(() => version.value === 'personal')
+  const usesLiveApi = computed(() => true)
 
   const activeTargetCreditsUserId = computed(() => {
     if (!showSubAccountScope.value || accountScopeMode.value === 'self') {
@@ -373,26 +372,13 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
     }
   }
 
-  function loadMockData() {
-    records.value = version.value === 'member' ? memberRecords : adminRecords
-    totalRecords.value = records.value.length
-    dataSource.value = 'mock'
-    loadError.value = null
-    isLoading.value = false
-  }
-
   async function refresh() {
     if (usesTeamDashboard.value) {
       await loadTeamData()
       return
     }
 
-    if (usesLiveApi.value) {
-      await loadPersonalData()
-      return
-    }
-
-    loadMockData()
+    await loadPersonalData()
   }
 
   function setAccountScopeMode(mode: PointsAccountScopeMode) {

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { computed } from "vue";
 
@@ -43,7 +43,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
       role="button"
       tabindex="0"
       :aria-pressed="selected"
-      :aria-label="`${plan.name}，点击选择`"
+      :aria-label="`${plan.name}锛岀偣鍑婚€夋嫨`"
       @click="emit('select')"
       @keydown.enter.prevent="emit('select')"
       @keydown.space.prevent="emit('select')"
@@ -59,7 +59,7 @@ const showBadge = computed(() => Boolean(props.plan.badge));
 
         <div class="plan-price-row">
           <strong>{{ plan.price }}</strong>
-          <span>/ 套</span>
+          <span>/ 年</span>
         </div>
 
         <span class="plan-divider" aria-hidden="true" />
