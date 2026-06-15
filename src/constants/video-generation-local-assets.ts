@@ -1,15 +1,23 @@
 import digitalHumanBasementImg from '@/assets/img/数字人/数字人1地库.png'
 import digitalHumanOutdoorImg from '@/assets/img/数字人/数字人2室外.png'
+import digitalHumanOutdoorAltImg from '@/assets/img/数字人/数字人3室外.jpg'
+import digitalHumanIndoorForeignImg from '@/assets/img/数字人/数字人4室内外国人.jpg'
 import sceneBasementVideo from '@/assets/video/场景1地库.mp4'
 import sceneOutdoorVideo from '@/assets/video/场景2室外.mp4'
+import sceneOutdoorAltVideo from '@/assets/video/场景3室外.mp4'
+import sceneIndoorForeignVideo from '@/assets/video/场景4室内外国人讲解.mp4'
 import { VIDEO_DURATION_SECONDS } from '@/constants/short-video'
 import type { DigitalHuman, VideoTemplate, VideoTemplateType } from '@/types/video-generation'
 
 export const localSceneBasementVideo = sceneBasementVideo
 export const localSceneOutdoorVideo = sceneOutdoorVideo
+export const localSceneOutdoorAltVideo = sceneOutdoorAltVideo
+export const localSceneIndoorForeignVideo = sceneIndoorForeignVideo
 
 export const localDigitalHumanBasementImg = digitalHumanBasementImg
 export const localDigitalHumanOutdoorImg = digitalHumanOutdoorImg
+export const localDigitalHumanOutdoorAltImg = digitalHumanOutdoorAltImg
+export const localDigitalHumanIndoorForeignImg = digitalHumanIndoorForeignImg
 
 interface LocalSceneDefinition {
   key: string
@@ -34,14 +42,15 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '地库场景',
     styleLabel: '专业讲解',
-    stylePrompt: '地下车库均匀柔光，突出车身线条与漆面质感，适合精品车源口播展示。',
+    stylePrompt:
+      '地下车库均匀柔光，突出车身线条与漆面质感，适合精品车源口播展示。',
     badge: 'hot',
     videoUrl: sceneBasementVideo,
     posterUrl: digitalHumanBasementImg,
     fallbackTemplateId: 'local-scene-basement',
     backendDigitalHumanId: 'dh-female-01',
     digitalHuman: {
-      name: '主播 · 地库',
+      name: '主讲 · 地库',
       gender: 'female',
       ageStyle: '地库场景 · 沉稳专业',
       previewUrl: digitalHumanBasementImg,
@@ -55,18 +64,63 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'single-car',
     typeLabel: '室外场景',
     styleLabel: '口播出镜',
-    stylePrompt: '户外自然光环境，画面通透有层次，适合动感车型与促销口播讲解。',
+    stylePrompt:
+      '室外自然光环境，画面通透有层次，适合动感车型与促销口播讲解。',
     badge: null,
     videoUrl: sceneOutdoorVideo,
     posterUrl: digitalHumanOutdoorImg,
     fallbackTemplateId: 'local-scene-outdoor',
     backendDigitalHumanId: 'dh-female-02',
     digitalHuman: {
-      name: '主播 · 室外',
+      name: '主讲 · 室外',
       gender: 'female',
       ageStyle: '室外场景 · 亲和自然',
       previewUrl: digitalHumanOutdoorImg,
       imageUrl: digitalHumanOutdoorImg,
+      voiceStatus: 'ready',
+    },
+  },
+  {
+    key: 'outdoor-alt',
+    title: '室外门店讲解',
+    type: 'single-car',
+    typeLabel: '室外场景',
+    styleLabel: '专业讲解',
+    stylePrompt:
+      '室外门店自然光环境，人物与车辆同框更有真实成交氛围，适合精品车源讲解和门店口播展示。',
+    badge: null,
+    videoUrl: sceneOutdoorAltVideo,
+    posterUrl: digitalHumanOutdoorAltImg,
+    fallbackTemplateId: 'local-scene-outdoor-alt',
+    backendDigitalHumanId: 'dh-female-03',
+    digitalHuman: {
+      name: '主讲 · 室外二',
+      gender: 'female',
+      ageStyle: '室外场景 · 利落讲解',
+      previewUrl: digitalHumanOutdoorAltImg,
+      imageUrl: digitalHumanOutdoorAltImg,
+      voiceStatus: 'ready',
+    },
+  },
+  {
+    key: 'indoor-foreign',
+    title: '室内外国人讲解',
+    type: 'single-car',
+    typeLabel: '室内场景',
+    styleLabel: '专业讲解',
+    stylePrompt:
+      '现代展厅室内环境，外国人数字人自然口播，强调真实门店感与单车卖点表达。',
+    badge: 'new',
+    videoUrl: sceneIndoorForeignVideo,
+    posterUrl: digitalHumanIndoorForeignImg,
+    fallbackTemplateId: 'local-scene-indoor-foreign',
+    backendDigitalHumanId: 'dh-female-09',
+    digitalHuman: {
+      name: '主讲 · 室内外国人',
+      gender: 'female',
+      ageStyle: '室内场景 · 国际化讲解',
+      previewUrl: digitalHumanIndoorForeignImg,
+      imageUrl: digitalHumanIndoorForeignImg,
       voiceStatus: 'ready',
     },
   },
@@ -123,7 +177,7 @@ function findApiTemplateForScene(
   )
 }
 
-/** 仅保留地库 / 室外两个本地场景模板，并尽量复用后端 templateId */
+/** 仅保留本地场景模板展示，并尽量复用后端真实 templateId */
 export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []): VideoTemplate[] {
   const usedTemplateIds = new Set<string>()
 
@@ -191,6 +245,6 @@ export function getLocalScenePreviewById(): Record<string, string> {
 export function getLocalScenePreviewByType(): Partial<Record<VideoTemplateType, string>> {
   return {
     dealership: sceneBasementVideo,
-    'single-car': sceneOutdoorVideo,
+    'single-car': sceneIndoorForeignVideo,
   }
 }

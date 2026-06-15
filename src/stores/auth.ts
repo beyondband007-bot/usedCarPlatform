@@ -8,6 +8,7 @@ import {
   type LoginWithCodeRequest,
 } from '@/api/auth'
 import { removeMockStorage, readMockStorage, writeMockStorage } from '@/mock/mock-storage'
+import { clearWorkspaceLogoCache } from '@/composables/useWorkspaceLogo'
 import { useSubscriptionStore } from '@/stores/subscription'
 import type { LoginRequest, UserInfo, UserRole } from '@/types/auth'
 import { resetCreditsIdentity, setCreditsIdentity } from '@/utils/credits-identity'
@@ -165,6 +166,7 @@ export const useAuthStore = defineStore('auth', {
       removeToken()
       removeMockStorage(USER_KEY)
       removeMockStorage(SUBSCRIPTION_STATE_KEY)
+      clearWorkspaceLogoCache()
       resetCreditsIdentity()
     },
     async refreshUserInfo() {

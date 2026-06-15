@@ -259,6 +259,13 @@ const definitions: VideoTemplateDefinition[] = [
     badge: "new",
     inputRequirements: dealershipRequirements(),
   },
+  {
+    referenceMaterialId: "ref-video-007",
+    type: "single-car",
+    style: "professional",
+    badge: "new",
+    inputRequirements: singleCarRequirements(),
+  },
 ];
 
 const definitionByReferenceMaterialId = new Map(

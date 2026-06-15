@@ -2,7 +2,7 @@
 import { computed, inject } from "vue";
 import { useRouter } from "vue-router";
 
-import footerBrandLogoLight from "@/assets/img/icon/logo/日间模式logo.png";
+import footerBrandLogoLight from "@/assets/img/footer-brand-logo-light.png";
 import { mediaUrls } from "@/constants/media-urls";
 import { WORKBENCH_ENTRY_KEY } from "@/composables/workbench-entry-key";
 import {
@@ -54,9 +54,9 @@ const footerBrandLogoSrc = computed(() =>
         <img
           class="brand-logo-image"
           :src="footerBrandLogoSrc"
-          alt="Facemini 脸谱科技"
-          width="168"
-          height="40"
+          alt="AI商拍"
+          width="240"
+          height="24"
           loading="lazy"
           decoding="async"
         />
@@ -245,8 +245,9 @@ const footerBrandLogoSrc = computed(() =>
 .brand-logo-image {
   display: block;
   width: auto;
-  max-width: 168px;
-  height: 40px;
+  max-width: 240px;
+  height: auto;
+  max-height: 24px;
   margin-bottom: 24px;
   object-fit: contain;
   object-position: left center;

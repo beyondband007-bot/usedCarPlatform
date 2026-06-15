@@ -107,6 +107,13 @@ const logoEnabledState = ref(readStoredLogoEnabled())
 const isUploadingState = ref(false)
 const isLoadingState = ref(false)
 
+export function clearWorkspaceLogoCache() {
+  customLogoState.value = null
+  logoEnabledState.value = false
+  persistCustomLogo(null)
+  persistLogoEnabled(false)
+}
+
 export function useWorkspaceLogo() {
   const activeLogo = computed<LogoInfo | null>(() => customLogoState.value)
 
@@ -159,8 +166,7 @@ export function useWorkspaceLogo() {
   }
 
   function removeCustomLogo() {
-    customLogoState.value = null
-    persistCustomLogo(null)
+    clearWorkspaceLogoCache()
   }
 
   return {

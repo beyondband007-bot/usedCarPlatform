@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
+import { clearWorkspaceLogoCache } from '@/composables/useWorkspaceLogo'
 import { toCreditsHeaders } from '@/utils/credits-identity'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
@@ -154,6 +155,7 @@ http.interceptors.response.use(
       switch (status) {
         case 401:
           localStorage.removeItem(TOKEN_KEY)
+          clearWorkspaceLogoCache()
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'
           }

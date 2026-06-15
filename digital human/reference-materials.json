@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "generatedAt": "2026-06-10T15:00:00+08:00",
+  "generatedAt": "2026-06-15T18:30:00+08:00",
   "sourceDirectory": "C:/Users/Administrator/Desktop/digital human",
   "purpose": "video_reference_style_library",
   "styleExtraction": {
@@ -37,15 +37,32 @@
       "styleJson": {
         "videoType": "indoor_showroom_host_walkthrough",
         "referenceRole": "展厅口播、外观介绍、内饰展示的综合参考",
-        "styleTags": ["室内展厅", "数字人口播", "新车/准新车介绍", "外观环绕", "内饰卖点", "干净商业感"],
+        "styleTags": [
+          "室内展厅",
+          "数字人口播",
+          "新车/准新车介绍",
+          "外观环绕",
+          "内饰卖点",
+          "干净商业感"
+        ],
         "sceneStyle": "明亮现代汽车展厅，玻璃隔断和线性顶灯，车辆停在干净地面，主持人在车旁讲解并切入内饰视角。",
         "visualTone": "冷白展厅光、低饱和、真实手机短视频质感，画面干净但保留真实销售现场感。",
         "lighting": "室内均匀顶灯和自然漫射光，车辆金属漆面有柔和反光，人物面部光线明亮。",
         "cameraLanguage": "竖屏手持/稳定器口播，人物中近景开场，切到车头、侧身和内饰驾驶位；镜头以轻推、轻移和定点讲解为主。",
         "subjectComposition": "主持人和车辆同框，人物通常位于画面一侧，车辆作为主要背景和卖点承载；内饰段落采用驾驶位第一视角。",
         "pacing": "口播节奏中等偏快，围绕卖点逐段切换，适合 15-30 秒成片。",
-        "applicableCarTypes": ["新能源SUV", "中大型SUV", "展厅现车", "高配置车型"],
-        "avoid": ["过度电影化", "暗光夜景", "夸张特效", "脱离真实展厅销售语境"]
+        "applicableCarTypes": [
+          "新能源SUV",
+          "中大型SUV",
+          "展厅现车",
+          "高配置车型"
+        ],
+        "avoid": [
+          "过度电影化",
+          "暗光夜景",
+          "夸张特效",
+          "脱离真实展厅销售语境"
+        ]
       },
       "stylePrompt": "明亮现代汽车展厅、冷白顶灯和干净地面，数字人销售顾问站在车辆旁自然讲解。采用竖屏稳定镜头，穿插外观与内饰细节，保持真实销售现场感和中等偏快节奏。",
       "extractionStatus": "completed",
@@ -78,15 +95,32 @@
       "styleJson": {
         "videoType": "outdoor_vehicle_walkaround_mechanical_detail",
         "referenceRole": "户外实拍、整车外观、发动机舱/硬件细节讲解参考",
-        "styleTags": ["户外停车场", "实车走拍", "销售顾问讲解", "发动机舱展示", "自然光", "朴素可信"],
+        "styleTags": [
+          "户外停车场",
+          "实车走拍",
+          "销售顾问讲解",
+          "发动机舱展示",
+          "自然光",
+          "朴素可信"
+        ],
         "sceneStyle": "开阔户外铺装地面，蓝天自然光，车辆停在空旷位置，主持人围绕车辆介绍并展示机舱细节。",
         "visualTone": "自然日光、真实手机拍摄、色彩直接清晰，不强调高级影棚感，更偏可信实拍。",
         "lighting": "日间户外自然光，车身高光明显，人物面部受环境光影响，整体明亮。",
         "cameraLanguage": "竖屏实拍，人物站立讲解，镜头切换整车前侧、侧面、发动机舱近景；以手势指向和固定说明为主。",
         "subjectComposition": "车辆占据画面主体，主持人与车同框；机舱段落突出开盖后的机械结构和具体配置。",
         "pacing": "信息密度较高，卖点按外观、空间、机舱/配置顺序展开，适合务实型二手车介绍。",
-        "applicableCarTypes": ["家用SUV", "燃油车", "二手车实拍", "需要强调车况和硬件的车型"],
-        "avoid": ["过度美颜", "虚拟展厅", "夸张光效", "不真实的豪华广告感"]
+        "applicableCarTypes": [
+          "家用SUV",
+          "燃油车",
+          "二手车实拍",
+          "需要强调车况和硬件的车型"
+        ],
+        "avoid": [
+          "过度美颜",
+          "虚拟展厅",
+          "夸张光效",
+          "不真实的豪华广告感"
+        ]
       },
       "stylePrompt": "蓝天自然光和开阔铺装场地中，数字人销售顾问围绕真实停放的车辆进行竖屏讲解。镜头突出整车前侧、侧面、车轮和细节，画面真实、可信、直接。",
       "extractionStatus": "completed",
@@ -119,15 +153,33 @@
       "styleJson": {
         "videoType": "glamour_auto_show_marketing_host",
         "referenceRole": "高颜值主持、车展/展厅高光、强营销转化参考",
-        "styleTags": ["车展感", "高光营销", "女性主持", "内饰体验", "动态转场", "促销话术", "精致妆造"],
+        "styleTags": [
+          "车展感",
+          "高光营销",
+          "女性主持",
+          "内饰体验",
+          "动态转场",
+          "促销话术",
+          "精致妆造"
+        ],
         "sceneStyle": "室内展厅或车展环境，主持人造型精致，车辆旁口播与车内体验镜头交替出现。",
         "visualTone": "偏亮、精致、带一点网感和销售转化气质，人物形象和车辆质感同时突出。",
         "lighting": "展厅顶灯与车内环境光结合，人物面部明亮，内饰屏幕和座舱材质有明显展示。",
         "cameraLanguage": "竖屏短视频，车内第一视角、主持人半身口播、车外走动镜头与轻微动感模糊转场结合。",
         "subjectComposition": "人物占比较高，车辆作为高价值产品背景；内饰段落强调方向盘、中控屏、座椅和档把。",
         "pacing": "节奏较快，带强促销节点，适合优惠、限时、年轻化车型推荐。",
-        "applicableCarTypes": ["城市SUV", "年轻化车型", "高配车型", "需要强营销转化的库存车"],
-        "avoid": ["过度严肃", "纯硬件检测口吻", "暗沉色调", "无人讲解"]
+        "applicableCarTypes": [
+          "城市SUV",
+          "年轻化车型",
+          "高配车型",
+          "需要强营销转化的库存车"
+        ],
+        "avoid": [
+          "过度严肃",
+          "纯硬件检测口吻",
+          "暗沉色调",
+          "无人讲解"
+        ]
       },
       "stylePrompt": "精致数字人主持人在明亮展厅或车展环境中讲解车辆，人物表情和镜头表现力更强。穿插车内视角、外观口播和轻微动感转场，整体精致、明快、节奏较快。",
       "extractionStatus": "completed",
@@ -160,15 +212,33 @@
       "styleJson": {
         "videoType": "tech_feature_showroom_explainer",
         "referenceRole": "科技配置、智能座舱、空间座椅卖点参考",
-        "styleTags": ["室内展厅", "科技配置", "智能座舱", "大车空间", "字幕卖点", "蓝黑科技感"],
+        "styleTags": [
+          "室内展厅",
+          "科技配置",
+          "智能座舱",
+          "大车空间",
+          "字幕卖点",
+          "蓝黑科技感"
+        ],
         "sceneStyle": "现代展厅内，车辆颜色和灯光偏科技感，穿插配置特写、车外讲解和座舱空间展示。",
         "visualTone": "展厅真实感叠加科技蓝黑氛围，卖点字幕醒目，适合强调配置和空间。",
         "lighting": "室内顶灯为主，部分配置特写采用暗色科技光效，座舱段落保持明亮可辨。",
         "cameraLanguage": "竖屏讲解，人物在车头/侧前方介绍，切入配置特写和车内后排/座舱视角；镜头稳定、卖点突出。",
         "subjectComposition": "人物、车头和车身同框，配置特写独立成段；座舱镜头强调座椅布局和空间层次。",
         "pacing": "卖点驱动，适合按配置一条条展开；字幕感强，节奏中等。",
-        "applicableCarTypes": ["新能源车", "中大型SUV", "MPV", "智能座舱车型", "高配旗舰车型"],
-        "avoid": ["户外粗糙实拍", "弱化配置细节", "过度情绪化促销", "低清暗部不可辨"]
+        "applicableCarTypes": [
+          "新能源车",
+          "中大型SUV",
+          "MPV",
+          "智能座舱车型",
+          "高配旗舰车型"
+        ],
+        "avoid": [
+          "户外粗糙实拍",
+          "弱化配置细节",
+          "过度情绪化促销",
+          "低清暗部不可辨"
+        ]
       },
       "stylePrompt": "数字人销售顾问在现代展厅中竖屏介绍车辆，画面突出座舱空间、灯光和能够由素材确认的配置细节。镜头在人物口播、车身展示和座舱特写之间切换，色调带轻微蓝黑科技感。",
       "extractionStatus": "completed",
@@ -201,15 +271,33 @@
       "styleJson": {
         "videoType": "outdoor_pickup_promotion_pitch",
         "referenceRole": "大车/皮卡/硬派车型强促销口播参考",
-        "styleTags": ["户外口播", "皮卡猛禽", "强促销", "价格刺激", "硬派车型", "人物走动讲解"],
+        "styleTags": [
+          "户外口播",
+          "皮卡猛禽",
+          "强促销",
+          "价格刺激",
+          "硬派车型",
+          "人物走动讲解"
+        ],
         "sceneStyle": "户外或半户外停车区域，车辆体量大，主持人在车旁走动介绍，强调价格和购买冲动。",
         "visualTone": "真实手机短视频质感，情绪更强、口播更直接，画面不追求精致影棚而强调临场感。",
         "lighting": "户外自然光或阴天漫射光，车漆和车头造型清晰，人物受环境光照明。",
         "cameraLanguage": "竖屏手持跟拍，人物在车侧和车头前走动，镜头轻微晃动，配合近距离口播和强调性手势。",
         "subjectComposition": "大车占据背景主体，主持人靠近车身形成体量对比；结尾可用车头暗化/标题化强化记忆点。",
         "pacing": "强节奏促销话术，适合价格、稀缺性、回头率、气场等卖点。",
-        "applicableCarTypes": ["皮卡", "硬派越野", "大尺寸SUV", "进口车", "价格促销库存车"],
-        "avoid": ["过度精致柔和", "慢节奏品牌片", "弱化价格刺激", "纯内饰静态展示"]
+        "applicableCarTypes": [
+          "皮卡",
+          "硬派越野",
+          "大尺寸SUV",
+          "进口车",
+          "价格促销库存车"
+        ],
+        "avoid": [
+          "过度精致柔和",
+          "慢节奏品牌片",
+          "弱化价格刺激",
+          "纯内饰静态展示"
+        ]
       },
       "stylePrompt": "数字人主持人在户外大尺寸车辆旁进行竖屏走动讲解，镜头带真实手持跟拍感。车辆作为强视觉主体，围绕车侧、车头和人物手势切换，整体直接、有冲击力。",
       "extractionStatus": "completed",
@@ -242,20 +330,95 @@
       "styleJson": {
         "videoType": "garage_inventory_walkthrough_sales",
         "referenceRole": "二手车库存场景、地库走播、车源导购参考",
-        "styleTags": ["地下车库", "库存车源", "走播导购", "真实销售现场", "多车背景", "字幕口播"],
+        "styleTags": [
+          "地下车库",
+          "库存车源",
+          "走播导购",
+          "真实销售现场",
+          "多车背景",
+          "字幕口播"
+        ],
         "sceneStyle": "地下停车场或车库车源区，多辆车排列，主持人在车道中边走边介绍单台车或车源优势。",
         "visualTone": "真实地库短视频质感，顶灯线条明显，画面有库存现场感和导购氛围。",
         "lighting": "地库线性顶灯，冷白人工光，车辆漆面反射顶灯，环境稍有压缩但主体清晰。",
         "cameraLanguage": "竖屏跟拍/边走边讲，人物从车旁走入或站在车头旁，镜头在人物、车头和停车位背景之间轻推轻移。",
         "subjectComposition": "人物位于前景，多辆车形成库存背景；目标车辆靠近人物一侧，字幕覆盖中下部。",
         "pacing": "轻快导购节奏，适合批量车源、低价车、代步车、库存推荐。",
-        "applicableCarTypes": ["二手代步车", "库存车源", "经济型轿车", "多车可选场景"],
-        "avoid": ["高端影棚感", "空旷无车背景", "过强电影调色", "只拍单车不体现库存环境"]
+        "applicableCarTypes": [
+          "二手代步车",
+          "库存车源",
+          "经济型轿车",
+          "多车可选场景"
+        ],
+        "avoid": [
+          "高端影棚感",
+          "空旷无车背景",
+          "过强电影调色",
+          "只拍单车不体现库存环境"
+        ]
       },
       "stylePrompt": "数字人主持人在地下车库或库存车源区竖屏边走边讲，背景为整齐停放的车辆和冷白线性顶灯。镜头突出人物、目标车辆和库存环境，带轻微跟拍感与真实销售现场氛围。",
       "extractionStatus": "completed",
       "extractedAt": "2026-06-10T15:35:00+08:00",
       "extractionMethod": "keyframe_visual_review"
+    },
+    {
+      "id": "ref-video-007",
+      "title": "室内外国人数字人讲解",
+      "fileName": "fb2abc1e7502a063537285ff38c8950f.mp4",
+      "sourcePath": "D:/微信文件/WeChat Files/wxid_fmx7ouigx77c12/FileStorage/Video/2026-06/fb2abc1e7502a063537285ff38c8950f.mp4",
+      "sha256": "5072f5e65996b750e1709a5d74266d08791bec6c5d62572ac1a03e9ef8524481",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 3171161,
+        "duration": "00:00:17",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "30.00"
+      },
+      "videoType": "indoor_foreign_host_explainer",
+      "referenceRole": "室内展厅、外国人口播、单车卖点讲解参考",
+      "previewImagePath": "digital human/reference-frames/ref-video-007-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-007-frame-01.jpg",
+        "digital human/reference-frames/ref-video-007-frame-02.jpg",
+        "digital human/reference-frames/ref-video-007-frame-03.jpg",
+        "digital human/reference-frames/ref-video-007-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "indoor_foreign_host_explainer",
+        "referenceRole": "室内展厅、外国人口播、单车卖点讲解参考",
+        "styleTags": [
+          "室内展厅",
+          "外国人讲解",
+          "数字人口播",
+          "单车介绍",
+          "现代门店",
+          "真实销售感"
+        ],
+        "sceneStyle": "现代汽车展厅或门店室内环境，人物围绕车辆自然讲解，兼顾整车展示与局部卖点切换。",
+        "visualTone": "画面明亮干净，强调真实门店拍摄感和讲解亲和力，不过度营销，也不过度影视化。",
+        "lighting": "室内均匀顶灯与环境漫反射为主，车辆表面反光自然，人物面部清晰。",
+        "cameraLanguage": "竖屏稳定镜头，以人物出镜讲解为主，穿插车辆外观与内饰细节近景，镜头移动克制。",
+        "subjectComposition": "人物与车辆同框，人物通常位于前景或侧前方，车辆承担主要信息表达。",
+        "pacing": "节奏中等偏快，适合 15-30 秒内完成核心卖点说明。",
+        "applicableCarTypes": [
+          "新能源 SUV",
+          "家用 SUV",
+          "高配轿车",
+          "展厅现车"
+        ],
+        "avoid": [
+          "夸张特效",
+          "过暗光线",
+          "强烈直播叫卖感",
+          "脱离真实门店环境"
+        ]
+      },
+      "stylePrompt": "现代室内汽车展厅场景，外国人数字人以自然口播方式围绕车辆进行讲解。保持竖屏稳定镜头，穿插外观与内饰卖点，整体真实、专业、亲和。",
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-15T18:30:00+08:00",
+      "extractionMethod": "manual_reference_registration"
     }
   ]
 }

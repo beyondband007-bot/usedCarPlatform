@@ -1,10 +1,10 @@
 {
   "manifestVersion": 1,
-  "updatedAt": "2026-06-10T16:45:00+08:00",
+  "updatedAt": "2026-06-15T18:30:00+08:00",
   "purpose": "digital_human_selection_library",
   "notes": [
     "每张图片包含正面、侧面、背面和人物特写，后端列表接口只返回可选数字人和预览地址。",
-    "当前先登记 9 个数字人素材：8 个女性、1 个男性。"
+    "当前共登记 10 个数字人素材，9 个女性、1 个男性。"
   ],
   "items": [
     {
@@ -96,6 +96,16 @@
       "frontPreviewStrategy": "use_left_panel_or_backend_crop",
       "status": "active",
       "sortOrder": 9
+    },
+    {
+      "id": "dh-female-09",
+      "name": "数字人女 09",
+      "gender": "female",
+      "ageStyle": "young_adult",
+      "imagePath": "digital human/female-09-four-view.jpg",
+      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
+      "status": "active",
+      "sortOrder": 10
     }
   ]
 }
