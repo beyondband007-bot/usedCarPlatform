@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useDialog, useMessage } from "naive-ui";
 
-import { createVideoGenerationTask } from "@/api/video-generation";
+import { createVideoGenerationTask, getVideoGenerationTask } from "@/api/video-generation";
 import {
   createCreativeImageConversation,
   createCreativeImageGeneration,
@@ -29,6 +29,8 @@ import {
   VIDEO_OUTPUT_RATIO_LABEL,
   isShortVideoModuleCode,
 } from "@/constants/short-video";
+import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
+import { useVideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
@@ -48,6 +50,7 @@ import { usePointsStore } from "@/stores/points";
 import { useAuthStore } from "@/stores/auth";
 import { useCreditsStore } from "@/stores/credits";
 import { useSubscriptionStore } from "@/stores/subscription";
+import { useRecentGenerateStore } from "@/stores/recentGenerate";
 import type {
   CreativeThreadTurn,
   SidebarCapabilityStatus,
@@ -66,6 +69,10 @@ import {
   registerStaticImageUrls,
   warmStaticImages,
 } from "@/utils/static-image-cache";
+import { buildWorkspaceResultFromVideoTask } from "@/utils/video-generation-result";
+import { resolveVideoGenerationErrorMessage } from "@/utils/video-generation-errors";
+import { attachPreviewGallery } from "@/utils/workspace-image-preview";
+import { resolveRecentGenerateCacheKey } from "@/utils/recent-generate-cache";
 
 const route = useRoute();
 const router = useRouter();
@@ -76,7 +83,50 @@ const authStore = useAuthStore();
 const pointsStore = usePointsStore();
 const creditsStore = useCreditsStore();
 const subscriptionStore = useSubscriptionStore();
+const recentGenerateStore = useRecentGenerateStore();
 registerStaticImageUrls(workspaceStaticImageUrls);
+
+const videoFlowOwnerKey = computed(
+  () =>
+    authStore.userInfo?.id ??
+    authStore.userInfo?.username ??
+    "guest",
+);
+const videoFlow = useVideoGenerationFlow(videoFlowOwnerKey.value);
+provide(VIDEO_GENERATION_FLOW_KEY, videoFlow);
+
+function getCachedRecentItemsForActiveModule(): WorkspaceRecentItem[] {
+  const key = resolveRecentGenerateCacheKey({
+    capabilityCode: activeCode.value,
+    capabilityKind: activeCapability.value.kind,
+  });
+  if (!key) {
+    return assistPanelRef.value?.getRecentItems?.() ?? [];
+  }
+
+  const cachedItems = recentGenerateStore.getCache(key).taskList;
+  if (cachedItems.length) {
+    return cachedItems;
+  }
+
+  return assistPanelRef.value?.getRecentItems?.() ?? [];
+}
+
+function setGenerationResultWithGallery(result: WorkspaceGenerateResult | null) {
+  if (!result) {
+    generationResult.value = null;
+    return;
+  }
+
+  if (result.mediaType === "video" || result.previewGallery?.length) {
+    generationResult.value = result;
+    return;
+  }
+
+  generationResult.value = attachPreviewGallery(result, {
+    recentItems: getCachedRecentItemsForActiveModule(),
+  });
+}
 
 function getViewMediaFailureMessage(moduleCode?: string) {
   return isShortVideoModuleCode(moduleCode) ? "查看视频失败" : "查看图片失败";
@@ -1159,7 +1209,7 @@ function handleDeliveryListLoadingChange(loading: boolean) {
 }
 
 function handleOpenDeliveryAssetResult(result: WorkspaceGenerateResult) {
-  generationResult.value = result;
+  setGenerationResultWithGallery(result);
   deliveryImagePreview.value = null;
 }
 
@@ -1287,14 +1337,16 @@ async function pollMultipleGenerationTasks(taskIds: string[]) {
 function buildResultFromTask(
   task: GenerationTaskDetail,
 ): WorkspaceGenerateResult | null {
-  const isShortVideo = task.moduleCode === SHORT_VIDEO_CAPABILITY_CODE;
+  const isShortVideo = isShortVideoModuleCode(task.moduleCode);
+  const videoItem = task.resultVideos?.[0];
   const image = task.resultImages[0];
-  const videoUrl =
-    task.resultVideos?.[0]?.url ??
-    task.videoUrl ??
-    task.previewVideo ??
-    task.downloadUrl ??
-    image?.url;
+  const videoUrl = isShortVideo
+    ? videoItem?.url ??
+      task.videoUrl ??
+      task.previewVideo ??
+      task.downloadUrl ??
+      image?.url
+    : undefined;
   const resultUrl = isShortVideo ? videoUrl : image?.url;
   if (!resultUrl) return null;
 
@@ -1315,14 +1367,16 @@ function buildResultFromTask(
       : `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel,
     mediaType: isShortVideo ? "video" : "image",
-    previewImage: isShortVideo ? "" : resultUrl,
+    previewImage: isShortVideo ? resultUrl : resultUrl,
     previewVideo: isShortVideo ? resultUrl : undefined,
     previewAlt: `${sceneTitle}生成结果`,
-    downloadUrl: resultUrl,
+    downloadUrl: isShortVideo
+      ? task.downloadUrl ?? videoItem?.url ?? resultUrl
+      : resultUrl,
     resultImages: task.resultImages,
     taskId: task.taskId,
-    imageWidth: 1600,
-    imageHeight: 900,
+    imageWidth: isShortVideo ? 900 : 1600,
+    imageHeight: isShortVideo ? 1600 : 900,
   };
 }
 
@@ -1388,15 +1442,80 @@ async function resolveInteriorCollageTasks(
       return;
     }
 
-    generationResult.value = result;
-    clearActiveGenerationTask(result.taskId);
     if (!options.restored && successTasks[0]) {
       notifyGenerationSuccess(successTasks[0]);
     }
     refreshCreditsBalance();
     await assistPanelRef.value?.refreshRecentItems();
+    setGenerationResultWithGallery(result);
+    clearActiveGenerationTask(result.taskId);
   } finally {
     untrackRunningTasks(taskIds);
+  }
+}
+
+async function resolveVideoGenerationModuleTask(
+  taskId: string,
+  options: { restored?: boolean } = {},
+) {
+  isGenerating.value = true;
+  generationResult.value = null;
+  generatingCapabilityCode.value = SHORT_VIDEO_CAPABILITY_CODE;
+
+  try {
+    const task = await videoFlow.waitForTaskCompletion(taskId);
+
+    if (task.status !== "success") {
+      markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "fail");
+      const failureMessage =
+        task.error?.message ??
+        resolveVideoGenerationErrorMessage(task.error?.code ?? task.status);
+      message.error(
+        failureMessage ||
+          getViewMediaFailureMessage(VIDEO_GENERATION_MODULE_CODE),
+      );
+      return;
+    }
+
+    const result = buildWorkspaceResultFromVideoTask(task);
+    if (!result) {
+      message.warning("任务完成，但没有返回视频");
+      return;
+    }
+
+    if (!options.restored) {
+      notifyGenerationSuccess({
+        moduleCode: VIDEO_GENERATION_MODULE_CODE,
+        status: "success",
+        taskId: task.taskId,
+      });
+    }
+
+    if (
+      shouldSyncWorkspaceForTask({ moduleCode: VIDEO_GENERATION_MODULE_CODE })
+    ) {
+      if (!options.restored) {
+        generationResult.value = result;
+      }
+    }
+
+    await assistPanelRef.value?.refreshRecentItems();
+    void videoFlow.loadHistory();
+  } catch (error) {
+    clearActiveGenerationTask(taskId);
+    markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "fail");
+    message.error(
+      error instanceof Error
+        ? error.message
+        : getViewMediaFailureMessage(VIDEO_GENERATION_MODULE_CODE),
+    );
+  } finally {
+    clearActiveGenerationTask(taskId);
+    untrackRunningTask(taskId);
+    isGenerating.value = false;
+    generatingCapabilityCode.value = null;
+    refreshCreditsBalance();
+    void refreshRunningTaskSummary();
   }
 }
 
@@ -1404,6 +1523,10 @@ async function resolveGenerationTask(
   taskId: string,
   options: { restored?: boolean } = {},
 ) {
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    return resolveVideoGenerationModuleTask(taskId, options);
+  }
+
   isGenerating.value = true;
   generationResult.value = null;
   let taskModuleCode: string | undefined;
@@ -1447,19 +1570,6 @@ async function resolveGenerationTask(
     }
 
     const shouldShowResultOnPage = shouldSyncWorkspaceForTask(task);
-    if (shouldShowResultOnPage) {
-      applyTaskOptionIfOnActivePage(task);
-      if (isShortVideoModuleCode(task.moduleCode)) {
-        generationResult.value = null;
-        if (!options.restored) {
-          shortVideoSessionPreview.value = result;
-          shortVideoPlayRequest.value += 1;
-          assistPanelRef.value?.focusShortVideoPreviewView?.();
-        }
-      } else {
-        generationResult.value = result;
-      }
-    }
     if (
       task.moduleCode === "creative-image" &&
       activeCreativeConversationId.value
@@ -1467,6 +1577,17 @@ async function resolveGenerationTask(
       await refreshCreativeConversations();
     }
     await assistPanelRef.value?.refreshRecentItems();
+
+    if (shouldShowResultOnPage) {
+      applyTaskOptionIfOnActivePage(task);
+      if (isShortVideoModuleCode(task.moduleCode)) {
+        if (!options.restored) {
+          generationResult.value = result;
+        }
+      } else {
+        setGenerationResultWithGallery(result);
+      }
+    }
   } catch (error) {
     clearActiveGenerationTask(taskId);
     markSidebarStatusForModule(taskModuleCode, "fail");
@@ -1518,7 +1639,8 @@ async function resolveCreativeGenerationTask(
       activeCode.value === "creative-image" &&
       activeCreativeConversationId.value === conversationId
     ) {
-      generationResult.value = result;
+      await assistPanelRef.value?.refreshRecentItems();
+      setGenerationResultWithGallery(result);
     }
   } catch {
     if (!options.restored) {
@@ -1868,7 +1990,7 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
       trackRunningTask(created.taskId, moduleCode);
       message.info("视频任务已创建，正在生成", { duration: 3000 });
       await refreshRunningTaskSummary();
-      await resolveGenerationTask(created.taskId);
+      await resolveVideoGenerationModuleTask(created.taskId);
     } catch (error) {
       clearActiveGenerationTask();
       const text =
@@ -2018,16 +2140,33 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
   }
 
   if (item.status === "success") {
+    if (isShortVideoModuleCode(item.moduleCode)) {
+      try {
+        const task = await getVideoGenerationTask(item.taskId);
+        videoFlow.currentTask.value = task;
+        const result = buildWorkspaceResultFromVideoTask(task);
+        if (result) {
+          generationResult.value = result;
+          return;
+        }
+      } catch (error) {
+        const text =
+          error instanceof Error
+            ? error.message
+            : getViewMediaFailureMessage(item.moduleCode);
+        message.error(text);
+        return;
+      }
+
+      message.error(getViewMediaFailureMessage(item.moduleCode));
+      return;
+    }
+
     try {
       const task = await getGenerationTask(item.taskId);
       const result = buildResultFromTask(task);
       if (result) {
-        if (isShortVideoModuleCode(item.moduleCode)) {
-          generationResult.value = result;
-          assistPanelRef.value?.focusShortVideoPreviewView?.();
-        } else {
-          generationResult.value = result;
-        }
+        setGenerationResultWithGallery(result);
         return;
       }
     } catch (error) {
@@ -2040,6 +2179,11 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
     }
 
     message.error(getViewMediaFailureMessage(item.moduleCode));
+    return;
+  }
+
+  if (isShortVideoModuleCode(item.moduleCode)) {
+    void resolveVideoGenerationModuleTask(item.taskId, { restored: true });
     return;
   }
 
@@ -2080,6 +2224,11 @@ onMounted(async () => {
       conversationId ?? "",
       { restored: true },
     );
+    return;
+  }
+
+  if (isShortVideoModuleCode(activeTask.moduleCode)) {
+    void resolveVideoGenerationModuleTask(activeTask.taskId, { restored: true });
     return;
   }
 
@@ -2245,13 +2394,13 @@ onUnmounted(() => {
   --workspace-muted: #64748b;
   --workspace-text-placeholder: #94a3b8;
   --workspace-text-disabled: #cbd5e1;
-  --workspace-accent: #2f6bff;
-  --workspace-accent-strong: #2f6bff;
-  --workspace-accent-border: #b8cdf4;
-  --workspace-accent-bg: #f2f7ff;
-  --workspace-accent-glow: rgba(47, 107, 255, 0.16);
-  --workspace-accent-underline: #4f7fff;
-  --workspace-hover-bg: #f3f7fc;
+  --workspace-accent: #d4a017;
+  --workspace-accent-strong: #ffb800;
+  --workspace-accent-border: rgba(212, 160, 23, 0.42);
+  --workspace-accent-bg: #fff8e8;
+  --workspace-accent-glow: rgba(212, 160, 23, 0.16);
+  --workspace-accent-underline: #d4a017;
+  --workspace-hover-bg: #fff8e8;
   --workspace-commercial: #d89a00;
   --workspace-commercial-strong: #d4a017;
   --workspace-commercial-bg: #fff8e8;
@@ -2259,8 +2408,8 @@ onUnmounted(() => {
   --workspace-tag-available-text: #00a870;
   --workspace-tag-demo-bg: #fff4e5;
   --workspace-tag-demo-text: #f59e0b;
-  --workspace-tag-beta-bg: #eef4ff;
-  --workspace-tag-beta-text: #2f6bff;
+  --workspace-tag-beta-bg: #fff4e5;
+  --workspace-tag-beta-text: #d4a017;
   --workspace-tag-planned-bg: #f1f5f9;
   --workspace-tag-planned-text: #94a3b8;
   --workspace-panel: #ffffff;

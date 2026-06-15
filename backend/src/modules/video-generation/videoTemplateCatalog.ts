@@ -96,12 +96,12 @@ const modelYearRequirement: VideoTemplateInputRequirement = {
 
 const displacementRequirement: VideoTemplateInputRequirement = {
   key: "displacement",
-  label: "排量",
+  label: "排量/动力",
   type: "text",
   required: true,
   minLength: 1,
   maxLength: 20,
-  placeholder: "如：2.0L、2.0T",
+  placeholder: "如：2.0T、1.5L、纯电",
 };
 
 const salesNameRequirement: VideoTemplateInputRequirement = {

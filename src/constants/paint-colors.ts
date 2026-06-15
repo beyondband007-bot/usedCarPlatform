@@ -1,33 +1,66 @@
 export interface PaintColorOption {
-  id: string
-  nameCn: string
-  nameEn: string
+  name: string
   hex: string
 }
 
 export const paintColorOptions: PaintColorOption[] = [
-  { id: 'pearl-white', nameCn: '珍珠白', nameEn: 'Pearl White', hex: '#F5F5F3' },
-  { id: 'polar-white', nameCn: '极地白', nameEn: 'Polar White', hex: '#FFFFFF' },
-  { id: 'titanium-silver', nameCn: '钛金银', nameEn: 'Titanium Silver', hex: '#C0C4CC' },
-  { id: 'star-silver', nameCn: '星耀银', nameEn: 'Star Silver', hex: '#D9DDE4' },
-  { id: 'cement-gray', nameCn: '水泥灰', nameEn: 'Cement Gray', hex: '#8D9199' },
-  { id: 'obsidian-black', nameCn: '曜石黑', nameEn: 'Obsidian Black', hex: '#111111' },
-  { id: 'space-black', nameCn: '深空黑', nameEn: 'Space Black', hex: '#1C1C1E' },
-  { id: 'sapphire-blue', nameCn: '宝石蓝', nameEn: 'Sapphire Blue', hex: '#0047AB' },
-  { id: 'deep-ocean-blue', nameCn: '深海蓝', nameEn: 'Deep Ocean Blue', hex: '#003B73' },
-  { id: 'electric-blue', nameCn: '电光蓝', nameEn: 'Electric Blue', hex: '#0066FF' },
-  { id: 'china-red', nameCn: '中国红', nameEn: 'China Red', hex: '#D7000F' },
-  { id: 'flame-red', nameCn: '烈焰红', nameEn: 'Flame Red', hex: '#C40018' },
-  { id: 'wine-red', nameCn: '酒红', nameEn: 'Wine Red', hex: '#6E0F1F' },
-  { id: 'champagne-gold', nameCn: '香槟金', nameEn: 'Champagne Gold', hex: '#C7A46C' },
-  { id: 'metallic-gold', nameCn: '流光金', nameEn: 'Metallic Gold', hex: '#D4AF37' },
-  { id: 'emerald-green', nameCn: '翡翠绿', nameEn: 'Emerald Green', hex: '#007F5F' },
-  { id: 'jade-green', nameCn: '墨玉绿', nameEn: 'Jade Green', hex: '#1B4332' },
-  { id: 'lava-orange', nameCn: '熔岩橙', nameEn: 'Lava Orange', hex: '#F97316' },
-  { id: 'racing-yellow', nameCn: '赛道黄', nameEn: 'Racing Yellow', hex: '#FFD000' },
-  { id: 'glacier-blue', nameCn: '冰川蓝', nameEn: 'Glacier Blue', hex: '#A9D6E5' },
-  { id: 'matte-gray', nameCn: '哑光灰', nameEn: 'Matte Gray', hex: '#6B7280' },
-  { id: 'meteor-gray', nameCn: '陨石灰', nameEn: 'Meteor Gray', hex: '#4B5563' },
-  { id: 'pearl-black', nameCn: '珍珠黑', nameEn: 'Pearl Black', hex: '#2B2B2B' },
-  { id: 'carbon-black', nameCn: '炭黑', nameEn: 'Carbon Black', hex: '#0F0F0F' },
+  { name: '珍珠白', hex: '#F8F9F5' },
+  { name: '冰川白', hex: '#F2F6F8' },
+  { name: '极地白', hex: '#FFFFFF' },
+  { name: '象牙白', hex: '#F6F0E3' },
+  { name: '奶油白', hex: '#F4EAD5' },
+  { name: '银白色', hex: '#D9DEE3' },
+  { name: '星耀银', hex: '#C8CED6' },
+  { name: '钛银灰', hex: '#AEB5BD' },
+  { name: '流光银', hex: '#BFC6CC' },
+  { name: '香槟银', hex: '#D6C7A8' },
+  { name: '浅灰色', hex: '#B8BDC3' },
+  { name: '水泥灰', hex: '#8D9298' },
+  { name: '量子灰', hex: '#6F7781' },
+  { name: '钛金灰', hex: '#5F666D' },
+  { name: '深空灰', hex: '#3E454D' },
+  { name: '磨砂灰', hex: '#555A60' },
+  { name: '石墨灰', hex: '#2F3439' },
+  { name: '碳晶灰', hex: '#23272B' },
+  { name: '曜石黑', hex: '#0E1114' },
+  { name: '玄武黑', hex: '#111111' },
+  { name: '魅影黑', hex: '#181A1D' },
+  { name: '星夜黑', hex: '#080A0D' },
+  { name: '钢琴黑', hex: '#050505' },
+  { name: '墨蓝黑', hex: '#101820' },
+  { name: '深海蓝', hex: '#0B2B45' },
+  { name: '宝石蓝', hex: '#0057A8' },
+  { name: '极光蓝', hex: '#1E6FB8' },
+  { name: '冰川蓝', hex: '#A9D8F2' },
+  { name: '天空蓝', hex: '#75BCE8' },
+  { name: '电光蓝', hex: '#0077FF' },
+  { name: '星河蓝', hex: '#1D2F6F' },
+  { name: '午夜蓝', hex: '#061A2F' },
+  { name: '湖水蓝', hex: '#2FA7B8' },
+  { name: '松石绿', hex: '#2A9D8F' },
+  { name: '森林绿', hex: '#123C2C' },
+  { name: '墨绿色', hex: '#0B2F22' },
+  { name: '翡翠绿', hex: '#007A5E' },
+  { name: '青灰绿', hex: '#6F8A83' },
+  { name: '沙漠金', hex: '#C7A15A' },
+  { name: '香槟金', hex: '#D9C79E' },
+  { name: '琥珀金', hex: '#B9822C' },
+  { name: '金属棕', hex: '#6B4A2D' },
+  { name: '摩卡棕', hex: '#4B3326' },
+  { name: '咖啡棕', hex: '#3B2418' },
+  { name: '枫叶红', hex: '#A21C26' },
+  { name: '中国红', hex: '#D71920' },
+  { name: '酒红色', hex: '#6E1023' },
+  { name: '熔岩红', hex: '#C1121F' },
+  { name: '橙红色', hex: '#E85D04' },
+  { name: '活力橙', hex: '#F77F00' },
 ]
+
+export const paintColorSwatches = paintColorOptions.map((item) => item.hex)
+
+export function findPaintColorByHex(hex?: string | null) {
+  if (!hex) return undefined
+  const normalized = hex.trim().toUpperCase()
+  const withHash = normalized.startsWith('#') ? normalized : `#${normalized}`
+  return paintColorOptions.find((item) => item.hex.toUpperCase() === withHash)
+}

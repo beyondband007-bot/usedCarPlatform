@@ -62,6 +62,9 @@ export interface WorkspaceGenerateResult {
   imageWidth?: number
   imageHeight?: number
   caption?: string
+  /** 同组可切换的大图列表，例如成片交付任务内的多张成图 */
+  previewGallery?: WorkspaceImagePreview[]
+  previewGalleryIndex?: number
 }
 
 export interface CreativeThreadTurn {

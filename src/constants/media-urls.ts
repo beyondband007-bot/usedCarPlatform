@@ -88,13 +88,13 @@ export const mediaUrls = {
       tutorialLogoSample:
         'https://vip.123pan.cn/1849524247/ymjew503t0m000ddyguqkoygo0ofq7odDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialClassicWhite:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmzldg3i4pn8kbxDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjwz0tdutvtv8e5oDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialGlassHall:
-        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7w2k4md85k7mx2kDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjwzxwsbtjtv9devDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialLuxuryDark:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybmt5my1lmpn5lygDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygusvfez9tofs18zDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialSoftTopLight:
-        'https://vip.123pan.cn/1849524247/ymjew503t0n000ddy7w8j8l064k7o12vDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyjx35qctrwtvb7pfDIYxBIJvAdixAvxzBIUzAIr=.png',
       /** 极简留白 / 广角空间：文档未收录，沿用既有图床地址 */
       sceneMinimal:
         'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybmybi6j7tpn7u6lDIYxBIJvAdixAvxzBIUzAIr=.png',
@@ -133,23 +133,23 @@ export const mediaUrls = {
     },
     outdoor: {
       tutorialTreePark:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyboalfimigpnuca1DIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygup71wh4gofpofgDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialMountainLake:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddyboa0qamynpnt1z8DIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0n000ddyguklm16vxofodpaDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialCityBlock:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddybo4mc19qipnsx41DIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddyguj7y8ty1ofnjrhDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialCoastCity:
-        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7xb5scpo6k88m3eDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/yk6baz03t0l000ddyjwvc8sy5ptv7iqyDIYxBIJvAdixAvxzBIUzAIr=.png',
     },
     sky: {
       tutorialMirrorField:
-        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddy7wt7tz9adk7y9bsDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddyjx9ld3ftjtvfaxaDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialSunsetDrive:
-        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddy7wwfo8bmfk7z8blDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygv1med97oofyryvDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialCloudSeaStage:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0m000ddybnnhxeyk0pnkuvcDIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0n000ddygv15uhqv1ofx70iDIYxBIJvAdixAvxzBIUzAIr=.png',
       tutorialCloudParking:
-        'https://vip.123pan.cn/1849524247/yk6baz03t0n000ddybnoit1y2xpnlni5DIYxBIJvAdixAvxzBIUzAIr=.png',
+        'https://vip.123pan.cn/1849524247/ymjew503t0m000ddygv08r36t1ofwzddDIYxBIJvAdixAvxzBIUzAIr=.png',
     },
     beauty: {
       watermarkBefore:

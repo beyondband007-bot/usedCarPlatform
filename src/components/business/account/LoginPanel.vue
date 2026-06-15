@@ -23,7 +23,7 @@ const authStore = useAuthStore();
 const username = ref("");
 const password = ref("");
 const code = ref("");
-const loginMode = ref<"code" | "password">("code");
+const loginMode = ref<"code" | "password">("password");
 const submitting = ref(false);
 const sendingLoginCode = ref(false);
 const loginCountdown = ref(0);
@@ -251,21 +251,21 @@ onBeforeUnmount(() => {
         <div class="login-mode-tabs" role="tablist" aria-label="登录方式">
           <button
             type="button"
-            :class="{ 'is-active': loginMode === 'code' }"
-            role="tab"
-            :aria-selected="loginMode === 'code'"
-            @click="loginMode = 'code'"
-          >
-            验证码登录
-          </button>
-          <button
-            type="button"
             :class="{ 'is-active': loginMode === 'password' }"
             role="tab"
             :aria-selected="loginMode === 'password'"
             @click="loginMode = 'password'"
           >
             密码登录
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': loginMode === 'code' }"
+            role="tab"
+            :aria-selected="loginMode === 'code'"
+            @click="loginMode = 'code'"
+          >
+            验证码登录
           </button>
         </div>
 

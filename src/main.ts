@@ -3,8 +3,7 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 import router from './router'
-import { useAppStore } from './stores/app'
-import { initBrowserEnv, registerViewportThemeSync } from './utils/browser-env'
+import { initBrowserEnv } from './utils/browser-env'
 import '@company/ai-studio-sdk/styles.css'
 import './styles/tailwind.css'
 import './styles/index.scss'
@@ -18,11 +17,6 @@ async function bootstrap() {
 
   app.use(pinia)
 
-  const appStore = useAppStore()
-  registerViewportThemeSync(() => {
-    appStore.syncThemeForViewport()
-  })
-  appStore.syncThemeForViewport()
   app.use(router)
 
   await router.isReady()
