@@ -1091,6 +1091,7 @@ export interface CreditsApplicationFunction {
 export interface CreditsCustomerProfile {
   id: string
   applicationCode: string
+  applicationCodes?: string[]
   userId: string
   username: string
   displayName: string
@@ -1100,6 +1101,8 @@ export interface CreditsCustomerProfile {
   creditsTotalBalance?: string | number | null
   creditsAvailableBalance?: string | number | null
   creditsCurrency?: string | null
+  depositBalance?: number | string | null
+  depositCurrency?: string | null
   accountScope: 'personal' | 'tenant' | string
   creditsTenantId?: number | string | null
   enterpriseTenantId?: string | null
@@ -1340,6 +1343,7 @@ export interface AgentOperationsOverview {
     displayName: string
     depositBalance?: number | string | null
     depositCurrency?: string | null
+    applications?: string[]
   }
   metrics: {
     customerCount: number
@@ -1517,6 +1521,7 @@ export interface PlatformAgentPolicyOverride {
   creditsCurrency?: string | null
   depositBalance?: number | string | null
   depositCurrency?: string | null
+  applications: string[]
   assignedByUserId?: string | null
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null

@@ -266,6 +266,7 @@ const connectApplicationForm = reactive({
   applicationCode: '',
   planCode: '',
   existingApplications: [] as string[],
+  availableApplications: [] as string[],
 })
 const agentCommissionRateDrafts = reactive<Record<string, number | null>>({})
 const agentDepositAdjustmentDrafts = reactive<Record<string, number | null>>({})
@@ -602,6 +603,16 @@ const applicationSelectOptions = computed(() =>
     value: item.code,
   })),
 )
+
+const connectApplicationSelectOptions = computed(() => {
+  const available = new Set(connectApplicationForm.availableApplications)
+  return applicationCatalog.value
+    .filter((item) => available.size === 0 || available.has(item.code))
+    .map((item) => ({
+      label: `${item.name} (${item.code})`,
+      value: item.code,
+    }))
+})
 
 const trendPeriodOptions: Array<{ value: TrendPeriod; label: string }> = [
   { value: 'today', label: '今日' },
@@ -1749,8 +1760,50 @@ const selectedApplicationFunctions = computed(() => {
   return applicationFunctions.value.filter((item) => item.applicationCode === selectedApplicationCode.value)
 })
 
+const groupedCustomerProfiles = computed<CreditsCustomerProfile[]>(() => {
+  const grouped = new Map<string, CreditsCustomerProfile & { applicationCodes: string[] }>()
+  for (const row of customerProfiles.value) {
+    const existing = grouped.get(row.userId)
+    if (!existing) {
+      grouped.set(row.userId, {
+        ...row,
+        applicationCodes: row.applicationCode ? [row.applicationCode] : [],
+      })
+      continue
+    }
+
+    if (row.applicationCode && !existing.applicationCodes.includes(row.applicationCode)) {
+      existing.applicationCodes.push(row.applicationCode)
+      existing.applicationCodes.sort()
+    }
+    existing.totalTopUpCredits = Math.max(
+      Number(existing.totalTopUpCredits ?? 0),
+      Number(row.totalTopUpCredits ?? 0),
+    )
+    existing.totalConsumedCredits = Math.max(
+      Number(existing.totalConsumedCredits ?? 0),
+      Number(row.totalConsumedCredits ?? 0),
+    )
+    existing.consumptionTransactionCount = Math.max(
+      Number(existing.consumptionTransactionCount ?? 0),
+      Number(row.consumptionTransactionCount ?? 0),
+    )
+    existing.lastTopUpAt =
+      (row.lastTopUpAt ?? '') > (existing.lastTopUpAt ?? '') ? row.lastTopUpAt : existing.lastTopUpAt
+    existing.lastConsumedAt =
+      (row.lastConsumedAt ?? '') > (existing.lastConsumedAt ?? '') ? row.lastConsumedAt : existing.lastConsumedAt
+    existing.createdAt = (row.createdAt ?? '') > (existing.createdAt ?? '') ? row.createdAt : existing.createdAt
+  }
+
+  return [...grouped.values()]
+})
+
 const filteredCustomerProfiles = computed(() =>
-  customerProfiles.value.filter((item) => matchesSelectedApplication(item.applicationCode)),
+  groupedCustomerProfiles.value.filter((item) =>
+    selectedApplicationCode.value === 'all' ||
+    item.applicationCodes?.includes(selectedApplicationCode.value) ||
+    item.applicationCode === selectedApplicationCode.value,
+  ),
 )
 
 const globalLedgerTransactions = computed(() =>
@@ -2579,11 +2632,18 @@ function defaultApplicationCode() {
   return applicationCatalog.value[0]?.code ?? 'used-car-platform'
 }
 
-function targetConnectableApplication(existingApplications: readonly string[]) {
+const agentGrantedApplications = computed(() => agentOverview.value?.agent.applications ?? [])
+
+function targetConnectableApplication(
+  existingApplications: readonly string[],
+  availableApplications: readonly string[] = [],
+) {
   const existing = new Set(existingApplications)
+  const available = new Set(availableApplications)
+  const candidates = applicationCatalog.value.filter((item) => available.size === 0 || available.has(item.code))
   const selected = selectedApplicationCode.value !== 'all' ? selectedApplicationCode.value : ''
-  if (selected && !existing.has(selected)) return selected
-  return applicationCatalog.value.find((item) => !existing.has(item.code))?.code ?? applicationCatalog.value[0]?.code ?? 'used-car-platform'
+  if (selected && !existing.has(selected) && (available.size === 0 || available.has(selected))) return selected
+  return candidates.find((item) => !existing.has(item.code))?.code ?? candidates[0]?.code ?? 'used-car-platform'
 }
 
 function customerApplicationsForUser(userId: string) {
@@ -2600,10 +2660,23 @@ function agentApplicationsForUser(userId: string) {
   return platformAgents.value.find((row) => row.userId === userId)?.applications ?? []
 }
 
+function agentCustomerApplicationsForUser(userId: string) {
+  const applications = new Set<string>()
+  for (const row of agentOverview.value?.customers ?? []) {
+    if (row.customerUserId === userId && row.status === 'active') {
+      applications.add(row.applicationCode)
+    }
+  }
+  return [...applications].sort()
+}
+
 function canConnectApplicationToTarget(targetRole: 'agent' | 'user', userId: string, status?: string | null) {
-  if (activeRole.value !== 'developer' && activeRole.value !== 'admin') return false
   if (authStore.userInfo?.id === userId) return false
   if (status && status !== 'active') return false
+  if (activeRole.value === 'agent') {
+    return targetRole === 'user' && agentGrantedApplications.value.length > 0
+  }
+  if (activeRole.value !== 'developer' && activeRole.value !== 'admin') return false
   return targetRole === 'agent' || targetRole === 'user'
 }
 
@@ -2613,6 +2686,7 @@ async function openConnectApplicationModal(params: {
   displayName: string
   targetRole: 'agent' | 'user'
   existingApplications: readonly string[]
+  availableApplications?: readonly string[]
   status?: string | null
 }) {
   if (!canConnectApplicationToTarget(params.targetRole, params.userId, params.status)) {
@@ -2625,7 +2699,11 @@ async function openConnectApplicationModal(params: {
   connectApplicationForm.displayName = params.displayName
   connectApplicationForm.targetRole = params.targetRole
   connectApplicationForm.existingApplications = [...params.existingApplications]
-  connectApplicationForm.applicationCode = targetConnectableApplication(params.existingApplications)
+  connectApplicationForm.availableApplications = [...(params.availableApplications ?? [])]
+  connectApplicationForm.applicationCode = targetConnectableApplication(
+    params.existingApplications,
+    params.availableApplications,
+  )
   connectApplicationForm.planCode = ''
   connectSubscriptionPlans.value = []
   loadedConnectPlanApplicationCode.value = ''
@@ -2640,6 +2718,13 @@ async function handleConnectApplication() {
   }
   if (!connectApplicationForm.applicationCode) {
     message.error('请选择接入应用')
+    return
+  }
+  if (
+    connectApplicationForm.availableApplications.length > 0 &&
+    !connectApplicationForm.availableApplications.includes(connectApplicationForm.applicationCode)
+  ) {
+    message.error('只能选择当前账号被授权接入的应用')
     return
   }
   if (
@@ -3391,10 +3476,13 @@ const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctio
 
 const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
   {
-    title: '应用',
+    title: '接入应用',
     key: 'applicationCode',
     width: 150,
     render(row) {
+      if (row.applicationCodes?.length) {
+        return formatApplicationList(row.applicationCodes)
+      }
       return formatApplicationDisplayName(row.applicationCode)
     },
   },
@@ -3430,6 +3518,14 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
     width: 130,
     render(row) {
       return formatCreditsBalance(row)
+    },
+  },
+  {
+    title: '押金余额',
+    key: 'depositBalance',
+    width: 140,
+    render(row) {
+      return formatDepositBalance(row)
     },
   },
   {
@@ -3700,6 +3796,14 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
     minWidth: 220,
     render(row) {
       return `${row.displayName} (${row.username})`
+    },
+  },
+  {
+    title: '接入应用',
+    key: 'applications',
+    minWidth: 170,
+    render(row) {
+      return formatApplicationList(row.applications)
     },
   },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
@@ -4056,7 +4160,7 @@ const developerCustomerColumns = computed<DataTableColumns<CreditsCustomerProfil
 
 const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
   {
-    title: '应用',
+    title: '接入应用',
     key: 'applicationCode',
     width: 150,
     render(row) {
@@ -4116,8 +4220,12 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
   {
     title: '操作',
     key: 'actions',
-    width: 200,
+    width: 320,
     render(row) {
+      const existingApplications = agentCustomerApplicationsForUser(row.customerUserId)
+      const hasConnectableApplication = agentGrantedApplications.value.some(
+        (applicationCode) => !existingApplications.includes(applicationCode),
+      )
       return h(
         'div',
         { class: 'admin-table-actions' },
@@ -4132,6 +4240,30 @@ const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
             {
               icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
               default: () => '编辑',
+            },
+          ),
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              disabled:
+                !canConnectApplicationToTarget('user', row.customerUserId, row.status) ||
+                !hasConnectableApplication,
+              onClick: () => void openConnectApplicationModal({
+                userId: row.customerUserId,
+                username: row.customerUsername,
+                displayName: row.customerDisplayName,
+                targetRole: 'user',
+                existingApplications,
+                availableApplications: agentGrantedApplications.value,
+                status: row.status,
+              }),
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:apps' }),
+              default: () => '接入应用',
             },
           ),
           h(
@@ -5793,7 +5925,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           <NFormItem label="接入应用" required>
             <NSelect
               v-model:value="connectApplicationForm.applicationCode"
-              :options="applicationSelectOptions"
+              :options="connectApplicationSelectOptions"
             />
           </NFormItem>
           <NFormItem label="订阅计划" required>

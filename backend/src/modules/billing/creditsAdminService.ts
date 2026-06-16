@@ -11,6 +11,7 @@ import {
 } from "./creditsClient";
 import { getCreditsPool } from "./creditsAccountLookupService";
 import { classifyAgentCustomerUserType } from "../platform/agentOperationsService";
+import { listAgentDepositBalances } from "../platform/agentDepositService";
 
 const transactionTime = (transaction: CreditTransactionResponse) =>
   new Date(transaction.createdAt).getTime() || 0;
@@ -393,9 +394,11 @@ async function listCustomerProfiles() {
     }),
   );
   const usageStatsByCustomer = await listCustomerUsageStats(rows);
+  const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
 
   return rows.map((row) => {
     const usageStats = usageStatsByCustomer.get(customerUsageKey(row)) ?? emptyCustomerUsageStats();
+    const depositBalance = depositBalances.get(row.user_id);
     return {
       id: row.id,
       applicationCode: row.application_code,
@@ -408,6 +411,8 @@ async function listCustomerProfiles() {
       creditsTotalBalance: balanceByCreditsUserId.get(row.credits_user_id)?.totalBalance ?? null,
       creditsAvailableBalance: balanceByCreditsUserId.get(row.credits_user_id)?.availableBalance ?? null,
       creditsCurrency: balanceByCreditsUserId.get(row.credits_user_id)?.currency ?? null,
+      depositBalance: depositBalance?.balance ?? 0,
+      depositCurrency: depositBalance?.currency ?? "CNY",
       accountScope: row.account_scope,
       creditsTenantId: row.credits_tenant_id,
       enterpriseTenantId: row.enterprise_tenant_id,

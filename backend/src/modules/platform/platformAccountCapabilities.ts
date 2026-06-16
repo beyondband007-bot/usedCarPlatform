@@ -120,7 +120,8 @@ function canConnectApplicationTarget(
   operator: AuthenticatedUser,
   targetRole: MatrixTargetRole | "developer" | null,
 ) {
-  if (operator.role !== "developer" && operator.role !== "admin") return false;
+  if (operator.role !== "developer" && operator.role !== "admin" && operator.role !== "agent") return false;
+  if (operator.role === "agent") return targetRole === "user";
   return targetRole === "agent" || targetRole === "user";
 }
 
@@ -241,6 +242,44 @@ async function findPersonalCreditsAccount(creditsUserId: number) {
   const account = rows[0];
   if (!account) throw errors.invalidParameter("target credits account not found");
   return account;
+}
+
+async function assertAgentCanConnectCustomerApplication(
+  operatorUserId: string,
+  targetUserId: string,
+  applicationCode: string,
+) {
+  const [grantRows] = await pool.query<Array<RowDataPacket & { application_code: string }>>(
+    `SELECT application_code
+     FROM application_customer_links
+     WHERE user_id = :operatorUserId
+       AND application_code = :applicationCode
+       AND status = 'active'
+     LIMIT 1`,
+    { operatorUserId, applicationCode },
+  );
+  if (!grantRows.length) {
+    throw errors.forbidden("Agent is not granted access to this application", {
+      operatorUserId,
+      applicationCode,
+    });
+  }
+
+  const [relationRows] = await pool.query<Array<RowDataPacket & { id: string }>>(
+    `SELECT id
+     FROM agent_customer_relations
+     WHERE agent_user_id = :operatorUserId
+       AND customer_user_id = :targetUserId
+       AND status = 'active'
+     LIMIT 1`,
+    { operatorUserId, targetUserId },
+  );
+  if (!relationRows.length) {
+    throw errors.forbidden("Agent can only connect applications for bound customers", {
+      operatorUserId,
+      targetUserId,
+    });
+  }
 }
 
 export async function adjustPlatformUserCredits(
@@ -396,6 +435,9 @@ export async function connectPlatformUserApplicationByCapability(
   const applicationCode = normalizeApplicationCode(payload.applicationCode);
   const planCode = normalizePlanCode(payload.planCode);
   const reason = normalizeText(payload.reason, 240) || "back-office application connection";
+  if (current.user.role === "agent") {
+    await assertAgentCanConnectCustomerApplication(current.user.id, target.id, applicationCode);
+  }
 
   const [planRows] = await pool.query<SubscriptionPlanLookupRow[]>(
     `SELECT code, application_code, name, status
@@ -458,10 +500,40 @@ export async function connectPlatformUserApplicationByCapability(
         metadataJson: JSON.stringify({
           targetRole,
           planCode,
-          source: "back-office-application-connect",
+          source: current.user.role === "agent"
+            ? "agent-customer-application-connect"
+            : "back-office-application-connect",
         }),
       },
     );
+
+    if (current.user.role === "agent") {
+      await connection.query(
+        `INSERT INTO agent_customer_relations
+          (id, agent_user_id, customer_user_id, customer_credits_user_id,
+           application_code, relation_type, status, metadata_json)
+         VALUES
+          (:id, :agentUserId, :customerUserId, :customerCreditsUserId,
+           :applicationCode, 'direct', 'active', :metadataJson)
+         ON DUPLICATE KEY UPDATE
+           customer_credits_user_id = VALUES(customer_credits_user_id),
+           relation_type = VALUES(relation_type),
+           status = 'active',
+           metadata_json = VALUES(metadata_json),
+           updated_at = CURRENT_TIMESTAMP(3)`,
+        {
+          id: createId("acr"),
+          agentUserId: current.user.id,
+          customerUserId: target.id,
+          customerCreditsUserId: target.credits_user_id,
+          applicationCode,
+          metadataJson: JSON.stringify({
+            source: "agent-customer-application-connect",
+            planCode,
+          }),
+        },
+      );
+    }
 
     await connection.query(
       `INSERT INTO account_creation_audit_logs

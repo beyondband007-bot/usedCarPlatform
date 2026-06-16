@@ -43,6 +43,10 @@ type CountRow = RowDataPacket & {
   count: number | string;
 };
 
+type ApplicationCodeRow = RowDataPacket & {
+  application_code: string;
+};
+
 type AgentCustomerUsageStatsRow = RowDataPacket & {
   account_key: string;
   total_consumed_credits: string | number;
@@ -1761,7 +1765,7 @@ function buildAgentCustomerInsights(customers: AgentCustomerOverviewItem[]) {
 
 export async function getAgentOperationsOverview(req: Request) {
   const agent = await resolveAgentUser(req, req.query.agentUserId);
-  const [customers, leads, commissionPreviews, settlementBills, materials, tickets, depositBalances] =
+  const [customers, leads, commissionPreviews, settlementBills, materials, tickets, depositBalances, applicationRows] =
     await Promise.all([
       listAgentCustomers(agent.id),
       listAgentLeads(agent.id),
@@ -1770,6 +1774,14 @@ export async function getAgentOperationsOverview(req: Request) {
       listAgentMaterials(),
       listAgentTickets(agent.id),
       listAgentDepositBalances([agent.id]),
+      pool.query<ApplicationCodeRow[]>(
+        `SELECT application_code
+         FROM application_customer_links
+         WHERE user_id = :agentUserId
+           AND status = 'active'
+         ORDER BY application_code ASC`,
+        { agentUserId: agent.id },
+      ).then(([rows]) => rows),
     ]);
   const depositBalance = depositBalances.get(agent.id);
 
@@ -1780,6 +1792,7 @@ export async function getAgentOperationsOverview(req: Request) {
       displayName: agent.display_name,
       depositBalance: depositBalance?.balance ?? 0,
       depositCurrency: depositBalance?.currency ?? "CNY",
+      applications: applicationRows.map((row) => row.application_code),
     },
     metrics: {
       customerCount: customers.filter((item) => item.status === "active").length,
