@@ -40,6 +40,10 @@ function resolveCardClass() {
 }
 
 const recentCaption = computed(() => formatRecentCardCaption(props.item));
+const recentImageUrl = computed(() => resolveRecentDisplayImage(props.item));
+const recentVideoUrl = computed(() =>
+  props.item.mediaType === "video" ? props.item.downloadUrl : undefined,
+);
 
 function handlePick() {
   if (!props.clickable) return;
@@ -66,10 +70,20 @@ function handlePick() {
     @keydown.space.prevent="handlePick"
   >
     <div class="recent-media recent-media--flow" :style="resolveMediaStyle()">
+      <video
+        v-if="recentVideoUrl"
+        class="recent-video recent-video--cover"
+        :src="recentVideoUrl"
+        :poster="recentImageUrl"
+        muted
+        playsinline
+        preload="metadata"
+        :aria-label="item.title"
+      />
       <PreloadImage
-        v-if="resolveRecentDisplayImage(item)"
+        v-else-if="recentImageUrl"
         class="recent-image recent-image--cover"
-        :src="resolveRecentDisplayImage(item)"
+        :src="recentImageUrl"
         :alt="item.title"
         loading="lazy"
         decoding="async"
@@ -172,6 +186,16 @@ function handlePick() {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.recent-video--cover {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .recent-image--cover :deep(.preload-image__img) {

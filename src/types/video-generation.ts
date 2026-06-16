@@ -5,6 +5,7 @@ export type VideoTemplateType =
   | 'promotion'
   | 'dealership'
   | 'market'
+  | 'vehicle-ad'
 
 export type VideoTemplateStyle =
   | 'calm'
@@ -12,7 +13,7 @@ export type VideoTemplateStyle =
   | 'professional'
   | 'humorous'
 
-export type VideoGenerationLanguage = 'zh-CN' | 'en' | 'yue'
+export type VideoGenerationLanguage = string
 
 export type VideoTaskStatus = GenerationTaskStatus
 
@@ -62,6 +63,12 @@ export interface VideoTemplate {
   thumbnailUrl: string
   previewUrl?: string
   stylePrompt: string
+  scenePrompt?: string
+  shotPlan15s?: Array<{
+    timeRange: string
+    visual: string
+    assetRole?: string
+  }>
   durationSeconds: number
   durationLabel?: string
   outputRatio: string
@@ -88,6 +95,8 @@ export interface VideoWorkflowContract {
     durationSeconds: number
     resolution: string
     outputRatio: string
+    language?: VideoGenerationLanguage
+    languageMode?: string
   }
   supportedLanguages: Array<{
     value: VideoGenerationLanguage
@@ -116,6 +125,7 @@ export interface DigitalHumanVoice {
   model?: string | null
   sourceFileName?: string | null
   updatedAt?: string | null
+  source?: string | null
 }
 
 export interface UploadedAsset {
@@ -283,6 +293,11 @@ export interface VideoGenerationTask {
   createdAt?: string
   updatedAt?: string
   language?: VideoGenerationLanguage
+  billingTaskId?: number | string | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
+  settledPoints?: string | null
 }
 
 export interface VideoHistoryItem extends VideoGenerationTask {}
@@ -297,6 +312,5 @@ export interface VideoHistoryListResult {
 export type VideoGenerationStep =
   | 'template'
   | 'form'
-  | 'draft-review'
   | 'task'
   | 'result'

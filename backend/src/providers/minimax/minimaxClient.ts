@@ -9,8 +9,7 @@ import type {
   MinimaxUploadedCloneAudio,
 } from "./minimaxTypes";
 import {
-  getMinimaxLanguageBoost,
-  type VideoGenerationLanguage,
+  type MinimaxTtsLanguageBoost,
 } from "../../modules/video-generation/videoGenerationLanguage";
 
 const asRecord = (value: unknown): Record<string, any> =>
@@ -129,12 +128,10 @@ export class MinimaxClient {
     text: string;
     voiceId: string;
     speed?: number;
-    language?: VideoGenerationLanguage;
+    language?: MinimaxTtsLanguageBoost;
   }): Promise<MinimaxSpeechAudio> {
     const speed = input.speed ?? 1;
-    const languageBoost = getMinimaxLanguageBoost(
-      input.language ?? "zh-CN",
-    );
+    const languageBoost = input.language ?? "auto";
     const raw = await requestJson("/v1/t2a_v2", {
       model: env.minimax.speechModel,
       text: input.text,

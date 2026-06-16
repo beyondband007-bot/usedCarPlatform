@@ -29,6 +29,7 @@ export interface WorkspaceRecentItem {
   thumbnail?: string
   previewImage?: string
   downloadUrl?: string
+  mediaType?: 'image' | 'video'
   ratioLabel?: string
   sceneLabel?: string
   outputRatio?: string

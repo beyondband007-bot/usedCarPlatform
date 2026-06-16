@@ -1964,7 +1964,7 @@ async function handleCreativeGenerate(payload: {
 async function handleGenerate(payload: WorkspaceGeneratePayload) {
   if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
     if (payload.shortVideoAction !== "confirm" || !payload.scriptDraftId) {
-      message.warning("请先生成口播草稿，并在审核后确认生成视频");
+      message.warning("请先在左侧完善素材信息后点击开始生成");
       return;
     }
 
@@ -2258,6 +2258,7 @@ onUnmounted(() => {
           activeCode === 'interior-clean' ||
           activeCode === 'interior-stitch',
         'workspace-page--creative-image': activeCode === 'creative-image',
+        'workspace-page--short-video': activeCode === SHORT_VIDEO_CAPABILITY_CODE,
       },
     ]"
   >
@@ -2581,6 +2582,30 @@ onUnmounted(() => {
   @media (width >= 1536px) {
     grid-template-columns: 260px 440px minmax(520px, 1fr);
   }
+}
+
+.workspace-page--short-video .workspace-shell {
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 220px 430px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
+    grid-template-columns: 240px 460px minmax(420px, 1fr);
+  }
+
+  @media (width >= 1536px) {
+    grid-template-columns: 260px 480px minmax(680px, 1fr);
+  }
+}
+
+.workspace-page--short-video .workspace-col--main {
+  position: relative;
+  z-index: 2;
+}
+
+.workspace-page--short-video .workspace-col--assist {
+  position: relative;
+  z-index: 1;
 }
 
 .workspace-page--creative-image .workspace-shell {

@@ -3,8 +3,6 @@ import type { VideoTemplate } from '@/types/video-generation'
 import {
   getLocalScenePreviewById,
   getLocalScenePreviewByType,
-  localSceneBasementVideo,
-  localSceneOutdoorVideo,
 } from '@/constants/video-generation-local-assets'
 
 /** 按模板 type 映射本地 preview 视频 */
@@ -13,24 +11,20 @@ export const localTemplatePreviewByType = getLocalScenePreviewByType()
 /** 按 templateId 精确映射（优先级高于 type） */
 export const localTemplatePreviewById: Record<string, string> = {
   ...getLocalScenePreviewById(),
-  'ref-video-006': localSceneBasementVideo,
-  'ref-video-001': localSceneOutdoorVideo,
-  'ref-video-003': localSceneOutdoorVideo,
-  'coming-soon-market': localSceneBasementVideo,
-  'showroom-luxury': localSceneBasementVideo,
-  'benz-e300l': localSceneOutdoorVideo,
-  'autumn-sale': localSceneOutdoorVideo,
-  'market-october': localSceneBasementVideo,
 }
 
 /** 默认 preview（API / 映射均缺失时使用） */
-export const defaultTemplatePreviewUrl = localSceneBasementVideo
+export const defaultTemplatePreviewUrl =
+  localTemplatePreviewById['ref-video-001'] ?? ''
 
 const VIDEO_PREVIEW_PATTERN = /\.(mp4|webm|mov|m4v)(\?|#|$)/i
 
-/** 后端 reference-materials preview 接口返回的是提取的首帧图片，不是视频 */
 function isReferenceMaterialPosterUrl(url: string) {
   return /\/reference-materials\/[^/]+\/preview(?:\?|#|$)/i.test(url)
+}
+
+function isProtectedApiAssetUrl(url: string) {
+  return url.startsWith('/api/') || /^https?:\/\/[^/]+\/api\//i.test(url)
 }
 
 export function isVideoPreviewUrl(url: string) {
@@ -40,8 +34,8 @@ export function isVideoPreviewUrl(url: string) {
 
 /**
  * 模板封面首帧（静态图）。
- * API 的 previewUrl / thumbnailUrl 均为 reference 首帧图，与右侧模板库卡片默认展示一致。
- * 跳过 mp4 等视频地址，避免 PreloadImage 加载失败。
+ * 受鉴权保护的 API 素材地址不能直接放进 img/video 标签，否则浏览器不会带 token。
+ * 当前模板库优先使用本地打包视频展示首帧和 hover 预览。
  */
 export function resolveTemplatePosterUrl(
   template: Pick<VideoTemplate, 'previewUrl' | 'thumbnailUrl'>,
@@ -51,6 +45,7 @@ export function resolveTemplatePosterUrl(
   ) as string[]
 
   for (const url of candidates) {
+    if (isProtectedApiAssetUrl(url)) continue
     if (!isVideoPreviewUrl(url)) {
       return url
     }

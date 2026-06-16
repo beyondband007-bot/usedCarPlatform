@@ -219,24 +219,24 @@ const dealershipRequirements = (): VideoTemplateInputRequirement[] => [
 const definitions: VideoTemplateDefinition[] = [
   {
     referenceMaterialId: "ref-video-001",
-    type: "single-car",
-    style: "professional",
+    type: "dealership",
+    style: "lively",
     badge: "hot",
-    inputRequirements: singleCarRequirements(),
+    inputRequirements: dealershipRequirements(),
   },
   {
     referenceMaterialId: "ref-video-002",
-    type: "single-car",
+    type: "dealership",
     style: "professional",
     badge: null,
-    inputRequirements: singleCarRequirements(),
+    inputRequirements: dealershipRequirements(),
   },
   {
     referenceMaterialId: "ref-video-003",
-    type: "promotion",
-    style: "lively",
-    badge: "hot",
-    inputRequirements: promotionRequirements(),
+    type: "dealership",
+    style: "calm",
+    badge: null,
+    inputRequirements: dealershipRequirements(),
   },
   {
     referenceMaterialId: "ref-video-004",
@@ -247,17 +247,10 @@ const definitions: VideoTemplateDefinition[] = [
   },
   {
     referenceMaterialId: "ref-video-005",
-    type: "promotion",
-    style: "lively",
-    badge: "hot",
-    inputRequirements: promotionRequirements(),
-  },
-  {
-    referenceMaterialId: "ref-video-006",
-    type: "dealership",
-    style: "lively",
+    type: "single-car",
+    style: "professional",
     badge: "new",
-    inputRequirements: dealershipRequirements(),
+    inputRequirements: singleCarRequirements(),
   },
   {
     referenceMaterialId: "ref-video-007",
@@ -451,7 +444,7 @@ export const videoGenerationWorkflowContract = {
     durationSeconds: 15,
     resolution: "720p",
     outputRatio: "9:16",
-    language: "zh-CN",
+    language: "Chinese",
     languageMode: "selectable",
   },
   vehicleNameComposition: {

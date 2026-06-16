@@ -3,8 +3,7 @@ import path from "node:path";
 
 import { env } from "../../config/env";
 import { arkClient } from "../../providers/ark/arkClient";
-import { kieClient } from "../../providers/kie/kieClient";
-import { kieKeyPool } from "../../providers/kie/kieKeyPool";
+import type { ArkReferenceContent } from "../../providers/ark/arkTypes";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import {
@@ -14,16 +13,26 @@ import {
 import { deepSeekClient } from "../../providers/deepseek/deepseekClient";
 import { minimaxClient } from "../../providers/minimax/minimaxClient";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
+import { shortVideoGenerationPoints } from "../billing/generationPointRules";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { tasksService } from "../tasks/tasksService";
 import { digitalHumanVoiceRepository } from "./digitalHumanVoiceRepository";
 import {
+  getVideoGenerationScriptLengthRule,
   getVideoGenerationLanguageLabel,
   normalizeVideoGenerationLanguage,
   type VideoGenerationLanguage,
 } from "./videoGenerationLanguage";
+import { arkVirtualAssetService } from "./arkVirtualAssetService";
 import { videoScriptDraftRepository } from "./videoScriptDraftRepository";
 import {
   getVideoTemplateDefinition,
@@ -47,6 +56,17 @@ interface DigitalHumanRecord {
   frontPreviewStrategy: string;
   status: "active" | "inactive";
   sortOrder: number;
+  presetVoice?: {
+    status: "ready" | "not_configured";
+    voiceId: string;
+    displayName?: string;
+    languageBoost?: string;
+    speed?: number;
+    vol?: number;
+    pitch?: number;
+    model?: string;
+    sourceImagePath?: string;
+  };
 }
 
 interface DigitalHumanManifest {
@@ -81,6 +101,12 @@ interface ReferenceMaterialRecord {
     avoid: string[];
   };
   stylePrompt: string;
+  scenePrompt?: string;
+  shotPlan15s?: Array<{
+    timeRange: string;
+    visual: string;
+    assetRole?: string;
+  }>;
   extractionStatus: "pending" | "completed";
 }
 
@@ -139,6 +165,9 @@ interface VehicleProfile {
 
 const VIDEO_DURATION_SECONDS = 15;
 const FIXED_SHOT_TIME_RANGES = ["0-3s", "3-7s", "7-12s", "12-15s"] as const;
+const VIDEO_DURATION_MS = VIDEO_DURATION_SECONDS * 1000;
+const MIN_NARRATION_AUDIO_DURATION_MS = 12_000;
+const MAX_NARRATION_AUDIO_DURATION_MS = VIDEO_DURATION_MS;
 
 const workspaceRoot = path.resolve(__dirname, "../../../..");
 const digitalHumanRoot = path.join(workspaceRoot, "digital human");
@@ -299,6 +328,206 @@ const toPublicDigitalHumanAssetUrl = (id: string) =>
 const toPublicReferencePreviewUrl = (id: string) =>
   `/api/v1/modules/video-generation/reference-materials/${encodeURIComponent(id)}/preview`;
 
+const digitalHumanDisplayById: Record<
+  string,
+  Pick<DigitalHumanRecord, "name" | "ageStyle">
+> = {
+  "dh-message-01": {
+    name: "数字人 1｜亲和女声",
+    ageStyle: "年轻女性 · 预设音色 Friendly Paige",
+  },
+  "dh-message-02": {
+    name: "数字人 2｜专业男声",
+    ageStyle: "年轻男性 · 预设音色 博学讲师",
+  },
+  "dh-message-03": {
+    name: "数字人 3｜明亮女声",
+    ageStyle: "年轻女性 · 预设音色 Bright Queen",
+  },
+  "dh-message-04": {
+    name: "数字人 4｜活力女声",
+    ageStyle: "年轻女性 · 预设音色 EngagingGirl",
+  },
+};
+
+const referenceMaterialDisplayById: Record<
+  string,
+  {
+    title: string;
+    referenceRole: string;
+    styleTags: string[];
+    stylePrompt: string;
+    shotPlan15s: NonNullable<ReferenceMaterialRecord["shotPlan15s"]>;
+  }
+> = {
+  "ref-video-001": {
+    title: "车场介绍 1｜开场总览",
+    referenceRole: "用于介绍门店环境、车场规模和到店看车氛围，适合作为车场介绍开场。",
+    styleTags: ["车场介绍", "环境总览", "数字人口播", "真实门店", "开场镜头"],
+    stylePrompt: "真实二手车车场介绍风格。数字人以销售顾问身份自然出镜，先建立门店或车场环境，再切入车辆陈列和到店看车氛围。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人在门店或车场环境中开场，先建立真实空间和车场氛围。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "镜头扫过车辆排列、通道和门店细节，表现干净可信的库存空间。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "数字人靠近主推车辆，衔接用户上传的车辆外观或车场素材。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人回到主画面收尾，引导用户到店看实车和确认车况。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+  "ref-video-002": {
+    title: "车场介绍 2｜销售导览",
+    referenceRole: "以销售顾问口吻带看车场，突出车辆陈列、接待动线和真实服务感。",
+    styleTags: ["销售导览", "车场动线", "车辆陈列", "到店体验", "可信讲解"],
+    stylePrompt: "销售顾问式车场导览风格。数字人边走边介绍场地、车辆陈列和到店体验，画面明亮自然，语气专业可信。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人在门店入口、展厅或车辆队列前开场。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "沿看车动线展示多台车辆和门店空间，形成真实销售现场感。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "切到用户上传的车辆素材，用导览语气说明看车重点。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人在车场背景中停下收尾，提醒以实车配置和车况为准。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+  "ref-video-003": {
+    title: "车场介绍 3｜库存展示",
+    referenceRole: "适合展示多台车源和库存规模，再自然引出主推车型或重点车辆。",
+    styleTags: ["库存展示", "多车陈列", "真实场地", "主推车源", "稳健节奏"],
+    stylePrompt: "多车库存展示风格。数字人在真实车场空间中出镜，镜头强调车辆排列、场地规模和主推车源导入，整体保持真实二手车门店质感。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人以多台车辆为背景开场，点明车场或库存主题。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "横向或纵深展示车辆队列，突出库存规模和场地氛围。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "切入用户上传的外观或内饰素材，作为重点车源讲解段落。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人回到车辆旁或车场中做简短收尾。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+  "ref-video-004": {
+    title: "单车品介绍｜实车讲解",
+    referenceRole: "聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。",
+    styleTags: ["单车介绍", "外观展示", "内饰展示", "数字人讲解", "真实卖点"],
+    stylePrompt: "单车品介绍风格。数字人与目标车辆共同出镜，在 15 秒内围绕外观、内饰、空间和使用场景组织讲解，所有车况信息以用户上传素材为准。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人与目标车辆同框开场，快速说明车型定位。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "展示车辆前脸、侧面和外观细节，严格匹配用户上传外观图。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "在用户提供内饰图时展示座舱、空间或配置细节。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人回到车旁收尾，提醒配置和车况以实车为准。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+  "ref-video-005": {
+    title: "行情资讯｜信息型讲车",
+    referenceRole: "适合做车型定位、适用人群和看车关注点说明，不主动编造价格行情。",
+    styleTags: ["行情资讯", "信息口播", "车型定位", "理性分析", "二手车内容"],
+    stylePrompt: "行情资讯型讲车风格。数字人以理性、信息密度适中的方式介绍车型定位、适用人群和看车关注点；不编造价格走势、保值率或市场变化。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人以资讯口吻开场，围绕车型定位和看车关注点建立主题。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "展示用户上传外观素材，说明车型定位和使用场景。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "结合内饰或补充素材说明空间、日常使用和适用人群。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人总结购车前需要确认的配置、车况和实车细节。",
+        assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+};
+
+const localizeDigitalHumanRecord = (item: DigitalHumanRecord): DigitalHumanRecord => ({
+  ...item,
+  ...(digitalHumanDisplayById[item.id] ?? {}),
+});
+
+const localizeReferenceMaterial = (
+  material: ReferenceMaterialRecord,
+): ReferenceMaterialRecord => {
+  const display = referenceMaterialDisplayById[material.id];
+  if (!display) return material;
+  return {
+    ...material,
+    title: display.title,
+    referenceRole: display.referenceRole,
+    stylePrompt: display.stylePrompt,
+    scenePrompt: display.stylePrompt,
+    shotPlan15s: display.shotPlan15s,
+    styleJson: {
+      ...material.styleJson,
+      referenceRole: display.referenceRole,
+      styleTags: display.styleTags,
+      sceneStyle: display.stylePrompt,
+    },
+  };
+};
+
 const summarizeAsset = (asset: AssetRecord) => ({
   assetId: asset.id,
   purpose: asset.purpose,
@@ -308,6 +537,33 @@ const summarizeAsset = (asset: AssetRecord) => ({
   width: asset.width,
   height: asset.height,
 });
+
+const toPresetDigitalHumanVoice = (digitalHuman: DigitalHumanRecord) => {
+  const preset = digitalHuman.presetVoice;
+  if (!preset || preset.status !== "ready" || !preset.voiceId) return null;
+  return {
+    digitalHumanId: digitalHuman.id,
+    status: "ready" as const,
+    voiceId: preset.voiceId,
+    model: preset.model ?? env.minimax.speechModel,
+    sourceFileName: preset.displayName ?? null,
+    updatedAt: null as Date | null,
+    speed: preset.speed,
+    source: "manifest_preset" as const,
+  };
+};
+
+const toSceneShotPlanPrompt = (material: ReferenceMaterialRecord) => {
+  const shotPlan = material.shotPlan15s ?? [];
+  if (!shotPlan.length) return "";
+  return [
+    "预设场景 15 秒分镜：",
+    ...shotPlan.map(
+      (shot) =>
+        `${shot.timeRange}：${shot.visual}${shot.assetRole ? `（素材角色：${shot.assetRole}）` : ""}`,
+    ),
+  ].join("\n");
+};
 
 const assertAssetPurpose = (asset: AssetRecord, allowed: AssetPurpose[], role: string) => {
   if (!allowed.includes(asset.purpose)) {
@@ -354,6 +610,7 @@ const buildScriptPrompt = (input: {
     `节奏：${style.pacing}`,
     `禁用方向：${style.avoid.join("、")}`,
     `预设风格与场景 Prompt：${conciseStylePrompt(input.referenceMaterial.stylePrompt)}`,
+    toSceneShotPlanPrompt(input.referenceMaterial),
     "要求：文案必须适合数字人口播；视频风格、类型、镜头节奏必须跟随参考素材；不得编造年份、里程、事故、价格、金融政策。",
   ].filter(Boolean).join("\n");
 };
@@ -366,9 +623,10 @@ const buildDeepSeekSystemPrompt = (input: {
     "你是汽车行业短视频口播文案策划，负责根据用户输入、上传图片摘要和预设参考风格生成数字人口播文案。",
     "只输出 JSON，不输出 Markdown，不输出解释。",
     `目标语言为${getVideoGenerationLanguageLabel(input.language)}，scriptText、openingHook、sellingPoints、shotCues.voiceover 必须使用该语言。`,
-    "视频时长固定为 15 秒。普通话或粤语约 90-125 个汉字，英文约 35-48 个单词，确保自然语速覆盖主要镜头。",
+    `视频时长以上限 15 秒为准，口播音频必须自然控制在 12-15 秒之间，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
+    "如果信息量和时长冲突，必须优先压缩文案，宁可少讲一个卖点，也不能让自然语速口播超过 15 秒。",
     `当前模板类型为${videoTemplateTypeLabels[input.templateType]}，必须围绕该模板目标组织内容。`,
-    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 15 秒口播的车型级通用卖点。",
+    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 12-15 秒口播的车型级通用卖点。",
     "可以使用可靠的车型级常识介绍车辆定位、空间取向、舒适取向和典型使用场景；凡是依赖具体配置版本的信息，必须放入 uncertainItems，不能写成确定事实。",
     "年款不代表新车。二手车口播禁止使用“全新”“新车”；车型名称未明确提供代际时，禁止擅自补充“第几代”。",
     "禁止使用“公认、标杆、首选、领先、就是答案、闭眼买”等绝对化营销词；未由图片摘要确认时，不要断言座椅软硬、内饰用料或具体车内配置。",
@@ -401,7 +659,8 @@ const buildDeepSeekUserPrompt = (input: {
     `模板类型：${videoTemplateTypeLabels[input.templateType]}`,
     `内容主体：${input.vehicleName}`,
     `目标语言：${getVideoGenerationLanguageLabel(input.language)}`,
-    `视频时长：固定 ${input.durationSeconds} 秒，不得延长或缩短`,
+    `视频时长：上限 ${input.durationSeconds} 秒。口播音频必须自然控制在 12-15 秒之间，只能短于或等于 15 秒，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
+    "如果卖点较多，优先保留车型定位、核心用途和一条最可信卖点，删掉次要描述，避免口播超时。",
     input.promotionText ? `用户确认的优惠信息：${input.promotionText}` : "",
     input.dealershipName ? `车场名称：${input.dealershipName}` : "",
     input.featuredVehicleNames
@@ -423,10 +682,11 @@ const buildDeepSeekUserPrompt = (input: {
     `节奏：${style.pacing}`,
     `禁用方向：${style.avoid.join("、")}`,
     `预设风格与场景 Prompt：${conciseStylePrompt(input.referenceMaterial.stylePrompt)}`,
+    toSceneShotPlanPrompt(input.referenceMaterial),
     "",
     "生成要求：",
     "1. 先在 vehicleProfile 中给出车型级理解，不能只复述车名。",
-    "2. scriptText 必须自然包含车型定位、目标人群或使用场景，并至少讲出 2 个稳妥的车型卖点。",
+    "2. scriptText 必须自然包含车型定位、目标人群或使用场景，并讲出 1-2 个稳妥的车型卖点；时长优先，不能为了卖点完整而超时。",
     "3. 未提供具体配置版本时，不得写死动力形式、排量、辅助驾驶、屏幕尺寸、座椅功能等配置。",
     "4. 用户上传图片是车辆外观和内饰的事实依据；参考视频只决定风格、类型、场景和镜头节奏。",
     "5. 这是二手车视频：禁止使用“全新”“新车”；输入未写明代际时，禁止补充第几代车型。",
@@ -450,6 +710,150 @@ const sellingPointFallbacks = (vehicleName: string) => {
   if (category === "sedan") return ["家用舒适", "通勤省心", "外观耐看", "驾驶质感"];
   return ["外观状态", "空间表现", "日常通勤", "到店实看"];
 };
+
+const localScriptFallbackLanguages = new Set<VideoGenerationLanguage>([
+  "Chinese",
+  "Chinese,Yue",
+  "English",
+]);
+
+const canUseLocalScriptFallback = (language: VideoGenerationLanguage) =>
+  localScriptFallbackLanguages.has(language);
+
+const compactNarrationScript = (
+  scriptText: string,
+  language: VideoGenerationLanguage,
+) => {
+  const trimmed = scriptText.trim().replace(/\s+/g, " ");
+  if (!trimmed) return trimmed;
+  const cjkLike = ["Chinese", "Chinese,Yue", "Japanese", "Korean"].includes(language);
+  if (cjkLike) {
+    return trimmed.length > 82 ? `${trimmed.slice(0, 82).replace(/[，,。.!！?？、；;：:]$/, "")}。` : trimmed;
+  }
+  const maxWords = [
+    "Russian",
+    "German",
+    "French",
+    "Spanish",
+    "Portuguese",
+    "Italian",
+    "Ukrainian",
+    "Polish",
+    "Romanian",
+    "Greek",
+    "Czech",
+    "Bulgarian",
+    "Hungarian",
+    "Norwegian",
+    "Slovenian",
+    "Catalan",
+    "Nynorsk",
+    "Afrikaans",
+  ].includes(language)
+    ? 24
+    : 32;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const wordLimited =
+    words.length <= maxWords ? trimmed : words.slice(0, maxWords).join(" ");
+  const charLimited =
+    !cjkLike && wordLimited.length > 155
+      ? wordLimited.slice(0, 155).replace(/\s+\S*$/, "")
+      : wordLimited;
+  if (charLimited === trimmed) return trimmed;
+  const shortened = charLimited.replace(/[，,。.!！?？、；;：:]$/, "");
+  return `${shortened}.`;
+};
+
+const isCjkLikeNarrationLanguage = (language: VideoGenerationLanguage) =>
+  ["Chinese", "Chinese,Yue", "Japanese", "Korean"].includes(language);
+
+const trimNarrationPunctuation = (value: string) =>
+  value.trim().replace(/[\s,.;:!?，。！？、；：]+$/, "");
+
+const shortenNarrationScriptForDuration = (input: {
+  scriptText: string;
+  language: VideoGenerationLanguage;
+  currentDurationMs: number;
+  attempt: number;
+}) => {
+  const normalized = input.scriptText.trim().replace(/\s+/g, " ");
+  if (!normalized) return normalized;
+
+  const targetRatio = Math.max(
+    0.42,
+    Math.min(0.94, (MAX_NARRATION_AUDIO_DURATION_MS * 0.96) / input.currentDurationMs),
+  );
+  const safetyRatio = Math.max(0.38, targetRatio - Math.max(0, input.attempt - 1) * 0.08);
+
+  if (isCjkLikeNarrationLanguage(input.language)) {
+    const targetLength = Math.max(42, Math.floor(normalized.length * safetyRatio));
+    const shortened = trimNarrationPunctuation(normalized.slice(0, targetLength));
+    return shortened ? `${shortened}。` : normalized;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const targetWords = Math.max(14, Math.floor(words.length * safetyRatio));
+  const wordLimited = words.slice(0, targetWords).join(" ");
+  const charLimit = Math.max(96, Math.floor(normalized.length * safetyRatio));
+  const charLimited =
+    wordLimited.length > charLimit
+      ? wordLimited.slice(0, charLimit).replace(/\s+\S*$/, "")
+      : wordLimited;
+  const shortened = trimNarrationPunctuation(charLimited);
+  return shortened ? `${shortened}.` : normalized;
+};
+
+const narrationExtensionByLanguage: Partial<Record<VideoGenerationLanguage, string>> = {
+  Chinese: "整体来看，这台车更适合日常通勤和家庭出行，具体配置和车况欢迎到店结合实车进一步了解。",
+  "Chinese,Yue": "整体嚟讲，呢台车好适合日常代步同家庭出行，具体配置同车况欢迎到店睇实车再了解。",
+  English:
+    "Overall, it is a practical choice for daily commuting and family use. Visit the showroom to check the vehicle details in person.",
+  Russian:
+    "В целом, этот автомобиль хорошо подходит для ежедневных поездок и семейного использования. Подробности лучше уточнить при осмотре автомобиля.",
+  German:
+    "Insgesamt eignet sich dieses Fahrzeug gut fuer Alltag und Familie. Weitere Details pruefen wir gern direkt am Fahrzeug vor Ort.",
+  Japanese:
+    "全体として、日常の移動や家族での利用に向いた一台です。詳しい状態は実車で確認できます。",
+  Korean:
+    "전반적으로 일상 주행과 가족용으로 잘 어울리는 차량입니다. 자세한 상태는 실차로 확인해 보실 수 있습니다.",
+  French:
+    "Dans l'ensemble, ce vehicule convient bien aux trajets quotidiens et aux usages familiaux. Les details sont a verifier sur place.",
+  Spanish:
+    "En conjunto, es una opcion practica para uso diario y familiar. Los detalles se pueden confirmar revisando el vehiculo en persona.",
+};
+
+const extendNarrationScriptForDuration = (input: {
+  scriptText: string;
+  language: VideoGenerationLanguage;
+}) => {
+  const normalized = trimNarrationPunctuation(input.scriptText.replace(/\s+/g, " "));
+  const extension =
+    narrationExtensionByLanguage[input.language] ??
+    "Please review the vehicle in person for more details about its condition, configuration, and actual availability.";
+  if (!normalized) return extension;
+  if (normalized.includes(trimNarrationPunctuation(extension).slice(0, 16))) {
+    return `${normalized} ${extension}`;
+  }
+  return isCjkLikeNarrationLanguage(input.language)
+    ? `${normalized}。${extension}`
+    : `${normalized}. ${extension}`;
+};
+
+const getGenerationErrorDetails = (error: unknown): Record<string, unknown> => {
+  if (!error || typeof error !== "object") return {};
+  const details = (error as { details?: unknown }).details;
+  return details && typeof details === "object"
+    ? (details as Record<string, unknown>)
+    : {};
+};
+
+const isNarrationAudioTooLongError = (error: unknown) =>
+  error instanceof Error &&
+  error.message.includes("MiniMax narration audio exceeds the 15-second maximum");
+
+const isNarrationAudioTooShortError = (error: unknown) =>
+  error instanceof Error &&
+  error.message.includes("MiniMax narration audio is shorter than the 12-second minimum");
 
 const inferVehicleProfile = (vehicleName: string): VehicleProfile => {
   const modelYear = vehicleName.match(/(\d{2,4})款/)?.[1];
@@ -554,28 +958,28 @@ const buildScriptText = (input: {
     const featured = input.featuredVehicleNames
       ? `，主推${input.featuredVehicleNames}`
       : "";
-    if (input.language === "en") {
+    if (input.language === "English") {
       return `Welcome to ${dealershipName}. Explore a clear, comfortable showroom with carefully presented used cars${input.featuredVehicleNames ? `, including ${input.featuredVehicleNames}` : ""}. Our digital host will guide you through the space and featured vehicles. Visit the store to confirm availability and vehicle details.`;
     }
-    if (input.language === "yue") {
+    if (input.language === "Chinese,Yue") {
       return `欢迎嚟到${dealershipName}，展厅环境企理，二手车展示清晰${featured}。数字人会带你睇场地、车辆陈列同重点车型，实际库存、配置同车况，请到店再确认。`;
     }
     return `欢迎来到${dealershipName}，展厅环境整洁明亮，二手车陈列清晰${featured}。数字人将带你快速了解场地、车辆展示和主推车型；实际库存、具体配置和车况，请以到店确认结果为准。`;
   }
   if (input.templateType === "promotion") {
     const promotionText = input.promotionText || "";
-    if (input.language === "en") {
+    if (input.language === "English") {
       return `${input.vehicleName} is ready for a closer look. It balances practical space, daily comfort and confident styling for commuting and family use. Current offer: ${promotionText}. Final eligibility, vehicle condition and configuration must be confirmed with the store.`;
     }
-    if (input.language === "yue") {
+    if (input.language === "Chinese,Yue") {
       return `${input.vehicleName}，空间实用、日常乘坐舒服，外观亦够利落，适合通勤同家庭出行。今期优惠系：${promotionText}。实际车况、配置同优惠适用条件，请到店确认。`;
     }
     return `${input.vehicleName}，兼顾实用空间、日常舒适和利落外观，适合通勤与家庭出行。本期优惠信息：${promotionText}。实际车况、具体配置和优惠适用条件，请以到店确认结果为准。`;
   }
-  if (input.language === "en") {
+  if (input.language === "English") {
     return `${input.vehicleName} is designed for practical daily use, balancing comfort, useful space and confident styling. It suits commuting, family trips and city driving. Please confirm the exact configuration, mileage and vehicle condition from the uploaded materials and inspection report.`;
   }
-  if (input.language === "yue") {
+  if (input.language === "Chinese,Yue") {
     return `${input.vehicleName}，定位实用，兼顾舒适、空间同日常驾驶，适合城市通勤同家庭出行。外观同内饰细节以用户上传图片为准，具体配置、里程同车况，请结合实车同检测报告确认。`;
   }
   if (/宝马\s*218i|2系旅行/i.test(input.vehicleName)) {
@@ -765,6 +1169,63 @@ const buildVideoTaskErrorMessage = (error: unknown) => {
     : `${message}\nKIE response: ${JSON.stringify(details).slice(0, 4000)}`;
 };
 
+const deriveSeedanceDurationSeconds = (audioDurationMs: number | null) => {
+  if (!audioDurationMs) return VIDEO_DURATION_SECONDS;
+  return Math.min(
+    VIDEO_DURATION_SECONDS,
+    Math.max(5, Math.ceil(audioDurationMs / 1000)),
+  );
+};
+
+const isChineseNarrationLanguage = (language: VideoGenerationLanguage) =>
+  language === "Chinese" || language === "Chinese,Yue";
+
+const FIXED_DEALERSHIP_SEEDANCE_PROMPT =
+  "用模特 {{Mixed 2}} ，生成精品二手车销售风格的口播短视频使用音频 {{Mixed 3}} ，真人口播感，场地参考图 {{Mixed 1}} ，不要做特写，不要画面文字，不要打开引擎盖，不要展示我没给你参考图部位，内容真实。";
+
+const toMixedReferenceList = (start: number, count: number) =>
+  count > 0
+    ? Array.from({ length: count }, (_, index) => `{{Mixed ${start + index}}}`).join(" ")
+    : "无";
+
+const conciseSingleCarSceneRequirement = (finalVideoPrompt: string) => {
+  const paragraphs = finalVideoPrompt
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return paragraphs.slice(0, 2).join("\n\n");
+};
+
+const buildFixedSingleCarSeedancePrompt = (input: {
+  language: VideoGenerationLanguage;
+  exteriorCount: number;
+  interiorCount: number;
+  finalVideoPrompt: string;
+  scriptText: string;
+  durationSeconds?: number;
+  audioDurationMs?: number | null;
+}) => {
+  const languageLabel = getVideoGenerationLanguageLabel(input.language);
+  const exteriorReferences = toMixedReferenceList(3, input.exteriorCount);
+  const interiorReferences = toMixedReferenceList(3 + input.exteriorCount, input.interiorCount);
+  const base =
+    `用 模特 {{Mixed 1}} ，生成精品二手车销售风格的口播短视频，真人口播感，车辆外观参考图 ${exteriorReferences} ，车辆内饰参考图 ${interiorReferences} ，不要做特写，不要画面文字，不要打开引擎盖，不要展示我没给你参考图部位，内容真实。 她完全按照提供的${languageLabel}音频 {{Mixed 2}} 进行跟读。`;
+  const sceneRequirement = `场景与分镜要求：${conciseSingleCarSceneRequirement(input.finalVideoPrompt)}`;
+
+  if (isChineseNarrationLanguage(input.language)) {
+    return [base, "无字幕。自然对嘴，专业解说视频风格。", sceneRequirement].join("\n");
+  }
+
+  return [
+    base,
+    "不要翻译这段演讲。",
+    "不要说中文或普通话。",
+    "无字幕。",
+    "自然对嘴，专业解说视频风格。",
+    sceneRequirement,
+  ].join("\n");
+};
+
 export const buildSeedancePrompt = (input: {
   finalVideoPrompt: string;
   scriptText: string;
@@ -774,7 +1235,18 @@ export const buildSeedancePrompt = (input: {
   dealershipCount: number;
   language: VideoGenerationLanguage;
   templateType: VideoTemplateType;
+  durationSeconds?: number;
+  audioDurationMs?: number | null;
 }) => {
+  if (input.templateType === "dealership") {
+    return FIXED_DEALERSHIP_SEEDANCE_PROMPT;
+  }
+
+  if (input.templateType === "single-car") {
+    return buildFixedSingleCarSeedancePrompt(input);
+  }
+
+  const durationSeconds = input.durationSeconds ?? VIDEO_DURATION_SECONDS;
   const firstExteriorImage = 2;
   const exteriorEnd = firstExteriorImage + input.exteriorCount - 1;
   const firstInteriorImage = exteriorEnd + 1;
@@ -790,7 +1262,7 @@ export const buildSeedancePrompt = (input: {
       : Array.from({ length: end - start + 1 }, (_, index) => `#image${start + index}`).join("、");
 
   return [
-    `生成一条严格 15 秒、9:16 竖屏、720p 的${getVideoGenerationLanguageLabel(input.language)}汽车行业数字人口播视频。`,
+    `生成一条严格 ${durationSeconds} 秒、9:16 竖屏、720p 的${getVideoGenerationLanguageLabel(input.language)}汽车行业数字人口播视频。`,
     `模板类型：${videoTemplateTypeLabels[input.templateType]}。`,
     "媒体引用规则：",
     "- #image1 是同一个数字人的四视图和人物特写身份板。只提取身份、五官、发型、服装和体型，最终画面只能出现一个完整自然的人物，禁止把多视图拼板直接放进视频。",
@@ -798,16 +1270,15 @@ export const buildSeedancePrompt = (input: {
     `- 车辆内饰事实依据：${range(firstInteriorImage, interiorEnd)}。仅展示参考图能够支持的座舱、座椅和空间细节。`,
     `- 车场与展厅事实依据：${range(firstDealershipImage, dealershipEnd)}。仅展示用户上传素材能够支持的场地、陈列和车辆信息。`,
     `- 用户额外参考：${range(firstUserReferenceImage, userReferenceEnd)}。只补充构图和视觉信息，不覆盖预设风格与场景提示词。`,
-    `- #audio1 是 MiniMax 根据固定数字人音色生成的完整${getVideoGenerationLanguageLabel(input.language)}口播音轨。它是全片唯一人声与唯一口播内容，数字人口型、停顿和语速必须严格跟随 #audio1。`,
+    `- #audio1 是 MiniMax 根据固定数字人音色生成的${getVideoGenerationLanguageLabel(input.language)}口播音轨。视频总时长必须按 #audio1 的真实时长匹配，不要额外延长画面或补演口播。它是全片唯一人声与唯一口播内容，数字人口型、停顿和语速必须严格跟随 #audio1。`,
     "",
     input.finalVideoPrompt,
     "",
     "声音要求：直接使用 #audio1，不重新配音、不变声、不改写、不增加背景解说、价格、字幕或额外台词；允许加入极轻环境底噪，但不得盖过口播。",
+    "口型要求：只有 #audio1 中真实有声音的时间段可以张嘴说话；当 #audio1 进入静音或无口播尾段时，数字人必须闭嘴，保持自然微笑、点头、看车或手势收尾，禁止继续无声张嘴、补说台词或模拟额外口播。",
     `#audio1 对应口播文本：${input.scriptText}`,
     "",
-    input.templateType === "dealership"
-      ? "硬性约束：全片 15 秒；0-3 秒数字人在车场或展厅中开场；3-7 秒展示场地与车辆陈列；7-12 秒展示主推车型或服务范围；12-15 秒数字人在展厅内收束。保持人物身份和展厅空间连续一致，不得虚构库存、价格或服务承诺。"
-      : "硬性约束：全片 15 秒；0-3 秒数字人与车辆同框介绍车型定位；3-7 秒展示外观；7-12 秒展示内饰、空间或活动信息；12-15 秒数字人回到车旁收束。保持人物身份、车辆身份和展厅空间连续一致。不得改变车标，不得虚构配置，不得生成其他车型，不得出现多余人物、畸形手指、漂浮部件或错误文字。",
+    `硬性约束：全片 ${durationSeconds} 秒；数字人与车辆同框介绍车型定位，中段展示外观、内饰、空间或活动信息；结尾跟随 #audio1 自然收束，不要在音频结束后继续张嘴或延长表演。保持人物身份、车辆身份和展厅空间连续一致。不得改变车标，不得虚构配置，不得生成其他车型，不得出现多余人物、畸形手指、漂浮部件或错误文字。`,
   ].join("\n");
 };
 
@@ -815,50 +1286,41 @@ const synthesizeNarrationAudio = async (input: {
   taskId: string;
   scriptText: string;
   voiceId: string;
+  speed?: number;
   language: VideoGenerationLanguage;
 }) => {
-  let speed = 0.5;
-  let speech = await minimaxClient.synthesizeSpeech({
+  const speed = 1;
+  const speech = await minimaxClient.synthesizeSpeech({
     text: input.scriptText,
     voiceId: input.voiceId,
     speed,
     language: input.language,
   });
 
-  for (let attempt = 1; attempt < 3; attempt += 1) {
-    if (
-      !speech.durationMs ||
-      speech.durationMs <= env.minimax.targetAudioDurationMs
-    ) {
-      break;
-    }
-    speed = Math.min(
-      2,
-      Math.max(
-        speed + 0.05,
-        Number(
-          (
-            speed *
-            (speech.durationMs / env.minimax.targetAudioDurationMs)
-          ).toFixed(2),
-        ),
-      ),
-    );
-    speech = await minimaxClient.synthesizeSpeech({
-      text: input.scriptText,
-      voiceId: input.voiceId,
-      speed,
-      language: input.language,
+  if (!speech.durationMs) {
+    throw errors.generationFailed("MiniMax narration audio response missing duration", {
+      scriptLength: input.scriptText.length,
     });
   }
 
-  if (speech.durationMs && speech.durationMs > VIDEO_DURATION_SECONDS * 1000) {
+  if (speech.durationMs > MAX_NARRATION_AUDIO_DURATION_MS) {
     throw errors.generationFailed(
-      "MiniMax narration audio is longer than the fixed 15-second video",
+      "MiniMax narration audio exceeds the 15-second maximum",
       {
         audioDurationMs: speech.durationMs,
         scriptLength: input.scriptText.length,
         suggestion: "shorten the script text",
+      },
+    );
+  }
+
+  if (speech.durationMs < MIN_NARRATION_AUDIO_DURATION_MS) {
+    throw errors.generationFailed(
+      "MiniMax narration audio is shorter than the 12-second minimum",
+      {
+        audioDurationMs: speech.durationMs,
+        scriptLength: input.scriptText.length,
+        suggestion: "make the script text slightly longer",
       },
     );
   }
@@ -873,13 +1335,96 @@ const synthesizeNarrationAudio = async (input: {
     localPath,
     publicUrl,
     durationMs: speech.durationMs,
+    originalDurationMs: speech.durationMs,
+    normalizedSpeechDurationMs: speech.durationMs,
+    silencePadMs: 0,
+    timeStretchRatio: null,
+    originalLocalPath: localPath,
+    originalPublicUrl: publicUrl,
     sizeBytes: speech.sizeBytes,
+    originalSizeBytes: speech.sizeBytes,
     model: speech.model,
     voiceId: speech.voiceId,
     speed: speech.speed,
     language: input.language,
     languageBoost: speech.languageBoost,
   };
+};
+
+const synthesizeNarrationAudioWithAutoFit = async (input: {
+  taskId: string;
+  scriptText: string;
+  voiceId: string;
+  speed?: number;
+  language: VideoGenerationLanguage;
+}) => {
+  let scriptText = input.scriptText.trim();
+  const attempts: Array<{
+    attempt: number;
+    scriptText: string;
+    durationMs?: number;
+    status: "too_long" | "too_short" | "success";
+  }> = [];
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const audio = await synthesizeNarrationAudio({
+        ...input,
+        scriptText,
+      });
+      attempts.push({
+        attempt: attempt + 1,
+        scriptText,
+        durationMs: audio.durationMs,
+        status: "success",
+      });
+      return {
+        audio,
+        scriptText,
+        attempts,
+      };
+    } catch (error) {
+      const isTooLong = isNarrationAudioTooLongError(error);
+      const isTooShort = isNarrationAudioTooShortError(error);
+      if ((!isTooLong && !isTooShort) || attempt === 4) {
+        throw error;
+      }
+      const details = getGenerationErrorDetails(error);
+      const durationMs =
+        typeof details.audioDurationMs === "number"
+          ? details.audioDurationMs
+          : isTooShort
+            ? MIN_NARRATION_AUDIO_DURATION_MS - 1
+            : MAX_NARRATION_AUDIO_DURATION_MS + 1;
+      attempts.push({
+        attempt: attempt + 1,
+        scriptText,
+        durationMs,
+        status: isTooShort ? "too_short" : "too_long",
+      });
+      if (isTooShort) {
+        scriptText = extendNarrationScriptForDuration({
+          scriptText,
+          language: input.language,
+        });
+      } else {
+        const shortened = shortenNarrationScriptForDuration({
+          scriptText,
+          language: input.language,
+          currentDurationMs: durationMs,
+          attempt: attempt + 1,
+        });
+        scriptText =
+          shortened && shortened !== scriptText
+            ? shortened
+            : compactNarrationScript(scriptText, input.language);
+      }
+    }
+  }
+
+  throw errors.generationFailed("MiniMax narration audio could not be fitted under 15 seconds", {
+    attempts,
+  });
 };
 
 class VideoGenerationService {
@@ -891,22 +1436,25 @@ class VideoGenerationService {
     material: ReferenceMaterialRecord,
     definition: NonNullable<ReturnType<typeof getVideoTemplateDefinition>>,
   ) {
+    const localizedMaterial = localizeReferenceMaterial(material);
     return {
-      id: material.id,
-      templateId: material.id,
-      referenceMaterialId: material.id,
-      title: material.title,
+      id: localizedMaterial.id,
+      templateId: localizedMaterial.id,
+      referenceMaterialId: localizedMaterial.id,
+      title: localizedMaterial.title,
       type: definition.type,
       typeLabel: videoTemplateTypeLabels[definition.type],
       style: definition.style,
       styleLabel: videoTemplateStyleLabels[definition.style],
       badge: definition.badge,
-      description: material.referenceRole,
-      thumbnailUrl: toPublicReferencePreviewUrl(material.id),
-      previewUrl: toPublicReferencePreviewUrl(material.id),
-      prompt: conciseStylePrompt(material.stylePrompt),
-      stylePrompt: conciseStylePrompt(material.stylePrompt),
-      styleTags: material.styleJson.styleTags,
+      description: localizedMaterial.referenceRole,
+      thumbnailUrl: toPublicReferencePreviewUrl(localizedMaterial.id),
+      previewUrl: toPublicReferencePreviewUrl(localizedMaterial.id),
+      prompt: conciseStylePrompt(localizedMaterial.stylePrompt),
+      stylePrompt: conciseStylePrompt(localizedMaterial.stylePrompt),
+      scenePrompt: localizedMaterial.scenePrompt ?? localizedMaterial.stylePrompt,
+      shotPlan15s: localizedMaterial.shotPlan15s ?? [],
+      styleTags: localizedMaterial.styleJson.styleTags,
       durationSeconds: VIDEO_DURATION_SECONDS,
       durationLabel: "00:15",
       outputRatio: "9:16" as const,
@@ -962,6 +1510,7 @@ class VideoGenerationService {
     const materialById = new Map(
       manifest.materials
         .filter((material) => material.extractionStatus === "completed")
+        .map(localizeReferenceMaterial)
         .map((material) => [material.id, material]),
     );
     const items = [];
@@ -1024,6 +1573,7 @@ class VideoGenerationService {
     const manifest = await readJson<DigitalHumanManifest>(digitalHumanManifestPath);
     const activeItems = manifest.items
       .filter((item) => item.status === "active")
+      .map(localizeDigitalHumanRecord)
       .sort((a, b) => a.sortOrder - b.sortOrder);
     const voices = await digitalHumanVoiceRepository.listByDigitalHumanIds(
       activeItems.map((item) => item.id),
@@ -1033,7 +1583,9 @@ class VideoGenerationService {
     );
 
     return activeItems
-      .map((item) => ({
+      .map((item) => {
+        const presetVoice = toPresetDigitalHumanVoice(item);
+        return {
         id: item.id,
         name: item.name,
         gender: item.gender,
@@ -1042,11 +1594,12 @@ class VideoGenerationService {
         imageUrl: toPublicDigitalHumanAssetUrl(item.id),
         frontPreviewStrategy: item.frontPreviewStrategy,
         voiceStatus:
-          voiceByDigitalHumanId.get(item.id)?.status === "ready"
+          voiceByDigitalHumanId.get(item.id)?.status === "ready" || presetVoice
             ? "ready"
             : "not_configured",
-        voiceModel: voiceByDigitalHumanId.get(item.id)?.model ?? null,
-      }));
+        voiceModel: voiceByDigitalHumanId.get(item.id)?.model ?? presetVoice?.model ?? null,
+        };
+      });
   }
 
   async getDigitalHuman(id: string) {
@@ -1055,7 +1608,7 @@ class VideoGenerationService {
     if (!item) {
       throw errors.invalidParameter("digitalHumanId is invalid", { digitalHumanId: id });
     }
-    return item;
+    return localizeDigitalHumanRecord(item);
   }
 
   async getDigitalHumanImagePath(id: string) {
@@ -1067,10 +1620,27 @@ class VideoGenerationService {
     return imagePath;
   }
 
-  async getDigitalHumanVoice(id: string) {
-    await this.getDigitalHuman(id);
+  private async getEffectiveDigitalHumanVoice(id: string) {
+    const digitalHuman = await this.getDigitalHuman(id);
     const voice = await digitalHumanVoiceRepository.findByDigitalHumanId(id);
-    if (!voice || voice.status !== "ready") {
+    if (voice?.status === "ready") {
+      return {
+        digitalHumanId: voice.digitalHumanId,
+        status: voice.status,
+        voiceId: voice.voiceId,
+        model: voice.model,
+        sourceFileName: voice.sourceFileName,
+        updatedAt: voice.updatedAt,
+        speed: undefined,
+        source: "db_voice_clone" as const,
+      };
+    }
+    return toPresetDigitalHumanVoice(digitalHuman);
+  }
+
+  async getDigitalHumanVoice(id: string) {
+    const voice = await this.getEffectiveDigitalHumanVoice(id);
+    if (!voice) {
       return {
         digitalHumanId: id,
         status: "not_configured",
@@ -1084,7 +1654,8 @@ class VideoGenerationService {
       voiceId: voice.voiceId,
       model: voice.model,
       sourceFileName: voice.sourceFileName,
-      updatedAt: voice.updatedAt.toISOString(),
+      updatedAt: voice.updatedAt ? voice.updatedAt.toISOString() : null,
+      source: voice.source,
     };
   }
 
@@ -1144,6 +1715,7 @@ class VideoGenerationService {
     const manifest = await readJson<ReferenceMaterialManifest>(referenceManifestPath);
     return manifest.materials
       .filter((material) => material.extractionStatus === "completed")
+      .map(localizeReferenceMaterial)
       .map((material) => ({
         id: material.id,
         title: material.title,
@@ -1153,6 +1725,8 @@ class VideoGenerationService {
         media: material.media,
         styleTags: material.styleJson.styleTags,
         stylePrompt: conciseStylePrompt(material.stylePrompt),
+        scenePrompt: material.scenePrompt ?? material.stylePrompt,
+        shotPlan15s: material.shotPlan15s ?? [],
         generationMode: "preset_prompt_only",
       }));
   }
@@ -1165,7 +1739,7 @@ class VideoGenerationService {
         referenceMaterialId: id,
       });
     }
-    return material;
+    return localizeReferenceMaterial(material);
   }
 
   async getReferencePreviewPath(id: string) {
@@ -1416,6 +1990,16 @@ class VideoGenerationService {
     } catch (error) {
       deepSeekFailureNote = error instanceof Error ? error.message : "unknown DeepSeek error";
     }
+    if (!deepSeekDraft && !canUseLocalScriptFallback(language)) {
+      throw errors.generationFailed(
+        "DeepSeek script generation is required for selected narration language",
+        {
+          language,
+          targetLanguage: getVideoGenerationLanguageLabel(language),
+          deepSeekFailureNote,
+        },
+      );
+    }
     const generatedDraft = mergeGeneratedDraft({
       vehicleName,
       vehicleProfile: fallbackVehicleProfile,
@@ -1429,12 +2013,13 @@ class VideoGenerationService {
         "车型名称未提供完整车况、里程和价格时，文案不会编造这些信息。",
       ],
     }, deepSeekDraft);
-    const scriptText = generatedDraft.scriptText;
+    const scriptText = compactNarrationScript(generatedDraft.scriptText, language);
     const shotCues = generatedDraft.shotCues;
 
     const promptBundle = {
       digitalHumanPrompt: `使用数字人「${digitalHuman.name}」（${digitalHuman.gender}，${digitalHuman.ageStyle}）作为口播主体，参考其四视图与人物特写保持身份一致。`,
       stylePrompt: conciseStylePrompt(referenceMaterial.stylePrompt),
+      sceneShotPlanPrompt: toSceneShotPlanPrompt(referenceMaterial),
       scriptPrompt,
       uploadedReferencePrompt: [
         `外观参考图 ${uploadedAssets.vehicleExteriorAssets.length} 张：必须锁定车辆外观、颜色、车身结构、灯组、轮毂和真实车况。`,
@@ -1473,6 +2058,8 @@ class VideoGenerationService {
         title: referenceMaterial.title,
         videoType: referenceMaterial.videoType,
         stylePrompt: conciseStylePrompt(referenceMaterial.stylePrompt),
+        scenePrompt: referenceMaterial.scenePrompt ?? referenceMaterial.stylePrompt,
+        shotPlan15s: referenceMaterial.shotPlan15s ?? [],
         generationMode: "preset_prompt_only",
         previewUrl: toPublicReferencePreviewUrl(referenceMaterial.id),
       },
@@ -1511,6 +2098,7 @@ class VideoGenerationService {
     const finalVideoPrompt = [
       promptBundle.digitalHumanPrompt,
       promptBundle.stylePrompt,
+      promptBundle.sceneShotPlanPrompt,
       [
         `${videoTemplateTypeLabels[templateDefinition.type]}重点：`,
         `内容主体：${vehicleName}`,
@@ -1525,7 +2113,7 @@ class VideoGenerationService {
         featuredVehicleNames ? `用户填写的主推车型：${featuredVehicleNames}` : "",
       ].join("\n"),
       `口播文案：${scriptText}`,
-      `固定时长：${VIDEO_DURATION_SECONDS} 秒；镜头时间轴必须为 ${FIXED_SHOT_TIME_RANGES.join("、")}。`,
+      `视频时长上限：${VIDEO_DURATION_SECONDS} 秒；实际生成时长以后续 MiniMax 口播音频时长为准，镜头节奏参考 ${FIXED_SHOT_TIME_RANGES.join("、")}。`,
       promptBundle.uploadedReferencePrompt,
       "视频生成时必须同时包含数字人、预设风格与场景提示词、口播文案、用户上传车辆参考素材；参考视频本身不得上传给视频模型。",
     ].join("\n\n");
@@ -1583,7 +2171,7 @@ class VideoGenerationService {
       vehicleName: draft.vehicleName,
       structuredVehicle: vehicle.structured ?? null,
       language:
-        typeof vehicle.language === "string" ? vehicle.language : "zh-CN",
+        typeof vehicle.language === "string" ? vehicle.language : "Chinese",
       durationSeconds: draft.durationSeconds,
       outputRatio: draft.outputRatio,
       videoResolution: draft.videoResolution,
@@ -1610,7 +2198,7 @@ class VideoGenerationService {
     const draft = await videoScriptDraftRepository.findById(scriptDraftId, userId);
     if (!draft) throw errors.videoScriptDraftNotFound();
     const digitalHumanVoice =
-      await digitalHumanVoiceRepository.findByDigitalHumanId(draft.digitalHumanId);
+      await this.getEffectiveDigitalHumanVoice(draft.digitalHumanId);
     if (!digitalHumanVoice || digitalHumanVoice.status !== "ready") {
       throw errors.invalidParameter(
         "selected digital human has no ready MiniMax voice clone",
@@ -1673,27 +2261,53 @@ class VideoGenerationService {
         }),
       ]);
 
+    const seedanceExteriorAssets =
+      templateType === "single-car" ? exteriorAssets.slice(0, 4) : exteriorAssets;
+    const seedanceInteriorAssets =
+      templateType === "single-car" ? interiorAssets.slice(0, 3) : interiorAssets;
+    const seedanceUserReferenceAssets =
+      templateType === "single-car" || templateType === "dealership"
+        ? []
+        : userReferenceAssets;
+    const seedanceDealershipAssets =
+      templateType === "dealership" ? dealershipAssets.slice(0, 1) : dealershipAssets;
     const selectedVehicleAssets = [
-      ...exteriorAssets,
-      ...interiorAssets,
-      ...dealershipAssets,
-      ...userReferenceAssets,
+      ...seedanceExteriorAssets,
+      ...seedanceInteriorAssets,
+      ...seedanceDealershipAssets,
+      ...seedanceUserReferenceAssets,
     ];
-    const seedancePrompt = buildSeedancePrompt({
-      finalVideoPrompt: draft.finalVideoPrompt,
-      scriptText: draft.scriptText,
-      exteriorCount: exteriorAssets.length,
-      interiorCount: interiorAssets.length,
-      userReferenceCount: userReferenceAssets.length,
-      dealershipCount: dealershipAssets.length,
-      language,
-      templateType,
-    });
     const taskId = createId("task");
-    let lease: Awaited<ReturnType<typeof kieKeyPool.acquire>> | null = null;
     let taskCreated = false;
+    let billing: FrozenGenerationBilling | null = null;
+    let billingFreezeFailed = false;
 
     try {
+      const fittedNarration = await synthesizeNarrationAudioWithAutoFit({
+        taskId,
+        scriptText: draft.scriptText,
+        voiceId: digitalHumanVoice.voiceId,
+        speed: digitalHumanVoice.speed,
+        language,
+      });
+      const narrationAudio = fittedNarration.audio;
+      const narrationScriptText = fittedNarration.scriptText;
+      const seedanceDurationSeconds = deriveSeedanceDurationSeconds(
+        narrationAudio.durationMs,
+      );
+      const seedancePrompt = buildSeedancePrompt({
+        finalVideoPrompt: draft.finalVideoPrompt,
+        scriptText: narrationScriptText,
+        exteriorCount: seedanceExteriorAssets.length,
+        interiorCount: seedanceInteriorAssets.length,
+        userReferenceCount: seedanceUserReferenceAssets.length,
+        dealershipCount: seedanceDealershipAssets.length,
+        language,
+        templateType,
+        durationSeconds: seedanceDurationSeconds,
+        audioDurationMs: narrationAudio.durationMs,
+      });
+
       await tasksRepository.createWaitingTask({
         id: taskId,
         userId: subscription.userKey,
@@ -1710,59 +2324,137 @@ class VideoGenerationService {
       });
       taskCreated = true;
 
-      const narrationAudio = await synthesizeNarrationAudio({
-        taskId,
-        scriptText: draft.scriptText,
-        voiceId: digitalHumanVoice.voiceId,
-        language,
-      });
-      const acquiredLease = await kieKeyPool.acquire();
-      lease = acquiredLease;
+      try {
+        billing = await freezeGenerationBilling({
+          taskId,
+          functionCode: "video-generation",
+          estimatedPoints: shortVideoGenerationPoints(),
+          body: {},
+          context,
+        });
+      } catch (error) {
+        billingFreezeFailed = true;
+        await tasksRepository.markFailed(
+          taskId,
+          "BILLING_FREEZE_FAILED",
+          error instanceof Error ? error.message : "billing freeze failed",
+        );
+        throw error;
+      }
 
-      const uploadedDigitalHuman = await kieClient.uploadLocalFileWithLease(
-        acquiredLease,
-        digitalHumanPath,
-        "used-car-platform/video-generation/digital-human",
-      );
-      const uploadedVehicleAssets = await Promise.all(
+      const digitalHumanAsset = await arkVirtualAssetService.ensureLocalFileAsset({
+        userId: subscription.userKey,
+        assetType: "Image",
+        filePath: digitalHumanPath,
+        fileName: `${draft.digitalHumanId}${path.extname(digitalHumanPath) || ".png"}`,
+      });
+      const vehicleVirtualAssets = await Promise.all(
         selectedVehicleAssets.map((asset) =>
-          kieClient.uploadLocalFileWithLease(
-            acquiredLease,
-            asset.localPath,
-            "used-car-platform/video-generation/vehicle",
-          ),
+          arkVirtualAssetService.ensureLocalFileAsset({
+            userId: subscription.userKey,
+            assetType: "Image",
+            filePath: asset.localPath,
+            publicUrl: asset.publicUrl,
+            fileName: asset.fileName,
+          }),
         ),
       );
-      const uploadedNarrationAudio = await kieClient.uploadLocalFileWithLease(
-        acquiredLease,
-        narrationAudio.localPath,
-        "used-car-platform/video-generation/narration-audio",
-      );
-      await kieKeyPool.release(acquiredLease.accountHash);
-      lease = null;
+      const narrationAudioAsset = await arkVirtualAssetService.ensureLocalFileAsset({
+        userId: subscription.userKey,
+        assetType: "Audio",
+        filePath: narrationAudio.localPath,
+        publicUrl: narrationAudio.publicUrl,
+        fileName: path.basename(narrationAudio.localPath),
+      });
 
-      const inputUrls = [
-        uploadedDigitalHuman.fileUrl,
-        ...uploadedVehicleAssets.map((item) => item.fileUrl),
-        uploadedNarrationAudio.fileUrl,
-      ];
-      if (inputUrls.length > 12) {
+      const inputAssetUris = [
+        digitalHumanAsset.assetUri,
+        ...vehicleVirtualAssets.map((item) => item.assetUri),
+        narrationAudioAsset.assetUri,
+      ].filter((item): item is string => typeof item === "string" && item.startsWith("asset://"));
+      if (inputAssetUris.length > 12) {
         throw errors.invalidParameter("Seedance supports at most 12 reference files", {
-          inputCount: inputUrls.length,
+          inputCount: inputAssetUris.length,
+        });
+      }
+      if (inputAssetUris.length !== selectedVehicleAssets.length + 2) {
+        throw errors.generationFailed("ark virtual asset uri is missing", {
+          expectedInputCount: selectedVehicleAssets.length + 2,
+          actualInputCount: inputAssetUris.length,
         });
       }
 
+      const referenceImageAssetUris = [
+        digitalHumanAsset.assetUri,
+        ...vehicleVirtualAssets.map((item) => item.assetUri),
+      ].filter((item): item is string => typeof item === "string" && item.startsWith("asset://"));
+      const referenceAudioAssetUris = [narrationAudioAsset.assetUri].filter(
+        (item): item is string => typeof item === "string" && item.startsWith("asset://"),
+      );
+      const orderedReferenceContents: ArkReferenceContent[] | undefined =
+        templateType === "single-car" &&
+        digitalHumanAsset.assetUri &&
+        narrationAudioAsset.assetUri
+          ? [
+              {
+                type: "image_url",
+                role: "reference_image",
+                image_url: { url: digitalHumanAsset.assetUri },
+              },
+              {
+                type: "audio_url",
+                role: "reference_audio",
+                audio_url: { url: narrationAudioAsset.assetUri },
+              },
+              ...vehicleVirtualAssets
+                .map((item): ArkReferenceContent | null =>
+                  item.assetUri
+                    ? {
+                        type: "image_url",
+                        role: "reference_image",
+                        image_url: { url: item.assetUri },
+                      }
+                    : null,
+                )
+                .filter((item): item is ArkReferenceContent => Boolean(item)),
+            ]
+          : templateType === "dealership" &&
+              vehicleVirtualAssets[0]?.assetUri &&
+              digitalHumanAsset.assetUri &&
+              narrationAudioAsset.assetUri
+            ? [
+                {
+                  type: "image_url",
+                  role: "reference_image",
+                  image_url: { url: vehicleVirtualAssets[0].assetUri },
+                },
+                {
+                  type: "image_url",
+                  role: "reference_image",
+                  image_url: { url: digitalHumanAsset.assetUri },
+                },
+                {
+                  type: "audio_url",
+                  role: "reference_audio",
+                  audio_url: { url: narrationAudioAsset.assetUri },
+                },
+              ]
+            : undefined;
+      const publicSourceUrls = [
+        digitalHumanAsset.publicUrl,
+        ...vehicleVirtualAssets.map((item) => item.publicUrl),
+        narrationAudioAsset.publicUrl,
+      ];
+
       const arkTask = await arkClient.createSeedanceVideoTask({
         prompt: seedancePrompt,
-        referenceImageUrls: [
-          uploadedDigitalHuman.fileUrl,
-          ...uploadedVehicleAssets.map((item) => item.fileUrl),
-        ],
-        referenceAudioUrls: [uploadedNarrationAudio.fileUrl],
+        referenceContents: orderedReferenceContents,
+        referenceImageUrls: referenceImageAssetUris,
+        referenceAudioUrls: referenceAudioAssetUris,
         ratio: "9:16",
         resolution: VIDEO_GENERATION_RESOLUTION,
-        duration: VIDEO_DURATION_SECONDS,
-        generateAudio: false,
+        duration: seedanceDurationSeconds,
+        generateAudio: true,
       });
 
       await tasksRepository.markSubmitted({
@@ -1782,51 +2474,72 @@ class VideoGenerationService {
           templateType,
           language,
           prompt: seedancePrompt,
-          inputUrls,
-          referenceImageUrls: [
-            uploadedDigitalHuman.fileUrl,
-            ...uploadedVehicleAssets.map((item) => item.fileUrl),
-          ],
-          referenceAudioUrls: [uploadedNarrationAudio.fileUrl],
+          projectName: env.ark.projectName,
+          inputAssetUris,
+          publicSourceUrls,
+          referenceImageAssetUris,
+          referenceAudioAssetUris,
+          referenceContents: orderedReferenceContents,
           mediaInputs: {
             digitalHuman: {
-              tag: "#image1",
+              tag: templateType === "dealership" ? "{{Mixed 2}}" : "{{Mixed 1}}",
               digitalHumanId: draft.digitalHumanId,
-              url: uploadedDigitalHuman.fileUrl,
+              assetUri: digitalHumanAsset.assetUri,
+              publicSourceUrl: digitalHumanAsset.publicUrl,
+              providerAssetId: digitalHumanAsset.providerAssetId,
             },
             stylePreset: {
               referenceMaterialId: draft.referenceMaterialId,
               mode: "preset_prompt_only",
-              uploadedToKie: false,
+              uploadedToArk: false,
               prompt: conciseStylePrompt(
                 String(asRecord(draft.promptBundle).stylePrompt ?? ""),
               ),
             },
             vehicleAssets: selectedVehicleAssets.map((asset, index) => ({
-              tag: `#image${index + 2}`,
+              tag:
+                templateType === "dealership"
+                  ? `{{Mixed ${index + 1}}}`
+                  : `{{Mixed ${index + 3}}}`,
               assetId: asset.id,
               purpose: asset.purpose,
-              url: uploadedVehicleAssets[index].fileUrl,
+              assetUri: vehicleVirtualAssets[index].assetUri,
+              publicSourceUrl: vehicleVirtualAssets[index].publicUrl,
+              providerAssetId: vehicleVirtualAssets[index].providerAssetId,
             })),
             narrationAudio: {
-              tag: "#audio1",
+              tag: templateType === "dealership" ? "{{Mixed 3}}" : "{{Mixed 2}}",
               provider: "minimax",
               model: narrationAudio.model,
               voiceId: narrationAudio.voiceId,
+              usage: "seedance_reference_audio_for_generation",
+              scriptText: narrationScriptText,
+              fitAttempts: fittedNarration.attempts,
               durationMs: narrationAudio.durationMs,
+              originalDurationMs: narrationAudio.originalDurationMs,
+              normalizedSpeechDurationMs: narrationAudio.normalizedSpeechDurationMs,
+              silencePadMs: narrationAudio.silencePadMs,
+              timeStretchRatio: narrationAudio.timeStretchRatio,
               speed: narrationAudio.speed,
               sizeBytes: narrationAudio.sizeBytes,
+              originalSizeBytes: narrationAudio.originalSizeBytes,
               localUrl: narrationAudio.publicUrl,
               localPath: narrationAudio.localPath,
-              kieUrl: uploadedNarrationAudio.fileUrl,
+              originalLocalUrl: narrationAudio.originalPublicUrl,
+              originalLocalPath: narrationAudio.originalLocalPath,
+              assetUri: narrationAudioAsset.assetUri,
+              publicSourceUrl: narrationAudioAsset.publicUrl,
+              providerAssetId: narrationAudioAsset.providerAssetId,
               language: narrationAudio.language,
               languageBoost: narrationAudio.languageBoost,
             },
           },
           aspectRatio: "9:16",
           videoResolution: VIDEO_GENERATION_RESOLUTION,
-          duration: VIDEO_DURATION_SECONDS,
-          generateAudio: false,
+          duration: seedanceDurationSeconds,
+          generateAudio: true,
+          audioHandling:
+            "MiniMax audio is sent to Seedance as reference_audio and should be used during generation.",
         },
         responseJson: arkTask.raw,
       });
@@ -1839,23 +2552,30 @@ class VideoGenerationService {
         progress: 5,
         kieTaskId: arkTask.taskId,
         model: env.ark.videoModel,
-        durationSeconds: VIDEO_DURATION_SECONDS,
+        durationSeconds: seedanceDurationSeconds,
         templateId: draft.referenceMaterialId,
         templateType,
         language,
         outputRatio: "9:16",
         videoResolution: VIDEO_GENERATION_RESOLUTION,
-        generateAudio: false,
+        generateAudio: true,
         narrationAudio: {
           provider: "minimax",
           model: narrationAudio.model,
           voiceId: narrationAudio.voiceId,
+          usage: "seedance_reference_audio_for_generation",
+          scriptText: narrationScriptText,
+          fitAttempts: fittedNarration.attempts,
           durationMs: narrationAudio.durationMs,
+          originalDurationMs: narrationAudio.originalDurationMs,
+          normalizedSpeechDurationMs: narrationAudio.normalizedSpeechDurationMs,
+          silencePadMs: narrationAudio.silencePadMs,
+          timeStretchRatio: narrationAudio.timeStretchRatio,
           speed: narrationAudio.speed,
           language: narrationAudio.language,
           url: narrationAudio.publicUrl,
         },
-        inputReferenceCount: inputUrls.length,
+        inputReferenceCount: inputAssetUris.length,
         mediaSummary: {
           digitalHumanCount: 1,
           narrationAudioCount: 1,
@@ -1866,22 +2586,24 @@ class VideoGenerationService {
           dealershipImageCount: dealershipAssets.length,
           userReferenceImageCount: userReferenceAssets.length,
         },
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/modules/video-generation/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
-      try {
-        if (taskCreated) {
-          await tasksRepository.markFailed(
-            taskId,
-            "VIDEO_GENERATION_CREATE_FAILED",
-            buildVideoTaskErrorMessage(error),
-          );
+      if (billing) {
+        try {
+          await refundFrozenGenerationBilling(taskId, billing);
+        } catch {
+          await markGenerationBillingRefundFailed(taskId, billing);
         }
-      } finally {
-        if (lease) {
-          await kieKeyPool.release(lease.accountHash);
-        }
+      }
+      if (taskCreated && !billingFreezeFailed) {
+        await tasksRepository.markFailed(
+          taskId,
+          "VIDEO_GENERATION_CREATE_FAILED",
+          buildVideoTaskErrorMessage(error),
+        );
       }
       throw error;
     }
@@ -1935,7 +2657,7 @@ class VideoGenerationService {
             : null,
       vehicleName: draft?.vehicleName ?? null,
       language:
-        typeof vehicle.language === "string" ? vehicle.language : "zh-CN",
+        typeof vehicle.language === "string" ? vehicle.language : "Chinese",
       narrationAudio:
         Object.keys(narrationAudio).length > 0
           ? {
@@ -1943,9 +2665,15 @@ class VideoGenerationService {
               model: narrationAudio.model ?? null,
               voiceId: narrationAudio.voiceId ?? null,
               durationMs: narrationAudio.durationMs ?? null,
+              originalDurationMs: narrationAudio.originalDurationMs ?? null,
+              normalizedSpeechDurationMs:
+                narrationAudio.normalizedSpeechDurationMs ?? null,
+              silencePadMs: narrationAudio.silencePadMs ?? null,
+              timeStretchRatio: narrationAudio.timeStretchRatio ?? null,
               speed: narrationAudio.speed ?? null,
               language: narrationAudio.language ?? null,
               url: narrationAudio.localUrl ?? null,
+              originalUrl: narrationAudio.originalLocalUrl ?? null,
             }
           : null,
     };

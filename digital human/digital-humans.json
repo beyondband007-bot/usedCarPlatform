@@ -1,111 +1,96 @@
 {
-  "manifestVersion": 1,
-  "updatedAt": "2026-06-15T18:30:00+08:00",
+  "manifestVersion": 2,
+  "updatedAt": "2026-06-15T00:00:00+08:00",
   "purpose": "digital_human_selection_library",
+  "sourceDirectory": "C:/Users/Administrator/Desktop/test_message",
   "notes": [
-    "每张图片包含正面、侧面、背面和人物特写，后端列表接口只返回可选数字人和预览地址。",
-    "当前共登记 10 个数字人素材，9 个女性、1 个男性。"
+    "Each image contains front, side, back, and close-up views. The frontend displays a front preview; backend generation uses the full identity board.",
+    "Each digital human has a preset MiniMax voice in manifest.presetVoice. Database voice clones can override these presets later."
   ],
   "items": [
     {
-      "id": "dh-female-01",
-      "name": "数字人女 01",
+      "id": "dh-message-01",
+      "name": "Digital Human 1 | Friendly Paige",
       "gender": "female",
       "ageStyle": "young_adult",
-      "imagePath": "digital human/female-01-four-view.png",
+      "imagePath": "digital human/message-dh-01.png",
       "frontPreviewStrategy": "use_left_panel_or_backend_crop",
       "status": "active",
-      "sortOrder": 1
+      "sortOrder": 1,
+      "presetVoice": {
+        "status": "ready",
+        "voiceId": "conversational_female_2_v1",
+        "displayName": "Friendly Paige",
+        "languageBoost": "English",
+        "speed": 1.1,
+        "vol": 4,
+        "pitch": 0,
+        "model": "speech-2.8-hd",
+        "sourceImagePath": "digital human/voice-presets/message-dh-01-voice.png"
+      }
     },
     {
-      "id": "dh-female-02",
-      "name": "数字人女 02",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-02-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 2
-    },
-    {
-      "id": "dh-female-03",
-      "name": "数字人女 03",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-03-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 3
-    },
-    {
-      "id": "dh-female-04",
-      "name": "数字人女 04",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-04-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 4
-    },
-    {
-      "id": "dh-female-05",
-      "name": "数字人女 05",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-05-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 5
-    },
-    {
-      "id": "dh-female-06",
-      "name": "数字人女 06",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-06-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 6
-    },
-    {
-      "id": "dh-female-07",
-      "name": "数字人女 07",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-07-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 7
-    },
-    {
-      "id": "dh-female-08",
-      "name": "数字人女 08",
-      "gender": "female",
-      "ageStyle": "young_adult",
-      "imagePath": "digital human/female-08-four-view.png",
-      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
-      "status": "active",
-      "sortOrder": 8
-    },
-    {
-      "id": "dh-male-01",
-      "name": "数字人男 01",
+      "id": "dh-message-02",
+      "name": "Digital Human 2 | Scholarly Lecturer",
       "gender": "male",
       "ageStyle": "young_adult",
-      "imagePath": "digital human/male-01-four-view.png",
+      "imagePath": "digital human/message-dh-02.jpg",
       "frontPreviewStrategy": "use_left_panel_or_backend_crop",
       "status": "active",
-      "sortOrder": 9
+      "sortOrder": 2,
+      "presetVoice": {
+        "status": "ready",
+        "voiceId": "Chinese_knowledgable_instructor_vv1",
+        "displayName": "博学讲师",
+        "languageBoost": "Chinese",
+        "speed": 1.15,
+        "vol": 2.5,
+        "pitch": 0,
+        "model": "speech-2.8-hd",
+        "sourceImagePath": "digital human/voice-presets/message-dh-02-voice.png"
+      }
     },
     {
-      "id": "dh-female-09",
-      "name": "数字人女 09",
+      "id": "dh-message-03",
+      "name": "Digital Human 3 | Bright Queen",
       "gender": "female",
       "ageStyle": "young_adult",
-      "imagePath": "digital human/female-09-four-view.jpg",
+      "imagePath": "digital human/message-dh-03.jpg",
       "frontPreviewStrategy": "use_left_panel_or_backend_crop",
       "status": "active",
-      "sortOrder": 10
+      "sortOrder": 3,
+      "presetVoice": {
+        "status": "ready",
+        "voiceId": "Russian_BrightHeroine",
+        "displayName": "Bright Queen",
+        "languageBoost": "Russian",
+        "speed": 1.15,
+        "vol": 2.5,
+        "pitch": 0,
+        "model": "speech-2.8-hd",
+        "sourceImagePath": "digital human/voice-presets/message-dh-03-voice.png"
+      }
+    },
+    {
+      "id": "dh-message-04",
+      "name": "Digital Human 4 | EngagingGirl",
+      "gender": "female",
+      "ageStyle": "young_adult",
+      "imagePath": "digital human/message-dh-04.png",
+      "frontPreviewStrategy": "use_left_panel_or_backend_crop",
+      "status": "active",
+      "sortOrder": 4,
+      "presetVoice": {
+        "status": "ready",
+        "voiceId": "moss_audio_c12a59b9-7115-11f0-a447-9613c873494c",
+        "displayName": "EngagingGirl",
+        "languageBoost": "English",
+        "speed": 1.15,
+        "vol": 2.5,
+        "pitch": 0,
+        "model": "speech-2.8-hd",
+        "sourceImagePath": "digital human/voice-presets/message-dh-04-voice.png"
+      }
     }
   ]
 }

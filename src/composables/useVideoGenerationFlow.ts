@@ -32,6 +32,7 @@ import type {
   DigitalHuman,
   PromotionFormData,
   SingleCarFormData,
+  UploadedAsset,
   ValidateTemplateInputsIssue,
   VideoGenerationTask,
   VideoGenerationStep,
@@ -47,6 +48,7 @@ import {
   getLocalVideoSceneTemplates,
   isLocalOnlyDigitalHumanId,
 } from '@/constants/video-generation-local-assets'
+import { useCreditsStore } from '@/stores/credits'
 
 const TERMINAL_STATUSES = new Set(['success', 'fail', 'canceled'])
 const CANCELABLE_STATUSES = new Set(['waiting', 'queued', 'generating'])
@@ -60,7 +62,7 @@ function createEmptySingleCarForm(): SingleCarFormData {
     salesName: '',
     series: '',
     digitalHumanId: '',
-    language: 'zh-CN',
+    language: 'Chinese',
     sellingPointHints: '',
     vehicleImageSummary: '',
   }
@@ -77,16 +79,28 @@ function createEmptyDealershipForm(): DealershipFormData {
   return {
     dealershipName: '',
     digitalHumanId: '',
-    language: 'zh-CN',
+    language: 'Chinese',
     featuredVehicleNames: '',
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function asString(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
 export function useVideoGenerationFlow(ownerKey: string) {
+  const creditsStore = useCreditsStore()
   const currentStep = ref<VideoGenerationStep>('template')
   const templateList = ref<VideoTemplate[]>([])
   const selectedTemplate = ref<VideoTemplate | null>(null)
   const digitalHumanList = ref<DigitalHuman[]>([])
+  const supportedLanguageOptions = ref<Array<{ value: string; label: string; status: string }>>([])
   const singleCarForm = ref<SingleCarFormData>(createEmptySingleCarForm())
   const promotionForm = ref<PromotionFormData>(createEmptyPromotionForm())
   const dealershipForm = ref<DealershipFormData>(createEmptyDealershipForm())
@@ -123,7 +137,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
     () =>
       selectedTemplate.value?.status === 'coming_soon' ||
       selectedTemplate.value?.generationReadiness === 'unavailable' ||
-      selectedTemplate.value?.type === 'market',
+      selectedTemplate.value?.type === 'market' ||
+      selectedTemplate.value?.type === 'vehicle-ad',
   )
 
   function setLoading(key: string, value: boolean) {
@@ -289,11 +304,12 @@ export function useVideoGenerationFlow(ownerKey: string) {
       )
       templateList.value = getLocalVideoSceneTemplates(apiTemplates)
       digitalHumanList.value = getLocalDigitalHumans(humans)
+      supportedLanguageOptions.value = contract.supportedLanguages ?? []
 
       const draftId = readPersistedDraftId()
       if (draftId) {
         scriptDraft.value = await getVideoScriptDraft(draftId)
-        currentStep.value = 'draft-review'
+        restoreFormFromDraft()
       }
 
       const taskId = readPersistedTaskId()
@@ -302,14 +318,20 @@ export function useVideoGenerationFlow(ownerKey: string) {
         if (currentTask.value && !TERMINAL_STATUSES.has(currentTask.value.status)) {
           currentStep.value = 'task'
           startPolling(taskId)
-        } else if (currentTask.value?.status === 'success') {
-          currentStep.value = 'result'
+        } else {
+          currentTask.value = null
+          clearPersistedTaskId()
         }
       }
     } catch (error) {
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
       templateList.value = getFallbackVideoTemplates()
       digitalHumanList.value = getLocalDigitalHumans([])
+      supportedLanguageOptions.value = [
+        { value: 'Chinese', label: '中文（普通话）', status: 'available' },
+        { value: 'English', label: '英语', status: 'available' },
+        { value: 'Chinese,Yue', label: '粤语', status: 'available' },
+      ]
     } finally {
       setLoading('bootstrap', false)
       autoSelectDefaultTemplate()
@@ -320,7 +342,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
     return (
       template.status === 'coming_soon' ||
       template.generationReadiness === 'unavailable' ||
-      template.type === 'market'
+      template.type === 'market' ||
+      template.type === 'vehicle-ad'
     )
   }
 
@@ -332,7 +355,6 @@ export function useVideoGenerationFlow(ownerKey: string) {
     const preferred =
       available.find((item) => item.type === 'dealership') ??
       available.find((item) => item.type === 'single-car') ??
-      available.find((item) => item.type === 'promotion') ??
       available[0]
 
     if (preferred) {
@@ -344,7 +366,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
     if (
       template.status === 'coming_soon' ||
       template.generationReadiness === 'unavailable' ||
-      template.type === 'market'
+      template.type === 'market' ||
+      template.type === 'vehicle-ad'
     ) {
       return
     }
@@ -361,11 +384,191 @@ export function useVideoGenerationFlow(ownerKey: string) {
     currentStep.value = 'form'
   }
 
+  function findTemplateForDraft(draft: VideoScriptDraft) {
+    const requiredInputs = asRecord(draft.requiredInputs)
+    const templateInput = asRecord(requiredInputs.template)
+    const referenceMaterial = asRecord(requiredInputs.referenceMaterial)
+    const candidateIds = [
+      draft.templateId,
+      referenceMaterial.templateId,
+      referenceMaterial.id,
+      templateInput.id,
+    ]
+      .map(asString)
+      .filter(Boolean)
+
+    const byId = templateList.value.find((item) =>
+      candidateIds.some(
+        (id) =>
+          item.templateId === id ||
+          item.id === id ||
+          item.referenceMaterialId === id,
+      ),
+    )
+    if (byId) return byId
+
+    const templateType = asString(draft.templateType) || asString(templateInput.type)
+    if (!templateType) return null
+    return (
+      templateList.value.find(
+        (item) => item.type === templateType && !isTemplateDisabled(item),
+      ) ?? null
+    )
+  }
+
+  function restoreUploadItemsFromDraft(value: unknown, purpose: string) {
+    if (!Array.isArray(value)) return [] as VideoUploadPreviewItem[]
+    const restored: VideoUploadPreviewItem[] = []
+    value.forEach((raw, index) => {
+      const item = asRecord(raw)
+      const assetId = asString(item.assetId)
+      const url = asString(item.thumbnailUrl) || asString(item.url)
+      if (!assetId || !url) return
+
+      const fileName = asString(item.fileName) || `已上传素材 ${index + 1}`
+      const asset: UploadedAsset = {
+        assetId,
+        purpose: asString(item.purpose) || purpose,
+        url: asString(item.url) || url,
+        thumbnailUrl: asString(item.thumbnailUrl) || null,
+        fileName,
+        mimeType: 'image/jpeg',
+        size: 0,
+      }
+
+      restored.push({
+        id: assetId,
+        name: fileName,
+        previewUrl: url,
+        status: 'success',
+        asset,
+      })
+    })
+    return restored
+  }
+
+  function restoreFormFromDraft() {
+    const draft = scriptDraft.value
+    if (!draft) return false
+
+    if (!selectedTemplate.value) {
+      const template = findTemplateForDraft(draft)
+      if (!template) return false
+      selectedTemplate.value = template
+    }
+
+    const requiredInputs = asRecord(draft.requiredInputs)
+    const vehicle = asRecord(requiredInputs.vehicle)
+    const structured = asRecord(vehicle.structured)
+    const templateInput = asRecord(requiredInputs.template)
+    const digitalHuman = asRecord(requiredInputs.digitalHuman)
+    const script = asRecord(requiredInputs.script)
+    const vehicleProfile = asRecord(script.vehicleProfile)
+    const uploadedReferences = asRecord(requiredInputs.uploadedReferences)
+    const language = asString(vehicle.language) || 'Chinese'
+    const digitalHumanId = asString(digitalHuman.id)
+
+    if (selectedTemplate.value.type === 'dealership') {
+      dealershipForm.value = {
+        ...dealershipForm.value,
+        dealershipName:
+          asString(templateInput.dealershipName) ||
+          dealershipForm.value.dealershipName ||
+          selectedTemplate.value.title,
+        featuredVehicleNames:
+          asString(templateInput.featuredVehicleNames) ||
+          dealershipForm.value.featuredVehicleNames,
+        digitalHumanId: digitalHumanId || dealershipForm.value.digitalHumanId,
+        language,
+      }
+      if (!dealershipUploads.value.length) {
+        dealershipUploads.value = restoreUploadItemsFromDraft(
+          uploadedReferences.dealershipAssets,
+          'video_reference_image',
+        )
+      }
+      currentStep.value = 'form'
+      return true
+    }
+
+    const nextCarForm = {
+      brand:
+        asString(structured.brand) ||
+        asString(vehicleProfile.brand) ||
+        singleCarForm.value.brand,
+      modelYear:
+        asString(structured.modelYear) ||
+        asString(vehicleProfile.modelYear) ||
+        singleCarForm.value.modelYear,
+      displacement:
+        asString(structured.displacement) ||
+        asString(vehicleProfile.displacement) ||
+        singleCarForm.value.displacement,
+      salesName:
+        asString(structured.salesName) ||
+        asString(vehicleProfile.salesName) ||
+        singleCarForm.value.salesName,
+      series:
+        asString(structured.series) ||
+        asString(vehicleProfile.series) ||
+        singleCarForm.value.series,
+      digitalHumanId: digitalHumanId || singleCarForm.value.digitalHumanId,
+      language,
+      sellingPointHints: singleCarForm.value.sellingPointHints,
+      vehicleImageSummary: singleCarForm.value.vehicleImageSummary,
+    }
+
+    if (selectedTemplate.value.type === 'promotion') {
+      promotionForm.value = {
+        ...promotionForm.value,
+        ...nextCarForm,
+        promotionText:
+          asString(templateInput.promotionText) || promotionForm.value.promotionText,
+      }
+    } else {
+      singleCarForm.value = {
+        ...singleCarForm.value,
+        ...nextCarForm,
+      }
+    }
+
+    if (!exteriorUploads.value.length) {
+      exteriorUploads.value = restoreUploadItemsFromDraft(
+        uploadedReferences.vehicleExteriorAssets,
+        'car_exterior',
+      )
+    }
+    if (!interiorUploads.value.length) {
+      interiorUploads.value = restoreUploadItemsFromDraft(
+        uploadedReferences.vehicleInteriorAssets,
+        'car_interior',
+      )
+    }
+    if (!referenceUploads.value.length) {
+      referenceUploads.value = restoreUploadItemsFromDraft(
+        uploadedReferences.userReferenceAssets,
+        'video_reference_image',
+      )
+    }
+
+    currentStep.value = 'form'
+    return true
+  }
+
   function goBackToTemplate() {
     currentStep.value = 'template'
   }
 
   function goBackToForm() {
+    if (!selectedTemplate.value && scriptDraft.value) {
+      if (restoreFormFromDraft()) return
+      currentStep.value = 'template'
+      return
+    }
+    if (scriptDraft.value) {
+      restoreFormFromDraft()
+      return
+    }
     currentStep.value = 'form'
   }
 
@@ -464,7 +667,6 @@ export function useVideoGenerationFlow(ownerKey: string) {
       const draft = await createVideoScriptDraft(buildDraftPayload())
       scriptDraft.value = draft
       persistDraftId(draft.scriptDraftId)
-      currentStep.value = 'draft-review'
       return draft
     } catch (error) {
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
@@ -485,6 +687,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
       const created = await createVideoGenerationTask({
         scriptDraftId: scriptDraft.value.scriptDraftId,
       })
+      void creditsStore.hydrateAccounts(true)
       const task = await getVideoGenerationTask(created.taskId)
       currentTask.value = task
       persistTaskId(task.taskId)
@@ -663,6 +866,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     currentStep,
     templateList,
     selectedTemplate,
+    supportedLanguageOptions,
     digitalHumanList,
     selectedDigitalHuman,
     singleCarForm,

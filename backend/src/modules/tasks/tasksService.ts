@@ -88,6 +88,11 @@ const extractKieTimeoutErrorCode = (error: unknown) => {
   return kieTimeoutErrorCodes.find((code) => error.message.includes(code)) ?? null;
 };
 
+const shouldMuxNarrationAudio = (record: KieTaskRecord) => {
+  const request = asRecord(record.requestJson);
+  return request.generateAudio !== true;
+};
+
 const runFfmpeg = (args: string[]) =>
   new Promise<void>((resolve, reject) => {
     const child = spawn(env.ffmpegPath, args, {
@@ -335,10 +340,12 @@ class TasksService {
     const resultImages =
       status === "success"
         ? task.moduleCode === "video-generation"
-          ? await this.muxVideoNarration(
-              await this.persistResultImages(task.moduleCode, detail.resultUrls),
-              record,
-            )
+          ? shouldMuxNarrationAudio(record)
+            ? await this.muxVideoNarration(
+                await this.persistResultImages(task.moduleCode, detail.resultUrls),
+                record,
+              )
+            : await this.persistResultImages(task.moduleCode, detail.resultUrls)
           : await this.persistResultImages(task.moduleCode, detail.resultUrls)
         : detail.resultUrls.map((url) => ({ url, sourceUrl: url }));
 
@@ -604,6 +611,8 @@ class TasksService {
       const parsed = path.parse(result.localPath);
       const outputFileName = `${parsed.name}-with-audio.mp4`;
       const outputPath = path.join(parsed.dir, outputFileName);
+      const thumbnailFileName = `${parsed.name}-thumb.jpg`;
+      const thumbnailPath = path.join(parsed.dir, thumbnailFileName);
       await runFfmpeg([
         "-hide_banner",
         "-loglevel",
@@ -623,14 +632,34 @@ class TasksService {
         "aac",
         "-b:a",
         "128k",
-        "-af",
-        "apad=whole_dur=15",
-        "-t",
-        "15",
+        "-shortest",
         "-movflags",
         "+faststart",
         outputPath,
       ]);
+      let thumbnailUrl: string | undefined;
+      try {
+        await runFfmpeg([
+          "-hide_banner",
+          "-loglevel",
+          "warning",
+          "-y",
+          "-ss",
+          "0",
+          "-i",
+          outputPath,
+          "-frames:v",
+          "1",
+          "-q:v",
+          "2",
+          "-update",
+          "1",
+          thumbnailPath,
+        ]);
+        thumbnailUrl = `${publicBase}/results/video-generation/${thumbnailFileName}`;
+      } catch {
+        thumbnailUrl = undefined;
+      }
       const stat = await fs.stat(outputPath);
       muxedResults.push({
         ...result,
@@ -638,6 +667,7 @@ class TasksService {
         localPath: outputPath,
         contentType: "video/mp4",
         size: stat.size,
+        thumbnailUrl,
         narrationAudioUrl:
           typeof narrationAudio.localUrl === "string"
             ? narrationAudio.localUrl

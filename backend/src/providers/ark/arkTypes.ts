@@ -23,12 +23,13 @@ export type ArkReferenceContent =
 
 export interface CreateArkSeedanceTaskInput {
   prompt: string;
+  referenceContents?: ArkReferenceContent[];
   referenceImageUrls?: string[];
   referenceVideoUrls?: string[];
   referenceAudioUrls?: string[];
   ratio: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9" | "adaptive";
   resolution?: "480p" | "720p" | "1080p";
-  duration: 5 | 10 | 15;
+  duration: number;
   generateAudio: boolean;
   watermark?: boolean;
 }

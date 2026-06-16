@@ -12,7 +12,6 @@ import {
   MAX_DEALERSHIP_IMAGES,
   MAX_VIDEO_EXTERIOR_IMAGES,
   MAX_VIDEO_INTERIOR_IMAGES,
-  getVideoScriptGeneratorLabel,
 } from "@/constants/short-video";
 import {
   useVideoGenerationFlow,
@@ -32,11 +31,6 @@ const props = defineProps<{
   capability: WorkspaceCapability;
   disabled?: boolean;
   isGenerating?: boolean;
-}>();
-
-const emit = defineEmits<{
-  generateDraft: [];
-  confirmVideo: [scriptDraftId: string];
 }>();
 
 const message = useMessage();
@@ -62,6 +56,7 @@ const flow = injectedFlow ?? localFlow;
 const {
   currentStep,
   selectedTemplate,
+  supportedLanguageOptions,
   digitalHumanList,
   singleCarForm,
   promotionForm,
@@ -69,14 +64,13 @@ const {
   exteriorUploads,
   interiorUploads,
   dealershipUploads,
-  scriptDraft,
   validationIssues,
   errorMessage,
   isLoading,
   initializeFlow,
   goBackToTemplate,
-  goBackToForm,
   generateScriptDraft,
+  submitVideoTask,
   uploadExteriorImages,
   uploadInteriorImages,
   uploadDealershipImages,
@@ -87,23 +81,32 @@ const {
 
 const acceptTypes = "image/jpeg,image/png,image/webp";
 
-const languageOptions = [
-  {
-    value: "zh-CN" as const,
-    label: "中文（普通话）",
-    hint: "最常用",
-    badge: "最常用",
-  },
-  { value: "en" as const, label: "英文", hint: "English" },
-  { value: "yue" as const, label: "粤语", hint: "广东话" },
-];
+const preferredLanguageHints: Record<string, { hint: string; badge?: string }> = {
+  Chinese: { hint: "普通话", badge: "默认" },
+  "Chinese,Yue": { hint: "粤语" },
+  English: { hint: "English" },
+  Russian: { hint: "Русский" },
+  Japanese: { hint: "日本語" },
+  Korean: { hint: "한국어" },
+  French: { hint: "Français" },
+  Spanish: { hint: "Español" },
+};
+
+const languageOptions = computed(() =>
+  supportedLanguageOptions.value
+    .filter((option) => option.status === "available")
+    .map((option) => ({
+      value: option.value,
+      label: option.label,
+      hint: preferredLanguageHints[option.value]?.hint ?? option.value,
+      badge: preferredLanguageHints[option.value]?.badge,
+    })),
+);
 
 const humanToneClasses = ["tone-warm", "tone-cool", "tone-neutral", "tone-warm"];
 
-const isCarTemplate = computed(() =>
-  ["single-car", "promotion", "dealership"].includes(
-    selectedTemplate.value?.type ?? "",
-  ),
+const isSingleCarTemplate = computed(
+  () => selectedTemplate.value?.type === "single-car",
 );
 
 const isDealershipTemplate = computed(
@@ -232,6 +235,13 @@ const activeFormLanguage = computed({
   },
 });
 
+const selectedLanguageOption = computed(
+  () =>
+    languageOptions.value.find(
+      (option) => option.value === activeFormLanguage.value,
+    ) ?? languageOptions.value[0] ?? null,
+);
+
 const activeDigitalHumanId = computed({
   get() {
     if (selectedTemplate.value?.type === "dealership") {
@@ -259,15 +269,43 @@ const primaryExterior = computed(() => exteriorUploads.value[0] ?? null);
 const primaryInterior = computed(() => interiorUploads.value[0] ?? null);
 const primaryDealership = computed(() => dealershipUploads.value[0] ?? null);
 
-const scriptText = computed(
-  () => scriptDraft.value?.requiredInputs?.script?.scriptText ?? "",
+const uploadedExteriorAssetCount = computed(
+  () => exteriorUploads.value.filter((item) => item.asset?.assetId).length,
 );
-const shotCues = computed(
-  () => scriptDraft.value?.requiredInputs?.script?.shotCues ?? [],
+
+const uploadedDealershipAssetCount = computed(
+  () => dealershipUploads.value.filter((item) => item.asset?.assetId).length,
 );
-const vehicleProfile = computed(
-  () => scriptDraft.value?.requiredInputs?.script?.vehicleProfile ?? null,
+
+const isSingleCarFormComplete = computed(() => {
+  const form = singleCarForm.value;
+  return Boolean(
+    form.brand.trim() &&
+      form.modelYear.trim() &&
+      form.displacement.trim() &&
+      form.salesName.trim() &&
+      form.series.trim() &&
+      form.digitalHumanId &&
+      form.language &&
+      uploadedExteriorAssetCount.value > 0,
+  );
+});
+
+const isDealershipFormComplete = computed(() =>
+  Boolean(
+    dealershipForm.value.digitalHumanId &&
+      dealershipForm.value.language &&
+      uploadedDealershipAssetCount.value > 0,
+  ),
 );
+
+const isFormReadyForDraft = computed(() => {
+  if (isDealershipTemplate.value) return isDealershipFormComplete.value;
+  if (isSingleCarTemplate.value) return isSingleCarFormComplete.value;
+  return false;
+});
+
+const languageStepIndex = computed(() => (isSingleCarTemplate.value ? "4" : "3"));
 
 const tipBannerText = computed(() => {
   const styleLabel = selectedTemplate.value?.styleLabel ?? "专业";
@@ -295,24 +333,15 @@ const canGenerateDraft = computed(
     !props.disabled &&
     !props.isGenerating &&
     !isLoading("draft") &&
-    Boolean(selectedTemplate.value),
-);
-
-const canConfirmVideo = computed(
-  () =>
-    currentStep.value === "draft-review" &&
-    Boolean(scriptDraft.value?.scriptDraftId) &&
-    !props.disabled &&
-    !props.isGenerating &&
-    !isLoading("task"),
+    !isLoading("task") &&
+    Boolean(selectedTemplate.value) &&
+    isFormReadyForDraft.value,
 );
 
 defineExpose({
   currentStep,
   canGenerateDraft,
-  canConfirmVideo,
   submitDraft,
-  confirmVideo,
   isLoading,
 });
 
@@ -400,21 +429,23 @@ function selectDigitalHuman(human: DigitalHuman) {
 }
 
 async function submitDraft() {
+  currentStep.value = "task";
   const draft = await generateScriptDraft();
-  if (draft) {
-    message.success("口播草稿已生成");
-    emit("generateDraft");
-  } else if (errorMessage.value) {
-    message.error(errorMessage.value);
-  }
-}
-
-async function confirmVideo() {
-  if (!scriptDraft.value?.scriptDraftId) {
-    errorMessage.value = "请先生成并确认口播草稿";
+  if (!draft) {
+    currentStep.value = "form";
+    if (errorMessage.value) {
+      message.error(errorMessage.value);
+    }
     return;
   }
-  emit("confirmVideo", scriptDraft.value.scriptDraftId);
+
+  const task = await submitVideoTask();
+  if (task) {
+    message.success("已提交视频生成");
+  } else if (errorMessage.value) {
+    currentStep.value = "form";
+    message.error(errorMessage.value);
+  }
 }
 </script>
 
@@ -447,7 +478,7 @@ async function confirmVideo() {
       </section>
     </template>
 
-    <template v-else-if="currentStep === 'form' && selectedTemplate">
+    <template v-else-if="['form', 'task', 'result'].includes(currentStep) && selectedTemplate">
       <article class="sv-template-summary">
         <PreloadImage
           v-if="selectedTemplatePosterUrl && !selectedTemplateUseVideoCover"
@@ -483,7 +514,7 @@ async function confirmVideo() {
           <span class="sv-step-index">1</span>
           <div class="sv-section-copy">
             <h3>上传素材照片</h3>
-            <p>拖拽或点击上传汽车外观和内饰照片</p>
+            <p>{{ isDealershipTemplate ? "拖拽或点击上传车场/展厅照片" : "拖拽或点击上传汽车外观和内饰照片" }}</p>
           </div>
         </header>
 
@@ -491,6 +522,7 @@ async function confirmVideo() {
           <article
             class="sv-upload-card"
             :class="{
+              'sv-upload-card--wide': isDealershipTemplate,
               'is-filled': primaryUploadPreview,
               'is-uploading': isDealershipTemplate
                 ? isLoading('upload-dealership')
@@ -523,7 +555,7 @@ async function confirmVideo() {
               v-if="primaryUploadPreview"
               class="sv-upload-preview"
               :src="primaryUploadPreview.previewUrl"
-              alt="汽车外观预览"
+              :alt="isDealershipTemplate ? '展厅车场素材预览' : '汽车外观预览'"
               fit="cover"
             />
 
@@ -531,8 +563,35 @@ async function confirmVideo() {
               <span class="sv-upload-icon">
                 <Icon icon="mdi:camera-outline" />
               </span>
-              <strong>上传汽车外观照片</strong>
+              <strong>{{ isDealershipTemplate ? "上传展厅/车场素材" : "上传汽车外观照片" }}</strong>
               <span>支持 JPG、PNG，建议分辨率 ≥1920×1080</span>
+            </div>
+
+            <div
+              v-if="isDealershipTemplate ? dealershipUploads.length : exteriorUploads.length"
+              class="sv-upload-thumb-strip"
+            >
+              <button
+                v-for="item in isDealershipTemplate ? dealershipUploads : exteriorUploads"
+                :key="item.id"
+                type="button"
+                class="sv-upload-thumb"
+                :class="{ 'is-failed': item.status === 'fail' }"
+                :aria-label="`删除${item.name}`"
+                @click.stop="
+                  isDealershipTemplate
+                    ? removeDealershipUpload(item.id)
+                    : removeExteriorUpload(item.id)
+                "
+              >
+                <PreloadImage
+                  class="sv-upload-thumb-image"
+                  :src="item.previewUrl"
+                  :alt="item.name"
+                  fit="cover"
+                />
+                <Icon icon="mdi:close" />
+              </button>
             </div>
 
             <span v-if="primaryUploadPreview || isDealershipTemplate" class="sv-upload-count">
@@ -543,7 +602,7 @@ async function confirmVideo() {
               v-if="primaryUploadPreview"
               type="button"
               class="sv-upload-remove"
-              aria-label="删除外观照片"
+              :aria-label="isDealershipTemplate ? '删除主展厅素材' : '删除主外观照片'"
               @click.stop="removePrimaryUpload"
             >
               <Icon icon="mdi:close" />
@@ -601,6 +660,26 @@ async function confirmVideo() {
               {{ interiorCountLabel }}
             </span>
 
+            <div v-if="interiorUploads.length" class="sv-upload-thumb-strip">
+              <button
+                v-for="item in interiorUploads"
+                :key="item.id"
+                type="button"
+                class="sv-upload-thumb"
+                :class="{ 'is-failed': item.status === 'fail' }"
+                :aria-label="`删除${item.name}`"
+                @click.stop="removeInteriorUpload(item.id)"
+              >
+                <PreloadImage
+                  class="sv-upload-thumb-image"
+                  :src="item.previewUrl"
+                  :alt="item.name"
+                  fit="cover"
+                />
+                <Icon icon="mdi:close" />
+              </button>
+            </div>
+
             <button
               v-if="primaryInterior"
               type="button"
@@ -613,46 +692,6 @@ async function confirmVideo() {
 
             <span v-if="isLoading('upload-interior')" class="sv-upload-loading">
               <Icon icon="mdi:loading" />
-            </span>
-          </article>
-
-          <article
-            v-else
-            class="sv-upload-card"
-            :class="{
-              'is-filled': dealershipUploads.length > 1,
-              'is-uploading': isLoading('upload-dealership'),
-            }"
-            @click="openDealershipPicker"
-            @dragover="handleDragOver"
-            @drop="handleDealershipDrop"
-          >
-            <input
-              type="file"
-              class="sv-upload-input"
-              :accept="acceptTypes"
-              multiple
-              @change="handleFiles($event, uploadDealershipImages)"
-            />
-
-            <PreloadImage
-              v-if="dealershipUploads[1]"
-              class="sv-upload-preview"
-              :src="dealershipUploads[1].previewUrl"
-              alt="补充展厅图预览"
-              fit="cover"
-            />
-
-            <div v-else class="sv-upload-placeholder">
-              <span class="sv-upload-icon">
-                <Icon icon="mdi:image-multiple-outline" />
-              </span>
-              <strong>上传汽车内饰照片</strong>
-              <span>支持 JPG、PNG，可选</span>
-            </div>
-
-            <span v-if="dealershipUploads.length > 1" class="sv-upload-count">
-              {{ uploadCountLabel }}
             </span>
           </article>
         </div>
@@ -716,7 +755,7 @@ async function confirmVideo() {
         <p v-else class="sv-empty-tip">暂无可用数字人，请稍后重试</p>
       </section>
 
-      <section v-if="isCarTemplate" class="sv-section sv-section--vehicle-form">
+      <section v-if="isSingleCarTemplate" class="sv-section sv-section--vehicle-form">
         <header class="sv-section-head">
           <span class="sv-step-index">3</span>
           <div class="sv-section-copy">
@@ -763,7 +802,7 @@ async function confirmVideo() {
               v-model="activeSeries"
               :options="modelOptions"
               placeholder="如：A4L、530Li、E300L"
-              :disabled="disabled || !matchedBrand"
+              :disabled="disabled"
               :matched="Boolean(matchedBrand && activeSeries.trim())"
             />
           </label>
@@ -781,31 +820,31 @@ async function confirmVideo() {
 
       <section class="sv-section">
         <header class="sv-section-head">
-          <span class="sv-step-index">4</span>
+          <span class="sv-step-index">{{ languageStepIndex }}</span>
           <div class="sv-section-copy">
             <h3>选择口播语言</h3>
             <p>选择数字人播报的语言</p>
           </div>
         </header>
 
-        <div class="sv-language-grid">
-          <button
-            v-for="option in languageOptions"
-            :key="option.value"
-            type="button"
-            class="sv-language-card"
-            :class="{ 'is-active': activeFormLanguage === option.value }"
-            :disabled="disabled"
-            @click="activeFormLanguage = option.value"
-          >
-            <span class="sv-language-icon" aria-hidden="true">
-              <Icon icon="mdi:earth" />
-            </span>
-            <span v-if="option.badge" class="sv-language-badge">{{ option.badge }}</span>
-            <strong>{{ option.label }}</strong>
-            <span>{{ option.hint }}</span>
-          </button>
-        </div>
+        <label class="sv-language-select">
+          <span class="sv-language-select-icon" aria-hidden="true">
+            <Icon icon="mdi:earth" />
+          </span>
+          <select v-model="activeFormLanguage" :disabled="disabled">
+            <option
+              v-for="option in languageOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.badge ? `${option.label}（${option.badge}）` : option.label }}
+            </option>
+          </select>
+          <span class="sv-language-select-hint">
+            {{ selectedLanguageOption?.hint ?? "请选择语言" }}
+          </span>
+          <Icon icon="mdi:chevron-down" class="sv-language-select-arrow" aria-hidden="true" />
+        </label>
       </section>
 
       <ul v-if="validationIssues.length" class="vg-issues">
@@ -835,7 +874,7 @@ async function confirmVideo() {
           @click="submitDraft"
         >
           <Icon
-            v-if="isLoading('draft')"
+            v-if="isLoading('draft') || isLoading('task')"
             icon="mdi:loading"
             class="vg-spin"
             aria-hidden="true"
@@ -845,78 +884,6 @@ async function confirmVideo() {
         </button>
       </div>
     </template>
-
-    <section v-else-if="currentStep === 'draft-review' && scriptDraft" class="sv-section">
-      <header class="sv-section-head sv-section-head--row">
-        <div class="sv-section-head-main">
-          <span class="sv-step-index">✓</span>
-          <div class="sv-section-copy">
-            <h3>审核口播草稿</h3>
-            <p>{{ getVideoScriptGeneratorLabel(scriptDraft.requiredInputs?.script?.generator) }}</p>
-          </div>
-        </div>
-        <button type="button" class="sv-template-summary-action" @click="goBackToForm">
-          返回修改
-        </button>
-      </header>
-
-      <article class="vg-review-card">
-        <h4>口播正文</h4>
-        <p class="vg-script-text">{{ scriptText }}</p>
-      </article>
-
-      <article v-if="vehicleProfile" class="vg-review-card">
-        <h4>车辆信息</h4>
-        <pre>{{ JSON.stringify(vehicleProfile, null, 2) }}</pre>
-      </article>
-
-      <article v-if="shotCues.length" class="vg-review-card">
-        <h4>镜头提示</h4>
-        <ul>
-          <li v-for="(cue, index) in shotCues" :key="index">
-            {{ cue.label || cue.description || JSON.stringify(cue) }}
-          </li>
-        </ul>
-      </article>
-
-      <article class="vg-review-card">
-        <h4>最终视频提示词</h4>
-        <p>{{ scriptDraft.finalVideoPrompt }}</p>
-      </article>
-
-      <article v-if="scriptDraft.riskNotes?.length" class="vg-review-card is-warning">
-        <h4>风险提示</h4>
-        <ul>
-          <li v-for="(note, index) in scriptDraft.riskNotes" :key="index">{{ note }}</li>
-        </ul>
-      </article>
-
-      <div class="sv-form-footer">
-        <button
-          type="button"
-          class="sv-form-footer-btn sv-form-footer-btn--ghost"
-          :disabled="disabled || isGenerating"
-          @click="goBackToForm"
-        >
-          返回修改
-        </button>
-        <button
-          type="button"
-          class="sv-form-footer-btn sv-form-footer-btn--primary"
-          :disabled="!canConfirmVideo"
-          @click="confirmVideo"
-        >
-          <Icon
-            v-if="isLoading('task')"
-            icon="mdi:loading"
-            class="vg-spin"
-            aria-hidden="true"
-          />
-          <Icon v-else icon="mdi:sparkles" aria-hidden="true" />
-          确认生成视频
-        </button>
-      </div>
-    </section>
   </div>
 </template>
 
@@ -1154,8 +1121,7 @@ async function confirmVideo() {
 }
 
 .sv-upload-grid,
-.sv-human-grid,
-.sv-language-grid {
+.sv-human-grid {
   display: grid;
   gap: 12px;
 }
@@ -1166,10 +1132,6 @@ async function confirmVideo() {
 
 .sv-human-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.sv-language-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .sv-upload-card {
@@ -1186,6 +1148,7 @@ async function confirmVideo() {
 }
 
 .sv-upload-card--wide {
+  grid-column: 1 / -1;
   min-height: 180px;
 }
 
@@ -1246,6 +1209,11 @@ async function confirmVideo() {
   height: 148px;
 }
 
+.sv-upload-card--wide .sv-upload-preview,
+.sv-upload-card--wide .sv-upload-placeholder {
+  min-height: 180px;
+}
+
 .sv-upload-preview--wide {
   height: 180px;
 }
@@ -1267,6 +1235,64 @@ async function confirmVideo() {
   color: #fff;
   font-size: 11px;
   font-weight: 700;
+}
+
+.sv-upload-thumb-strip {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 68px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.sv-upload-thumb {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sv-upload-thumb.is-failed {
+  border-color: #ef4444;
+}
+
+.sv-upload-thumb :deep(.preload-image),
+.sv-upload-thumb :deep(.preload-image__img),
+.sv-upload-thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sv-upload-thumb .iconify {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #fff;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 160ms ease;
+}
+
+.sv-upload-thumb:hover .iconify {
+  opacity: 1;
 }
 
 .sv-upload-remove,
@@ -1301,8 +1327,7 @@ async function confirmVideo() {
   animation: sv-spin 0.9s linear infinite;
 }
 
-.sv-human-card,
-.sv-language-card {
+.sv-human-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1322,27 +1347,23 @@ async function confirmVideo() {
     transform 180ms ease;
 }
 
-.sv-human-card:hover:not(:disabled),
-.sv-language-card:hover:not(:disabled) {
+.sv-human-card:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--sv-accent) 42%, var(--sv-card-border));
 }
 
-.sv-human-card.is-active,
-.sv-language-card.is-active {
+.sv-human-card.is-active {
   border-color: color-mix(in srgb, var(--sv-accent) 62%, var(--sv-card-border));
   box-shadow: 0 10px 24px color-mix(in srgb, var(--sv-accent) 12%, transparent);
 }
 
-.sv-human-card strong,
-.sv-language-card strong {
+.sv-human-card strong {
   color: var(--sv-text);
   font-size: 14px;
   font-weight: 700;
 }
 
-.sv-human-card span:last-child,
-.sv-language-card span:last-child {
+.sv-human-card span:last-child {
   font-size: 12px;
   line-height: 1.4;
 }
@@ -1372,7 +1393,42 @@ async function confirmVideo() {
   background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
 }
 
-.sv-language-icon {
+.sv-language-select {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto 20px;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--sv-accent) 28%, var(--sv-card-border));
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sv-accent) 7%, transparent),
+      transparent 58%
+    ),
+    color-mix(in srgb, var(--sv-card-bg) 86%, #05070a);
+  color: var(--sv-text);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.sv-language-select:hover {
+  border-color: color-mix(in srgb, var(--sv-accent) 46%, var(--sv-card-border));
+}
+
+.sv-language-select:focus-within {
+  border-color: color-mix(in srgb, var(--sv-accent) 68%, var(--sv-card-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--sv-accent) 14%, transparent),
+    0 10px 24px color-mix(in srgb, var(--sv-accent) 8%, transparent);
+}
+
+.sv-language-select-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1384,16 +1440,66 @@ async function confirmVideo() {
   font-size: 18px;
 }
 
-.sv-language-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sv-accent) 18%, transparent);
-  color: var(--sv-accent);
-  font-size: 10px;
+.sv-language-select select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--sv-text);
+  font: inherit;
   font-weight: 700;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.sv-language-select select option {
+  background: #101318;
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.sv-language-select select option:checked {
+  background: color-mix(in srgb, var(--sv-accent) 38%, #101318);
+  color: #ffffff;
+}
+
+.sv-language-select select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sv-language-select-hint {
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sv-language-select-arrow {
+  color: color-mix(in srgb, var(--sv-accent) 72%, var(--sv-text-soft));
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.sv-theme-light .sv-language-select {
+  border-color: color-mix(in srgb, var(--sv-accent) 22%, var(--sv-card-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sv-accent) 6%, transparent),
+      transparent 60%
+    ),
+    #ffffff;
+}
+
+.sv-theme-light .sv-language-select select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.sv-theme-light .sv-language-select select option:checked {
+  background: color-mix(in srgb, var(--sv-accent) 14%, #ffffff);
+  color: #0f172a;
 }
 
 .sv-form-grid {
@@ -1675,9 +1781,16 @@ async function confirmVideo() {
 
 @media (max-width: 767px) {
   .sv-upload-grid,
-  .sv-language-grid,
   .sv-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sv-language-select {
+    grid-template-columns: 34px minmax(0, 1fr) 20px;
+  }
+
+  .sv-language-select-hint {
+    display: none;
   }
 
   .sv-field--wide {

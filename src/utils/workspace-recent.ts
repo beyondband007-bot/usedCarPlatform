@@ -52,8 +52,19 @@ export function resolveRecentDisplayImage(
     | 'downloadUrl'
     | 'inputAssetThumbnailUrl'
     | 'inputAssetUrl'
+    | 'mediaType'
   >,
 ) {
+  if (item.mediaType === 'video') {
+    return (
+      item.thumbnail ??
+      item.previewImage ??
+      item.inputAssetThumbnailUrl ??
+      item.inputAssetUrl ??
+      undefined
+    )
+  }
+
   return (
     item.previewImage ??
     item.thumbnail ??

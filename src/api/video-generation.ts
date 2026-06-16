@@ -32,6 +32,10 @@ export interface CreatedVideoGenerationTask {
   pollingRecommendedMs?: number
   pollingUrl?: string
   templateId?: string | null
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
 }
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
