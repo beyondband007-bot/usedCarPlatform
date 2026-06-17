@@ -7,6 +7,10 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import type { AuthenticatedUser, UserRole } from "../auth/authTypes";
+import {
+  resolvePlatformCreditsAccountIdentity,
+  type PlatformCreditsAccountIdentity,
+} from "./platformCreditsAccountIdentity";
 
 type MatrixTargetRole = "admin" | "agent" | "user";
 
@@ -40,7 +44,8 @@ type ApplicationCodeRow = RowDataPacket & {
 type CreditsAccountRow = RowDataPacket & {
   id: number;
   tenant_id: number | null;
-  user_id: number;
+  user_id: number | null;
+  account_scope: "personal" | "tenant";
   total_balance: string;
   locked_balance: string;
   available_balance: string;
@@ -226,17 +231,21 @@ function requireProfileEditAllowed(operator: AuthenticatedUser, target: Platform
   return targetRole as MatrixTargetRole;
 }
 
-async function findPersonalCreditsAccount(creditsUserId: number) {
+async function findCreditsAccount(identity: PlatformCreditsAccountIdentity) {
   const [rows] = await getCreditsPool().query<CreditsAccountRow[]>(
-    `SELECT id, tenant_id, user_id, total_balance, locked_balance, available_balance, status
+    `SELECT id, tenant_id, user_id, account_scope,
+            total_balance, locked_balance, available_balance, status
      FROM credit_accounts
-     WHERE user_id = :creditsUserId
-       AND tenant_id IS NULL
-       AND account_scope = 'personal'
+     WHERE account_scope = :accountScope
+       AND (
+         (:accountScope = 'tenant' AND tenant_id = :creditsTenantId AND user_id IS NULL)
+         OR
+         (:accountScope = 'personal' AND user_id = :creditsUserId AND tenant_id IS NULL)
+       )
        AND status = 'active'
      ORDER BY id
      LIMIT 1`,
-    { creditsUserId },
+    identity,
   );
 
   const account = rows[0];
@@ -294,7 +303,12 @@ export async function adjustPlatformUserCredits(
     "credits:points:adjust",
     canAdjustTarget,
   );
-  if (!target.credits_user_id) throw errors.invalidParameter("target user is not linked to credits");
+  const creditsIdentity = resolvePlatformCreditsAccountIdentity({
+    creditsUserId: target.credits_user_id,
+    accountScope: target.account_scope,
+    creditsTenantId: target.credits_tenant_id,
+  });
+  if (!creditsIdentity) throw errors.invalidParameter("target user is not linked to credits");
 
   const points = normalizePoints(payload.points);
   const reason = normalizeText(payload.reason, 240) || "back-office manual adjustment";
@@ -302,7 +316,7 @@ export async function adjustPlatformUserCredits(
   const classifyAsRecharge = payload.classifyAsRecharge === true && points > 0;
   const transactionType = classifyAsRecharge ? "recharge" : "adjustment";
   const bizType = classifyAsRecharge ? "back-office-recharge" : "back-office-adjustment";
-  const account = await findPersonalCreditsAccount(target.credits_user_id);
+  const account = await findCreditsAccount(creditsIdentity);
   const balanceBefore = Number(account.total_balance);
   const balanceAfter = Number((balanceBefore + points).toFixed(4));
 
@@ -318,7 +332,8 @@ export async function adjustPlatformUserCredits(
     await connection.beginTransaction();
 
     const [lockedRows] = await connection.query<CreditsAccountRow[]>(
-      `SELECT id, tenant_id, user_id, total_balance, locked_balance, available_balance, status
+      `SELECT id, tenant_id, user_id, account_scope,
+              total_balance, locked_balance, available_balance, status
        FROM credit_accounts
        WHERE id = :accountId
        FOR UPDATE`,
@@ -362,7 +377,7 @@ export async function adjustPlatformUserCredits(
        )`,
       {
         tenantId: locked.tenant_id,
-        creditsUserId: locked.user_id,
+        creditsUserId: creditsIdentity.creditsUserId,
         accountId: locked.id,
         transactionType,
         points: points.toFixed(4),
