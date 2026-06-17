@@ -3038,12 +3038,6 @@ defineExpose({
           :capability="props.capability"
           :disabled="props.isGenerating"
           :is-generating="props.isGenerating"
-          @confirm-video="
-            emit('generate', {
-              shortVideoAction: 'confirm',
-              scriptDraftId: $event,
-            })
-          "
         />
       </div>
     </template>

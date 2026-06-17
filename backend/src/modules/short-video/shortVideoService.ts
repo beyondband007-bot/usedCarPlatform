@@ -6,7 +6,15 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { IMAGE_GENERATION_RESOLUTION, type CreateModuleTaskRequest } from "../../shared/types";
 import { assetsRepository } from "../assets/assetsRepository";
+import {
+  freezeGenerationBilling,
+  markGenerationBillingRefundFailed,
+  refundFrozenGenerationBilling,
+  toBillingResponseFields,
+  type FrozenGenerationBilling,
+} from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
+import { shortVideoGenerationPoints } from "../billing/generationPointRules";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { shortVideoPrompt } from "./shortVideoPrompts";
@@ -62,6 +70,8 @@ class ShortVideoService {
 
     const lease = await kieKeyPool.acquire();
     let taskCreated = false;
+    let billing: FrozenGenerationBilling | null = null;
+    let billingFreezeFailed = false;
     try {
       await tasksRepository.createWaitingTask({
         id: taskId,
@@ -77,6 +87,24 @@ class ShortVideoService {
         subscriptionPlanCode: subscription.planCode,
       });
       taskCreated = true;
+
+      try {
+        billing = await freezeGenerationBilling({
+          taskId,
+          functionCode: "short-video",
+          estimatedPoints: shortVideoGenerationPoints(),
+          body,
+          context,
+        });
+      } catch (error) {
+        billingFreezeFailed = true;
+        await tasksRepository.markFailed(
+          taskId,
+          "BILLING_FREEZE_FAILED",
+          error instanceof Error ? error.message : "billing freeze failed",
+        );
+        throw error;
+      }
 
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(
         lease,
@@ -124,12 +152,20 @@ class ShortVideoService {
         aspectRatio,
         videoResolution,
         inputImageCount: 1,
+        ...toBillingResponseFields(billing),
         pollingUrl: `/api/v1/tasks/${taskId}`,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
       try {
-        if (taskCreated) {
+        if (billing) {
+          try {
+            await refundFrozenGenerationBilling(taskId, billing);
+          } catch {
+            await markGenerationBillingRefundFailed(taskId, billing);
+          }
+        }
+        if (taskCreated && !billingFreezeFailed) {
           await tasksRepository.markFailed(
             taskId,
             "SHORT_VIDEO_CREATE_FAILED",

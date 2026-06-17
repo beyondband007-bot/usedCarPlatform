@@ -42,7 +42,7 @@ const props = defineProps<{
   initialView?: "templates" | "preview" | "generating" | "recent";
 }>();
 
-type ShortVideoView = "templates" | "history" | "preview" | "generating" | "recent";
+type ShortVideoView = "templates" | "preview" | "generating" | "recent";
 
 const PENDING_RECENT_STATUSES = new Set([
   "waiting",
@@ -61,12 +61,10 @@ const appStore = useAppStore();
 const flow = inject<VideoGenerationFlow | null>(VIDEO_GENERATION_FLOW_KEY, null);
 
 const videoRef = ref<HTMLVideoElement | null>(null);
-const activeView = ref<ShortVideoView>("recent");
+const activeView = ref<ShortVideoView>("templates");
 const activeCategory = ref<ShortVideoTemplateCategory>("all");
 const activeStyle = ref("all");
 const searchQuery = ref("");
-const historyStatusFilter = ref("");
-const selectedHistoryTaskId = ref("");
 const selectedRecentItemId = ref("");
 const previewTask = ref<VideoHistoryItem | null>(null);
 
@@ -77,32 +75,27 @@ const recentDisplayItems = computed(() =>
 const statusLabelMap = recentStatusLabelMap;
 
 const currentTask = computed(() => flow?.currentTask.value ?? null);
+const isDraftGenerating = computed(() => flow?.isLoading("draft") ?? false);
 const templateList = computed(() => flow?.templateList.value ?? []);
 const selectedTemplateId = computed(
   () => flow?.selectedTemplate.value?.templateId ?? "",
 );
 const templatesLoading = computed(() => flow?.isLoading("bootstrap") ?? false);
-const historyList = computed(() => flow?.historyList.value ?? []);
-const historyLoading = computed(() => flow?.isLoading("history") ?? false);
-
-const filteredHistoryList = computed(() => {
-  if (!historyStatusFilter.value) return historyList.value;
-  return historyList.value.filter(
-    (item) => item.status === historyStatusFilter.value,
-  );
-});
 
 const categoryTypeMap: Record<Exclude<ShortVideoTemplateCategory, "all">, string> = {
   showroom: "dealership",
   "single-car": "single-car",
-  promotion: "promotion",
-  market: "market",
+  "vehicle-ad": "vehicle-ad",
 };
+
+const visibleTemplateTypes = new Set(["dealership", "single-car", "vehicle-ad"]);
 
 const filteredTemplates = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
 
   return templateList.value.filter((item) => {
+    if (!visibleTemplateTypes.has(item.type)) return false;
+
     if (activeCategory.value !== "all") {
       const mappedType = categoryTypeMap[activeCategory.value];
       if (item.type !== mappedType) return false;
@@ -149,16 +142,23 @@ const activePreviewDownloadUrl = computed(() => {
 
 const generatingProgress = computed(() => {
   const task = currentTask.value;
+  if (isDraftGenerating.value) return 8;
   if (!task) return props.isGenerating ? 8 : 0;
   return Math.max(0, Math.min(100, task.progress ?? 0));
 });
 
 const generatingStatusLabel = computed(() => {
   const task = currentTask.value;
+  if (isDraftGenerating.value) return "视频文案生成中";
   if (!task) return "正在准备视频任务";
   const stageLabel = getVideoWorkflowStageLabel(task.workflowStage ?? undefined);
   if (stageLabel) return stageLabel;
   return getVideoTaskStatusLabel(task.status);
+});
+
+const generatingDescription = computed(() => {
+  if (isDraftGenerating.value) return "正在生成口播文案与视频任务参数，请稍候。";
+  return `输出 ${VIDEO_OUTPUT_RATIO_LABEL}，按音频时长生成（最长15秒），请稍候。`;
 });
 
 const generatingErrorMessage = computed(() => {
@@ -197,18 +197,18 @@ function resolveShortVideoView(
   if (props.isGenerating || isPendingTask(currentTask.value)) return "generating";
   if (preferred === "preview") return "preview";
   if (preferred === "generating") return "generating";
-  if (preferred === "history") return "history";
   if (preferred === "recent") return "recent";
   if (preferred === "templates") return "templates";
   if (flow?.currentStep.value === "template") return "templates";
-  return "recent";
+  return "templates";
 }
 
 function isTemplateDisabled(template: VideoTemplate) {
   return (
     template.status === "coming_soon" ||
     template.generationReadiness === "unavailable" ||
-    template.type === "market"
+    template.type === "market" ||
+    template.type === "vehicle-ad"
   );
 }
 
@@ -224,13 +224,9 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
-function getHistoryPreviewUrl(item: VideoHistoryItem) {
-  return item.resultVideos?.[0]?.url ?? null;
-}
-
 function handleTemplatePick(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
-    message.info("该模板即将开放");
+    message.info("该模板暂未开放，敬请期待！");
     return;
   }
   flow?.selectTemplate(item);
@@ -259,10 +255,6 @@ async function playGeneratedVideo() {
   } catch {
     // 浏览器可能阻止自动播放，保留控件供用户手动播放。
   }
-}
-
-function openHistoryView() {
-  activeView.value = "history";
 }
 
 function openRecentView() {
@@ -308,25 +300,6 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   }
 
   emit("pickRecent", item);
-}
-
-function handleHistoryPick(item: VideoHistoryItem) {
-  selectedHistoryTaskId.value = item.taskId;
-
-  if (isPendingTask(item)) {
-    activeView.value = "generating";
-    void flow?.trackTask(item.taskId);
-    return;
-  }
-
-  if (item.status === "success") {
-    openPreviewView(item);
-    return;
-  }
-
-  if (item.status === "fail") {
-    message.error(item.error?.message ?? "视频生成失败");
-  }
 }
 
 async function handleCancelTask(taskId?: string) {
@@ -433,6 +406,10 @@ watch(
   (step) => {
     if (step === "template") {
       activeView.value = "templates";
+      return;
+    }
+    if (step === "task") {
+      activeView.value = "generating";
     }
   },
 );
@@ -456,7 +433,7 @@ watch(
       <div class="sv-generating-copy">
         <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成中" }}</p>
         <h2>{{ generatingStatusLabel }}</h2>
-        <span>固定输出 {{ VIDEO_OUTPUT_RATIO_LABEL }}，请稍候。</span>
+        <span>{{ generatingDescription }}</span>
         <p v-if="generatingErrorMessage" class="sv-generating-error">
           {{ generatingErrorMessage }}
         </p>
@@ -489,9 +466,9 @@ watch(
       class="sv-state-panel sv-state-panel--preview"
     >
       <header class="sv-preview-head">
-        <button type="button" class="sv-back-button" @click="openHistoryView">
+        <button type="button" class="sv-back-button" @click="openRecentView">
           <Icon icon="mdi:arrow-left" />
-          返回历史任务
+          返回最近生成
         </button>
         <a
           v-if="activePreviewDownloadUrl"
@@ -540,16 +517,6 @@ watch(
           @click="openTemplatesView"
         >
           模板库
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="sv-primary-tab"
-          :class="{ 'is-active': activeView === 'history' }"
-          :aria-selected="activeView === 'history'"
-          @click="openHistoryView"
-        >
-          历史任务
         </button>
         <button
           v-if="showSessionPreviewTab"
@@ -687,7 +654,7 @@ watch(
               >
                 <Icon icon="mdi:image-outline" />
               </div>
-              <span class="sv-template-duration">{{ item.durationSeconds }}秒</span>
+              <span class="sv-template-duration">最长{{ item.durationSeconds }}秒</span>
               <span v-if="isTemplateDisabled(item)" class="sv-template-badge is-soon">即将开放</span>
               <span v-else-if="item.badge === 'hot'" class="sv-template-badge">热门</span>
               <span v-else-if="item.badge === 'new'" class="sv-template-badge is-new">新品</span>
@@ -701,108 +668,6 @@ watch(
         </div>
       </section>
 
-      <section
-        v-else-if="activeView === 'history'"
-        class="sv-recent-panel"
-        aria-label="历史任务"
-      >
-        <div class="sv-history-toolbar">
-          <label class="sv-style-filter">
-            <span class="sv-style-filter-label">状态筛选</span>
-            <select v-model="historyStatusFilter">
-              <option value="">全部状态</option>
-              <option value="waiting">正在准备素材</option>
-              <option value="queued">已进入生成队列</option>
-              <option value="generating">正在生成视频</option>
-              <option value="success">生成完成</option>
-              <option value="fail">生成失败</option>
-              <option value="canceled">任务已取消</option>
-            </select>
-            <Icon icon="mdi:chevron-down" aria-hidden="true" />
-          </label>
-        </div>
-
-        <div v-if="historyLoading && !filteredHistoryList.length" class="sv-empty-state">
-          <Icon icon="mdi:loading" class="sv-spin" />
-          <span>正在加载历史任务</span>
-        </div>
-        <div v-else-if="!filteredHistoryList.length" class="sv-empty-state">
-          <Icon icon="mdi:video-off-outline" />
-          <span>暂无历史视频任务</span>
-        </div>
-        <div v-else class="sv-history-list">
-          <article
-            v-for="item in filteredHistoryList"
-            :key="item.taskId"
-            class="sv-history-card"
-            :class="{ 'is-selected': selectedHistoryTaskId === item.taskId }"
-            @click="handleHistoryPick(item)"
-          >
-            <div class="sv-history-media">
-              <HoverPreviewVideo
-                v-if="getHistoryPreviewUrl(item)"
-                class="sv-history-cover"
-                :src="getHistoryPreviewUrl(item)!"
-                :alt="item.title || item.vehicleName || '视频预览'"
-                lazy
-              />
-              <PreloadImage
-                v-else-if="item.thumbnail || item.resultVideos?.[0]?.thumbnail"
-                class="sv-history-cover"
-                :src="item.thumbnail || item.resultVideos?.[0]?.thumbnail || ''"
-                :alt="item.title || item.vehicleName || '视频封面'"
-                loading="lazy"
-                decoding="async"
-                fit="cover"
-              />
-              <div v-else class="sv-history-cover sv-history-cover--placeholder">
-                <Icon icon="mdi:video-outline" />
-              </div>
-            </div>
-            <div class="sv-history-body">
-              <h3>{{ item.title || item.vehicleName || "短视频任务" }}</h3>
-              <p v-if="item.vehicleName && item.title">{{ item.vehicleName }}</p>
-              <div class="sv-history-meta">
-                <span>{{ getVideoTaskStatusLabel(item.status) }}</span>
-                <span v-if="item.workflowStage">
-                  {{ getVideoWorkflowStageLabel(item.workflowStage) }}
-                </span>
-                <span v-if="item.progress">{{ item.progress }}%</span>
-              </div>
-              <p v-if="item.status === 'fail' && item.error?.message" class="sv-history-error">
-                {{ item.error.message }}
-              </p>
-              <div class="sv-history-actions" @click.stop>
-                <button
-                  v-if="canCancelTask(item)"
-                  type="button"
-                  class="sv-action-button sv-action-button--ghost"
-                  @click="handleCancelTask(item.taskId)"
-                >
-                  取消
-                </button>
-                <button
-                  v-if="canRegenerateTask(item)"
-                  type="button"
-                  class="sv-action-button"
-                  @click="handleRegenerateTask(item.taskId)"
-                >
-                  重新生成
-                </button>
-                <a
-                  v-if="item.status === 'success' && resolveVideoTaskDownloadUrl(item)"
-                  class="sv-download-link"
-                  :href="resolveVideoTaskDownloadUrl(item)"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  下载
-                </a>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
     </section>
   </section>
 </template>

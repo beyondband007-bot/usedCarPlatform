@@ -10,106 +10,125 @@ import {
 
 const definitions = listVideoTemplateDefinitions();
 
-assert.equal(definitions.length, 6);
+assert.equal(definitions.length, 5);
 assert.equal(
   definitions.filter((item) => item.type === "single-car").length,
-  3,
-);
-assert.equal(
-  definitions.filter((item) => item.type === "promotion").length,
   2,
 );
 assert.equal(
+  definitions.filter((item) => item.type === "promotion").length,
+  0,
+);
+assert.equal(
   definitions.filter((item) => item.type === "dealership").length,
-  1,
+  3,
 );
 assert.equal(
   videoTemplateCapabilities.find((item) => item.type === "market")?.status,
   "coming_soon",
 );
 assert.equal(
-  videoTemplateCapabilities.find((item) => item.type === "promotion")
-    ?.generationReadiness,
-  "ready",
-);
-assert.equal(
   videoTemplateCapabilities.find((item) => item.type === "dealership")
     ?.generationReadiness,
   "ready",
 );
+
 assert.deepEqual(videoGenerationWorkflowContract.fixedOutput, {
   durationSeconds: 15,
   resolution: "720p",
   outputRatio: "9:16",
-  language: "zh-CN",
+  language: "Chinese",
   languageMode: "selectable",
 });
-assert.deepEqual(
-  videoGenerationWorkflowContract.supportedLanguages.map((item) => ({
-    value: item.value,
-    status: item.status,
-  })),
-  [
-    { value: "zh-CN", status: "available" },
-    { value: "en", status: "available" },
-    { value: "yue", status: "available" },
-  ],
+
+const supportedLanguageValues = videoGenerationWorkflowContract.supportedLanguages.map(
+  (item): string => item.value,
+);
+for (const language of ["Chinese", "Chinese,Yue", "English", "Russian", "Japanese", "Korean", "French"]) {
+  assert.ok(supportedLanguageValues.includes(language));
+}
+for (const legacyLanguage of ["zh-CN", "en", "yue"]) {
+  assert.equal(supportedLanguageValues.includes(legacyLanguage), false);
+}
+assert.ok(
+  videoGenerationWorkflowContract.supportedLanguages.every(
+    (item) => item.status === "available",
+  ),
 );
 
-const singleCar = getVideoTemplateDefinition("ref-video-001");
+const singleCar = getVideoTemplateDefinition("ref-video-004");
 assert.ok(singleCar);
 assert.equal(
   validateVideoTemplateInputs(singleCar, {
-    brand: "丰田",
+    brand: "Toyota",
     modelYear: "2025",
     displacement: "2.0L",
-    salesName: "运动版",
-    series: "凯美瑞",
+    salesName: "Sport",
+    series: "Camry",
     vehicleExteriorAssetIds: ["asset_exterior_01"],
     vehicleInteriorAssetIds: [],
-    digitalHumanId: "dh-female-01",
-    language: "zh-CN",
+    digitalHumanId: "dh-message-01",
+    language: "Chinese",
     userReferenceAssetIds: [],
   }).valid,
   true,
 );
 
-const promotion = getVideoTemplateDefinition("ref-video-003");
-assert.ok(promotion);
-const invalidPromotion = validateVideoTemplateInputs(promotion, {
-  brand: "宝马",
+const invalidSingleCar = validateVideoTemplateInputs(singleCar, {
+  brand: "BMW",
   modelYear: "2016",
   displacement: "1.5T",
   salesName: "218i",
-  series: "2系旅行车",
-  vehicleExteriorAssetIds: ["asset_exterior_01"],
-  digitalHumanId: "dh-female-02",
-  language: "zh-CN",
+  series: "2 Series",
+  digitalHumanId: "dh-message-02",
+  language: "Chinese",
 });
-assert.equal(invalidPromotion.valid, false);
+assert.equal(invalidSingleCar.valid, false);
 assert.ok(
-  invalidPromotion.issues.some(
-    (issue) => issue.field === "promotionText" && issue.code === "required",
+  invalidSingleCar.issues.some(
+    (issue) => issue.field === "vehicleExteriorAssetIds" && issue.code === "required",
   ),
 );
 
-const dealership = getVideoTemplateDefinition("ref-video-006");
+const dealership = getVideoTemplateDefinition("ref-video-001");
 assert.ok(dealership);
+assert.equal(
+  dealership.inputRequirements.some(
+    (item) =>
+      item.key === "vehicleExteriorAssetIds" ||
+      item.key === "vehicleInteriorAssetIds" ||
+      item.key === "brand" ||
+      item.key === "modelYear" ||
+      item.key === "displacement" ||
+      item.key === "salesName" ||
+      item.key === "series",
+  ),
+  false,
+);
 const validDealership = validateVideoTemplateInputs(dealership, {
-  dealershipName: "靠谱二手车展厅",
+  dealershipName: "Reliable Used Car Showroom",
   dealershipImageAssetIds: ["asset_showroom_01"],
-  digitalHumanId: "dh-male-01",
-  language: "zh-CN",
+  digitalHumanId: "dh-message-02",
+  language: "Chinese",
 });
 assert.equal(validDealership.valid, true);
 assert.equal(
   validateVideoTemplateInputs(dealership, {
     dealershipName: "Harbour Used Cars",
     dealershipImageAssetIds: ["asset_showroom_01"],
-    digitalHumanId: "dh-male-01",
-    language: "en",
+    digitalHumanId: "dh-message-02",
+    language: "English",
   }).valid,
   true,
+);
+assert.equal(
+  validateVideoTemplateInputs(dealership, {
+    dealershipName: "Harbour Used Cars",
+    dealershipImageAssetIds: ["asset_showroom_01"],
+    digitalHumanId: "dh-message-02",
+    language: "zh-CN",
+  }).valid,
+  false,
 );
 
 const workflowSteps = videoGenerationWorkflowContract.workflow.map(
@@ -122,17 +141,17 @@ assert.ok(workflowSteps.includes("regenerate"));
 console.log(
   JSON.stringify(
     {
-      runId: "video-template-contract-20260611-02",
+      runId: "video-template-contract-20260615-test-message",
       templateCount: definitions.length,
       typeCounts: {
-        singleCar: 3,
-        promotion: 2,
-        dealership: 1,
+        singleCar: 2,
+        promotion: 0,
+        dealership: 3,
         market: 0,
       },
       fixedOutput: videoGenerationWorkflowContract.fixedOutput,
       dynamicValidation: "passed",
-      supportedLanguages: ["zh-CN", "en", "yue"],
+      supportedLanguages: supportedLanguageValues,
       taskLifecycle: ["poll", "cancel", "history", "regenerate"],
       status: "passed",
     },

@@ -46,6 +46,10 @@ import {
   isWorkspaceFeatureCompareCode,
   workspaceFeatureCompareMap,
 } from "@/constants/workspace-feature-compare";
+import {
+  VIDEO_GENERATION_MODULE_CODE,
+  isShortVideoModuleCode,
+} from "@/constants/short-video";
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -280,7 +284,7 @@ const recentLoaded = ref(false);
 const recentLayoutRef = ref<HTMLElement | null>(null);
 const shortVideoInitialView = ref<
   "templates" | "preview" | "generating" | "recent"
->("recent");
+>("templates");
 let recentRefreshTimer: number | null = null;
 
 const isBatchCapability = computed(() => props.capability.kind === "batch");
@@ -533,9 +537,13 @@ const recentTaskModuleCodes = new Set([
   "interior-stitch",
   "watermark-remove",
   "short-video",
+  VIDEO_GENERATION_MODULE_CODE,
 ]);
 
 function resolveRecentModuleCode() {
+  if (props.capability.code === "short-video") {
+    return VIDEO_GENERATION_MODULE_CODE;
+  }
   if (props.capability.code === "interior-stitch") {
     return "interior-collage";
   }
@@ -646,14 +654,22 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     item.moduleCode,
     item.sceneLabel,
   );
-  const isShortVideo = item.moduleCode === "short-video";
-  const coverUrl =
-    item.previewImage ??
-    item.thumbnail ??
-    item.downloadUrl ??
-    item.inputAssetThumbnailUrl ??
-    item.inputAssetUrl ??
-    undefined;
+  const isShortVideo = isShortVideoModuleCode(item.moduleCode);
+  const isVideoUrl = (url?: string | null) =>
+    typeof url === "string" && /\.(mp4|mov|webm)(?:[?#]|$)/i.test(url);
+  const coverUrl = isShortVideo
+    ? [
+        item.thumbnail,
+        item.previewImage,
+        item.inputAssetThumbnailUrl,
+        item.inputAssetUrl,
+      ].find((url) => url && !isVideoUrl(url))
+    : (item.previewImage ??
+      item.thumbnail ??
+      item.downloadUrl ??
+      item.inputAssetThumbnailUrl ??
+      item.inputAssetUrl ??
+      undefined);
 
   return {
     id: item.id || item.taskId,
@@ -665,9 +681,10 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     updatedAt: item.updatedAt
       ? formatDate(item.updatedAt, "YYYY-MM-DD HH:mm")
       : undefined,
-    thumbnail: coverUrl,
-    previewImage: coverUrl,
+    thumbnail: coverUrl ?? undefined,
+    previewImage: coverUrl ?? undefined,
     downloadUrl: item.downloadUrl ?? undefined,
+    mediaType: isShortVideo ? "video" : "image",
     ratioLabel: isShortVideo
       ? "16:9 · 720p · 10秒"
       : (item.ratioLabel ??
@@ -840,7 +857,14 @@ function syncShortVideoInitialView() {
     shortVideoInitialView.value = "generating";
     return;
   }
-  shortVideoInitialView.value = "recent";
+  if (
+    props.shortVideoSessionPreview?.previewVideo ||
+    props.generationResult?.mediaType === "video"
+  ) {
+    shortVideoInitialView.value = "recent";
+    return;
+  }
+  shortVideoInitialView.value = "templates";
 }
 
 function focusShortVideoGeneratingView() {
@@ -913,7 +937,9 @@ watch(
       void loadRecentItems({ force: true });
     }
 
-    if (props.capability.code === "short-video") {
+    if (props.capability.code === "short-video" && wasGenerating) {
+      shortVideoInitialView.value = "recent";
+    } else if (props.capability.code === "short-video") {
       syncShortVideoInitialView();
     }
   },
@@ -922,9 +948,9 @@ watch(
 
 watch(
   () => props.shortVideoSessionPreview?.previewVideo,
-  () => {
+  (videoUrl) => {
     if (props.capability.code === "short-video") {
-      syncShortVideoInitialView();
+      shortVideoInitialView.value = videoUrl ? "recent" : "templates";
     }
   },
 );

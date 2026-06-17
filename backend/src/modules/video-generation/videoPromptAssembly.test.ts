@@ -10,18 +10,47 @@ const singleCarPrompt = buildSeedancePrompt({
   interiorCount: 1,
   dealershipCount: 0,
   userReferenceCount: 1,
-  language: "en",
+  language: "English",
   templateType: "single-car",
+  durationSeconds: 13,
+  audioDurationMs: 14_328,
 });
 
-assert.match(singleCarPrompt, /#image1/);
-assert.match(singleCarPrompt, /#image2、#image3/);
-assert.match(singleCarPrompt, /#image4/);
-assert.match(singleCarPrompt, /#image5/);
-assert.match(singleCarPrompt, /#audio1/);
-assert.match(singleCarPrompt, /英文/);
-assert.match(singleCarPrompt, /严格 15 秒/);
-assert.match(singleCarPrompt, /This is the approved English narration/);
+assert.match(singleCarPrompt, /用 模特 \{\{Mixed 1\}\}/);
+assert.match(singleCarPrompt, /英语音频 \{\{Mixed 2\}\}/);
+assert.match(singleCarPrompt, /车辆外观参考图 \{\{Mixed 3\}\} \{\{Mixed 4\}\}/);
+assert.match(singleCarPrompt, /车辆内饰参考图 \{\{Mixed 5\}\}/);
+assert.match(singleCarPrompt, /不要翻译这段演讲/);
+assert.match(singleCarPrompt, /不要说中文或普通话/);
+assert.match(singleCarPrompt, /无字幕/);
+assert.match(
+  singleCarPrompt,
+  /场景与分镜要求：Use the selected digital human, professional showroom style and uploaded BMW references\./,
+);
+assert.doesNotMatch(singleCarPrompt, /口播文案/);
+assert.doesNotMatch(singleCarPrompt, /This is the approved English narration\./);
+assert.doesNotMatch(singleCarPrompt, /真实时长/);
+assert.doesNotMatch(singleCarPrompt, /时长要求/);
+assert.doesNotMatch(singleCarPrompt, /#image1/);
+
+const chineseSingleCarPrompt = buildSeedancePrompt({
+  finalVideoPrompt: "Use the selected digital human.",
+  scriptText: "这是一段中文口播。",
+  exteriorCount: 4,
+  interiorCount: 3,
+  dealershipCount: 0,
+  userReferenceCount: 0,
+  language: "Chinese",
+  templateType: "single-car",
+  durationSeconds: 13,
+});
+
+assert.match(chineseSingleCarPrompt, /中文（普通话）音频 \{\{Mixed 2\}\}/);
+assert.match(chineseSingleCarPrompt, /无字幕。自然对嘴，专业解说视频风格。/);
+assert.doesNotMatch(chineseSingleCarPrompt, /口播文案/);
+assert.doesNotMatch(chineseSingleCarPrompt, /这是一段中文口播。/);
+assert.doesNotMatch(chineseSingleCarPrompt, /时长要求/);
+assert.doesNotMatch(chineseSingleCarPrompt, /不要说中文或普通话/);
 
 const dealershipPrompt = buildSeedancePrompt({
   finalVideoPrompt:
@@ -31,32 +60,33 @@ const dealershipPrompt = buildSeedancePrompt({
   interiorCount: 0,
   dealershipCount: 2,
   userReferenceCount: 1,
-  language: "yue",
+  language: "Chinese,Yue",
   templateType: "dealership",
 });
 
-assert.match(dealershipPrompt, /模板类型：车场介绍/);
-assert.match(dealershipPrompt, /车场与展厅事实依据：#image2、#image3/);
-assert.match(dealershipPrompt, /用户额外参考：#image4/);
-assert.match(dealershipPrompt, /粤语/);
-assert.match(dealershipPrompt, /不得虚构库存、价格或服务承诺/);
+assert.match(
+  dealershipPrompt,
+  /用模特 \{\{Mixed 2\}\} ，生成精品二手车销售风格的口播短视频使用音频 \{\{Mixed 3\}\} ，真人口播感，场地参考图 \{\{Mixed 1\}\}/,
+);
+assert.doesNotMatch(dealershipPrompt, /#image1/);
+assert.doesNotMatch(dealershipPrompt, /#audio1/);
+assert.doesNotMatch(dealershipPrompt, /车辆外观/);
+assert.doesNotMatch(dealershipPrompt, /车辆内饰/);
 
 console.log(
   JSON.stringify(
     {
-      runId: "video-prompt-assembly-20260611-01",
+      runId: "video-prompt-assembly-20260616-lip-sync",
       singleCarReferences: {
-        digitalHuman: "#image1",
-        exterior: ["#image2", "#image3"],
-        interior: ["#image4"],
-        userReference: ["#image5"],
-        narration: "#audio1",
+        digitalHuman: "{{Mixed 1}}",
+        narration: "{{Mixed 2}}",
+        exterior: ["{{Mixed 3}}", "{{Mixed 4}}"],
+        interior: ["{{Mixed 5}}"],
       },
       dealershipReferences: {
-        digitalHuman: "#image1",
-        dealership: ["#image2", "#image3"],
-        userReference: ["#image4"],
-        narration: "#audio1",
+        dealership: ["{{Mixed 1}}"],
+        digitalHuman: "{{Mixed 2}}",
+        narration: "{{Mixed 3}}",
       },
       status: "passed",
     },

@@ -2,8 +2,7 @@ export type ShortVideoTemplateCategory =
   | 'all'
   | 'showroom'
   | 'single-car'
-  | 'promotion'
-  | 'market'
+  | 'vehicle-ad'
 
 export interface ShortVideoTemplateCategoryOption {
   id: ShortVideoTemplateCategory
@@ -31,8 +30,7 @@ export const shortVideoTemplateCategories: ShortVideoTemplateCategoryOption[] = 
   { id: 'all', label: '全部' },
   { id: 'showroom', label: '车场介绍' },
   { id: 'single-car', label: '单车品介绍' },
-  { id: 'promotion', label: '促销活动' },
-  { id: 'market', label: '行情资讯' },
+  { id: 'vehicle-ad', label: '车辆广告' },
 ]
 
 export const shortVideoTemplateStyles: ShortVideoTemplateStyleOption[] = [
@@ -70,8 +68,8 @@ export const shortVideoTemplateItems: ShortVideoTemplateItem[] = [
   },
   {
     id: 'autumn-sale',
-    title: '金秋特惠 购车狂欢节',
-    category: 'promotion',
+    title: '车辆广告 金秋展示',
+    category: 'vehicle-ad',
     style: 'promotion',
     duration: '00:19',
     likes: 341,
@@ -82,8 +80,8 @@ export const shortVideoTemplateItems: ShortVideoTemplateItem[] = [
   },
   {
     id: 'market-october',
-    title: '10月二手车行情速报',
-    category: 'market',
+    title: '车辆广告 信息展示',
+    category: 'vehicle-ad',
     style: 'data',
     duration: '00:45',
     likes: 623,
@@ -118,8 +116,8 @@ export const shortVideoTemplateItems: ShortVideoTemplateItem[] = [
   },
   {
     id: 'year-end-sale',
-    title: '年终大促 年终换车季',
-    category: 'promotion',
+    title: '车辆广告 年终展示',
+    category: 'vehicle-ad',
     style: 'promotion',
     duration: '00:22',
     likes: 389,
@@ -130,8 +128,8 @@ export const shortVideoTemplateItems: ShortVideoTemplateItem[] = [
   },
   {
     id: 'market-weekly',
-    title: '本周二手车行情解读',
-    category: 'market',
+    title: '车辆广告 动态说明',
+    category: 'vehicle-ad',
     style: 'data',
     duration: '00:41',
     likes: 512,

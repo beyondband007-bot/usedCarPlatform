@@ -101,6 +101,52 @@ export const migrations = [
     INDEX idx_digital_human_voices_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `CREATE TABLE IF NOT EXISTS ark_virtual_asset_groups (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
+    feature VARCHAR(80) NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    provider_group_id VARCHAR(160) NOT NULL,
+    project_name VARCHAR(120) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'ready',
+    error_message TEXT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_ark_virtual_asset_group_scope (user_id, feature, name, project_name),
+    INDEX idx_ark_virtual_asset_groups_provider (provider_group_id),
+    INDEX idx_ark_virtual_asset_groups_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS ark_virtual_assets (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',
+    group_id VARCHAR(64) NOT NULL,
+    feature VARCHAR(80) NOT NULL,
+    asset_type VARCHAR(16) NOT NULL,
+    local_url VARCHAR(1024) NOT NULL,
+    public_url VARCHAR(1024) NOT NULL,
+    file_path VARCHAR(1024) NULL,
+    file_name VARCHAR(255) NULL,
+    mime_type VARCHAR(160) NULL,
+    size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    source_hash CHAR(64) NULL,
+    provider_asset_id VARCHAR(160) NULL,
+    asset_uri VARCHAR(220) NULL,
+    project_name VARCHAR(120) NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'processing',
+    error_message TEXT NULL,
+    raw_json JSON NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_ark_virtual_assets_user_feature (user_id, feature, created_at),
+    INDEX idx_ark_virtual_assets_status (status),
+    INDEX idx_ark_virtual_assets_source_hash (source_hash),
+    INDEX idx_ark_virtual_assets_provider (provider_asset_id),
+    INDEX idx_ark_virtual_assets_project_type_hash (project_name, asset_type, source_hash),
+    CONSTRAINT ark_virtual_assets_group_fk FOREIGN KEY (group_id) REFERENCES ark_virtual_asset_groups (id)
+      ON DELETE RESTRICT ON UPDATE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   `CREATE TABLE IF NOT EXISTS batch_tasks (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL DEFAULT 'user_admin',

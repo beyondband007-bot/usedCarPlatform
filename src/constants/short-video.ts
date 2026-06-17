@@ -9,7 +9,7 @@ export const VIDEO_DURATION_SECONDS = 15
 export const VIDEO_OUTPUT_RATIO = '9:16'
 export const VIDEO_RESOLUTION = '720p'
 export const VIDEO_MODEL = 'bytedance/seedance-2'
-export const VIDEO_OUTPUT_RATIO_LABEL = '9:16 · 720p · 15秒'
+export const VIDEO_OUTPUT_RATIO_LABEL = '9:16 · 720p · 按音频时长生成（最长15秒）'
 export const VIDEO_TASK_POLL_MS = 5000
 
 export const VIDEO_SCRIPT_GENERATOR_LABELS: Record<string, string> = {

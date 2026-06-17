@@ -1,250 +1,220 @@
-import digitalHumanBasementImg from '@/assets/img/数字人/数字人1地库.png'
-import digitalHumanOutdoorImg from '@/assets/img/数字人/数字人2室外.png'
-import digitalHumanOutdoorAltImg from '@/assets/img/数字人/数字人3室外.jpg'
-import digitalHumanIndoorForeignImg from '@/assets/img/数字人/数字人4室内外国人.jpg'
-import sceneBasementVideo from '@/assets/video/场景1地库.mp4'
-import sceneOutdoorVideo from '@/assets/video/场景2室外.mp4'
-import sceneOutdoorAltVideo from '@/assets/video/场景3室外.mp4'
-import sceneIndoorForeignVideo from '@/assets/video/场景4室内外国人讲解.mp4'
+import messageDh01 from '@/assets/img/video-generation/message-dh-01.png'
+import messageDh02 from '@/assets/img/video-generation/message-dh-02.jpg'
+import messageDh03 from '@/assets/img/video-generation/message-dh-03.jpg'
+import messageDh04 from '@/assets/img/video-generation/message-dh-04.png'
+import scene01Video from '@/assets/video/video-generation/message-scene-01-dealership.mp4'
+import scene02Video from '@/assets/video/video-generation/message-scene-02-dealership.mp4'
+import scene03Video from '@/assets/video/video-generation/message-scene-03-dealership.mp4'
+import scene04Video from '@/assets/video/video-generation/message-scene-04-single-car.mp4'
+import scene05Video from '@/assets/video/video-generation/message-scene-05-market-info.mp4'
 import { VIDEO_DURATION_SECONDS } from '@/constants/short-video'
 import type { DigitalHuman, VideoTemplate, VideoTemplateType } from '@/types/video-generation'
 
-export const localSceneBasementVideo = sceneBasementVideo
-export const localSceneOutdoorVideo = sceneOutdoorVideo
-export const localSceneOutdoorAltVideo = sceneOutdoorAltVideo
-export const localSceneIndoorForeignVideo = sceneIndoorForeignVideo
-
-export const localDigitalHumanBasementImg = digitalHumanBasementImg
-export const localDigitalHumanOutdoorImg = digitalHumanOutdoorImg
-export const localDigitalHumanOutdoorAltImg = digitalHumanOutdoorAltImg
-export const localDigitalHumanIndoorForeignImg = digitalHumanIndoorForeignImg
-
 interface LocalSceneDefinition {
-  key: string
+  templateId: string
   title: string
   type: VideoTemplateType
   typeLabel: string
   styleLabel: string
   stylePrompt: string
+  description: string
   badge: VideoTemplate['badge']
   videoUrl: string
-  posterUrl: string
-  /** 对应后端 digital-humans.json 中的真实 id，仅用于提交任务 */
-  backendDigitalHumanId: string
-  digitalHuman: Omit<DigitalHuman, 'id'>
-  fallbackTemplateId: string
 }
 
 const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
   {
-    key: 'basement',
-    title: '地库光影场景',
+    templateId: 'ref-video-001',
+    title: '车场介绍 1｜开场总览',
     type: 'dealership',
-    typeLabel: '地库场景',
-    styleLabel: '专业讲解',
-    stylePrompt:
-      '地下车库均匀柔光，突出车身线条与漆面质感，适合精品车源口播展示。',
+    typeLabel: '车场介绍',
+    styleLabel: '真实导览',
+    stylePrompt: '真实二手车车场介绍风格，先建立场地环境，再切入车辆陈列和到店看车氛围。',
+    description: '用于介绍门店环境、车场规模和到店看车氛围，适合作为车场介绍开场。',
     badge: 'hot',
-    videoUrl: sceneBasementVideo,
-    posterUrl: digitalHumanBasementImg,
-    fallbackTemplateId: 'local-scene-basement',
-    backendDigitalHumanId: 'dh-female-01',
-    digitalHuman: {
-      name: '主讲 · 地库',
-      gender: 'female',
-      ageStyle: '地库场景 · 沉稳专业',
-      previewUrl: digitalHumanBasementImg,
-      imageUrl: digitalHumanBasementImg,
-      voiceStatus: 'ready',
-    },
+    videoUrl: scene01Video,
   },
   {
-    key: 'outdoor',
-    title: '室外自然光场景',
-    type: 'single-car',
-    typeLabel: '室外场景',
-    styleLabel: '口播出镜',
-    stylePrompt:
-      '室外自然光环境，画面通透有层次，适合动感车型与促销口播讲解。',
+    templateId: 'ref-video-002',
+    title: '车场介绍 2｜销售导览',
+    type: 'dealership',
+    typeLabel: '车场介绍',
+    styleLabel: '销售导览',
+    stylePrompt: '销售顾问式车场导览风格，围绕场地、车辆陈列和服务体验组织镜头。',
+    description: '以销售顾问口吻带看车场，突出车辆陈列、接待动线和真实服务感。',
     badge: null,
-    videoUrl: sceneOutdoorVideo,
-    posterUrl: digitalHumanOutdoorImg,
-    fallbackTemplateId: 'local-scene-outdoor',
-    backendDigitalHumanId: 'dh-female-02',
-    digitalHuman: {
-      name: '主讲 · 室外',
-      gender: 'female',
-      ageStyle: '室外场景 · 亲和自然',
-      previewUrl: digitalHumanOutdoorImg,
-      imageUrl: digitalHumanOutdoorImg,
-      voiceStatus: 'ready',
-    },
+    videoUrl: scene02Video,
   },
   {
-    key: 'outdoor-alt',
-    title: '室外门店讲解',
-    type: 'single-car',
-    typeLabel: '室外场景',
-    styleLabel: '专业讲解',
-    stylePrompt:
-      '室外门店自然光环境，人物与车辆同框更有真实成交氛围，适合精品车源讲解和门店口播展示。',
+    templateId: 'ref-video-003',
+    title: '车场介绍 3｜库存展示',
+    type: 'dealership',
+    typeLabel: '车场介绍',
+    styleLabel: '库存展示',
+    stylePrompt: '多车库存展示风格，强调车辆排列、场地规模和重点车源导入。',
+    description: '适合展示多台车源和库存规模，再自然引出主推车型或重点车辆。',
     badge: null,
-    videoUrl: sceneOutdoorAltVideo,
-    posterUrl: digitalHumanOutdoorAltImg,
-    fallbackTemplateId: 'local-scene-outdoor-alt',
-    backendDigitalHumanId: 'dh-female-03',
-    digitalHuman: {
-      name: '主讲 · 室外二',
-      gender: 'female',
-      ageStyle: '室外场景 · 利落讲解',
-      previewUrl: digitalHumanOutdoorAltImg,
-      imageUrl: digitalHumanOutdoorAltImg,
-      voiceStatus: 'ready',
-    },
+    videoUrl: scene03Video,
   },
   {
-    key: 'indoor-foreign',
-    title: '室内外国人讲解',
+    templateId: 'ref-video-004',
+    title: '单车品介绍｜实车讲解',
     type: 'single-car',
-    typeLabel: '室内场景',
-    styleLabel: '专业讲解',
-    stylePrompt:
-      '现代展厅室内环境，外国人数字人自然口播，强调真实门店感与单车卖点表达。',
+    typeLabel: '单车品介绍',
+    styleLabel: '实车讲解',
+    stylePrompt: '单车品介绍风格，围绕一台车完成外观、内饰、空间和使用场景的 12-15 秒短口播介绍。',
+    description: '聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。',
+    badge: 'hot',
+    videoUrl: scene04Video,
+  },
+  {
+    templateId: 'ref-video-005',
+    title: '车辆广告｜动态展示',
+    type: 'vehicle-ad',
+    typeLabel: '车辆广告',
+    styleLabel: '暂未开放',
+    stylePrompt: '车辆广告模板暂未开放，敬请期待。',
+    description: '适合用车辆动态镜头制作广告展示，当前模板暂未开放。',
     badge: 'new',
-    videoUrl: sceneIndoorForeignVideo,
-    posterUrl: digitalHumanIndoorForeignImg,
-    fallbackTemplateId: 'local-scene-indoor-foreign',
-    backendDigitalHumanId: 'dh-female-09',
-    digitalHuman: {
-      name: '主讲 · 室内外国人',
-      gender: 'female',
-      ageStyle: '室内场景 · 国际化讲解',
-      previewUrl: digitalHumanIndoorForeignImg,
-      imageUrl: digitalHumanIndoorForeignImg,
-      voiceStatus: 'ready',
-    },
+    videoUrl: scene05Video,
   },
 ]
 
-function buildLocalSceneTemplate(
-  scene: LocalSceneDefinition,
-  apiTemplate?: VideoTemplate,
-): VideoTemplate {
+const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
+  {
+    id: 'dh-message-01',
+    name: '数字人 1｜亲和女声',
+    gender: 'female',
+    ageStyle: '年轻女性 · 预设音色 Friendly Paige',
+    previewUrl: messageDh01,
+    imageUrl: messageDh01,
+    voiceStatus: 'ready',
+    voiceModel: 'speech-2.8-hd',
+  },
+  {
+    id: 'dh-message-02',
+    name: '数字人 2｜专业男声',
+    gender: 'male',
+    ageStyle: '年轻男性 · 预设音色 博学讲师',
+    previewUrl: messageDh02,
+    imageUrl: messageDh02,
+    voiceStatus: 'ready',
+    voiceModel: 'speech-2.8-hd',
+  },
+  {
+    id: 'dh-message-03',
+    name: '数字人 3｜明亮女声',
+    gender: 'female',
+    ageStyle: '年轻女性 · 预设音色 Bright Queen',
+    previewUrl: messageDh03,
+    imageUrl: messageDh03,
+    voiceStatus: 'ready',
+    voiceModel: 'speech-2.8-hd',
+  },
+  {
+    id: 'dh-message-04',
+    name: '数字人 4｜活力女声',
+    gender: 'female',
+    ageStyle: '年轻女性 · 预设音色 EngagingGirl',
+    previewUrl: messageDh04,
+    imageUrl: messageDh04,
+    voiceStatus: 'ready',
+    voiceModel: 'speech-2.8-hd',
+  },
+]
+
+function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate {
   return {
-    id: apiTemplate?.id ?? scene.fallbackTemplateId,
-    templateId: apiTemplate?.templateId ?? scene.fallbackTemplateId,
-    referenceMaterialId: apiTemplate?.referenceMaterialId,
+    id: scene.templateId,
+    templateId: scene.templateId,
+    referenceMaterialId: scene.templateId,
     title: scene.title,
     type: scene.type,
     typeLabel: scene.typeLabel,
-    style: apiTemplate?.style ?? 'professional',
+    style: 'professional',
     styleLabel: scene.styleLabel,
     badge: scene.badge,
-    thumbnailUrl: scene.posterUrl,
+    description: scene.description,
+    thumbnailUrl: scene.videoUrl,
     previewUrl: scene.videoUrl,
     stylePrompt: scene.stylePrompt,
-    durationSeconds: apiTemplate?.durationSeconds ?? VIDEO_DURATION_SECONDS,
-    outputRatio: apiTemplate?.outputRatio ?? '9:16',
-    videoResolution: apiTemplate?.videoResolution ?? '720p',
-    inputRequirements: apiTemplate?.inputRequirements ?? [],
-    requiredFields: apiTemplate?.requiredFields ?? [],
-    optionalFields: apiTemplate?.optionalFields ?? [],
-    status: 'available',
-    generationReadiness: 'ready',
+    durationSeconds: VIDEO_DURATION_SECONDS,
+    durationLabel: '≤00:15',
+    outputRatio: '9:16',
+    videoResolution: '720p',
+    inputRequirements: [],
+    requiredFields: [],
+    optionalFields: [],
+    status: scene.type === 'vehicle-ad' ? 'coming_soon' : 'available',
+    generationReadiness: scene.type === 'vehicle-ad' ? 'unavailable' : 'ready',
+    reason: scene.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : undefined,
   }
 }
 
-function findApiTemplateForScene(
-  scene: LocalSceneDefinition,
-  apiTemplates: VideoTemplate[],
-  usedTemplateIds: Set<string>,
-) {
-  const preferred = apiTemplates.find(
-    (item) =>
-      item.type === scene.type &&
-      item.status !== 'coming_soon' &&
-      item.generationReadiness !== 'unavailable' &&
-      !usedTemplateIds.has(item.templateId),
-  )
-  if (preferred) return preferred
-
-  return apiTemplates.find(
-    (item) =>
-      item.status !== 'coming_soon' &&
-      item.generationReadiness !== 'unavailable' &&
-      item.type !== 'market' &&
-      !usedTemplateIds.has(item.templateId),
-  )
-}
-
-/** 仅保留本地场景模板展示，并尽量复用后端真实 templateId */
 export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []): VideoTemplate[] {
-  const usedTemplateIds = new Set<string>()
+  if (apiTemplates.length) {
+    return apiTemplates.map((template) => {
+      const local = localSceneDefinitionById[template.templateId]
+      if (!local) return template
 
-  return LOCAL_SCENE_DEFINITIONS.map((scene) => {
-    const apiTemplate = findApiTemplateForScene(scene, apiTemplates, usedTemplateIds)
-    if (apiTemplate) {
-      usedTemplateIds.add(apiTemplate.templateId)
-    }
-    return buildLocalSceneTemplate(scene, apiTemplate)
-  })
-}
-
-function findApiHumanForScene(
-  scene: LocalSceneDefinition,
-  apiHumans: DigitalHuman[],
-  usedHumanIds: Set<string>,
-) {
-  const byConfiguredId = apiHumans.find(
-    (item) => item.id === scene.backendDigitalHumanId && !usedHumanIds.has(item.id),
-  )
-  if (byConfiguredId) return byConfiguredId
-
-  return apiHumans.find((item) => !usedHumanIds.has(item.id))
-}
-
-/** 使用本地数字人形象展示，提交时始终走后端真实 digitalHumanId */
-export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHuman[] {
-  const usedHumanIds = new Set<string>()
-
-  return LOCAL_SCENE_DEFINITIONS.map((scene) => {
-    const localHuman = scene.digitalHuman
-    const apiHuman = findApiHumanForScene(scene, apiHumans, usedHumanIds)
-    if (apiHuman) {
-      usedHumanIds.add(apiHuman.id)
       return {
-        ...apiHuman,
-        name: localHuman.name,
-        gender: localHuman.gender,
-        ageStyle: localHuman.ageStyle,
-        previewUrl: localHuman.previewUrl,
-        imageUrl: localHuman.previewUrl,
+        ...template,
+        title: local.title,
+        type: local.type,
+        typeLabel: local.typeLabel,
+        styleLabel: local.styleLabel,
+        description: local.description,
+        stylePrompt: local.stylePrompt,
+        scenePrompt: template.scenePrompt ?? local.stylePrompt,
+        thumbnailUrl: local.videoUrl,
+        previewUrl: local.videoUrl,
+        status: local.type === 'vehicle-ad' ? 'coming_soon' : template.status,
+        generationReadiness:
+          local.type === 'vehicle-ad' ? 'unavailable' : template.generationReadiness,
+        reason: local.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : template.reason,
       }
-    }
+    })
+  }
 
-    return {
-      id: scene.backendDigitalHumanId,
-      ...localHuman,
-      voiceStatus: 'not_configured',
-    }
-  })
+  return LOCAL_SCENE_DEFINITIONS.map(buildFallbackSceneTemplate)
+}
+
+export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHuman[] {
+  if (apiHumans.length) {
+    return apiHumans.map((human) => ({
+      ...human,
+      ...localDigitalHumanDisplayById[human.id],
+      previewUrl: localDigitalHumanDisplayById[human.id]?.previewUrl ?? human.previewUrl,
+      imageUrl: localDigitalHumanDisplayById[human.id]?.imageUrl ?? human.imageUrl,
+    }))
+  }
+  return LOCAL_DIGITAL_HUMANS
 }
 
 export function isLocalOnlyDigitalHumanId(digitalHumanId: string) {
   return digitalHumanId.startsWith('local-dh-')
 }
 
+export const localTemplatePreviewById: Record<string, string> = Object.fromEntries(
+  LOCAL_SCENE_DEFINITIONS.map((scene) => [scene.templateId, scene.videoUrl]),
+)
+
+const localSceneDefinitionById: Record<string, LocalSceneDefinition> = Object.fromEntries(
+  LOCAL_SCENE_DEFINITIONS.map((scene) => [scene.templateId, scene]),
+)
+
+const localDigitalHumanDisplayById: Record<string, Partial<DigitalHuman>> = Object.fromEntries(
+  LOCAL_DIGITAL_HUMANS.map((human) => [human.id, human]),
+)
+
 export function getLocalScenePreviewById(): Record<string, string> {
-  const map: Record<string, string> = {}
-  for (const scene of LOCAL_SCENE_DEFINITIONS) {
-    map[scene.fallbackTemplateId] = scene.videoUrl
-  }
-  return map
+  return { ...localTemplatePreviewById }
 }
 
 export function getLocalScenePreviewByType(): Partial<Record<VideoTemplateType, string>> {
   return {
-    dealership: sceneBasementVideo,
-    'single-car': sceneIndoorForeignVideo,
+    dealership: scene01Video,
+    'single-car': scene04Video,
+    'vehicle-ad': scene05Video,
   }
 }

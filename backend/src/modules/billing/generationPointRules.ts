@@ -1,7 +1,7 @@
 import type { BatchVisualConfig } from "../batch-new/batchTypes";
 
 const BASE_GENERATION_POINTS = 30;
-const SHORT_VIDEO_POINTS = 4000;
+const SHORT_VIDEO_POINTS = 2000;
 const BATCH_LIGHT_CONSISTENCY_POINTS = 10;
 const BATCH_PAINT_REFRESH_POINTS = 10;
 const BATCH_WALL_LOGO_SCENE_POINTS = 30;

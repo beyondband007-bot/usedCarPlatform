@@ -66,7 +66,7 @@ const run = async () => {
   const speech = await minimaxClient.synthesizeSpeech({
     text: "这是一段用于验证十五秒数字人口播链路的测试文案。",
     voiceId: voice.voiceId,
-    language: "zh-CN",
+    language: "Chinese",
   });
   assert.equal(speech.durationMs, 13_800);
   assert.equal(speech.audio.toString("hex"), "494433");
@@ -76,15 +76,21 @@ const run = async () => {
   const englishSpeech = await minimaxClient.synthesizeSpeech({
     text: "This is a multilingual narration contract test.",
     voiceId: voice.voiceId,
-    language: "en",
+    language: "English",
   });
   const cantoneseSpeech = await minimaxClient.synthesizeSpeech({
     text: "呢段系粤语口播链路测试。",
     voiceId: voice.voiceId,
-    language: "yue",
+    language: "Chinese,Yue",
+  });
+  const russianSpeech = await minimaxClient.synthesizeSpeech({
+    text: "Это тест многоязычной озвучки для автомобильного видео.",
+    voiceId: voice.voiceId,
+    language: "Russian",
   });
   assert.equal(englishSpeech.languageBoost, "English");
   assert.equal(cantoneseSpeech.languageBoost, "Chinese,Yue");
+  assert.equal(russianSpeech.languageBoost, "Russian");
 
   env.ark.apiKey = env.ark.apiKey || "ark-contract-key";
   await arkClient.createSeedanceVideoTask({
@@ -118,7 +124,7 @@ const run = async () => {
     speechRequests.map(
       (request) => (request.body as any).language_boost,
     ),
-    ["Chinese", "English", "Chinese,Yue"],
+    ["Chinese", "English", "Chinese,Yue", "Russian"],
   );
 
   const arkRequest = requests.find(
@@ -145,7 +151,7 @@ const run = async () => {
         minimaxUploadPurpose: "voice_clone",
         minimaxSpeechModel: speech.model,
         narrationDurationMs: speech.durationMs,
-        supportedLanguages: ["zh-CN", "en", "yue"],
+        supportedLanguages: ["Chinese", "English", "Chinese,Yue", "Russian"],
         arkReferenceAudioCount: 1,
         arkGenerateAudio: false,
         status: "passed",

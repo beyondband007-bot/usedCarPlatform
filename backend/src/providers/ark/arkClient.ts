@@ -39,23 +39,26 @@ const requireArkApiKey = () => {
   }
 };
 
-const buildReferenceContents = (input: CreateArkSeedanceTaskInput): ArkReferenceContent[] => [
-  ...(input.referenceImageUrls ?? []).map((url) => ({
-    type: "image_url" as const,
-    role: "reference_image" as const,
-    image_url: { url },
-  })),
-  ...(input.referenceVideoUrls ?? []).map((url) => ({
-    type: "video_url" as const,
-    role: "reference_video" as const,
-    video_url: { url },
-  })),
-  ...(input.referenceAudioUrls ?? []).map((url) => ({
-    type: "audio_url" as const,
-    role: "reference_audio" as const,
-    audio_url: { url },
-  })),
-];
+const buildReferenceContents = (input: CreateArkSeedanceTaskInput): ArkReferenceContent[] =>
+  input.referenceContents?.length
+    ? input.referenceContents
+    : [
+        ...(input.referenceImageUrls ?? []).map((url) => ({
+          type: "image_url" as const,
+          role: "reference_image" as const,
+          image_url: { url },
+        })),
+        ...(input.referenceVideoUrls ?? []).map((url) => ({
+          type: "video_url" as const,
+          role: "reference_video" as const,
+          video_url: { url },
+        })),
+        ...(input.referenceAudioUrls ?? []).map((url) => ({
+          type: "audio_url" as const,
+          role: "reference_audio" as const,
+          audio_url: { url },
+        })),
+      ];
 
 const normalizeArkStatus = (status: unknown): ArkTaskDetail["status"] => {
   const value = String(status ?? "").toLowerCase();
