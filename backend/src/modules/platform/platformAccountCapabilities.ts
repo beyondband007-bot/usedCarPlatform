@@ -11,6 +11,11 @@ import {
   resolvePlatformCreditsAccountIdentity,
   type PlatformCreditsAccountIdentity,
 } from "./platformCreditsAccountIdentity";
+import {
+  deactivateCanonicalAgentRelations,
+  hasCanonicalAgentCustomerRelation,
+  suspendCanonicalAgent,
+} from "./creditsAgentRelationsService";
 
 type MatrixTargetRole = "admin" | "agent" | "user";
 
@@ -274,16 +279,7 @@ async function assertAgentCanConnectCustomerApplication(
     });
   }
 
-  const [relationRows] = await pool.query<Array<RowDataPacket & { id: string }>>(
-    `SELECT id
-     FROM agent_customer_relations
-     WHERE agent_user_id = :operatorUserId
-       AND customer_user_id = :targetUserId
-       AND status = 'active'
-     LIMIT 1`,
-    { operatorUserId, targetUserId },
-  );
-  if (!relationRows.length) {
+  if (!(await hasCanonicalAgentCustomerRelation(operatorUserId, targetUserId))) {
     throw errors.forbidden("Agent can only connect applications for bound customers", {
       operatorUserId,
       targetUserId,
@@ -522,34 +518,6 @@ export async function connectPlatformUserApplicationByCapability(
       },
     );
 
-    if (current.user.role === "agent") {
-      await connection.query(
-        `INSERT INTO agent_customer_relations
-          (id, agent_user_id, customer_user_id, customer_credits_user_id,
-           application_code, relation_type, status, metadata_json)
-         VALUES
-          (:id, :agentUserId, :customerUserId, :customerCreditsUserId,
-           :applicationCode, 'direct', 'active', :metadataJson)
-         ON DUPLICATE KEY UPDATE
-           customer_credits_user_id = VALUES(customer_credits_user_id),
-           relation_type = VALUES(relation_type),
-           status = 'active',
-           metadata_json = VALUES(metadata_json),
-           updated_at = CURRENT_TIMESTAMP(3)`,
-        {
-          id: createId("acr"),
-          agentUserId: current.user.id,
-          customerUserId: target.id,
-          customerCreditsUserId: target.credits_user_id,
-          applicationCode,
-          metadataJson: JSON.stringify({
-            source: "agent-customer-application-connect",
-            planCode,
-          }),
-        },
-      );
-    }
-
     await connection.query(
       `INSERT INTO account_creation_audit_logs
         (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
@@ -645,14 +613,13 @@ export async function deletePlatformUserByCapability(
     { targetUserId: target.id },
   );
 
-  await pool.query(
-    `UPDATE agent_customer_relations
-     SET status = 'deleted',
-         updated_at = CURRENT_TIMESTAMP(3)
-     WHERE agent_user_id = :targetUserId
-        OR customer_user_id = :targetUserId`,
-    { targetUserId: target.id },
-  );
+  if (target.credits_user_id) {
+    await deactivateCanonicalAgentRelations(
+      targetRole === "agent"
+        ? { agentCreditsUserId: target.credits_user_id }
+        : { customerCreditsUserId: target.credits_user_id },
+    );
+  }
 
   await pool.query(
     `INSERT INTO account_creation_audit_logs
@@ -877,11 +844,6 @@ export async function disablePlatformAgentByCapability(
          WHERE user_id = :targetUserId
          UNION
          SELECT application_code
-         FROM agent_customer_relations
-         WHERE agent_user_id = :targetUserId
-           AND status = 'active'
-         UNION
-         SELECT application_code
          FROM agent_leads
          WHERE agent_user_id = :targetUserId
            AND status = 'active'
@@ -992,6 +954,8 @@ export async function disablePlatformAgentByCapability(
   } finally {
     connection.release();
   }
+
+  await suspendCanonicalAgent(target.credits_user_id);
 
   return {
     disabled: true,

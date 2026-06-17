@@ -10,12 +10,15 @@ import {
   ensurePersonalCreditsAccount,
   ensureTenantCreditsBundle,
 } from "../modules/billing/creditsAccountLinkService";
+import { getCreditsPool } from "../modules/billing/creditsAccountLookupService";
 import {
   defaultBackOfficePermissionPolicies,
   defaultBackOfficeRolePermissions,
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
 import { ensureAllAgentDepositAccounts } from "../modules/platform/agentDepositService";
+import { upsertCanonicalAgentCustomerRelation } from "../modules/platform/creditsAgentRelationsService";
+import { syncCreditsAgentRelations } from "./syncCreditsAgentRelations";
 
 const ADMIN_USER_ID = "user_admin";
 
@@ -652,26 +655,11 @@ const seedAgentOperationsData = async () => {
       },
     );
 
-    await pool.query(
-      `INSERT INTO agent_customer_relations
-        (id, agent_user_id, customer_user_id, customer_credits_user_id,
-         application_code, relation_type, status, metadata_json)
-       VALUES
-        ('acr_seed_agent_enterprise', 'user_agent', 'user_enterprise', :creditsUserId,
-         'used-car-platform', 'direct', 'active', :metadataJson)
-       ON DUPLICATE KEY UPDATE
-        customer_credits_user_id = VALUES(customer_credits_user_id),
-        relation_type = VALUES(relation_type),
-        status = VALUES(status),
-        metadata_json = VALUES(metadata_json)`,
-      {
-        creditsUserId: enterprise.credits_user_id,
-        metadataJson: JSON.stringify({
-          source: "demo-seed",
-          approvalMode: "auto",
-        }),
-      },
-    );
+    await upsertCanonicalAgentCustomerRelation({
+      agentAppUserId: "user_agent",
+      customerCreditsUserId: enterprise.credits_user_id,
+      creditsTenantId: enterprise.credits_tenant_id,
+    });
   } else {
     console.warn("Skipped seeded agent/customer credit links because user_enterprise has no credits link.");
   }
@@ -938,11 +926,15 @@ const run = async () => {
     await migrateMockSubscriptions();
     await seedFlagshipEnterpriseTenant();
     await seedAgentOperationsData();
+    const relationMigration = await syncCreditsAgentRelations();
+    await pool.query("DROP TABLE IF EXISTS agent_customer_relations");
     await ensureAllAgentDepositAccounts();
+    console.log(`Migrated ${relationMigration.sourceRelations} agent/customer relations to the Credits Platform.`);
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();
     await closeCreditsAccountLinkPool();
+    await getCreditsPool().end();
     await pool.end();
   }
 };

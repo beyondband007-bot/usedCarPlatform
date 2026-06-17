@@ -334,25 +334,6 @@ export const migrations = [
       ON DELETE RESTRICT ON UPDATE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
-  `CREATE TABLE IF NOT EXISTS agent_customer_relations (
-    id VARCHAR(64) PRIMARY KEY,
-    agent_user_id VARCHAR(64) NOT NULL,
-    customer_user_id VARCHAR(64) NOT NULL,
-    customer_credits_user_id BIGINT NOT NULL,
-    application_code VARCHAR(80) NOT NULL,
-    relation_type VARCHAR(24) NOT NULL DEFAULT 'direct',
-    status VARCHAR(24) NOT NULL DEFAULT 'active',
-    metadata_json JSON NULL,
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-    UNIQUE KEY uk_agent_customer_relations_agent_customer_app (agent_user_id, customer_user_id, application_code),
-    INDEX idx_agent_customer_relations_customer (customer_user_id, created_at),
-    CONSTRAINT agent_customer_relations_agent_fk FOREIGN KEY (agent_user_id) REFERENCES app_users (id)
-      ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT agent_customer_relations_customer_fk FOREIGN KEY (customer_user_id) REFERENCES app_users (id)
-      ON DELETE CASCADE ON UPDATE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
   `CREATE TABLE IF NOT EXISTS agent_leads (
     id VARCHAR(64) PRIMARY KEY,
     agent_user_id VARCHAR(64) NOT NULL,

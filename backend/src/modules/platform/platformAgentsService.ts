@@ -5,6 +5,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { listAgentDepositBalances } from "./agentDepositService";
+import { listCanonicalAgentCustomers } from "./creditsAgentRelationsService";
 import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type PlatformAgentRow = RowDataPacket & {
@@ -55,7 +56,7 @@ export async function listPlatformAgents(req: Request) {
        boa.status assignment_status,
        boa.created_at,
        boa.updated_at,
-       COUNT(DISTINCT CASE WHEN acr.status = 'active' THEN acr.customer_user_id END) customer_count,
+       0 customer_count,
        COUNT(DISTINCT CASE WHEN al.status = 'active' THEN al.id END) lead_count,
        COUNT(DISTINCT CASE WHEN ast.status <> 'closed' THEN ast.id END) open_ticket_count,
        GROUP_CONCAT(
@@ -66,14 +67,9 @@ export async function listPlatformAgents(req: Request) {
      FROM back_office_role_assignments boa
      JOIN app_users u ON u.id = boa.user_id
      LEFT JOIN app_users assigned_by ON assigned_by.id = boa.assigned_by_user_id
-     LEFT JOIN agent_customer_relations acr ON acr.agent_user_id = u.id
      LEFT JOIN agent_leads al ON al.agent_user_id = u.id
      LEFT JOIN agent_support_tickets ast ON ast.agent_user_id = u.id
      LEFT JOIN (
-       SELECT agent_user_id, application_code
-       FROM agent_customer_relations
-       WHERE status = 'active'
-       UNION
        SELECT agent_user_id, application_code
        FROM agent_leads
        WHERE status = 'active'
@@ -110,6 +106,11 @@ export async function listPlatformAgents(req: Request) {
     })),
   );
   const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
+  const canonicalCustomersByAgent = new Map(
+    await Promise.all(
+      rows.map(async (row) => [row.user_id, await listCanonicalAgentCustomers(row.user_id)] as const),
+    ),
+  );
 
   return {
     items: rows.map((row) => {
@@ -134,10 +135,15 @@ export async function listPlatformAgents(req: Request) {
         assignedByUserId: row.assigned_by_user_id,
         assignedByUsername: row.assigned_by_username,
         assignedByDisplayName: row.assigned_by_display_name,
-        customerCount: toNumber(row.customer_count),
+        customerCount: new Set(
+          (canonicalCustomersByAgent.get(row.user_id) ?? []).map((customer) => customer.customer_user_id),
+        ).size,
         leadCount: toNumber(row.lead_count),
         openTicketCount: toNumber(row.open_ticket_count),
-        applications: row.applications_csv ? row.applications_csv.split(",").filter(Boolean) : [],
+        applications: Array.from(new Set([
+          ...(row.applications_csv ? row.applications_csv.split(",").filter(Boolean) : []),
+          ...(canonicalCustomersByAgent.get(row.user_id) ?? []).map((customer) => customer.application_code),
+        ])).sort(),
         createdAt: row.created_at.toISOString(),
         updatedAt: row.updated_at.toISOString(),
       };

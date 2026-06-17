@@ -10,6 +10,7 @@
     "migrate": "tsx src/db/migrate.ts",
     "backfill:thumbnails": "tsx scripts/backfill-asset-thumbnails.ts",
     "sync:credits-accounts": "tsx src/db/syncCreditsAccounts.ts",
+    "sync:credits-agent-relations": "tsx src/db/syncCreditsAgentRelations.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "phase2:policy-test": "tsx src/modules/platform/accountCreationPolicyDefaults.test.ts",
     "phase3:rbac-test": "tsx src/modules/auth/rbac.test.ts",

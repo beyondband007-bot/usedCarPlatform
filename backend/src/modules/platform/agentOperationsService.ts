@@ -10,6 +10,10 @@ import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { normalizePhone, toLocalChinaPhone } from "../auth/verificationService";
 import { listAgentDepositBalances } from "./agentDepositService";
 import { getCommissionPolicy } from "./commissionPolicyService";
+import {
+  findCanonicalAgentCustomer,
+  listCanonicalAgentCustomers,
+} from "./creditsAgentRelationsService";
 import { creditsBalanceKey, listCreditsBalances } from "./creditsBalanceLookup";
 
 type AgentUserRow = RowDataPacket & {
@@ -18,7 +22,7 @@ type AgentUserRow = RowDataPacket & {
   display_name: string;
 };
 
-type AgentCustomerRow = RowDataPacket & {
+type AgentCustomerRow = {
   id: string;
   application_code: string;
   relation_type: string;
@@ -403,35 +407,7 @@ async function resolveAgentUser(req: Request, requestedAgentUserId?: unknown) {
 }
 
 async function listAgentCustomers(agentUserId: string) {
-  const [rows] = await pool.query<AgentCustomerRow[]>(
-    `SELECT
-       acr.id,
-       acr.application_code,
-       acr.relation_type,
-       acr.status,
-       acr.created_at,
-       acl.created_by_user_id,
-       creator.username created_by_username,
-       creator.display_name created_by_display_name,
-       acl.created_by_role_code,
-       u.id customer_user_id,
-       u.username customer_username,
-       u.display_name customer_display_name,
-       u.phone customer_phone,
-       acr.customer_credits_user_id,
-       u.account_scope customer_account_scope,
-       u.credits_tenant_id customer_credits_tenant_id
-     FROM agent_customer_relations acr
-     JOIN app_users u ON u.id = acr.customer_user_id
-     LEFT JOIN application_customer_links acl
-       ON acl.user_id = acr.customer_user_id
-      AND acl.application_code = acr.application_code
-     LEFT JOIN app_users creator ON creator.id = acl.created_by_user_id
-     WHERE acr.agent_user_id = :agentUserId
-     ORDER BY acr.created_at DESC
-     LIMIT 100`,
-    { agentUserId },
-  );
+  const rows = (await listCanonicalAgentCustomers(agentUserId)).slice(0, 100);
 
   const totalTopUpCreditsByCustomer = await listCustomerTopUpCredits(rows);
   const usageStatsByCustomer = await listAgentCustomerUsageStats(rows);
@@ -632,26 +608,21 @@ async function listAgentCustomerUsageStats(rows: AgentCustomerRow[]) {
 }
 
 async function loadAgentCustomerForLedger(agentUserId: string, relationId: string) {
-  const [rows] = await pool.query<AgentCustomerLedgerRow[]>(
+  const relation = await findCanonicalAgentCustomer(agentUserId, relationId);
+  if (!relation) return null;
+
+  const [rows] = await pool.query<Array<RowDataPacket & {
+    enterprise_tenant_id: string | null;
+    enterprise_tenant_name: string | null;
+    enterprise_owner_user_id: string | null;
+    enterprise_owner_credits_user_id: number | null;
+  }>>(
     `SELECT
-       acr.id,
-       acr.application_code,
-       acr.relation_type,
-       acr.status,
-       acr.created_at,
-       u.id customer_user_id,
-       u.username customer_username,
-       u.display_name customer_display_name,
-       u.phone customer_phone,
-       acr.customer_credits_user_id,
-       u.account_scope customer_account_scope,
-       u.credits_tenant_id customer_credits_tenant_id,
        em.tenant_id enterprise_tenant_id,
        et.name enterprise_tenant_name,
        et.owner_user_id enterprise_owner_user_id,
        owner.credits_user_id enterprise_owner_credits_user_id
-     FROM agent_customer_relations acr
-     JOIN app_users u ON u.id = acr.customer_user_id
+     FROM app_users u
      LEFT JOIN enterprise_members em
        ON em.user_id = u.id
       AND em.status = 'active'
@@ -659,16 +630,21 @@ async function loadAgentCustomerForLedger(agentUserId: string, relationId: strin
        ON et.id = em.tenant_id
       AND et.status = 'active'
      LEFT JOIN app_users owner ON owner.id = et.owner_user_id
-     WHERE acr.id = :relationId
-       AND acr.agent_user_id = :agentUserId
+     WHERE u.id = :customerUserId
      LIMIT 1`,
-    { agentUserId, relationId },
+    { customerUserId: relation.customer_user_id },
   );
-  return rows[0] ?? null;
+  return {
+    ...relation,
+    enterprise_tenant_id: rows[0]?.enterprise_tenant_id ?? null,
+    enterprise_tenant_name: rows[0]?.enterprise_tenant_name ?? null,
+    enterprise_owner_user_id: rows[0]?.enterprise_owner_user_id ?? null,
+    enterprise_owner_credits_user_id: rows[0]?.enterprise_owner_credits_user_id ?? null,
+  } satisfies AgentCustomerLedgerRow;
 }
 
 async function loadCustomerProfileForLedger(customerProfileId: string) {
-  const [rows] = await pool.query<AgentCustomerLedgerRow[]>(
+  const [rows] = await pool.query<Array<RowDataPacket & AgentCustomerLedgerRow>>(
     `SELECT
        acl.id,
        acl.application_code,

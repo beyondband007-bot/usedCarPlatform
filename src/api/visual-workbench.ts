@@ -1097,6 +1097,11 @@ export interface CreditsCustomerProfile {
   displayName: string
   phone?: string | null
   role: string
+  agents?: Array<{
+    userId: string
+    username: string
+    displayName: string
+  }>
   creditsUserId: number | string
   creditsTotalBalance?: string | number | null
   creditsAvailableBalance?: string | number | null

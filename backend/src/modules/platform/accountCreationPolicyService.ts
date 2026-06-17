@@ -447,10 +447,6 @@ async function listAgentPolicyOverrides(
      LEFT JOIN back_office_agent_policy_overrides override ON override.agent_user_id = u.id
      LEFT JOIN (
        SELECT agent_user_id, application_code
-       FROM agent_customer_relations
-       WHERE status = 'active'
-       UNION
-       SELECT agent_user_id, application_code
        FROM agent_leads
        WHERE status = 'active'
        UNION

@@ -60,7 +60,7 @@ Reusable Credits Platform owns:
 usedCarPlatform MVP backend currently owns temporary console operations tables:
 
 - `application_customer_links`
-- `agent_customer_relations`
+- Agent/customer ownership is canonical in Credits Platform `agent_relations`.
 - `agent_leads`
 - `agent_support_tickets`
 - `agent_commission_previews`

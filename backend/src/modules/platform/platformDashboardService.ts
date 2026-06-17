@@ -5,6 +5,7 @@ import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { getCreditsPool } from "../billing/creditsAccountLookupService";
+import { listCanonicalAgentCustomers } from "./creditsAgentRelationsService";
 
 type CountRow = RowDataPacket & {
   count: number | string;
@@ -74,20 +75,19 @@ const listPlatformApplications = async () => {
 };
 
 const listApplicationsForAgentScope = async (agentUserId: string) => {
+  const customers = await listCanonicalAgentCustomers(agentUserId);
   const [rows] = await pool.query<ApplicationRow[]>(
     `SELECT application_code
-     FROM agent_customer_relations
-     WHERE agent_user_id = :agentUserId
-       AND status = 'active'
-     UNION
-     SELECT application_code
      FROM agent_leads
      WHERE agent_user_id = :agentUserId
        AND status = 'active'
      ORDER BY application_code ASC`,
     { agentUserId },
   );
-  return rows.map((row) => row.application_code);
+  return Array.from(new Set([
+    ...customers.map((customer) => customer.application_code),
+    ...rows.map((row) => row.application_code),
+  ])).sort();
 };
 
 const buildSourceOfTruth = () => ({
@@ -98,11 +98,11 @@ const buildSourceOfTruth = () => ({
     "recharge products",
     "recharge/payment orders",
     "billing tasks",
+    "agent profiles and relations",
   ],
   usedCarPlatformMvpBackend: [
     "back-office role sessions",
     "application customer links",
-    "agent-customer relations",
     "agent leads",
     "agent support tickets",
     "settlement workflow records",
@@ -143,20 +143,15 @@ const buildSections = (role: string) => [
 ];
 
 async function listScopedCreditsUserIds(role: string, agentUserId: string) {
+  if (role === "agent") {
+    return Array.from(new Set(
+      (await listCanonicalAgentCustomers(agentUserId)).map((row) => row.customer_credits_user_id),
+    ));
+  }
   const [rows] = await pool.query<CreditsUserRow[]>(
-    role === "agent"
-      ? `SELECT DISTINCT u.credits_user_id
-         FROM app_users u
-         WHERE u.credits_user_id IS NOT NULL
-           AND u.id IN (
-             SELECT acr.customer_user_id
-             FROM agent_customer_relations acr
-             WHERE acr.agent_user_id = :agentUserId
-               AND acr.status = 'active'
-           )`
-      : `SELECT DISTINCT credits_user_id
-         FROM app_users
-         WHERE credits_user_id IS NOT NULL`,
+    `SELECT DISTINCT credits_user_id
+     FROM app_users
+     WHERE credits_user_id IS NOT NULL`,
     { agentUserId },
   );
 
@@ -166,20 +161,17 @@ async function listScopedCreditsUserIds(role: string, agentUserId: string) {
 }
 
 async function listScopedCreditsTenantIds(role: string, agentUserId: string) {
+  if (role === "agent") {
+    return Array.from(new Set(
+      (await listCanonicalAgentCustomers(agentUserId))
+        .map((row) => row.customer_credits_tenant_id)
+        .filter((id): id is number => Boolean(id)),
+    ));
+  }
   const [rows] = await pool.query<CreditsTenantRow[]>(
-    role === "agent"
-      ? `SELECT DISTINCT u.credits_tenant_id
-         FROM app_users u
-         WHERE u.credits_tenant_id IS NOT NULL
-           AND u.id IN (
-             SELECT acr.customer_user_id
-             FROM agent_customer_relations acr
-             WHERE acr.agent_user_id = :agentUserId
-               AND acr.status = 'active'
-           )`
-      : `SELECT DISTINCT credits_tenant_id
-         FROM app_users
-         WHERE credits_tenant_id IS NOT NULL`,
+    `SELECT DISTINCT credits_tenant_id
+     FROM app_users
+     WHERE credits_tenant_id IS NOT NULL`,
     { agentUserId },
   );
 
@@ -324,13 +316,14 @@ async function listTrendEvents(role: string, agentUserId: string) {
 }
 
 async function listPlanDistribution(role: string, agentUserId: string) {
+  const agentCustomerUserIds = role === "agent"
+    ? Array.from(new Set(
+        (await listCanonicalAgentCustomers(agentUserId)).map((row) => row.customer_user_id),
+      ))
+    : [];
+  if (role === "agent" && !agentCustomerUserIds.length) return [];
   const scopeSql = role === "agent"
-    ? `AND us.user_id IN (
-         SELECT acr.customer_user_id
-         FROM agent_customer_relations acr
-         WHERE acr.agent_user_id = :agentUserId
-           AND acr.status = 'active'
-       )`
+    ? "AND us.user_id IN (:agentCustomerUserIds)"
     : `AND NOT EXISTS (
          SELECT 1
          FROM back_office_role_assignments boa
@@ -355,7 +348,7 @@ async function listPlanDistribution(role: string, agentUserId: string) {
        ${scopeSql}
      GROUP BY us.application_code, us.plan_code, sp.name
      ORDER BY count DESC, us.application_code ASC, sp.name ASC`,
-    { agentUserId },
+    { agentUserId, agentCustomerUserIds },
   );
 
   return rows.map((row) => ({
@@ -532,6 +525,7 @@ async function getGlobalMetrics() {
 }
 
 async function getAgentMetrics(agentUserId: string) {
+  const canonicalCustomers = await listCanonicalAgentCustomers(agentUserId);
   const [
     linkedCustomerCount,
     activeLeadCount,
@@ -541,13 +535,7 @@ async function getAgentMetrics(agentUserId: string) {
     todayRechargedCredits,
     todayConsumedCredits,
   ] = await Promise.all([
-    countRows(
-      `SELECT COUNT(*) count
-       FROM agent_customer_relations
-       WHERE agent_user_id = :agentUserId
-         AND status = 'active'`,
-      { agentUserId },
-    ),
+    Promise.resolve(new Set(canonicalCustomers.map((row) => row.customer_user_id)).size),
     countRows(
       `SELECT COUNT(*) count
        FROM agent_leads

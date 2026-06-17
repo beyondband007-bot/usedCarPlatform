@@ -44,6 +44,19 @@ type CustomerProfileRow = RowDataPacket & {
   created_at: Date;
 };
 
+type CustomerAgentRow = RowDataPacket & {
+  referred_user_id: number;
+  tenant_id: number | null;
+  agent_user_id: number;
+  agent_username: string | null;
+};
+
+type CustomerAgentAssignment = {
+  userId: string;
+  username: string;
+  displayName: string;
+};
+
 type CustomerUsageStatsRow = RowDataPacket & {
   account_key: string;
   total_top_up_credits: string | number;
@@ -113,6 +126,54 @@ function customerUsageKey(row: Pick<CustomerProfileRow, "account_scope" | "credi
     return `tenant:${row.credits_tenant_id}`;
   }
   return `user:${row.credits_user_id}`;
+}
+
+async function listCustomerAgentAssignments(rows: CustomerProfileRow[]) {
+  const result = new Map<number, CustomerAgentAssignment[]>();
+  const referredUserIds = Array.from(new Set(rows.map((row) => row.credits_user_id).filter(Boolean)));
+  if (!referredUserIds.length) return result;
+
+  const [agentRows] = await getCreditsPool().query<CustomerAgentRow[]>(
+    `SELECT DISTINCT
+       relation.referred_user_id,
+       relation.tenant_id,
+       agent.id agent_user_id,
+       agent.username agent_username
+     FROM agent_relations relation
+     JOIN users agent
+       ON agent.id = relation.agent_user_id
+      AND agent.status = 'active'
+     JOIN agent_profiles profile
+       ON profile.user_id = agent.id
+      AND profile.status = 'approved'
+     WHERE relation.referred_user_id IN (:referredUserIds)
+       AND relation.relation_type = 'direct'
+       AND relation.status = 'active'
+     ORDER BY agent.username, agent.id`,
+    { referredUserIds },
+  );
+
+  for (const row of agentRows) {
+    const customer = rows.find(
+      (item) =>
+        item.credits_user_id === row.referred_user_id &&
+        (row.tenant_id === null || row.tenant_id === item.credits_tenant_id),
+    );
+    if (!customer) continue;
+
+    const assignments = result.get(row.referred_user_id) ?? [];
+    if (!assignments.some((assignment) => assignment.userId === String(row.agent_user_id))) {
+      const username = row.agent_username || String(row.agent_user_id);
+      assignments.push({
+        userId: String(row.agent_user_id),
+        username,
+        displayName: username,
+      });
+      result.set(row.referred_user_id, assignments);
+    }
+  }
+
+  return result;
 }
 
 function emptyCustomerUsageStats(): CustomerUsageStats {
@@ -393,8 +454,11 @@ async function listCustomerProfiles() {
       }
     }),
   );
-  const usageStatsByCustomer = await listCustomerUsageStats(rows);
-  const depositBalances = await listAgentDepositBalances(rows.map((row) => row.user_id));
+  const [usageStatsByCustomer, depositBalances, agentsByCreditsUserId] = await Promise.all([
+    listCustomerUsageStats(rows),
+    listAgentDepositBalances(rows.map((row) => row.user_id)),
+    listCustomerAgentAssignments(rows),
+  ]);
 
   return rows.map((row) => {
     const usageStats = usageStatsByCustomer.get(customerUsageKey(row)) ?? emptyCustomerUsageStats();
@@ -407,6 +471,7 @@ async function listCustomerProfiles() {
       displayName: row.display_name,
       phone: row.phone,
       role: normalizeBackOfficeCustomerRole(row.role_code),
+      agents: agentsByCreditsUserId.get(row.credits_user_id) ?? [],
       creditsUserId: row.credits_user_id,
       creditsTotalBalance: balanceByCreditsUserId.get(row.credits_user_id)?.totalBalance ?? null,
       creditsAvailableBalance: balanceByCreditsUserId.get(row.credits_user_id)?.availableBalance ?? null,

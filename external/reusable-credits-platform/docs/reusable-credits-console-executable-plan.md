@@ -147,7 +147,7 @@ Implementation status:
 - Creates an app user and role assignment.
 - Ensures a personal credits user/account through the existing credits account linker.
 - Writes `application_customer_links`.
-- Writes `agent_customer_relations` when an Agent creates a User.
+- Writes the Credits Platform `agent_relations` record when an Agent creates a User.
 - Writes allowed and denied account-creation audit rows.
 - Stores idempotent completed responses for same-key replay and rejects same-key request-hash conflicts.
 - `/reusable-credits-console` now exposes role-aware Create Admin/Agent/User buttons and a shared account creation form wired to this endpoint.

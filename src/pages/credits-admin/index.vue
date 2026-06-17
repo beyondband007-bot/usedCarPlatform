@@ -1776,6 +1776,15 @@ const groupedCustomerProfiles = computed<CreditsCustomerProfile[]>(() => {
       existing.applicationCodes.push(row.applicationCode)
       existing.applicationCodes.sort()
     }
+    const agentsByUserId = new Map(
+      [...(existing.agents ?? []), ...(row.agents ?? [])].map((agent) => [agent.userId, agent]),
+    )
+    existing.agents = [...agentsByUserId.values()].sort((left, right) =>
+      (left.displayName || left.username || left.userId).localeCompare(
+        right.displayName || right.username || right.userId,
+        'zh-CN',
+      ),
+    )
     existing.totalTopUpCredits = Math.max(
       Number(existing.totalTopUpCredits ?? 0),
       Number(row.totalTopUpCredits ?? 0),
@@ -2592,6 +2601,16 @@ function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
     return owner ? `子账号 · 母账号 ${owner}` : '子账号'
   }
   return '-'
+}
+
+function formatCustomerAgentOwnership(row: CreditsCustomerProfile) {
+  if (!row.agents?.length) return '平台自有'
+  return row.agents
+    .map((agent) => {
+      const name = agent.displayName || agent.username || agent.userId
+      return agent.username && agent.username !== name ? `${name} (${agent.username})` : name
+    })
+    .join('、')
 }
 
 function formatCreatorName(input: {
@@ -3502,7 +3521,14 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
       return formatEnterpriseAccountRelation(row)
     },
   },
-  { title: '角色', key: 'role', width: 110 },
+  {
+    title: '所属代理',
+    key: 'agents',
+    width: 180,
+    render(row) {
+      return formatCustomerAgentOwnership(row)
+    },
+  },
   { title: '手机号', key: 'phone', width: 140, render(row) { return row.phone ?? '-' } },
   {
     title: '经办人',
@@ -5330,7 +5356,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 <article class="admin-agent-card">
                   <h3>自有客户</h3>
                   <strong>{{ filteredAgentCustomers.length }}</strong>
-                  <p>来自 agent_customer_relations</p>
+                  <p>来自 Credits Platform · agent_relations</p>
                 </article>
                 <article class="admin-agent-card">
                   <h3>押金余额</h3>
