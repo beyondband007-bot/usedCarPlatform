@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue'
+import type { VNodeChild } from 'vue'
 import * as echarts from 'echarts'
 import { Icon } from '@iconify/vue'
 import {
@@ -99,10 +100,22 @@ type CustomerAgentFilterOption = {
   displayName?: string | null
   customerCount: number
 }
+type AdminDropdownMixedOption =
+  | DropdownOption
+  | { type: 'divider'; key: string }
+  | { type: 'render'; key: string; render: () => VNodeChild }
+type DeveloperAgentEditActionKey =
+  | 'editProfile'
+  | 'connectApplication'
+  | 'resetPassword'
+  | 'disableAgent'
 type PlatformEditableProfileRole = PlatformUserTargetRole | 'developer'
 type PlatformEditableProfileRow = PasswordResetTableRow & {
   phone?: string | null
   status?: string | null
+}
+type PlatformCreditsAdjustmentTarget = PasswordResetTableRow & {
+  role?: PlatformUserTargetRole | 'developer' | string | null
 }
 type TrendPeriod = 'today' | '7d' | '30d'
 type TrendMetric = 'consume' | 'recharge'
@@ -198,6 +211,7 @@ const isAdjustCreditsModalOpen = ref(false)
 const isAdjustingCredits = ref(false)
 const isDeleteAccountModalOpen = ref(false)
 const isDeletingAccount = ref(false)
+const isAgentDepositAdjustmentModalOpen = ref(false)
 const isPasswordResetModalOpen = ref(false)
 const isResettingPassword = ref(false)
 const isConnectApplicationModalOpen = ref(false)
@@ -215,8 +229,11 @@ const updatingFunctionKey = ref<string | null>(null)
 const adminAgentSearchQuery = ref('')
 const adminCustomerSearchQuery = ref('')
 const selectedCustomerAgentUserId = ref<string | null>(null)
+const customerAgentDropdownSearchQuery = ref('')
 const agentCustomerSearchQuery = ref('')
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
+const selectedAdjustCreditsUser = ref<PlatformCreditsAdjustmentTarget | null>(null)
+const selectedAgentDepositUser = ref<PlatformAgentPolicyOverride | null>(null)
 const selectedCommissionDetail = ref<AgentOperationsCommissionPreview | null>(null)
 const selectedAgentCustomer = ref<AgentOperationsCustomer | null>(null)
 const agentCustomerLedger = ref<AgentCustomerLedger | null>(null)
@@ -1857,10 +1874,15 @@ const searchedAgentPolicyOverrides = computed(() =>
 )
 
 const customerAgentFilterOptions = computed<CustomerAgentFilterOption[]>(() => {
-  const agentsByUserId = new Map<string, CustomerAgentFilterOption>()
+  const agentsByIdentity = new Map<string, CustomerAgentFilterOption>()
+  const agentIdentityKey = (agent: {
+    userId: string
+    username?: string | null
+    displayName?: string | null
+  }) => normalizeSearchText(agent.username || agent.displayName || agent.userId)
 
   for (const agent of filteredAgentProfiles.value) {
-    agentsByUserId.set(agent.userId, {
+    agentsByIdentity.set(agentIdentityKey(agent), {
       userId: agent.userId,
       username: agent.username,
       displayName: agent.displayName,
@@ -1871,15 +1893,17 @@ const customerAgentFilterOptions = computed<CustomerAgentFilterOption[]>(() => {
   for (const customer of filteredCustomerProfiles.value) {
     if (matrixTargetRole(customer.role) !== 'user') continue
     for (const agent of customer.agents ?? []) {
-      const existing = agentsByUserId.get(agent.userId)
+      const identityKey = agentIdentityKey(agent)
+      const existing = agentsByIdentity.get(identityKey)
       if (existing) {
         existing.username ||= agent.username
         existing.displayName ||= agent.displayName
+        existing.userId = agent.userId
         existing.customerCount += 1
         continue
       }
 
-      agentsByUserId.set(agent.userId, {
+      agentsByIdentity.set(identityKey, {
         userId: agent.userId,
         username: agent.username,
         displayName: agent.displayName,
@@ -1888,7 +1912,7 @@ const customerAgentFilterOptions = computed<CustomerAgentFilterOption[]>(() => {
     }
   }
 
-  return [...agentsByUserId.values()].sort((left, right) => {
+  return [...agentsByIdentity.values()].sort((left, right) => {
     const leftName = left.displayName || left.username || left.userId
     const rightName = right.displayName || right.username || right.userId
     return leftName.localeCompare(rightName, 'zh-CN')
@@ -1904,14 +1928,25 @@ const selectedCustomerAgentFilter = computed(() => {
   )
 })
 
-const customerAgentDropdownOptions = computed<DropdownOption[]>(() => {
-  const agentOptions = customerAgentFilterOptions.value.map((agent) => ({
-    label: `${formatAgentFilterName(agent)}${agent.customerCount ? ` · ${agent.customerCount} 客户` : ''}`,
+const customerAgentDropdownOptions = computed<AdminDropdownMixedOption[]>(() => {
+  const keyword = normalizeSearchText(customerAgentDropdownSearchQuery.value)
+  const filteredAgents = customerAgentFilterOptions.value.filter((agent) => {
+    if (!keyword) return true
+    return [agent.displayName, agent.username, agent.userId]
+      .some((value) => normalizeSearchText(value).includes(keyword))
+  })
+  const agentOptions = filteredAgents.map((agent) => ({
+    label: `${formatAgentFilterName(agent)}·${agent.customerCount}客户`,
     key: agent.userId,
     icon: renderDropdownIcon('mdi:account-tie-outline'),
   }))
 
   return [
+    {
+      type: 'render',
+      key: 'customer-agent-search',
+      render: renderCustomerAgentDropdownSearch,
+    },
     {
       label: '全部代理',
       key: CUSTOMER_AGENT_FILTER_ALL_KEY,
@@ -1921,7 +1956,7 @@ const customerAgentDropdownOptions = computed<DropdownOption[]>(() => {
       ? [{ type: 'divider' as const, key: 'customer-agent-divider' }, ...agentOptions]
       : [
           {
-            label: '暂无代理',
+            label: keyword ? '没有匹配的代理' : '暂无代理',
             key: CUSTOMER_AGENT_FILTER_EMPTY_KEY,
             disabled: true,
           },
@@ -2437,6 +2472,15 @@ function canAdjustCustomer(row: CreditsCustomerProfile) {
   )
 }
 
+function canAdjustAgent(row: PlatformAgentPolicyOverride) {
+  return (
+    activeRole.value === 'developer' &&
+    authStore.role === 'developer' &&
+    authStore.userInfo?.id !== row.userId &&
+    authStore.permissions.includes('credits:points:adjust')
+  )
+}
+
 function canDeleteCustomer(row: CreditsCustomerProfile) {
   const targetRole = matrixTargetRole(row.role)
   if (activeRole.value === 'admin' && targetRole !== 'agent') return false
@@ -2559,8 +2603,31 @@ function formatAgentFilterName(agent: {
   username?: string | null
   displayName?: string | null
 }) {
-  const name = agent.displayName || agent.username || agent.userId
-  return agent.username && agent.username !== name ? `${name} (${agent.username})` : name
+  const displayName = agent.displayName || agent.username || agent.userId
+  const username = agent.username || agent.userId
+  return `${displayName}(${username})`
+}
+
+function renderCustomerAgentDropdownSearch() {
+  return h(
+    'div',
+    {
+      class: 'admin-dropdown-search',
+      onClick: (event: MouseEvent) => event.stopPropagation(),
+      onMousedown: (event: MouseEvent) => event.stopPropagation(),
+    },
+    [
+      h(NInput, {
+        value: customerAgentDropdownSearchQuery.value,
+        size: 'small',
+        clearable: true,
+        placeholder: '搜索代理用户名 / 显示名称',
+        'onUpdate:value': (value: string) => {
+          customerAgentDropdownSearchQuery.value = value
+        },
+      }),
+    ],
+  )
 }
 
 function customerAgentFilterButtonText() {
@@ -2572,10 +2639,12 @@ function customerAgentFilterButtonText() {
 function handleCustomerAgentFilterSelect(key: string | number) {
   if (key === CUSTOMER_AGENT_FILTER_ALL_KEY) {
     selectedCustomerAgentUserId.value = null
+    customerAgentDropdownSearchQuery.value = ''
     return
   }
   if (key === CUSTOMER_AGENT_FILTER_EMPTY_KEY) return
   selectedCustomerAgentUserId.value = String(key)
+  customerAgentDropdownSearchQuery.value = ''
 }
 
 function renderCustomerAgentOwnershipTitle() {
@@ -2602,6 +2671,9 @@ function renderCustomerAgentOwnershipTitle() {
                 type: hasSelectedAgent ? 'primary' : 'default',
                 secondary: hasSelectedAgent,
                 quaternary: !hasSelectedAgent,
+                onClick: () => {
+                  customerAgentDropdownSearchQuery.value = ''
+                },
               },
               {
                 icon: () =>
@@ -2671,13 +2743,15 @@ function customerEditDropdownOptions(
     })
   }
 
-  menuOptions.push({
-    label: '删除账号',
-    key: 'deleteAccount',
-    disabled: !canDeleteCustomer(row),
-    icon: renderDropdownIcon('mdi:trash-can-outline'),
-    props: { class: 'admin-dropdown-option-danger' },
-  })
+  if (activeRole.value !== 'admin') {
+    menuOptions.push({
+      label: '删除账号',
+      key: 'deleteAccount',
+      disabled: !canDeleteCustomer(row),
+      icon: renderDropdownIcon('mdi:trash-can-outline'),
+      props: { class: 'admin-dropdown-option-danger' },
+    })
+  }
 
   return menuOptions
 }
@@ -2738,6 +2812,35 @@ function renderCustomerCreditsAdjustmentCell(row: CreditsCustomerProfile) {
   )
 }
 
+function renderAgentCreditsAdjustmentCell(row: PlatformAgentPolicyOverride) {
+  const canAdjust = canAdjustAgent(row)
+
+  return h(
+    NButton,
+    {
+      size: 'small',
+      secondary: true,
+      disabled: !canAdjust,
+      onClick: () => openAdjustAgentCreditsModal(row),
+    },
+    {
+      icon: () => h(Icon, { icon: 'mdi:plus-minus-variant' }),
+      default: () => '增减积分',
+    },
+  )
+}
+
+function agentCreditsAdjustmentColumn(): DataTableColumns<PlatformAgentPolicyOverride>[number] {
+  return {
+    title: '增减积分',
+    key: 'creditsAdjustment',
+    width: 120,
+    render(row) {
+      return renderAgentCreditsAdjustmentCell(row)
+    },
+  }
+}
+
 function customerCreditsAdjustmentColumn(): DataTableColumns<CreditsCustomerProfile>[number] {
   return {
     title: '增减积分',
@@ -2771,7 +2874,7 @@ function renderCustomerActionsCell(
         },
         {
           icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
-          default: () => '查看详情',
+          default: () => '查看流水',
         },
       ),
     )
@@ -2854,6 +2957,237 @@ function canDisableAgentPolicy(row: PlatformAgentPolicyOverride) {
   if (authStore.userInfo?.id === row.userId) return false
   if (!authStore.permissions.includes('account:delete:agent')) return false
   return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
+function isDeveloperAgentEditActionKey(key: string | number): key is DeveloperAgentEditActionKey {
+  return (
+    key === 'editProfile' ||
+    key === 'connectApplication' ||
+    key === 'resetPassword' ||
+    key === 'disableAgent'
+  )
+}
+
+function renderDropdownControl(
+  title: string,
+  icon: string,
+  children: VNodeChild[],
+) {
+  return h(
+    'div',
+    {
+      class: 'admin-dropdown-control',
+      onClick: (event: MouseEvent) => event.stopPropagation(),
+      onMousedown: (event: MouseEvent) => event.stopPropagation(),
+    },
+    [
+      h(
+        'div',
+        { class: 'admin-dropdown-control-title' },
+        [
+          h(Icon, { icon }),
+          h('span', title),
+        ],
+      ),
+      h('div', { class: 'admin-dropdown-control-row' }, children),
+    ],
+  )
+}
+
+function renderDeveloperAgentCreateUserControl(row: PlatformAgentPolicyOverride) {
+  const rowEnabled = !row.developerDisabledCreateUsers
+  const effectiveEnabled =
+    accountCreationPolicyState.developerAllowsAgentCreateUsers &&
+    accountCreationPolicyState.adminAllowsAgentCreateUsers &&
+    rowEnabled
+
+  return renderDropdownControl('创建 User', 'mdi:account-plus-outline', [
+    h(NSwitch, {
+      value: rowEnabled,
+      loading: updatingAgentPolicyUserId.value === row.userId,
+      disabled: !accountCreationPolicyState.developerAllowsAgentCreateUsers,
+      'onUpdate:value': (value: boolean) =>
+        handleAgentCreateUserDisableChange(row.userId, !value),
+    }),
+    h(
+      'span',
+      { class: effectiveEnabled ? 'is-enabled' : 'is-disabled' },
+      effectiveEnabled ? '可创建 User' : '已禁用',
+    ),
+  ])
+}
+
+function renderDeveloperAgentCommissionControl(row: PlatformAgentPolicyOverride) {
+  const isBusy = updatingAgentCommissionUserId.value === row.userId
+
+  return renderDropdownControl('返佣比例', 'mdi:percent-outline', [
+    h(NInputNumber, {
+      value: agentCommissionRatePercent(row),
+      min: 0,
+      max: 100,
+      precision: 2,
+      step: 0.5,
+      size: 'small',
+      disabled: isBusy,
+      'onUpdate:value': (value: number | null) => {
+        agentCommissionRateDrafts[row.userId] = value
+      },
+    }),
+    h(
+      'span',
+      { class: 'admin-percent-suffix' },
+      '%',
+    ),
+    h(
+      NButton,
+      {
+        size: 'small',
+        type: 'primary',
+        secondary: true,
+        loading: isBusy,
+        disabled: isBusy,
+        onClick: () => void handleAgentCommissionRateSave(row),
+      },
+      { default: () => '保存' },
+    ),
+  ])
+}
+
+function developerAgentEditDropdownOptions(row: PlatformAgentPolicyOverride): AdminDropdownMixedOption[] {
+  return [
+    {
+      label: '编辑资料',
+      key: 'editProfile',
+      disabled: !canEditPlatformProfile('agent', row.userId),
+      icon: renderDropdownIcon('mdi:pencil-outline'),
+    },
+    {
+      label: '接入应用',
+      key: 'connectApplication',
+      disabled: !canConnectApplicationToTarget('agent', row.userId),
+      icon: renderDropdownIcon('mdi:apps'),
+    },
+    {
+      label: '重置密码',
+      key: 'resetPassword',
+      disabled: !canResetPlatformPassword(row.userId),
+      icon: renderDropdownIcon('mdi:lock-reset'),
+    },
+    { type: 'divider', key: 'developer-agent-edit-divider-controls' },
+    {
+      type: 'render',
+      key: 'developer-agent-create-user',
+      render: () => renderDeveloperAgentCreateUserControl(row),
+    },
+    {
+      type: 'render',
+      key: 'developer-agent-commission-rate',
+      render: () => renderDeveloperAgentCommissionControl(row),
+    },
+    { type: 'divider', key: 'developer-agent-edit-divider-danger' },
+    {
+      label: '禁用代理商',
+      key: 'disableAgent',
+      disabled: disablingAgentUserId.value === row.userId || !canDisableAgentPolicy(row),
+      icon: renderDropdownIcon('mdi:account-cancel-outline'),
+      props: { class: 'admin-dropdown-option-danger' },
+    },
+  ]
+}
+
+function handleDeveloperAgentEditActionSelect(
+  key: string | number,
+  row: PlatformAgentPolicyOverride,
+) {
+  if (!isDeveloperAgentEditActionKey(key)) return
+
+  if (key === 'editProfile') {
+    openEditPlatformUserProfile(row, 'agent')
+    return
+  }
+
+  if (key === 'connectApplication') {
+    void openConnectApplicationModal({
+      userId: row.userId,
+      username: row.username,
+      displayName: row.displayName,
+      targetRole: 'agent',
+      existingApplications: agentApplicationsForUser(row.userId),
+    })
+    return
+  }
+
+  if (key === 'resetPassword') {
+    openPasswordResetModal(row)
+    return
+  }
+
+  void handleDisableAgentPolicy(row)
+}
+
+function renderDeveloperAgentEditCell(row: PlatformAgentPolicyOverride) {
+  return h(
+    NDropdown,
+    {
+      trigger: 'click',
+      options: developerAgentEditDropdownOptions(row),
+      onSelect: (key: string | number) => handleDeveloperAgentEditActionSelect(key, row),
+    },
+    {
+      default: () =>
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'primary',
+            secondary: true,
+          },
+          {
+            icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+            default: () => '编辑',
+          },
+        ),
+    },
+  )
+}
+
+function developerAgentEditColumn(): DataTableColumns<PlatformAgentPolicyOverride>[number] {
+  return {
+    title: '管理动作',
+    key: 'actions',
+    width: 110,
+    render(row) {
+      return h(
+        'div',
+        { class: 'admin-table-actions' },
+        [renderDeveloperAgentEditCell(row)],
+      )
+    },
+  }
+}
+
+function withDeveloperAgentColumns(
+  columns: DataTableColumns<PlatformAgentPolicyOverride>,
+): DataTableColumns<PlatformAgentPolicyOverride> {
+  const hiddenColumnKeys = new Set(['developerDisabledCreateUsers', 'commissionRate', 'actions'])
+  const visibleColumns = columns.filter((item) => !('key' in item) || !hiddenColumnKeys.has(String(item.key)))
+  const creditsBalanceIndex = visibleColumns.findIndex(
+    (item) => 'key' in item && item.key === 'creditsAvailableBalance',
+  )
+  const creditsAdjustmentColumn = agentCreditsAdjustmentColumn()
+  const columnsWithCreditsAdjustment =
+    creditsBalanceIndex < 0
+      ? [...visibleColumns, creditsAdjustmentColumn]
+      : [
+          ...visibleColumns.slice(0, creditsBalanceIndex + 1),
+          creditsAdjustmentColumn,
+          ...visibleColumns.slice(creditsBalanceIndex + 1),
+        ]
+
+  return [
+    ...columnsWithCreditsAdjustment,
+    developerAgentEditColumn(),
+  ]
 }
 
 function deleteActionText(row: CreditsCustomerProfile) {
@@ -2998,12 +3332,19 @@ function formatEnterpriseAccountRelation(row: CreditsCustomerProfile) {
 
 function formatCustomerAgentOwnership(row: CreditsCustomerProfile) {
   if (!row.agents?.length) return '平台自有'
-  return row.agents
-    .map((agent) => {
-      const name = agent.displayName || agent.username || agent.userId
-      return agent.username && agent.username !== name ? `${name} (${agent.username})` : name
-    })
-    .join('、')
+  return row.agents.map(formatAgentFilterName).join('、')
+}
+
+function formatDisplayUsername(input: {
+  userId?: string | null
+  username?: string | null
+  displayName?: string | null
+}) {
+  const displayName = input.displayName || input.username || input.userId
+  const username = input.username || input.userId
+  if (!displayName) return '-'
+  if (!username) return displayName
+  return `${displayName}(${username})`
 }
 
 function formatCreatorName(input: {
@@ -3012,9 +3353,11 @@ function formatCreatorName(input: {
   createdByDisplayName?: string | null
   createdByRole?: string | null
 }) {
-  const name = input.createdByDisplayName || input.createdByUsername || input.createdByUserId
-  if (!name) return '-'
-  return input.createdByRole ? `${name} · ${input.createdByRole}` : name
+  return formatDisplayUsername({
+    userId: input.createdByUserId,
+    username: input.createdByUsername,
+    displayName: input.createdByDisplayName,
+  })
 }
 
 function formatAssignerName(input: {
@@ -3022,7 +3365,11 @@ function formatAssignerName(input: {
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null
 }) {
-  return input.assignedByDisplayName || input.assignedByUsername || input.assignedByUserId || '-'
+  return formatDisplayUsername({
+    userId: input.assignedByUserId,
+    username: input.assignedByUsername,
+    displayName: input.assignedByDisplayName,
+  })
 }
 
 function canCreateTargetRole(role: PlatformUserTargetRole) {
@@ -3305,6 +3652,12 @@ function agentDepositAdjustmentAmount(row: PlatformAgentPolicyOverride) {
   return agentDepositAdjustmentDrafts[row.userId] ?? null
 }
 
+function openAgentDepositAdjustmentModal(row: PlatformAgentPolicyOverride) {
+  selectedAgentDepositUser.value = row
+  agentDepositAdjustmentDrafts[row.userId] = agentDepositAdjustmentAmount(row)
+  isAgentDepositAdjustmentModalOpen.value = true
+}
+
 async function handleAgentDepositAdjustment(
   row: PlatformAgentPolicyOverride,
   direction: 'increase' | 'decrease',
@@ -3343,6 +3696,8 @@ async function handleAgentDepositAdjustment(
         : `已扣减 ${row.displayName} 的押金`,
     )
     await refreshOverview()
+    isAgentDepositAdjustmentModalOpen.value = false
+    selectedAgentDepositUser.value = null
   } catch (error) {
     const text = error instanceof Error ? error.message : '调整押金失败'
     message.error(text)
@@ -3518,7 +3873,24 @@ function openAdjustCreditsModal(row: CreditsCustomerProfile) {
     message.warning('当前角色不能为该账号增减积分')
     return
   }
-  selectedCapabilityUser.value = row
+  selectedAdjustCreditsUser.value = row
+  adjustCreditsForm.points = 0
+  adjustCreditsForm.reason = ''
+  adjustCreditsForm.classifyAsRecharge = true
+  isAdjustCreditsModalOpen.value = true
+}
+
+function openAdjustAgentCreditsModal(row: PlatformAgentPolicyOverride) {
+  if (!canAdjustAgent(row)) {
+    message.warning('当前角色不能为该代理商增减积分')
+    return
+  }
+  selectedAdjustCreditsUser.value = {
+    userId: row.userId,
+    username: row.username,
+    displayName: row.displayName,
+    role: 'agent',
+  }
   adjustCreditsForm.points = 0
   adjustCreditsForm.reason = ''
   adjustCreditsForm.classifyAsRecharge = true
@@ -3526,14 +3898,18 @@ function openAdjustCreditsModal(row: CreditsCustomerProfile) {
 }
 
 async function handleAdjustCredits() {
-  const target = selectedCapabilityUser.value
+  const target = selectedAdjustCreditsUser.value
   const points = Number(adjustCreditsForm.points ?? 0)
   if (!target) return
   if (!Number.isFinite(points) || points === 0) {
     message.error('积分变动必须是非 0 数字')
     return
   }
-  if (!canAdjustCustomer(target)) {
+  if (
+    activeRole.value !== 'developer' ||
+    authStore.userInfo?.id === target.userId ||
+    !authStore.permissions.includes('credits:points:adjust')
+  ) {
     message.error('当前角色不能为该账号增减积分')
     return
   }
@@ -3558,7 +3934,7 @@ async function handleAdjustCredits() {
       `已调整 ${target.username}：${points > 0 ? '+' : ''}${points.toLocaleString('zh-CN')}，余额 ${result.adjustment.balanceAfter}`,
     )
     isAdjustCreditsModalOpen.value = false
-    selectedCapabilityUser.value = null
+    selectedAdjustCreditsUser.value = null
     await refreshOverview()
   } catch (error) {
     message.error(error instanceof Error ? error.message : '积分调整失败')
@@ -4111,50 +4487,22 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
   {
     title: '增减押金',
     key: 'depositAdjustment',
-    minWidth: 250,
+    width: 120,
     render(row) {
       const isBusy = updatingAgentDepositUserId.value === row.userId
       return h(
-        'div',
-        { class: 'admin-function-points-cell' },
-        [
-          h(NInputNumber, {
-            value: agentDepositAdjustmentAmount(row),
-            min: 0,
-            precision: 2,
-            step: 100,
-            size: 'small',
-            disabled: isBusy,
-            placeholder: '金额',
-            'onUpdate:value': (value: number | null) => {
-              agentDepositAdjustmentDrafts[row.userId] = value
-            },
-          }),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              secondary: true,
-              loading: isBusy,
-              disabled: isBusy,
-              onClick: () => void handleAgentDepositAdjustment(row, 'increase'),
-            },
-            { default: () => '增加' },
-          ),
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'warning',
-              secondary: true,
-              loading: isBusy,
-              disabled: isBusy,
-              onClick: () => void handleAgentDepositAdjustment(row, 'decrease'),
-            },
-            { default: () => '扣减' },
-          ),
-        ],
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          loading: isBusy,
+          disabled: isBusy,
+          onClick: () => openAgentDepositAdjustmentModal(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:plus-minus-variant' }),
+          default: () => '增减押金',
+        },
       )
     },
   },
@@ -4312,7 +4660,7 @@ const agentAuthorizationColumns: DataTableColumns<PlatformAgentPolicyOverride> =
 ]
 
 const developerAgentAuthorizationColumns = computed<DataTableColumns<PlatformAgentPolicyOverride>>(() =>
-  withPasswordManagementColumn(agentAuthorizationColumns),
+  withDeveloperAgentColumns(agentAuthorizationColumns),
 )
 
 const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
@@ -5281,7 +5629,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               </span>
             </button>
             <div class="admin-collapse-body">
-              <div v-if="filteredRegularUserProfiles.length" class="agent-customer-insights-grid">
+              <div class="agent-customer-insights-grid">
                 <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
                   <div class="admin-trend-head">
                     <h2>Top 5 积分充值客户</h2>
@@ -5308,14 +5656,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 </NInput>
               </div>
               <NDataTable
-                v-if="searchedRegularUserProfiles.length"
                 :columns="developerCustomerColumns"
                 :data="searchedRegularUserProfiles"
                 :bordered="false"
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else :description="filteredRegularUserProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
             </div>
           </section>
 
@@ -5466,7 +5812,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
               />
             </button>
             <div v-if="isConsoleSectionOpen('adminUsers')" class="admin-collapse-body">
-              <div v-if="filteredRegularUserProfiles.length" class="agent-customer-insights-grid">
+              <div class="agent-customer-insights-grid">
                 <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
                   <div class="admin-trend-head">
                     <h2>Top 5 积分充值客户</h2>
@@ -5493,14 +5839,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 </NInput>
               </div>
               <NDataTable
-                v-if="searchedRegularUserProfiles.length"
                 :columns="customerColumns"
                 :data="searchedRegularUserProfiles"
                 :bordered="false"
                 :single-line="false"
                 :pagination="false"
               />
-              <NEmpty v-else :description="filteredRegularUserProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
             </div>
           </section>
 
@@ -6058,6 +6402,80 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
       </NModal>
 
       <NModal
+        v-model:show="isAgentDepositAdjustmentModalOpen"
+        preset="card"
+        class="admin-create-modal"
+        title="增减押金"
+        :style="{ width: '520px', maxWidth: '92vw' }"
+        :mask-closable="!updatingAgentDepositUserId"
+        @update:show="(show) => {
+          if (!show && selectedAgentDepositUser) {
+            delete agentDepositAdjustmentDrafts[selectedAgentDepositUser.userId]
+            selectedAgentDepositUser = null
+          }
+        }"
+      >
+        <div class="admin-modal-context">
+          <strong>{{ selectedAgentDepositUser?.displayName || selectedAgentDepositUser?.username }}</strong>
+          <span>
+            当前押金余额：
+            {{ Number(selectedAgentDepositUser?.depositBalance ?? 0).toLocaleString('zh-CN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) }}
+            {{ selectedAgentDepositUser?.depositCurrency || 'CNY' }}
+          </span>
+        </div>
+        <NForm label-placement="top" class="admin-create-form" :show-feedback="false">
+          <NFormItem label="调整金额" required>
+            <NInputNumber
+              v-if="selectedAgentDepositUser"
+              :value="agentDepositAdjustmentAmount(selectedAgentDepositUser)"
+              :min="0"
+              :precision="2"
+              :step="100"
+              placeholder="请输入押金金额"
+              class="admin-create-number"
+              :disabled="!!updatingAgentDepositUserId"
+              @update:value="(value) => {
+                if (selectedAgentDepositUser) {
+                  agentDepositAdjustmentDrafts[selectedAgentDepositUser.userId] = value
+                }
+              }"
+            />
+          </NFormItem>
+        </NForm>
+        <template #footer>
+          <div class="admin-modal-footer">
+            <NButton
+              :disabled="!!updatingAgentDepositUserId"
+              @click="isAgentDepositAdjustmentModalOpen = false"
+            >
+              取消
+            </NButton>
+            <NButton
+              type="warning"
+              secondary
+              :loading="!!selectedAgentDepositUser && updatingAgentDepositUserId === selectedAgentDepositUser.userId"
+              :disabled="!selectedAgentDepositUser || !!updatingAgentDepositUserId"
+              @click="selectedAgentDepositUser && handleAgentDepositAdjustment(selectedAgentDepositUser, 'decrease')"
+            >
+              扣减押金
+            </NButton>
+            <NButton
+              type="success"
+              secondary
+              :loading="!!selectedAgentDepositUser && updatingAgentDepositUserId === selectedAgentDepositUser.userId"
+              :disabled="!selectedAgentDepositUser || !!updatingAgentDepositUserId"
+              @click="selectedAgentDepositUser && handleAgentDepositAdjustment(selectedAgentDepositUser, 'increase')"
+            >
+              增加押金
+            </NButton>
+          </div>
+        </template>
+      </NModal>
+
+      <NModal
         v-model:show="isPasswordResetModalOpen"
         preset="card"
         class="admin-create-modal"
@@ -6245,10 +6663,18 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
         style="width: min(560px, calc(100vw - 32px))"
         title="增减积分"
         :mask-closable="!isAdjustingCredits"
+        @update:show="(show) => {
+          if (!show && !isAdjustingCredits) {
+            selectedAdjustCreditsUser = null
+          }
+        }"
       >
-        <div class="admin-modal-context" v-if="selectedCapabilityUser">
-          <strong>{{ selectedCapabilityUser.displayName }}</strong>
-          <span>{{ selectedCapabilityUser.username }} · {{ matrixTargetRole(selectedCapabilityUser.role) }}</span>
+        <div class="admin-modal-context" v-if="selectedAdjustCreditsUser">
+          <strong>{{ selectedAdjustCreditsUser.displayName }}</strong>
+          <span>
+            {{ selectedAdjustCreditsUser.username }}
+            · {{ selectedAdjustCreditsUser.role ? matrixTargetRole(selectedAdjustCreditsUser.role) : '-' }}
+          </span>
         </div>
         <NForm label-placement="top" class="admin-create-form">
           <NFormItem label="积分变动">
@@ -7140,6 +7566,35 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+}
+
+:global(.admin-dropdown-search) {
+  width: 260px;
+  padding: 8px;
+}
+
+:global(.admin-dropdown-control) {
+  display: grid;
+  gap: 8px;
+  min-width: 280px;
+  padding: 8px 12px 10px;
+}
+
+:global(.admin-dropdown-control-title),
+:global(.admin-dropdown-control-row) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:global(.admin-dropdown-control-title) {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+:global(.admin-dropdown-control-row .n-input-number) {
+  width: 112px;
 }
 
 :deep(.admin-password-cell) {
