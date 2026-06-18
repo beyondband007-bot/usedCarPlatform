@@ -138,16 +138,6 @@ type DeveloperConsolePage =
   | 'developer-transactions'
   | 'developer-settlements'
   | 'developer-billing'
-type ConsoleSectionKey =
-  | 'adminAccountCreation'
-  | 'adminAgents'
-  | 'adminUsers'
-  | 'adminSettlementApplications'
-  | 'agentOverview'
-  | 'agentCustomers'
-  | 'agentTransactions'
-  | 'agentCommissions'
-  | 'agentSettlements'
 
 type ApplicationFilterOption = {
   code: string
@@ -216,7 +206,6 @@ const isPasswordResetModalOpen = ref(false)
 const isResettingPassword = ref(false)
 const isConnectApplicationModalOpen = ref(false)
 const isConnectingApplication = ref(false)
-const consoleSectionOpen = ref<Record<string, boolean>>({})
 const promotingUserId = ref<string | null>(null)
 const disablingAgentUserId = ref<string | null>(null)
 const confirmingSettlementId = ref<string | null>(null)
@@ -316,69 +305,48 @@ let agentUserTypePieChartInstance: echarts.ECharts | null = null
 let agentLedgerConsumerBarChartInstance: echarts.ECharts | null = null
 let agentFunctionUsagePieChartInstance: echarts.ECharts | null = null
 
-const defaultConsoleSectionState: Record<RoleTab, Partial<Record<ConsoleSectionKey, boolean>>> = {
-  developer: {},
-  admin: {
-    adminAccountCreation: true,
-    adminAgents: true,
-    adminUsers: true,
-    adminSettlementApplications: true,
-  },
-  agent: {
-    agentOverview: true,
-    agentCustomers: true,
-    agentTransactions: true,
-    agentCommissions: true,
-    agentSettlements: true,
-  },
+const tablePagination = {
+  pageSize: 20,
+  pageSizes: [10, 20, 50, 100],
+  showSizePicker: true,
+  showQuickJumper: true,
 }
 
-const consoleCollapseStorageKey = computed(() =>
-  `credits-admin:${activeRole.value}-section-collapse:${authStore.userInfo?.id ?? 'anonymous'}`,
-)
-
-function loadConsoleSectionState() {
-  const defaults = defaultConsoleSectionState[activeRole.value] ?? {}
-  if (typeof window === 'undefined') {
-    consoleSectionOpen.value = { ...defaults }
-    return
-  }
-
-  try {
-    const stored = window.localStorage.getItem(consoleCollapseStorageKey.value)
-    const parsed = stored ? JSON.parse(stored) as Record<string, unknown> : {}
-    const next: Record<string, boolean> = {}
-    for (const [key, defaultValue] of Object.entries(defaults)) {
-      next[key] = typeof parsed[key] === 'boolean' ? parsed[key] as boolean : defaultValue ?? true
-    }
-    consoleSectionOpen.value = next
-  } catch {
-    consoleSectionOpen.value = { ...defaults }
-  }
+const compactTablePagination = {
+  pageSize: 10,
+  pageSizes: [10, 20, 50],
+  showSizePicker: true,
+  showQuickJumper: true,
 }
 
-function persistConsoleSectionState() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(consoleCollapseStorageKey.value, JSON.stringify(consoleSectionOpen.value))
-  } catch {
-    // Collapse controls should still work for the current session if storage is unavailable.
-  }
+const ledgerTablePagination = {
+  pageSize: 20,
+  pageSizes: [20, 50, 100],
+  showSizePicker: true,
+  showQuickJumper: true,
 }
 
-function isConsoleSectionOpen(key: ConsoleSectionKey) {
-  return consoleSectionOpen.value[key] ?? true
+const functionNameZhByCode: Record<string, string> = {
+  'showroom-light': '展厅棚拍',
+  'outdoor-scene': '户外实景',
+  'road-motion': '行驶动效',
+  'sky-studio': '天空影棚',
+  'paint-refresh': '烤漆翻新',
+  'light-consistency': '光污美化',
+  'interior-clean': '内饰清洁',
+  'interior-collage': '内饰拼接',
+  'watermark-remove': '去水印',
+  'creative-image': '创意生图',
+  'short-video': '短视频生成',
+  'batch-new-exterior': '批量上新',
+  'batch-new-wall-logo-scene': '批量墙标场景',
+  'batch-new-interior': '批量内饰',
+  single_image_generate: '单图生成',
+  batch_item_generate: '批量单项生成',
+  model_generate: '模特图生成',
+  try_on_generate: '试穿图生成',
+  lifestyle_photo: '生活方式图生成',
 }
-
-function toggleConsoleSection(key: ConsoleSectionKey) {
-  consoleSectionOpen.value = {
-    ...consoleSectionOpen.value,
-    [key]: !isConsoleSectionOpen(key),
-  }
-  persistConsoleSectionState()
-}
-
-watch(() => consoleCollapseStorageKey.value, loadConsoleSectionState, { immediate: true })
 watch(
   () => createAccountForm.applicationCode,
   (applicationCode) => {
@@ -748,6 +716,20 @@ function formatApplicationDisplayName(value?: string | null) {
 
 function formatApplicationList(values?: readonly string[] | null) {
   return values?.map((item) => formatApplicationDisplayName(item)).join(' / ') || '-'
+}
+
+function formatFunctionDisplayName(functionCode?: string | null, functionName?: string | null) {
+  const normalizedCode = functionCode?.trim()
+  if (normalizedCode && functionNameZhByCode[normalizedCode]) {
+    return functionNameZhByCode[normalizedCode]
+  }
+
+  const catalogFunction = applicationFunctions.value.find((item) => item.code === normalizedCode)
+  if (catalogFunction?.name && functionNameZhByCode[catalogFunction.code]) {
+    return functionNameZhByCode[catalogFunction.code]
+  }
+
+  return functionName || normalizedCode || '未标记功能'
 }
 
 function getTrendPeriodRange(period: TrendPeriod) {
@@ -2086,7 +2068,7 @@ const globalFunctionUsagePieData = computed(() => {
 
   for (const item of globalLedgerTransactions.value) {
     if (item.txnType !== 'settle') continue
-    const name = item.functionName ?? item.functionCode ?? '未标记功能'
+    const name = formatFunctionDisplayName(item.functionCode, item.functionName)
     const existing = grouped.get(name) ?? {
       name,
       value: 0,
@@ -2212,7 +2194,7 @@ const agentFunctionUsagePieData = computed(() => {
 
   for (const item of agentLedgerTransactions.value) {
     if (item.txnType !== 'settle') continue
-    const name = item.functionName ?? item.functionCode ?? '未标记功能'
+    const name = formatFunctionDisplayName(item.functionCode, item.functionName)
     const existing = grouped.get(name) ?? {
       name,
       value: 0,
@@ -3305,7 +3287,9 @@ function formatLedgerSignedPoints(row: AgentCustomerLedgerTransaction) {
 }
 
 function ledgerSourceText(row: AgentCustomerLedgerTransaction) {
-  return row.functionName ?? row.functionCode ?? row.remark ?? row.bizType ?? row.txnType
+  return row.functionCode || row.functionName
+    ? formatFunctionDisplayName(row.functionCode, row.functionName)
+    : row.remark ?? row.bizType ?? row.txnType
 }
 
 function ledgerActorText(row: AgentCustomerLedgerTransaction) {
@@ -4207,7 +4191,14 @@ async function handleSaveFunctionDefaultPoints(
 
 const functionColumns: DataTableColumns<CreditsAdminOverview['applicationFunctions'][number]> = [
   { title: '功能编码', key: 'code', width: 220 },
-  { title: '功能名称', key: 'name', width: 200 },
+  {
+    title: '功能名称',
+    key: 'name',
+    width: 200,
+    render(row) {
+      return formatFunctionDisplayName(row.code, row.name)
+    },
+  },
   { title: '计费模式', key: 'chargeMode', width: 140, render(row) { return row.chargeMode ?? '-' } },
   {
     title: '默认积分',
@@ -5434,12 +5425,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           id="developer-account-controls"
           class="admin-section"
         >
-          <button type="button" class="admin-collapse-head" aria-expanded="true">
+          <div class="admin-collapse-head">
             <span>
               <strong>账号与权限</strong>
               <small>开发者可创建 Admin、Agent 和 User，并配置全局创建权限。</small>
             </span>
-          </button>
+          </div>
           <div class="admin-collapse-body">
             <div class="admin-action-row" aria-label="开发者创建账号">
               <NButton type="primary" @click="openCreateAccountModal('admin')">
@@ -5492,22 +5483,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           id="admin-account-creation"
           class="admin-section"
         >
-          <button
-            type="button"
-            class="admin-collapse-head"
-            :aria-expanded="isConsoleSectionOpen('adminAccountCreation')"
-            @click="toggleConsoleSection('adminAccountCreation')"
-          >
+          <div class="admin-collapse-head">
             <span>
               <strong>账号创建权限</strong>
               <small>公司管理员可创建 User 和 Agent；也可以将普通 User 升级为 Agent。</small>
             </span>
-            <Icon
-              icon="mdi:chevron-down"
-              :class="{ rotated: isConsoleSectionOpen('adminAccountCreation') }"
-            />
-          </button>
-          <div v-if="isConsoleSectionOpen('adminAccountCreation')" class="admin-collapse-body">
+          </div>
+          <div class="admin-collapse-body">
             <div class="admin-action-row" aria-label="公司管理员创建账号">
               <NButton
                 type="primary"
@@ -5570,12 +5552,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
         <template v-if="activeRole === 'developer'">
           <section v-if="activeDeveloperConsolePage === 'developer-admins'" id="developer-admins" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>管理员表</strong>
                 <small>{{ adminPolicyOverrides.length }} 条记录；查看 Admin 信息并配置公司管理员创建权限。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <NDataTable
                 v-if="adminPolicyOverrides.length"
@@ -5583,19 +5565,19 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="adminPolicyOverrides"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="compactTablePagination"
               />
               <NEmpty v-else description="暂无公司管理员账号" />
             </div>
           </section>
 
           <section v-if="activeDeveloperConsolePage === 'developer-agents'" id="developer-agents" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>代理商表</strong>
                 <small>{{ searchedAgentPolicyOverrides.length }} 条记录；全平台 Agent 创建权限、押金、返佣比例与禁用管理。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <div class="admin-table-toolbar">
                 <NInput
@@ -5615,19 +5597,19 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="searchedAgentPolicyOverrides"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else :description="agentPolicyOverrides.length ? '没有匹配的代理商账号' : '暂无代理商账号'" />
             </div>
           </section>
 
           <section v-if="activeDeveloperConsolePage === 'developer-customers'" id="developer-customers" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>客户表</strong>
                 <small>{{ searchedRegularUserProfiles.length }} 条记录；开发者可读取全平台客户余额/流水。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <div class="agent-customer-insights-grid">
                 <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
@@ -5660,18 +5642,18 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="searchedRegularUserProfiles"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
             </div>
           </section>
 
           <section v-if="activeDeveloperConsolePage === 'developer-transactions'" id="developer-transactions" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>流水表</strong>
                 <small>{{ globalLedgerTransactions.length }} 条记录；开发者查看全平台积分流水。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <div v-if="globalLedgerTransactions.length" class="agent-ledger-insights-grid">
                 <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
@@ -5702,7 +5684,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   :data="globalLedgerTransactions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="{ pageSize: 20 }"
+                  :pagination="ledgerTablePagination"
                 />
                 <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
               </NSpin>
@@ -5710,12 +5692,12 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           </section>
 
           <section v-if="activeDeveloperConsolePage === 'developer-settlements'" id="developer-settlements" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>结算审批</strong>
                 <small>{{ settlementApplications.length }} 条记录；开发者查看全平台结算申请。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <NDataTable
                 v-if="settlementApplications.length"
@@ -5723,19 +5705,19 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="settlementApplications"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else description="暂无结算申请" />
             </div>
           </section>
 
           <section v-if="activeDeveloperConsolePage === 'developer-billing'" id="developer-billing" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>跨应用功能计费配置 · {{ selectedApplicationLabel }}</strong>
                 <small>按当前应用筛选功能编码、计费模式、默认积分与状态。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <NDataTable
                 v-if="selectedApplicationFunctions.length"
@@ -5743,7 +5725,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="selectedApplicationFunctions"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty
                 v-else
@@ -5755,22 +5737,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
         <template v-else-if="activeRole === 'admin'">
           <section v-if="activeAdminConsolePage === 'admin-agents'" id="admin-agents" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminAgents')"
-              @click="toggleConsoleSection('adminAgents')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>代理商表</strong>
                 <small>{{ searchedAdminAgentProfiles.length }} 条记录；公司管理员可以创建 Agent，并可禁用 Agent。</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminAgents') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('adminAgents')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div class="admin-table-toolbar">
                 <NInput
                   v-model:value="adminAgentSearchQuery"
@@ -5789,29 +5762,20 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="searchedAdminAgentProfiles"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else :description="filteredAgentProfiles.length ? '没有匹配的代理商账号' : '暂无代理商账号'" />
             </div>
           </section>
 
           <section v-if="activeAdminConsolePage === 'admin-users'" id="admin-users" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminUsers')"
-              @click="toggleConsoleSection('adminUsers')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>客户表</strong>
                 <small>{{ searchedRegularUserProfiles.length }} 条记录；公司管理员可读取全部客户余额/流水。</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminUsers') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('adminUsers')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div class="agent-customer-insights-grid">
                 <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
                   <div class="admin-trend-head">
@@ -5843,18 +5807,18 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="searchedRegularUserProfiles"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
             </div>
           </section>
 
           <section v-if="activeAdminConsolePage === 'admin-transactions'" id="admin-transactions" class="admin-section">
-            <button type="button" class="admin-collapse-head" aria-expanded="true">
+            <div class="admin-collapse-head">
               <span>
                 <strong>流水表</strong>
                 <small>{{ globalLedgerTransactions.length }} 条记录；公司管理员查看全平台积分流水。</small>
               </span>
-            </button>
+            </div>
             <div class="admin-collapse-body">
               <div v-if="globalLedgerTransactions.length" class="agent-ledger-insights-grid">
                 <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
@@ -5885,7 +5849,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   :data="globalLedgerTransactions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="{ pageSize: 20 }"
+                  :pagination="ledgerTablePagination"
                 />
                 <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
               </NSpin>
@@ -5893,29 +5857,20 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           </section>
 
           <section v-if="activeAdminConsolePage === 'admin-settlements'" id="admin-settlements" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('adminSettlementApplications')"
-              @click="toggleConsoleSection('adminSettlementApplications')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>结算审批</strong>
                 <small>{{ settlementApplications.length }} 条记录</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('adminSettlementApplications') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('adminSettlementApplications')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <NDataTable
                 v-if="settlementApplications.length"
                 :columns="settlementApplicationColumns"
                 :data="settlementApplications"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else description="暂无结算申请" />
             </div>
@@ -5925,24 +5880,15 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 
         <template v-else>
           <section v-if="activeAgentConsolePage === 'agent-dashboard'" id="agent-dashboard" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('agentOverview')"
-              @click="toggleConsoleSection('agentOverview')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>代理商运营视图</strong>
                 <small>
                   当前状态：{{ agentCreationGateText }}；当前代理：{{ agentOverview?.agent.displayName ?? '未加载' }}。
                 </small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('agentOverview') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('agentOverview')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div class="admin-action-row" aria-label="代理商创建账号">
                 <NButton
                   type="primary"
@@ -5982,22 +5928,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           </section>
 
           <section v-if="activeAgentConsolePage === 'agent-customers'" id="agent-customers" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('agentCustomers')"
-              @click="toggleConsoleSection('agentCustomers')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>客户表</strong>
                 <small>{{ searchedAgentCustomers.length }} 条记录</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('agentCustomers') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('agentCustomers')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div v-if="filteredAgentCustomers.length" class="agent-customer-insights-grid">
                 <section class="agent-customer-chart-panel" aria-label="客户积分充值排行">
                   <div class="admin-trend-head">
@@ -6036,29 +5973,20 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="searchedAgentCustomers"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else :description="filteredAgentCustomers.length ? '没有匹配的客户档案' : '暂无客户档案'" />
             </div>
           </section>
 
           <section v-if="activeAgentConsolePage === 'agent-consumption'" id="agent-consumption" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('agentTransactions')"
-              @click="toggleConsoleSection('agentTransactions')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>流水表</strong>
                 <small>{{ agentLedgerTransactions.length }} 条记录</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('agentTransactions') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('agentTransactions')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div v-if="agentLedgerTransactions.length" class="agent-ledger-insights-grid">
                 <section class="agent-ledger-chart-panel" aria-label="流水积分消费排行">
                   <div class="admin-trend-head">
@@ -6088,7 +6016,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   :data="agentLedgerTransactions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="{ pageSize: 20 }"
+                  :pagination="ledgerTablePagination"
                 />
                 <NEmpty v-else :description="isLoadingAgentTransactionsLedger ? '正在加载流水表' : '暂无绑定客户积分流水'" />
               </NSpin>
@@ -6096,22 +6024,13 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           </section>
 
           <section v-if="activeAgentConsolePage === 'agent-settlements'" id="agent-settlements" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('agentCommissions')"
-              @click="toggleConsoleSection('agentCommissions')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>返佣结算</strong>
                 <small>{{ filteredAgentCommissions.length }} 条记录</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('agentCommissions') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('agentCommissions')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div class="admin-section-actions">
                 <NButton size="small" secondary @click="exportRows('agent-commission-settlements', filteredAgentCommissions)">
                   <template #icon>
@@ -6143,29 +6062,20 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="filteredAgentCommissions"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else description="暂无返佣结算" />
             </div>
           </section>
 
           <section v-if="activeAgentConsolePage === 'agent-settlements'" class="admin-section">
-            <button
-              type="button"
-              class="admin-collapse-head"
-              :aria-expanded="isConsoleSectionOpen('agentSettlements')"
-              @click="toggleConsoleSection('agentSettlements')"
-            >
+            <div class="admin-collapse-head">
               <span>
                 <strong>历史账单</strong>
                 <small>{{ agentSettlements.length }} 条记录</small>
               </span>
-              <Icon
-                icon="mdi:chevron-down"
-                :class="{ rotated: isConsoleSectionOpen('agentSettlements') }"
-              />
-            </button>
-            <div v-if="isConsoleSectionOpen('agentSettlements')" class="admin-collapse-body">
+            </div>
+            <div class="admin-collapse-body">
               <div class="admin-section-actions">
                 <NButton size="small" secondary @click="exportRows('agent-settlement-history', agentSettlements)">
                   <template #icon>
@@ -6180,7 +6090,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                 :data="agentSettlements"
                 :bordered="false"
                 :single-line="false"
-                :pagination="false"
+                :pagination="tablePagination"
               />
               <NEmpty v-else description="暂无历史账单" />
             </div>
@@ -6215,7 +6125,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           :data="selectedCommissionDetail.topUpTransactions"
           :bordered="false"
           :single-line="false"
-          :pagination="false"
+          :pagination="compactTablePagination"
           :scroll-x="760"
           class="agent-ledger-table"
         />
@@ -6385,7 +6295,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             :data="agentCustomerLedger.transactions"
             :bordered="false"
             :single-line="false"
-            :pagination="false"
+            :pagination="ledgerTablePagination"
             :scroll-x="980"
             class="agent-ledger-table"
           />
@@ -7304,7 +7214,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   color: var(--app-text);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 
 .admin-collapse-trigger span,

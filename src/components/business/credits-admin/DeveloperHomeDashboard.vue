@@ -23,12 +23,6 @@ import type { AccountCreationPolicyState } from '@/policies/accountProvisioning'
 
 type ChartPeriod = 'today' | '7d' | '30d'
 type ChartMetric = 'consume' | 'recharge'
-type ManagementSectionKey =
-  | 'adminAuthorization'
-  | 'agentAuthorization'
-  | 'functionBilling'
-  | 'customers'
-  | 'resources'
 
 interface ApplicationCatalogItem {
   code: string
@@ -71,14 +65,21 @@ const chartMetric = ref<ChartMetric>('recharge')
 const chartRef = ref<HTMLElement | null>(null)
 const developerAgentSearchQuery = ref('')
 const developerCustomerSearchQuery = ref('')
-const managementSectionOpen = ref<Record<ManagementSectionKey, boolean>>({
-  adminAuthorization: true,
-  agentAuthorization: true,
-  functionBilling: false,
-  customers: true,
-  resources: true,
-})
 let chartInstance: echarts.ECharts | null = null
+
+const tablePagination = {
+  pageSize: 20,
+  pageSizes: [10, 20, 50, 100],
+  showSizePicker: true,
+  showQuickJumper: true,
+}
+
+const compactTablePagination = {
+  pageSize: 10,
+  pageSizes: [10, 20, 50],
+  showSizePicker: true,
+  showQuickJumper: true,
+}
 
 const applications = computed(() => props.overview?.applications ?? [])
 const recentTransactions = computed(() => props.overview?.recentTransactions ?? [])
@@ -342,77 +343,6 @@ function handleAppCardClick(code: string) {
   document.getElementById('developer-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-function loadManagementSectionState() {
-  const defaults: Record<ManagementSectionKey, boolean> = {
-    adminAuthorization: true,
-    agentAuthorization: true,
-    functionBilling: props.isFunctionBillingOpen,
-    customers: true,
-    resources: true,
-  }
-
-  if (typeof window === 'undefined') {
-    managementSectionOpen.value = defaults
-    return
-  }
-
-  try {
-    const stored = window.localStorage.getItem(props.collapseStorageKey)
-    const parsed = stored ? JSON.parse(stored) as Partial<Record<ManagementSectionKey, boolean>> : {}
-    managementSectionOpen.value = {
-      adminAuthorization: typeof parsed.adminAuthorization === 'boolean'
-        ? parsed.adminAuthorization
-        : defaults.adminAuthorization,
-      agentAuthorization: typeof parsed.agentAuthorization === 'boolean'
-        ? parsed.agentAuthorization
-        : defaults.agentAuthorization,
-      functionBilling: typeof parsed.functionBilling === 'boolean'
-        ? parsed.functionBilling
-        : defaults.functionBilling,
-      customers: typeof parsed.customers === 'boolean'
-        ? parsed.customers
-        : defaults.customers,
-      resources: typeof parsed.resources === 'boolean'
-        ? parsed.resources
-        : defaults.resources,
-    }
-  } catch {
-    managementSectionOpen.value = defaults
-  }
-
-  emit('update:isFunctionBillingOpen', managementSectionOpen.value.functionBilling)
-}
-
-function persistManagementSectionState() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(props.collapseStorageKey, JSON.stringify(managementSectionOpen.value))
-  } catch {
-    // Ignore storage failures; collapse controls should still work for the current session.
-  }
-}
-
-function isManagementSectionOpen(key: ManagementSectionKey) {
-  return managementSectionOpen.value[key]
-}
-
-function setManagementSectionOpen(key: ManagementSectionKey, open: boolean) {
-  managementSectionOpen.value = {
-    ...managementSectionOpen.value,
-    [key]: open,
-  }
-  if (key === 'functionBilling') {
-    emit('update:isFunctionBillingOpen', open)
-  }
-  persistManagementSectionState()
-}
-
-function toggleManagementSection(key: ManagementSectionKey) {
-  setManagementSectionOpen(key, !managementSectionOpen.value[key])
-}
-
-watch(() => props.collapseStorageKey, loadManagementSectionState, { immediate: true })
-
 watch([chartPeriod, chartMetric, recentTransactions], async () => {
   await nextTick()
   renderChart()
@@ -619,51 +549,33 @@ onBeforeUnmount(() => {
 
           <div class="dev-management-stack">
             <section class="dev-auth-block">
-              <button
-                type="button"
-                class="dev-collapse-head"
-                :aria-expanded="isManagementSectionOpen('adminAuthorization')"
-                @click="toggleManagementSection('adminAuthorization')"
-              >
+              <div class="dev-collapse-head">
                 <span>
                   <strong>公司管理员授权</strong>
                   <small>二级开关，控制 Admin 是否能创建 Agent 及 User</small>
                 </span>
-                <Icon
-                  icon="mdi:chevron-down"
-                  :class="{ rotated: isManagementSectionOpen('adminAuthorization') }"
-                />
-              </button>
-              <div v-if="isManagementSectionOpen('adminAuthorization')" class="dev-collapse-body">
+              </div>
+              <div class="dev-collapse-body">
                 <NDataTable
                   v-if="adminPolicyOverrides.length"
                   :columns="adminAuthorizationColumns"
                   :data="adminPolicyOverrides"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="false"
+                  :pagination="compactTablePagination"
                 />
                 <p v-else class="dev-auth-empty">暂无公司管理员账号</p>
               </div>
             </section>
 
             <section class="dev-auth-block">
-              <button
-                type="button"
-                class="dev-collapse-head"
-                :aria-expanded="isManagementSectionOpen('agentAuthorization')"
-                @click="toggleManagementSection('agentAuthorization')"
-              >
+              <div class="dev-collapse-head">
                 <span>
                   <strong>代理商授权与管理</strong>
                   <small>{{ searchedAgentPolicyOverrides.length }} 条记录；控制 Agent 创建 User，并可禁用 Agent。</small>
                 </span>
-                <Icon
-                  icon="mdi:chevron-down"
-                  :class="{ rotated: isManagementSectionOpen('agentAuthorization') }"
-                />
-              </button>
-              <div v-if="isManagementSectionOpen('agentAuthorization')" class="dev-collapse-body">
+              </div>
+              <div class="dev-collapse-body">
                 <div class="dev-table-toolbar">
                   <NInput
                     v-model:value="developerAgentSearchQuery"
@@ -682,7 +594,7 @@ onBeforeUnmount(() => {
                   :data="searchedAgentPolicyOverrides"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="false"
+                  :pagination="tablePagination"
                 />
                 <p v-else class="dev-auth-empty">
                   {{ agentPolicyOverrides.length ? '没有匹配的代理商账号' : '暂无代理商账号' }}
@@ -691,22 +603,13 @@ onBeforeUnmount(() => {
             </section>
 
             <section id="developer-customers" class="dev-auth-block">
-              <button
-                type="button"
-                class="dev-collapse-head"
-                :aria-expanded="isManagementSectionOpen('customers')"
-                @click="toggleManagementSection('customers')"
-              >
+              <div class="dev-collapse-head">
                 <span>
                   <strong>客户目录</strong>
                   <small>{{ searchedCustomerProfiles.length }} 条记录</small>
                 </span>
-                <Icon
-                  icon="mdi:chevron-down"
-                  :class="{ rotated: isManagementSectionOpen('customers') }"
-                />
-              </button>
-              <div v-if="isManagementSectionOpen('customers')" class="dev-collapse-body">
+              </div>
+              <div class="dev-collapse-body">
                 <div class="dev-table-toolbar">
                   <NInput
                     v-model:value="developerCustomerSearchQuery"
@@ -726,36 +629,27 @@ onBeforeUnmount(() => {
                   :data="searchedCustomerProfiles"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="false"
+                  :pagination="tablePagination"
                 />
                 <NEmpty v-else :description="filteredCustomerProfiles.length ? '没有匹配的客户档案' : '暂无客户档案'" />
               </div>
             </section>
 
             <section class="dev-auth-block">
-              <button
-                type="button"
-                class="dev-collapse-head"
-                :aria-expanded="isManagementSectionOpen('functionBilling')"
-                @click="toggleManagementSection('functionBilling')"
-              >
+              <div class="dev-collapse-head">
                 <span>
                   <strong>跨应用功能计费配置 · {{ selectedApplicationLabel }}</strong>
                   <small>按当前应用筛选功能编码、计费模式、默认积分与状态。</small>
                 </span>
-                <Icon
-                  icon="mdi:chevron-down"
-                  :class="{ rotated: isManagementSectionOpen('functionBilling') }"
-                />
-              </button>
-              <div v-if="isManagementSectionOpen('functionBilling')" class="dev-collapse-body">
+              </div>
+              <div class="dev-collapse-body">
                 <NDataTable
                   v-if="selectedApplicationFunctions.length"
                   :columns="functionColumns"
                   :data="selectedApplicationFunctions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="false"
+                  :pagination="tablePagination"
                 />
                 <NEmpty
                   v-else
@@ -1194,7 +1088,7 @@ onBeforeUnmount(() => {
   color: var(--bo-text);
   text-align: left;
   font: inherit;
-  cursor: pointer;
+  cursor: default;
 
   span {
     display: grid;
