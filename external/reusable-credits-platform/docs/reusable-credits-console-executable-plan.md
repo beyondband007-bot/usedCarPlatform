@@ -233,7 +233,7 @@ Implementation status:
 - Updated credits function registration to accept an explicit `applicationCode`, while preserving the existing usedCarPlatform default.
 - Added `npm run phase7:integration-contract-test` to verify application/function codes, lifecycle steps, seed payloads, and idempotency key patterns.
 - Added `npm run print:application-contract-seed -- clothing_ai` to print the planned `clothing_ai` seed payload and billing example.
-- Documented the app onboarding checklist and function registration contract in `docs/reusable-credits-application-integration-contract.md`.
+- Documented the app onboarding checklist and function registration contract in `docs/credits-platform-new-app-integration-guide.md` and `docs/credits-platform-new-app-integration-guide.zh-CN.md`.
 
 ## Phase 8: Documentation, Tests, And Handoff
 

@@ -5,6 +5,8 @@ dist/
 
 docs/*
 !docs/three-role-back-office-phase-8-handoff.md
+!docs/credits-platform-new-app-integration-guide.md
+!docs/credits-platform-new-app-integration-guide.zh-CN.md
 .env
 .env.*
 !.env.example
