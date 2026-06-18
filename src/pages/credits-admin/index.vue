@@ -6,6 +6,7 @@ import {
   NButton,
   NCheckbox,
   NDataTable,
+  NDropdown,
   NEmpty,
   NForm,
   NFormItem,
@@ -18,7 +19,7 @@ import {
   NTag,
   useMessage,
 } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import type { DataTableColumns, DropdownOption } from 'naive-ui'
 
 import {
   adjustPlatformAgentDeposit,
@@ -86,6 +87,18 @@ type PasswordResetTableRow = {
   username: string
   displayName: string
 }
+type CustomerEditActionKey =
+  | 'editProfile'
+  | 'connectApplication'
+  | 'promoteToAgent'
+  | 'resetPassword'
+  | 'deleteAccount'
+type CustomerAgentFilterOption = {
+  userId: string
+  username?: string | null
+  displayName?: string | null
+  customerCount: number
+}
 type PlatformEditableProfileRole = PlatformUserTargetRole | 'developer'
 type PlatformEditableProfileRow = PasswordResetTableRow & {
   phone?: string | null
@@ -128,6 +141,9 @@ type ApplicationFilterOption = {
   name: string
   statusText: string
 }
+
+const CUSTOMER_AGENT_FILTER_ALL_KEY = '__all_customer_agents__'
+const CUSTOMER_AGENT_FILTER_EMPTY_KEY = '__empty_customer_agents__'
 
 const props = defineProps<{
   activeConsolePage?: string
@@ -198,6 +214,7 @@ const updatingAgentDepositUserId = ref<string | null>(null)
 const updatingFunctionKey = ref<string | null>(null)
 const adminAgentSearchQuery = ref('')
 const adminCustomerSearchQuery = ref('')
+const selectedCustomerAgentUserId = ref<string | null>(null)
 const agentCustomerSearchQuery = ref('')
 const selectedCapabilityUser = ref<CreditsCustomerProfile | null>(null)
 const selectedCommissionDetail = ref<AgentOperationsCommissionPreview | null>(null)
@@ -1839,8 +1856,94 @@ const searchedAgentPolicyOverrides = computed(() =>
   ),
 )
 
+const customerAgentFilterOptions = computed<CustomerAgentFilterOption[]>(() => {
+  const agentsByUserId = new Map<string, CustomerAgentFilterOption>()
+
+  for (const agent of filteredAgentProfiles.value) {
+    agentsByUserId.set(agent.userId, {
+      userId: agent.userId,
+      username: agent.username,
+      displayName: agent.displayName,
+      customerCount: 0,
+    })
+  }
+
+  for (const customer of filteredCustomerProfiles.value) {
+    if (matrixTargetRole(customer.role) !== 'user') continue
+    for (const agent of customer.agents ?? []) {
+      const existing = agentsByUserId.get(agent.userId)
+      if (existing) {
+        existing.username ||= agent.username
+        existing.displayName ||= agent.displayName
+        existing.customerCount += 1
+        continue
+      }
+
+      agentsByUserId.set(agent.userId, {
+        userId: agent.userId,
+        username: agent.username,
+        displayName: agent.displayName,
+        customerCount: 1,
+      })
+    }
+  }
+
+  return [...agentsByUserId.values()].sort((left, right) => {
+    const leftName = left.displayName || left.username || left.userId
+    const rightName = right.displayName || right.username || right.userId
+    return leftName.localeCompare(rightName, 'zh-CN')
+  })
+})
+
+const selectedCustomerAgentFilter = computed(() => {
+  if (!selectedCustomerAgentUserId.value) return null
+  return (
+    customerAgentFilterOptions.value.find(
+      (agent) => agent.userId === selectedCustomerAgentUserId.value,
+    ) ?? null
+  )
+})
+
+const customerAgentDropdownOptions = computed<DropdownOption[]>(() => {
+  const agentOptions = customerAgentFilterOptions.value.map((agent) => ({
+    label: `${formatAgentFilterName(agent)}${agent.customerCount ? ` · ${agent.customerCount} 客户` : ''}`,
+    key: agent.userId,
+    icon: renderDropdownIcon('mdi:account-tie-outline'),
+  }))
+
+  return [
+    {
+      label: '全部代理',
+      key: CUSTOMER_AGENT_FILTER_ALL_KEY,
+      icon: renderDropdownIcon('mdi:filter-off-outline'),
+    },
+    ...(agentOptions.length
+      ? [{ type: 'divider' as const, key: 'customer-agent-divider' }, ...agentOptions]
+      : [
+          {
+            label: '暂无代理',
+            key: CUSTOMER_AGENT_FILTER_EMPTY_KEY,
+            disabled: true,
+          },
+        ]),
+  ]
+})
+
+watch(customerAgentFilterOptions, (options) => {
+  if (
+    selectedCustomerAgentUserId.value &&
+    !options.some((agent) => agent.userId === selectedCustomerAgentUserId.value)
+  ) {
+    selectedCustomerAgentUserId.value = null
+  }
+})
+
 const filteredRegularUserProfiles = computed(() =>
-  filteredCustomerProfiles.value.filter((item) => matrixTargetRole(item.role) === 'user'),
+  filteredCustomerProfiles.value.filter((item) => {
+    if (matrixTargetRole(item.role) !== 'user') return false
+    if (!selectedCustomerAgentUserId.value) return true
+    return item.agents?.some((agent) => agent.userId === selectedCustomerAgentUserId.value) ?? false
+  }),
 )
 
 const searchedRegularUserProfiles = computed(() =>
@@ -2449,6 +2552,296 @@ function canPromoteCustomer(row: CreditsCustomerProfile) {
 
 function canViewCustomerLedger() {
   return activeRole.value === 'developer' || activeRole.value === 'admin'
+}
+
+function formatAgentFilterName(agent: {
+  userId: string
+  username?: string | null
+  displayName?: string | null
+}) {
+  const name = agent.displayName || agent.username || agent.userId
+  return agent.username && agent.username !== name ? `${name} (${agent.username})` : name
+}
+
+function customerAgentFilterButtonText() {
+  return selectedCustomerAgentFilter.value
+    ? formatAgentFilterName(selectedCustomerAgentFilter.value)
+    : '筛选代理'
+}
+
+function handleCustomerAgentFilterSelect(key: string | number) {
+  if (key === CUSTOMER_AGENT_FILTER_ALL_KEY) {
+    selectedCustomerAgentUserId.value = null
+    return
+  }
+  if (key === CUSTOMER_AGENT_FILTER_EMPTY_KEY) return
+  selectedCustomerAgentUserId.value = String(key)
+}
+
+function renderCustomerAgentOwnershipTitle() {
+  const hasSelectedAgent = !!selectedCustomerAgentFilter.value
+
+  return h(
+    'div',
+    { class: 'admin-column-filter-head' },
+    [
+      h('span', '所属代理'),
+      h(
+        NDropdown,
+        {
+          trigger: 'click',
+          options: customerAgentDropdownOptions.value,
+          onSelect: handleCustomerAgentFilterSelect,
+        },
+        {
+          default: () =>
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                type: hasSelectedAgent ? 'primary' : 'default',
+                secondary: hasSelectedAgent,
+                quaternary: !hasSelectedAgent,
+              },
+              {
+                icon: () =>
+                  h(Icon, {
+                    icon: hasSelectedAgent ? 'mdi:filter-check-outline' : 'mdi:filter-variant',
+                  }),
+                default: customerAgentFilterButtonText,
+              },
+            ),
+        },
+      ),
+    ],
+  )
+}
+
+function renderDropdownIcon(icon: string) {
+  return () => h(Icon, { icon })
+}
+
+function isCustomerEditActionKey(key: string | number): key is CustomerEditActionKey {
+  return (
+    key === 'editProfile' ||
+    key === 'connectApplication' ||
+    key === 'promoteToAgent' ||
+    key === 'resetPassword' ||
+    key === 'deleteAccount'
+  )
+}
+
+function customerEditDropdownOptions(
+  row: CreditsCustomerProfile,
+  options: { includePasswordReset?: boolean } = {},
+): DropdownOption[] {
+  const targetRole = matrixTargetRole(row.role)
+  const isUser = targetRole === 'user'
+  const canEditProfile = isUser && canEditPlatformProfile(targetRole, row.userId, row.status)
+  const canConnectApplication =
+    isUser && canConnectApplicationToTarget('user', row.userId, row.status)
+
+  const menuOptions: DropdownOption[] = [
+    {
+      label: '编辑资料',
+      key: 'editProfile',
+      disabled: !canEditProfile,
+      icon: renderDropdownIcon('mdi:pencil-outline'),
+    },
+    {
+      label: '接入应用',
+      key: 'connectApplication',
+      disabled: !canConnectApplication,
+      icon: renderDropdownIcon('mdi:apps'),
+    },
+    {
+      label: '升级为代理',
+      key: 'promoteToAgent',
+      disabled: !isUser || !canPromoteCustomer(row) || promotingUserId.value === row.userId,
+      icon: renderDropdownIcon('mdi:account-arrow-up-outline'),
+    },
+  ]
+
+  if (options.includePasswordReset) {
+    menuOptions.push({
+      label: '重置密码',
+      key: 'resetPassword',
+      disabled: !canResetPlatformPassword(row.userId),
+      icon: renderDropdownIcon('mdi:lock-reset'),
+    })
+  }
+
+  menuOptions.push({
+    label: '删除账号',
+    key: 'deleteAccount',
+    disabled: !canDeleteCustomer(row),
+    icon: renderDropdownIcon('mdi:trash-can-outline'),
+    props: { class: 'admin-dropdown-option-danger' },
+  })
+
+  return menuOptions
+}
+
+function handleCustomerEditActionSelect(key: string | number, row: CreditsCustomerProfile) {
+  if (!isCustomerEditActionKey(key)) return
+
+  if (key === 'editProfile') {
+    const targetRole = matrixTargetRole(row.role)
+    if (targetRole !== 'user' || !canEditPlatformProfile(targetRole, row.userId, row.status)) {
+      message.warning('当前账号无权编辑该客户资料')
+      return
+    }
+    openEditPlatformUserProfile(row, 'user')
+    return
+  }
+
+  if (key === 'connectApplication') {
+    void openConnectApplicationModal({
+      userId: row.userId,
+      username: row.username,
+      displayName: row.displayName,
+      targetRole: 'user',
+      existingApplications: customerApplicationsForUser(row.userId),
+      status: row.status,
+    })
+    return
+  }
+
+  if (key === 'promoteToAgent') {
+    void handlePromoteUserToAgent(row)
+    return
+  }
+
+  if (key === 'resetPassword') {
+    openPasswordResetModal(row)
+    return
+  }
+
+  openDeleteAccountModal(row)
+}
+
+function renderCustomerCreditsAdjustmentCell(row: CreditsCustomerProfile) {
+  const canAdjust = canAdjustCustomer(row)
+
+  return h(
+    NButton,
+    {
+      size: 'small',
+      secondary: true,
+      disabled: !canAdjust,
+      onClick: () => openAdjustCreditsModal(row),
+    },
+    {
+      icon: () => h(Icon, { icon: 'mdi:plus-minus-variant' }),
+      default: () => '增减积分',
+    },
+  )
+}
+
+function customerCreditsAdjustmentColumn(): DataTableColumns<CreditsCustomerProfile>[number] {
+  return {
+    title: '增减积分',
+    key: 'creditsAdjustment',
+    width: 120,
+    render(row) {
+      return renderCustomerCreditsAdjustmentCell(row)
+    },
+  }
+}
+
+function renderCustomerActionsCell(
+  row: CreditsCustomerProfile,
+  options: { includePasswordReset?: boolean } = {},
+) {
+  const canViewLedger = canViewCustomerLedger()
+  const menuOptions = customerEditDropdownOptions(row, options)
+  const canUseEditDropdown = menuOptions.some((item) => !item.disabled)
+
+  if (!canViewLedger && !canUseEditDropdown) return '-'
+
+  const actions = []
+  if (canViewLedger) {
+    actions.push(
+      h(
+        NButton,
+        {
+          size: 'small',
+          secondary: true,
+          onClick: () => void openCustomerProfileLedger(row),
+        },
+        {
+          icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
+          default: () => '查看详情',
+        },
+      ),
+    )
+  }
+
+  actions.push(
+    h(
+      NDropdown,
+      {
+        trigger: 'click',
+        options: menuOptions,
+        onSelect: (key: string | number) => handleCustomerEditActionSelect(key, row),
+      },
+      {
+        default: () =>
+          h(
+            NButton,
+            {
+              size: 'small',
+              type: 'primary',
+              secondary: true,
+              disabled: !canUseEditDropdown,
+            },
+            {
+              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
+              default: () => '编辑',
+            },
+          ),
+      },
+    ),
+  )
+
+  return h(
+    'div',
+    { class: 'admin-table-actions' },
+    actions,
+  )
+}
+
+function customerActionsColumn(
+  options: { includePasswordReset?: boolean } = {},
+): DataTableColumns<CreditsCustomerProfile>[number] {
+  return {
+    title: '能力操作',
+    key: 'actions',
+    width: 190,
+    render(row) {
+      return renderCustomerActionsCell(row, options)
+    },
+  }
+}
+
+function withDeveloperCustomerColumns(
+  columns: DataTableColumns<CreditsCustomerProfile>,
+): DataTableColumns<CreditsCustomerProfile> {
+  const actionIndex = columns.findIndex((item) => 'key' in item && item.key === 'actions')
+  if (actionIndex < 0) {
+    return [
+      ...columns,
+      customerCreditsAdjustmentColumn(),
+      customerActionsColumn({ includePasswordReset: true }),
+    ]
+  }
+
+  return [
+    ...columns.slice(0, actionIndex),
+    customerCreditsAdjustmentColumn(),
+    customerActionsColumn({ includePasswordReset: true }),
+    ...columns.slice(actionIndex + 1),
+  ]
 }
 
 function canDisableAgent(row: PlatformAgentProfile) {
@@ -3522,9 +3915,9 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
     },
   },
   {
-    title: '所属代理',
+    title: renderCustomerAgentOwnershipTitle,
     key: 'agents',
-    width: 180,
+    width: 210,
     render(row) {
       return formatCustomerAgentOwnership(row)
     },
@@ -3570,141 +3963,7 @@ const customerColumns: DataTableColumns<CreditsCustomerProfile> = [
       )
     },
   },
-  {
-    title: '能力操作',
-    key: 'actions',
-    width: 420,
-    render(row) {
-      const canViewLedger = canViewCustomerLedger()
-      const targetRole = matrixTargetRole(row.role)
-      const canEditProfile =
-        targetRole === 'user' &&
-        canEditPlatformProfile(targetRole, row.userId, row.status)
-      const canAdjust = canAdjustCustomer(row)
-      const canDelete = canDeleteCustomer(row)
-      const canPromote = canPromoteCustomer(row)
-      const canConnectApplication =
-        targetRole === 'user' &&
-        canConnectApplicationToTarget('user', row.userId, row.status)
-      if (!canViewLedger && !canEditProfile && !canAdjust && !canDelete && !canPromote && !canConnectApplication) return '-'
-
-      const actions = []
-      if (canViewLedger) {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              secondary: true,
-              onClick: () => void openCustomerProfileLedger(row),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:eye-outline' }),
-              default: () => '查看详情',
-            },
-          ),
-        )
-      }
-      if (canEditProfile) {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              secondary: true,
-              onClick: () => openEditPlatformUserProfile(row, 'user'),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:pencil-outline' }),
-              default: () => '编辑资料',
-            },
-          ),
-        )
-      }
-      if (matrixTargetRole(row.role) === 'user') {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              secondary: true,
-              disabled: !canPromote,
-              loading: promotingUserId.value === row.userId,
-              onClick: () => handlePromoteUserToAgent(row),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:account-arrow-up-outline' }),
-              default: () => '升级为代理',
-            },
-          ),
-        )
-      }
-      if (canConnectApplication) {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              secondary: true,
-              onClick: () => void openConnectApplicationModal({
-                userId: row.userId,
-                username: row.username,
-                displayName: row.displayName,
-                targetRole: 'user',
-                existingApplications: customerApplicationsForUser(row.userId),
-                status: row.status,
-              }),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:apps' }),
-              default: () => '接入应用',
-            },
-          ),
-        )
-      }
-      if (canAdjust) {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              secondary: true,
-              onClick: () => openAdjustCreditsModal(row),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:plus-minus-variant' }),
-              default: () => '增减积分',
-            },
-          ),
-        )
-      }
-      if (canDelete) {
-        actions.push(
-          h(
-            NButton,
-            {
-              size: 'small',
-              type: 'error',
-              secondary: true,
-              onClick: () => openDeleteAccountModal(row),
-            },
-            {
-              icon: () => h(Icon, { icon: 'mdi:trash-can-outline' }),
-              default: () => '删除',
-            },
-          ),
-        )
-      }
-
-      return h(
-        'div',
-        { class: 'admin-table-actions' },
-        actions,
-      )
-    },
-  },
+  customerActionsColumn(),
 ]
 
 const adminAuthorizationColumns: DataTableColumns<PlatformAdminPolicyOverride> = [
@@ -4181,7 +4440,7 @@ const agentManagementColumns: DataTableColumns<PlatformAgentProfile> = [
 ]
 
 const developerCustomerColumns = computed<DataTableColumns<CreditsCustomerProfile>>(() =>
-  withPasswordManagementColumn(customerColumns),
+  withDeveloperCustomerColumns(customerColumns),
 )
 
 const agentCustomerColumns: DataTableColumns<AgentOperationsCustomer> = [
@@ -6876,11 +7135,23 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
   gap: 8px;
 }
 
+:deep(.admin-column-filter-head) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
 :deep(.admin-password-cell) {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+:global(.admin-dropdown-option-danger .n-dropdown-option-body__label),
+:global(.admin-dropdown-option-danger .iconify) {
+  color: #d03050;
 }
 
 :deep(.admin-auth-switch-cell) {
