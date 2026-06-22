@@ -163,13 +163,7 @@ async function handleDownload() {
   width: 100%;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
-      transparent 42%
-    ),
-    var(--assist-card-strong, var(--sv-surface, #111));
+  background: var(--media-surface, var(--assist-card-strong, var(--sv-surface, #111)));
 }
 
 .delivery-asset-media :deep(.preload-image) {

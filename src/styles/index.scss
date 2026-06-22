@@ -21,6 +21,7 @@ $theme-vars: (
     app-header-credits-bg: #d4a017,
     app-header-credits-text: #ffffff,
     app-header-user: #0f172a,
+    media-surface: #e8edf4,
   ),
   dark: (
     app-bg: #050505,
@@ -42,6 +43,7 @@ $theme-vars: (
     app-header-credits-bg: rgba(239, 194, 76, 0.14),
     app-header-credits-text: #f4d36a,
     app-header-user: #f8f3e7,
+    media-surface: #111111,
   ),
 );
 
@@ -66,6 +68,7 @@ $theme-vars: (
   --app-header-credits-bg: #{map.get($vars, app-header-credits-bg)};
   --app-header-credits-text: #{map.get($vars, app-header-credits-text)};
   --app-header-user: #{map.get($vars, app-header-user)};
+  --media-surface: #{map.get($vars, media-surface)};
   --app-subnav-offset: 0rem;
   --app-header-offset: calc(5.5rem + var(--app-subnav-offset));
 }
@@ -246,5 +249,17 @@ body,
 @supports not (scrollbar-gutter: stable) {
   html {
     overflow-y: scroll;
+  }
+}
+
+/* 标签页切到后台时暂停金色扫光动画，避免切回时整屏闪黄 */
+html.is-tab-hidden {
+  .preload-image__placeholder,
+  .preload-image__spinner,
+  .waiting-scan,
+  .delivery-pending-scan,
+  .delivery-asset-pending-scan,
+  .sv-generating-scan {
+    animation-play-state: paused !important;
   }
 }

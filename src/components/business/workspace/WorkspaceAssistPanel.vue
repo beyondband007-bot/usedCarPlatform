@@ -2305,13 +2305,7 @@ defineExpose({
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
-      transparent 42%
-    ),
-    var(--assist-card-strong);
+  background: var(--media-surface, var(--assist-card-strong));
 }
 
 .delivery-result-image {
@@ -3025,13 +3019,7 @@ defineExpose({
   aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 10px 10px 0 0;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
-      transparent 42%
-    ),
-    var(--assist-card-strong);
+  background: var(--media-surface, var(--assist-card-strong));
 
   :deep(.preload-image) {
     position: absolute;

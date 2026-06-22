@@ -41,6 +41,10 @@ function resumeWeChatAutoplayVideos() {
   })
 }
 
+function syncTabHiddenClass() {
+  document.documentElement.classList.toggle('is-tab-hidden', document.hidden)
+}
+
 function bindWeChatVideoAutoplay() {
   if (!isWeChatBrowser()) {
     return
@@ -76,6 +80,9 @@ export function initBrowserEnv() {
     window.setTimeout(updateViewportHeightUnit, 100)
   })
   window.matchMedia(H5_MEDIA_QUERY).addEventListener('change', updateMobileClass)
+
+  syncTabHiddenClass()
+  document.addEventListener('visibilitychange', syncTabHiddenClass, { passive: true })
 
   bindWeChatVideoAutoplay()
 }

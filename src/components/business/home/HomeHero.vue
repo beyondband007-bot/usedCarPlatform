@@ -184,7 +184,6 @@ const heroImageStyle = computed((): CSSProperties => {
   overflow: hidden;
   width: 100%;
   height: 100%;
-  background: transparent !important;
 }
 
 .hero-copy {

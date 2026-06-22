@@ -199,8 +199,13 @@ function handleError(event: Event) {
   transition: opacity 0.24s ease;
 }
 
+.preload-image.is-loaded {
+  background: transparent;
+}
+
 .preload-image.is-loaded .preload-image__img {
   opacity: 1;
+  background-color: var(--preload-image-surface);
 }
 
 .preload-image__placeholder {
