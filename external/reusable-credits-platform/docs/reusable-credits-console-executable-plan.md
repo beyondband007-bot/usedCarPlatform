@@ -147,7 +147,7 @@ Implementation status:
 - Creates an app user and role assignment.
 - Ensures a personal credits user/account through the existing credits account linker.
 - Writes `application_customer_links`.
-- Writes `agent_customer_relations` when an Agent creates a User.
+- Writes the Credits Platform `agent_relations` record when an Agent creates a User.
 - Writes allowed and denied account-creation audit rows.
 - Stores idempotent completed responses for same-key replay and rejects same-key request-hash conflicts.
 - `/reusable-credits-console` now exposes role-aware Create Admin/Agent/User buttons and a shared account creation form wired to this endpoint.
@@ -233,7 +233,7 @@ Implementation status:
 - Updated credits function registration to accept an explicit `applicationCode`, while preserving the existing usedCarPlatform default.
 - Added `npm run phase7:integration-contract-test` to verify application/function codes, lifecycle steps, seed payloads, and idempotency key patterns.
 - Added `npm run print:application-contract-seed -- clothing_ai` to print the planned `clothing_ai` seed payload and billing example.
-- Documented the app onboarding checklist and function registration contract in `docs/reusable-credits-application-integration-contract.md`.
+- Documented the app onboarding checklist and function registration contract in `docs/credits-platform-new-app-integration-guide.md` and `docs/credits-platform-new-app-integration-guide.zh-CN.md`.
 
 ## Phase 8: Documentation, Tests, And Handoff
 

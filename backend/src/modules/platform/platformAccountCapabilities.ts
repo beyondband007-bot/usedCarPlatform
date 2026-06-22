@@ -1,3 +1,4 @@
+import { pbkdf2Sync, randomBytes } from "node:crypto";
 import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
 
 import { env } from "../../config/env";
@@ -6,6 +7,15 @@ import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import type { AuthenticatedUser, UserRole } from "../auth/authTypes";
+import {
+  resolvePlatformCreditsAccountIdentity,
+  type PlatformCreditsAccountIdentity,
+} from "./platformCreditsAccountIdentity";
+import {
+  deactivateCanonicalAgentRelations,
+  hasCanonicalAgentCustomerRelation,
+  suspendCanonicalAgent,
+} from "./creditsAgentRelationsService";
 
 type MatrixTargetRole = "admin" | "agent" | "user";
 
@@ -13,15 +23,34 @@ type PlatformAccountRow = RowDataPacket & {
   id: string;
   username: string;
   display_name: string;
+  phone: string | null;
   status: string;
   credits_user_id: number | null;
-  role_code: UserRole | null;
+  credits_tenant_id: number | null;
+  account_scope: string | null;
+  role_code: string | null;
+};
+
+type SubscriptionPlanLookupRow = RowDataPacket & {
+  code: string;
+  application_code: string;
+  name: string;
+  status: string;
+};
+
+type ApplicationLinkRow = RowDataPacket & {
+  application_code: string;
+};
+
+type ApplicationCodeRow = RowDataPacket & {
+  application_code: string | null;
 };
 
 type CreditsAccountRow = RowDataPacket & {
   id: number;
   tenant_id: number | null;
-  user_id: number;
+  user_id: number | null;
+  account_scope: "personal" | "tenant";
   total_balance: string;
   locked_balance: string;
   available_balance: string;
@@ -38,6 +67,7 @@ const getCreditsPool = () => {
       database: env.credits.mysql.database,
       user: env.credits.mysql.user,
       password: env.credits.mysql.password,
+      timezone: "Z",
       waitForConnections: true,
       connectionLimit: env.credits.mysql.connectionLimit,
       namedPlaceholders: true,
@@ -59,10 +89,50 @@ function normalizePoints(value: unknown) {
   return Number(points.toFixed(4));
 }
 
-function matrixRole(role: UserRole | null): MatrixTargetRole | "developer" | null {
+function normalizePassword(value: unknown) {
+  const password = typeof value === "string" ? value : "";
+  if (password.length < 6) {
+    throw errors.invalidParameter("password must be at least 6 characters");
+  }
+  return password;
+}
+
+function hashPassword(password: string) {
+  const iterations = 120_000;
+  const salt = randomBytes(16).toString("hex");
+  const hash = pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
+  return `pbkdf2_sha256$${iterations}$${salt}$${hash}`;
+}
+
+function matrixRole(role: string | null): MatrixTargetRole | "developer" | null {
   if (role === "admin" || role === "agent" || role === "developer") return role;
-  if (role === "enterprise") return "user";
+  if (role === "enterprise" || role === "user") return "user";
   return null;
+}
+
+function normalizeApplicationCode(value: unknown) {
+  const applicationCode = normalizeText(value, 80) || "used-car-platform";
+  if (!/^[a-z0-9][a-z0-9_-]{1,78}[a-z0-9]$/.test(applicationCode)) {
+    throw errors.invalidParameter("applicationCode must be 3-80 lowercase letters, numbers, hyphens, or underscores");
+  }
+  return applicationCode;
+}
+
+function normalizePlanCode(value: unknown) {
+  const planCode = normalizeText(value, 32);
+  if (!/^[a-z0-9][a-z0-9_-]{1,30}[a-z0-9]$/.test(planCode)) {
+    throw errors.invalidParameter("planCode must be 3-32 lowercase letters, numbers, hyphens, or underscores");
+  }
+  return planCode;
+}
+
+function canConnectApplicationTarget(
+  operator: AuthenticatedUser,
+  targetRole: MatrixTargetRole | "developer" | null,
+) {
+  if (operator.role !== "developer" && operator.role !== "admin" && operator.role !== "agent") return false;
+  if (operator.role === "agent") return targetRole === "user";
+  return targetRole === "agent" || targetRole === "user";
 }
 
 function canAdjustTarget(operator: AuthenticatedUser, targetRole: MatrixTargetRole | "developer" | null) {
@@ -78,6 +148,13 @@ function canDeleteTarget(operator: AuthenticatedUser, targetRole: MatrixTargetRo
   return false;
 }
 
+function canEditProfileTarget(operator: AuthenticatedUser, targetRole: MatrixTargetRole | "developer" | null) {
+  if (targetRole === "developer" || !targetRole) return false;
+  if (operator.role === "developer") return targetRole === "admin" || targetRole === "agent" || targetRole === "user";
+  if (operator.role === "admin") return targetRole === "agent" || targetRole === "user";
+  return false;
+}
+
 async function findTargetUser(targetUserId: unknown) {
   const userId = normalizeText(targetUserId, 64);
   if (!userId) throw errors.invalidParameter("targetUserId is required");
@@ -87,8 +164,11 @@ async function findTargetUser(targetUserId: unknown) {
        u.id,
        u.username,
        u.display_name,
+       u.phone,
        u.status,
        u.credits_user_id,
+       u.credits_tenant_id,
+       u.account_scope,
        COALESCE(boa.role_code, aur.role_code) role_code
      FROM app_users u
      LEFT JOIN back_office_role_assignments boa
@@ -140,22 +220,71 @@ function requireMutationAllowed(
   return targetRole as MatrixTargetRole;
 }
 
-async function findPersonalCreditsAccount(creditsUserId: number) {
+function requireProfileEditAllowed(operator: AuthenticatedUser, target: PlatformAccountRow) {
+  if (operator.id === target.id) {
+    throw errors.forbidden("operators cannot edit their own back-office account profile here");
+  }
+
+  const targetRole = matrixRole(target.role_code);
+  if (!canEditProfileTarget(operator, targetRole)) {
+    throw errors.forbidden("role capability matrix denied this target", {
+      operatorRole: operator.role,
+      targetRole,
+    });
+  }
+
+  return targetRole as MatrixTargetRole;
+}
+
+async function findCreditsAccount(identity: PlatformCreditsAccountIdentity) {
   const [rows] = await getCreditsPool().query<CreditsAccountRow[]>(
-    `SELECT id, tenant_id, user_id, total_balance, locked_balance, available_balance, status
+    `SELECT id, tenant_id, user_id, account_scope,
+            total_balance, locked_balance, available_balance, status
      FROM credit_accounts
-     WHERE user_id = :creditsUserId
-       AND tenant_id IS NULL
-       AND account_scope = 'personal'
+     WHERE account_scope = :accountScope
+       AND (
+         (:accountScope = 'tenant' AND tenant_id = :creditsTenantId AND user_id IS NULL)
+         OR
+         (:accountScope = 'personal' AND user_id = :creditsUserId AND tenant_id IS NULL)
+       )
        AND status = 'active'
      ORDER BY id
      LIMIT 1`,
-    { creditsUserId },
+    identity,
   );
 
   const account = rows[0];
   if (!account) throw errors.invalidParameter("target credits account not found");
   return account;
+}
+
+async function assertAgentCanConnectCustomerApplication(
+  operatorUserId: string,
+  targetUserId: string,
+  applicationCode: string,
+) {
+  const [grantRows] = await pool.query<Array<RowDataPacket & { application_code: string }>>(
+    `SELECT application_code
+     FROM application_customer_links
+     WHERE user_id = :operatorUserId
+       AND application_code = :applicationCode
+       AND status = 'active'
+     LIMIT 1`,
+    { operatorUserId, applicationCode },
+  );
+  if (!grantRows.length) {
+    throw errors.forbidden("Agent is not granted access to this application", {
+      operatorUserId,
+      applicationCode,
+    });
+  }
+
+  if (!(await hasCanonicalAgentCustomerRelation(operatorUserId, targetUserId))) {
+    throw errors.forbidden("Agent can only connect applications for bound customers", {
+      operatorUserId,
+      targetUserId,
+    });
+  }
 }
 
 export async function adjustPlatformUserCredits(
@@ -170,12 +299,20 @@ export async function adjustPlatformUserCredits(
     "credits:points:adjust",
     canAdjustTarget,
   );
-  if (!target.credits_user_id) throw errors.invalidParameter("target user is not linked to credits");
+  const creditsIdentity = resolvePlatformCreditsAccountIdentity({
+    creditsUserId: target.credits_user_id,
+    accountScope: target.account_scope,
+    creditsTenantId: target.credits_tenant_id,
+  });
+  if (!creditsIdentity) throw errors.invalidParameter("target user is not linked to credits");
 
   const points = normalizePoints(payload.points);
   const reason = normalizeText(payload.reason, 240) || "back-office manual adjustment";
   const idempotencyKey = normalizeText(payload.idempotencyKey, 160);
-  const account = await findPersonalCreditsAccount(target.credits_user_id);
+  const classifyAsRecharge = payload.classifyAsRecharge === true && points > 0;
+  const transactionType = classifyAsRecharge ? "recharge" : "adjustment";
+  const bizType = classifyAsRecharge ? "back-office-recharge" : "back-office-adjustment";
+  const account = await findCreditsAccount(creditsIdentity);
   const balanceBefore = Number(account.total_balance);
   const balanceAfter = Number((balanceBefore + points).toFixed(4));
 
@@ -191,7 +328,8 @@ export async function adjustPlatformUserCredits(
     await connection.beginTransaction();
 
     const [lockedRows] = await connection.query<CreditsAccountRow[]>(
-      `SELECT id, tenant_id, user_id, total_balance, locked_balance, available_balance, status
+      `SELECT id, tenant_id, user_id, account_scope,
+              total_balance, locked_balance, available_balance, status
        FROM credit_accounts
        WHERE id = :accountId
        FOR UPDATE`,
@@ -230,16 +368,18 @@ export async function adjustPlatformUserCredits(
        )
        VALUES (
          :tenantId, :creditsUserId, :accountId, NULL, NULL,
-         NULL, NULL, 'adjustment', :points, :balanceBefore,
-         :balanceAfter, 'back-office-adjustment', :bizId, NULL, :remark
+         NULL, NULL, :transactionType, :points, :balanceBefore,
+         :balanceAfter, :bizType, :bizId, NULL, :remark
        )`,
       {
         tenantId: locked.tenant_id,
-        creditsUserId: locked.user_id,
+        creditsUserId: creditsIdentity.creditsUserId,
         accountId: locked.id,
+        transactionType,
         points: points.toFixed(4),
         balanceBefore: lockedBalanceBefore.toFixed(4),
         balanceAfter: lockedBalanceAfter.toFixed(4),
+        bizType,
         bizId: idempotencyKey || createId("adjust"),
         remark: JSON.stringify({
           reason,
@@ -247,6 +387,7 @@ export async function adjustPlatformUserCredits(
           operatorRole: current.user.role,
           targetAppUserId: target.id,
           targetRole,
+          classifyAsRecharge,
         }),
       },
     );
@@ -264,6 +405,7 @@ export async function adjustPlatformUserCredits(
       adjustment: {
         transactionId: Number(transactionResult.insertId),
         points,
+        txnType: transactionType,
         balanceBefore: lockedBalanceBefore.toFixed(4),
         balanceAfter: lockedBalanceAfter.toFixed(4),
         reason,
@@ -275,6 +417,161 @@ export async function adjustPlatformUserCredits(
   } finally {
     connection.release();
   }
+}
+
+export async function connectPlatformUserApplicationByCapability(
+  req: Parameters<typeof getRequiredCurrentUser>[0],
+  targetUserId: unknown,
+  payload: Record<string, unknown>,
+) {
+  const current = getRequiredCurrentUser(req);
+  const target = await findTargetUser(targetUserId);
+  const targetRole = matrixRole(target.role_code);
+  if (!canConnectApplicationTarget(current.user, targetRole)) {
+    throw errors.forbidden("only Developer or Admin can connect applications for Agents and Users", {
+      operatorRole: current.user.role,
+      targetRole,
+    });
+  }
+  if (current.user.id === target.id) {
+    throw errors.forbidden("operators cannot mutate their own back-office account");
+  }
+  if (target.status !== "active") {
+    throw errors.invalidParameter("target user account is not active");
+  }
+  if (!target.credits_user_id) {
+    throw errors.invalidParameter("target user is not linked to credits");
+  }
+
+  const applicationCode = normalizeApplicationCode(payload.applicationCode);
+  const planCode = normalizePlanCode(payload.planCode);
+  const reason = normalizeText(payload.reason, 240) || "back-office application connection";
+  if (current.user.role === "agent") {
+    await assertAgentCanConnectCustomerApplication(current.user.id, target.id, applicationCode);
+  }
+
+  const [planRows] = await pool.query<SubscriptionPlanLookupRow[]>(
+    `SELECT code, application_code, name, status
+     FROM subscription_plans
+     WHERE application_code = :applicationCode
+       AND code = :planCode
+       AND status = 'active'
+     LIMIT 1`,
+    { applicationCode, planCode },
+  );
+  const plan = planRows[0];
+  if (!plan) {
+    throw errors.invalidParameter("selected application plan is not active");
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    await connection.query(
+      `INSERT INTO user_subscriptions (user_id, application_code, plan_code, status)
+       VALUES (:userId, :applicationCode, :planCode, 'active')
+       ON DUPLICATE KEY UPDATE
+         application_code = VALUES(application_code),
+         plan_code = VALUES(plan_code),
+         status = 'active',
+         updated_at = CURRENT_TIMESTAMP(3)`,
+      {
+        userId: target.id,
+        applicationCode,
+        planCode,
+      },
+    );
+
+    await connection.query(
+      `INSERT INTO application_customer_links
+        (id, application_code, user_id, credits_user_id, account_scope, credits_tenant_id,
+         created_by_user_id, created_by_role_code, status, metadata_json)
+       VALUES
+        (:id, :applicationCode, :userId, :creditsUserId, :accountScope, :creditsTenantId,
+         :createdByUserId, :createdByRoleCode, 'active', :metadataJson)
+       ON DUPLICATE KEY UPDATE
+         credits_user_id = VALUES(credits_user_id),
+         account_scope = VALUES(account_scope),
+         credits_tenant_id = VALUES(credits_tenant_id),
+         created_by_user_id = VALUES(created_by_user_id),
+         created_by_role_code = VALUES(created_by_role_code),
+         status = 'active',
+         metadata_json = VALUES(metadata_json),
+         updated_at = CURRENT_TIMESTAMP(3)`,
+      {
+        id: createId("acl"),
+        applicationCode,
+        userId: target.id,
+        creditsUserId: target.credits_user_id,
+        accountScope: target.account_scope || "personal",
+        creditsTenantId: target.credits_tenant_id,
+        createdByUserId: current.user.id,
+        createdByRoleCode: current.user.role,
+        metadataJson: JSON.stringify({
+          targetRole,
+          planCode,
+          source: current.user.role === "agent"
+            ? "agent-customer-application-connect"
+            : "back-office-application-connect",
+        }),
+      },
+    );
+
+    await connection.query(
+      `INSERT INTO account_creation_audit_logs
+        (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+         application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+       VALUES
+        (:id, :operatorUserId, :operatorRoleCode, :targetUserId, :targetRoleCode,
+         :applicationCode, 'account:application:connect', JSON_OBJECT(), 'allowed', :reason, :metadataJson)`,
+      {
+        id: createId("acal"),
+        operatorUserId: current.user.id,
+        operatorRoleCode: current.user.role,
+        targetUserId: target.id,
+        targetRoleCode: targetRole,
+        applicationCode,
+        reason,
+        metadataJson: JSON.stringify({
+          username: target.username,
+          creditsUserId: target.credits_user_id,
+          planCode,
+          planName: plan.name,
+        }),
+      },
+    );
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  const [applicationRows] = await pool.query<ApplicationLinkRow[]>(
+    `SELECT application_code
+     FROM application_customer_links
+     WHERE user_id = :userId
+       AND status = 'active'
+     ORDER BY application_code ASC`,
+    { userId: target.id },
+  );
+
+  return {
+    updated: true,
+    applicationCode,
+    planCode,
+    applications: applicationRows.map((row) => row.application_code),
+    user: {
+      id: target.id,
+      username: target.username,
+      displayName: target.display_name,
+      role: targetRole,
+      status: target.status,
+    },
+  };
 }
 
 export async function deletePlatformUserByCapability(
@@ -316,14 +613,13 @@ export async function deletePlatformUserByCapability(
     { targetUserId: target.id },
   );
 
-  await pool.query(
-    `UPDATE agent_customer_relations
-     SET status = 'deleted',
-         updated_at = CURRENT_TIMESTAMP(3)
-     WHERE agent_user_id = :targetUserId
-        OR customer_user_id = :targetUserId`,
-    { targetUserId: target.id },
-  );
+  if (target.credits_user_id) {
+    await deactivateCanonicalAgentRelations(
+      targetRole === "agent"
+        ? { agentCreditsUserId: target.credits_user_id }
+        : { customerCreditsUserId: target.credits_user_id },
+    );
+  }
 
   await pool.query(
     `INSERT INTO account_creation_audit_logs
@@ -357,6 +653,160 @@ export async function deletePlatformUserByCapability(
   };
 }
 
+export async function resetPlatformUserPasswordByDeveloper(
+  req: Parameters<typeof getRequiredCurrentUser>[0],
+  targetUserId: unknown,
+  payload: Record<string, unknown>,
+) {
+  const current = getRequiredCurrentUser(req);
+  const target = await findTargetUser(targetUserId);
+  const targetRole = matrixRole(target.role_code);
+  if (!targetRole) {
+    throw errors.invalidParameter("target user role is not available");
+  }
+  if (target.status !== "active") {
+    throw errors.invalidParameter("target user account is not active");
+  }
+  const resetsSelf = current.user.id === target.id;
+  if (current.user.role !== "developer" && !resetsSelf) {
+    throw errors.forbidden("only Developer can reset other platform user passwords");
+  }
+
+  const password = normalizePassword(payload.password);
+  const reason = normalizeText(payload.reason, 240) || (
+    resetsSelf
+      ? "back-office user reset own platform password"
+      : "Developer reset platform user password"
+  );
+
+  await pool.query(
+    `UPDATE app_users
+     SET password_hash = :passwordHash,
+         updated_at = CURRENT_TIMESTAMP(3)
+     WHERE id = :targetUserId`,
+    {
+      targetUserId: target.id,
+      passwordHash: hashPassword(password),
+    },
+  );
+
+  await pool.query(
+    `INSERT INTO account_creation_audit_logs
+      (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+       application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+     VALUES
+      (:id, :operatorUserId, :operatorRoleCode, :targetUserId, :targetRoleCode,
+       NULL, 'account:password:reset', JSON_OBJECT(), 'allowed', :reason, :metadataJson)`,
+    {
+      id: createId("acal"),
+      operatorUserId: current.user.id,
+      operatorRoleCode: current.user.role,
+      targetUserId: target.id,
+      targetRoleCode: targetRole,
+      reason,
+      metadataJson: JSON.stringify({
+        username: target.username,
+        resetSelf: resetsSelf,
+      }),
+    },
+  );
+
+  return {
+    updated: true,
+    user: {
+      id: target.id,
+      username: target.username,
+      displayName: target.display_name,
+      role: targetRole,
+      status: target.status,
+    },
+  };
+}
+
+export async function updatePlatformUserProfileByCapability(
+  req: Parameters<typeof getRequiredCurrentUser>[0],
+  targetUserId: unknown,
+  payload: Record<string, unknown>,
+) {
+  const current = getRequiredCurrentUser(req);
+  const target = await findTargetUser(targetUserId);
+  const targetRole = requireProfileEditAllowed(current.user, target);
+  if (target.status !== "active") {
+    throw errors.invalidParameter("target user account is not active");
+  }
+
+  const displayName = normalizeText(payload.displayName, 120);
+  if (!displayName) {
+    throw errors.invalidParameter("displayName is required");
+  }
+  const phone = normalizeText(payload.phone, 32) || null;
+  const reason = normalizeText(payload.reason, 240) || "back-office profile update";
+
+  if (phone) {
+    const [duplicateRows] = await pool.query<Array<RowDataPacket & { id: string }>>(
+      `SELECT id
+       FROM app_users
+       WHERE phone = :phone
+         AND id <> :targetUserId
+         AND status <> 'deleted'
+       LIMIT 1`,
+      { phone, targetUserId: target.id },
+    );
+    if (duplicateRows.length > 0) {
+      throw errors.invalidParameter("phone is already used by another account");
+    }
+  }
+
+  await pool.query(
+    `UPDATE app_users
+     SET display_name = :displayName,
+         phone = :phone,
+         updated_at = CURRENT_TIMESTAMP(3)
+     WHERE id = :targetUserId`,
+    {
+      targetUserId: target.id,
+      displayName,
+      phone,
+    },
+  );
+
+  await pool.query(
+    `INSERT INTO account_creation_audit_logs
+      (id, operator_user_id, operator_role_code, target_user_id, target_role_code,
+       application_code, action_code, policy_snapshot_json, decision, reason, metadata_json)
+     VALUES
+      (:id, :operatorUserId, :operatorRoleCode, :targetUserId, :targetRoleCode,
+       NULL, 'account:profile:update', JSON_OBJECT(), 'allowed', :reason, :metadataJson)`,
+    {
+      id: createId("acal"),
+      operatorUserId: current.user.id,
+      operatorRoleCode: current.user.role,
+      targetUserId: target.id,
+      targetRoleCode: targetRole,
+      reason,
+      metadataJson: JSON.stringify({
+        username: target.username,
+        previousDisplayName: target.display_name,
+        previousPhone: target.phone,
+        displayName,
+        phone,
+      }),
+    },
+  );
+
+  return {
+    updated: true,
+    user: {
+      id: target.id,
+      username: target.username,
+      displayName,
+      phone,
+      role: targetRole,
+      status: target.status,
+    },
+  };
+}
+
 export async function disablePlatformAgentByCapability(
   req: Parameters<typeof getRequiredCurrentUser>[0],
   targetUserId: unknown,
@@ -376,11 +826,39 @@ export async function disablePlatformAgentByCapability(
   if (target.status !== "active") {
     throw errors.invalidParameter("target Agent account is not active");
   }
+  if (!target.credits_user_id) {
+    throw errors.invalidParameter("target Agent is not linked to credits");
+  }
 
   const reason = normalizeText(payload.reason, 240) || "back-office agent disabled";
   const connection = await pool.getConnection();
+  let convertedApplicationCodes: string[] = [];
   try {
     await connection.beginTransaction();
+
+    const [applicationRows] = await connection.query<ApplicationCodeRow[]>(
+      `SELECT DISTINCT application_code
+       FROM (
+         SELECT application_code
+         FROM application_customer_links
+         WHERE user_id = :targetUserId
+         UNION
+         SELECT application_code
+         FROM agent_leads
+         WHERE agent_user_id = :targetUserId
+           AND status = 'active'
+       ) inferred_apps
+       WHERE application_code IS NOT NULL
+         AND application_code <> ''
+       ORDER BY application_code ASC`,
+      { targetUserId: target.id },
+    );
+    convertedApplicationCodes = applicationRows
+      .map((row) => row.application_code)
+      .filter((code): code is string => Boolean(code));
+    if (convertedApplicationCodes.length === 0) {
+      convertedApplicationCodes = [env.credits.applicationCode];
+    }
 
     await connection.query(
       `UPDATE back_office_role_assignments
@@ -406,6 +884,41 @@ export async function disablePlatformAgentByCapability(
       { targetUserId: target.id },
     );
 
+    for (const applicationCode of convertedApplicationCodes) {
+      await connection.query(
+        `INSERT INTO application_customer_links
+          (id, application_code, user_id, credits_user_id, account_scope, credits_tenant_id,
+           created_by_user_id, created_by_role_code, status, metadata_json)
+         VALUES
+          (:id, :applicationCode, :userId, :creditsUserId, :accountScope, :creditsTenantId,
+           :createdByUserId, :createdByRoleCode, 'active', :metadataJson)
+         ON DUPLICATE KEY UPDATE
+           credits_user_id = VALUES(credits_user_id),
+           account_scope = VALUES(account_scope),
+           credits_tenant_id = VALUES(credits_tenant_id),
+           created_by_user_id = VALUES(created_by_user_id),
+           created_by_role_code = VALUES(created_by_role_code),
+           status = 'active',
+           metadata_json = VALUES(metadata_json),
+           updated_at = CURRENT_TIMESTAMP(3)`,
+        {
+          id: createId("acl"),
+          applicationCode,
+          userId: target.id,
+          creditsUserId: target.credits_user_id,
+          accountScope: target.account_scope || "personal",
+          creditsTenantId: target.credits_tenant_id,
+          createdByUserId: current.user.id,
+          createdByRoleCode: current.user.role,
+          metadataJson: JSON.stringify({
+            targetRole: "user",
+            convertedFromRole: "agent",
+            source: "back-office-disable-agent",
+          }),
+        },
+      );
+    }
+
     await connection.query(
       `DELETE FROM back_office_agent_policy_overrides
        WHERE agent_user_id = :targetUserId`,
@@ -429,6 +942,7 @@ export async function disablePlatformAgentByCapability(
           username: target.username,
           creditsUserId: target.credits_user_id,
           revertedToRole: "user",
+          convertedApplicationCodes,
         }),
       },
     );
@@ -441,6 +955,8 @@ export async function disablePlatformAgentByCapability(
     connection.release();
   }
 
+  await suspendCanonicalAgent(target.credits_user_id);
+
   return {
     disabled: true,
     user: {
@@ -450,6 +966,7 @@ export async function disablePlatformAgentByCapability(
       role: "user",
       creditsUserId: target.credits_user_id,
       status: target.status,
+      applications: convertedApplicationCodes,
     },
   };
 }

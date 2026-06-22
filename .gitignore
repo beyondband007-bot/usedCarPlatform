@@ -7,6 +7,8 @@ tmp/
 docs/*
 !docs/three-role-back-office-phase-8-handoff.md
 !docs/视频生成前端接口协作说明.md
+!docs/credits-platform-new-app-integration-guide.md
+!docs/credits-platform-new-app-integration-guide.zh-CN.md
 digital human/*-three-view.png
 digital human/male-02-four-view.png
 .env

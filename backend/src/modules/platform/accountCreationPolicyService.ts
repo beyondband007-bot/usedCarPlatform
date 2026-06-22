@@ -65,6 +65,7 @@ export type AgentPolicyOverride = {
   creditsCurrency: string | null;
   depositBalance: number;
   depositCurrency: string;
+  applications: string[];
   assignedByUserId: string | null;
   assignedByUsername: string | null;
   assignedByDisplayName: string | null;
@@ -74,6 +75,22 @@ export type AgentPolicyOverride = {
   effectiveCanCreateUsers: boolean;
   updatedByUserId: string | null;
   updatedAt: string | null;
+};
+
+export type DeveloperAccount = {
+  userId: string;
+  username: string;
+  displayName: string;
+  phone: string | null;
+  status: string;
+};
+
+type DeveloperAccountRow = RowDataPacket & {
+  user_id: string;
+  username: string;
+  display_name: string;
+  phone: string | null;
+  status: string;
 };
 
 type AdminPolicyOverrideRow = RowDataPacket & {
@@ -98,6 +115,7 @@ type AgentPolicyOverrideRow = RowDataPacket & {
   credits_user_id: number | null;
   account_scope: string | null;
   credits_tenant_id: number | null;
+  applications_csv: string | null;
   assigned_by_user_id: string | null;
   assigned_by_username: string | null;
   assigned_by_display_name: string | null;
@@ -262,6 +280,33 @@ async function setPolicyEnabled(policyCode: AccountCreationPolicyCode, enabled: 
   return getPolicySnapshot();
 }
 
+async function listDeveloperAccounts(): Promise<{ items: DeveloperAccount[] }> {
+  const [rows] = await pool.query<DeveloperAccountRow[]>(
+    `SELECT
+       u.id user_id,
+       u.username,
+       u.display_name,
+       u.phone,
+       u.status
+     FROM back_office_role_assignments boa
+     JOIN app_users u ON u.id = boa.user_id
+     WHERE boa.role_code = 'developer'
+       AND boa.status = 'active'
+       AND u.status = 'active'
+     ORDER BY boa.created_at DESC`,
+  );
+
+  return {
+    items: rows.map((row) => ({
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      phone: row.phone,
+      status: row.status,
+    })),
+  };
+}
+
 async function listAdminPolicyOverrides(): Promise<{ items: AdminPolicyOverride[] }> {
   const snapshot = await getPolicySnapshot();
   const globalCreateUserGate = snapshot.developer_allows_admin_create_users;
@@ -384,6 +429,11 @@ async function listAgentPolicyOverrides(
        u.credits_user_id,
        u.account_scope,
        u.credits_tenant_id,
+       GROUP_CONCAT(
+         DISTINCT agent_apps.application_code
+         ORDER BY agent_apps.application_code
+         SEPARATOR ','
+       ) applications_csv,
        boa.assigned_by_user_id,
        assigned_by.username assigned_by_username,
        assigned_by.display_name assigned_by_display_name,
@@ -395,10 +445,34 @@ async function listAgentPolicyOverrides(
      JOIN app_users u ON u.id = boa.user_id
      LEFT JOIN app_users assigned_by ON assigned_by.id = boa.assigned_by_user_id
      LEFT JOIN back_office_agent_policy_overrides override ON override.agent_user_id = u.id
+     LEFT JOIN (
+       SELECT agent_user_id, application_code
+       FROM agent_leads
+       WHERE status = 'active'
+       UNION
+       SELECT user_id agent_user_id, application_code
+       FROM application_customer_links
+       WHERE status = 'active'
+     ) agent_apps ON agent_apps.agent_user_id = u.id
      WHERE boa.role_code = 'agent'
        AND boa.status = 'active'
        AND u.status = 'active'
        ${scopeSql}
+     GROUP BY
+       u.id,
+       u.username,
+       u.display_name,
+       u.phone,
+       u.credits_user_id,
+       u.account_scope,
+       u.credits_tenant_id,
+       boa.assigned_by_user_id,
+       assigned_by.username,
+       assigned_by.display_name,
+       override.commission_rate,
+       override.developer_allows_create_users,
+       override.updated_by_user_id,
+       override.updated_at
      ORDER BY boa.created_at DESC`,
     params,
   );
@@ -429,6 +503,7 @@ async function listAgentPolicyOverrides(
         creditsCurrency: balance?.currency ?? null,
         depositBalance: depositBalances.get(row.user_id)?.balance ?? 0,
         depositCurrency: depositBalances.get(row.user_id)?.currency ?? "CNY",
+        applications: row.applications_csv ? row.applications_csv.split(",").filter(Boolean) : [],
         assignedByUserId: row.assigned_by_user_id,
         assignedByUsername: row.assigned_by_username,
         assignedByDisplayName: row.assigned_by_display_name,
@@ -533,6 +608,7 @@ export const accountCreationPolicyService = {
   canCreateUser,
   canPromoteUserToAgent,
   getPolicySnapshot,
+  listDeveloperAccounts,
   listAdminPolicyOverrides,
   listAgentPolicyOverrides,
   resolveAccountCreationPolicy,

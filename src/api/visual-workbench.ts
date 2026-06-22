@@ -1091,15 +1091,23 @@ export interface CreditsApplicationFunction {
 export interface CreditsCustomerProfile {
   id: string
   applicationCode: string
+  applicationCodes?: string[]
   userId: string
   username: string
   displayName: string
   phone?: string | null
   role: string
+  agents?: Array<{
+    userId: string
+    username: string
+    displayName: string
+  }>
   creditsUserId: number | string
   creditsTotalBalance?: string | number | null
   creditsAvailableBalance?: string | number | null
   creditsCurrency?: string | null
+  depositBalance?: number | string | null
+  depositCurrency?: string | null
   accountScope: 'personal' | 'tenant' | string
   creditsTenantId?: number | string | null
   enterpriseTenantId?: string | null
@@ -1109,6 +1117,15 @@ export interface CreditsCustomerProfile {
   enterpriseOwnerUsername?: string | null
   enterpriseOwnerDisplayName?: string | null
   enterpriseAccountRole?: 'standalone' | 'mother' | 'child' | string | null
+  totalTopUpCredits?: number | string
+  totalConsumedCredits?: number | string
+  consumptionTransactionCount?: number | string
+  lastConsumedAt?: string | null
+  lastTopUpAt?: string | null
+  userType?: {
+    code: 'active' | 'potential' | 'low_frequency' | string
+    label: string
+  }
   createdByUserId: string
   createdByUsername?: string | null
   createdByDisplayName?: string | null
@@ -1145,11 +1162,40 @@ export interface AgentOperationsCustomer {
   creditsAvailableBalance?: number | string | null
   creditsTotalBalance?: number | string | null
   creditsCurrency?: string | null
-  totalTopUpAmount?: number | string
+  totalTopUpCredits?: number | string
+  totalConsumedCredits?: number | string
+  consumptionTransactionCount?: number | string
+  lastConsumedAt?: string | null
+  lastTopUpAt?: string | null
+  userType?: {
+    code: 'active' | 'potential' | 'low_frequency' | string
+    label: string
+  }
+}
+
+export interface UpdateAgentCustomerProfilePayload {
+  displayName: string
+  phone?: string | null
+  agentUserId?: string
+}
+
+export interface UpdateAgentCustomerProfileResult {
+  relationId: string
+  customerUserId: string
+  customerUsername: string
+  customerDisplayName: string
+  customerPhone: string | null
+  applicationCode: string
 }
 
 export interface AgentCustomerLedgerTransaction {
   id: number | string
+  relationId?: string
+  customerUserId?: string
+  customerUsername?: string
+  customerDisplayName?: string
+  customerPhone?: string | null
+  accountScope?: string | null
   tenantId?: number | string | null
   userId: number | string
   accountId: number | string
@@ -1187,6 +1233,40 @@ export interface AgentCustomerLedger {
   transactions: AgentCustomerLedgerTransaction[]
 }
 
+export interface AgentTransactionsLedger {
+  agent: {
+    userId: string
+    username: string
+    displayName: string
+  }
+  transactions: AgentCustomerLedgerTransaction[]
+  transactionInsights?: {
+    topCreditConsumers: Array<{
+      relationId?: string
+      customerUserId: string
+      customerUsername?: string | null
+      customerDisplayName?: string | null
+      customerPhone?: string | null
+      consumedCredits: number | string
+      transactionCount: number | string
+      lastConsumedAt?: string | null
+    }>
+    functionUsageDistribution: Array<{
+      functionCode?: string | null
+      functionName: string
+      usageCount: number | string
+      consumedCredits: number | string
+    }>
+    generatedAt: string
+  }
+}
+
+export interface PlatformTransactionsLedger {
+  scope: 'global'
+  transactions: AgentCustomerLedgerTransaction[]
+  transactionInsights?: AgentTransactionsLedger['transactionInsights']
+}
+
 export interface AgentOperationsLead {
   id: string
   applicationCode: string
@@ -1206,6 +1286,7 @@ export interface AgentOperationsCommissionPreview {
   applicationCode: string
   period: string
   consumedPoints: number
+  topUpCredits?: number
   commissionRate: number
   commissionPoints: number
   status: string
@@ -1213,7 +1294,19 @@ export interface AgentOperationsCommissionPreview {
   customerUserId?: string | null
   customerUsername?: string | null
   customerDisplayName?: string | null
+  topUpTransactions?: AgentOperationsTopUpTransaction[]
   createdAt: string
+}
+
+export interface AgentOperationsTopUpTransaction {
+  id: number | string
+  createdAt: string
+  txnType: string
+  points: number
+  paymentOrderId?: number | null
+  bizType?: string | null
+  bizId?: string | null
+  remark?: string | null
 }
 
 export interface AgentOperationsSettlementBill {
@@ -1221,6 +1314,7 @@ export interface AgentOperationsSettlementBill {
   period: string
   totalCommissionPoints: number
   status: string
+  requestedAt?: string | null
   confirmedAt?: string | null
   paidAt?: string | null
   createdAt: string
@@ -1254,6 +1348,7 @@ export interface AgentOperationsOverview {
     displayName: string
     depositBalance?: number | string | null
     depositCurrency?: string | null
+    applications?: string[]
   }
   metrics: {
     customerCount: number
@@ -1263,6 +1358,24 @@ export interface AgentOperationsOverview {
     openTicketCount: number
   }
   customers: AgentOperationsCustomer[]
+  customerInsights?: {
+    topTopUpCustomers: Array<{
+      relationId: string
+      customerUserId: string
+      customerUsername: string
+      customerDisplayName: string
+      customerPhone?: string | null
+      applicationCode: string
+      totalTopUpCredits: number | string
+    }>
+    userTypeDistribution: Array<{
+      code: 'active' | 'potential' | 'low_frequency' | string
+      label: string
+      description: string
+      count: number
+    }>
+    generatedAt: string
+  }
   leads: AgentOperationsLead[]
   commissionPreviews: AgentOperationsCommissionPreview[]
   settlementBills: AgentOperationsSettlementBill[]
@@ -1270,13 +1383,40 @@ export interface AgentOperationsOverview {
   tickets: AgentOperationsTicket[]
 }
 
+export interface PlatformSettlementApplication {
+  id: string
+  agentUserId: string
+  agentUsername: string
+  agentDisplayName: string
+  period: string
+  totalCommissionPoints: number
+  status: string
+  requestedAt?: string | null
+  approvedByUserId?: string | null
+  approvedByUsername?: string | null
+  approvedByDisplayName?: string | null
+  approvedByRole?: string | null
+  confirmedAt?: string | null
+  paidAt?: string | null
+}
+
+export interface PlatformSettlementApplicationList {
+  items: PlatformSettlementApplication[]
+}
+
 export interface PlatformDashboardMetricSet {
   linkedCustomerCount: number
+  customerAccountCount: number
   activeAgentCount: number
   activeLeadCount: number
   openTicketCount: number
   draftSettlementCount: number
+  pendingSettlementCount: number
   applicationCount: number
+  platformApplicationCount: number
+  todayRechargedCredits?: number
+  todayOrderAmount: number
+  todayConsumedCredits: number
   applications: string[]
 }
 
@@ -1287,11 +1427,27 @@ export interface PlatformDashboardSection {
   access: string
 }
 
+export interface PlatformDashboardTrendEvent {
+  metric: 'recharge' | 'consume'
+  applicationCode?: string | null
+  occurredAt: string
+  value: number
+}
+
+export interface PlatformDashboardPlanDistributionItem {
+  applicationCode: string
+  planCode: string
+  planName: string
+  count: number
+}
+
 export interface PlatformDashboard {
   role: 'developer' | 'admin' | 'agent' | string
   scope: 'global_back_office_scope' | 'own_agent_scope' | string
   generatedAt: string
   metrics: PlatformDashboardMetricSet
+  trends: PlatformDashboardTrendEvent[]
+  planDistribution: PlatformDashboardPlanDistributionItem[]
   sections: PlatformDashboardSection[]
   sourceOfTruth: {
     reusableCreditsPlatform: string[]
@@ -1344,6 +1500,18 @@ export interface PlatformAdminPolicyOverride {
   updatedAt?: string | null
 }
 
+export interface PlatformDeveloperAccount {
+  userId: string
+  username: string
+  displayName: string
+  phone?: string | null
+  status: string
+}
+
+export interface PlatformDeveloperAccountList {
+  items: PlatformDeveloperAccount[]
+}
+
 export interface PlatformAdminPolicyOverrideList {
   items: PlatformAdminPolicyOverride[]
 }
@@ -1358,6 +1526,7 @@ export interface PlatformAgentPolicyOverride {
   creditsCurrency?: string | null
   depositBalance?: number | string | null
   depositCurrency?: string | null
+  applications: string[]
   assignedByUserId?: string | null
   assignedByUsername?: string | null
   assignedByDisplayName?: string | null
@@ -1371,6 +1540,16 @@ export interface PlatformAgentPolicyOverride {
 
 export interface PlatformAgentPolicyOverrideList {
   items: PlatformAgentPolicyOverride[]
+}
+
+export interface AgentDepositAdjustmentResult {
+  agentUserId: string
+  direction: 'increase' | 'decrease'
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  currency: string
+  transactionId: string
 }
 
 export interface CreateAgentLeadPayload {
@@ -1489,6 +1668,43 @@ export interface PlatformUserCreationResult {
   }
 }
 
+export interface PlatformUserPasswordResetResult {
+  updated: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+    status: string
+  }
+}
+
+export interface PlatformUserProfileUpdateResult {
+  updated: boolean
+  user: {
+    id: string
+    username: string
+    displayName: string
+    phone: string | null
+    role: string
+    status: string
+  }
+}
+
+export interface PlatformUserApplicationConnectResult {
+  updated: boolean
+  applicationCode: string
+  planCode: string
+  applications: string[]
+  user: {
+    id: string
+    username: string
+    displayName: string
+    role: string
+    status: string
+  }
+}
+
 export interface PlatformUserPromotionResult {
   user: {
     id: string
@@ -1520,6 +1736,7 @@ export interface PlatformAgentDisableResult {
     role: 'user'
     creditsUserId: number | string | null
     status: string
+    applications?: string[]
   }
 }
 
@@ -1528,6 +1745,7 @@ export interface AdjustPlatformCreditsPayload {
   targetUserId: string
   points: number
   reason?: string
+  classifyAsRecharge?: boolean
 }
 
 export interface PlatformCreditsAdjustmentResult {
@@ -1541,6 +1759,7 @@ export interface PlatformCreditsAdjustmentResult {
   adjustment: {
     transactionId: number | string
     points: number
+    txnType?: string
     balanceBefore: string
     balanceAfter: string
     reason: string
@@ -1838,7 +2057,12 @@ export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
   const customerProfiles = extractCreditsList<CreditsCustomerProfile>(
     payload,
     ['customerProfiles', 'customers'],
-  )
+  ).map((item) => ({
+    ...item,
+    totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits ?? 0),
+    totalConsumedCredits: parseCreditsNumber(item.totalConsumedCredits ?? 0),
+    consumptionTransactionCount: parseCreditsNumber(item.consumptionTransactionCount ?? 0),
+  }))
 
   return {
     application: payload.application ?? applications[0] ?? null,
@@ -1858,7 +2082,40 @@ export async function getAgentOperationsOverview(params?: {
     '/platform/agent/overview',
     { params },
   )
-  return unwrapApiResponse(response)
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    customers: (payload.customers ?? []).map((item) => ({
+      ...item,
+      totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits ?? 0),
+      totalConsumedCredits: parseCreditsNumber(item.totalConsumedCredits ?? 0),
+      consumptionTransactionCount: parseCreditsNumber(item.consumptionTransactionCount ?? 0),
+    })),
+    customerInsights: payload.customerInsights
+        ? {
+          ...payload.customerInsights,
+          topTopUpCustomers: (payload.customerInsights.topTopUpCustomers ?? []).map((item) => ({
+            ...item,
+            totalTopUpCredits: parseCreditsNumber(item.totalTopUpCredits),
+          })),
+        }
+      : undefined,
+    commissionPreviews: (payload.commissionPreviews ?? []).map((item) => ({
+      ...item,
+      consumedPoints: parseCreditsNumber(item.consumedPoints),
+      topUpCredits: parseCreditsNumber(item.topUpCredits ?? item.consumedPoints),
+      commissionRate: Number(item.commissionRate ?? 0),
+      commissionPoints: parseCreditsNumber(item.commissionPoints),
+      topUpTransactions: (item.topUpTransactions ?? []).map((transaction) => ({
+        ...transaction,
+        points: parseCreditsNumber(transaction.points),
+      })),
+    })),
+    settlementBills: (payload.settlementBills ?? []).map((item) => ({
+      ...item,
+      totalCommissionPoints: parseCreditsNumber(item.totalCommissionPoints),
+    })),
+  }
 }
 
 export async function getAgentCustomerLedger(
@@ -1884,6 +2141,89 @@ export async function getAgentCustomerLedger(
   }
 }
 
+export async function updateAgentCustomerProfile(
+  relationId: string,
+  payload: UpdateAgentCustomerProfilePayload,
+): Promise<UpdateAgentCustomerProfileResult> {
+  const response = await request.patch<ApiResponse<UpdateAgentCustomerProfileResult>>(
+    `/platform/agent/customers/${encodeURIComponent(relationId)}/profile`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getAgentTransactionsLedger(params?: {
+  agentUserId?: string
+}): Promise<AgentTransactionsLedger> {
+  const response = await request.get<ApiResponse<AgentTransactionsLedger>>(
+    '/platform/agent/transactions',
+    { params },
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    transactionInsights: payload.transactionInsights
+      ? {
+          ...payload.transactionInsights,
+          topCreditConsumers: (payload.transactionInsights.topCreditConsumers ?? []).map((item) => ({
+            ...item,
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+            transactionCount: parseCreditsNumber(item.transactionCount),
+          })),
+          functionUsageDistribution: (
+            payload.transactionInsights.functionUsageDistribution ?? []
+          ).map((item) => ({
+            ...item,
+            usageCount: parseCreditsNumber(item.usageCount),
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+          })),
+        }
+      : undefined,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+  }
+}
+
+function normalizeTransactionsLedgerPayload<T extends { transactions?: AgentCustomerLedgerTransaction[]; transactionInsights?: AgentTransactionsLedger['transactionInsights'] }>(
+  payload: T,
+): T {
+  return {
+    ...payload,
+    transactionInsights: payload.transactionInsights
+      ? {
+          ...payload.transactionInsights,
+          topCreditConsumers: (payload.transactionInsights.topCreditConsumers ?? []).map((item) => ({
+            ...item,
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+            transactionCount: parseCreditsNumber(item.transactionCount),
+          })),
+          functionUsageDistribution: (
+            payload.transactionInsights.functionUsageDistribution ?? []
+          ).map((item) => ({
+            ...item,
+            usageCount: parseCreditsNumber(item.usageCount),
+            consumedCredits: parseCreditsNumber(item.consumedCredits),
+          })),
+        }
+      : undefined,
+    transactions: (payload.transactions ?? []).map((item) => ({
+      ...item,
+      points: parseCreditsNumber(item.points),
+      balanceBefore: parseCreditsNumber(item.balanceBefore),
+      balanceAfter: parseCreditsNumber(item.balanceAfter),
+    })),
+  }
+}
+
+export async function getPlatformTransactionsLedger(): Promise<PlatformTransactionsLedger> {
+  const response = await request.get<ApiResponse<PlatformTransactionsLedger>>('/platform/transactions')
+  return normalizeTransactionsLedgerPayload(unwrapApiResponse(response))
+}
+
 export async function getPlatformCustomerLedger(
   customerProfileId: string,
 ): Promise<AgentCustomerLedger> {
@@ -1907,7 +2247,18 @@ export async function getPlatformCustomerLedger(
 
 export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const response = await request.get<ApiResponse<PlatformDashboard>>('/platform/dashboard')
-  return unwrapApiResponse(response)
+  const payload = unwrapApiResponse(response)
+  return {
+    ...payload,
+    trends: (payload.trends ?? []).map((item) => ({
+      ...item,
+      value: parseCreditsNumber(item.value),
+    })),
+    planDistribution: (payload.planDistribution ?? []).map((item) => ({
+      ...item,
+      count: Number(item.count ?? 0),
+    })),
+  }
 }
 
 export async function getPlatformAgents(): Promise<PlatformAgentList> {
@@ -1918,6 +2269,13 @@ export async function getPlatformAgents(): Promise<PlatformAgentList> {
 export async function getPlatformAdminPolicyOverrides(): Promise<PlatformAdminPolicyOverrideList> {
   const response = await request.get<ApiResponse<PlatformAdminPolicyOverrideList>>(
     '/platform/admin-policy-overrides',
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformDeveloperAccounts(): Promise<PlatformDeveloperAccountList> {
+  const response = await request.get<ApiResponse<PlatformDeveloperAccountList>>(
+    '/platform/developer-accounts',
   )
   return unwrapApiResponse(response)
 }
@@ -1949,6 +2307,17 @@ export async function updatePlatformAgentPolicyOverride(
 ): Promise<PlatformAgentPolicyOverrideList> {
   const response = await request.patch<ApiResponse<PlatformAgentPolicyOverrideList>>(
     `/platform/agent-policy-overrides/${encodeURIComponent(agentUserId)}`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function adjustPlatformAgentDeposit(
+  agentUserId: string,
+  payload: { amount: number; direction: 'increase' | 'decrease'; remark?: string },
+): Promise<AgentDepositAdjustmentResult> {
+  const response = await request.post<ApiResponse<AgentDepositAdjustmentResult>>(
+    `/platform/agent-deposits/${encodeURIComponent(agentUserId)}/adjustments`,
     payload,
   )
   return unwrapApiResponse(response)
@@ -1991,16 +2360,39 @@ export async function createAgentTicket(
   return unwrapApiResponse(response)
 }
 
-export async function confirmAgentSettlement(
+export async function applyAgentSettlement(
   settlementId: string,
   params?: { agentUserId?: string },
 ): Promise<AgentOperationMutationResult> {
   const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
-    `/platform/agent/settlements/${encodeURIComponent(settlementId)}/confirm`,
-    null,
+    `/platform/agent/settlements/${encodeURIComponent(settlementId)}/apply`,
+    {},
     { params },
   )
   return unwrapApiResponse(response)
+}
+
+export async function approvePlatformSettlementPayment(
+  settlementId: string,
+): Promise<AgentOperationMutationResult> {
+  const response = await request.post<ApiResponse<AgentOperationMutationResult>>(
+    `/platform/settlement-applications/${encodeURIComponent(settlementId)}/approve-payment`,
+    {},
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function getPlatformSettlementApplications(): Promise<PlatformSettlementApplicationList> {
+  const response = await request.get<ApiResponse<PlatformSettlementApplicationList>>(
+    '/platform/settlement-applications',
+  )
+  const payload = unwrapApiResponse(response)
+  return {
+    items: (payload.items ?? []).map((item) => ({
+      ...item,
+      totalCommissionPoints: parseCreditsNumber(item.totalCommissionPoints),
+    })),
+  }
 }
 
 export async function createPlatformUser(
@@ -2008,6 +2400,17 @@ export async function createPlatformUser(
 ): Promise<PlatformUserCreationResult> {
   const response = await request.post<ApiResponse<PlatformUserCreationResult>>(
     '/platform/users',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function connectPlatformUserApplication(
+  userId: string,
+  payload: { applicationCode: string; planCode: string; reason?: string },
+): Promise<PlatformUserApplicationConnectResult> {
+  const response = await request.post<ApiResponse<PlatformUserApplicationConnectResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/applications`,
     payload,
   )
   return unwrapApiResponse(response)
@@ -2050,6 +2453,28 @@ export async function adjustPlatformCredits(
 ): Promise<PlatformCreditsAdjustmentResult> {
   const response = await request.post<ApiResponse<PlatformCreditsAdjustmentResult>>(
     '/platform/credits/adjustments',
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function resetPlatformUserPassword(
+  userId: string,
+  payload: { password: string; reason?: string },
+): Promise<PlatformUserPasswordResetResult> {
+  const response = await request.patch<ApiResponse<PlatformUserPasswordResetResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/password`,
+    payload,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function updatePlatformUserProfile(
+  userId: string,
+  payload: { displayName: string; phone?: string | null; reason?: string },
+): Promise<PlatformUserProfileUpdateResult> {
+  const response = await request.patch<ApiResponse<PlatformUserProfileUpdateResult>>(
+    `/platform/users/${encodeURIComponent(userId)}/profile`,
     payload,
   )
   return unwrapApiResponse(response)

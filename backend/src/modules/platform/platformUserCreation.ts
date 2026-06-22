@@ -19,6 +19,7 @@ import {
   deductAgentDepositForUserCreation,
   ensureAgentDepositAccount,
 } from "./agentDepositService";
+import { upsertCanonicalAgentCustomerRelation } from "./creditsAgentRelationsService";
 
 export type PlatformUserCreationTargetRole = AccountCreationTargetRole;
 
@@ -574,7 +575,23 @@ export async function createPlatformUser(
     const appTenantId = createsTenantWithChildren ? createId("tenant") : null;
     const appRole = targetRoleToAppRole(input.targetRole);
     const applicationLinkId = createId("acl");
-    const agentRelationId = agentCreatesUser ? createId("acr") : null;
+    const agentRelationId = agentCreatesUser
+      ? await upsertCanonicalAgentCustomerRelation({
+          agentAppUserId: current.user.id,
+          customerCreditsUserId: credits.userId,
+          creditsTenantId,
+        })
+      : null;
+
+    if (agentCreatesUser && tenantCredits) {
+      for (const childCreditsUserId of tenantMemberUserIds.slice(1)) {
+        await upsertCanonicalAgentCustomerRelation({
+          agentAppUserId: current.user.id,
+          customerCreditsUserId: childCreditsUserId,
+          creditsTenantId,
+        });
+      }
+    }
 
     const response = await pool.getConnection().then(async (connection) => {
       try {
@@ -653,25 +670,6 @@ export async function createPlatformUser(
             }),
           },
         );
-
-        if (agentRelationId) {
-          await connection.query(
-            `INSERT INTO agent_customer_relations
-              (id, agent_user_id, customer_user_id, customer_credits_user_id,
-               application_code, relation_type, status, metadata_json)
-             VALUES
-              (:id, :agentUserId, :customerUserId, :customerCreditsUserId,
-               :applicationCode, 'direct', 'active', :metadataJson)`,
-            {
-              id: agentRelationId,
-              agentUserId: current.user.id,
-              customerUserId: appUserId,
-              customerCreditsUserId: credits.userId,
-              applicationCode: input.applicationCode,
-              metadataJson: JSON.stringify({ source: "platform-user-creation" }),
-            },
-          );
-        }
 
         if (agentCreatesUser) {
           await deductAgentDepositForUserCreation({
@@ -771,27 +769,6 @@ export async function createPlatformUser(
               },
             );
 
-            if (agentRelationId) {
-              await connection.query(
-                `INSERT INTO agent_customer_relations
-                  (id, agent_user_id, customer_user_id, customer_credits_user_id,
-                   application_code, relation_type, status, metadata_json)
-                 VALUES
-                  (:id, :agentUserId, :customerUserId, :customerCreditsUserId,
-                   :applicationCode, 'direct', 'active', :metadataJson)`,
-                {
-                  id: createId("acr"),
-                  agentUserId: current.user.id,
-                  customerUserId: child.id,
-                  customerCreditsUserId: childCreditsUserId,
-                  applicationCode: input.applicationCode,
-                  metadataJson: JSON.stringify({
-                    source: "platform-user-creation",
-                    parentUserId: appUserId,
-                  }),
-                },
-              );
-            }
           }
         }
 

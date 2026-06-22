@@ -22,6 +22,10 @@ type PlanPriceRow = RowDataPacket & {
   price: string | number;
 };
 
+type AgentTargetRow = RowDataPacket & {
+  user_id: string;
+};
+
 const toNumber = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -196,4 +200,118 @@ export async function deductAgentDepositForUserCreation(input: {
     balanceAfter,
     currency: account.currency,
   };
+}
+
+export async function adjustAgentDepositBalance(input: {
+  developerUserId: string;
+  agentUserId: string;
+  amount: number;
+  direction: "increase" | "decrease";
+  remark?: string | null;
+}) {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw errors.invalidParameter("amount must be a positive number");
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [agents] = await connection.query<AgentTargetRow[]>(
+      `SELECT u.id user_id
+       FROM back_office_role_assignments boa
+       JOIN app_users u ON u.id = boa.user_id
+       WHERE boa.user_id = :agentUserId
+         AND boa.role_code = 'agent'
+         AND boa.status = 'active'
+         AND u.status = 'active'
+       LIMIT 1`,
+      { agentUserId: input.agentUserId },
+    );
+    if (!agents.length) {
+      throw errors.invalidParameter("target agent account not found");
+    }
+
+    await ensureAgentDepositAccount(connection, input.agentUserId);
+
+    const [rows] = await connection.query<AgentDepositRow[]>(
+      `SELECT agent_user_id, balance, currency, status
+       FROM agent_deposit_accounts
+       WHERE agent_user_id = :agentUserId
+         AND status = 'active'
+       FOR UPDATE`,
+      { agentUserId: input.agentUserId },
+    );
+    const account = rows[0];
+    if (!account) {
+      throw errors.invalidParameter("agent deposit account is not available");
+    }
+
+    const balanceBefore = toNumber(account.balance);
+    const balanceAfter =
+      input.direction === "increase"
+        ? balanceBefore + input.amount
+        : balanceBefore - input.amount;
+
+    if (balanceAfter < 0) {
+      throw errors.invalidParameter("agent deposit balance is insufficient", {
+        agentUserId: input.agentUserId,
+        requestedAmount: input.amount,
+        availableBalance: balanceBefore,
+        currency: account.currency,
+      });
+    }
+
+    await connection.query(
+      `UPDATE agent_deposit_accounts
+       SET balance = :balanceAfter
+       WHERE agent_user_id = :agentUserId`,
+      {
+        agentUserId: input.agentUserId,
+        balanceAfter,
+      },
+    );
+
+    const transactionId = createId("adt");
+    await connection.query(
+      `INSERT INTO agent_deposit_transactions
+        (id, agent_user_id, txn_type, amount, balance_before, balance_after,
+         currency, reference_type, reference_id, remark, created_by_user_id)
+       VALUES
+        (:id, :agentUserId, :txnType, :amount, :balanceBefore, :balanceAfter,
+         :currency, 'developer_deposit_adjustment', :referenceId, :remark, :createdByUserId)`,
+      {
+        id: transactionId,
+        agentUserId: input.agentUserId,
+        txnType:
+          input.direction === "increase"
+            ? "developer_deposit_increase"
+            : "developer_deposit_decrease",
+        amount: input.amount,
+        balanceBefore,
+        balanceAfter,
+        currency: account.currency,
+        referenceId: transactionId,
+        remark: input.remark ?? null,
+        createdByUserId: input.developerUserId,
+      },
+    );
+
+    await connection.commit();
+
+    return {
+      agentUserId: input.agentUserId,
+      direction: input.direction,
+      amount: input.amount,
+      balanceBefore,
+      balanceAfter,
+      currency: account.currency,
+      transactionId,
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

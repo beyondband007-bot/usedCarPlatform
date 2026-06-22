@@ -10,12 +10,15 @@ import {
   ensurePersonalCreditsAccount,
   ensureTenantCreditsBundle,
 } from "../modules/billing/creditsAccountLinkService";
+import { getCreditsPool } from "../modules/billing/creditsAccountLookupService";
 import {
   defaultBackOfficePermissionPolicies,
   defaultBackOfficeRolePermissions,
   defaultBackOfficeRoles,
 } from "../modules/platform/accountCreationPolicyDefaults";
 import { ensureAllAgentDepositAccounts } from "../modules/platform/agentDepositService";
+import { upsertCanonicalAgentCustomerRelation } from "../modules/platform/creditsAgentRelationsService";
+import { syncCreditsAgentRelations } from "./syncCreditsAgentRelations";
 
 const ADMIN_USER_ID = "user_admin";
 
@@ -652,26 +655,11 @@ const seedAgentOperationsData = async () => {
       },
     );
 
-    await pool.query(
-      `INSERT INTO agent_customer_relations
-        (id, agent_user_id, customer_user_id, customer_credits_user_id,
-         application_code, relation_type, status, metadata_json)
-       VALUES
-        ('acr_seed_agent_enterprise', 'user_agent', 'user_enterprise', :creditsUserId,
-         'used-car-platform', 'direct', 'active', :metadataJson)
-       ON DUPLICATE KEY UPDATE
-        customer_credits_user_id = VALUES(customer_credits_user_id),
-        relation_type = VALUES(relation_type),
-        status = VALUES(status),
-        metadata_json = VALUES(metadata_json)`,
-      {
-        creditsUserId: enterprise.credits_user_id,
-        metadataJson: JSON.stringify({
-          source: "demo-seed",
-          approvalMode: "auto",
-        }),
-      },
-    );
+    await upsertCanonicalAgentCustomerRelation({
+      agentAppUserId: "user_agent",
+      customerCreditsUserId: enterprise.credits_user_id,
+      creditsTenantId: enterprise.credits_tenant_id,
+    });
   } else {
     console.warn("Skipped seeded agent/customer credit links because user_enterprise has no credits link.");
   }
@@ -726,8 +714,7 @@ const seedAgentOperationsData = async () => {
       VALUES
       ('asb_agent_2026_06', 'user_agent', '2026-06', 1800.0000, 'draft')
      ON DUPLICATE KEY UPDATE
-      total_commission_points = VALUES(total_commission_points),
-      status = VALUES(status)`,
+      total_commission_points = VALUES(total_commission_points)`,
   );
 
   await pool.query(
@@ -814,6 +801,12 @@ const run = async () => {
       "VARCHAR(80) NOT NULL DEFAULT 'used-car-platform' AFTER code",
     );
     await addColumnIfMissing("subscription_plans", "metadata_json", "JSON NULL AFTER status");
+    await addColumnIfMissing("agent_settlement_bills", "requested_at", "DATETIME(3) NULL AFTER status");
+    await addColumnIfMissing("agent_settlement_bills", "approved_by_user_id", "VARCHAR(64) NULL AFTER requested_at");
+    await addColumnIfMissing("agent_settlement_bills", "approved_by_role_code", "VARCHAR(32) NULL AFTER approved_by_user_id");
+    await addIndexIfMissing("agent_settlement_bills", "idx_agent_settlement_agent_period", "(agent_user_id, period)");
+    await dropIndexIfExists("agent_settlement_bills", "uk_agent_settlement_agent_period");
+    await addIndexIfMissing("agent_settlement_bills", "idx_agent_settlement_approved_by", "(approved_by_user_id)");
     await addIndexIfMissing(
       "subscription_plans",
       "idx_subscription_plans_application_status",
@@ -933,11 +926,15 @@ const run = async () => {
     await migrateMockSubscriptions();
     await seedFlagshipEnterpriseTenant();
     await seedAgentOperationsData();
+    const relationMigration = await syncCreditsAgentRelations();
+    await pool.query("DROP TABLE IF EXISTS agent_customer_relations");
     await ensureAllAgentDepositAccounts();
+    console.log(`Migrated ${relationMigration.sourceRelations} agent/customer relations to the Credits Platform.`);
     console.log(`Applied ${migrations.length} MySQL migrations.`);
   } finally {
     connection.release();
     await closeCreditsAccountLinkPool();
+    await getCreditsPool().end();
     await pool.end();
   }
 };
