@@ -41,6 +41,7 @@ function resolveCardClass() {
 
 const recentCaption = computed(() => formatRecentCardCaption(props.item));
 const recentImageUrl = computed(() => resolveRecentDisplayImage(props.item));
+const recentBackdropUrl = computed(() => props.item.sceneBackgroundUrl);
 const recentVideoUrl = computed(() =>
   props.item.mediaType === "video" ? props.item.downloadUrl : undefined,
 );
@@ -70,6 +71,12 @@ function handlePick() {
     @keydown.space.prevent="handlePick"
   >
     <div class="recent-media recent-media--flow" :style="resolveMediaStyle()">
+      <div
+        v-if="recentBackdropUrl"
+        class="recent-media-backdrop"
+        :style="{ backgroundImage: `url(${recentBackdropUrl})` }"
+        aria-hidden="true"
+      />
       <video
         v-if="recentVideoUrl"
         class="recent-video recent-video--cover"
@@ -89,7 +96,7 @@ function handlePick() {
         decoding="async"
         fetchpriority="low"
         :draggable="false"
-        fit="cover"
+        fit="contain"
         object-position="center"
       />
       <div v-else class="recent-empty">
@@ -175,11 +182,30 @@ function handlePick() {
     var(--assist-card-strong, var(--sv-surface, #111));
 }
 
+.recent-media-backdrop {
+  position: absolute;
+  inset: -10px;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0.2;
+  transform: scale(1.04);
+}
+
+.recent-media-backdrop::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0.08));
+}
+
 .recent-media--flow :deep(.preload-image) {
   position: absolute;
   inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
+  background: transparent;
 }
 
 .recent-image--cover {
@@ -191,17 +217,18 @@ function handlePick() {
 .recent-video--cover {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 
 .recent-image--cover :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 
@@ -213,6 +240,7 @@ function handlePick() {
 .recent-empty {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
   color: var(--assist-muted, var(--app-text-soft));
@@ -279,7 +307,7 @@ function handlePick() {
   position: absolute;
   left: 8px;
   top: 8px;
-  z-index: 1;
+  z-index: 3;
   display: inline-flex;
   max-width: calc(100% - 16px);
   align-items: center;

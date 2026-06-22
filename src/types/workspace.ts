@@ -32,6 +32,7 @@ export interface WorkspaceRecentItem {
   mediaType?: 'image' | 'video'
   ratioLabel?: string
   sceneLabel?: string
+  sceneBackgroundUrl?: string
   outputRatio?: string
   inputAssetId?: string
   inputAssetThumbnailUrl?: string
