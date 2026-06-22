@@ -262,6 +262,7 @@ export interface VideoScriptDraft {
 export interface VideoResultItem {
   url: string
   thumbnail?: string
+  thumbnailUrl?: string | null
   downloadUrl?: string
   width?: number
   height?: number

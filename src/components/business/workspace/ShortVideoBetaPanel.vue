@@ -929,8 +929,8 @@ watch(
   min-height: 0;
   flex: 1;
   align-content: start;
-  gap: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
@@ -1415,13 +1415,13 @@ watch(
 
 @media (max-width: 1279px) {
   .sv-template-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 1023px) {
   .sv-template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -1441,7 +1441,7 @@ watch(
   }
 
   .sv-template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12px;
   }
 

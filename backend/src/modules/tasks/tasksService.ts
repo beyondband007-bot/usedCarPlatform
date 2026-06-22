@@ -112,11 +112,16 @@ const runFfmpeg = (args: string[]) =>
       }
       reject(
         new Error(
-          `ffmpeg narration mux failed with exit code ${code}: ${stderr.slice(-2000)}`,
+          `ffmpeg failed with exit code ${code}: ${stderr.slice(-2000)}`,
         ),
       );
     });
   });
+
+const videoThumbnailSeekSeconds = "0.5";
+
+const isVideoModuleCode = (moduleCode: string) =>
+  moduleCode === "short-video" || moduleCode === "video-generation";
 
 class TasksService {
   async listRecentTasks(input: {
@@ -526,16 +531,50 @@ class TasksService {
 
     for (const sourceUrl of sourceUrls) {
       const downloaded = await downloadFile(sourceUrl, moduleDir, moduleCode);
+      const thumbnailUrl = isVideoModuleCode(moduleCode)
+        ? await this.generateVideoThumbnail(downloaded.filePath, moduleCode)
+        : undefined;
       results.push({
         url: `${publicBase}/results/${moduleCode}/${downloaded.fileName}`,
         sourceUrl,
         localPath: downloaded.filePath,
         contentType: downloaded.contentType,
         size: downloaded.size,
+        thumbnailUrl,
       });
     }
 
     return results;
+  }
+
+  private async generateVideoThumbnail(localPath: string, moduleCode: string) {
+    const publicBase = env.publicBaseUrl.replace(/\/$/, "");
+    const parsed = path.parse(localPath);
+    const thumbnailFileName = `${parsed.name}-thumb.jpg`;
+    const thumbnailPath = path.join(parsed.dir, thumbnailFileName);
+
+    try {
+      await runFfmpeg([
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+        "-y",
+        "-ss",
+        videoThumbnailSeekSeconds,
+        "-i",
+        localPath,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
+        "-update",
+        "1",
+        thumbnailPath,
+      ]);
+      return `${publicBase}/results/${moduleCode}/${thumbnailFileName}`;
+    } catch {
+      return undefined;
+    }
   }
 
   async cancelTask(
@@ -611,8 +650,6 @@ class TasksService {
       const parsed = path.parse(result.localPath);
       const outputFileName = `${parsed.name}-with-audio.mp4`;
       const outputPath = path.join(parsed.dir, outputFileName);
-      const thumbnailFileName = `${parsed.name}-thumb.jpg`;
-      const thumbnailPath = path.join(parsed.dir, thumbnailFileName);
       await runFfmpeg([
         "-hide_banner",
         "-loglevel",
@@ -637,29 +674,7 @@ class TasksService {
         "+faststart",
         outputPath,
       ]);
-      let thumbnailUrl: string | undefined;
-      try {
-        await runFfmpeg([
-          "-hide_banner",
-          "-loglevel",
-          "warning",
-          "-y",
-          "-ss",
-          "0",
-          "-i",
-          outputPath,
-          "-frames:v",
-          "1",
-          "-q:v",
-          "2",
-          "-update",
-          "1",
-          thumbnailPath,
-        ]);
-        thumbnailUrl = `${publicBase}/results/video-generation/${thumbnailFileName}`;
-      } catch {
-        thumbnailUrl = undefined;
-      }
+      const thumbnailUrl = await this.generateVideoThumbnail(outputPath, "video-generation");
       const stat = await fs.stat(outputPath);
       muxedResults.push({
         ...result,

@@ -112,6 +112,7 @@ export interface GenerationResultImage {
   url: string
   sourceUrl?: string
   localPath?: string
+  thumbnailUrl?: string | null
   contentType?: string
   size?: number
 }
@@ -453,6 +454,7 @@ function normalizeGenerationResultImage(image: GenerationResultImage): Generatio
     ...image,
     url: normalizeMediaUrl(image.url) ?? image.url,
     sourceUrl: normalizeMediaUrl(image.sourceUrl),
+    thumbnailUrl: normalizeMediaUrl(image.thumbnailUrl) ?? null,
   }
 }
 

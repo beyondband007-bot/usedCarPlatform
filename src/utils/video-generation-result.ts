@@ -42,7 +42,7 @@ export function buildWorkspaceResultFromVideoTask(
     statusText: `已完成 · ${title} · 短视频生成结果`,
     ratioLabel: VIDEO_OUTPUT_RATIO_LABEL,
     mediaType: 'video',
-    previewImage: videoItem?.thumbnail ?? task.thumbnail ?? '',
+    previewImage: videoItem?.thumbnail ?? videoItem?.thumbnailUrl ?? task.thumbnail ?? '',
     previewVideo: videoUrl,
     previewAlt: `${title}生成结果`,
     downloadUrl: resolveVideoTaskDownloadUrl(task) || videoUrl,

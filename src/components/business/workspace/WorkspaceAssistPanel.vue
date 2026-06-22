@@ -20,7 +20,10 @@ import WorkspaceGenerateResultPanel from "@/components/business/workspace/Worksp
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import { formatOutputRatioLabel } from "@/constants/output-ratio";
 import { RECENT_REFRESH_MS } from "@/constants/workspace-polling";
-import { workspaceTemplateRecommendations } from "@/constants/workspace";
+import {
+  getWorkspaceSceneOptionImage,
+  workspaceTemplateRecommendations,
+} from "@/constants/workspace";
 import { useAppStore } from "@/stores/app";
 import { useRecentGenerateStore } from "@/stores/recentGenerate";
 import {
@@ -654,6 +657,10 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     item.moduleCode,
     item.sceneLabel,
   );
+  const sceneBackgroundUrl =
+    typeof item.sceneLabel === "string"
+      ? getWorkspaceSceneOptionImage(item.sceneLabel)
+      : undefined;
   const isShortVideo = isShortVideoModuleCode(item.moduleCode);
   const isVideoUrl = (url?: string | null) =>
     typeof url === "string" && /\.(mp4|mov|webm)(?:[?#]|$)/i.test(url);
@@ -695,6 +702,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
       : item.moduleCode === "batch-new"
         ? resolveBatchRecentSceneLabel(item.sceneLabel)
         : (sceneTitle ?? item.sceneLabel ?? undefined),
+    sceneBackgroundUrl,
     outputRatio: item.outputRatio ?? undefined,
     inputAssetId: item.inputAssetId ?? undefined,
     inputAssetThumbnailUrl: item.inputAssetThumbnailUrl ?? undefined,
@@ -2865,14 +2873,14 @@ defineExpose({
 .recent-layout.recent-layout--flow {
   overflow-x: visible;
   overflow-y: auto;
-  padding: 12px 10px 24px;
+  padding: 10px 8px 22px;
 }
 
 .recent-layout--flow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-auto-rows: max-content;
-  gap: 14px;
+  gap: 10px;
   align-content: start;
   align-items: start;
   padding: 0;
@@ -2889,13 +2897,13 @@ defineExpose({
 
 @container assist (max-width: 640px) {
   .recent-layout--flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
 @container assist (max-width: 400px) {
   .recent-layout--flow {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
