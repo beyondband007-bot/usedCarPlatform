@@ -5,6 +5,7 @@ import mysql, {
   type RowDataPacket
 } from "mysql2/promise";
 import type { AppEnv } from "../config/env.js";
+import { configureMysqlChinaTimezone, MYSQL_CHINA_TIME_ZONE } from "./mysql-timezone.js";
 
 export type DatabaseResult<T> = {
   rows: T[];
@@ -178,18 +179,19 @@ function makeClient(connection: Pool | PoolConnection): DatabaseClient {
 }
 
 export function createDatabase(env: AppEnv): Database {
-  const pool = mysql.createPool({
+  const pool = configureMysqlChinaTimezone(mysql.createPool({
     host: env.mysql.host,
     port: env.mysql.port,
     database: env.mysql.database,
     user: env.mysql.user,
     password: env.mysql.password,
+    timezone: MYSQL_CHINA_TIME_ZONE,
     waitForConnections: true,
     connectionLimit: env.mysql.connectionLimit,
     namedPlaceholders: false,
     dateStrings: false,
     decimalNumbers: false
-  });
+  }));
   let closePromise: Promise<void> | null = null;
   const client = makeClient(pool);
 

@@ -2,6 +2,7 @@ import { pbkdf2Sync, randomBytes } from "node:crypto";
 import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
 
 import { env } from "../../config/env";
+import { configureMysqlChinaTimezone, MYSQL_CHINA_TIME_ZONE } from "../../db/mysqlTimezone";
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
@@ -61,17 +62,17 @@ let creditsPool: Pool | null = null;
 
 const getCreditsPool = () => {
   if (!creditsPool) {
-    creditsPool = mysql.createPool({
+    creditsPool = configureMysqlChinaTimezone(mysql.createPool({
       host: env.credits.mysql.host,
       port: env.credits.mysql.port,
       database: env.credits.mysql.database,
       user: env.credits.mysql.user,
       password: env.credits.mysql.password,
-      timezone: "Z",
+      timezone: MYSQL_CHINA_TIME_ZONE,
       waitForConnections: true,
       connectionLimit: env.credits.mysql.connectionLimit,
       namedPlaceholders: true,
-    });
+    }));
   }
   return creditsPool;
 };
