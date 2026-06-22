@@ -20,6 +20,7 @@ const functionNameMap: Record<string, string> = {
   'watermark-remove': '去水印',
   'creative-image': '创意图',
   'short-video': '短视频',
+  'video-generation': '视频生成',
   'batch-new-exterior': '批量外观',
   'batch-new-interior': '批量内饰',
 }
@@ -68,28 +69,48 @@ export function mapCreditsBizSource(
   txnType: PointsTxnType,
   rawTxnType?: string,
   bizType?: string | null,
+  functionCode?: string | null,
 ): PointsBizSource {
   const normalized = (bizType ?? '').toLowerCase()
+  const normalizedFunctionCode = (functionCode ?? '').toLowerCase()
   const normalizedTxnType = (rawTxnType ?? '').toLowerCase()
   if (txnType === 'recharge') return 'purchase'
   if (txnType === 'gift') return 'package'
   if (txnType === 'refund' && normalizedTxnType === 'refund') return 'fail'
+  if (normalizedFunctionCode === 'video-generation' || normalizedFunctionCode === 'short-video') return 'video'
   if (normalized.includes('batch')) return 'batch'
   return 'single'
 }
 
-function resolveSceneTitle(txnType: PointsTxnType, rawTxnType?: string, bizType?: string | null) {
+function resolveSceneTitle(
+  txnType: PointsTxnType,
+  rawTxnType?: string,
+  bizType?: string | null,
+  functionCode?: string | null,
+) {
   const normalized = (bizType ?? '').toLowerCase()
+  const normalizedFunctionCode = (functionCode ?? '').toLowerCase()
   const normalizedTxnType = (rawTxnType ?? '').toLowerCase()
   if (txnType === 'recharge') return '充值购买'
   if (txnType === 'gift') return '套餐赠送'
   if (txnType === 'refund' && normalizedTxnType === 'refund') return '失败退款'
   if (normalized.includes('batch')) return '批量上新'
+  if (normalizedFunctionCode === 'video-generation' || normalizedFunctionCode === 'short-video') return '视频生成'
   if (normalized.includes('video')) return '短视频生成'
   return '单图生成'
 }
 
-function resolveFunctionName(bizType?: string | null, remark?: string | null) {
+function resolveFunctionName(
+  bizType?: string | null,
+  remark?: string | null,
+  functionCode?: string | null,
+  functionName?: string | null,
+) {
+  const normalizedFunctionCode = (functionCode ?? '').toLowerCase()
+  if (normalizedFunctionCode && functionNameMap[normalizedFunctionCode]) {
+    return functionNameMap[normalizedFunctionCode]
+  }
+  if (functionName?.trim()) return functionName.trim()
   const normalized = (bizType ?? '').toLowerCase()
   for (const [code, label] of Object.entries(functionNameMap)) {
     if (normalized.includes(code)) return label
@@ -106,7 +127,12 @@ export function mapCreditsTransactionToFlowRecord(
   const pointsChange = parsePoints(transaction.points)
   const rawTxnType = String(transaction.txnType)
   const txnType = mapCreditsTxnType(rawTxnType, pointsChange)
-  const bizSource = mapCreditsBizSource(txnType, rawTxnType, transaction.bizType)
+  const bizSource = mapCreditsBizSource(
+    txnType,
+    rawTxnType,
+    transaction.bizType,
+    transaction.functionCode,
+  )
 
   const status = txnType === 'gift' ? 'pending' : 'effective'
 
@@ -116,8 +142,13 @@ export function mapCreditsTransactionToFlowRecord(
     pointsChange,
     balanceAfter: parsePoints(transaction.balanceAfter),
     bizSource,
-    title: resolveSceneTitle(txnType, rawTxnType, transaction.bizType),
-    functionName: resolveFunctionName(transaction.bizType, transaction.remark),
+    title: resolveSceneTitle(txnType, rawTxnType, transaction.bizType, transaction.functionCode),
+    functionName: resolveFunctionName(
+      transaction.bizType,
+      transaction.remark,
+      transaction.functionCode,
+      transaction.functionName,
+    ),
     remark: transaction.remark?.trim() || transaction.bizId || '-',
     createdAt: formatDateTime(transaction.createdAt),
     status,

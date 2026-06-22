@@ -1933,7 +1933,7 @@ export type CreditsTransactionsQuery = {
   pageSize?: number
   txnType?: CreditsTransactionType
   status?: 'effective' | 'pending'
-  bizSource?: 'single' | 'batch' | 'package' | 'purchase' | 'fail'
+  bizSource?: 'single' | 'video' | 'batch' | 'package' | 'purchase' | 'fail'
   from?: string
   to?: string
 }

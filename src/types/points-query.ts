@@ -4,6 +4,7 @@ export type PointsTxnType = "recharge" | "gift" | "consume" | "refund";
 
 export type PointsBizSource =
   | "single"
+  | "video"
   | "batch"
   | "package"
   | "purchase"
