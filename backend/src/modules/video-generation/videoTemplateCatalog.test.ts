@@ -10,10 +10,10 @@ import {
 
 const definitions = listVideoTemplateDefinitions();
 
-assert.equal(definitions.length, 5);
+assert.equal(definitions.length, 6);
 assert.equal(
   definitions.filter((item) => item.type === "single-car").length,
-  2,
+  3,
 );
 assert.equal(
   definitions.filter((item) => item.type === "promotion").length,
@@ -144,7 +144,7 @@ console.log(
       runId: "video-template-contract-20260615-test-message",
       templateCount: definitions.length,
       typeCounts: {
-        singleCar: 2,
+        singleCar: 3,
         promotion: 0,
         dealership: 3,
         market: 0,

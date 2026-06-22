@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
 
 import { env } from "../../config/env";
@@ -142,6 +143,53 @@ interface CreateScriptDraftInput {
 
 interface CreateVideoTaskInput {
   scriptDraftId?: unknown;
+  audioPreviewId?: unknown;
+}
+
+interface CreateAudioPreviewInput {
+  scriptDraftId?: unknown;
+  scriptText?: unknown;
+  voiceId?: unknown;
+}
+
+interface OptimizeNarrationInput {
+  scriptText?: unknown;
+  voiceId?: unknown;
+  baselineAudioPreviewId?: unknown;
+}
+
+interface PlatformVoiceOption {
+  id: string;
+  label: string;
+  provider: "minimax";
+  providerVoiceId: string;
+  gender: DigitalHumanGender;
+  tags: string[];
+  model: string;
+  speed?: number;
+  sortOrder: number;
+  enabled: boolean;
+}
+
+interface AudioPreviewRecord {
+  audioPreviewId: string;
+  userId: string;
+  scriptDraftId: string;
+  digitalHumanId: string;
+  scriptHash: string;
+  scriptText: string;
+  voiceId: string;
+  voiceLabel: string;
+  voiceGender: DigitalHumanGender;
+  model: string;
+  speed: number;
+  language: VideoGenerationLanguage;
+  status: "ready" | "too_long" | "too_short";
+  durationMs: number;
+  localPath: string;
+  publicUrl: string;
+  sizeBytes: number;
+  createdAt: string;
 }
 
 interface ValidatedAssets {
@@ -177,6 +225,11 @@ const narrationAudioDir = path.join(
   env.resultsDir,
   "video-generation",
   "narration-audio",
+);
+const audioPreviewDir = path.join(
+  env.resultsDir,
+  "video-generation",
+  "audio-previews",
 );
 
 const asStringArray = (value: unknown) =>
@@ -550,6 +603,146 @@ const toPresetDigitalHumanVoice = (digitalHuman: DigitalHumanRecord) => {
     updatedAt: null as Date | null,
     speed: preset.speed,
     source: "manifest_preset" as const,
+  };
+};
+
+const platformVoiceCatalog: PlatformVoiceOption[] = [
+  {
+    id: "warm_female_host",
+    label: "亲和女声",
+    provider: "minimax",
+    providerVoiceId: "conversational_female_2_v1",
+    gender: "female",
+    tags: ["讲解", "温和", "门店介绍"],
+    model: env.minimax.speechModel,
+    speed: 1.1,
+    sortOrder: 10,
+    enabled: true,
+  },
+  {
+    id: "bright_female_promo",
+    label: "活力女声",
+    provider: "minimax",
+    providerVoiceId: "moss_audio_c12a59b9-7115-11f0-a447-9613c873494c",
+    gender: "female",
+    tags: ["促销", "短视频", "明快"],
+    model: env.minimax.speechModel,
+    speed: 1.15,
+    sortOrder: 20,
+    enabled: true,
+  },
+  {
+    id: "premium_female_narrator",
+    label: "高级感女声",
+    provider: "minimax",
+    providerVoiceId: "Russian_BrightHeroine",
+    gender: "female",
+    tags: ["高级感", "展示", "节奏感"],
+    model: env.minimax.speechModel,
+    speed: 1.12,
+    sortOrder: 30,
+    enabled: true,
+  },
+  {
+    id: "professional_male_host",
+    label: "专业男声",
+    provider: "minimax",
+    providerVoiceId: "Chinese_knowledgable_instructor_vv1",
+    gender: "male",
+    tags: ["专业", "讲解", "稳重"],
+    model: env.minimax.speechModel,
+    speed: 1.15,
+    sortOrder: 10,
+    enabled: true,
+  },
+  {
+    id: "steady_male_narrator",
+    label: "沉稳男声",
+    provider: "minimax",
+    providerVoiceId: "Chinese_knowledgable_instructor_vv1",
+    gender: "male",
+    tags: ["沉稳", "车况说明", "可信"],
+    model: env.minimax.speechModel,
+    speed: 1.05,
+    sortOrder: 20,
+    enabled: true,
+  },
+];
+
+const hashScriptText = (scriptText: string) =>
+  crypto.createHash("sha256").update(scriptText.trim(), "utf8").digest("hex");
+
+const audioPreviewMetaPath = (audioPreviewId: string) =>
+  path.join(audioPreviewDir, `${audioPreviewId}.json`);
+
+const audioPreviewAudioPath = (audioPreviewId: string) =>
+  path.join(audioPreviewDir, `${audioPreviewId}.mp3`);
+
+const toAudioPreviewPublicUrl = (audioPreviewId: string) =>
+  `${env.publicBaseUrl.replace(/\/$/, "")}/results/video-generation/audio-previews/${audioPreviewId}.mp3`;
+
+const normalizeConfirmedScriptText = (value: unknown) => {
+  if (typeof value !== "string") {
+    throw errors.invalidParameter("scriptText is required");
+  }
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length < 8 || normalized.length > 500) {
+    throw errors.invalidParameter("scriptText length must be between 8 and 500 characters", {
+      scriptLength: normalized.length,
+    });
+  }
+  return normalized;
+};
+
+const normalizeAudioPreviewId = (value: unknown) => {
+  const audioPreviewId = typeof value === "string" ? value.trim() : "";
+  if (!/^audio_preview_[a-zA-Z0-9_]+$/.test(audioPreviewId)) {
+    throw errors.invalidParameter("audioPreviewId is required");
+  }
+  return audioPreviewId;
+};
+
+const resolveAudioPreviewStatus = (durationMs: number) =>
+  durationMs > MAX_NARRATION_AUDIO_DURATION_MS
+    ? "too_long" as const
+    : durationMs < MIN_NARRATION_AUDIO_DURATION_MS
+      ? "too_short" as const
+      : "ready" as const;
+
+const toAudioPreviewResponse = (record: AudioPreviewRecord) => ({
+  audioPreviewId: record.audioPreviewId,
+  scriptDraftId: record.scriptDraftId,
+  status: record.status,
+  audioUrl: record.publicUrl,
+  durationMs: record.durationMs,
+  minDurationMs: MIN_NARRATION_AUDIO_DURATION_MS,
+  maxDurationMs: MAX_NARRATION_AUDIO_DURATION_MS,
+  scriptText: record.scriptText,
+  voiceId: record.voiceId,
+  voiceLabel: record.voiceLabel,
+  voiceGender: record.voiceGender,
+  model: record.model,
+  createdAt: record.createdAt,
+  canUseForVideo: record.status === "ready",
+});
+
+const updateDraftScriptText = (
+  draft: NonNullable<Awaited<ReturnType<typeof videoScriptDraftRepository.findById>>>,
+  scriptText: string,
+) => {
+  const requiredInputs = {
+    ...draft.requiredInputs,
+    script: {
+      ...asRecord(asRecord(draft.requiredInputs).script),
+      scriptText,
+    },
+  };
+  const finalVideoPrompt = draft.finalVideoPrompt.includes(draft.scriptText)
+    ? draft.finalVideoPrompt.replace(draft.scriptText, scriptText)
+    : `${draft.finalVideoPrompt}\n\n口播文案：${scriptText}`;
+  return {
+    requiredInputs,
+    finalVideoPrompt,
   };
 };
 
@@ -1611,6 +1804,200 @@ class VideoGenerationService {
     return localizeDigitalHumanRecord(item);
   }
 
+  private async listPlatformVoicesForDigitalHuman(digitalHuman: DigitalHumanRecord) {
+    const preset = toPresetDigitalHumanVoice(digitalHuman);
+    const presetVoice: PlatformVoiceOption | null = preset
+      ? {
+          id: `preset_${digitalHuman.id}`,
+          label:
+            typeof digitalHuman.presetVoice?.displayName === "string" &&
+            digitalHuman.presetVoice.displayName.trim()
+              ? digitalHuman.presetVoice.displayName.trim()
+              : "默认音色",
+          provider: "minimax",
+          providerVoiceId: preset.voiceId,
+          gender: digitalHuman.gender,
+          tags: ["默认", "数字人匹配"],
+          model: preset.model,
+          speed: preset.speed,
+          sortOrder: 0,
+          enabled: true,
+        }
+      : null;
+    const clonedVoice = await digitalHumanVoiceRepository.findByDigitalHumanId(digitalHuman.id);
+    const cloneOption: PlatformVoiceOption | null =
+      clonedVoice?.status === "ready"
+        ? {
+            id: `clone_${digitalHuman.id}`,
+            label: "克隆音色",
+            provider: "minimax",
+            providerVoiceId: clonedVoice.voiceId,
+            gender: digitalHuman.gender,
+            tags: ["克隆", "数字人匹配"],
+            model: clonedVoice.model,
+            sortOrder: 1,
+            enabled: true,
+          }
+        : null;
+    const deduped = new Map<string, PlatformVoiceOption>();
+    for (const voice of [
+      presetVoice,
+      cloneOption,
+      ...platformVoiceCatalog.filter(
+        (voice) => voice.enabled && voice.gender === digitalHuman.gender,
+      ),
+    ]) {
+      if (!voice) continue;
+      const key = `${voice.providerVoiceId}:${voice.speed ?? ""}`;
+      if (!deduped.has(key)) {
+        deduped.set(key, voice);
+      }
+    }
+    return Array.from(deduped.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async listVoiceOptions(input: { digitalHumanId?: unknown }) {
+    const digitalHumanId =
+      typeof input.digitalHumanId === "string" ? input.digitalHumanId.trim() : "";
+    if (!digitalHumanId) {
+      throw errors.invalidParameter("digitalHumanId is required");
+    }
+    const digitalHuman = await this.getDigitalHuman(digitalHumanId);
+    const voices = await this.listPlatformVoicesForDigitalHuman(digitalHuman);
+    return {
+      digitalHumanId: digitalHuman.id,
+      digitalHumanGender: digitalHuman.gender,
+      items: voices.map((voice, index) => ({
+        id: voice.id,
+        label: voice.label,
+        gender: voice.gender,
+        provider: voice.provider,
+        model: voice.model,
+        tags: voice.tags,
+        recommended: index === 0,
+      })),
+      total: voices.length,
+    };
+  }
+
+  private async resolveVoiceOption(digitalHuman: DigitalHumanRecord, voiceId: string) {
+    const voices = await this.listPlatformVoicesForDigitalHuman(digitalHuman);
+    const voice =
+      voices.find((item) => item.id === voiceId) ??
+      voices.find((item) => item.providerVoiceId === voiceId);
+    if (!voice) {
+      throw errors.invalidParameter("voiceId is invalid for selected digital human", {
+        digitalHumanId: digitalHuman.id,
+        voiceId,
+      });
+    }
+    if (voice.gender !== digitalHuman.gender) {
+      throw errors.invalidParameter("voice gender does not match selected digital human", {
+        digitalHumanId: digitalHuman.id,
+        digitalHumanGender: digitalHuman.gender,
+        voiceGender: voice.gender,
+      });
+    }
+    return voice;
+  }
+
+  private async loadAudioPreview(audioPreviewId: string) {
+    try {
+      return await readJson<AudioPreviewRecord>(audioPreviewMetaPath(audioPreviewId));
+    } catch {
+      throw errors.invalidParameter("audioPreviewId is invalid", { audioPreviewId });
+    }
+  }
+
+  private async persistAudioPreview(input: {
+    userId: string;
+    scriptDraftId: string;
+    digitalHumanId: string;
+    scriptText: string;
+    voice: PlatformVoiceOption;
+    language: VideoGenerationLanguage;
+    speech: Awaited<ReturnType<typeof minimaxClient.synthesizeSpeech>>;
+  }) {
+    if (!input.speech.durationMs) {
+      throw errors.generationFailed("MiniMax narration audio response missing duration", {
+        scriptLength: input.scriptText.length,
+      });
+    }
+    const audioPreviewId = createId("audio_preview");
+    await fs.mkdir(audioPreviewDir, { recursive: true });
+    const localPath = audioPreviewAudioPath(audioPreviewId);
+    await fs.writeFile(localPath, input.speech.audio);
+    const record: AudioPreviewRecord = {
+      audioPreviewId,
+      userId: input.userId,
+      scriptDraftId: input.scriptDraftId,
+      digitalHumanId: input.digitalHumanId,
+      scriptHash: hashScriptText(input.scriptText),
+      scriptText: input.scriptText,
+      voiceId: input.voice.id,
+      voiceLabel: input.voice.label,
+      voiceGender: input.voice.gender,
+      model: input.speech.model,
+      speed: input.speech.speed,
+      language: input.language,
+      status: resolveAudioPreviewStatus(input.speech.durationMs),
+      durationMs: input.speech.durationMs,
+      localPath,
+      publicUrl: toAudioPreviewPublicUrl(audioPreviewId),
+      sizeBytes: input.speech.sizeBytes,
+      createdAt: new Date().toISOString(),
+    };
+    await fs.writeFile(
+      audioPreviewMetaPath(audioPreviewId),
+      JSON.stringify(record, null, 2),
+      "utf8",
+    );
+    return record;
+  }
+
+  private async validateAudioPreviewForTask(input: {
+    audioPreviewId: string;
+    userId: string;
+    draft: Awaited<ReturnType<typeof videoScriptDraftRepository.findById>>;
+    language: VideoGenerationLanguage;
+  }) {
+    if (!input.draft) throw errors.videoScriptDraftNotFound();
+    const preview = await this.loadAudioPreview(input.audioPreviewId);
+    if (
+      preview.userId !== input.userId ||
+      preview.scriptDraftId !== input.draft.id ||
+      preview.digitalHumanId !== input.draft.digitalHumanId
+    ) {
+      throw errors.invalidParameter("audioPreviewId does not match script draft");
+    }
+    if (preview.scriptHash !== hashScriptText(input.draft.scriptText)) {
+      throw errors.invalidParameter("audio preview is stale after script changes");
+    }
+    if (preview.language !== input.language) {
+      throw errors.invalidParameter("audio preview language does not match script draft");
+    }
+    const digitalHuman = await this.getDigitalHuman(input.draft.digitalHumanId);
+    if (preview.voiceGender !== digitalHuman.gender) {
+      throw errors.invalidParameter("audio preview voice gender does not match selected digital human");
+    }
+    if (
+      preview.durationMs < MIN_NARRATION_AUDIO_DURATION_MS ||
+      preview.durationMs > MAX_NARRATION_AUDIO_DURATION_MS
+    ) {
+      throw errors.invalidParameter("audio preview duration is outside the supported range", {
+        audioDurationMs: preview.durationMs,
+      });
+    }
+    try {
+      await fs.access(preview.localPath);
+    } catch {
+      throw errors.invalidParameter("audio preview file is missing", {
+        audioPreviewId: input.audioPreviewId,
+      });
+    }
+    return preview;
+  }
+
   async getDigitalHumanImagePath(id: string) {
     const item = await this.getDigitalHuman(id);
     const imagePath = path.resolve(workspaceRoot, item.imagePath);
@@ -2184,6 +2571,177 @@ class VideoGenerationService {
     };
   }
 
+  async createAudioPreview(body: CreateAudioPreviewInput, userId: string) {
+    const scriptDraftId =
+      typeof body.scriptDraftId === "string" ? body.scriptDraftId.trim() : "";
+    if (!scriptDraftId) {
+      throw errors.invalidParameter("scriptDraftId is required");
+    }
+    const draft = await videoScriptDraftRepository.findById(scriptDraftId, userId);
+    if (!draft) throw errors.videoScriptDraftNotFound();
+
+    const scriptText = normalizeConfirmedScriptText(body.scriptText);
+    const voiceId = typeof body.voiceId === "string" ? body.voiceId.trim() : "";
+    if (!voiceId) {
+      throw errors.invalidParameter("voiceId is required");
+    }
+    const digitalHuman = await this.getDigitalHuman(draft.digitalHumanId);
+    const voice = await this.resolveVoiceOption(digitalHuman, voiceId);
+    const requiredInputs = asRecord(draft.requiredInputs);
+    const vehicleInput = asRecord(requiredInputs.vehicle);
+    const language = normalizeVideoGenerationLanguage(vehicleInput.language);
+    const updatedDraft = updateDraftScriptText(draft, scriptText);
+    const savedDraft = await videoScriptDraftRepository.updateScriptText({
+      id: draft.id,
+      userId,
+      scriptText,
+      finalVideoPrompt: updatedDraft.finalVideoPrompt,
+      requiredInputs: updatedDraft.requiredInputs,
+    });
+    if (!savedDraft) throw errors.videoScriptDraftNotFound();
+
+    const speed = voice.speed ?? 1;
+    const speech = await minimaxClient.synthesizeSpeech({
+      text: scriptText,
+      voiceId: voice.providerVoiceId,
+      speed,
+      language,
+    });
+    const record = await this.persistAudioPreview({
+      userId,
+      scriptDraftId,
+      digitalHumanId: draft.digitalHumanId,
+      scriptText,
+      voice,
+      language,
+      speech,
+    });
+    return toAudioPreviewResponse(record);
+  }
+
+  async optimizeNarration(
+    scriptDraftId: string,
+    body: OptimizeNarrationInput,
+    userId: string,
+  ) {
+    const draftId = scriptDraftId.trim();
+    if (!draftId) throw errors.invalidParameter("scriptDraftId is required");
+    const draft = await videoScriptDraftRepository.findById(draftId, userId);
+    if (!draft) throw errors.videoScriptDraftNotFound();
+
+    const initialScriptText = normalizeConfirmedScriptText(body.scriptText);
+    const voiceId = typeof body.voiceId === "string" ? body.voiceId.trim() : "";
+    if (!voiceId) throw errors.invalidParameter("voiceId is required");
+    const digitalHuman = await this.getDigitalHuman(draft.digitalHumanId);
+    const voice = await this.resolveVoiceOption(digitalHuman, voiceId);
+    const requiredInputs = asRecord(draft.requiredInputs);
+    const language = normalizeVideoGenerationLanguage(asRecord(requiredInputs.vehicle).language);
+
+    let measuredDurationMs: number | null = null;
+    const baselineAudioPreviewId =
+      typeof body.baselineAudioPreviewId === "string"
+        ? body.baselineAudioPreviewId.trim()
+        : "";
+    if (baselineAudioPreviewId) {
+      const baseline = await this.loadAudioPreview(normalizeAudioPreviewId(baselineAudioPreviewId));
+      if (
+        baseline.userId !== userId ||
+        baseline.scriptDraftId !== draft.id ||
+        baseline.digitalHumanId !== draft.digitalHumanId ||
+        baseline.scriptHash !== hashScriptText(initialScriptText) ||
+        baseline.voiceId !== voice.id
+      ) {
+        throw errors.invalidParameter("baseline audio preview does not match current narration");
+      }
+      measuredDurationMs = baseline.durationMs;
+    }
+
+    const candidates: Array<{
+      scriptText: string;
+      speech: Awaited<ReturnType<typeof minimaxClient.synthesizeSpeech>>;
+    }> = [];
+    let sourceScriptText = initialScriptText;
+    const targetDurationMs = 13_500;
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const durationGuidance = measuredDurationMs
+        ? `The current narration measured ${measuredDurationMs} ms. Adjust its spoken length toward ${targetDurationMs} ms.`
+        : `No measured duration is available yet. Target a natural spoken duration near ${targetDurationMs} ms.`;
+      const optimized = await deepSeekClient.optimizeNarration({
+        systemPrompt: [
+          "You are an automotive narration editor.",
+          "Return one JSON object with exactly one field: scriptText.",
+          "Keep the original language, named entities, verified facts, selling points, and call to action.",
+          "Do not invent prices, mileage, configuration, condition, warranty, inventory, or promotional claims.",
+          "Rewrite for natural speech and a real TTS duration between 12 and 15 seconds.",
+        ].join("\n"),
+        userPrompt: [
+          `Language: ${getVideoGenerationLanguageLabel(language)}`,
+          `Calibration attempt: ${attempt} of 3`,
+          durationGuidance,
+          "Source narration:",
+          sourceScriptText,
+        ].join("\n"),
+      });
+      const scriptText = normalizeConfirmedScriptText(optimized.scriptText);
+      const speech = await minimaxClient.synthesizeSpeech({
+        text: scriptText,
+        voiceId: voice.providerVoiceId,
+        speed: voice.speed ?? 1,
+        language,
+      });
+      if (!speech.durationMs) {
+        throw errors.generationFailed("MiniMax narration audio response missing duration", {
+          attempt,
+          scriptLength: scriptText.length,
+        });
+      }
+      candidates.push({ scriptText, speech });
+      measuredDurationMs = speech.durationMs;
+      sourceScriptText = scriptText;
+      if (
+        speech.durationMs >= MIN_NARRATION_AUDIO_DURATION_MS &&
+        speech.durationMs <= MAX_NARRATION_AUDIO_DURATION_MS
+      ) {
+        break;
+      }
+    }
+
+    const best = [...candidates].sort(
+      (a, b) =>
+        Math.abs((a.speech.durationMs ?? 0) - targetDurationMs) -
+        Math.abs((b.speech.durationMs ?? 0) - targetDurationMs),
+    )[0];
+    if (!best) throw errors.generationFailed("narration optimization produced no candidate");
+
+    const updatedDraft = updateDraftScriptText(draft, best.scriptText);
+    const savedDraft = await videoScriptDraftRepository.updateScriptText({
+      id: draft.id,
+      userId,
+      scriptText: best.scriptText,
+      finalVideoPrompt: updatedDraft.finalVideoPrompt,
+      requiredInputs: updatedDraft.requiredInputs,
+    });
+    if (!savedDraft) throw errors.videoScriptDraftNotFound();
+
+    const record = await this.persistAudioPreview({
+      userId,
+      scriptDraftId: draft.id,
+      digitalHumanId: draft.digitalHumanId,
+      scriptText: best.scriptText,
+      voice,
+      language,
+      speech: best.speech,
+    });
+    return {
+      scriptDraftId: draft.id,
+      scriptText: best.scriptText,
+      preview: toAudioPreviewResponse(record),
+      attempts: candidates.length,
+      converged: record.status === "ready",
+    };
+  }
+
   async createVideoTask(
     body: CreateVideoTaskInput,
     userId: string,
@@ -2194,20 +2752,10 @@ class VideoGenerationService {
     if (!scriptDraftId) {
       throw errors.invalidParameter("scriptDraftId is required");
     }
+    const audioPreviewId = normalizeAudioPreviewId(body.audioPreviewId);
 
     const draft = await videoScriptDraftRepository.findById(scriptDraftId, userId);
     if (!draft) throw errors.videoScriptDraftNotFound();
-    const digitalHumanVoice =
-      await this.getEffectiveDigitalHumanVoice(draft.digitalHumanId);
-    if (!digitalHumanVoice || digitalHumanVoice.status !== "ready") {
-      throw errors.invalidParameter(
-        "selected digital human has no ready MiniMax voice clone",
-        {
-          digitalHumanId: draft.digitalHumanId,
-          setupEndpoint: `/api/v1/modules/video-generation/digital-humans/${encodeURIComponent(draft.digitalHumanId)}/voice-clone`,
-        },
-      );
-    }
 
     const subscription = await assertCanStartGeneration(context, {
       moduleCodes: ["video-generation"],
@@ -2224,6 +2772,12 @@ class VideoGenerationService {
       (typeof templateInput.type === "string"
         ? templateInput.type
         : templateDefinition?.type ?? "single-car") as VideoTemplateType;
+    const confirmedAudioPreview = await this.validateAudioPreviewForTask({
+      audioPreviewId,
+      userId,
+      draft,
+      language,
+    });
     const [digitalHumanPath, exteriorAssets, interiorAssets, userReferenceAssets, dealershipAssets] =
       await Promise.all([
         this.getDigitalHumanImagePath(draft.digitalHumanId),
@@ -2283,15 +2837,25 @@ class VideoGenerationService {
     let billingFreezeFailed = false;
 
     try {
-      const fittedNarration = await synthesizeNarrationAudioWithAutoFit({
-        taskId,
-        scriptText: draft.scriptText,
-        voiceId: digitalHumanVoice.voiceId,
-        speed: digitalHumanVoice.speed,
-        language,
-      });
-      const narrationAudio = fittedNarration.audio;
-      const narrationScriptText = fittedNarration.scriptText;
+      const narrationAudio = {
+        localPath: confirmedAudioPreview.localPath,
+        publicUrl: confirmedAudioPreview.publicUrl,
+        durationMs: confirmedAudioPreview.durationMs,
+        originalDurationMs: confirmedAudioPreview.durationMs,
+        normalizedSpeechDurationMs: confirmedAudioPreview.durationMs,
+        silencePadMs: 0,
+        timeStretchRatio: null as number | null,
+        originalLocalPath: confirmedAudioPreview.localPath,
+        originalPublicUrl: confirmedAudioPreview.publicUrl,
+        sizeBytes: confirmedAudioPreview.sizeBytes,
+        originalSizeBytes: confirmedAudioPreview.sizeBytes,
+        model: confirmedAudioPreview.model,
+        voiceId: confirmedAudioPreview.voiceId,
+        speed: confirmedAudioPreview.speed,
+        language: confirmedAudioPreview.language,
+        languageBoost: null as string | null,
+      };
+      const narrationScriptText = confirmedAudioPreview.scriptText;
       const seedanceDurationSeconds = deriveSeedanceDurationSeconds(
         narrationAudio.durationMs,
       );
@@ -2469,6 +3033,7 @@ class VideoGenerationService {
           model: env.ark.videoModel,
           moduleCode: "video-generation",
           scriptDraftId,
+          audioPreviewId,
           vehicleName: draft.vehicleName,
           templateId: draft.referenceMaterialId,
           templateType,
@@ -2512,9 +3077,19 @@ class VideoGenerationService {
               provider: "minimax",
               model: narrationAudio.model,
               voiceId: narrationAudio.voiceId,
+              voiceLabel: confirmedAudioPreview.voiceLabel,
+              voiceGender: confirmedAudioPreview.voiceGender,
+              audioPreviewId,
               usage: "seedance_reference_audio_for_generation",
               scriptText: narrationScriptText,
-              fitAttempts: fittedNarration.attempts,
+              fitAttempts: [
+                {
+                  attempt: 1,
+                  scriptText: narrationScriptText,
+                  durationMs: narrationAudio.durationMs,
+                  status: "success",
+                },
+              ],
               durationMs: narrationAudio.durationMs,
               originalDurationMs: narrationAudio.originalDurationMs,
               normalizedSpeechDurationMs: narrationAudio.normalizedSpeechDurationMs,
@@ -2563,9 +3138,18 @@ class VideoGenerationService {
           provider: "minimax",
           model: narrationAudio.model,
           voiceId: narrationAudio.voiceId,
+          voiceLabel: confirmedAudioPreview.voiceLabel,
+          audioPreviewId,
           usage: "seedance_reference_audio_for_generation",
           scriptText: narrationScriptText,
-          fitAttempts: fittedNarration.attempts,
+          fitAttempts: [
+            {
+              attempt: 1,
+              scriptText: narrationScriptText,
+              durationMs: narrationAudio.durationMs,
+              status: "success",
+            },
+          ],
           durationMs: narrationAudio.durationMs,
           originalDurationMs: narrationAudio.originalDurationMs,
           normalizedSpeechDurationMs: narrationAudio.normalizedSpeechDurationMs,

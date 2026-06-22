@@ -1,17 +1,20 @@
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 import { uploadAsset } from '@/api/visual-workbench'
 import {
   cancelVideoGenerationTask,
+  createVideoAudioPreview,
   createVideoScriptDraft,
   createVideoGenerationTask,
   getDigitalHumanVoice,
+  getVideoVoiceOptions,
   getVideoDigitalHumans,
   getVideoGenerationTask,
   getVideoGenerationTasks,
   getVideoScriptDraft,
   getVideoTemplates,
   getVideoWorkflowContract,
+  optimizeVideoNarration,
   regenerateVideoGenerationTask,
   validateTemplateInputs,
 } from '@/api/video-generation'
@@ -37,8 +40,11 @@ import type {
   VideoGenerationTask,
   VideoGenerationStep,
   VideoHistoryItem,
+  VideoAudioPreview,
+  OptimizeNarrationResult,
   VideoScriptDraft,
   VideoTemplate,
+  VideoVoiceOption,
   VideoUploadPreviewItem,
 } from '@/types/video-generation'
 import { resolveVideoGenerationErrorMessage } from '@/utils/video-generation-errors'
@@ -109,6 +115,13 @@ export function useVideoGenerationFlow(ownerKey: string) {
   const referenceUploads = ref<VideoUploadPreviewItem[]>([])
   const dealershipUploads = ref<VideoUploadPreviewItem[]>([])
   const scriptDraft = ref<VideoScriptDraft | null>(null)
+  const confirmedScriptText = ref('')
+  const voiceOptions = ref<VideoVoiceOption[]>([])
+  const selectedVoiceId = ref('')
+  const audioPreviews = ref<VideoAudioPreview[]>([])
+  const confirmedAudioPreviewId = ref('')
+  const draftInputFingerprint = ref('')
+  const draftNeedsRegeneration = ref(false)
   const currentTask = ref<VideoGenerationTask | null>(null)
   const historyList = ref<VideoHistoryItem[]>([])
   const validationIssues = ref<ValidateTemplateInputsIssue[]>([])
@@ -121,6 +134,22 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
   const selectedDigitalHuman = computed(() =>
     digitalHumanList.value.find((item) => item.id === activeDigitalHumanId.value) ?? null,
+  )
+
+  const confirmedAudioPreview = computed(() =>
+    audioPreviews.value.find((item) => item.audioPreviewId === confirmedAudioPreviewId.value) ?? null,
+  )
+
+  const canSubmitVideoTask = computed(
+    () => Boolean(scriptDraft.value?.scriptDraftId && confirmedAudioPreview.value?.canUseForVideo),
+  )
+
+  const currentInputFingerprint = computed(() => JSON.stringify(buildValidatePayload()))
+  const hasReusableDraft = computed(
+    () =>
+      Boolean(scriptDraft.value?.scriptDraftId) &&
+      Boolean(draftInputFingerprint.value) &&
+      currentInputFingerprint.value === draftInputFingerprint.value,
   )
 
   const activeDigitalHumanId = computed(() => {
@@ -179,6 +208,88 @@ export function useVideoGenerationFlow(ownerKey: string) {
     } catch {
       // ignore
     }
+  }
+
+  function resetAudioConfirmation() {
+    audioPreviews.value = []
+    confirmedAudioPreviewId.value = ''
+  }
+
+  function invalidateDraftForInputChange() {
+    scriptDraft.value = null
+    confirmedScriptText.value = ''
+    voiceOptions.value = []
+    selectedVoiceId.value = ''
+    draftInputFingerprint.value = ''
+    draftNeedsRegeneration.value = true
+    resetAudioConfirmation()
+    clearPersistedDraftId()
+  }
+
+  watch(currentInputFingerprint, (nextFingerprint) => {
+    if (
+      currentStep.value === 'form' &&
+      scriptDraft.value &&
+      draftInputFingerprint.value &&
+      nextFingerprint !== draftInputFingerprint.value
+    ) {
+      invalidateDraftForInputChange()
+    }
+  })
+
+  function setDefaultVoice() {
+    selectedVoiceId.value =
+      voiceOptions.value.find((item) => item.recommended)?.id ??
+      voiceOptions.value[0]?.id ??
+      ''
+  }
+
+  async function loadVoiceOptions(digitalHumanId = activeDigitalHumanId.value) {
+    if (!digitalHumanId || isLocalOnlyDigitalHumanId(digitalHumanId)) {
+      voiceOptions.value = []
+      selectedVoiceId.value = ''
+      return []
+    }
+    setLoading('voices', true)
+    try {
+      const result = await getVideoVoiceOptions(digitalHumanId)
+      voiceOptions.value = result.items ?? []
+      if (!voiceOptions.value.some((item) => item.id === selectedVoiceId.value)) {
+        setDefaultVoice()
+      }
+      return voiceOptions.value
+    } finally {
+      setLoading('voices', false)
+    }
+  }
+
+  function setConfirmedScriptText(value: string) {
+    confirmedScriptText.value = value
+    resetAudioConfirmation()
+  }
+
+  function selectVoice(voiceId: string) {
+    if (selectedVoiceId.value === voiceId) return
+    selectedVoiceId.value = voiceId
+    resetAudioConfirmation()
+  }
+
+  function confirmAudioPreview(audioPreviewId: string) {
+    const preview = audioPreviews.value.find((item) => item.audioPreviewId === audioPreviewId)
+    if (!preview?.canUseForVideo) {
+      errorMessage.value = '试听音频时长需在 12-15 秒内，才能生成视频'
+      return false
+    }
+    confirmedAudioPreviewId.value = audioPreviewId
+    currentStep.value = 'review'
+    return true
+  }
+
+  function cancelAudioPreviewConfirmation() {
+    if (!confirmedAudioPreviewId.value) return false
+    confirmedAudioPreviewId.value = ''
+    currentStep.value = 'review'
+    return true
   }
 
   function readPersistedDraftId() {
@@ -309,7 +420,12 @@ export function useVideoGenerationFlow(ownerKey: string) {
       const draftId = readPersistedDraftId()
       if (draftId) {
         scriptDraft.value = await getVideoScriptDraft(draftId)
-        restoreFormFromDraft()
+        if (restoreFormFromDraft()) {
+          draftInputFingerprint.value = currentInputFingerprint.value
+        }
+        if (activeDigitalHumanId.value) {
+          await loadVoiceOptions(activeDigitalHumanId.value)
+        }
       }
 
       const taskId = readPersistedTaskId()
@@ -373,6 +489,12 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
     selectedTemplate.value = template
     scriptDraft.value = null
+    confirmedScriptText.value = ''
+    voiceOptions.value = []
+    selectedVoiceId.value = ''
+    draftInputFingerprint.value = ''
+    draftNeedsRegeneration.value = false
+    resetAudioConfirmation()
     currentTask.value = null
     validationIssues.value = []
     clearPersistedDraftId()
@@ -487,7 +609,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
           'video_reference_image',
         )
       }
-      currentStep.value = 'form'
+      confirmedScriptText.value = asString(script.scriptText)
+      currentStep.value = 'review'
       return true
     }
 
@@ -551,7 +674,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
       )
     }
 
-    currentStep.value = 'form'
+    confirmedScriptText.value = asString(script.scriptText)
+    currentStep.value = 'review'
     return true
   }
 
@@ -561,15 +685,25 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
   function goBackToForm() {
     if (!selectedTemplate.value && scriptDraft.value) {
-      if (restoreFormFromDraft()) return
+      if (restoreFormFromDraft()) {
+        currentStep.value = 'form'
+        return
+      }
       currentStep.value = 'template'
       return
     }
     if (scriptDraft.value) {
       restoreFormFromDraft()
+      currentStep.value = 'form'
       return
     }
     currentStep.value = 'form'
+  }
+
+  function continueReview() {
+    if (!hasReusableDraft.value) return false
+    currentStep.value = 'review'
+    return true
   }
 
   function buildValidatePayload(): Record<string, unknown> {
@@ -666,6 +800,13 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
       const draft = await createVideoScriptDraft(buildDraftPayload())
       scriptDraft.value = draft
+      confirmedScriptText.value =
+        draft.requiredInputs.script?.scriptText ?? ''
+      resetAudioConfirmation()
+      await loadVoiceOptions(digitalHumanId)
+      draftInputFingerprint.value = JSON.stringify(payload)
+      draftNeedsRegeneration.value = false
+      currentStep.value = 'review'
       persistDraftId(draft.scriptDraftId)
       return draft
     } catch (error) {
@@ -676,9 +817,88 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
+  async function generateAudioPreview() {
+    if (!scriptDraft.value?.scriptDraftId) {
+      errorMessage.value = '请先生成并确认口播草稿'
+      return null
+    }
+    if (!confirmedScriptText.value.trim()) {
+      errorMessage.value = '请先确认口播文案'
+      return null
+    }
+    if (!selectedVoiceId.value) {
+      errorMessage.value = '请选择可试听的音色'
+      return null
+    }
+    setLoading('audio', true)
+    errorMessage.value = ''
+    try {
+      const preview = await createVideoAudioPreview({
+        scriptDraftId: scriptDraft.value.scriptDraftId,
+        scriptText: confirmedScriptText.value,
+        voiceId: selectedVoiceId.value,
+      })
+      audioPreviews.value = [preview, ...audioPreviews.value]
+        .filter((item, index, items) =>
+          items.findIndex((candidate) => candidate.audioPreviewId === item.audioPreviewId) === index,
+        )
+        .slice(0, 3)
+      confirmedAudioPreviewId.value = ''
+      currentStep.value = 'review'
+      scriptDraft.value = await getVideoScriptDraft(scriptDraft.value.scriptDraftId)
+      confirmedScriptText.value =
+        scriptDraft.value.requiredInputs.script?.scriptText ?? confirmedScriptText.value
+      return preview
+    } catch (error) {
+      errorMessage.value = resolveVideoGenerationErrorMessage(error)
+      return null
+    } finally {
+      setLoading('audio', false)
+    }
+  }
+
+  async function optimizeNarrationScript(): Promise<OptimizeNarrationResult | null> {
+    if (!scriptDraft.value?.scriptDraftId) {
+      errorMessage.value = '请先生成口播文案'
+      return null
+    }
+    if (!confirmedScriptText.value.trim()) {
+      errorMessage.value = '请先填写口播文案'
+      return null
+    }
+    if (!selectedVoiceId.value) {
+      errorMessage.value = '请选择用于校准时长的音色'
+      return null
+    }
+    setLoading('optimize', true)
+    errorMessage.value = ''
+    try {
+      const result = await optimizeVideoNarration(scriptDraft.value.scriptDraftId, {
+        scriptText: confirmedScriptText.value,
+        voiceId: selectedVoiceId.value,
+        baselineAudioPreviewId: audioPreviews.value[0]?.audioPreviewId,
+      })
+      confirmedScriptText.value = result.scriptText
+      audioPreviews.value = [result.preview]
+      confirmedAudioPreviewId.value = ''
+      currentStep.value = 'review'
+      scriptDraft.value = await getVideoScriptDraft(scriptDraft.value.scriptDraftId)
+      return result
+    } catch (error) {
+      errorMessage.value = resolveVideoGenerationErrorMessage(error)
+      return null
+    } finally {
+      setLoading('optimize', false)
+    }
+  }
+
   async function submitVideoTask() {
     if (!scriptDraft.value?.scriptDraftId) {
       errorMessage.value = '请先生成并确认口播草稿'
+      return null
+    }
+    if (!confirmedAudioPreview.value?.audioPreviewId) {
+      errorMessage.value = '请先试听并确认 12-15 秒内的音频'
       return null
     }
     setLoading('task', true)
@@ -686,6 +906,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     try {
       const created = await createVideoGenerationTask({
         scriptDraftId: scriptDraft.value.scriptDraftId,
+        audioPreviewId: confirmedAudioPreview.value.audioPreviewId,
       })
       void creditsStore.hydrateAccounts(true)
       const task = await getVideoGenerationTask(created.taskId)
@@ -877,6 +1098,15 @@ export function useVideoGenerationFlow(ownerKey: string) {
     referenceUploads,
     dealershipUploads,
     scriptDraft,
+    confirmedScriptText,
+    voiceOptions,
+    selectedVoiceId,
+    audioPreviews,
+    confirmedAudioPreviewId,
+    confirmedAudioPreview,
+    canSubmitVideoTask,
+    hasReusableDraft,
+    draftNeedsRegeneration,
     currentTask,
     historyList,
     validationIssues,
@@ -888,7 +1118,15 @@ export function useVideoGenerationFlow(ownerKey: string) {
     selectTemplate,
     goBackToTemplate,
     goBackToForm,
+    continueReview,
     generateScriptDraft,
+    loadVoiceOptions,
+    setConfirmedScriptText,
+    selectVoice,
+    generateAudioPreview,
+    optimizeNarrationScript,
+    confirmAudioPreview,
+    cancelAudioPreviewConfirmation,
     submitVideoTask,
     refreshTask,
     waitForTaskCompletion,

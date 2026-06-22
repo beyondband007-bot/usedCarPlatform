@@ -66,10 +66,28 @@ const {
   dealershipUploads,
   validationIssues,
   errorMessage,
+  scriptDraft,
+  confirmedScriptText,
+  voiceOptions,
+  selectedVoiceId,
+  audioPreviews,
+  confirmedAudioPreviewId,
+  confirmedAudioPreview,
+  canSubmitVideoTask,
+  hasReusableDraft,
+  draftNeedsRegeneration,
   isLoading,
   initializeFlow,
   goBackToTemplate,
+  goBackToForm,
+  continueReview,
   generateScriptDraft,
+  setConfirmedScriptText,
+  selectVoice,
+  generateAudioPreview,
+  optimizeNarrationScript,
+  confirmAudioPreview,
+  cancelAudioPreviewConfirmation,
   submitVideoTask,
   uploadExteriorImages,
   uploadInteriorImages,
@@ -338,6 +356,54 @@ const canGenerateDraft = computed(
     isFormReadyForDraft.value,
 );
 
+const editableScriptText = computed({
+  get() {
+    return confirmedScriptText.value;
+  },
+  set(value: string) {
+    setConfirmedScriptText(value);
+  },
+});
+
+const canGenerateAudioPreview = computed(
+  () =>
+    Boolean(scriptDraft.value?.scriptDraftId) &&
+    Boolean(editableScriptText.value.trim()) &&
+    Boolean(selectedVoiceId.value) &&
+    !props.disabled &&
+    !isLoading("audio") &&
+    !isLoading("optimize"),
+);
+
+const canOptimizeNarration = computed(
+  () =>
+    Boolean(scriptDraft.value?.scriptDraftId) &&
+    Boolean(editableScriptText.value.trim()) &&
+    Boolean(selectedVoiceId.value) &&
+    !props.disabled &&
+    !isLoading("audio") &&
+    !isLoading("optimize") &&
+    !isLoading("task"),
+);
+
+const latestAudioPreview = computed(() => audioPreviews.value[0] ?? null);
+const showConfigurationPage = computed(() =>
+  ["form", "task", "result"].includes(currentStep.value),
+);
+const showConfigurationFooter = computed(() => currentStep.value === "form");
+
+function formatAudioDuration(durationMs?: number | null) {
+  if (!durationMs) return "--";
+  return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function resolveAudioPreviewLabel(status: string) {
+  if (status === "ready") return "可用于生成";
+  if (status === "too_long") return "超过 15 秒";
+  if (status === "too_short") return "不足 12 秒";
+  return "需重新试听";
+}
+
 defineExpose({
   currentStep,
   canGenerateDraft,
@@ -429,7 +495,6 @@ function selectDigitalHuman(human: DigitalHuman) {
 }
 
 async function submitDraft() {
-  currentStep.value = "task";
   const draft = await generateScriptDraft();
   if (!draft) {
     currentStep.value = "form";
@@ -438,12 +503,57 @@ async function submitDraft() {
     }
     return;
   }
+  message.success("口播文案已生成，请确认文案并试听音色");
+}
 
+async function submitAudioPreview() {
+  const preview = await generateAudioPreview();
+  if (!preview) {
+    if (errorMessage.value) message.error(errorMessage.value);
+    return;
+  }
+  if (preview.canUseForVideo) {
+    message.success("试听音频已生成，请试听并确认");
+    return;
+  }
+  message.warning(`试听音频${resolveAudioPreviewLabel(preview.status)}，请调整文案后重新试听`);
+}
+
+async function submitNarrationOptimization() {
+  const result = await optimizeNarrationScript();
+  if (!result) {
+    if (errorMessage.value) message.error(errorMessage.value);
+    return;
+  }
+  if (result.converged) {
+    message.success(`已优化至 ${formatAudioDuration(result.preview.durationMs)}，请试听并确认`);
+    return;
+  }
+  message.warning(
+    `已完成 ${result.attempts} 轮优化，当前 ${formatAudioDuration(result.preview.durationMs)}，请手动调整`,
+  );
+}
+
+function toggleAudioConfirmation(audioPreviewId: string, canUseForVideo: boolean) {
+  if (!canUseForVideo) {
+    message.warning("音频时长需在 12–15 秒内，请修改文案或使用一键优化");
+    return;
+  }
+  if (confirmedAudioPreviewId.value === audioPreviewId) {
+    cancelAudioPreviewConfirmation();
+    message.info("已取消音频确认");
+    return;
+  }
+  if (confirmAudioPreview(audioPreviewId)) {
+    message.success("音频已确认，可以生成视频");
+  }
+}
+
+async function submitConfirmedVideo() {
   const task = await submitVideoTask();
   if (task) {
     message.success("已提交视频生成");
   } else if (errorMessage.value) {
-    currentStep.value = "form";
     message.error(errorMessage.value);
   }
 }
@@ -478,7 +588,7 @@ async function submitDraft() {
       </section>
     </template>
 
-    <template v-else-if="['form', 'task', 'result'].includes(currentStep) && selectedTemplate">
+    <template v-else-if="['form', 'review', 'task', 'result'].includes(currentStep) && selectedTemplate">
       <article class="sv-template-summary">
         <PreloadImage
           v-if="selectedTemplatePosterUrl && !selectedTemplateUseVideoCover"
@@ -509,6 +619,7 @@ async function submitDraft() {
         </div>
       </article>
 
+      <template v-if="showConfigurationPage">
       <section class="sv-section">
         <header class="sv-section-head">
           <span class="sv-step-index">1</span>
@@ -858,7 +969,7 @@ async function submitDraft() {
         <p>{{ tipBannerText }}</p>
       </footer>
 
-      <div class="sv-form-footer">
+      <div v-if="showConfigurationFooter" class="sv-form-footer">
         <button
           type="button"
           class="sv-form-footer-btn sv-form-footer-btn--ghost"
@@ -868,6 +979,17 @@ async function submitDraft() {
           取消
         </button>
         <button
+          v-if="hasReusableDraft"
+          type="button"
+          class="sv-form-footer-btn sv-form-footer-btn--primary"
+          :disabled="disabled || isGenerating"
+          @click="continueReview"
+        >
+          <Icon icon="mdi:arrow-right" aria-hidden="true" />
+          继续确认文案
+        </button>
+        <button
+          v-else
           type="button"
           class="sv-form-footer-btn sv-form-footer-btn--primary"
           :disabled="!canGenerateDraft"
@@ -880,9 +1002,166 @@ async function submitDraft() {
             aria-hidden="true"
           />
           <Icon v-else icon="mdi:auto-fix" aria-hidden="true" />
-          开始生成
+          {{ draftNeedsRegeneration ? "重新生成文案" : "生成文案" }}
         </button>
       </div>
+      </template>
+
+      <template v-else-if="currentStep === 'review' && scriptDraft">
+      <section class="sv-section sv-script-review">
+        <header class="sv-section-head">
+          <span class="sv-step-index">5</span>
+          <div class="sv-section-copy">
+            <h3>确认口播文案</h3>
+            <p>修改文案后需要重新试听，音频时长需控制在 12-15 秒</p>
+          </div>
+        </header>
+        <label class="sv-field sv-field--block">
+          <span class="sv-field-label">口播文案 <em>*</em></span>
+          <textarea
+            v-model="editableScriptText"
+            rows="5"
+            placeholder="请确认或修改数字人口播文案"
+            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('task')"
+          />
+        </label>
+        <div
+          v-if="latestAudioPreview && !latestAudioPreview.canUseForVideo"
+          class="sv-script-actions"
+        >
+          <button
+            type="button"
+            class="sv-form-footer-btn sv-form-footer-btn--primary sv-optimize-btn"
+            :disabled="!canOptimizeNarration"
+            @click="submitNarrationOptimization"
+          >
+            <Icon
+              v-if="isLoading('optimize')"
+              icon="mdi:loading"
+              class="vg-spin"
+              aria-hidden="true"
+            />
+            <Icon v-else icon="mdi:magic-staff" aria-hidden="true" />
+            一键优化到 12–15 秒
+          </button>
+        </div>
+      </section>
+
+      <section class="sv-section sv-audio-preview">
+        <header class="sv-section-head">
+          <span class="sv-step-index">6</span>
+          <div class="sv-section-copy">
+            <h3>选择音色并试听</h3>
+            <p>音色已按数字人性别过滤，不匹配的男/女声不会出现在列表中</p>
+          </div>
+        </header>
+
+        <div class="sv-voice-grid">
+          <button
+            v-for="voice in voiceOptions"
+            :key="voice.id"
+            type="button"
+            class="sv-voice-card"
+            :class="{ 'is-active': selectedVoiceId === voice.id }"
+            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('task')"
+            @click="selectVoice(voice.id)"
+          >
+            <strong>{{ voice.label }}</strong>
+            <span>{{ voice.gender === 'female' ? '女声' : '男声' }} · {{ voice.tags.join(' / ') }}</span>
+          </button>
+        </div>
+
+        <p v-if="!voiceOptions.length" class="sv-empty-tip">请先选择已配置音色的数字人</p>
+
+        <div v-if="audioPreviews.length" class="sv-audio-list">
+          <article
+            v-for="preview in audioPreviews"
+            :key="preview.audioPreviewId"
+            class="sv-audio-item"
+            :class="{
+              'is-active': confirmedAudioPreviewId === preview.audioPreviewId,
+              'is-invalid': !preview.canUseForVideo,
+            }"
+          >
+            <div class="sv-audio-meta">
+              <strong>{{ preview.voiceLabel }}</strong>
+              <span>{{ formatAudioDuration(preview.durationMs) }} · {{ resolveAudioPreviewLabel(preview.status) }}</span>
+            </div>
+            <div class="sv-audio-controls">
+              <audio :src="preview.audioUrl" controls preload="none" />
+              <button
+                type="button"
+                class="sv-form-footer-btn sv-audio-confirm"
+                :class="{
+                  'sv-form-footer-btn--primary': preview.canUseForVideo && confirmedAudioPreviewId !== preview.audioPreviewId,
+                  'sv-form-footer-btn--ghost': !preview.canUseForVideo || confirmedAudioPreviewId === preview.audioPreviewId,
+                  'is-confirmed': confirmedAudioPreviewId === preview.audioPreviewId,
+                }"
+                :disabled="!preview.canUseForVideo || disabled || isLoading('task')"
+                :title="preview.canUseForVideo ? '' : '音频时长需在 12–15 秒内才能确认'"
+                @click="toggleAudioConfirmation(preview.audioPreviewId, preview.canUseForVideo)"
+              >
+                {{
+                  confirmedAudioPreviewId === preview.audioPreviewId
+                    ? "取消确认"
+                    : preview.canUseForVideo
+                      ? "确认此音频"
+                      : "无法确认"
+                }}
+              </button>
+            </div>
+            <p v-if="!preview.canUseForVideo" class="sv-audio-warning">
+              <Icon icon="mdi:alert-circle-outline" aria-hidden="true" />
+              音频时长不在 12–15 秒内，请修改文案或使用一键优化。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <div class="sv-form-footer">
+        <button
+          type="button"
+          class="sv-form-footer-btn sv-form-footer-btn--ghost"
+          :disabled="disabled || isGenerating"
+          @click="goBackToForm"
+        >
+          <Icon icon="mdi:arrow-left" aria-hidden="true" />
+          上一步
+        </button>
+        <button
+          v-if="!confirmedAudioPreview"
+          type="button"
+          class="sv-form-footer-btn sv-form-footer-btn--primary"
+          :disabled="!canGenerateAudioPreview"
+          @click="submitAudioPreview"
+        >
+          <Icon
+            v-if="isLoading('audio')"
+            icon="mdi:loading"
+            class="vg-spin"
+            aria-hidden="true"
+          />
+          <Icon v-else icon="mdi:volume-high" aria-hidden="true" />
+          {{ audioPreviews.length ? "重新生成音频" : "生成音频" }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="sv-form-footer-btn sv-form-footer-btn--primary"
+          :disabled="!canSubmitVideoTask || isLoading('task')"
+          @click="submitConfirmedVideo"
+        >
+          <Icon
+            v-if="isLoading('task')"
+            icon="mdi:loading"
+            class="vg-spin"
+            aria-hidden="true"
+          />
+          <Icon v-else icon="mdi:movie-check-outline" aria-hidden="true" />
+          生成视频（2000积分）
+        </button>
+      </div>
+      </template>
     </template>
   </div>
 </template>
@@ -1634,6 +1913,158 @@ async function submitDraft() {
   font-size: 13px;
 }
 
+.sv-script-review textarea {
+  min-height: 132px;
+  line-height: 1.65;
+}
+
+.sv-script-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.sv-optimize-btn {
+  min-width: 196px;
+}
+
+.sv-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sv-voice-card {
+  display: flex;
+  min-height: 74px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sv-card-bg) 92%, #000);
+  color: var(--sv-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.sv-theme-light .sv-voice-card {
+  background: #f8fafc;
+}
+
+.sv-voice-card strong {
+  font-size: 14px;
+}
+
+.sv-voice-card span {
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sv-voice-card.is-active {
+  border-color: color-mix(in srgb, var(--sv-accent) 64%, var(--sv-card-border));
+  background: color-mix(in srgb, var(--sv-accent) 12%, var(--sv-card-bg));
+}
+
+.sv-voice-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sv-audio-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.sv-audio-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sv-card-bg) 94%, #000);
+}
+
+.sv-theme-light .sv-audio-item {
+  background: #f8fafc;
+}
+
+.sv-audio-item.is-active {
+  border-color: color-mix(in srgb, var(--sv-accent) 68%, var(--sv-card-border));
+}
+
+.sv-audio-item.is-invalid {
+  border-style: dashed;
+}
+
+.sv-audio-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sv-audio-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.sv-audio-meta strong {
+  color: var(--sv-text);
+  font-size: 13px;
+}
+
+.sv-audio-meta span {
+  color: var(--sv-text-soft);
+  font-size: 12px;
+}
+
+.sv-audio-controls audio {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+}
+
+.sv-audio-confirm {
+  min-width: 104px;
+  max-width: 132px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
+
+.sv-audio-confirm.is-confirmed {
+  border-color: color-mix(in srgb, var(--sv-accent) 70%, var(--sv-card-border));
+  background: color-mix(in srgb, var(--sv-accent) 14%, var(--sv-card-bg));
+  color: var(--sv-accent);
+}
+
+.sv-audio-warning {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  color: #d97706;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sv-audio-warning .iconify {
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
 .sv-tip-banner {
   display: flex;
   gap: 10px;
@@ -1781,7 +2212,8 @@ async function submitDraft() {
 
 @media (max-width: 767px) {
   .sv-upload-grid,
-  .sv-form-grid {
+  .sv-form-grid,
+  .sv-voice-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1799,6 +2231,30 @@ async function submitDraft() {
 
   .sv-template-summary {
     grid-template-columns: 1fr;
+  }
+
+  .sv-form-footer {
+    flex-direction: column;
+  }
+
+  .sv-form-footer-btn {
+    width: 100%;
+  }
+
+  .sv-script-actions,
+  .sv-audio-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .sv-audio-confirm {
+    width: 100%;
+    max-width: none;
+  }
+
+  .sv-optimize-btn {
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

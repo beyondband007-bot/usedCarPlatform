@@ -20,6 +20,7 @@
     "user-isolation-test": "tsx src/modules/tasks/userIsolation.test.ts",
     "kie-failure-policy-test": "tsx src/providers/kie/kieFailurePolicy.test.ts",
     "video-voice-chain-test": "tsx src/modules/video-generation/videoVoiceChain.test.ts",
+    "video-narration-optimization-test": "tsx src/modules/video-generation/videoNarrationOptimization.test.ts",
     "video-template-contract-test": "tsx src/modules/video-generation/videoTemplateCatalog.test.ts",
     "video-task-lifecycle-test": "tsx src/modules/video-generation/videoTaskLifecycle.test.ts",
     "deepseek-script-contract-test": "tsx src/providers/deepseek/deepseekClient.test.ts",
