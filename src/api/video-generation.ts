@@ -4,11 +4,15 @@ import type {
   CreateVideoScriptDraftPayload,
   DigitalHuman,
   DigitalHumanVoice,
+  OptimizeNarrationRequest,
+  OptimizeNarrationResult,
+  VideoAudioPreview,
   ValidateTemplateInputsResult,
   VideoGenerationTask,
   VideoHistoryListResult,
   VideoScriptDraft,
   VideoTemplate,
+  VideoVoiceOptionsResult,
   VideoWorkflowContract,
 } from '@/types/video-generation'
 
@@ -16,10 +20,14 @@ export type {
   CreateVideoScriptDraftPayload,
   DigitalHuman,
   DigitalHumanVoice,
+  OptimizeNarrationRequest,
+  OptimizeNarrationResult,
+  VideoAudioPreview,
   VideoGenerationTask,
   VideoHistoryListResult,
   VideoScriptDraft,
   VideoTemplate,
+  VideoVoiceOptionsResult,
   VideoWorkflowContract,
 } from '@/types/video-generation'
 
@@ -100,6 +108,39 @@ export async function getDigitalHumanVoice(digitalHumanId: string) {
   return unwrapApiResponse(response)
 }
 
+export async function getVideoVoiceOptions(digitalHumanId: string) {
+  const response = await request.get<ApiResponse<VideoVoiceOptionsResult>>(
+    '/modules/video-generation/voices',
+    { params: { digitalHumanId } },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function createVideoAudioPreview(payload: {
+  scriptDraftId: string
+  scriptText: string
+  voiceId: string
+}) {
+  const response = await request.post<ApiResponse<VideoAudioPreview>>(
+    '/modules/video-generation/audio-previews',
+    payload,
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function optimizeVideoNarration(
+  scriptDraftId: string,
+  payload: OptimizeNarrationRequest,
+) {
+  const response = await request.post<ApiResponse<OptimizeNarrationResult>>(
+    `/modules/video-generation/script-drafts/${encodeURIComponent(scriptDraftId)}/optimize-narration`,
+    payload,
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}
+
 export async function createVideoScriptDraft(payload: CreateVideoScriptDraftPayload) {
   const response = await request.post<ApiResponse<VideoScriptDraft>>(
     '/modules/video-generation/script-drafts',
@@ -122,7 +163,10 @@ export async function getVideoScriptDraft(scriptDraftId: string) {
   return unwrapApiResponse(response)
 }
 
-export async function createVideoGenerationTask(payload: { scriptDraftId: string }) {
+export async function createVideoGenerationTask(payload: {
+  scriptDraftId: string
+  audioPreviewId?: string
+}) {
   const response = await request.post<ApiResponse<CreatedVideoGenerationTask>>(
     '/modules/video-generation/tasks',
     payload,

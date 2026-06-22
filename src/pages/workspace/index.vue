@@ -226,6 +226,7 @@ const sidebarTerminalStatuses = ref<
   Partial<Record<string, SidebarCapabilityStatus>>
 >({});
 const sidebarStatusTimers = new Map<string, number>();
+const syncedVideoResultTaskIds = new Set<string>();
 
 function resolveCapabilityCodeFromModule(moduleCode: string) {
   const matched = workspaceCapabilities.find(
@@ -1518,6 +1519,43 @@ async function resolveVideoGenerationModuleTask(
     void refreshRunningTaskSummary();
   }
 }
+
+async function syncVideoGenerationResultFromFlow() {
+  const task = videoFlow.currentTask.value;
+  if (
+    !task ||
+    task.status !== "success" ||
+    syncedVideoResultTaskIds.has(task.taskId)
+  ) {
+    return;
+  }
+
+  const result = buildWorkspaceResultFromVideoTask(task);
+  if (!result) return;
+
+  syncedVideoResultTaskIds.add(task.taskId);
+  generationResult.value = result;
+  shortVideoSessionPreview.value = result;
+  shortVideoPlayRequest.value += 1;
+  markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "success");
+  clearActiveGenerationTask(task.taskId);
+  untrackRunningTask(task.taskId);
+  refreshCreditsBalance();
+  await assistPanelRef.value?.refreshRecentItems();
+  void videoFlow.loadHistory();
+  void refreshRunningTaskSummary();
+}
+
+watch(
+  () => videoFlow.currentTask.value,
+  (task) => {
+    if (activeCode.value !== SHORT_VIDEO_CAPABILITY_CODE) return;
+    if (task?.status === "success") {
+      void syncVideoGenerationResultFromFlow();
+    }
+  },
+  { deep: true },
+);
 
 async function resolveGenerationTask(
   taskId: string,

@@ -27,6 +27,8 @@ interface CreditsTransactionRow extends RowDataPacket {
   payment_order_id: number | null;
   application_id: number | null;
   function_id: number | null;
+  function_code: string | null;
+  function_name: string | null;
   txn_type: string;
   points: string;
   balance_before: string;
@@ -226,6 +228,8 @@ export async function queryCreditsTransactions(input: CreditsTransactionQueryInp
          ct.payment_order_id,
          ct.application_id,
          ct.function_id,
+         fn.code function_code,
+         fn.name function_name,
          ct.txn_type,
          ct.points,
          ct.balance_before,
@@ -236,6 +240,7 @@ export async function queryCreditsTransactions(input: CreditsTransactionQueryInp
          ct.remark,
          ct.created_at
        FROM credit_transactions ct
+       LEFT JOIN application_functions fn ON fn.id = ct.function_id
        WHERE ${whereSql}
        ORDER BY ct.created_at DESC, ct.id DESC
        LIMIT :limit OFFSET :offset`,
@@ -282,6 +287,8 @@ export async function queryCreditsTransactions(input: CreditsTransactionQueryInp
       paymentOrderId: row.payment_order_id,
       applicationId: row.application_id,
       functionId: row.function_id,
+      functionCode: row.function_code,
+      functionName: row.function_name,
       txnType: row.txn_type,
       points: toSqlNumber(row.points),
       balanceBefore: toSqlNumber(row.balance_before),

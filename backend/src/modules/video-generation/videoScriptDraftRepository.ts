@@ -89,6 +89,27 @@ export class VideoScriptDraftRepository extends Repository {
     );
     return rows[0] ? mapRow(rows[0]) : null;
   }
+
+  async updateScriptText(input: {
+    id: string;
+    userId: string;
+    scriptText: string;
+    finalVideoPrompt: string;
+    requiredInputs: Record<string, unknown>;
+  }) {
+    await this.execute(
+      `UPDATE video_script_drafts
+       SET script_text = :scriptText,
+           final_video_prompt = :finalVideoPrompt,
+           required_inputs_json = :requiredInputs
+       WHERE id = :id AND user_id = :userId`,
+      {
+        ...input,
+        requiredInputs: JSON.stringify(input.requiredInputs),
+      },
+    );
+    return this.findById(input.id, input.userId);
+  }
 }
 
 export const videoScriptDraftRepository = new VideoScriptDraftRepository();

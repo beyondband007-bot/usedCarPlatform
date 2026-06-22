@@ -89,6 +89,7 @@ const bizSourceOptions: Array<{ value: "" | PointsBizSource; label: string }> =
   [
     { value: "", label: "全部" },
     { value: "single", label: "单图生成" },
+    { value: "video", label: "视频生成" },
     { value: "batch", label: "批量上新" },
     { value: "package", label: "套餐赠送" },
     { value: "purchase", label: "充值购买" },

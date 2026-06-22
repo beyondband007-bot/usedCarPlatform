@@ -70,6 +70,16 @@ const run = async () => {
       type: "json_object",
     });
 
+    const optimized = await deepSeekClient.optimizeNarration({
+      systemPrompt: "Return JSON with scriptText.",
+      userPrompt: "Optimize this narration to 13.5 seconds.",
+    });
+    assert.equal(
+      optimized.scriptText,
+      "Meet the 2016 BMW 218i, a practical choice for city driving and family use.",
+    );
+    assert.equal(requestBody?.temperature, 0.25);
+
     console.log(
       JSON.stringify(
         {

@@ -107,6 +107,18 @@ videoGenerationRoutes.get(
   }),
 );
 
+videoGenerationRoutes.get(
+  "/voices",
+  asyncHandler(async (req, res) => {
+    ok(
+      res,
+      await videoGenerationService.listVoiceOptions({
+        digitalHumanId: req.query.digitalHumanId,
+      }),
+    );
+  }),
+);
+
 videoGenerationRoutes.post(
   "/digital-humans/:digitalHumanId/voice-clone",
   voiceCloneUpload.single("file"),
@@ -156,6 +168,29 @@ videoGenerationRoutes.get(
       res,
       await videoGenerationService.getScriptDraft(
         String(req.params.scriptDraftId),
+        current.user.id,
+      ),
+    );
+  }),
+);
+
+videoGenerationRoutes.post(
+  "/audio-previews",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    ok(res, await videoGenerationService.createAudioPreview(req.body, current.user.id));
+  }),
+);
+
+videoGenerationRoutes.post(
+  "/script-drafts/:scriptDraftId/optimize-narration",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    ok(
+      res,
+      await videoGenerationService.optimizeNarration(
+        String(req.params.scriptDraftId),
+        req.body,
         current.user.id,
       ),
     );

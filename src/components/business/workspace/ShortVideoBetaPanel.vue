@@ -120,13 +120,16 @@ const filteredTemplates = computed(() => {
   });
 });
 
-const activePreviewVideo = computed(() => {
-  if (activeView.value !== "preview") return "";
-  return (
+const availablePreviewVideo = computed(
+  () =>
     props.generationResult?.previewVideo ??
     props.sessionPreview?.previewVideo ??
-    (previewTask.value ? resolveVideoTaskMediaUrl(previewTask.value) : "")
-  );
+    (previewTask.value ? resolveVideoTaskMediaUrl(previewTask.value) : ""),
+);
+
+const activePreviewVideo = computed(() => {
+  if (activeView.value !== "preview") return "";
+  return availablePreviewVideo.value;
 });
 
 const activePreviewDownloadUrl = computed(() => {
@@ -359,6 +362,7 @@ watch(
   () => props.sessionPreview?.previewVideo,
   (videoUrl) => {
     if (!videoUrl || props.isGenerating) return;
+    activeView.value = "preview";
     if (activeView.value === "preview") {
       void playGeneratedVideo();
     }
@@ -381,7 +385,7 @@ watch(
     }
 
     if (activeView.value === "generating") {
-      activeView.value = "recent";
+      activeView.value = availablePreviewVideo.value ? "preview" : "recent";
     }
   },
   { immediate: true },

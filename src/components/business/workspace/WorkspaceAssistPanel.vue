@@ -869,7 +869,7 @@ function syncShortVideoInitialView() {
     props.shortVideoSessionPreview?.previewVideo ||
     props.generationResult?.mediaType === "video"
   ) {
-    shortVideoInitialView.value = "recent";
+    shortVideoInitialView.value = "preview";
     return;
   }
   shortVideoInitialView.value = "templates";
@@ -905,7 +905,7 @@ function focusGeneratingView() {
 
 function focusShortVideoPreviewView() {
   if (props.capability.code !== "short-video") return;
-  shortVideoInitialView.value = "recent";
+  shortVideoInitialView.value = "preview";
 }
 
 function focusDeliveryBatchProcessingView() {
@@ -946,7 +946,7 @@ watch(
     }
 
     if (props.capability.code === "short-video" && wasGenerating) {
-      shortVideoInitialView.value = "recent";
+      syncShortVideoInitialView();
     } else if (props.capability.code === "short-video") {
       syncShortVideoInitialView();
     }
@@ -958,7 +958,7 @@ watch(
   () => props.shortVideoSessionPreview?.previewVideo,
   (videoUrl) => {
     if (props.capability.code === "short-video") {
-      shortVideoInitialView.value = videoUrl ? "recent" : "templates";
+      shortVideoInitialView.value = videoUrl ? "preview" : "templates";
     }
   },
 );

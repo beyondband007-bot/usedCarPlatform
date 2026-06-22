@@ -128,6 +128,54 @@ export interface DigitalHumanVoice {
   source?: string | null
 }
 
+export interface VideoVoiceOption {
+  id: string
+  label: string
+  gender: 'female' | 'male' | string
+  provider: 'minimax' | string
+  model: string
+  tags: string[]
+  recommended?: boolean
+}
+
+export interface VideoVoiceOptionsResult {
+  digitalHumanId: string
+  digitalHumanGender: 'female' | 'male' | string
+  items: VideoVoiceOption[]
+  total: number
+}
+
+export interface VideoAudioPreview {
+  audioPreviewId: string
+  scriptDraftId: string
+  status: 'ready' | 'too_long' | 'too_short'
+  audioUrl: string
+  durationMs: number
+  minDurationMs: number
+  maxDurationMs: number
+  scriptText: string
+  voiceId: string
+  voiceLabel: string
+  voiceGender: 'female' | 'male' | string
+  model: string
+  createdAt: string
+  canUseForVideo: boolean
+}
+
+export interface OptimizeNarrationRequest {
+  scriptText: string
+  voiceId: string
+  baselineAudioPreviewId?: string
+}
+
+export interface OptimizeNarrationResult {
+  scriptDraftId: string
+  scriptText: string
+  preview: VideoAudioPreview
+  attempts: number
+  converged: boolean
+}
+
 export interface UploadedAsset {
   assetId: string
   purpose: string
@@ -299,6 +347,17 @@ export interface VideoGenerationTask {
   estimatedCost?: number | null
   estimatedPoints?: string | null
   settledPoints?: string | null
+  narrationAudio?: {
+    provider?: string
+    model?: string | null
+    voiceId?: string | null
+    voiceLabel?: string | null
+    audioPreviewId?: string | null
+    durationMs?: number | null
+    speed?: number | null
+    language?: VideoGenerationLanguage | null
+    url?: string | null
+  } | null
 }
 
 export interface VideoHistoryItem extends VideoGenerationTask {}
@@ -313,5 +372,6 @@ export interface VideoHistoryListResult {
 export type VideoGenerationStep =
   | 'template'
   | 'form'
+  | 'review'
   | 'task'
   | 'result'
