@@ -606,7 +606,7 @@ onMounted(() => {
     var(--points-table-head-h) + var(--points-table-row-h) * 10
   );
   --points-scale-w: calc(
-    (100vw - 2 * var(--points-shell-x)) / var(--points-design-w)
+    (100% - 2 * var(--points-shell-x)) / var(--points-design-w)
   );
   --points-content-scale: min(1, var(--points-scale-w));
 
@@ -672,7 +672,7 @@ onMounted(() => {
   z-index: 1;
   display: flex;
   width: min(
-    calc(100vw - 2 * var(--points-shell-x)),
+    100%,
     var(--points-content-max),
     calc((100dvh - var(--app-header-offset, 72px)) * 1.42)
   );
@@ -901,7 +901,7 @@ onMounted(() => {
   }
 
   .points-query-shell {
-    width: min(calc(100vw - 2 * var(--points-shell-x)), var(--points-content-max));
+    width: min(100%, var(--points-content-max));
     flex: none;
     margin-block: 0 auto;
     translate: 0 0;

@@ -225,8 +225,10 @@ html {
   scroll-padding-bottom: var(--h5-bottom-inset, 0px);
 }
 
-/* 工作台内部自行滚动，仅取消 html 右侧预留槽位，不影响页面高度布局 */
-html:has(.app-layout--auth) {
+/* 内部容器自行滚动时，取消 html 右侧预留槽位，避免露出底色竖条 */
+html:has(.app-layout--auth),
+html:has(.app-layout--pricing),
+html:has(.app-layout--points) {
   scrollbar-gutter: auto;
 }
 

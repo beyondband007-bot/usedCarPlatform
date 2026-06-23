@@ -180,7 +180,7 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(calc(100vw - 56px), calc((100dvh - 72px) * 1.65));
+  width: min(100%, calc((100dvh - 72px) * 1.65));
   height: 100%;
   min-width: 0;
   min-height: 100%;
@@ -446,7 +446,7 @@ onMounted(() => {
   }
 
   .pricing-shell {
-    width: min(980px, calc(100vw - 28px), calc((100dvh - 72px) * 1.65));
+    width: min(980px, 100%, calc((100dvh - 72px) * 1.65));
   }
 
   .pricing-plans-grid {
