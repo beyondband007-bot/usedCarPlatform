@@ -867,11 +867,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
         scriptText: confirmedScriptText.value,
         voiceId: selectedVoiceId.value,
       })
-      audioPreviews.value = [preview, ...audioPreviews.value]
-        .filter((item, index, items) =>
-          items.findIndex((candidate) => candidate.audioPreviewId === item.audioPreviewId) === index,
-        )
-        .slice(0, 3)
+      audioPreviews.value = [preview]
       confirmedAudioPreviewId.value = ''
       currentStep.value = 'review'
       scriptDraft.value = await getVideoScriptDraft(scriptDraft.value.scriptDraftId)
