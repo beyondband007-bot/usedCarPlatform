@@ -1,9 +1,10 @@
-import type { BatchVisualConfig } from "../batch-new/batchTypes";
+import type { BatchItemKind, BatchVisualConfig } from "../batch-new/batchTypes";
 
 const BASE_GENERATION_POINTS = 30;
 const SHORT_VIDEO_POINTS = 2000;
 const BATCH_LIGHT_CONSISTENCY_POINTS = 10;
 const BATCH_PAINT_REFRESH_POINTS = 10;
+const BATCH_INTERIOR_COLLAGE_POINTS = 10;
 const BATCH_WALL_LOGO_SCENE_POINTS = 30;
 
 const formatPoints = (points: number) => `${points.toFixed(4)}`;
@@ -16,7 +17,7 @@ export const singleImageGenerationPoints = (imageCount = 1) =>
 export const shortVideoGenerationPoints = (videoCount = 1) =>
   formatPoints(Math.max(0, videoCount) * SHORT_VIDEO_POINTS);
 
-export const batchItemGenerationPoints = (config: BatchVisualConfig) => {
+export const batchExteriorItemGenerationPoints = (config: BatchVisualConfig) => {
   const lightConsistencyPoints =
     isEnabled(config.enableLightConsistency) || isEnabled(config.lightConsistency)
       ? BATCH_LIGHT_CONSISTENCY_POINTS
@@ -25,8 +26,32 @@ export const batchItemGenerationPoints = (config: BatchVisualConfig) => {
     isEnabled(config.enablePaintRefresh) || isEnabled(config.paintRefresh)
       ? BATCH_PAINT_REFRESH_POINTS
       : 0;
+  const interiorCollagePoints =
+    isEnabled(config.enableInteriorCollage) || isEnabled(config.interiorCollage)
+      ? BATCH_INTERIOR_COLLAGE_POINTS
+      : 0;
 
-  return formatPoints(BASE_GENERATION_POINTS + lightConsistencyPoints + paintRefreshPoints);
+  return formatPoints(
+    BASE_GENERATION_POINTS +
+      lightConsistencyPoints +
+      paintRefreshPoints +
+      interiorCollagePoints,
+  );
+};
+
+export const batchInteriorItemGenerationPoints = (sourceImageCount = 1) =>
+  formatPoints(BASE_GENERATION_POINTS * Math.max(1, sourceImageCount));
+
+export const batchItemGenerationPoints = (
+  config: BatchVisualConfig,
+  itemKind: BatchItemKind = "exterior",
+  sourceImageCount = 1,
+) => {
+  if (itemKind !== "exterior") {
+    return batchInteriorItemGenerationPoints(sourceImageCount);
+  }
+
+  return batchExteriorItemGenerationPoints(config);
 };
 
 export const batchWallLogoSceneGenerationPoints = () =>
@@ -37,6 +62,7 @@ export const generationPointRuleSummary = {
   shortVideoPoints: SHORT_VIDEO_POINTS,
   batchLightConsistencyPoints: BATCH_LIGHT_CONSISTENCY_POINTS,
   batchPaintRefreshPoints: BATCH_PAINT_REFRESH_POINTS,
+  batchInteriorCollagePoints: BATCH_INTERIOR_COLLAGE_POINTS,
   batchWallLogoScenePoints: BATCH_WALL_LOGO_SCENE_POINTS,
-  ignoredBatchOptions: ["enableSceneChange", "useRecentLogo", "enableInteriorClean", "enableInteriorCollage"],
+  ignoredBatchOptions: ["enableSceneChange", "useRecentLogo", "enableInteriorClean"],
 };

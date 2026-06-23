@@ -36,6 +36,7 @@ import {
 import { useBatchVisualTemplates } from "@/composables/useBatchVisualTemplates";
 import { useWorkspaceLogo } from "@/composables/useWorkspaceLogo";
 import { formatDate } from "@/utils/dayjs";
+import { resolveBatchEstimatedCost } from "@/utils/batch-points";
 import { downloadFilesAsZip, sanitizeFilename } from "@/utils/download";
 import { resolveSceneReferenceImageUrl } from "@/utils/scene-reference-url";
 import type {
@@ -166,7 +167,7 @@ const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
   outputRatio: DEFAULT_BATCH_OUTPUT_RATIO,
   useRecentLogo: false,
   logoPlacements: ["plate"],
-  lightConsistency: true,
+  lightConsistency: false,
   paintRefresh: false,
   colorCode: null,
   interiorEnhance: false,
@@ -182,7 +183,7 @@ const batchScenes = computed(() =>
 const useRecentLogo = ref(false);
 const generateLogoPlacements = ref<LogoPlacement[]>(["plate"]);
 const batchLogoPlacements = ref<LogoPlacement[]>(["plate"]);
-const lightConsistency = ref(true);
+const lightConsistency = ref(false);
 const paintRefresh = ref(false);
 const interiorEnhance = ref(false);
 const interiorCollage = ref(false);
@@ -740,13 +741,21 @@ const canAddInteriorCollageImages = computed(
 );
 
 const batchEstimatedCost = computed(() => {
-  const inputCount =
-    uploadedExteriorAssets.value.length +
-    (uploadInterior.value ? uploadedInteriorCollageAssets.value.length : 0);
-  const itemCost =
-    30 + (lightConsistency.value ? 10 : 0) + (paintRefresh.value ? 10 : 0);
+  const template = effectiveCreateTemplate.value;
 
-  return inputCount * itemCost;
+  return resolveBatchEstimatedCost({
+    exteriorCount: uploadedExteriorAssets.value.length,
+    interiorCount: uploadInterior.value
+      ? uploadedInteriorCollageAssets.value.length
+      : 0,
+    config: template
+      ? {
+          lightConsistency: template.lightConsistency,
+          paintRefresh: template.paintRefresh,
+          interiorCollage: template.interiorCollage,
+        }
+      : null,
+  });
 });
 
 function buildTemplateInput(): BatchVisualTemplateInput {
@@ -918,7 +927,7 @@ function resetVisualConfigSelection() {
   outputRatio.value = DEFAULT_BATCH_OUTPUT_RATIO;
   useRecentLogo.value = false;
   batchLogoPlacements.value = ["plate"];
-  lightConsistency.value = true;
+  lightConsistency.value = false;
   paintRefresh.value = false;
   batchPaintColorCode.value = "";
   interiorEnhance.value = false;
@@ -2834,7 +2843,10 @@ defineExpose({
                 <h3>光污一致化</h3>
                 <p>批量弱化眩光、反光和色偏，让车辆与新场景更融合。</p>
               </div>
-              <NSwitch v-model:value="lightConsistency" size="large" />
+              <div class="switch-card__control">
+                <span class="switch-card__points-hint">开启后加10积分</span>
+                <NSwitch v-model:value="lightConsistency" size="large" />
+              </div>
             </section>
 
             <section class="batch-card switch-card">
@@ -2842,7 +2854,10 @@ defineExpose({
                 <h3>漆面翻新预览</h3>
                 <p>增强漆面亮度和轮毂金属质感，作为演示型美容开关。</p>
               </div>
-              <NSwitch v-model:value="paintRefresh" size="large" />
+              <div class="switch-card__control">
+                <span class="switch-card__points-hint">开启后加10积分</span>
+                <NSwitch v-model:value="paintRefresh" size="large" />
+              </div>
             </section>
 
             <PaintColorPicker
@@ -2855,7 +2870,10 @@ defineExpose({
                 <h3>内饰拼接</h3>
                 <p>2-10 张内饰图按规则自动分组拼图，可与清洁增强组合。</p>
               </div>
-              <NSwitch v-model:value="interiorCollage" size="large" />
+              <div class="switch-card__control">
+                <span class="switch-card__points-hint">开启后加10积分</span>
+                <NSwitch v-model:value="interiorCollage" size="large" />
+              </div>
             </section>
 
             <section v-if="interiorCollage" class="batch-card switch-card">
@@ -4497,12 +4515,28 @@ defineExpose({
   gap: 20px;
 }
 
+.switch-card__control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .switch-card p {
   margin: 0;
   color: var(--app-text-soft);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.65;
+}
+
+.switch-card .switch-card__points-hint {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .batch-scene-card {

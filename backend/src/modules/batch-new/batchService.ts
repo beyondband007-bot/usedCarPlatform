@@ -216,7 +216,7 @@ class BatchService {
       sceneCategory: "展厅灯光",
       outputRatio: "1:1",
       useRecentLogo: false,
-      enableLightConsistency: true,
+      enableLightConsistency: false,
       enablePaintRefresh: false,
       colorCode: null,
       enableInteriorClean: false,
@@ -912,7 +912,11 @@ class BatchService {
       billing = await freezeGenerationBilling({
         taskId: task.id,
         functionCode: batchItemFunctionCode(item.itemKind),
-        estimatedPoints: batchItemGenerationPoints(config),
+        estimatedPoints: batchItemGenerationPoints(
+          config,
+          item.itemKind,
+          sourceAssetIds.length,
+        ),
         body: batchBillingBody(batch),
         scope: batchItemBillingScope(item.itemId),
       });
