@@ -605,11 +605,6 @@ onMounted(() => {
   --points-table-scroll-max-h: calc(
     var(--points-table-head-h) + var(--points-table-row-h) * 10
   );
-  --points-scale-w: calc(
-    (100% - 2 * var(--points-shell-x)) / var(--points-design-w)
-  );
-  --points-content-scale: min(1, var(--points-scale-w));
-
   box-sizing: border-box;
   position: relative;
   display: flex;
@@ -682,16 +677,6 @@ onMounted(() => {
   align-items: center;
   margin-inline: auto;
   translate: 0 var(--points-offset-y);
-  zoom: var(--points-content-scale);
-}
-
-@supports not (zoom: 1) {
-  .points-query-shell {
-    translate: none;
-    transform: scale(var(--points-content-scale))
-      translateY(var(--points-offset-y));
-    transform-origin: top center;
-  }
 }
 
 .points-query-glass {
