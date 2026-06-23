@@ -99,7 +99,7 @@ const installMocks = (durations: number[]) => {
       model: input.speech.model,
       speed: input.speech.speed,
       language: input.language,
-      status: durationMs > 15_000 ? "too_long" : durationMs < 12_000 ? "too_short" : "ready",
+      status: durationMs > 15_000 ? "too_long" : durationMs < 8_000 ? "too_short" : "ready",
       durationMs,
       localPath: "contract.mp3",
       publicUrl: "http://localhost/contract.mp3",
@@ -110,7 +110,7 @@ const installMocks = (durations: number[]) => {
 };
 
 const run = async () => {
-  installMocks([16_700, 10_900, 13_500]);
+  installMocks([16_700, 7_900, 13_500]);
   const converged = await videoGenerationService.optimizeNarration(
     draft.id,
     {
@@ -123,7 +123,7 @@ const run = async () => {
   assert.equal(converged.converged, true);
   assert.equal(converged.preview.durationMs, 13_500);
 
-  installMocks([16_000, 11_000, 15_500]);
+  installMocks([16_000, 7_000, 15_500]);
   const closest = await videoGenerationService.optimizeNarration(
     draft.id,
     {

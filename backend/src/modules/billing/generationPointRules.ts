@@ -2,6 +2,7 @@ import type { BatchItemKind, BatchVisualConfig } from "../batch-new/batchTypes";
 
 const BASE_GENERATION_POINTS = 30;
 const SHORT_VIDEO_POINTS = 2000;
+const VIDEO_GENERATION_POINTS_PER_SECOND = 150;
 const BATCH_LIGHT_CONSISTENCY_POINTS = 10;
 const BATCH_PAINT_REFRESH_POINTS = 10;
 const BATCH_INTERIOR_COLLAGE_POINTS = 10;
@@ -16,6 +17,9 @@ export const singleImageGenerationPoints = (imageCount = 1) =>
 
 export const shortVideoGenerationPoints = (videoCount = 1) =>
   formatPoints(Math.max(0, videoCount) * SHORT_VIDEO_POINTS);
+
+export const videoGenerationPointsByAudioSeconds = (audioSeconds = 15) =>
+  formatPoints(Math.max(0, audioSeconds) * VIDEO_GENERATION_POINTS_PER_SECOND);
 
 export const batchExteriorItemGenerationPoints = (config: BatchVisualConfig) => {
   const lightConsistencyPoints =
@@ -60,6 +64,7 @@ export const batchWallLogoSceneGenerationPoints = () =>
 export const generationPointRuleSummary = {
   baseGenerationPoints: BASE_GENERATION_POINTS,
   shortVideoPoints: SHORT_VIDEO_POINTS,
+  videoGenerationPointsPerSecond: VIDEO_GENERATION_POINTS_PER_SECOND,
   batchLightConsistencyPoints: BATCH_LIGHT_CONSISTENCY_POINTS,
   batchPaintRefreshPoints: BATCH_PAINT_REFRESH_POINTS,
   batchInteriorCollagePoints: BATCH_INTERIOR_COLLAGE_POINTS,

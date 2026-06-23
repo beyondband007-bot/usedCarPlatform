@@ -29,6 +29,10 @@ export interface DeepSeekNarrationOptimization {
   scriptText: string;
 }
 
+export interface DeepSeekNarrationTranslation {
+  scriptText: string;
+}
+
 const stripCodeFence = (value: string) => {
   const trimmed = value.trim();
   const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
@@ -239,6 +243,72 @@ export class DeepSeekClient {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw errors.generationFailed("deepseek narration optimization timeout", {
+          timeoutMs: env.deepseek.timeoutMs,
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async translateNarration(input: {
+    systemPrompt: string;
+    userPrompt: string;
+  }): Promise<DeepSeekNarrationTranslation> {
+    if (!this.isConfigured) {
+      throw errors.generationFailed("DeepSeek narration translation is not configured");
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), env.deepseek.timeoutMs);
+    try {
+      const response = await fetch(`${env.deepseek.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.deepseek.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: env.deepseek.model,
+          temperature: 0.2,
+          max_tokens: Math.min(env.deepseek.maxTokens, 1200),
+          response_format: { type: "json_object" },
+          thinking: { type: "disabled" },
+          messages: [
+            { role: "system", content: input.systemPrompt },
+            { role: "user", content: input.userPrompt },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw errors.generationFailed("deepseek narration translation failed", {
+          status: response.status,
+          response: raw,
+        });
+      }
+      const choice = raw?.choices?.[0] ?? {};
+      const message = choice?.message ?? {};
+      const content =
+        asMessageContent(message.content) ||
+        asString(choice.text) ||
+        asString(raw?.content) ||
+        asString(raw?.output_text);
+      if (!content) {
+        throw errors.generationFailed("deepseek narration translation response missing content");
+      }
+      const parsed = parseJsonObject(content);
+      const scriptText = asString(parsed.scriptText);
+      if (!scriptText) {
+        throw errors.generationFailed("deepseek narration translation response missing scriptText");
+      }
+      return { scriptText };
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw errors.generationFailed("deepseek narration translation timeout", {
           timeoutMs: env.deepseek.timeoutMs,
         });
       }

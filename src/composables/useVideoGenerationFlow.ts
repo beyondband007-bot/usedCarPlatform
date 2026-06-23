@@ -16,6 +16,7 @@ import {
   getVideoWorkflowContract,
   optimizeVideoNarration,
   regenerateVideoGenerationTask,
+  translateVideoNarration,
   validateTemplateInputs,
 } from '@/api/video-generation'
 import {
@@ -116,6 +117,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
   const dealershipUploads = ref<VideoUploadPreviewItem[]>([])
   const scriptDraft = ref<VideoScriptDraft | null>(null)
   const confirmedScriptText = ref('')
+  const translatedNarrationText = ref('')
   const voiceOptions = ref<VideoVoiceOption[]>([])
   const selectedVoiceId = ref('')
   const audioPreviews = ref<VideoAudioPreview[]>([])
@@ -247,6 +249,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
   function invalidateDraftForInputChange() {
     scriptDraft.value = null
     confirmedScriptText.value = ''
+    translatedNarrationText.value = ''
     voiceOptions.value = []
     selectedVoiceId.value = ''
     draftInputFingerprint.value = ''
@@ -294,6 +297,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
   function setConfirmedScriptText(value: string) {
     confirmedScriptText.value = value
+    translatedNarrationText.value = ''
     resetAudioConfirmation()
   }
 
@@ -306,7 +310,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
   function confirmAudioPreview(audioPreviewId: string) {
     const preview = audioPreviews.value.find((item) => item.audioPreviewId === audioPreviewId)
     if (!preview?.canUseForVideo) {
-      errorMessage.value = '试听音频时长需在 12-15 秒内，才能生成视频'
+      errorMessage.value = '试听音频时长需在 8-15 秒内，才能生成视频'
       return false
     }
     confirmedAudioPreviewId.value = audioPreviewId
@@ -639,6 +643,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
         )
       }
       confirmedScriptText.value = asString(script.scriptText)
+      translatedNarrationText.value = ''
       currentStep.value = 'review'
       return true
     }
@@ -704,6 +709,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
 
     confirmedScriptText.value = asString(script.scriptText)
+    translatedNarrationText.value = ''
     currentStep.value = 'review'
     return true
   }
@@ -831,6 +837,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
       scriptDraft.value = draft
       confirmedScriptText.value =
         draft.requiredInputs.script?.scriptText ?? ''
+      translatedNarrationText.value = ''
       resetAudioConfirmation()
       await loadVoiceOptions(digitalHumanId)
       draftInputFingerprint.value = JSON.stringify(payload)
@@ -904,6 +911,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
         baselineAudioPreviewId: audioPreviews.value[0]?.audioPreviewId,
       })
       confirmedScriptText.value = result.scriptText
+      translatedNarrationText.value = ''
       audioPreviews.value = [result.preview]
       confirmedAudioPreviewId.value = ''
       currentStep.value = 'review'
@@ -917,13 +925,39 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
+  async function translateNarrationScript() {
+    if (!scriptDraft.value?.scriptDraftId) {
+      errorMessage.value = '请先生成口播文案'
+      return null
+    }
+    if (!confirmedScriptText.value.trim()) {
+      errorMessage.value = '请先填写口播文案'
+      return null
+    }
+    setLoading('translate', true)
+    errorMessage.value = ''
+    try {
+      const result = await translateVideoNarration(scriptDraft.value.scriptDraftId, {
+        scriptText: confirmedScriptText.value,
+      })
+      translatedNarrationText.value = result.scriptText
+      currentStep.value = 'review'
+      return result
+    } catch (error) {
+      errorMessage.value = resolveVideoGenerationErrorMessage(error)
+      return null
+    } finally {
+      setLoading('translate', false)
+    }
+  }
+
   async function submitVideoTask() {
     if (!scriptDraft.value?.scriptDraftId) {
       errorMessage.value = '请先生成并确认口播草稿'
       return null
     }
     if (!confirmedAudioPreview.value?.audioPreviewId) {
-      errorMessage.value = '请先试听并确认 12-15 秒内的音频'
+      errorMessage.value = '请先试听并确认 8-15 秒内的音频'
       return null
     }
     setLoading('task', true)
@@ -1125,6 +1159,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     dealershipUploads,
     scriptDraft,
     confirmedScriptText,
+    translatedNarrationText,
     voiceOptions,
     selectedVoiceId,
     audioPreviews,
@@ -1151,6 +1186,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     selectVoice,
     generateAudioPreview,
     optimizeNarrationScript,
+    translateNarrationScript,
     confirmAudioPreview,
     cancelAudioPreviewConfirmation,
     submitVideoTask,

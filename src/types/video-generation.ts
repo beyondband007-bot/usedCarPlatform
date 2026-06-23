@@ -176,6 +176,16 @@ export interface OptimizeNarrationResult {
   converged: boolean
 }
 
+export interface TranslateNarrationRequest {
+  scriptText: string
+}
+
+export interface TranslateNarrationResult {
+  scriptDraftId: string
+  scriptText: string
+  targetLanguage: 'Chinese'
+}
+
 export interface UploadedAsset {
   assetId: string
   purpose: string

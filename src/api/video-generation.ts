@@ -6,6 +6,8 @@ import type {
   DigitalHumanVoice,
   OptimizeNarrationRequest,
   OptimizeNarrationResult,
+  TranslateNarrationRequest,
+  TranslateNarrationResult,
   VideoAudioPreview,
   ValidateTemplateInputsResult,
   VideoGenerationTask,
@@ -22,6 +24,8 @@ export type {
   DigitalHumanVoice,
   OptimizeNarrationRequest,
   OptimizeNarrationResult,
+  TranslateNarrationRequest,
+  TranslateNarrationResult,
   VideoAudioPreview,
   VideoGenerationTask,
   VideoHistoryListResult,
@@ -135,6 +139,18 @@ export async function optimizeVideoNarration(
 ) {
   const response = await request.post<ApiResponse<OptimizeNarrationResult>>(
     `/modules/video-generation/script-drafts/${encodeURIComponent(scriptDraftId)}/optimize-narration`,
+    payload,
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function translateVideoNarration(
+  scriptDraftId: string,
+  payload: TranslateNarrationRequest,
+) {
+  const response = await request.post<ApiResponse<TranslateNarrationResult>>(
+    `/modules/video-generation/script-drafts/${encodeURIComponent(scriptDraftId)}/translate-narration`,
     payload,
     generationRequestConfig,
   )

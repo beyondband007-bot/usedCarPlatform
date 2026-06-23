@@ -22,7 +22,7 @@ import {
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
-import { shortVideoGenerationPoints } from "../billing/generationPointRules";
+import { videoGenerationPointsByAudioSeconds } from "../billing/generationPointRules";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { tasksService } from "../tasks/tasksService";
@@ -158,6 +158,10 @@ interface OptimizeNarrationInput {
   baselineAudioPreviewId?: unknown;
 }
 
+interface TranslateNarrationInput {
+  scriptText?: unknown;
+}
+
 interface PlatformVoiceOption {
   id: string;
   label: string;
@@ -214,7 +218,7 @@ interface VehicleProfile {
 const VIDEO_DURATION_SECONDS = 15;
 const FIXED_SHOT_TIME_RANGES = ["0-3s", "3-7s", "7-12s", "12-15s"] as const;
 const VIDEO_DURATION_MS = VIDEO_DURATION_SECONDS * 1000;
-const MIN_NARRATION_AUDIO_DURATION_MS = 12_000;
+const MIN_NARRATION_AUDIO_DURATION_MS = 8_000;
 const MAX_NARRATION_AUDIO_DURATION_MS = VIDEO_DURATION_MS;
 
 const workspaceRoot = path.resolve(__dirname, "../../../..");
@@ -816,10 +820,10 @@ const buildDeepSeekSystemPrompt = (input: {
     "你是汽车行业短视频口播文案策划，负责根据用户输入、上传图片摘要和预设参考风格生成数字人口播文案。",
     "只输出 JSON，不输出 Markdown，不输出解释。",
     `目标语言为${getVideoGenerationLanguageLabel(input.language)}，scriptText、openingHook、sellingPoints、shotCues.voiceover 必须使用该语言。`,
-    `视频时长以上限 15 秒为准，口播音频必须自然控制在 12-15 秒之间，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
+    `视频时长以上限 15 秒为准，口播音频必须自然控制在 8-15 秒之间，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
     "如果信息量和时长冲突，必须优先压缩文案，宁可少讲一个卖点，也不能让自然语速口播超过 15 秒。",
     `当前模板类型为${videoTemplateTypeLabels[input.templateType]}，必须围绕该模板目标组织内容。`,
-    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 12-15 秒口播的车型级通用卖点。",
+    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 8-15 秒口播的车型级通用卖点。",
     "可以使用可靠的车型级常识介绍车辆定位、空间取向、舒适取向和典型使用场景；凡是依赖具体配置版本的信息，必须放入 uncertainItems，不能写成确定事实。",
     "年款不代表新车。二手车口播禁止使用“全新”“新车”；车型名称未明确提供代际时，禁止擅自补充“第几代”。",
     "禁止使用“公认、标杆、首选、领先、就是答案、闭眼买”等绝对化营销词；未由图片摘要确认时，不要断言座椅软硬、内饰用料或具体车内配置。",
@@ -852,7 +856,7 @@ const buildDeepSeekUserPrompt = (input: {
     `模板类型：${videoTemplateTypeLabels[input.templateType]}`,
     `内容主体：${input.vehicleName}`,
     `目标语言：${getVideoGenerationLanguageLabel(input.language)}`,
-    `视频时长：上限 ${input.durationSeconds} 秒。口播音频必须自然控制在 12-15 秒之间，只能短于或等于 15 秒，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
+    `视频时长：上限 ${input.durationSeconds} 秒。口播音频必须自然控制在 8-15 秒之间，只能短于或等于 15 秒，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
     "如果卖点较多，优先保留车型定位、核心用途和一条最可信卖点，删掉次要描述，避免口播超时。",
     input.promotionText ? `用户确认的优惠信息：${input.promotionText}` : "",
     input.dealershipName ? `车场名称：${input.dealershipName}` : "",
@@ -2673,7 +2677,7 @@ class VideoGenerationService {
           "Return one JSON object with exactly one field: scriptText.",
           "Keep the original language, named entities, verified facts, selling points, and call to action.",
           "Do not invent prices, mileage, configuration, condition, warranty, inventory, or promotional claims.",
-          "Rewrite for natural speech and a real TTS duration between 12 and 15 seconds.",
+          "Rewrite for natural speech and a real TTS duration between 8 and 15 seconds.",
         ].join("\n"),
         userPrompt: [
           `Language: ${getVideoGenerationLanguageLabel(language)}`,
@@ -2739,6 +2743,53 @@ class VideoGenerationService {
       preview: toAudioPreviewResponse(record),
       attempts: candidates.length,
       converged: record.status === "ready",
+    };
+  }
+
+  async translateNarration(
+    scriptDraftId: string,
+    body: TranslateNarrationInput,
+    userId: string,
+  ) {
+    const draftId = scriptDraftId.trim();
+    if (!draftId) throw errors.invalidParameter("scriptDraftId is required");
+    const draft = await videoScriptDraftRepository.findById(draftId, userId);
+    if (!draft) throw errors.videoScriptDraftNotFound();
+
+    const scriptText = normalizeConfirmedScriptText(body.scriptText);
+    const requiredInputs = asRecord(draft.requiredInputs);
+    const sourceLanguage = normalizeVideoGenerationLanguage(
+      asRecord(requiredInputs.vehicle).language,
+    );
+    if (sourceLanguage === "Chinese" || sourceLanguage === "Chinese,Yue") {
+      throw errors.invalidParameter(
+        "Chinese and Cantonese narration do not require Chinese translation",
+      );
+    }
+    const targetLanguage: VideoGenerationLanguage = "Chinese";
+    const targetLabel = getVideoGenerationLanguageLabel(targetLanguage);
+
+    const translated = await deepSeekClient.translateNarration({
+      systemPrompt: [
+        "You are a professional automotive narration translator.",
+        "Return one JSON object with exactly one field: scriptText.",
+        "Translate the narration faithfully into natural Simplified Chinese for display only.",
+        "Preserve vehicle names, numbers, verified facts, selling points, and call to action.",
+        "Do not add prices, mileage, configuration, condition, warranty, inventory, or promotional claims.",
+        "Do not shorten, optimize, or rewrite the source narration beyond what translation requires.",
+      ].join("\n"),
+      userPrompt: [
+        `Source language: ${getVideoGenerationLanguageLabel(sourceLanguage)}`,
+        `Target language: ${targetLabel}`,
+        "Source narration:",
+        scriptText,
+      ].join("\n"),
+    });
+
+    return {
+      scriptDraftId: draft.id,
+      scriptText: normalizeConfirmedScriptText(translated.scriptText),
+      targetLanguage,
     };
   }
 
@@ -2859,6 +2910,7 @@ class VideoGenerationService {
       const seedanceDurationSeconds = deriveSeedanceDurationSeconds(
         narrationAudio.durationMs,
       );
+      const billableAudioSeconds = Math.ceil(narrationAudio.durationMs / 1000);
       const seedancePrompt = buildSeedancePrompt({
         finalVideoPrompt: draft.finalVideoPrompt,
         scriptText: narrationScriptText,
@@ -2892,7 +2944,7 @@ class VideoGenerationService {
         billing = await freezeGenerationBilling({
           taskId,
           functionCode: "video-generation",
-          estimatedPoints: shortVideoGenerationPoints(),
+          estimatedPoints: videoGenerationPointsByAudioSeconds(billableAudioSeconds),
           body: {},
           context,
         });

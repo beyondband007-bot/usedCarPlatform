@@ -123,7 +123,7 @@ export const getVideoGenerationScriptLengthRule = (
   language: VideoGenerationLanguage,
 ) => {
   if (["Chinese", "Chinese,Yue", "Japanese", "Korean"].includes(language)) {
-    return "口播文案约 50-75 个字/字符，必须自然语速控制在 12-15 秒内，宁可偏短，绝不能超过 15 秒。";
+    return "口播文案约 35-75 个字/字符，必须自然语速控制在 8-15 秒内，宁可偏短，绝不能超过 15 秒。";
   }
   if (
     [
@@ -154,7 +154,7 @@ export const getVideoGenerationScriptLengthRule = (
       "Afrikaans",
     ].includes(language)
   ) {
-    return "口播文案约 18-24 个单词，必须自然语速控制在 12-15 秒内，宁可偏短，绝不能超过 15 秒。";
+    return "口播文案约 12-24 个单词，必须自然语速控制在 8-15 秒内，宁可偏短，绝不能超过 15 秒。";
   }
-  return "口播文案约 18-24 个词或等效长度，必须自然语速控制在 12-15 秒内，宁可偏短，绝不能超过 15 秒。";
+  return "口播文案约 12-24 个词或等效长度，必须自然语速控制在 8-15 秒内，宁可偏短，绝不能超过 15 秒。";
 };
