@@ -217,6 +217,35 @@ export function useVideoGenerationFlow(ownerKey: string) {
     confirmedAudioPreviewId.value = ''
   }
 
+  function resetFlowToInitial() {
+    stopPolling()
+    selectedTemplate.value = null
+    singleCarForm.value = createEmptySingleCarForm()
+    promotionForm.value = createEmptyPromotionForm()
+    dealershipForm.value = createEmptyDealershipForm()
+    exteriorUploads.value.forEach(revokeUploadItem)
+    interiorUploads.value.forEach(revokeUploadItem)
+    referenceUploads.value.forEach(revokeUploadItem)
+    dealershipUploads.value.forEach(revokeUploadItem)
+    exteriorUploads.value = []
+    interiorUploads.value = []
+    referenceUploads.value = []
+    dealershipUploads.value = []
+    scriptDraft.value = null
+    confirmedScriptText.value = ''
+    voiceOptions.value = []
+    selectedVoiceId.value = ''
+    draftInputFingerprint.value = ''
+    draftNeedsRegeneration.value = false
+    resetAudioConfirmation()
+    currentTask.value = null
+    validationIssues.value = []
+    errorMessage.value = ''
+    clearPersistedDraftId()
+    clearPersistedTaskId()
+    currentStep.value = 'template'
+  }
+
   function invalidateDraftForInputChange() {
     scriptDraft.value = null
     confirmedScriptText.value = ''
@@ -342,6 +371,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
     if (task.status === 'success') {
       currentStep.value = 'result'
+      clearPersistedDraftId()
     } else if (TERMINAL_STATUSES.has(task.status)) {
       stopPolling()
     }
@@ -439,8 +469,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
           currentStep.value = 'task'
           startPolling(taskId)
         } else {
-          currentTask.value = null
-          clearPersistedTaskId()
+          resetFlowToInitial()
         }
       }
     } catch (error) {
@@ -963,6 +992,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     currentTask.value = task
     if (task.status === 'success') {
       currentStep.value = 'result'
+      clearPersistedDraftId()
       stopPolling()
     } else if (TERMINAL_STATUSES.has(task.status)) {
       stopPolling()

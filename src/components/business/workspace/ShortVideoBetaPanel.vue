@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { useMessage } from "naive-ui";
+import { NButton, NModal, useMessage } from "naive-ui";
 
 import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
+import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
@@ -40,6 +41,7 @@ const props = defineProps<{
   recentLoading?: boolean;
   deletingRecentTaskIds?: string[];
   initialView?: "templates" | "preview" | "generating" | "recent";
+  suppressPreviewPlayback?: boolean;
 }>();
 
 type ShortVideoView = "templates" | "preview" | "generating" | "recent";
@@ -67,6 +69,7 @@ const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
 const previewTask = ref<VideoHistoryItem | null>(null);
+const templatePreviewSession = ref<VideoTemplate | null>(null);
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const recentDisplayItems = computed(() =>
@@ -227,13 +230,30 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
-function handleTemplatePick(item: VideoTemplate) {
+function openTemplatePreview(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
     message.info("该模板暂未开放，敬请期待！");
     return;
   }
+  templatePreviewSession.value = item;
+}
+
+function closeTemplatePreviewPlayer() {
+  templatePreviewSession.value = null;
+}
+
+function handleTemplatePreviewVisibleChange(show: boolean) {
+  if (!show) {
+    closeTemplatePreviewPlayer();
+  }
+}
+
+function confirmTemplateSelection() {
+  const item = templatePreviewSession.value;
+  if (!item) return;
   flow?.selectTemplate(item);
   message.success(`已选择「${item.title}」`);
+  closeTemplatePreviewPlayer();
 }
 
 function openTemplatesView() {
@@ -245,7 +265,16 @@ function isPendingTask(task?: VideoHistoryItem | null) {
   return PENDING_RECENT_STATUSES.has(task.status);
 }
 
+async function pauseGeneratedVideo() {
+  await nextTick();
+  const video = videoRef.value;
+  if (!video) return;
+  video.pause();
+}
+
 async function playGeneratedVideo() {
+  if (props.suppressPreviewPlayback) return;
+
   await nextTick();
 
   const video = videoRef.value;
@@ -341,6 +370,15 @@ function canRegenerateTask(task?: VideoHistoryItem | null) {
   if (!task || !flow) return false;
   return flow.REGENERATABLE_STATUSES.has(task.status);
 }
+
+watch(
+  () => props.suppressPreviewPlayback,
+  (suppressed) => {
+    if (suppressed) {
+      void pauseGeneratedVideo();
+    }
+  },
+);
 
 watch(
   () => props.playRequest,
@@ -628,7 +666,12 @@ watch(
               'is-selected': selectedTemplateId === item.templateId,
               'is-disabled': isTemplateDisabled(item),
             }"
-            @click="handleTemplatePick(item)"
+            role="button"
+            tabindex="0"
+            :aria-label="`预览模板 ${item.title}`"
+            @click="openTemplatePreview(item)"
+            @keydown.enter.prevent="openTemplatePreview(item)"
+            @keydown.space.prevent="openTemplatePreview(item)"
           >
             <div class="sv-template-media">
               <PreloadImage
@@ -674,6 +717,56 @@ watch(
 
     </section>
   </section>
+
+  <NModal
+    v-if="templatePreviewSession"
+    :show="true"
+    preset="card"
+    :title="templatePreviewSession.title"
+    class="sv-template-preview-modal"
+    :bordered="false"
+    :segmented="{ content: true, footer: 'soft' }"
+    :mask-closable="true"
+    @update:show="handleTemplatePreviewVisibleChange"
+  >
+    <div class="sv-template-preview-body">
+      <div class="sv-template-preview-media">
+        <TemplatePreviewVideoPlayer
+          v-if="getTemplateVideoUrl(templatePreviewSession)"
+          :key="templatePreviewSession.templateId"
+          :src="getTemplateVideoUrl(templatePreviewSession)!"
+          :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
+          :template-id="templatePreviewSession.templateId"
+        />
+        <PreloadImage
+          v-else-if="getTemplatePosterUrl(templatePreviewSession)"
+          class="sv-template-preview-poster"
+          :src="getTemplatePosterUrl(templatePreviewSession)!"
+          :alt="templatePreviewSession.title"
+          fit="contain"
+        />
+        <div v-else class="sv-template-preview-placeholder">
+          <Icon icon="mdi:movie-open-outline" />
+        </div>
+      </div>
+
+      <div class="sv-template-preview-meta">
+        <div class="sv-template-preview-tags">
+          <span>{{ templatePreviewSession.typeLabel }}</span>
+          <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
+          <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+        </div>
+        <p>{{ templatePreviewSession.stylePrompt }}</p>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="sv-template-preview-actions">
+        <NButton @click="closeTemplatePreviewPlayer">取消</NButton>
+        <NButton type="primary" @click="confirmTemplateSelection">使用此模板</NButton>
+      </div>
+    </template>
+  </NModal>
 </template>
 
 <style scoped lang="scss">
@@ -1258,6 +1351,7 @@ watch(
 
 .sv-state-panel--preview {
   gap: 12px;
+  align-items: center;
 }
 
 .sv-preview-head {
@@ -1265,6 +1359,7 @@ watch(
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  width: 100%;
 }
 
 .sv-preview-head h2 {
@@ -1287,10 +1382,15 @@ watch(
 }
 
 .sv-preview-player {
-  width: 100%;
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
   max-height: calc(100% - 48px);
+  margin: 0 auto;
   border-radius: 12px;
   background: #000;
+  object-fit: contain;
 }
 
 .sv-generating-visual {
@@ -1614,5 +1714,86 @@ watch(
   color: var(--sv-text-soft);
   font-size: 13px;
   font-weight: 700;
+}
+
+.sv-template-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sv-template-preview-media {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.sv-template-preview-poster,
+.sv-template-preview-placeholder {
+  width: min(100%, 320px);
+  aspect-ratio: 9 / 16;
+  border-radius: 12px;
+  background: var(--sv-surface);
+}
+
+.sv-template-preview-poster :deep(.preload-image),
+.sv-template-preview-poster :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+.sv-template-preview-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--sv-text-soft);
+  font-size: 40px;
+}
+
+.sv-template-preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sv-template-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sv-template-preview-tags span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sv-template-preview-tags span.is-accent {
+  background: color-mix(in srgb, var(--sv-accent) 18%, transparent);
+  color: var(--sv-accent);
+}
+
+.sv-template-preview-meta p {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sv-template-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+</style>
+
+<style lang="scss">
+.sv-template-preview-modal {
+  width: min(480px, calc(100vw - 32px)) !important;
+  max-width: min(480px, calc(100vw - 32px)) !important;
 }
 </style>
