@@ -866,8 +866,7 @@ function syncShortVideoInitialView() {
     return;
   }
   if (
-    props.shortVideoSessionPreview?.previewVideo ||
-    props.generationResult?.mediaType === "video"
+    props.shortVideoSessionPreview?.previewVideo
   ) {
     shortVideoInitialView.value = "preview";
     return;
@@ -1403,6 +1402,7 @@ defineExpose({
         :recent-loading="recentLoading"
         :deleting-recent-task-ids="deletingRecentIds"
         :initial-view="shortVideoInitialView"
+        :suppress-preview-playback="showGenerationResultOverlay"
         @pick-recent="handleRecentPick"
         @delete-recent="handleDeleteRecent"
       />

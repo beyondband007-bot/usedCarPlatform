@@ -24,7 +24,51 @@ const videoDownloadUrl = computed(() => props.result.downloadUrl ?? videoUrl.val
 const isVideoResult = computed(
   () => props.result.mediaType === "video" && Boolean(videoUrl.value),
 );
-const isDownloadingVideo = ref(false);
+const isDownloadingVideo = ref(false);
+
+
+
+const videoAspectRatio = computed(() => {
+
+  const width = props.result.imageWidth ?? 9;
+
+  const height = props.result.imageHeight ?? 16;
+
+  return `${width} / ${height}`;
+
+});
+
+const isVideoLoading = ref(true);
+
+
+
+function ensureVideoPaused() {
+
+  const video = videoRef.value;
+
+  if (!video) return;
+
+  video.pause();
+
+}
+
+
+
+function handleVideoLoadStart() {
+
+  isVideoLoading.value = true;
+
+}
+
+
+
+function handleVideoLoadedMetadata() {
+
+  isVideoLoading.value = false;
+
+  ensureVideoPaused();
+
+}
 
 async function handleDownloadVideo() {
   if (!videoDownloadUrl.value || isDownloadingVideo.value) return;
@@ -44,8 +88,16 @@ async function handleDownloadVideo() {
 
 watch(videoUrl, async () => {
   await nextTick();
-  videoRef.value?.load();
-});
+  const video = videoRef.value;
+
+  isVideoLoading.value = true;
+
+  if (!video) return;
+
+  ensureVideoPaused();
+
+  video.load();
+});
 </script>
 
 <template>
@@ -61,14 +113,33 @@ watch(videoUrl, async () => {
     </header>
 
     <div class="video-preview-body" aria-label="视频预览区域">
-      <div class="video-preview-frame">
-        <video
+      <div
+
+        class="video-preview-frame"
+
+        :style="{ aspectRatio: videoAspectRatio }"
+
+      >
+
+        <div v-if="isVideoLoading" class="video-preview-loading" aria-hidden="true">
+
+          <Icon icon="mdi:loading" class="video-preview-loading-icon" />
+
+        </div>
+
+        <video
           ref="videoRef"
           class="video-preview-player"
           controls
           playsinline
           preload="metadata"
-          :src="videoUrl"
+          :src="videoUrl"
+
+          @loadstart="handleVideoLoadStart"
+
+          @loadedmetadata="handleVideoLoadedMetadata"
+
+          @canplay="ensureVideoPaused"
         >
           当前浏览器不支持视频播放。
         </video>
@@ -100,8 +171,9 @@ watch(videoUrl, async () => {
 
 <style scoped lang="scss">
 .video-preview {
-  display: flex;
-  min-height: 0;
+  display: flex;
+
+  min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 16px;
@@ -170,26 +242,129 @@ watch(videoUrl, async () => {
   background: transparent;
 }
 
-.video-preview-frame {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-height: 240px;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-preview-player {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  max-height: 100%;
-  border-radius: 12px;
-  background: #050914;
-  object-fit: contain;
-}
-
+.video-preview-frame {
+
+  position: relative;
+
+  display: flex;
+
+  width: auto;
+
+  height: 100%;
+
+  max-width: 100%;
+
+  max-height: 100%;
+
+  margin: 0 auto;
+
+  align-items: center;
+
+  justify-content: center;
+
+  overflow: hidden;
+
+  border-radius: 12px;
+
+  background: #050914;
+
+}
+
+
+
+.video-preview-loading {
+
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 1;
+
+  display: grid;
+
+  place-items: center;
+
+  background: #050914;
+
+}
+
+
+
+.video-preview-loading-icon {
+
+  width: 28px;
+
+  height: 28px;
+
+  color: #ffffff;
+
+  animation: video-preview-spin 0.8s linear infinite;
+
+}
+
+
+
+@keyframes video-preview-spin {
+
+  to {
+
+    transform: rotate(360deg);
+
+  }
+
+}
+
+
+
+.video-preview-player {
+
+  display: block;
+
+  width: 100%;
+
+  height: 100%;
+
+  border-radius: 12px;
+
+  background: #050914;
+
+  object-fit: cover;
+
+}
+
+
+
+.video-preview-player:fullscreen {
+
+  width: 100%;
+
+  height: 100%;
+
+  border-radius: 0;
+
+  background: #000000;
+
+  object-fit: contain;
+
+}
+
+
+
+.video-preview-player:-webkit-full-screen {
+
+  width: 100%;
+
+  height: 100%;
+
+  border-radius: 0;
+
+  background: #000000;
+
+  object-fit: contain;
+
+}
+
+
 .video-preview-foot {
   flex-shrink: 0;
   padding-top: 4px;
