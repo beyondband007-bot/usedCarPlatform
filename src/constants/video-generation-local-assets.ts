@@ -62,7 +62,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'single-car',
     typeLabel: '单车品介绍',
     styleLabel: '实车讲解',
-    stylePrompt: '单车品介绍风格，围绕一台车完成外观、内饰、空间和使用场景的 12-15 秒短口播介绍。',
+    stylePrompt: '单车品介绍风格，围绕一台车完成外观、内饰、空间和使用场景的 8-15 秒短口播介绍。',
     description: '聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。',
     badge: 'hot',
     videoUrl: scene04Video,

@@ -3,6 +3,7 @@ import {
   batchWallLogoSceneGenerationPoints,
   shortVideoGenerationPoints,
   singleImageGenerationPoints,
+  videoGenerationPointsByAudioSeconds,
 } from "./generationPointRules";
 
 export type CreditFunctionCatalogItem = {
@@ -65,7 +66,7 @@ export const creditFunctionCatalog: CreditFunctionCatalogItem[] = [
     name: "Digital Human Vehicle Video",
     description: "15-second Seedance 2.0 digital-human vehicle video generation",
     chargeMode: "estimate_required",
-    defaultPoints: shortVideoGenerationPoints(),
+    defaultPoints: videoGenerationPointsByAudioSeconds(),
     status: "active",
   },
   {

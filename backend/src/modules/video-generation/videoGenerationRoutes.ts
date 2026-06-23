@@ -198,6 +198,21 @@ videoGenerationRoutes.post(
 );
 
 videoGenerationRoutes.post(
+  "/script-drafts/:scriptDraftId/translate-narration",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    ok(
+      res,
+      await videoGenerationService.translateNarration(
+        String(req.params.scriptDraftId),
+        req.body,
+        current.user.id,
+      ),
+    );
+  }),
+);
+
+videoGenerationRoutes.post(
   "/tasks",
   asyncHandler(async (req, res) => {
     const current = getRequiredCurrentUser(req);

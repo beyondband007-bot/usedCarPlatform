@@ -68,6 +68,7 @@ const {
   errorMessage,
   scriptDraft,
   confirmedScriptText,
+  translatedNarrationText,
   voiceOptions,
   selectedVoiceId,
   audioPreviews,
@@ -86,6 +87,7 @@ const {
   selectVoice,
   generateAudioPreview,
   optimizeNarrationScript,
+  translateNarrationScript,
   confirmAudioPreview,
   cancelAudioPreviewConfirmation,
   submitVideoTask,
@@ -260,6 +262,10 @@ const selectedLanguageOption = computed(
     ) ?? languageOptions.value[0] ?? null,
 );
 
+const isNonChineseLanguage = computed(
+  () => !["Chinese", "Chinese,Yue"].includes(activeFormLanguage.value),
+);
+
 const activeDigitalHumanId = computed({
   get() {
     if (selectedTemplate.value?.type === "dealership") {
@@ -372,7 +378,8 @@ const canGenerateAudioPreview = computed(
     Boolean(selectedVoiceId.value) &&
     !props.disabled &&
     !isLoading("audio") &&
-    !isLoading("optimize"),
+    !isLoading("optimize") &&
+    !isLoading("translate"),
 );
 
 const canOptimizeNarration = computed(
@@ -383,10 +390,28 @@ const canOptimizeNarration = computed(
     !props.disabled &&
     !isLoading("audio") &&
     !isLoading("optimize") &&
+    !isLoading("translate") &&
+    !isLoading("task"),
+);
+
+const canTranslateNarration = computed(
+  () =>
+    Boolean(scriptDraft.value?.scriptDraftId) &&
+    Boolean(editableScriptText.value.trim()) &&
+    isNonChineseLanguage.value &&
+    !props.disabled &&
+    !isLoading("audio") &&
+    !isLoading("optimize") &&
+    !isLoading("translate") &&
     !isLoading("task"),
 );
 
 const latestAudioPreview = computed(() => audioPreviews.value[0] ?? null);
+const estimatedConfirmedAudioPoints = computed(() => {
+  const durationMs = confirmedAudioPreview.value?.durationMs ?? 0;
+  if (!durationMs) return 0;
+  return Math.ceil(durationMs / 1000) * 150;
+});
 const showConfigurationPage = computed(() =>
   ["form", "task", "result"].includes(currentStep.value),
 );
@@ -400,7 +425,7 @@ function formatAudioDuration(durationMs?: number | null) {
 function resolveAudioPreviewLabel(status: string) {
   if (status === "ready") return "可用于生成";
   if (status === "too_long") return "超过 15 秒";
-  if (status === "too_short") return "不足 12 秒";
+  if (status === "too_short") return "不足 8 秒";
   return "需重新试听";
 }
 
@@ -534,9 +559,18 @@ async function submitNarrationOptimization() {
   );
 }
 
+async function submitNarrationTranslation() {
+  const result = await translateNarrationScript();
+  if (!result) {
+    if (errorMessage.value) message.error(errorMessage.value);
+    return;
+  }
+  message.success("已翻译为中文，仅供对照查看");
+}
+
 function toggleAudioConfirmation(audioPreviewId: string, canUseForVideo: boolean) {
   if (!canUseForVideo) {
-    message.warning("音频时长需在 12–15 秒内，请修改文案或使用一键优化");
+    message.warning("音频时长需在 8–15 秒内，请修改文案或使用一键优化");
     return;
   }
   if (confirmedAudioPreviewId.value === audioPreviewId) {
@@ -1013,7 +1047,7 @@ async function submitConfirmedVideo() {
           <span class="sv-step-index">5</span>
           <div class="sv-section-copy">
             <h3>确认口播文案</h3>
-            <p>修改文案后需要重新试听，音频时长需控制在 12-15 秒</p>
+            <p>修改文案后需要重新试听，音频时长需控制在 8-15 秒</p>
           </div>
         </header>
         <label class="sv-field sv-field--block">
@@ -1022,7 +1056,38 @@ async function submitConfirmedVideo() {
             v-model="editableScriptText"
             rows="5"
             placeholder="请确认或修改数字人口播文案"
-            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('task')"
+            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
+          />
+        </label>
+        <div
+          v-if="isNonChineseLanguage"
+          class="sv-script-actions"
+        >
+          <button
+            type="button"
+            class="sv-form-footer-btn sv-form-footer-btn--ghost"
+            :disabled="!canTranslateNarration"
+            @click="submitNarrationTranslation"
+          >
+            <Icon
+              v-if="isLoading('translate')"
+              icon="mdi:loading"
+              class="vg-spin"
+              aria-hidden="true"
+            />
+            <Icon v-else icon="mdi:translate" aria-hidden="true" />
+            翻译为中文
+          </button>
+        </div>
+        <label
+          v-if="translatedNarrationText"
+          class="sv-field sv-field--block sv-translation-preview"
+        >
+          <span class="sv-field-label">中文译文预览（仅供查看）</span>
+          <textarea
+            :value="translatedNarrationText"
+            rows="4"
+            readonly
           />
         </label>
         <div
@@ -1042,7 +1107,7 @@ async function submitConfirmedVideo() {
               aria-hidden="true"
             />
             <Icon v-else icon="mdi:magic-staff" aria-hidden="true" />
-            一键优化到 12–15 秒
+            一键优化到 8–15 秒
           </button>
         </div>
       </section>
@@ -1063,7 +1128,7 @@ async function submitConfirmedVideo() {
             type="button"
             class="sv-voice-card"
             :class="{ 'is-active': selectedVoiceId === voice.id }"
-            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('task')"
+            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
             @click="selectVoice(voice.id)"
           >
             <strong>{{ voice.label }}</strong>
@@ -1098,7 +1163,7 @@ async function submitConfirmedVideo() {
                   'is-confirmed': confirmedAudioPreviewId === preview.audioPreviewId,
                 }"
                 :disabled="!preview.canUseForVideo || disabled || isLoading('task')"
-                :title="preview.canUseForVideo ? '' : '音频时长需在 12–15 秒内才能确认'"
+                :title="preview.canUseForVideo ? '' : '音频时长需在 8–15 秒内才能确认'"
                 @click="toggleAudioConfirmation(preview.audioPreviewId, preview.canUseForVideo)"
               >
                 {{
@@ -1112,7 +1177,7 @@ async function submitConfirmedVideo() {
             </div>
             <p v-if="!preview.canUseForVideo" class="sv-audio-warning">
               <Icon icon="mdi:alert-circle-outline" aria-hidden="true" />
-              音频时长不在 12–15 秒内，请修改文案或使用一键优化。
+              音频时长不在 8–15 秒内，请修改文案或使用一键优化。
             </p>
           </article>
         </div>
@@ -1158,7 +1223,7 @@ async function submitConfirmedVideo() {
             aria-hidden="true"
           />
           <Icon v-else icon="mdi:movie-check-outline" aria-hidden="true" />
-          生成视频（2000积分）
+          生成视频（{{ estimatedConfirmedAudioPoints }}积分）
         </button>
       </div>
       </template>
