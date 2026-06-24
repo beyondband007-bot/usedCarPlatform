@@ -140,22 +140,23 @@ const themeToggleAriaLabel = computed(() =>
 );
 
 const navItems = computed(() => {
+  const withoutLogin = (items: NavItem[]) =>
+    items.filter((item) => item.path !== "/login");
+
   if (usesStudioChrome.value) {
     if (!authStore.isLoggedIn) {
       return studioGuestNavigation;
     }
 
-    return topNavigation.filter(
-      (item) => item.path !== "/login" && canShowNavItem(item),
-    );
+    return withoutLogin(topNavigation).filter(canShowNavItem);
   }
 
-  return authStore.isLoggedIn
-    ? topNavigation.filter(
-        (item) => item.path !== "/login" && canShowNavItem(item),
-      )
-    : topNavigation.filter(canShowNavItem);
+  return withoutLogin(topNavigation).filter(canShowNavItem);
 });
+
+const showHeaderLogin = computed(
+  () => !authStore.isLoggedIn && route.path !== "/login",
+);
 
 const canShowRechargeEntry = computed(
   () => authStore.userInfo?.enterpriseAccountRole !== "child",
@@ -221,13 +222,6 @@ const showHeaderRecharge = computed(
                 充值
               </button>
             </div>
-            <RouterLink
-              v-else-if="route.path !== '/login'"
-              class="header-action-pill credit-pill site-login-fallback"
-              to="/login"
-            >
-              企业账号登录
-            </RouterLink>
             <NPopover
               v-if="authStore.isLoggedIn"
               v-model:show="userMenuOpen"
@@ -308,6 +302,13 @@ const showHeaderRecharge = computed(
                 draggable="false"
               />
             </button>
+            <RouterLink
+              v-if="showHeaderLogin"
+              class="header-login-btn"
+              to="/login"
+            >
+              登录
+            </RouterLink>
           </div>
           <button
             type="button"
@@ -341,6 +342,14 @@ const showHeaderRecharge = computed(
         >
           {{ item.label }}
         </button>
+        <RouterLink
+          v-if="showHeaderLogin"
+          class="mobile-nav-login"
+          to="/login"
+          @click="mobileNavOpen = false"
+        >
+          登录
+        </RouterLink>
       </nav>
     </header>
 
@@ -431,6 +440,14 @@ const showHeaderRecharge = computed(
             draggable="false"
           />
         </button>
+
+        <RouterLink
+          v-if="showHeaderLogin"
+          class="header-login-btn header-login-btn--admin"
+          to="/login"
+        >
+          登录
+        </RouterLink>
 
         <NPopover
           v-if="authStore.isLoggedIn"
@@ -772,14 +789,91 @@ const showHeaderRecharge = computed(
   background: var(--studio-chrome-credit-hover, #f8fafc);
 }
 
-.site-login-fallback {
-  display: none;
-}
-
 .site-header-actions {
   display: inline-flex;
   align-items: center;
   gap: clamp(8px, 0.75vw, 12px);
+}
+
+.header-login-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: clamp(36px, 2.4vw, 40px);
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: var(--studio-chrome-action-size, clamp(13px, 0.78vw, 15px));
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.header-login-btn:hover {
+  background: #f1f5f9;
+  opacity: 1;
+}
+
+.site-header.is-light .header-login-btn {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.site-header.is-light .header-login-btn:hover {
+  background: #1e293b;
+}
+
+.header-login-btn--admin {
+  min-height: 40px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.header-login-btn--admin:hover {
+  background: #f1f5f9;
+}
+
+:global(html[data-theme="dark"]) .header-login-btn--admin,
+:global(.workspace-page.theme-dark) .header-login-btn--admin {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+:global(html[data-theme="dark"]) .header-login-btn--admin:hover,
+:global(.workspace-page.theme-dark) .header-login-btn--admin:hover {
+  background: #f1f5f9;
+}
+
+.mobile-nav-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-header.is-light .mobile-nav-login {
+  background: #0f172a;
+  color: #ffffff;
 }
 
 .theme-toggle {
@@ -938,10 +1032,6 @@ const showHeaderRecharge = computed(
 
   .mobile-nav-panel {
     display: flex;
-  }
-
-  .site-login-fallback {
-    display: inline-flex;
   }
 }
 
@@ -1114,20 +1204,5 @@ const showHeaderRecharge = computed(
 
 .user-menu-item-icon {
   font-size: 18px;
-}
-
-.header-login-link {
-  background: var(--color-action-primary, #2f6bff);
-  color: #ffffff;
-}
-
-.header-login-link:hover {
-  background: var(--color-action-primary-hover, #4f7fff);
-  opacity: 1;
-}
-
-[data-theme="dark"] .header-login-link {
-  background: var(--app-header-nav-active-bg);
-  color: var(--app-header-nav-active);
 }
 </style>

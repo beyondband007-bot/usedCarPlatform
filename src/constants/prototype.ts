@@ -15,7 +15,6 @@ export const studioGuestNavigation: NavItem[] = [
     workbenchEntry: true,
   },
   { path: '/pricing', label: '企业套餐' },
-  { path: '/login', label: '企业账号登录' },
 ]
 
 /** 访客顶栏（与登录页 UI 稿一致，含工作台入口） */

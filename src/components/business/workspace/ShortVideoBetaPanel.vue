@@ -164,7 +164,7 @@ const generatingStatusLabel = computed(() => {
 
 const generatingDescription = computed(() => {
   if (isDraftGenerating.value) return "正在生成口播文案与视频任务参数，请稍候。";
-  return `输出 ${VIDEO_OUTPUT_RATIO_LABEL}，按音频时长生成（最长15秒），请稍候。`;
+  return `输出 ${VIDEO_OUTPUT_RATIO_LABEL}，请稍候。`;
 });
 
 const generatingErrorMessage = computed(() => {
@@ -468,38 +468,49 @@ watch(
       class="sv-state-panel sv-state-panel--generating"
       aria-live="polite"
     >
-      <div class="sv-generating-visual" aria-hidden="true">
-        <span class="sv-generating-scan"></span>
-        <Icon icon="mdi:video-outline" />
-      </div>
-      <div class="sv-generating-copy">
-        <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成中" }}</p>
-        <h2>{{ generatingStatusLabel }}</h2>
-        <span>{{ generatingDescription }}</span>
-        <p v-if="generatingErrorMessage" class="sv-generating-error">
-          {{ generatingErrorMessage }}
-        </p>
-      </div>
-      <div class="sv-generating-progress" role="progressbar" :aria-valuenow="generatingProgress">
-        <span :style="{ width: `${generatingProgress}%` }"></span>
-      </div>
-      <div class="sv-generating-actions">
-        <button
-          v-if="canCancelTask(currentTask)"
-          type="button"
-          class="sv-action-button sv-action-button--ghost"
-          @click="handleCancelTask(currentTask?.taskId)"
+      <div class="sv-generating-card">
+        <div class="sv-generating-visual" aria-hidden="true">
+          <span class="sv-generating-scan"></span>
+          <Icon icon="mdi:video-outline" />
+        </div>
+
+        <div class="sv-generating-copy">
+          <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成中" }}</p>
+          <h2>{{ generatingStatusLabel }}</h2>
+          <span>{{ generatingDescription }}</span>
+          <p v-if="generatingErrorMessage" class="sv-generating-error">
+            {{ generatingErrorMessage }}
+          </p>
+        </div>
+
+        <div
+          class="sv-generating-progress"
+          role="progressbar"
+          :aria-valuenow="generatingProgress"
+          aria-valuemin="0"
+          aria-valuemax="100"
         >
-          取消生成
-        </button>
-        <button
-          v-if="canRegenerateTask(currentTask)"
-          type="button"
-          class="sv-action-button"
-          @click="handleRegenerateTask()"
-        >
-          重新生成
-        </button>
+          <span :style="{ width: `${Math.max(generatingProgress, 8)}%` }"></span>
+        </div>
+
+        <div v-if="canCancelTask(currentTask) || canRegenerateTask(currentTask)" class="sv-generating-actions">
+          <button
+            v-if="canCancelTask(currentTask)"
+            type="button"
+            class="sv-action-button sv-action-button--ghost"
+            @click="handleCancelTask(currentTask?.taskId)"
+          >
+            取消生成
+          </button>
+          <button
+            v-if="canRegenerateTask(currentTask)"
+            type="button"
+            class="sv-action-button"
+            @click="handleRegenerateTask()"
+          >
+            重新生成
+          </button>
+        </div>
       </div>
     </section>
 
@@ -836,7 +847,13 @@ watch(
 }
 
 .sv-beta-panel.theme-light .sv-generating-visual {
-  background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--sv-accent) 13%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
 }
 
 .sv-beta-panel.theme-light .sv-generating-progress {
@@ -1393,36 +1410,90 @@ watch(
   object-fit: contain;
 }
 
+.sv-state-panel--generating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 2vw, 24px);
+}
+
+.sv-generating-card {
+  display: grid;
+  width: min(100%, 560px);
+  justify-items: center;
+  gap: 18px;
+  padding: clamp(24px, 3vw, 40px);
+  border: 1px solid var(--sv-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sv-accent) 8%, transparent),
+      transparent 42%
+    ),
+    var(--sv-surface);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+}
+
+.sv-beta-panel.theme-light .sv-generating-card {
+  border-color: #e1eaf5;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sv-accent) 10%, #ffffff),
+      #ffffff 48%
+    ),
+    #ffffff;
+  box-shadow: 0 10px 28px rgba(78, 111, 148, 0.08);
+}
+
 .sv-generating-visual {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 220px;
+  width: min(100%, 320px);
+  aspect-ratio: 16 / 10;
   overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #151922 0%, #0d1117 100%);
+  border: 1px dashed color-mix(in srgb, var(--sv-accent) 28%, var(--sv-border));
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--sv-accent) 16%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(180deg, #151922 0%, #0d1117 100%);
 }
 
 .sv-generating-visual .iconify {
   position: relative;
   z-index: 1;
   color: var(--sv-accent);
-  font-size: 42px;
+  font-size: clamp(48px, 6vw, 72px);
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--sv-accent) 18%, transparent));
+  animation: sv-generating-pulse 1.6s ease-in-out infinite;
 }
 
 .sv-generating-scan {
   position: absolute;
-  inset: 0;
+  inset: 12% 16%;
+  border-radius: 14px;
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(212, 176, 106, 0.12) 50%,
+    rgba(212, 176, 106, 0.16) 48%,
+    rgba(212, 176, 106, 0.04) 52%,
     transparent 100%
   );
+  opacity: 0.75;
   animation: sv-scan 1.8s linear infinite;
 }
 
 .sv-generating-copy {
+  display: grid;
+  width: min(100%, 520px);
+  justify-items: center;
+  gap: 8px;
   text-align: center;
 }
 
@@ -1436,24 +1507,26 @@ watch(
   color: var(--sv-accent);
   font-size: 13px;
   font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .sv-generating-copy h2 {
-  margin-top: 8px;
-  font-size: 24px;
+  font-size: clamp(20px, 1.8vw, 28px);
   font-weight: 900;
+  line-height: 1.25;
 }
 
 .sv-generating-copy span {
   display: block;
-  margin-top: 8px;
+  max-width: 420px;
   color: var(--sv-text-soft);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .sv-generating-progress {
-  height: 4px;
+  width: min(100%, 320px);
+  height: 8px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -1461,11 +1534,11 @@ watch(
 
 .sv-generating-progress span {
   display: block;
-  width: 36%;
+  min-width: 8%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--sv-accent), #f6dfaa);
-  animation: sv-progress 1.6s ease-in-out infinite;
+  background: linear-gradient(90deg, var(--sv-accent), #f6dfaa 70%, #fff4d6);
+  transition: width 0.35s ease;
 }
 
 .sv-empty-state {
@@ -1490,6 +1563,19 @@ watch(
   animation: sv-spin 0.9s linear infinite;
 }
 
+@keyframes sv-generating-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
 @keyframes sv-scan {
   0% {
     transform: translateY(-100%);
@@ -1497,17 +1583,6 @@ watch(
 
   100% {
     transform: translateY(100%);
-  }
-}
-
-@keyframes sv-progress {
-  0%,
-  100% {
-    transform: translateX(-12%);
-  }
-
-  50% {
-    transform: translateX(180%);
   }
 }
 
@@ -1572,29 +1647,45 @@ watch(
   line-height: 1.5;
 }
 
-.sv-generating-actions,
-.sv-history-actions {
+.sv-generating-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
 }
 
 .sv-action-button {
-  padding: 6px 12px;
+  min-width: 112px;
+  padding: 10px 18px;
   border: 1px solid color-mix(in srgb, var(--sv-accent) 40%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--sv-accent) 16%, transparent);
   color: var(--sv-text);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease;
+}
+
+.sv-action-button:hover {
+  transform: translateY(-1px);
 }
 
 .sv-action-button--ghost {
   border-color: var(--sv-border);
   background: transparent;
   color: var(--sv-text-soft);
+}
+
+.sv-beta-panel.theme-light .sv-action-button--ghost {
+  border-color: #d7e3f2;
+  background: #f8fbff;
+  color: #64748b;
 }
 
 .sv-download-link {

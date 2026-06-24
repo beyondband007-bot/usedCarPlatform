@@ -3051,7 +3051,7 @@ defineExpose({
     </template>
 
     <template v-else-if="props.capability.code === 'short-video'">
-      <div class="generate-panel-body">
+      <div class="generate-panel-body generate-panel-body--short-video">
         <VideoGenerationPanel
           :capability="props.capability"
           :disabled="props.isGenerating"
@@ -3498,6 +3498,10 @@ defineExpose({
   --saas-logo-row-selected-surface: #14171a;
   --saas-logo-preview-surface: #14171a;
   --saas-trigger-title: #ffffff;
+}
+
+.generate-panel-body--short-video {
+  scroll-padding-bottom: 80px;
 }
 
 .generate-panel-body > * {

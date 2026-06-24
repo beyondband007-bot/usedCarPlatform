@@ -434,9 +434,7 @@ const estimatedConfirmedAudioPoints = computed(() => {
   if (!durationMs) return 0;
   return Math.ceil(durationMs / 1000) * 150;
 });
-const showConfigurationPage = computed(() =>
-  ["form", "task", "result"].includes(currentStep.value),
-);
+const showConfigurationPage = computed(() => currentStep.value === "form");
 const showConfigurationFooter = computed(() => currentStep.value === "form");
 
 function formatAudioDuration(durationMs?: number | null) {
@@ -1065,6 +1063,19 @@ async function submitConfirmedVideo() {
         </button>
       </div>
       </template>
+
+      <section
+        v-else-if="['task', 'result'].includes(currentStep)"
+        class="sv-section sv-section--task-hint"
+      >
+        <header class="sv-section-head">
+          <span class="sv-step-index">···</span>
+          <div class="sv-section-copy">
+            <h3>{{ currentStep === 'result' ? '视频已生成' : '视频生成中' }}</h3>
+            <p>可在右侧查看生成进度与结果，左侧表单将在任务结束后可继续编辑。</p>
+          </div>
+        </header>
+      </section>
 
       <template v-else-if="currentStep === 'review' && scriptDraft">
       <section class="sv-section sv-script-review">
@@ -2189,11 +2200,33 @@ async function submitConfirmedVideo() {
   line-height: 1.55;
 }
 
+.sv-section--task-hint {
+  border-style: dashed;
+}
+
+.sv-section--task-hint .sv-section-copy p {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .sv-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 4px;
+  margin-top: 4px;
+  padding: 14px 0 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sv-card-bg) 0%, transparent) 0%,
+    var(--sv-card-bg) 24%,
+    var(--sv-card-bg) 100%
+  );
+  border-top: 1px solid color-mix(in srgb, var(--sv-card-border) 84%, transparent);
 }
 
 .sv-form-footer-btn {
