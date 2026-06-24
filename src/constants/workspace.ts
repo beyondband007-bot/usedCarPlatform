@@ -566,7 +566,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     tagType: 'info',
     title: '短视频生成',
     description:
-      '上传素材后直接生成竖屏营销短视频（9:16、720p、含口播音频，最长15秒）。',
+      '上传素材后按所选模板生成横屏或竖屏营销短视频（16:9 / 9:16、720p、含口播音频，最长15秒）。',
     uploadTitle: '车辆外观图',
     uploadHint: '点击/拖拽上传 · JPG / PNG / WebP · ≤ 10MB',
     middleBlocks: onlyActions,

@@ -12,6 +12,8 @@ export type VideoTemplateStyle =
   | "professional"
   | "humorous";
 
+export type VideoGenerationOutputRatio = "9:16" | "16:9";
+
 export type VideoTemplateFieldType =
   | "text"
   | "asset_ids"
@@ -39,6 +41,7 @@ export interface VideoTemplateDefinition {
   referenceMaterialId: string;
   type: VideoTemplateType;
   style: VideoTemplateStyle;
+  outputRatio: VideoGenerationOutputRatio;
   badge: "hot" | "new" | null;
   inputRequirements: VideoTemplateInputRequirement[];
 }
@@ -221,6 +224,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-001",
     type: "dealership",
     style: "lively",
+    outputRatio: "16:9",
     badge: "hot",
     inputRequirements: dealershipRequirements(),
   },
@@ -228,6 +232,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-002",
     type: "dealership",
     style: "professional",
+    outputRatio: "9:16",
     badge: null,
     inputRequirements: dealershipRequirements(),
   },
@@ -235,6 +240,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-003",
     type: "dealership",
     style: "calm",
+    outputRatio: "9:16",
     badge: null,
     inputRequirements: dealershipRequirements(),
   },
@@ -242,6 +248,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-004",
     type: "single-car",
     style: "professional",
+    outputRatio: "9:16",
     badge: "new",
     inputRequirements: singleCarRequirements(),
   },
@@ -249,6 +256,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-005",
     type: "single-car",
     style: "professional",
+    outputRatio: "9:16",
     badge: "new",
     inputRequirements: singleCarRequirements(),
   },
@@ -256,6 +264,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-007",
     type: "single-car",
     style: "professional",
+    outputRatio: "9:16",
     badge: "new",
     inputRequirements: singleCarRequirements(),
   },
@@ -431,7 +440,7 @@ export const validateVideoTemplateInputs = (
 };
 
 export const videoGenerationWorkflowContract = {
-  contractVersion: 2,
+  contractVersion: 3,
   identifiers: {
     templateId: "前端模板标识；当前与referenceMaterialId使用同一个值",
     referenceMaterialId: "兼容旧接口的预设风格素材标识",
@@ -443,9 +452,12 @@ export const videoGenerationWorkflowContract = {
   fixedOutput: {
     durationSeconds: 15,
     resolution: "720p",
-    outputRatio: "9:16",
     language: "Chinese",
     languageMode: "selectable",
+  },
+  outputRatioPolicy: {
+    mode: "template_locked",
+    supportedRatios: ["16:9", "9:16"] as VideoGenerationOutputRatio[],
   },
   vehicleNameComposition: {
     canonicalField: "vehicleName",

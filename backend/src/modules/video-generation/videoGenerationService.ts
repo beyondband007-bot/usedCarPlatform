@@ -42,6 +42,7 @@ import {
   videoGenerationWorkflowContract,
   videoTemplateStyleLabels,
   videoTemplateTypeLabels,
+  type VideoGenerationOutputRatio,
   type VideoTemplateStyle,
   type VideoTemplateType,
 } from "./videoTemplateCatalog";
@@ -1377,8 +1378,12 @@ const deriveSeedanceDurationSeconds = (audioDurationMs: number | null) => {
 const isChineseNarrationLanguage = (language: VideoGenerationLanguage) =>
   language === "Chinese" || language === "Chinese,Yue";
 
-const FIXED_DEALERSHIP_SEEDANCE_PROMPT =
-  "用模特 {{Mixed 2}} ，生成精品二手车销售风格的口播短视频使用音频 {{Mixed 3}} ，真人口播感，场地参考图 {{Mixed 1}} ，不要做特写，不要画面文字，不要打开引擎盖，不要展示我没给你参考图部位，内容真实。";
+const buildFixedDealershipSeedancePrompt = (
+  outputRatio: VideoGenerationOutputRatio,
+) => {
+  const orientation = outputRatio === "16:9" ? "横屏" : "竖屏";
+  return `用模特 {{Mixed 2}} ，生成 ${outputRatio} ${orientation}精品二手车销售风格的口播短视频使用音频 {{Mixed 3}} ，真人口播感，场地参考图 {{Mixed 1}} ，不要做特写，不要画面文字，不要打开引擎盖，不要展示我没给你参考图部位，内容真实。`;
+};
 
 const toMixedReferenceList = (start: number, count: number) =>
   count > 0
@@ -1432,11 +1437,12 @@ export const buildSeedancePrompt = (input: {
   dealershipCount: number;
   language: VideoGenerationLanguage;
   templateType: VideoTemplateType;
+  outputRatio: VideoGenerationOutputRatio;
   durationSeconds?: number;
   audioDurationMs?: number | null;
 }) => {
   if (input.templateType === "dealership") {
-    return FIXED_DEALERSHIP_SEEDANCE_PROMPT;
+    return buildFixedDealershipSeedancePrompt(input.outputRatio);
   }
 
   if (input.templateType === "single-car") {
@@ -1459,7 +1465,7 @@ export const buildSeedancePrompt = (input: {
       : Array.from({ length: end - start + 1 }, (_, index) => `#image${start + index}`).join("、");
 
   return [
-    `生成一条严格 ${durationSeconds} 秒、9:16 竖屏、720p 的${getVideoGenerationLanguageLabel(input.language)}汽车行业数字人口播视频。`,
+    `生成一条严格 ${durationSeconds} 秒、${input.outputRatio}、720p 的${getVideoGenerationLanguageLabel(input.language)}汽车行业数字人口播视频。`,
     `模板类型：${videoTemplateTypeLabels[input.templateType]}。`,
     "媒体引用规则：",
     "- #image1 是同一个数字人的四视图和人物特写身份板。只提取身份、五官、发型、服装和体型，最终画面只能出现一个完整自然的人物，禁止把多视图拼板直接放进视频。",
@@ -1654,7 +1660,7 @@ class VideoGenerationService {
       styleTags: localizedMaterial.styleJson.styleTags,
       durationSeconds: VIDEO_DURATION_SECONDS,
       durationLabel: "00:15",
-      outputRatio: "9:16" as const,
+      outputRatio: definition.outputRatio,
       videoResolution: VIDEO_GENERATION_RESOLUTION,
       generationMode: "preset_prompt_only" as const,
       inputRequirements: definition.inputRequirements,
@@ -2305,6 +2311,7 @@ class VideoGenerationService {
     const { vehicleName, structuredVehicle } = normalizedVehicle;
 
     const durationSeconds = normalizeDuration(body.durationSeconds);
+    const outputRatio = templateDefinition.outputRatio;
     const sellingPointHints = normalizeSellingPointHints(body.sellingPointHints);
     const vehicleImageSummary =
       typeof body.vehicleImageSummary === "string" ? body.vehicleImageSummary.trim().slice(0, 500) : "";
@@ -2518,7 +2525,7 @@ class VideoGenerationService {
       structuredVehicle,
       language,
       durationSeconds,
-      outputRatio: "9:16" as const,
+      outputRatio,
       videoResolution: VIDEO_GENERATION_RESOLUTION,
       requiredInputs,
       promptBundle,
@@ -2533,7 +2540,7 @@ class VideoGenerationService {
       digitalHumanId,
       referenceMaterialId,
       durationSeconds: VIDEO_DURATION_SECONDS,
-      outputRatio: "9:16",
+      outputRatio,
       videoResolution: VIDEO_GENERATION_RESOLUTION,
       scriptText,
       finalVideoPrompt,
@@ -2564,7 +2571,9 @@ class VideoGenerationService {
       language:
         typeof vehicle.language === "string" ? vehicle.language : "Chinese",
       durationSeconds: draft.durationSeconds,
-      outputRatio: draft.outputRatio,
+      outputRatio:
+        getVideoTemplateDefinition(draft.referenceMaterialId)?.outputRatio ??
+        draft.outputRatio,
       videoResolution: draft.videoResolution,
       requiredInputs: draft.requiredInputs,
       promptBundle: draft.promptBundle,
@@ -2823,6 +2832,7 @@ class VideoGenerationService {
       (typeof templateInput.type === "string"
         ? templateInput.type
         : templateDefinition?.type ?? "single-car") as VideoTemplateType;
+    const outputRatio = templateDefinition?.outputRatio ?? draft.outputRatio;
     const confirmedAudioPreview = await this.validateAudioPreviewForTask({
       audioPreviewId,
       userId,
@@ -2920,6 +2930,7 @@ class VideoGenerationService {
         dealershipCount: seedanceDealershipAssets.length,
         language,
         templateType,
+        outputRatio,
         durationSeconds: seedanceDurationSeconds,
         audioDurationMs: narrationAudio.durationMs,
       });
@@ -2931,7 +2942,7 @@ class VideoGenerationService {
         inputAssetId:
           exteriorAssets[0]?.id ?? dealershipAssets[0]?.id ?? null,
         optionId: scriptDraftId,
-        outputRatio: "9:16",
+        outputRatio,
         resolution: VIDEO_GENERATION_RESOLUTION,
         logoAssetId: null,
         prompt: seedancePrompt,
@@ -3067,7 +3078,7 @@ class VideoGenerationService {
         referenceContents: orderedReferenceContents,
         referenceImageUrls: referenceImageAssetUris,
         referenceAudioUrls: referenceAudioAssetUris,
-        ratio: "9:16",
+        ratio: outputRatio,
         resolution: VIDEO_GENERATION_RESOLUTION,
         duration: seedanceDurationSeconds,
         generateAudio: true,
@@ -3161,7 +3172,7 @@ class VideoGenerationService {
               languageBoost: narrationAudio.languageBoost,
             },
           },
-          aspectRatio: "9:16",
+          aspectRatio: outputRatio,
           videoResolution: VIDEO_GENERATION_RESOLUTION,
           duration: seedanceDurationSeconds,
           generateAudio: true,
@@ -3183,7 +3194,7 @@ class VideoGenerationService {
         templateId: draft.referenceMaterialId,
         templateType,
         language,
-        outputRatio: "9:16",
+        outputRatio,
         videoResolution: VIDEO_GENERATION_RESOLUTION,
         generateAudio: true,
         narrationAudio: {

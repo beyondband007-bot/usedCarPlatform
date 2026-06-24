@@ -36,10 +36,17 @@ assert.equal(
 assert.deepEqual(videoGenerationWorkflowContract.fixedOutput, {
   durationSeconds: 15,
   resolution: "720p",
-  outputRatio: "9:16",
   language: "Chinese",
   languageMode: "selectable",
 });
+assert.deepEqual(videoGenerationWorkflowContract.outputRatioPolicy, {
+  mode: "template_locked",
+  supportedRatios: ["16:9", "9:16"],
+});
+
+assert.equal(getVideoTemplateDefinition("ref-video-001")?.outputRatio, "16:9");
+assert.equal(getVideoTemplateDefinition("ref-video-002")?.outputRatio, "9:16");
+assert.equal(getVideoTemplateDefinition("ref-video-003")?.outputRatio, "9:16");
 
 const supportedLanguageValues = videoGenerationWorkflowContract.supportedLanguages.map(
   (item): string => item.value,

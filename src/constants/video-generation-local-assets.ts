@@ -1,7 +1,11 @@
 import messageDh01 from '@/assets/img/video-generation/message-dh-01.png'
+import messageDh01Closeup from '@/assets/img/video-generation/message-dh-01-closeup.png'
 import messageDh02 from '@/assets/img/video-generation/message-dh-02.jpg'
+import messageDh02Closeup from '@/assets/img/video-generation/message-dh-02-closeup.png'
 import messageDh03 from '@/assets/img/video-generation/message-dh-03.jpg'
+import messageDh03Closeup from '@/assets/img/video-generation/message-dh-03-closeup.png'
 import messageDh04 from '@/assets/img/video-generation/message-dh-04.png'
+import messageDh04Closeup from '@/assets/img/video-generation/message-dh-04-closeup.png'
 import scene01Video from '@/assets/video/video-generation/message-scene-01-dealership.mp4'
 import scene02Video from '@/assets/video/video-generation/message-scene-02-dealership.mp4'
 import scene03Video from '@/assets/video/video-generation/message-scene-03-dealership.mp4'
@@ -20,6 +24,7 @@ interface LocalSceneDefinition {
   description: string
   badge: VideoTemplate['badge']
   videoUrl: string
+  outputRatio: '16:9' | '9:16'
 }
 
 const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
@@ -33,6 +38,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     description: '用于介绍门店环境、车场规模和到店看车氛围，适合作为车场介绍开场。',
     badge: 'hot',
     videoUrl: scene01Video,
+    outputRatio: '16:9',
   },
   {
     templateId: 'ref-video-002',
@@ -44,6 +50,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     description: '以销售顾问口吻带看车场，突出车辆陈列、接待动线和真实服务感。',
     badge: null,
     videoUrl: scene02Video,
+    outputRatio: '9:16',
   },
   {
     templateId: 'ref-video-003',
@@ -55,6 +62,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     description: '适合展示多台车源和库存规模，再自然引出主推车型或重点车辆。',
     badge: null,
     videoUrl: scene03Video,
+    outputRatio: '9:16',
   },
   {
     templateId: 'ref-video-004',
@@ -66,6 +74,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     description: '聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。',
     badge: 'hot',
     videoUrl: scene04Video,
+    outputRatio: '9:16',
   },
   {
     templateId: 'ref-video-005',
@@ -77,6 +86,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     description: '适合用车辆动态镜头制作广告展示，当前模板暂未开放。',
     badge: 'new',
     videoUrl: scene05Video,
+    outputRatio: '9:16',
   },
 ]
 
@@ -86,7 +96,7 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
     name: '数字人 1｜亲和女声',
     gender: 'female',
     ageStyle: '年轻女性 · 预设音色 Friendly Paige',
-    previewUrl: messageDh01,
+    previewUrl: messageDh01Closeup,
     imageUrl: messageDh01,
     voiceStatus: 'ready',
     voiceModel: 'speech-2.8-hd',
@@ -96,7 +106,7 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
     name: '数字人 2｜专业男声',
     gender: 'male',
     ageStyle: '年轻男性 · 预设音色 博学讲师',
-    previewUrl: messageDh02,
+    previewUrl: messageDh02Closeup,
     imageUrl: messageDh02,
     voiceStatus: 'ready',
     voiceModel: 'speech-2.8-hd',
@@ -106,7 +116,7 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
     name: '数字人 3｜明亮女声',
     gender: 'female',
     ageStyle: '年轻女性 · 预设音色 Bright Queen',
-    previewUrl: messageDh03,
+    previewUrl: messageDh03Closeup,
     imageUrl: messageDh03,
     voiceStatus: 'ready',
     voiceModel: 'speech-2.8-hd',
@@ -116,7 +126,7 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
     name: '数字人 4｜活力女声',
     gender: 'female',
     ageStyle: '年轻女性 · 预设音色 EngagingGirl',
-    previewUrl: messageDh04,
+    previewUrl: messageDh04Closeup,
     imageUrl: messageDh04,
     voiceStatus: 'ready',
     voiceModel: 'speech-2.8-hd',
@@ -140,7 +150,7 @@ function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate 
     stylePrompt: scene.stylePrompt,
     durationSeconds: VIDEO_DURATION_SECONDS,
     durationLabel: '≤00:15',
-    outputRatio: '9:16',
+    outputRatio: scene.outputRatio,
     videoResolution: '720p',
     inputRequirements: [],
     requiredFields: [],

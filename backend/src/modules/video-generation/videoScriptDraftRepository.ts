@@ -2,6 +2,7 @@ import type { RowDataPacket } from "mysql2";
 
 import { Repository } from "../../db/repository";
 import { parseJsonValue } from "../tasks/taskJson";
+import type { VideoGenerationOutputRatio } from "./videoTemplateCatalog";
 
 export interface VideoScriptDraftRecord {
   id: string;
@@ -10,7 +11,7 @@ export interface VideoScriptDraftRecord {
   digitalHumanId: string;
   referenceMaterialId: string;
   durationSeconds: 15;
-  outputRatio: "9:16";
+  outputRatio: VideoGenerationOutputRatio;
   videoResolution: "720p";
   scriptText: string;
   finalVideoPrompt: string;
@@ -28,7 +29,7 @@ interface VideoScriptDraftRow extends RowDataPacket {
   digital_human_id: string;
   reference_material_id: string;
   duration_seconds: number;
-  output_ratio: "9:16";
+  output_ratio: VideoGenerationOutputRatio;
   video_resolution: "720p";
   script_text: string;
   final_video_prompt: string;

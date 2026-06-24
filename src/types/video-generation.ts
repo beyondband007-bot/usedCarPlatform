@@ -94,9 +94,12 @@ export interface VideoWorkflowContract {
   fixedOutput: {
     durationSeconds: number
     resolution: string
-    outputRatio: string
     language?: VideoGenerationLanguage
     languageMode?: string
+  }
+  outputRatioPolicy?: {
+    mode: 'template_locked'
+    supportedRatios: Array<'16:9' | '9:16'>
   }
   supportedLanguages: Array<{
     value: VideoGenerationLanguage

@@ -133,6 +133,28 @@ const isDealershipTemplate = computed(
   () => selectedTemplate.value?.type === "dealership",
 );
 
+const selectedOutputRatio = computed(() =>
+  selectedTemplate.value?.outputRatio === "16:9" ? "16:9" : "9:16",
+);
+
+const isHorizontalDealershipTemplate = computed(
+  () => isDealershipTemplate.value && selectedOutputRatio.value === "16:9",
+);
+
+const dealershipOrientationLabel = computed(() =>
+  isHorizontalDealershipTemplate.value ? "横版" : "竖版",
+);
+
+const dealershipUploadTitle = computed(
+  () => `上传${dealershipOrientationLabel.value}展厅/车场素材`,
+);
+
+const dealershipUploadHint = computed(() =>
+  isHorizontalDealershipTemplate.value
+    ? "建议使用 16:9 横版照片，分辨率 ≥1920×1080"
+    : "建议使用 9:16 竖版照片，分辨率 ≥1080×1920",
+);
+
 const primaryUploadPreview = computed(() => {
   if (isDealershipTemplate.value) {
     return primaryDealership.value;
@@ -648,6 +670,7 @@ async function submitConfirmedVideo() {
           <div class="sv-template-summary-tags">
             <span>{{ selectedTemplate.typeLabel }}</span>
             <span class="is-accent">{{ selectedTemplate.styleLabel }}</span>
+            <span>{{ selectedOutputRatio }} {{ selectedOutputRatio === "16:9" ? "横屏" : "竖屏" }}</span>
           </div>
           <p>{{ selectedTemplate.stylePrompt }}</p>
         </div>
@@ -659,7 +682,7 @@ async function submitConfirmedVideo() {
           <span class="sv-step-index">1</span>
           <div class="sv-section-copy">
             <h3>上传素材照片</h3>
-            <p>{{ isDealershipTemplate ? "拖拽或点击上传车场/展厅照片" : "拖拽或点击上传汽车外观和内饰照片" }}</p>
+            <p>{{ isDealershipTemplate ? `拖拽或点击${dealershipUploadTitle}` : "拖拽或点击上传汽车外观和内饰照片" }}</p>
           </div>
         </header>
 
@@ -668,6 +691,8 @@ async function submitConfirmedVideo() {
             class="sv-upload-card"
             :class="{
               'sv-upload-card--wide': isDealershipTemplate,
+              'sv-upload-card--landscape': isHorizontalDealershipTemplate,
+              'sv-upload-card--portrait': isDealershipTemplate && !isHorizontalDealershipTemplate,
               'is-filled': primaryUploadPreview,
               'is-uploading': isDealershipTemplate
                 ? isLoading('upload-dealership')
@@ -708,8 +733,8 @@ async function submitConfirmedVideo() {
               <span class="sv-upload-icon">
                 <Icon icon="mdi:camera-outline" />
               </span>
-              <strong>{{ isDealershipTemplate ? "上传展厅/车场素材" : "上传汽车外观照片" }}</strong>
-              <span>支持 JPG、PNG，建议分辨率 ≥1920×1080</span>
+              <strong>{{ isDealershipTemplate ? dealershipUploadTitle : "上传汽车外观照片" }}</strong>
+              <span>{{ isDealershipTemplate ? dealershipUploadHint : "支持 JPG、PNG，建议分辨率 ≥1920×1080" }}</span>
             </div>
 
             <div
@@ -888,7 +913,7 @@ async function submitConfirmedVideo() {
                 v-if="human.previewUrl"
                 class="sv-human-photo"
                 :src="human.previewUrl"
-                :alt="human.name"
+                :alt="`${human.name}正面特写`"
                 fit="cover"
               />
               <Icon v-else icon="mdi:account-outline" />
@@ -1496,6 +1521,16 @@ async function submitConfirmedVideo() {
   min-height: 180px;
 }
 
+.sv-upload-card--landscape {
+  aspect-ratio: 16 / 9;
+}
+
+.sv-upload-card--portrait {
+  width: min(100%, 360px);
+  aspect-ratio: 9 / 16;
+  justify-self: center;
+}
+
 .sv-upload-card:hover:not(.is-uploading) {
   border-color: color-mix(in srgb, var(--sv-accent) 58%, var(--sv-card-border));
   box-shadow: 0 8px 24px color-mix(in srgb, var(--sv-accent) 10%, transparent);
@@ -1555,6 +1590,7 @@ async function submitConfirmedVideo() {
 
 .sv-upload-card--wide .sv-upload-preview,
 .sv-upload-card--wide .sv-upload-placeholder {
+  height: 100%;
   min-height: 180px;
 }
 

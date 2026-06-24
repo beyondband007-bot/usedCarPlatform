@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildSeedancePrompt } from "./videoGenerationService";
 
 const singleCarPrompt = buildSeedancePrompt({
+  outputRatio: "9:16",
   finalVideoPrompt:
     "Use the selected digital human, professional showroom style and uploaded BMW references.",
   scriptText: "This is the approved English narration.",
@@ -34,6 +35,7 @@ assert.doesNotMatch(singleCarPrompt, /时长要求/);
 assert.doesNotMatch(singleCarPrompt, /#image1/);
 
 const chineseSingleCarPrompt = buildSeedancePrompt({
+  outputRatio: "9:16",
   finalVideoPrompt: "Use the selected digital human.",
   scriptText: "这是一段中文口播。",
   exteriorCount: 4,
@@ -53,6 +55,7 @@ assert.doesNotMatch(chineseSingleCarPrompt, /时长要求/);
 assert.doesNotMatch(chineseSingleCarPrompt, /不要说中文或普通话/);
 
 const dealershipPrompt = buildSeedancePrompt({
+  outputRatio: "9:16",
   finalVideoPrompt:
     "Use the real dealership images and the selected lively preset style.",
   scriptText: "欢迎来到安心二手车展厅。",
@@ -66,12 +69,26 @@ const dealershipPrompt = buildSeedancePrompt({
 
 assert.match(
   dealershipPrompt,
-  /用模特 \{\{Mixed 2\}\} ，生成精品二手车销售风格的口播短视频使用音频 \{\{Mixed 3\}\} ，真人口播感，场地参考图 \{\{Mixed 1\}\}/,
+  /用模特 \{\{Mixed 2\}\} ，生成 9:16 竖屏精品二手车销售风格的口播短视频使用音频 \{\{Mixed 3\}\} ，真人口播感，场地参考图 \{\{Mixed 1\}\}/,
 );
 assert.doesNotMatch(dealershipPrompt, /#image1/);
 assert.doesNotMatch(dealershipPrompt, /#audio1/);
 assert.doesNotMatch(dealershipPrompt, /车辆外观/);
 assert.doesNotMatch(dealershipPrompt, /车辆内饰/);
+assert.match(dealershipPrompt, /9:16 竖屏/);
+
+const horizontalDealershipPrompt = buildSeedancePrompt({
+  finalVideoPrompt: "Use a wide dealership overview.",
+  scriptText: "欢迎来到我们的车场。",
+  exteriorCount: 0,
+  interiorCount: 0,
+  dealershipCount: 1,
+  userReferenceCount: 0,
+  language: "Chinese",
+  templateType: "dealership",
+  outputRatio: "16:9",
+});
+assert.match(horizontalDealershipPrompt, /16:9 横屏/);
 
 console.log(
   JSON.stringify(
