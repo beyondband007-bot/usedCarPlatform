@@ -147,6 +147,7 @@ type ApplicationFilterOption = {
 
 const CUSTOMER_AGENT_FILTER_ALL_KEY = '__all_customer_agents__'
 const CUSTOMER_AGENT_FILTER_EMPTY_KEY = '__empty_customer_agents__'
+const CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY = '__platform_owned_customers__'
 
 const props = defineProps<{
   activeConsolePage?: string
@@ -175,6 +176,8 @@ const agentPolicyOverrides = ref<PlatformAgentPolicyOverride[]>([])
 const settlementApplications = ref<PlatformSettlementApplication[]>([])
 const platformDashboard = ref<PlatformDashboard | null>(null)
 const commissionPolicy = ref<CommissionPolicy | null>(null)
+const platformLedgerPage = ref(1)
+const platformLedgerPageSize = ref(20)
 const isLoading = ref(false)
 const lastError = ref<string | null>(null)
 const activeRole = ref<RoleTab>('developer')
@@ -325,6 +328,25 @@ const ledgerTablePagination = {
   showSizePicker: true,
   showQuickJumper: true,
 }
+
+const platformLedgerPagination = computed(() => ({
+  page: platformTransactionsLedger.value?.page ?? platformLedgerPage.value,
+  pageSize: platformTransactionsLedger.value?.pageSize ?? platformLedgerPageSize.value,
+  itemCount: platformTransactionsLedger.value?.total ?? globalLedgerTransactions.value.length,
+  pageSizes: [20, 50, 100],
+  showSizePicker: true,
+  showQuickJumper: true,
+  remote: true,
+  onUpdatePage(page: number) {
+    platformLedgerPage.value = page
+    void loadPlatformTransactionsLedger()
+  },
+  onUpdatePageSize(pageSize: number) {
+    platformLedgerPageSize.value = pageSize
+    platformLedgerPage.value = 1
+    void loadPlatformTransactionsLedger()
+  },
+}))
 
 const functionNameZhByCode: Record<string, string> = {
   'showroom-light': '展厅棚拍',
@@ -1661,6 +1683,19 @@ watch(
   { immediate: true },
 )
 
+watch(
+  selectedApplicationCode,
+  () => {
+    platformLedgerPage.value = 1
+    if (
+      (activeRole.value === 'developer' && activeDeveloperConsolePage.value === 'developer-transactions') ||
+      (activeRole.value === 'admin' && activeAdminConsolePage.value === 'admin-transactions')
+    ) {
+      void loadPlatformTransactionsLedger()
+    }
+  },
+)
+
 const createTargetOptions = computed(() => {
   if (activeRole.value === 'developer') {
     return [
@@ -1837,6 +1872,10 @@ const globalLedgerTransactions = computed(() =>
   ),
 )
 
+const globalLedgerTransactionTotal = computed(() =>
+  platformTransactionsLedger.value?.total ?? globalLedgerTransactions.value.length,
+)
+
 const filteredAgentProfiles = computed(() =>
   platformAgents.value.filter((item) =>
     selectedApplicationCode.value === 'all' || item.applications.includes(selectedApplicationCode.value),
@@ -1903,6 +1942,14 @@ const customerAgentFilterOptions = computed<CustomerAgentFilterOption[]>(() => {
 
 const selectedCustomerAgentFilter = computed(() => {
   if (!selectedCustomerAgentUserId.value) return null
+  if (selectedCustomerAgentUserId.value === CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY) {
+    return {
+      userId: CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY,
+      displayName: '平台自有',
+      username: null,
+      customerCount: platformOwnedCustomerCount.value,
+    }
+  }
   return (
     customerAgentFilterOptions.value.find(
       (agent) => agent.userId === selectedCustomerAgentUserId.value,
@@ -1910,13 +1957,27 @@ const selectedCustomerAgentFilter = computed(() => {
   )
 })
 
+const platformOwnedCustomerCount = computed(() =>
+  filteredCustomerProfiles.value.filter((item) =>
+    matrixTargetRole(item.role) === 'user' && !(item.agents?.length),
+  ).length,
+)
+
 const customerAgentDropdownOptions = computed<AdminDropdownMixedOption[]>(() => {
   const keyword = normalizeSearchText(customerAgentDropdownSearchQuery.value)
+  const platformOwnedKeywords = ['平台自有', '平台', '自有', 'platform', 'owned']
+  const shouldShowPlatformOwned =
+    !keyword || platformOwnedKeywords.some((value) => normalizeSearchText(value).includes(keyword))
   const filteredAgents = customerAgentFilterOptions.value.filter((agent) => {
     if (!keyword) return true
     return [agent.displayName, agent.username, agent.userId]
       .some((value) => normalizeSearchText(value).includes(keyword))
   })
+  const platformOwnedOption = {
+    label: `平台自有·${platformOwnedCustomerCount.value}客户`,
+    key: CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY,
+    icon: renderDropdownIcon('mdi:storefront-outline'),
+  }
   const agentOptions = filteredAgents.map((agent) => ({
     label: `${formatAgentFilterName(agent)}·${agent.customerCount}客户`,
     key: agent.userId,
@@ -1934,11 +1995,15 @@ const customerAgentDropdownOptions = computed<AdminDropdownMixedOption[]>(() => 
       key: CUSTOMER_AGENT_FILTER_ALL_KEY,
       icon: renderDropdownIcon('mdi:filter-off-outline'),
     },
-    ...(agentOptions.length
-      ? [{ type: 'divider' as const, key: 'customer-agent-divider' }, ...agentOptions]
+    ...(shouldShowPlatformOwned || agentOptions.length
+      ? [
+          { type: 'divider' as const, key: 'customer-agent-divider' },
+          ...(shouldShowPlatformOwned ? [platformOwnedOption] : []),
+          ...agentOptions,
+        ]
       : [
           {
-            label: keyword ? '没有匹配的代理' : '暂无代理',
+            label: keyword ? '没有匹配的代理或平台自有客户' : '暂无代理或平台自有客户',
             key: CUSTOMER_AGENT_FILTER_EMPTY_KEY,
             disabled: true,
           },
@@ -1949,6 +2014,7 @@ const customerAgentDropdownOptions = computed<AdminDropdownMixedOption[]>(() => 
 watch(customerAgentFilterOptions, (options) => {
   if (
     selectedCustomerAgentUserId.value &&
+    selectedCustomerAgentUserId.value !== CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY &&
     !options.some((agent) => agent.userId === selectedCustomerAgentUserId.value)
   ) {
     selectedCustomerAgentUserId.value = null
@@ -1959,6 +2025,9 @@ const filteredRegularUserProfiles = computed(() =>
   filteredCustomerProfiles.value.filter((item) => {
     if (matrixTargetRole(item.role) !== 'user') return false
     if (!selectedCustomerAgentUserId.value) return true
+    if (selectedCustomerAgentUserId.value === CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY) {
+      return !(item.agents?.length)
+    }
     return item.agents?.some((agent) => agent.userId === selectedCustomerAgentUserId.value) ?? false
   }),
 )
@@ -2585,6 +2654,7 @@ function formatAgentFilterName(agent: {
   username?: string | null
   displayName?: string | null
 }) {
+  if (agent.userId === CUSTOMER_AGENT_FILTER_PLATFORM_OWNED_KEY) return '平台自有'
   const displayName = agent.displayName || agent.username || agent.userId
   const username = agent.username || agent.userId
   return `${displayName}(${username})`
@@ -4121,7 +4191,11 @@ async function loadPlatformTransactionsLedger() {
   if (activeRole.value !== 'developer' && activeRole.value !== 'admin') return
   isLoadingPlatformTransactionsLedger.value = true
   try {
-    platformTransactionsLedger.value = await getPlatformTransactionsLedger()
+    platformTransactionsLedger.value = await getPlatformTransactionsLedger({
+      page: platformLedgerPage.value,
+      pageSize: platformLedgerPageSize.value,
+      applicationCode: selectedApplicationCode.value === 'all' ? undefined : selectedApplicationCode.value,
+    })
   } catch (error) {
     message.error(error instanceof Error ? error.message : '加载全平台流水表失败')
   } finally {
@@ -5651,7 +5725,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             <div class="admin-collapse-head">
               <span>
                 <strong>流水表</strong>
-                <small>{{ globalLedgerTransactions.length }} 条记录；开发者查看全平台积分流水。</small>
+                <small>{{ globalLedgerTransactionTotal }} 条记录；开发者查看全平台积分流水。</small>
               </span>
             </div>
             <div class="admin-collapse-body">
@@ -5684,7 +5758,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   :data="globalLedgerTransactions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="ledgerTablePagination"
+                  :pagination="platformLedgerPagination"
                 />
                 <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
               </NSpin>
@@ -5816,7 +5890,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             <div class="admin-collapse-head">
               <span>
                 <strong>流水表</strong>
-                <small>{{ globalLedgerTransactions.length }} 条记录；公司管理员查看全平台积分流水。</small>
+                <small>{{ globalLedgerTransactionTotal }} 条记录；公司管理员查看全平台积分流水。</small>
               </span>
             </div>
             <div class="admin-collapse-body">
@@ -5849,7 +5923,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
                   :data="globalLedgerTransactions"
                   :bordered="false"
                   :single-line="false"
-                  :pagination="ledgerTablePagination"
+                  :pagination="platformLedgerPagination"
                 />
                 <NEmpty v-else :description="isLoadingPlatformTransactionsLedger ? '正在加载流水表' : '暂无积分流水'" />
               </NSpin>
@@ -6119,16 +6193,17 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
             <small>{{ (Number(selectedCommissionDetail.commissionRate ?? 0) * 100).toFixed(1) }}%</small>
           </div>
         </div>
-        <NDataTable
-          v-if="selectedCommissionDetail?.topUpTransactions?.length"
-          :columns="commissionTopUpTransactionColumns"
-          :data="selectedCommissionDetail.topUpTransactions"
-          :bordered="false"
-          :single-line="false"
-          :pagination="compactTablePagination"
-          :scroll-x="760"
-          class="agent-ledger-table"
-        />
+        <div v-if="selectedCommissionDetail?.topUpTransactions?.length" class="agent-ledger-table-shell">
+          <NDataTable
+            :columns="commissionTopUpTransactionColumns"
+            :data="selectedCommissionDetail.topUpTransactions"
+            :bordered="false"
+            :single-line="false"
+            :pagination="compactTablePagination"
+            :scroll-x="760"
+            class="agent-ledger-table"
+          />
+        </div>
         <NEmpty v-else description="暂无充值积分流水" />
         <template #footer>
           <div class="admin-modal-footer">
@@ -6288,17 +6363,18 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
           </NButton>
         </div>
 
-        <NSpin :show="isLoadingAgentCustomerLedger">
-          <NDataTable
-            v-if="agentCustomerLedger?.transactions.length"
-            :columns="agentCustomerLedgerColumns"
-            :data="agentCustomerLedger.transactions"
-            :bordered="false"
-            :single-line="false"
-            :pagination="ledgerTablePagination"
-            :scroll-x="980"
-            class="agent-ledger-table"
-          />
+        <NSpin :show="isLoadingAgentCustomerLedger" class="agent-ledger-spin">
+          <div v-if="agentCustomerLedger?.transactions.length" class="agent-ledger-table-shell">
+            <NDataTable
+              :columns="agentCustomerLedgerColumns"
+              :data="agentCustomerLedger.transactions"
+              :bordered="false"
+              :single-line="false"
+              :pagination="ledgerTablePagination"
+              :scroll-x="980"
+              class="agent-ledger-table"
+            />
+          </div>
           <NEmpty v-else description="暂无积分流水" />
         </NSpin>
 
@@ -7548,13 +7624,25 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 }
 
 :deep(.agent-ledger-modal .n-card) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
   max-width: 100%;
   overflow: hidden;
 }
 
 :deep(.agent-ledger-modal .n-card__content) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
+
+:deep(.agent-ledger-modal .n-card__footer) {
+  flex: 0 0 auto;
 }
 
 :deep(.admin-delta.is-up) {
@@ -7685,6 +7773,7 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 }
 
 .agent-ledger-toolbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7705,6 +7794,28 @@ const settlementApplicationColumns: DataTableColumns<PlatformSettlementApplicati
 .agent-ledger-summary strong {
   color: var(--app-text);
   font-size: 20px;
+}
+
+:deep(.agent-ledger-spin) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+:deep(.agent-ledger-spin .n-spin-content) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.agent-ledger-table-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(56vh, 520px);
+  max-width: 100%;
+  overflow: auto;
+  border-radius: 12px;
 }
 
 :deep(.agent-ledger-table .n-data-table-th) {
