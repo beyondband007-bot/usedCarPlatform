@@ -427,6 +427,7 @@ Request body:
   "name": "展厅批量上新",
   "visualConfig": {
     "enableSceneChange": true,
+    "enableInteriorSceneChange": false,
     "sceneOptionId": "white-studio",
     "sceneReferenceImageUrl": "https://...",
     "sceneIndex": 0,
@@ -463,6 +464,7 @@ Request body:
   ],
   "visualConfig": {
     "enableSceneChange": true,
+    "enableInteriorSceneChange": false,
     "sceneOptionId": "white-studio",
     "sceneReferenceImageUrl": "https://...",
     "sceneIndex": 0,

@@ -162,6 +162,7 @@ const batchTab = ref<"create" | "visual">("create");
 const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
   name: "",
   enableSceneChange: false,
+  enableInteriorSceneChange: false,
   sceneIndex: 0,
   sceneCategory: "展厅灯光",
   outputRatio: DEFAULT_BATCH_OUTPUT_RATIO,
@@ -175,6 +176,7 @@ const DEFAULT_VISUAL_TEMPLATE_INPUT: BatchVisualTemplateInput = {
 };
 const uploadInterior = ref(false);
 const enableSceneChange = ref(false);
+const enableInteriorSceneChange = ref(false);
 const batchSceneIndex = ref(0);
 const batchSceneCategory = ref("展厅灯光");
 const batchScenes = computed(() =>
@@ -244,6 +246,7 @@ interface BatchDeliverySnapshot {
   projectName: string;
   outputRatio: string;
   interiorEnabled: boolean;
+  interiorProcessed: boolean;
   interiorCollage: boolean;
   exteriorAssets: BatchDeliverySnapshotAsset[];
   interiorAssets: BatchDeliverySnapshotAsset[];
@@ -475,9 +478,19 @@ function getBatchDeliverySnapshot(taskId: string) {
 
 function getSnapshotInteriorDisplayAssets(snapshot?: BatchDeliverySnapshot) {
   if (!snapshot?.interiorEnabled || !snapshot.interiorAssets.length) return [];
-  return snapshot.interiorCollage
-    ? snapshot.interiorAssets.slice(0, 1)
-    : snapshot.interiorAssets;
+  const assets = snapshot.interiorProcessed
+    ? [...snapshot.interiorAssets]
+    : [];
+  if (snapshot.interiorCollage) {
+    const collageCount =
+      snapshot.interiorAssets.length <= 4
+        ? 1
+        : snapshot.interiorAssets.length <= 8
+          ? 2
+          : 3;
+    assets.push(...snapshot.interiorAssets.slice(0, collageCount));
+  }
+  return assets.length ? assets : snapshot.interiorAssets;
 }
 
 function getSnapshotDisplayTotal(snapshot?: BatchDeliverySnapshot) {
@@ -688,7 +701,11 @@ const effectiveCreateTemplate = computed(() =>
 );
 
 const showCreateInteriorUpload = computed(() =>
-  Boolean(effectiveCreateTemplate.value?.interiorCollage),
+  Boolean(
+    effectiveCreateTemplate.value?.enableInteriorSceneChange ||
+    effectiveCreateTemplate.value?.interiorEnhance ||
+    effectiveCreateTemplate.value?.interiorCollage,
+  ),
 );
 
 const uploadedExteriorAssets = computed(() =>
@@ -753,6 +770,8 @@ const batchEstimatedCost = computed(() => {
           lightConsistency: template.lightConsistency,
           paintRefresh: template.paintRefresh,
           interiorCollage: template.interiorCollage,
+          interiorProcessing:
+            template.enableInteriorSceneChange || template.interiorEnhance,
         }
       : null,
   });
@@ -762,6 +781,8 @@ function buildTemplateInput(): BatchVisualTemplateInput {
   return {
     name: presetInput.value.trim(),
     enableSceneChange: enableSceneChange.value,
+    enableInteriorSceneChange:
+      enableSceneChange.value && enableInteriorSceneChange.value,
     sceneIndex: batchSceneIndex.value,
     sceneCategory: batchSceneCategory.value,
     outputRatio: outputRatio.value,
@@ -776,7 +797,7 @@ function buildTemplateInput(): BatchVisualTemplateInput {
     colorCode: paintRefresh.value
       ? batchPaintColorCode.value.trim() || null
       : null,
-    interiorEnhance: interiorCollage.value && interiorEnhance.value,
+    interiorEnhance: interiorEnhance.value,
     interiorCollage: interiorCollage.value,
   };
 }
@@ -799,7 +820,8 @@ function normalizeTemplateInput(
       input.useRecentLogo,
     ),
     colorCode: input.paintRefresh ? input.colorCode?.trim() || null : null,
-    interiorEnhance: input.interiorCollage && input.interiorEnhance,
+    enableInteriorSceneChange:
+      input.enableSceneChange && input.enableInteriorSceneChange,
   };
 }
 
@@ -812,6 +834,8 @@ function isSameTemplateInput(
 
   return (
     normalizedLeft.enableSceneChange === normalizedRight.enableSceneChange &&
+    normalizedLeft.enableInteriorSceneChange ===
+      normalizedRight.enableInteriorSceneChange &&
     normalizedLeft.sceneIndex === normalizedRight.sceneIndex &&
     normalizedLeft.sceneCategory === normalizedRight.sceneCategory &&
     normalizedLeft.outputRatio === normalizedRight.outputRatio &&
@@ -849,6 +873,8 @@ function mapBatchVisualConfigFromTemplate(
 ): BatchVisualConfig {
   return {
     enableSceneChange: template.enableSceneChange,
+    enableInteriorSceneChange:
+      template.enableSceneChange && template.enableInteriorSceneChange,
     sceneOptionId: template.enableSceneChange
       ? getBatchSceneOptionId(template.sceneCategory, template.sceneIndex)
       : undefined,
@@ -879,7 +905,7 @@ function mapBatchVisualConfigFromTemplate(
     colorCode: template.paintRefresh
       ? template.colorCode?.trim() || null
       : null,
-    enableInteriorClean: template.interiorCollage && template.interiorEnhance,
+    enableInteriorClean: template.interiorEnhance,
     enableInteriorCollage: template.interiorCollage,
   };
 }
@@ -887,6 +913,8 @@ function mapBatchVisualConfigFromTemplate(
 function applyTemplate(template: BatchVisualTemplate) {
   isApplyingTemplate.value = true;
   enableSceneChange.value = template.enableSceneChange;
+  enableInteriorSceneChange.value =
+    template.enableSceneChange && template.enableInteriorSceneChange;
   batchSceneIndex.value = template.sceneIndex;
   batchSceneCategory.value = template.sceneCategory;
   outputRatio.value = template.outputRatio;
@@ -904,7 +932,7 @@ function applyTemplate(template: BatchVisualTemplate) {
   paintRefresh.value = template.paintRefresh;
   batchPaintColorCode.value = template.colorCode ?? "";
   interiorCollage.value = template.interiorCollage;
-  interiorEnhance.value = template.interiorCollage && template.interiorEnhance;
+  interiorEnhance.value = template.interiorEnhance;
   isApplyingTemplate.value = false;
 }
 
@@ -922,6 +950,7 @@ function resetVisualConfigSelection() {
   visualPreset.value = NEW_PRESET_VALUE;
   presetInput.value = "";
   enableSceneChange.value = false;
+  enableInteriorSceneChange.value = false;
   batchSceneIndex.value = 0;
   batchSceneCategory.value = "展厅灯光";
   outputRatio.value = DEFAULT_BATCH_OUTPUT_RATIO;
@@ -973,9 +1002,9 @@ watch(paintRefresh, (enabled) => {
   batchPaintColorCode.value = "";
 });
 
-watch(interiorCollage, (enabled) => {
+watch(enableSceneChange, (enabled) => {
   if (isApplyingTemplate.value || enabled) return;
-  interiorEnhance.value = false;
+  enableInteriorSceneChange.value = false;
 });
 
 watch(showCreateInteriorUpload, (enabled) => {
@@ -1341,12 +1370,16 @@ function handleInteriorImageRemove() {
 }
 
 function validateBatchInteriorAssets(template: BatchVisualTemplate) {
-  if (!template.interiorCollage) {
+  const requiresInterior =
+    template.enableInteriorSceneChange ||
+    template.interiorEnhance ||
+    template.interiorCollage;
+  if (!requiresInterior) {
     return true;
   }
 
   if (!uploadInterior.value) {
-    message.warning("当前预设已开启内饰拼接，请同时上传内饰图");
+    message.warning("当前预设已开启内饰处理，请同时上传内饰图");
     return false;
   }
 
@@ -1360,8 +1393,9 @@ function validateBatchInteriorAssets(template: BatchVisualTemplate) {
   }
 
   if (
-    interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
-    interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES
+    template.interiorCollage &&
+    (interiorAssetIds.length < MIN_INTERIOR_COLLAGE_IMAGES ||
+      interiorAssetIds.length > MAX_INTERIOR_COLLAGE_IMAGES)
   ) {
     message.warning(
       `开启内饰拼接需要上传 ${MIN_INTERIOR_COLLAGE_IMAGES}-${MAX_INTERIOR_COLLAGE_IMAGES} 张内饰图`,
@@ -1530,6 +1564,10 @@ async function handleCreateBatchTask() {
       projectName: normalizedProjectName,
       outputRatio: visualConfig.outputRatio,
       interiorEnabled: uploadInterior.value,
+      interiorProcessed: Boolean(
+        visualConfig.enableInteriorSceneChange ||
+        visualConfig.enableInteriorClean,
+      ),
       interiorCollage: Boolean(visualConfig.enableInteriorCollage),
       exteriorAssets: exteriorAssets.map(toBatchDeliverySnapshotAsset),
       interiorAssets: interiorAssets.map(toBatchDeliverySnapshotAsset),
@@ -1867,10 +1905,13 @@ function getDeliveryPreviewSlotTitle(
 
   if (snapshot?.interiorEnabled && slotIndex >= exteriorCount) {
     const interiorIndex = slotIndex - exteriorCount;
-    if (snapshot.interiorCollage) {
+    const processedCount = snapshot.interiorProcessed
+      ? snapshot.interiorAssets.length
+      : 0;
+    if (snapshot.interiorCollage && interiorIndex >= processedCount) {
       return `${projectName}内饰拼接图`;
     }
-    return `${projectName}内饰图${interiorIndex + 1}`;
+    return `${projectName}内饰图${Math.min(interiorIndex, processedCount) + 1}`;
   }
 
   return formatDeliveryImageIndexTitle(projectName, slotIndex + 1);
@@ -2475,6 +2516,13 @@ defineExpose({
                   {{ effectiveCreateTemplate.colorCode }}
                 </span>
                 <span
+                  v-if="effectiveCreateTemplate.enableInteriorSceneChange"
+                  class="preset-tag is-on"
+                >
+                  <Icon icon="mdi:car-seat" />
+                  内饰场景更换
+                </span>
+                <span
                   v-if="effectiveCreateTemplate.interiorCollage"
                   class="preset-tag is-on"
                 >
@@ -2482,10 +2530,7 @@ defineExpose({
                   内饰拼接
                 </span>
                 <span
-                  v-if="
-                    effectiveCreateTemplate.interiorCollage &&
-                    effectiveCreateTemplate.interiorEnhance
-                  "
+                  v-if="effectiveCreateTemplate.interiorEnhance"
                   class="preset-tag is-on"
                 >
                   <Icon icon="mdi:seat-passenger" />
@@ -2732,6 +2777,20 @@ defineExpose({
               <NSwitch v-model:value="enableSceneChange" size="large" />
             </section>
 
+            <section
+              v-if="enableSceneChange"
+              class="batch-card switch-card"
+            >
+              <div>
+                <h3>内饰场景更换</h3>
+                <p>让内饰窗外环境、色温、光向和反射与所选外观场景保持一致。</p>
+              </div>
+              <NSwitch
+                v-model:value="enableInteriorSceneChange"
+                size="large"
+              />
+            </section>
+
             <section v-if="enableSceneChange" class="batch-scene-card">
               <div class="scene-head">
                 <h3>批量场景选择</h3>
@@ -2876,7 +2935,7 @@ defineExpose({
               </div>
             </section>
 
-            <section v-if="interiorCollage" class="batch-card switch-card">
+            <section class="batch-card switch-card">
               <div>
                 <h3>内饰清洁增强</h3>
                 <p>对已上传内饰图做清洁与质感增强。</p>

@@ -5,6 +5,7 @@ export type BatchPointsConfig = {
   lightConsistency?: boolean;
   paintRefresh?: boolean;
   interiorCollage?: boolean;
+  interiorProcessing?: boolean;
 };
 
 export function resolveBatchExteriorItemPoints(config?: BatchPointsConfig | null) {
@@ -27,8 +28,10 @@ export function resolveBatchEstimatedCost(input: {
   interiorCount: number;
   config?: BatchPointsConfig | null;
 }) {
+  const interiorTaskMultiplier =
+    input.config?.interiorCollage && input.config?.interiorProcessing ? 2 : 1;
   return (
     input.exteriorCount * resolveBatchExteriorItemPoints(input.config) +
-    resolveBatchInteriorItemPoints(input.interiorCount)
+    resolveBatchInteriorItemPoints(input.interiorCount) * interiorTaskMultiplier
   );
 }

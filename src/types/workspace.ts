@@ -143,6 +143,8 @@ export interface WorkspaceGeneratePayload {
 export type WorkspaceBatchItemKind =
   | 'exterior'
   | 'interior'
+  | 'interior_scene'
+  | 'interior_scene_clean'
   | 'interior_clean'
   | 'interior_collage'
   | 'interior_clean_collage'
@@ -244,6 +246,7 @@ export interface BatchVisualTemplate {
   id: string
   name: string
   enableSceneChange: boolean
+  enableInteriorSceneChange: boolean
   sceneIndex: number
   sceneCategory: string
   outputRatio: string
