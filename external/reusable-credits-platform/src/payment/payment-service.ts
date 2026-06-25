@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import QRCode from "qrcode";
+import type { AppEnv } from "../config/env.js";
 import type { Database, DatabaseClient } from "../db/pool.js";
 import {
   AccountResolver,
@@ -11,6 +13,11 @@ import {
 } from "../domain/index.js";
 import { requestHash } from "../http/request-hash.js";
 import { verifyPaymentSignature } from "./payment-signature.js";
+import {
+  AlipayProvider,
+  type ProviderQuery,
+  WechatPayProvider
+} from "./payment-providers.js";
 
 type AccountScope = "personal" | "tenant";
 type PaymentChannel = "alipay" | "wechat" | "card";
@@ -18,6 +25,28 @@ type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 type ProviderStatus = "paid" | "failed";
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type JsonObject = { [key: string]: JsonValue };
+
+const disabledPaymentEnv: NonNullable<AppEnv["payment"]> = {
+  publicBaseUrl: "",
+  alipay: {
+    environment: "sandbox",
+    appId: "",
+    sellerId: "",
+    privateKeyPath: "",
+    publicKeyPath: ""
+  },
+  wechat: {
+    appId: "",
+    mchId: "",
+    merchantSerialNo: "",
+    apiV3Key: "",
+    apiV3KeyPath: "",
+    privateKeyPath: "",
+    platformPublicKeyPath: "",
+    notifyUrl: "",
+    apiBaseUrl: "https://api.mch.weixin.qq.com"
+  }
+};
 
 type RechargeProductRow = {
   id: string;
@@ -64,11 +93,11 @@ export type CreatePaymentOrderInput = {
 export type PaymentCallbackInput = {
   channel: PaymentChannel;
   orderNo: string;
-  notifyId?: string;
+  notifyId?: string | undefined;
   providerStatus: ProviderStatus;
   rawData: JsonObject;
   sign: string;
-  idempotencyKey?: string;
+  idempotencyKey?: string | undefined;
   requestHash: string;
 };
 
@@ -97,6 +126,8 @@ export type PaymentOrderResponse = JsonObject & {
   status: PaymentStatus;
   paidAt: string | null;
   notifyId: string | null;
+  payUrl?: string | null;
+  qrCodeUrl?: string | null;
   idempotentReplay: boolean;
 };
 
@@ -156,12 +187,54 @@ function replayResponse(responseBody: unknown): JsonObject {
 
 export class PaymentService {
   private readonly balanceService: BalanceService;
+  private readonly alipay: AlipayProvider;
+  private readonly wechat: WechatPayProvider;
+  private readonly paymentEnv: NonNullable<AppEnv["payment"]>;
 
   constructor(
     private readonly db: Database,
-    private readonly paymentCallbackSecret: string
+    private readonly paymentCallbackSecret: string,
+    private readonly env: AppEnv = {
+      nodeEnv: "test",
+      host: "127.0.0.1",
+      port: 3000,
+      logLevel: "silent",
+      mysql: {
+        host: "127.0.0.1",
+        port: 3306,
+        database: "test",
+        user: "test",
+        password: "test",
+        connectionLimit: 1
+      },
+      paymentCallbackSecret: "test",
+      payment: {
+        publicBaseUrl: "",
+        alipay: {
+          environment: "sandbox",
+          appId: "",
+          sellerId: "",
+          privateKeyPath: "",
+          publicKeyPath: ""
+        },
+        wechat: {
+          appId: "",
+          mchId: "",
+          merchantSerialNo: "",
+          apiV3Key: "",
+          apiV3KeyPath: "",
+          privateKeyPath: "",
+          platformPublicKeyPath: "",
+          notifyUrl: "",
+          apiBaseUrl: "https://api.mch.weixin.qq.com"
+        }
+      }
+    }
   ) {
     this.balanceService = new BalanceService(db);
+    this.paymentEnv = env.payment ?? disabledPaymentEnv;
+    this.alipay = new AlipayProvider(this.paymentEnv);
+    this.wechat = new WechatPayProvider(this.paymentEnv);
   }
 
   async listRechargeProducts(): Promise<{ products: RechargeProductResponse[] }> {
@@ -199,7 +272,7 @@ export class PaymentService {
           userId: input.userId,
           accountId: account.id,
           productId: product.id,
-          orderNo: `pay_${randomUUID().replace(/-/g, "")}`,
+          orderNo: `pay_${randomUUID().replace(/-/g, "").slice(0, 28)}`,
           amount: product.amount,
           points: product.points,
           bonusPoints: product.bonusPoints,
@@ -207,7 +280,26 @@ export class PaymentService {
           idempotencyKey: input.idempotencyKey
         });
 
-        return mapOrder(order);
+        if (input.payChannel === "card") return mapOrder(order);
+        const provider =
+          input.payChannel === "alipay" ? this.alipay : this.wechat;
+        const payment = await provider.create({
+          orderNo: order.order_no,
+          amount: order.amount,
+          subject: `${product.name}积分充值`
+        });
+        if (!payment.payUrl) {
+          throw new BadRequestError(`${input.payChannel} did not return a payment URL`);
+        }
+        return {
+          ...mapOrder(order),
+          payUrl: payment.payUrl,
+          qrCodeUrl: await QRCode.toDataURL(payment.payUrl, {
+            width: 320,
+            margin: 1,
+            errorCorrectionLevel: "M"
+          })
+        };
       }
     );
   }
@@ -244,7 +336,128 @@ export class PaymentService {
     ) {
       throw new BadRequestError("Invalid payment callback signature");
     }
+    return this.processVerifiedCallback(input);
+  }
 
+  async processProviderResult(input: Omit<PaymentCallbackInput, "sign" | "requestHash">) {
+    return this.processVerifiedCallback({
+      ...input,
+      sign: "provider-verified",
+      requestHash: requestHash({
+        channel: input.channel,
+        orderNo: input.orderNo,
+        notifyId: input.notifyId ?? null,
+        providerStatus: input.providerStatus,
+        rawData: input.rawData
+      })
+    });
+  }
+
+  async syncPaymentOrder(orderId: number, userId: number): Promise<PaymentOrderResponse> {
+    const order = await this.getPaymentOrderRow(orderId, userId);
+    if (order.status !== "pending" || order.pay_channel === "card") return mapOrder(order);
+    const provider = order.pay_channel === "alipay" ? this.alipay : this.wechat;
+    const result = await provider.query({
+      orderNo: order.order_no,
+      amount: order.amount,
+      subject: "积分充值"
+    });
+    if (result.state === "pending") return mapOrder(order);
+    return (await this.processProviderQuery(order, result)) as PaymentOrderResponse;
+  }
+
+  async handleAlipayNotification(params: Record<string, string>) {
+    if (!this.alipay.verifyNotification(params)) {
+      throw new BadRequestError("Invalid Alipay notification signature");
+    }
+    if (params.app_id !== this.paymentEnv.alipay.appId) {
+      throw new BadRequestError("Alipay app_id mismatch");
+    }
+    if (
+      this.paymentEnv.alipay.sellerId &&
+      params.seller_id !== this.paymentEnv.alipay.sellerId
+    ) {
+      throw new BadRequestError("Alipay seller_id mismatch");
+    }
+    const order = await this.getOrderByOrderNo(params.out_trade_no ?? "");
+    if (Number(params.total_amount) !== Number(order.amount)) {
+      throw new BadRequestError("Alipay amount mismatch");
+    }
+    const tradeStatus = params.trade_status ?? "";
+    if (!["TRADE_SUCCESS", "TRADE_FINISHED", "TRADE_CLOSED"].includes(tradeStatus)) {
+      return mapOrder(order);
+    }
+    return this.processProviderResult({
+      channel: "alipay",
+      orderNo: order.order_no,
+      notifyId: params.notify_id || params.trade_no,
+      providerStatus:
+        tradeStatus === "TRADE_SUCCESS" || tradeStatus === "TRADE_FINISHED"
+          ? "paid"
+          : "failed",
+      rawData: params,
+      idempotencyKey: `alipay_notify:${params.notify_id || params.trade_no || order.order_no}`
+    });
+  }
+
+  async handleWechatNotification(
+    headers: Record<string, string | undefined>,
+    rawBody: string
+  ) {
+    if (!this.wechat.verifyNotification(headers, rawBody)) {
+      throw new BadRequestError("Invalid Wechat Pay notification signature");
+    }
+    const body = JSON.parse(rawBody) as {
+      id?: string;
+      resource?: { ciphertext: string; nonce: string; associated_data?: string };
+    };
+    if (!body.resource) throw new BadRequestError("Wechat Pay notification resource is missing");
+    const transaction = this.wechat.decryptNotification(body.resource);
+    if (
+      transaction.appid !== this.paymentEnv.wechat.appId ||
+      transaction.mchid !== this.paymentEnv.wechat.mchId
+    ) {
+      throw new BadRequestError("Wechat Pay merchant identity mismatch");
+    }
+    const order = await this.getOrderByOrderNo(String(transaction.out_trade_no ?? ""));
+    const amount = transaction.amount as { total?: number; currency?: string } | undefined;
+    if (
+      amount?.total !== Math.round(Number(order.amount) * 100) ||
+      (amount.currency && amount.currency !== "CNY")
+    ) {
+      throw new BadRequestError("Wechat Pay amount mismatch");
+    }
+    const tradeState = String(transaction.trade_state ?? "");
+    if (!["SUCCESS", "CLOSED", "REVOKED", "PAYERROR"].includes(tradeState)) {
+      return mapOrder(order);
+    }
+    return this.processProviderResult({
+      channel: "wechat",
+      orderNo: order.order_no,
+      notifyId: String(transaction.transaction_id ?? body.id ?? ""),
+      providerStatus: tradeState === "SUCCESS" ? "paid" : "failed",
+      rawData: Object.fromEntries(
+        Object.entries(transaction).map(([key, value]) => [
+          key,
+          value === null ? null : typeof value === "object" ? JSON.stringify(value) : String(value)
+        ])
+      ),
+      idempotencyKey: `wechat_notify:${body.id || transaction.transaction_id || order.order_no}`
+    });
+  }
+
+  private async processProviderQuery(order: PaymentOrderRow, result: ProviderQuery) {
+    return this.processProviderResult({
+      channel: order.pay_channel,
+      orderNo: order.order_no,
+      notifyId: result.notifyId,
+      providerStatus: result.state === "paid" ? "paid" : "failed",
+      rawData: result.rawData,
+      idempotencyKey: `payment_query:${order.pay_channel}:${order.order_no}:${result.state}`
+    });
+  }
+
+  private async processVerifiedCallback(input: PaymentCallbackInput): Promise<JsonObject> {
     return this.db.withTransaction(async (client) => {
       const order = await this.getOrderByOrderNoForUpdate(client, input.orderNo);
       const idempotencyKey = `payment_callback:${input.channel}:${
@@ -283,6 +496,40 @@ export class PaymentService {
       await idempotency.complete(reservation.id, response);
       return response;
     });
+  }
+
+  private async getPaymentOrderRow(orderId: number, userId: number): Promise<PaymentOrderRow> {
+    const result = await this.db.query<PaymentOrderRow>(
+      `
+        select id, tenant_id, user_id, account_id, product_id, order_no, amount,
+               points, bonus_points, pay_channel, status, paid_at, notify_id,
+               idempotency_key, created_at, updated_at
+        from payment_orders
+        where id = $1 and user_id = $2
+        limit 1
+      `,
+      [orderId, userId]
+    );
+    const row = result.rows[0];
+    if (!row) throw new NotFoundError(`Payment order not found: ${orderId}`);
+    return row;
+  }
+
+  private async getOrderByOrderNo(orderNo: string): Promise<PaymentOrderRow> {
+    const result = await this.db.query<PaymentOrderRow>(
+      `
+        select id, tenant_id, user_id, account_id, product_id, order_no, amount,
+               points, bonus_points, pay_channel, status, paid_at, notify_id,
+               idempotency_key, created_at, updated_at
+        from payment_orders
+        where order_no = $1
+        limit 1
+      `,
+      [orderNo]
+    );
+    const row = result.rows[0];
+    if (!row) throw new NotFoundError(`Payment order not found: ${orderNo}`);
+    return row;
   }
 
   callbackRequestHash(input: Omit<PaymentCallbackInput, "requestHash">): string {

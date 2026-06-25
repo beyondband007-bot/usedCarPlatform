@@ -2044,6 +2044,13 @@ export async function createRechargeOrder(payload: {
   return normalizePaymentOrder(unwrapApiResponse(response))
 }
 
+export async function syncRechargeOrder(paymentOrderId: number | string) {
+  const response = await request.get<ApiResponse<PaymentOrderResult & Record<string, unknown>>>(
+    `/credits/payment-orders/${encodeURIComponent(paymentOrderId)}/sync`,
+  )
+  return normalizePaymentOrder(unwrapApiResponse(response))
+}
+
 export async function getCreditsAdminOverview(): Promise<CreditsAdminOverview> {
   const response = await request.get<ApiResponse<CreditsAdminOverview & Record<string, unknown>>>(
     '/credits/admin/overview',

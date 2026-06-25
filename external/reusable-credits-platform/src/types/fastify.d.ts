@@ -5,4 +5,8 @@ declare module "fastify" {
   interface FastifyInstance {
     db: Database;
   }
+
+  interface FastifyRequest {
+    rawBody?: string;
+  }
 }

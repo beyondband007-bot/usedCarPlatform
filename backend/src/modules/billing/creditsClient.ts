@@ -91,6 +91,8 @@ export interface PaymentOrderResponse {
   status: "pending" | "paid" | "failed" | "refunded";
   paidAt: string | null;
   notifyId: string | null;
+  payUrl?: string | null;
+  qrCodeUrl?: string | null;
   idempotentReplay: boolean;
 }
 
@@ -216,6 +218,13 @@ class CreditsClient {
     idempotencyKey: string;
   }) {
     return this.post<PaymentOrderResponse>("/payment-orders", input);
+  }
+
+  async syncPaymentOrder(input: { paymentOrderId: number; userId: number }) {
+    return this.get<PaymentOrderResponse>(
+      `/payment-orders/${input.paymentOrderId}/sync`,
+      { userId: input.userId },
+    );
   }
 
   async estimate(input: EstimateBillingInput) {

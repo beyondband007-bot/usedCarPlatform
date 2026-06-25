@@ -98,7 +98,7 @@ function handleOpenRecharge() {
 
 async function handleRechargeSuccess() {
   notifyRechargeSuccess();
-  await creditsStore.hydrateAccounts();
+  await creditsStore.hydrateAccounts(true);
 }
 
 async function handleLogout() {

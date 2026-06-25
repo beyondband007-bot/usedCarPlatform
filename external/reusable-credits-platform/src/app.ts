@@ -25,6 +25,29 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
           }
   });
 
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "buffer" },
+    (request, body, done) => {
+      try {
+        const rawBody = body.toString("utf8");
+        request.rawBody = rawBody;
+        done(null, rawBody ? JSON.parse(rawBody) : {});
+      } catch (error) {
+        done(error as Error, undefined);
+      }
+    }
+  );
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (request, body, done) => {
+      const rawBody = String(body);
+      request.rawBody = rawBody;
+      done(null, Object.fromEntries(new URLSearchParams(rawBody)));
+    }
+  );
+
   app.decorate("db", options.db);
 
   await app.register(swagger, {
