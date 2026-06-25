@@ -217,12 +217,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     confirmedAudioPreviewId.value = ''
   }
 
-  function resetFlowToInitial() {
-    stopPolling()
-    selectedTemplate.value = null
-    singleCarForm.value = createEmptySingleCarForm()
-    promotionForm.value = createEmptyPromotionForm()
-    dealershipForm.value = createEmptyDealershipForm()
+  function clearUploads() {
     exteriorUploads.value.forEach(revokeUploadItem)
     interiorUploads.value.forEach(revokeUploadItem)
     referenceUploads.value.forEach(revokeUploadItem)
@@ -231,6 +226,15 @@ export function useVideoGenerationFlow(ownerKey: string) {
     interiorUploads.value = []
     referenceUploads.value = []
     dealershipUploads.value = []
+  }
+
+  function resetFlowToInitial() {
+    stopPolling()
+    selectedTemplate.value = null
+    singleCarForm.value = createEmptySingleCarForm()
+    promotionForm.value = createEmptyPromotionForm()
+    dealershipForm.value = createEmptyDealershipForm()
+    clearUploads()
     scriptDraft.value = null
     confirmedScriptText.value = ''
     voiceOptions.value = []
@@ -456,6 +460,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
         scriptDraft.value = await getVideoScriptDraft(draftId)
         if (restoreFormFromDraft()) {
           draftInputFingerprint.value = currentInputFingerprint.value
+          currentStep.value = 'form'
         }
         if (activeDigitalHumanId.value) {
           await loadVoiceOptions(activeDigitalHumanId.value)
@@ -520,6 +525,16 @@ export function useVideoGenerationFlow(ownerKey: string) {
     ) {
       return
     }
+
+    if (selectedTemplate.value?.templateId === template.templateId) {
+      return
+    }
+
+    const previousTemplateId = selectedTemplate.value?.templateId
+    if (previousTemplateId) {
+      clearUploads()
+    }
+
     selectedTemplate.value = template
     scriptDraft.value = null
     confirmedScriptText.value = ''
@@ -644,7 +659,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
       }
       confirmedScriptText.value = asString(script.scriptText)
       translatedNarrationText.value = ''
-      currentStep.value = 'review'
+      currentStep.value = 'form'
       return true
     }
 
@@ -710,7 +725,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
     confirmedScriptText.value = asString(script.scriptText)
     translatedNarrationText.value = ''
-    currentStep.value = 'review'
+    currentStep.value = 'form'
     return true
   }
 

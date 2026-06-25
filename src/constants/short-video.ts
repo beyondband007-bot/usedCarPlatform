@@ -9,7 +9,36 @@ export const VIDEO_DURATION_SECONDS = 15
 export const VIDEO_OUTPUT_RATIO = '9:16'
 export const VIDEO_RESOLUTION = '720p'
 export const VIDEO_MODEL = 'bytedance/seedance-2'
-export const VIDEO_OUTPUT_RATIO_LABEL = '9:16 · 720p · 按音频时长生成（最长15秒）'
+
+export function formatVideoOutputRatioLabel(
+  outputRatio = VIDEO_OUTPUT_RATIO,
+  resolution = VIDEO_RESOLUTION,
+) {
+  return `${outputRatio} · ${resolution} · 按音频时长生成（最长15秒）`
+}
+
+export const VIDEO_OUTPUT_RATIO_LABEL = formatVideoOutputRatioLabel()
+
+export function resolveVideoPreviewSize(
+  outputRatio = VIDEO_OUTPUT_RATIO,
+  width?: number | null,
+  height?: number | null,
+) {
+  if (width && height) {
+    return { width, height }
+  }
+  if (outputRatio === '16:9') {
+    return { width: 1600, height: 900 }
+  }
+  if (outputRatio === '9:16') {
+    return { width: 900, height: 1600 }
+  }
+  const [ratioWidth, ratioHeight] = outputRatio.split(':').map((part) => Number(part.trim()))
+  if (ratioWidth > 0 && ratioHeight > 0) {
+    return { width: ratioWidth * 100, height: ratioHeight * 100 }
+  }
+  return { width: 900, height: 1600 }
+}
 export const VIDEO_TASK_POLL_MS = 5000
 
 export const VIDEO_SCRIPT_GENERATOR_LABELS: Record<string, string> = {

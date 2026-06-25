@@ -51,6 +51,7 @@ import {
 } from "@/constants/workspace-feature-compare";
 import {
   VIDEO_GENERATION_MODULE_CODE,
+  formatVideoOutputRatioLabel,
   isShortVideoModuleCode,
 } from "@/constants/short-video";
 import type {
@@ -70,8 +71,6 @@ const props = defineProps<{
   deliveryTaskPreview?: WorkspaceDeliveryTaskPreview | null;
   deliveryImagePreview?: WorkspaceImagePreview | null;
   deliveryListLoading?: boolean;
-  shortVideoPlayRequest?: number;
-  shortVideoSessionPreview?: WorkspaceGenerateResult | null;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
 
@@ -286,7 +285,7 @@ const recentLoading = ref(false);
 const recentLoaded = ref(false);
 const recentLayoutRef = ref<HTMLElement | null>(null);
 const shortVideoInitialView = ref<
-  "templates" | "preview" | "generating" | "recent"
+  "templates" | "generating" | "recent"
 >("templates");
 let recentRefreshTimer: number | null = null;
 
@@ -693,7 +692,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     downloadUrl: item.downloadUrl ?? undefined,
     mediaType: isShortVideo ? "video" : "image",
     ratioLabel: isShortVideo
-      ? "16:9 · 720p · 10秒"
+      ? formatVideoOutputRatioLabel(item.outputRatio, item.resolution)
       : (item.ratioLabel ??
         formatOutputRatioLabel(item.outputRatio) ??
         undefined),
@@ -865,12 +864,6 @@ function syncShortVideoInitialView() {
     shortVideoInitialView.value = "generating";
     return;
   }
-  if (
-    props.shortVideoSessionPreview?.previewVideo
-  ) {
-    shortVideoInitialView.value = "preview";
-    return;
-  }
   shortVideoInitialView.value = "templates";
 }
 
@@ -900,11 +893,6 @@ function focusGeneratingView() {
   if (!isBatchCapability.value) {
     activeTab.value = "generating";
   }
-}
-
-function focusShortVideoPreviewView() {
-  if (props.capability.code !== "short-video") return;
-  shortVideoInitialView.value = "preview";
 }
 
 function focusDeliveryBatchProcessingView() {
@@ -951,15 +939,6 @@ watch(
     }
   },
   { immediate: true },
-);
-
-watch(
-  () => props.shortVideoSessionPreview?.previewVideo,
-  (videoUrl) => {
-    if (props.capability.code === "short-video") {
-      shortVideoInitialView.value = videoUrl ? "preview" : "templates";
-    }
-  },
 );
 
 watch(
@@ -1077,7 +1056,6 @@ defineExpose({
   getRecentItems: () => recentItems.value,
   focusGeneratingView,
   focusShortVideoGeneratingView,
-  focusShortVideoPreviewView,
   focusDeliveryBatchProcessingView,
 });
 </script>
@@ -1394,15 +1372,11 @@ defineExpose({
       :class="{ 'is-under-detail': isRecentListUnderDetail }"
     >
       <ShortVideoBetaPanel
-        :play-request="shortVideoPlayRequest"
         :is-generating="props.isGenerating"
-        :session-preview="props.shortVideoSessionPreview"
-        :generation-result="props.generationResult"
         :recent-items="recentItems"
         :recent-loading="recentLoading"
         :deleting-recent-task-ids="deletingRecentIds"
         :initial-view="shortVideoInitialView"
-        :suppress-preview-playback="showGenerationResultOverlay"
         @pick-recent="handleRecentPick"
         @delete-recent="handleDeleteRecent"
       />

@@ -352,6 +352,8 @@ export interface VideoGenerationTask {
     code?: string
     message?: string
   } | null
+  outputRatio?: string
+  resolution?: string
   createdAt?: string
   updatedAt?: string
   language?: VideoGenerationLanguage

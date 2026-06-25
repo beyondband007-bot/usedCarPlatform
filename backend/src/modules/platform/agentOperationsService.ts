@@ -113,6 +113,16 @@ type CreditsTransactionRow = RowDataPacket & {
   created_at: Date;
 };
 
+type TotalCountRow = RowDataPacket & {
+  total: number | string;
+};
+
+type LedgerPagination = {
+  page: number;
+  pageSize: number;
+  offset: number;
+};
+
 type EnterpriseMemberIdentity = {
   credits_user_id: number | null;
   username: string;
@@ -293,6 +303,29 @@ const toNumber = (value: string | number | null | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+function parsePositiveInteger(value: unknown, fallback: number) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw ?? fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.trunc(parsed));
+}
+
+function parseLedgerPagination(query: Request["query"]): LedgerPagination {
+  const page = parsePositiveInteger(query.page, 1);
+  const pageSize = Math.min(parsePositiveInteger(query.pageSize, 20), 100);
+  return {
+    page,
+    pageSize,
+    offset: (page - 1) * pageSize,
+  };
+}
+
+function parseOptionalApplicationCode(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const text = typeof raw === "string" ? raw.trim() : "";
+  return text && text !== "all" ? text : null;
+}
 
 function toTimestamp(value: Date | string | null | undefined) {
   if (!value) return 0;
@@ -821,6 +854,8 @@ function remarkTextForTransaction(row: CreditsTransactionRow) {
 async function listLedgerTransactions(input: {
   accountId: number;
   customer: AgentCustomerLedgerRow;
+  limit?: number;
+  offset?: number;
 }) {
   const creditsDb = getCreditsPool();
   const memberByCreditsUserId = await loadEnterpriseMemberIdentityByCreditsUserId(
@@ -838,6 +873,9 @@ async function listLedgerTransactions(input: {
     });
   }
 
+  const limitClause = input.limit
+    ? "LIMIT :limit OFFSET :offset"
+    : "";
   const [rows] = await creditsDb.query<CreditsTransactionRow[]>(
     `SELECT
        ct.id,
@@ -865,8 +903,12 @@ async function listLedgerTransactions(input: {
      LEFT JOIN application_functions fn ON fn.id = ct.function_id
      WHERE ct.account_id = :accountId
      ORDER BY ct.created_at DESC, ct.id DESC
-     LIMIT 100`,
-    { accountId: input.accountId },
+     ${limitClause}`,
+    {
+      accountId: input.accountId,
+      limit: input.limit ?? 0,
+      offset: input.offset ?? 0,
+    },
   );
 
   const operatorUserIds = rows
@@ -984,6 +1026,18 @@ export async function getPlatformTransactionsLedger(req: Request) {
   }
 
   const creditsDb = getCreditsPool();
+  const pagination = parseLedgerPagination(req.query);
+  const applicationCode = parseOptionalApplicationCode(req.query.applicationCode);
+
+  const [countRows] = await creditsDb.query<TotalCountRow[]>(
+    `SELECT COUNT(*) total
+     FROM credit_transactions ct
+     LEFT JOIN applications app ON app.id = ct.application_id
+     WHERE (:applicationCode IS NULL OR app.code = :applicationCode)`,
+    { applicationCode },
+  );
+  const total = toNumber(countRows[0]?.total);
+
   const [rows] = await creditsDb.query<CreditsTransactionRow[]>(
     `SELECT
        ct.id,
@@ -1009,8 +1063,14 @@ export async function getPlatformTransactionsLedger(req: Request) {
      FROM credit_transactions ct
      LEFT JOIN applications app ON app.id = ct.application_id
      LEFT JOIN application_functions fn ON fn.id = ct.function_id
+     WHERE (:applicationCode IS NULL OR app.code = :applicationCode)
      ORDER BY ct.created_at DESC, ct.id DESC
-     LIMIT 300`,
+     LIMIT :limit OFFSET :offset`,
+    {
+      applicationCode,
+      limit: pagination.pageSize,
+      offset: pagination.offset,
+    },
   );
 
   const customerByCreditsUserId = await loadPlatformLedgerCustomers(rows.map((row) => row.user_id));
@@ -1074,6 +1134,9 @@ export async function getPlatformTransactionsLedger(req: Request) {
   return {
     scope: "global",
     transactions,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    total,
     transactionInsights: buildAgentTransactionInsights(transactions),
   };
 }
@@ -1158,8 +1221,7 @@ export async function getAgentTransactionsLedger(req: Request) {
       const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (timeDiff !== 0) return timeDiff;
       return String(b.id).localeCompare(String(a.id));
-    })
-    .slice(0, 300);
+    });
 
   return {
     agent: {
@@ -1168,6 +1230,9 @@ export async function getAgentTransactionsLedger(req: Request) {
       displayName: agent.display_name,
     },
     transactions,
+    page: 1,
+    pageSize: transactions.length,
+    total: transactions.length,
     transactionInsights: buildAgentTransactionInsights(transactions),
   };
 }

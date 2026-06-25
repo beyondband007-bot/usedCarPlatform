@@ -1245,6 +1245,9 @@ export interface AgentTransactionsLedger {
     displayName: string
   }
   transactions: AgentCustomerLedgerTransaction[]
+  page?: number
+  pageSize?: number
+  total?: number
   transactionInsights?: {
     topCreditConsumers: Array<{
       relationId?: string
@@ -1269,6 +1272,9 @@ export interface AgentTransactionsLedger {
 export interface PlatformTransactionsLedger {
   scope: 'global'
   transactions: AgentCustomerLedgerTransaction[]
+  page?: number
+  pageSize?: number
+  total?: number
   transactionInsights?: AgentTransactionsLedger['transactionInsights']
 }
 
@@ -2159,6 +2165,9 @@ export async function updateAgentCustomerProfile(
 
 export async function getAgentTransactionsLedger(params?: {
   agentUserId?: string
+  page?: number
+  pageSize?: number
+  applicationCode?: string
 }): Promise<AgentTransactionsLedger> {
   const response = await request.get<ApiResponse<AgentTransactionsLedger>>(
     '/platform/agent/transactions',
@@ -2224,8 +2233,12 @@ function normalizeTransactionsLedgerPayload<T extends { transactions?: AgentCust
   }
 }
 
-export async function getPlatformTransactionsLedger(): Promise<PlatformTransactionsLedger> {
-  const response = await request.get<ApiResponse<PlatformTransactionsLedger>>('/platform/transactions')
+export async function getPlatformTransactionsLedger(params?: {
+  page?: number
+  pageSize?: number
+  applicationCode?: string
+}): Promise<PlatformTransactionsLedger> {
+  const response = await request.get<ApiResponse<PlatformTransactionsLedger>>('/platform/transactions', { params })
   return normalizeTransactionsLedgerPayload(unwrapApiResponse(response))
 }
 

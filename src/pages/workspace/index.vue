@@ -26,8 +26,9 @@ import {
 import {
   SHORT_VIDEO_CAPABILITY_CODE,
   VIDEO_GENERATION_MODULE_CODE,
-  VIDEO_OUTPUT_RATIO_LABEL,
+  formatVideoOutputRatioLabel,
   isShortVideoModuleCode,
+  resolveVideoPreviewSize,
 } from "@/constants/short-video";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { useVideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
@@ -203,9 +204,6 @@ const previewedDeliveryTaskId = ref<string | null>(null);
 const isDeliveryListLoading = ref(false);
 const isGenerating = ref(false);
 const generatingCapabilityCode = ref<string | null>(null);
-const shortVideoPlayRequest = ref(0);
-/** 仅当前会话：本次页面内刚生成成功的短视频，刷新后清空 */
-const shortVideoSessionPreview = ref<WorkspaceGenerateResult | null>(null);
 const assistPanelRef = ref<InstanceType<typeof WorkspaceAssistPanel> | null>(
   null,
 );
@@ -1172,13 +1170,6 @@ watch(activeCode, (code, previousCode) => {
     selectedOptionId.value = capability.options[0]?.id ?? "";
   }
 
-  if (
-    previousCode === SHORT_VIDEO_CAPABILITY_CODE &&
-    code !== SHORT_VIDEO_CAPABILITY_CODE
-  ) {
-    shortVideoSessionPreview.value = null;
-  }
-
   generationResult.value = null;
   creativeImageCaption.value = null;
   deliveryImagePreview.value = null;
@@ -1358,8 +1349,11 @@ function buildResultFromTask(
     ? "短视频生成"
     : (option?.title ?? activeCapability.value.label);
   const ratioLabel = isShortVideo
-    ? VIDEO_OUTPUT_RATIO_LABEL
+    ? formatVideoOutputRatioLabel(task.outputRatio, task.resolution)
     : `${task.outputRatio} · ${task.resolution}`;
+  const previewSize = isShortVideo
+    ? resolveVideoPreviewSize(task.outputRatio, videoItem?.width, videoItem?.height)
+    : { width: 1600, height: 900 };
 
   return {
     createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
@@ -1376,8 +1370,8 @@ function buildResultFromTask(
       : resultUrl,
     resultImages: task.resultImages,
     taskId: task.taskId,
-    imageWidth: isShortVideo ? 900 : 1600,
-    imageHeight: isShortVideo ? 1600 : 900,
+    imageWidth: previewSize.width,
+    imageHeight: previewSize.height,
   };
 }
 
@@ -1535,8 +1529,6 @@ async function syncVideoGenerationResultFromFlow() {
 
   syncedVideoResultTaskIds.add(task.taskId);
   generationResult.value = result;
-  shortVideoSessionPreview.value = result;
-  shortVideoPlayRequest.value += 1;
   markSidebarStatusForModule(VIDEO_GENERATION_MODULE_CODE, "success");
   clearActiveGenerationTask(task.taskId);
   untrackRunningTask(task.taskId);
@@ -2012,7 +2004,6 @@ async function handleGenerate(payload: WorkspaceGeneratePayload) {
 
     isGenerating.value = true;
     generationResult.value = null;
-    shortVideoSessionPreview.value = null;
     generatingCapabilityCode.value = SHORT_VIDEO_CAPABILITY_CODE;
 
     try {
@@ -2374,8 +2365,6 @@ onUnmounted(() => {
           :delivery-task-preview="deliveryTaskPreview"
           :delivery-image-preview="deliveryImagePreview"
           :delivery-list-loading="isDeliveryListLoading"
-          :short-video-play-request="shortVideoPlayRequest"
-          :short-video-session-preview="shortVideoSessionPreview"
           :batch-active-jobs="batchActiveJobs"
           @back-from-result="clearGenerationResult"
           @close-delivery-image-preview="clearDeliveryImagePreview"
