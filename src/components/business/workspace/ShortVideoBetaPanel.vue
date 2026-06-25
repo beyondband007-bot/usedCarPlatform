@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { useMessage } from "naive-ui";
+import { NModal, useMessage } from "naive-ui";
 
 import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
+import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
 import {
@@ -13,7 +14,6 @@ import {
   getVideoWorkflowStageLabel,
   VIDEO_OUTPUT_RATIO,
   VIDEO_RESOLUTION,
-  formatVideoOutputRatioLabel,
 } from "@/constants/short-video";
 import type { VideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import { useAppStore } from "@/stores/app";
@@ -60,6 +60,73 @@ const activeCategory = ref<ShortVideoTemplateCategory>("all");
 const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
+const templatePreviewSession = ref<VideoTemplate | null>(null);
+const templateGridRef = ref<HTMLElement | null>(null);
+const templateGridColumns = ref(2);
+
+function resolveTemplateGridColumns(width: number): number {
+  if (width >= 760) return 4;
+  if (width >= 520) return 3;
+  return 2;
+}
+
+function estimateTemplateHeightRatio(item: VideoTemplate): number {
+  return item.outputRatio === "16:9" ? 9 / 16 : 16 / 9;
+}
+
+const templateColumns = computed(() => {
+  const count = templateGridColumns.value;
+  const columns: VideoTemplate[][] = Array.from({ length: count }, () => []);
+  const heights = new Array(count).fill(0);
+
+  for (const item of filteredTemplates.value) {
+    const minIndex = heights.indexOf(Math.min(...heights));
+    columns[minIndex].push(item);
+    heights[minIndex] += estimateTemplateHeightRatio(item);
+  }
+
+  return columns;
+});
+
+let templateGridResizeObserver: ResizeObserver | null = null;
+
+function updateTemplateGridColumns() {
+  const width = templateGridRef.value?.clientWidth;
+  if (!width) return;
+  templateGridColumns.value = resolveTemplateGridColumns(width);
+}
+
+function observeTemplateGrid(el: HTMLElement | null) {
+  if (!el || !templateGridResizeObserver) return;
+  templateGridResizeObserver.disconnect();
+  templateGridResizeObserver.observe(el);
+}
+
+onMounted(() => {
+  updateTemplateGridColumns();
+  if (typeof ResizeObserver === "undefined") return;
+
+  templateGridResizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry) {
+      templateGridColumns.value = resolveTemplateGridColumns(entry.contentRect.width);
+    }
+  });
+  observeTemplateGrid(templateGridRef.value);
+});
+
+watch(templateGridRef, (el) => {
+  if (!el) return;
+  updateTemplateGridColumns();
+  observeTemplateGrid(el);
+});
+
+onBeforeUnmount(() => {
+  if (templateGridResizeObserver) {
+    templateGridResizeObserver.disconnect();
+    templateGridResizeObserver = null;
+  }
+});
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const recentDisplayItems = computed(() =>
@@ -212,12 +279,23 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
-function handleTemplatePick(item: VideoTemplate) {
+function openTemplatePreview(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
     message.info("该模板暂未开放，敬请期待！");
     return;
   }
   flow?.selectTemplate(item);
+  templatePreviewSession.value = item;
+}
+
+function closeTemplatePreviewPlayer() {
+  templatePreviewSession.value = null;
+}
+
+function handleTemplatePreviewVisibleChange(show: boolean) {
+  if (!show) {
+    closeTemplatePreviewPlayer();
+  }
 }
 
 function openTemplatesView() {
@@ -530,22 +608,32 @@ watch(
           <Icon icon="mdi:movie-search-outline" />
           <span>未找到匹配模板，请调整筛选条件</span>
         </div>
-        <div v-else class="sv-template-grid">
-          <article
-            v-for="item in filteredTemplates"
-            :key="item.templateId"
-            class="sv-template-card"
-            :class="{
-              'is-selected': selectedTemplateId === item.templateId,
-              'is-disabled': isTemplateDisabled(item),
-            }"
-            role="button"
-            tabindex="0"
-            :aria-label="`选择模板 ${item.title}`"
-            @click="handleTemplatePick(item)"
-            @keydown.enter.prevent="handleTemplatePick(item)"
-            @keydown.space.prevent="handleTemplatePick(item)"
+        <div
+          v-else
+          ref="templateGridRef"
+          class="sv-template-grid"
+        >
+          <div
+            v-for="(column, columnIndex) in templateColumns"
+            :key="columnIndex"
+            class="sv-template-column"
           >
+            <article
+              v-for="item in column"
+              :key="item.templateId"
+              class="sv-template-card"
+              :class="{
+                'is-selected': selectedTemplateId === item.templateId,
+                'is-disabled': isTemplateDisabled(item),
+                'is-landscape': item.outputRatio === '16:9',
+              }"
+              role="button"
+              tabindex="0"
+              :aria-label="`预览模板 ${item.title}`"
+              @click="openTemplatePreview(item)"
+              @keydown.enter.prevent="openTemplatePreview(item)"
+              @keydown.space.prevent="openTemplatePreview(item)"
+            >
             <div class="sv-template-media">
               <PreloadImage
                 v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item)"
@@ -574,21 +662,57 @@ watch(
               >
                 <Icon icon="mdi:image-outline" />
               </div>
-              <span class="sv-template-duration">最长{{ item.durationSeconds }}秒</span>
-              <span v-if="isTemplateDisabled(item)" class="sv-template-badge is-soon">即将开放</span>
-              <span v-else-if="item.badge === 'hot'" class="sv-template-badge">热门</span>
-              <span v-else-if="item.badge === 'new'" class="sv-template-badge is-new">新品</span>
+              <strong class="sv-template-title">{{ item.title }}</strong>
             </div>
-            <footer class="sv-template-foot">
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.typeLabel }} · {{ item.styleLabel }}</span>
-              <p>{{ item.stylePrompt }}</p>
-            </footer>
           </article>
+          </div>
         </div>
       </section>
 
     </section>
+
+    <NModal
+      v-if="templatePreviewSession"
+      :show="true"
+      preset="card"
+      :title="templatePreviewSession.title"
+      class="sv-template-preview-modal"
+      :bordered="false"
+      :segmented="{ content: true }"
+      :mask-closable="true"
+      @update:show="handleTemplatePreviewVisibleChange"
+    >
+      <div class="sv-template-preview-body">
+        <div class="sv-template-preview-media">
+          <TemplatePreviewVideoPlayer
+            v-if="getTemplateVideoUrl(templatePreviewSession)"
+            :key="templatePreviewSession.templateId"
+            :src="getTemplateVideoUrl(templatePreviewSession)!"
+            :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
+            :template-id="templatePreviewSession.templateId"
+          />
+          <PreloadImage
+            v-else-if="getTemplatePosterUrl(templatePreviewSession)"
+            class="sv-template-preview-poster"
+            :src="getTemplatePosterUrl(templatePreviewSession)!"
+            :alt="templatePreviewSession.title"
+            fit="contain"
+          />
+          <div v-else class="sv-template-preview-placeholder">
+            <Icon icon="mdi:movie-open-outline" />
+          </div>
+        </div>
+
+        <div class="sv-template-preview-meta">
+          <div class="sv-template-preview-tags">
+            <span>{{ templatePreviewSession.typeLabel }}</span>
+            <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
+            <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+          </div>
+          <p>{{ templatePreviewSession.stylePrompt }}</p>
+        </div>
+      </div>
+    </NModal>
   </section>
 </template>
 
@@ -921,17 +1045,24 @@ watch(
 }
 
 .sv-template-grid {
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1;
-  align-content: start;
-  gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.sv-template-column {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .sv-template-grid::-webkit-scrollbar {
@@ -1043,11 +1174,15 @@ watch(
 }
 
 .sv-template-card {
-  display: flex;
+  display: block;
   min-width: 0;
-  flex-direction: column;
-  gap: 10px;
+  width: 100%;
   cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) {
+  transform: translateY(-2px);
 }
 
 .sv-template-card.is-selected .sv-template-media {
@@ -1068,32 +1203,27 @@ watch(
   font-size: 28px;
 }
 
-.sv-template-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.88);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.sv-template-badge.is-soon {
-  background: rgba(15, 23, 42, 0.78);
-}
-
-.sv-template-badge.is-new {
-  background: rgba(34, 197, 94, 0.88);
-}
-
 .sv-template-media {
   position: relative;
   overflow: hidden;
   aspect-ratio: 9 / 16;
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--sv-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-media,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.sv-template-card.is-landscape .sv-template-media {
+  aspect-ratio: 16 / 9;
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1101,6 +1231,7 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .sv-template-cover--poster {
@@ -1126,31 +1257,24 @@ watch(
   opacity: 1;
 }
 
-.sv-template-duration,
-.sv-template-likes {
+.sv-template-title {
   position: absolute;
-  bottom: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: block;
+  overflow: hidden;
+  padding: 32px 12px 10px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sv-template-duration {
-  left: 8px;
-}
-
-.sv-template-likes {
-  right: 8px;
-}
-
-.sv-template-foot,
 .sv-recent-foot {
   display: flex;
   flex-direction: column;
@@ -1158,7 +1282,6 @@ watch(
   min-width: 0;
 }
 
-.sv-template-foot strong,
 .sv-recent-foot strong {
   overflow: hidden;
   color: var(--sv-text);
@@ -1167,42 +1290,6 @@ watch(
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sv-template-foot span {
-  color: var(--sv-text-soft);
-  font-size: 12px;
-}
-
-.sv-template-foot p {
-  margin: 0;
-  color: var(--sv-text-soft);
-  font-size: 12px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.sv-template-creator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  color: var(--sv-text-soft);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sv-template-avatar {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  color: color-mix(in srgb, var(--sv-accent) 72%, #fff);
-  font-size: 16px;
 }
 
 .sv-recent-foot span:last-child,
@@ -1438,14 +1525,16 @@ watch(
 }
 
 @media (max-width: 1279px) {
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 14px;
   }
 }
 
 @media (max-width: 1023px) {
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 12px;
   }
 }
 
@@ -1464,9 +1553,9 @@ watch(
     width: 100%;
   }
 
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 10px;
   }
 
   .sv-recent-flow {
@@ -1483,6 +1572,8 @@ watch(
 .sv-template-cover :deep(.hover-preview-video) {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .sv-generating-error {
@@ -1614,7 +1705,7 @@ watch(
 .sv-template-preview-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .sv-template-preview-media {
@@ -1626,10 +1717,14 @@ watch(
 
 .sv-template-preview-poster,
 .sv-template-preview-placeholder {
-  width: min(100%, 320px);
+  width: min(100%, 300px);
   aspect-ratio: 9 / 16;
   border-radius: 12px;
   background: var(--sv-surface);
+}
+
+.sv-template-preview-media :deep(.template-preview-video-player) {
+  max-height: min(60vh, 560px);
 }
 
 .sv-template-preview-poster :deep(.preload-image),
@@ -1649,13 +1744,14 @@ watch(
 .sv-template-preview-meta {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sv-template-preview-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .sv-template-preview-tags span {
@@ -1678,11 +1774,22 @@ watch(
   font-size: 13px;
   line-height: 1.55;
 }
+
 </style>
 
 <style lang="scss">
 .sv-template-preview-modal {
-  width: min(480px, calc(100vw - 32px)) !important;
-  max-width: min(480px, calc(100vw - 32px)) !important;
+  width: min(440px, calc(100vw - 32px)) !important;
+  max-width: min(440px, calc(100vw - 32px)) !important;
+}
+
+.sv-template-preview-modal > .n-card-header {
+  padding: 18px 22px !important;
+}
+
+.sv-template-preview-modal > .n-card__content {
+  padding: 18px 22px 22px !important;
+  max-height: calc(100vh - 124px);
+  overflow: hidden;
 }
 </style>
