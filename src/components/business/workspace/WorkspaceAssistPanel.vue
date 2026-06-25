@@ -828,7 +828,7 @@ function handleResultBack() {
     props.capability.code === "short-video" &&
     props.generationResult?.mediaType === "video"
   ) {
-    shortVideoInitialView.value = "recent";
+    shortVideoInitialView.value = "templates";
   } else if (!isBatchCapability.value) {
     activeTab.value = "recent";
   }
@@ -939,6 +939,20 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => props.generationResult,
+  (result, previous) => {
+    if (props.capability.code !== "short-video") return;
+    if (result?.mediaType === "video") {
+      shortVideoInitialView.value = "templates";
+      return;
+    }
+    if (!result && previous?.mediaType === "video") {
+      shortVideoInitialView.value = "templates";
+    }
+  },
 );
 
 watch(

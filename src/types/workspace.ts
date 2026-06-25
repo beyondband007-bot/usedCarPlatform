@@ -67,6 +67,8 @@ export interface WorkspaceGenerateResult {
   /** 同组可切换的大图列表，例如成片交付任务内的多张成图 */
   previewGallery?: WorkspaceImagePreview[]
   previewGalleryIndex?: number
+  /** 视频预览占位加载中，任务详情尚未返回时使用 */
+  previewLoading?: boolean
 }
 
 export interface CreativeThreadTurn {

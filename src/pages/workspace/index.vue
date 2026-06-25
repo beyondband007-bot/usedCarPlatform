@@ -70,7 +70,10 @@ import {
   registerStaticImageUrls,
   warmStaticImages,
 } from "@/utils/static-image-cache";
-import { buildWorkspaceResultFromVideoTask } from "@/utils/video-generation-result";
+import {
+  buildVideoPreviewLoadingResult,
+  buildWorkspaceResultFromVideoTask,
+} from "@/utils/video-generation-result";
 import { resolveVideoGenerationErrorMessage } from "@/utils/video-generation-errors";
 import { attachPreviewGallery } from "@/utils/workspace-image-preview";
 import { resolveRecentGenerateCacheKey } from "@/utils/recent-generate-cache";
@@ -1070,6 +1073,19 @@ const activeModuleGenerating = computed(() => {
     return true;
   }
 
+  if (activeCode.value === SHORT_VIDEO_CAPABILITY_CODE) {
+    if (videoFlow.currentStep.value === "task") {
+      if (videoFlow.isLoading("task")) return true;
+      const task = videoFlow.currentTask.value;
+      if (
+        task &&
+        ["waiting", "queued", "queue", "generating"].includes(task.status)
+      ) {
+        return true;
+      }
+    }
+  }
+
   return Object.values(trackedRunningTasks.value).some((moduleCode) => {
     const resolvedCode = resolveCapabilityCodeFromModule(moduleCode);
     return resolvedCode === activeCode.value;
@@ -1354,6 +1370,12 @@ function buildResultFromTask(
   const previewSize = isShortVideo
     ? resolveVideoPreviewSize(task.outputRatio, videoItem?.width, videoItem?.height)
     : { width: 1600, height: 900 };
+  const previewImage = isShortVideo
+    ? videoItem?.thumbnailUrl ??
+      task.thumbnail ??
+      task.previewImage ??
+      ""
+    : resultUrl;
 
   return {
     createdAt: formatDate(task.updatedAt ?? task.createdAt ?? new Date()),
@@ -1362,7 +1384,7 @@ function buildResultFromTask(
       : `已完成 · ${sceneTitle} · 单图生成结果`,
     ratioLabel,
     mediaType: isShortVideo ? "video" : "image",
-    previewImage: isShortVideo ? resultUrl : resultUrl,
+    previewImage,
     previewVideo: isShortVideo ? resultUrl : undefined,
     previewAlt: `${sceneTitle}生成结果`,
     downloadUrl: isShortVideo
@@ -2170,6 +2192,8 @@ async function handlePickRecent(item: WorkspaceRecentItem) {
 
   if (item.status === "success") {
     if (isShortVideoModuleCode(item.moduleCode)) {
+      generationResult.value = buildVideoPreviewLoadingResult(item);
+
       try {
         const task = await getVideoGenerationTask(item.taskId);
         videoFlow.currentTask.value = task;

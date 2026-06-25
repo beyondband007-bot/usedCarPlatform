@@ -3,7 +3,6 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { NModal, useMessage } from "naive-ui";
 
-import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
@@ -25,9 +24,16 @@ import {
 } from "@/constants/short-video-templates";
 import type { VideoHistoryItem, VideoTemplate } from "@/types/video-generation";
 import {
+  parseOutputRatioToCssAspect,
   recentStatusLabelMap,
+  resolveRecentDisplayImage,
 } from "@/utils/workspace-recent";
-import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
+import { formatDate } from "@/utils/dayjs";
+import {
+  distributeMasonryColumns,
+  estimateRecentHeightRatio,
+  resolveMasonryGridColumns,
+} from "@/utils/workspace-recent-layout";
 
 const props = defineProps<{
   isGenerating?: boolean;
@@ -63,37 +69,55 @@ const selectedRecentItemId = ref("");
 const templatePreviewSession = ref<VideoTemplate | null>(null);
 const templateGridRef = ref<HTMLElement | null>(null);
 const templateGridColumns = ref(2);
-
-function resolveTemplateGridColumns(width: number): number {
-  if (width >= 760) return 4;
-  if (width >= 520) return 3;
-  return 2;
-}
+const recentGridRef = ref<HTMLElement | null>(null);
+const recentGridColumns = ref(2);
 
 function estimateTemplateHeightRatio(item: VideoTemplate): number {
   return item.outputRatio === "16:9" ? 9 / 16 : 16 / 9;
 }
 
-const templateColumns = computed(() => {
-  const count = templateGridColumns.value;
-  const columns: VideoTemplate[][] = Array.from({ length: count }, () => []);
-  const heights = new Array(count).fill(0);
+const templateColumns = computed(() =>
+  distributeMasonryColumns(
+    filteredTemplates.value,
+    templateGridColumns.value,
+    estimateTemplateHeightRatio,
+  ),
+);
 
-  for (const item of filteredTemplates.value) {
-    const minIndex = heights.indexOf(Math.min(...heights));
-    columns[minIndex].push(item);
-    heights[minIndex] += estimateTemplateHeightRatio(item);
-  }
+const recentColumns = computed(() =>
+  distributeMasonryColumns(
+    recentDisplayItems.value,
+    recentGridColumns.value,
+    estimateRecentHeightRatio,
+  ),
+);
 
-  return columns;
-});
+function resolveRecentCoverUrl(item: WorkspaceRecentItem): string | undefined {
+  return resolveRecentDisplayImage(item);
+}
+
+function resolveRecentAspectRatio(item: WorkspaceRecentItem): string | undefined {
+  return parseOutputRatioToCssAspect(item.outputRatio);
+}
+
+function formatRecentCreatedAt(item: WorkspaceRecentItem): string {
+  if (!item.createdAt) return "";
+  return formatDate(item.createdAt, "YYYY-MM-DD HH:mm");
+}
 
 let templateGridResizeObserver: ResizeObserver | null = null;
+let recentGridResizeObserver: ResizeObserver | null = null;
 
 function updateTemplateGridColumns() {
   const width = templateGridRef.value?.clientWidth;
   if (!width) return;
-  templateGridColumns.value = resolveTemplateGridColumns(width);
+  templateGridColumns.value = resolveMasonryGridColumns(width);
+}
+
+function updateRecentGridColumns() {
+  const width = recentGridRef.value?.clientWidth;
+  if (!width) return;
+  recentGridColumns.value = resolveMasonryGridColumns(width);
 }
 
 function observeTemplateGrid(el: HTMLElement | null) {
@@ -102,17 +126,32 @@ function observeTemplateGrid(el: HTMLElement | null) {
   templateGridResizeObserver.observe(el);
 }
 
+function observeRecentGrid(el: HTMLElement | null) {
+  if (!el || !recentGridResizeObserver) return;
+  recentGridResizeObserver.disconnect();
+  recentGridResizeObserver.observe(el);
+}
+
 onMounted(() => {
   updateTemplateGridColumns();
+  updateRecentGridColumns();
   if (typeof ResizeObserver === "undefined") return;
 
   templateGridResizeObserver = new ResizeObserver((entries) => {
     const entry = entries[0];
     if (entry) {
-      templateGridColumns.value = resolveTemplateGridColumns(entry.contentRect.width);
+      templateGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
     }
   });
   observeTemplateGrid(templateGridRef.value);
+
+  recentGridResizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry) {
+      recentGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
+    }
+  });
+  observeRecentGrid(recentGridRef.value);
 });
 
 watch(templateGridRef, (el) => {
@@ -121,17 +160,25 @@ watch(templateGridRef, (el) => {
   observeTemplateGrid(el);
 });
 
+watch(recentGridRef, (el) => {
+  if (!el) return;
+  updateRecentGridColumns();
+  observeRecentGrid(el);
+});
+
 onBeforeUnmount(() => {
   if (templateGridResizeObserver) {
     templateGridResizeObserver.disconnect();
     templateGridResizeObserver = null;
   }
+  if (recentGridResizeObserver) {
+    recentGridResizeObserver.disconnect();
+    recentGridResizeObserver = null;
+  }
 });
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
-const recentDisplayItems = computed(() =>
-  normalizeDisplayOrder(recentVideoItems.value),
-);
+const recentDisplayItems = computed(() => recentVideoItems.value);
 const statusLabelMap = recentStatusLabelMap;
 
 const currentTask = computed(() => flow?.currentTask.value ?? null);
@@ -180,14 +227,18 @@ const filteredTemplates = computed(() => {
   });
 });
 
+const isSubmittingVideoTask = computed(() => flow?.isLoading("task") ?? false);
+
 const generatingProgress = computed(() => {
   const task = currentTask.value;
+  if (isSubmittingVideoTask.value) return 8;
   if (isDraftGenerating.value) return 8;
   if (!task) return props.isGenerating ? 8 : 0;
   return Math.max(0, Math.min(100, task.progress ?? 0));
 });
 
 const generatingStatusLabel = computed(() => {
+  if (isSubmittingVideoTask.value) return "正在提交视频任务";
   const task = currentTask.value;
   if (isDraftGenerating.value) return "视频文案生成中";
   if (!task) return "正在准备视频任务";
@@ -197,6 +248,9 @@ const generatingStatusLabel = computed(() => {
 });
 
 const generatingDescription = computed(() => {
+  if (isSubmittingVideoTask.value) {
+    return "正在创建视频生成任务，请稍候。";
+  }
   if (isDraftGenerating.value) return "正在生成口播文案与视频任务参数，请稍候。";
   const ratio =
     flow?.selectedTemplate.value?.outputRatio ??
@@ -217,9 +271,16 @@ const generatingErrorMessage = computed(() => {
 
 const isGenerationMode = computed(() => {
   if (flow?.currentStep.value !== "task") return false;
+  if (isSubmittingVideoTask.value) return true;
   if (!currentTask.value) return false;
   return props.isGenerating || isPendingTask(currentTask.value);
 });
+
+function shouldShowGeneratingView() {
+  if (flow?.currentStep.value !== "task") return false;
+  if (isSubmittingVideoTask.value) return true;
+  return isPendingTask(currentTask.value) || props.isGenerating;
+}
 
 function syncSelectedRecentItem() {
   const displayItems = recentDisplayItems.value;
@@ -241,10 +302,7 @@ function resolveShortVideoView(
   preferred?: ShortVideoView | "recent" | "templates",
 ): ShortVideoView {
   const step = flow?.currentStep.value;
-  if (
-    (props.isGenerating || isPendingTask(currentTask.value)) &&
-    step === "task"
-  ) {
+  if (shouldShowGeneratingView() && step === "task") {
     return "generating";
   }
   if (preferred === "generating") return "generating";
@@ -302,6 +360,21 @@ function openTemplatesView() {
   activeView.value = "templates";
 }
 
+function resetToDefaultView() {
+  activeView.value = "templates";
+}
+
+function syncActiveViewWithFlowState() {
+  if (isGenerationMode.value && shouldShowGeneratingView()) {
+    activeView.value = "generating";
+    return;
+  }
+
+  if (activeView.value === "generating") {
+    resetToDefaultView();
+  }
+}
+
 function isPendingTask(task?: VideoHistoryItem | null) {
   if (!task) return false;
   return PENDING_RECENT_STATUSES.has(task.status);
@@ -352,6 +425,7 @@ watch(
   () => props.initialView,
   (view) => {
     activeView.value = resolveShortVideoView(view);
+    syncActiveViewWithFlowState();
   },
 );
 
@@ -363,17 +437,37 @@ watch(
       return;
     }
 
-    if (!generating && activeView.value === "generating") {
-      activeView.value = "templates";
+    if (!generating) {
+      syncActiveViewWithFlowState();
     }
   },
   { immediate: true },
 );
 
+watch(
+  () =>
+    [
+      isGenerationMode.value,
+      flow?.currentStep.value,
+      isSubmittingVideoTask.value,
+      currentTask.value?.status,
+    ] as const,
+  () => {
+    syncActiveViewWithFlowState();
+  },
+);
+
 watch(currentTask, (task) => {
-  if (!task) return;
+  if (!task) {
+    syncActiveViewWithFlowState();
+    return;
+  }
   if (isPendingTask(task) && flow?.currentStep.value === "task") {
     activeView.value = "generating";
+    return;
+  }
+  if (task.status === "success" || task.status === "fail" || task.status === "canceled") {
+    syncActiveViewWithFlowState();
   }
 });
 
@@ -387,12 +481,12 @@ onMounted(() => {
 watch(
   () => flow?.currentStep.value,
   (step) => {
-    if (step === "task" && isPendingTask(currentTask.value)) {
+    if (step === "task" && shouldShowGeneratingView()) {
       activeView.value = "generating";
       return;
     }
-    if (step === "template" || step === "form" || step === "review") {
-      activeView.value = "templates";
+    if (step === "template" || step === "form" || step === "review" || step === "result") {
+      syncActiveViewWithFlowState();
     }
   },
 );
@@ -478,19 +572,69 @@ watch(
             <Icon icon="mdi:video-off-outline" />
             <span>暂无最近生成记录</span>
           </div>
-          <div v-else class="sv-recent-flow">
-            <WorkspaceRecentImageCard
-              v-for="item in recentDisplayItems"
-              :key="item.id"
-              :item="item"
-              :selected="item.id === selectedRecentItemId"
-              :clickable="canOpenRecentVideo(item)"
-              :deleting="isDeletingRecent(item)"
-              :show-status="shouldShowRecentStatus(item)"
-              :status-label="statusLabelMap[item.status]"
-              @pick="handleRecentPick"
-              @delete="handleDeleteRecent"
-            />
+          <div
+            v-else
+            ref="recentGridRef"
+            class="sv-template-grid sv-recent-grid"
+          >
+            <div
+              v-for="(column, columnIndex) in recentColumns"
+              :key="`recent-column-${columnIndex}`"
+              class="sv-template-column"
+            >
+              <article
+                v-for="item in column"
+                :key="item.id"
+                class="sv-recent-card"
+                :class="{
+                  'is-selected': item.id === selectedRecentItemId,
+                  'is-clickable': canOpenRecentVideo(item),
+                }"
+                :role="canOpenRecentVideo(item) ? 'button' : undefined"
+                :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+                :aria-label="`查看 ${item.title}`"
+                @click="handleRecentPick(item)"
+                @keydown.enter.prevent="handleRecentPick(item)"
+                @keydown.space.prevent="handleRecentPick(item)"
+              >
+                <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
+                  <PreloadImage
+                    v-if="resolveRecentCoverUrl(item)"
+                    class="sv-recent-card-cover"
+                    :src="resolveRecentCoverUrl(item)!"
+                    :alt="item.title"
+                    loading="lazy"
+                    fit="cover"
+                  />
+                  <div v-else class="sv-recent-card-placeholder">
+                    <Icon icon="mdi:video-off-outline" />
+                  </div>
+                  <span
+                    v-if="shouldShowRecentStatus(item)"
+                    class="sv-recent-card-status"
+                    :class="`is-${item.status}`"
+                  >
+                    {{ statusLabelMap[item.status] }}
+                  </span>
+                  <div class="sv-recent-card-body">
+                    <strong class="sv-recent-card-title">{{ item.title }}</strong>
+                    <span class="sv-recent-card-time">{{ formatRecentCreatedAt(item) }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="sv-recent-card-delete"
+                  :aria-label="`删除${item.title}`"
+                  :disabled="isDeletingRecent(item)"
+                  @click.stop="handleDeleteRecent(item)"
+                >
+                  <Icon
+                    :icon="isDeletingRecent(item) ? 'mdi:loading' : 'mdi:trash-can-outline'"
+                    :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
+                  />
+                </button>
+              </article>
+            </div>
           </div>
         </section>
       </div>
@@ -537,24 +681,74 @@ watch(
           <Icon icon="mdi:video-off-outline" />
           <span>暂无最近生成记录</span>
         </div>
-        <div v-else class="sv-recent-flow">
-          <WorkspaceRecentImageCard
-            v-for="item in recentDisplayItems"
-            :key="item.id"
-            :item="item"
-            :selected="item.id === selectedRecentItemId"
-            :clickable="canOpenRecentVideo(item)"
-            :deleting="isDeletingRecent(item)"
-            :show-status="shouldShowRecentStatus(item)"
-            :status-label="statusLabelMap[item.status]"
-            @pick="handleRecentPick"
-            @delete="handleDeleteRecent"
-          />
+        <div
+          v-else
+          ref="recentGridRef"
+          class="sv-template-grid sv-recent-grid"
+        >
+          <div
+            v-for="(column, columnIndex) in recentColumns"
+            :key="`recent-column-${columnIndex}`"
+            class="sv-template-column"
+          >
+            <article
+              v-for="item in column"
+              :key="item.id"
+              class="sv-recent-card"
+              :class="{
+                'is-selected': item.id === selectedRecentItemId,
+                'is-clickable': canOpenRecentVideo(item),
+              }"
+              :role="canOpenRecentVideo(item) ? 'button' : undefined"
+              :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+              :aria-label="`查看 ${item.title}`"
+              @click="handleRecentPick(item)"
+              @keydown.enter.prevent="handleRecentPick(item)"
+              @keydown.space.prevent="handleRecentPick(item)"
+            >
+              <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
+                <PreloadImage
+                  v-if="resolveRecentCoverUrl(item)"
+                  class="sv-recent-card-cover"
+                  :src="resolveRecentCoverUrl(item)!"
+                  :alt="item.title"
+                  loading="lazy"
+                  fit="cover"
+                />
+                <div v-else class="sv-recent-card-placeholder">
+                  <Icon icon="mdi:video-off-outline" />
+                </div>
+                <span
+                  v-if="shouldShowRecentStatus(item)"
+                  class="sv-recent-card-status"
+                  :class="`is-${item.status}`"
+                >
+                  {{ statusLabelMap[item.status] }}
+                </span>
+                <div class="sv-recent-card-body">
+                  <strong class="sv-recent-card-title">{{ item.title }}</strong>
+                  <span class="sv-recent-card-time">{{ formatRecentCreatedAt(item) }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="sv-recent-card-delete"
+                :aria-label="`删除${item.title}`"
+                :disabled="isDeletingRecent(item)"
+                @click.stop="handleDeleteRecent(item)"
+              >
+                <Icon
+                  :icon="isDeletingRecent(item) ? 'mdi:loading' : 'mdi:trash-can-outline'"
+                  :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
+                />
+              </button>
+            </article>
+          </div>
         </div>
       </section>
 
       <section
-        v-else-if="activeView === 'templates'"
+        v-else
         class="sv-gallery"
         aria-label="短视频模板"
       >
@@ -705,9 +899,15 @@ watch(
 
         <div class="sv-template-preview-meta">
           <div class="sv-template-preview-tags">
-            <span>{{ templatePreviewSession.typeLabel }}</span>
-            <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
-            <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+            <template v-if="templatePreviewSession.previewSubtitle">
+              <span>最长时长：{{ templatePreviewSession.durationSeconds }}s</span>
+              <span class="is-accent">视频内容：{{ templatePreviewSession.previewSubtitle }}</span>
+            </template>
+            <template v-else>
+              <span>{{ templatePreviewSession.typeLabel }}</span>
+              <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
+              <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+            </template>
           </div>
           <p>{{ templatePreviewSession.stylePrompt }}</p>
         </div>
@@ -1083,94 +1283,17 @@ watch(
 }
 
 .sv-recent-panel {
+  display: flex;
   min-height: 0;
   flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 16px 20px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 16px 20px 18px;
 }
 
-.sv-recent-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sv-recent-panel::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.55);
-}
-
-.sv-beta-panel.theme-dark .sv-recent-panel {
-  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
-}
-
-.sv-beta-panel.theme-dark .sv-recent-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.sv-recent-flow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: max-content;
-  gap: 14px;
-  align-content: start;
-  align-items: start;
-}
-
-.sv-recent-flow :deep(.recent-flow-item) {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  min-width: 0;
-  height: auto;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:hover) {
-  z-index: 30;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 1):hover) {
-  transform-origin: left center;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 2):hover) {
-  transform-origin: center center;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n):hover) {
-  transform-origin: right center;
-}
-
-@media (max-width: 1023px) {
-  .sv-recent-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 1):hover),
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 2):hover),
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n):hover) {
-    transform-origin: center center;
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(2n + 1):hover) {
-    transform-origin: left center;
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(2n):hover) {
-    transform-origin: right center;
-  }
-}
-
-@media (max-width: 640px) {
-  .sv-recent-flow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:hover) {
-    transform-origin: center center;
-  }
+.sv-recent-grid {
+  min-height: 0;
+  flex: 1;
 }
 
 .sv-template-card {
@@ -1192,6 +1315,156 @@ watch(
 .sv-template-card.is-disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.sv-recent-card {
+  position: relative;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  cursor: default;
+  transition: transform 0.2s ease;
+}
+
+.sv-recent-card.is-clickable {
+  cursor: pointer;
+}
+
+.sv-recent-card.is-clickable:hover {
+  transform: translateY(-2px);
+}
+
+.sv-recent-card.is-selected .sv-recent-card-media {
+  box-shadow: 0 0 0 2px var(--sv-accent);
+}
+
+.sv-recent-card-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: var(--sv-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.sv-recent-card.is-clickable:hover .sv-recent-card-media {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.sv-recent-card-cover,
+.sv-recent-card-cover :deep(.preload-image),
+.sv-recent-card-cover :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.sv-recent-card-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--sv-text-soft);
+  font-size: 28px;
+}
+
+.sv-recent-card-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sv-recent-card-status.is-generating {
+  background: rgba(255, 193, 7, 0.92);
+  color: #7a4f00;
+}
+
+.sv-recent-card-status.is-fail {
+  background: rgba(239, 99, 99, 0.92);
+  color: #ffffff;
+}
+
+.sv-recent-card-body {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 28px 10px 10px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+.sv-recent-card-title {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-recent-card-time {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.sv-recent-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.sv-recent-card:hover .sv-recent-card-delete,
+.sv-recent-card:focus-within .sv-recent-card-delete {
+  opacity: 1;
+}
+
+.sv-recent-card-delete:hover:not(:disabled) {
+  background: rgba(239, 99, 99, 0.88);
+  color: #ffffff;
+}
+
+.sv-recent-card-delete--loading {
+  animation: sv-spin 0.9s linear infinite;
 }
 
 .sv-template-cover--placeholder {
@@ -1558,8 +1831,8 @@ watch(
     gap: 10px;
   }
 
-  .sv-recent-flow {
-    gap: 12px;
+  .sv-recent-panel {
+    padding: 0 12px 20px 14px;
   }
 }
 
@@ -1770,8 +2043,9 @@ watch(
 
 .sv-template-preview-meta p {
   margin: 0;
-  color: var(--sv-text-soft);
+  color: #4b5563;
   font-size: 13px;
+  font-weight: 400;
   line-height: 1.55;
 }
 
@@ -1791,5 +2065,13 @@ watch(
   padding: 18px 22px 22px !important;
   max-height: calc(100vh - 124px);
   overflow: hidden;
+}
+
+.sv-template-preview-modal .sv-template-preview-meta p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
 }
 </style>

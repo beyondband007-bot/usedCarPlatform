@@ -21,6 +21,7 @@ interface LocalSceneDefinition {
   typeLabel: string
   styleLabel: string
   stylePrompt: string
+  previewSubtitle?: string
   description: string
   badge: VideoTemplate['badge']
   videoUrl: string
@@ -30,11 +31,12 @@ interface LocalSceneDefinition {
 const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
   {
     templateId: 'ref-video-001',
-    title: '车场介绍 1｜开场总览',
+    title: '车场介绍01 / 品牌介绍',
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '真实导览',
-    stylePrompt: '真实二手车车场介绍风格，先建立场地环境，再切入车辆陈列和到店看车氛围。',
+    stylePrompt: '真实二手车车场介绍风格，画面真实、口播流畅',
+    previewSubtitle: '全维度介绍车场',
     description: '用于介绍门店环境、车场规模和到店看车氛围，适合作为车场介绍开场。',
     badge: 'hot',
     videoUrl: scene01Video,
@@ -42,11 +44,12 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
   },
   {
     templateId: 'ref-video-002',
-    title: '车场介绍 2｜销售导览',
+    title: '车场介绍02 / 规模展示',
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '销售导览',
-    stylePrompt: '销售顾问式车场导览风格，围绕场地、车辆陈列和服务体验组织镜头。',
+    stylePrompt: '全方位介绍车场资源，传播品牌价值；从销售顾问角度介绍车场场地规模、主推品牌车辆，语调亲切、画面质感真实自然',
+    previewSubtitle: '车场规模与汽车品牌',
     description: '以销售顾问口吻带看车场，突出车辆陈列、接待动线和真实服务感。',
     badge: null,
     videoUrl: scene02Video,
@@ -54,11 +57,12 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
   },
   {
     templateId: 'ref-video-003',
-    title: '车场介绍 3｜库存展示',
+    title: '车场介绍03 / 车况展示',
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '库存展示',
-    stylePrompt: '多车库存展示风格，强调车辆排列、场地规模和重点车源导入。',
+    stylePrompt: '从库存展示的角度，介绍车辆情况、车辆信息等，人物表情自然、口音亲切',
+    previewSubtitle: '车库与车况概述',
     description: '适合展示多台车源和库存规模，再自然引出主推车型或重点车辆。',
     badge: null,
     videoUrl: scene03Video,
@@ -66,11 +70,12 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
   },
   {
     templateId: 'ref-video-004',
-    title: '单车品介绍｜实车讲解',
+    title: '单车品介绍 / 展厅实车讲解',
     type: 'single-car',
     typeLabel: '单车品介绍',
     styleLabel: '实车讲解',
-    stylePrompt: '单车品介绍风格，围绕一台车完成外观、内饰、空间和使用场景的 8-15 秒短口播介绍。',
+    stylePrompt: '根据车辆五维信息，自动获取车辆卖点，全车概况详细解释',
+    previewSubtitle: '全车概况讲解',
     description: '聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。',
     badge: 'hot',
     videoUrl: scene04Video,
@@ -148,6 +153,7 @@ function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate 
     thumbnailUrl: scene.videoUrl,
     previewUrl: scene.videoUrl,
     stylePrompt: scene.stylePrompt,
+    previewSubtitle: scene.previewSubtitle,
     durationSeconds: VIDEO_DURATION_SECONDS,
     durationLabel: '≤00:15',
     outputRatio: scene.outputRatio,
@@ -162,8 +168,8 @@ function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate 
 }
 
 export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []): VideoTemplate[] {
-  if (apiTemplates.length) {
-    return apiTemplates.map((template) => {
+  return apiTemplates.length
+    ? apiTemplates.map((template) => {
       const local = localSceneDefinitionById[template.templateId]
       if (!local) return template
 
@@ -175,6 +181,7 @@ export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []):
         styleLabel: local.styleLabel,
         description: local.description,
         stylePrompt: local.stylePrompt,
+        previewSubtitle: local.previewSubtitle,
         scenePrompt: template.scenePrompt ?? local.stylePrompt,
         thumbnailUrl: local.videoUrl,
         previewUrl: local.videoUrl,
@@ -184,9 +191,7 @@ export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []):
         reason: local.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : template.reason,
       }
     })
-  }
-
-  return LOCAL_SCENE_DEFINITIONS.map(buildFallbackSceneTemplate)
+    : LOCAL_SCENE_DEFINITIONS.map(buildFallbackSceneTemplate)
 }
 
 export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHuman[] {

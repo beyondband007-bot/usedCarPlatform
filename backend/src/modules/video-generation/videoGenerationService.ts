@@ -419,10 +419,10 @@ const referenceMaterialDisplayById: Record<
   }
 > = {
   "ref-video-001": {
-    title: "车场介绍 1｜开场总览",
+    title: "车场介绍01 / 品牌介绍",
     referenceRole: "用于介绍门店环境、车场规模和到店看车氛围，适合作为车场介绍开场。",
     styleTags: ["车场介绍", "环境总览", "数字人口播", "真实门店", "开场镜头"],
-    stylePrompt: "真实二手车车场介绍风格。数字人以销售顾问身份自然出镜，先建立门店或车场环境，再切入车辆陈列和到店看车氛围。",
+    stylePrompt: "真实二手车车场介绍风格，画面真实、口播流畅",
     shotPlan15s: [
       {
         timeRange: "0-3s",
@@ -447,10 +447,10 @@ const referenceMaterialDisplayById: Record<
     ],
   },
   "ref-video-002": {
-    title: "车场介绍 2｜销售导览",
+    title: "车场介绍02 / 规模展示",
     referenceRole: "以销售顾问口吻带看车场，突出车辆陈列、接待动线和真实服务感。",
     styleTags: ["销售导览", "车场动线", "车辆陈列", "到店体验", "可信讲解"],
-    stylePrompt: "销售顾问式车场导览风格。数字人边走边介绍场地、车辆陈列和到店体验，画面明亮自然，语气专业可信。",
+    stylePrompt: "全方位介绍车场资源，传播品牌价值；从销售顾问角度介绍车场场地规模、主推品牌车辆，语调亲切、画面质感真实自然",
     shotPlan15s: [
       {
         timeRange: "0-3s",
@@ -475,10 +475,10 @@ const referenceMaterialDisplayById: Record<
     ],
   },
   "ref-video-003": {
-    title: "车场介绍 3｜库存展示",
+    title: "车场介绍03 / 车况展示",
     referenceRole: "适合展示多台车源和库存规模，再自然引出主推车型或重点车辆。",
     styleTags: ["库存展示", "多车陈列", "真实场地", "主推车源", "稳健节奏"],
-    stylePrompt: "多车库存展示风格。数字人在真实车场空间中出镜，镜头强调车辆排列、场地规模和主推车源导入，整体保持真实二手车门店质感。",
+    stylePrompt: "从库存展示的角度，介绍车辆情况、车辆信息等，人物表情自然、口音亲切",
     shotPlan15s: [
       {
         timeRange: "0-3s",
@@ -503,10 +503,10 @@ const referenceMaterialDisplayById: Record<
     ],
   },
   "ref-video-004": {
-    title: "单车品介绍｜实车讲解",
+    title: "单车品介绍 / 展厅实车讲解",
     referenceRole: "聚焦单台车辆，按外观、内饰、空间和使用场景完成短节奏讲解。",
     styleTags: ["单车介绍", "外观展示", "内饰展示", "数字人讲解", "真实卖点"],
-    stylePrompt: "单车品介绍风格。数字人与目标车辆共同出镜，在 15 秒内围绕外观、内饰、空间和使用场景组织讲解，所有车况信息以用户上传素材为准。",
+    stylePrompt: "根据车辆五维信息，自动获取车辆卖点，全车概况详细解释",
     shotPlan15s: [
       {
         timeRange: "0-3s",

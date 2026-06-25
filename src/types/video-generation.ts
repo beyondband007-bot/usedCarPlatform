@@ -63,6 +63,7 @@ export interface VideoTemplate {
   thumbnailUrl: string
   previewUrl?: string
   stylePrompt: string
+  previewSubtitle?: string
   scenePrompt?: string
   shotPlan15s?: Array<{
     timeRange: string

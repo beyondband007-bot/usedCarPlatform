@@ -14,8 +14,37 @@ const RATIO_TYPE_VALUES: Array<{ type: RecentRatioType; value: number }> = [
   { type: '9-16', value: 9 / 16 },
 ]
 
-/** 流式卡片统一展示比例 */
-export const RECENT_FLOW_CARD_ASPECT_RATIO = '3 / 4'
+export function resolveMasonryGridColumns(width: number): number {
+  if (width >= 760) return 4
+  if (width >= 520) return 3
+  return 2
+}
+
+export function estimateRecentHeightRatio(
+  item: Pick<WorkspaceRecentItem, 'outputRatio' | 'imageWidth' | 'imageHeight'>,
+): number {
+  const group = resolveRecentDisplayGroup(item)
+  if (group === 'landscape') return 9 / 16
+  if (group === 'square') return 1
+  return 16 / 9
+}
+
+export function distributeMasonryColumns<T>(
+  items: T[],
+  columnCount: number,
+  estimateHeight: (item: T) => number,
+): T[][] {
+  const columns: T[][] = Array.from({ length: columnCount }, () => [])
+  const heights = new Array(columnCount).fill(0)
+
+  for (const item of items) {
+    const minIndex = heights.indexOf(Math.min(...heights))
+    columns[minIndex].push(item)
+    heights[minIndex] += estimateHeight(item)
+  }
+
+  return columns
+}
 
 export function resolveRecentRatioType(
   item: Pick<WorkspaceRecentItem, 'outputRatio' | 'imageWidth' | 'imageHeight'>,
@@ -55,9 +84,11 @@ export function resolveRecentFlowClass(item: WorkspaceRecentItem) {
   return [`recent-card--ratio-${resolveRecentRatioType(item)}`]
 }
 
-export function resolveRecentFlowMediaStyle(): CSSProperties {
+export function resolveRecentFlowMediaStyle(
+  item: Pick<WorkspaceRecentItem, 'outputRatio' | 'imageWidth' | 'imageHeight'>,
+): CSSProperties {
   return {
-    aspectRatio: RECENT_FLOW_CARD_ASPECT_RATIO,
+    aspectRatio: resolveRecentPlaceholderAspectRatio(item),
   }
 }
 

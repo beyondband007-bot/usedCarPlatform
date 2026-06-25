@@ -975,6 +975,9 @@ export function useVideoGenerationFlow(ownerKey: string) {
       errorMessage.value = '请先试听并确认 8-15 秒内的音频'
       return null
     }
+
+    const previousStep = currentStep.value
+    currentStep.value = 'task'
     setLoading('task', true)
     errorMessage.value = ''
     try {
@@ -986,10 +989,10 @@ export function useVideoGenerationFlow(ownerKey: string) {
       const task = await getVideoGenerationTask(created.taskId)
       currentTask.value = task
       persistTaskId(task.taskId)
-      currentStep.value = 'task'
       startPolling(task.taskId)
       return task
     } catch (error) {
+      currentStep.value = previousStep === 'task' ? 'review' : previousStep
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
       return null
     } finally {
@@ -1004,8 +1007,10 @@ export function useVideoGenerationFlow(ownerKey: string) {
     if (task.status === 'success') {
       currentStep.value = 'result'
       clearPersistedDraftId()
+      clearPersistedTaskId()
       stopPolling()
     } else if (TERMINAL_STATUSES.has(task.status)) {
+      clearPersistedTaskId()
       stopPolling()
     }
     return task
