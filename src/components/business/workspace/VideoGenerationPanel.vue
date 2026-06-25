@@ -5,6 +5,7 @@ import { useMessage } from "naive-ui";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
+import AudioPreviewPlayer from "@/components/business/workspace/AudioPreviewPlayer.vue";
 import VehicleLookupField from "@/components/business/workspace/VehicleLookupField.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
@@ -26,6 +27,11 @@ import {
   getCarModelDisplayNames,
   searchCarBrands,
 } from "@/utils/car-brand-series";
+import {
+  buildOutputRatioMismatchMessage,
+  imageMatchesOutputRatio,
+  readImageFileDimensions,
+} from "@/utils/image-orientation";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
@@ -174,6 +180,7 @@ const interiorCountLabel = computed(
 );
 
 function openPrimaryUploadPicker() {
+  if (isConfigurationLocked.value) return;
   if (isDealershipTemplate.value) {
     openDealershipPicker();
     return;
@@ -198,6 +205,7 @@ function handlePrimaryUploadFiles(event: Event) {
 }
 
 function removePrimaryUpload() {
+  if (isConfigurationLocked.value) return;
   if (isDealershipTemplate.value && primaryDealership.value) {
     removeDealershipUpload(primaryDealership.value.id);
     return;
@@ -205,6 +213,65 @@ function removePrimaryUpload() {
   if (primaryExterior.value) {
     removeExteriorUpload(primaryExterior.value.id);
   }
+}
+
+function handlePrimaryUploadRemove(event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  removePrimaryUpload();
+}
+
+function handleInteriorUploadRemove(event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (isConfigurationLocked.value || !primaryInterior.value) return;
+  removeInteriorUpload(primaryInterior.value.id);
+}
+
+function handleUploadCardClick(event: MouseEvent) {
+  if (isConfigurationLocked.value) return;
+  const target = event.target as HTMLElement | null;
+  if (
+    target?.closest(
+      ".sv-upload-remove, .sv-upload-thumb, .sv-upload-count, .sv-upload-loading",
+    )
+  ) {
+    return;
+  }
+  openPrimaryUploadPicker();
+}
+
+function handleInteriorCardClick(event: MouseEvent) {
+  if (isConfigurationLocked.value) return;
+  const target = event.target as HTMLElement | null;
+  if (
+    target?.closest(
+      ".sv-upload-remove, .sv-upload-thumb, .sv-upload-count, .sv-upload-loading",
+    )
+  ) {
+    return;
+  }
+  openInteriorPicker();
+}
+
+async function filterFilesByTemplateOrientation(files: File[]) {
+  const outputRatio = selectedOutputRatio.value;
+  const accepted: File[] = [];
+
+  for (const file of files) {
+    try {
+      const { width, height } = await readImageFileDimensions(file);
+      if (!imageMatchesOutputRatio(width, height, outputRatio)) {
+        message.warning(buildOutputRatioMismatchMessage(outputRatio));
+        continue;
+      }
+      accepted.push(file);
+    } catch {
+      message.error("无法读取图片尺寸，请换一张再试");
+    }
+  }
+
+  return accepted;
 }
 
 const matchedBrand = computed(() =>
@@ -373,10 +440,17 @@ const selectedTemplateUseVideoCover = computed(() => {
   return shouldPreferVideoCover(selectedTemplate.value);
 });
 
+const isTaskLocked = computed(() =>
+  ["task", "result"].includes(currentStep.value),
+);
+const isConfigurationLocked = computed(
+  () => props.disabled || props.isGenerating || isTaskLocked.value,
+);
+
 const canGenerateDraft = computed(
   () =>
     currentStep.value === "form" &&
-    !props.disabled &&
+    !isConfigurationLocked.value &&
     !props.isGenerating &&
     !isLoading("draft") &&
     !isLoading("task") &&
@@ -398,7 +472,7 @@ const canGenerateAudioPreview = computed(
     Boolean(scriptDraft.value?.scriptDraftId) &&
     Boolean(editableScriptText.value.trim()) &&
     Boolean(selectedVoiceId.value) &&
-    !props.disabled &&
+    !isConfigurationLocked.value &&
     !isLoading("audio") &&
     !isLoading("optimize") &&
     !isLoading("translate"),
@@ -409,7 +483,7 @@ const canOptimizeNarration = computed(
     Boolean(scriptDraft.value?.scriptDraftId) &&
     Boolean(editableScriptText.value.trim()) &&
     Boolean(selectedVoiceId.value) &&
-    !props.disabled &&
+    !isConfigurationLocked.value &&
     !isLoading("audio") &&
     !isLoading("optimize") &&
     !isLoading("translate") &&
@@ -421,7 +495,7 @@ const canTranslateNarration = computed(
     Boolean(scriptDraft.value?.scriptDraftId) &&
     Boolean(editableScriptText.value.trim()) &&
     isNonChineseLanguage.value &&
-    !props.disabled &&
+    !isConfigurationLocked.value &&
     !isLoading("audio") &&
     !isLoading("optimize") &&
     !isLoading("translate") &&
@@ -434,8 +508,18 @@ const estimatedConfirmedAudioPoints = computed(() => {
   if (!durationMs) return 0;
   return Math.ceil(durationMs / 1000) * 150;
 });
-const showConfigurationPage = computed(() => currentStep.value === "form");
-const showConfigurationFooter = computed(() => currentStep.value === "form");
+const showConfigurationPage = computed(() =>
+  ["form", "task", "result"].includes(currentStep.value),
+);
+const showReviewPage = computed(
+  () =>
+    ["review", "task", "result"].includes(currentStep.value) &&
+    Boolean(scriptDraft.value),
+);
+const showConfigurationFooter = computed(
+  () => currentStep.value === "form" && !isConfigurationLocked.value,
+);
+const showReviewFooter = computed(() => showReviewPage.value && !isTaskLocked.value);
 
 function formatAudioDuration(durationMs?: number | null) {
   if (!durationMs) return "--";
@@ -473,7 +557,7 @@ function handleDragOver(event: DragEvent) {
   event.preventDefault();
 }
 
-function handleFiles(
+async function handleFiles(
   event: Event,
   handler: (files: File[]) => void | Promise<void>,
 ) {
@@ -481,46 +565,55 @@ function handleFiles(
   const files = Array.from(input.files ?? []);
   input.value = "";
   if (!files.length) return;
-  void handler(files);
+  const accepted = await filterFilesByTemplateOrientation(files);
+  if (!accepted.length) return;
+  await handler(accepted);
+}
+
+async function uploadFilesFromDrop(
+  files: File[],
+  handler: (files: File[]) => void | Promise<void>,
+) {
+  if (!files.length) return;
+  const accepted = await filterFilesByTemplateOrientation(files);
+  if (!accepted.length) return;
+  await handler(accepted);
 }
 
 function openExteriorPicker() {
-  if (props.disabled || isLoading("upload-exterior")) return;
+  if (isConfigurationLocked.value || isLoading("upload-exterior")) return;
   exteriorInputRef.value?.click();
 }
 
 function openInteriorPicker() {
-  if (props.disabled || isLoading("upload-interior")) return;
+  if (isConfigurationLocked.value || isLoading("upload-interior")) return;
   interiorInputRef.value?.click();
 }
 
 function openDealershipPicker() {
-  if (props.disabled || isLoading("upload-dealership")) return;
+  if (isConfigurationLocked.value || isLoading("upload-dealership")) return;
   dealershipInputRef.value?.click();
 }
 
 async function handleExteriorDrop(event: DragEvent) {
   event.preventDefault();
-  if (props.disabled || isLoading("upload-exterior")) return;
+  if (isConfigurationLocked.value || isLoading("upload-exterior")) return;
   const files = Array.from(event.dataTransfer?.files ?? []);
-  if (!files.length) return;
-  await uploadExteriorImages(files);
+  await uploadFilesFromDrop(files, uploadExteriorImages);
 }
 
 async function handleInteriorDrop(event: DragEvent) {
   event.preventDefault();
-  if (props.disabled || isLoading("upload-interior")) return;
+  if (isConfigurationLocked.value || isLoading("upload-interior")) return;
   const files = Array.from(event.dataTransfer?.files ?? []);
-  if (!files.length) return;
-  await uploadInteriorImages(files);
+  await uploadFilesFromDrop(files, uploadInteriorImages);
 }
 
 async function handleDealershipDrop(event: DragEvent) {
   event.preventDefault();
-  if (props.disabled || isLoading("upload-dealership")) return;
+  if (isConfigurationLocked.value || isLoading("upload-dealership")) return;
   const files = Array.from(event.dataTransfer?.files ?? []);
-  if (!files.length) return;
-  await uploadDealershipImages(files);
+  await uploadFilesFromDrop(files, uploadDealershipImages);
 }
 
 function resolveHumanTone(index: number) {
@@ -535,7 +628,7 @@ function resolveHumanSubtitle(human: DigitalHuman) {
 }
 
 function selectDigitalHuman(human: DigitalHuman) {
-  if (props.disabled) return;
+  if (isConfigurationLocked.value) return;
   activeDigitalHumanId.value = human.id;
 }
 
@@ -616,7 +709,10 @@ async function submitConfirmedVideo() {
 <template>
   <div
     class="sv-upload-panel"
-    :class="appStore.isDarkMode ? 'sv-theme-dark' : 'sv-theme-light'"
+    :class="[
+      appStore.isDarkMode ? 'sv-theme-dark' : 'sv-theme-light',
+      { 'is-locked': isConfigurationLocked },
+    ]"
   >
     <div v-if="errorMessage" class="vg-error">{{ errorMessage }}</div>
 
@@ -696,7 +792,7 @@ async function submitConfirmedVideo() {
                 ? isLoading('upload-dealership')
                 : isLoading('upload-exterior'),
             }"
-            @click="openPrimaryUploadPicker"
+            @click="handleUploadCardClick"
             @dragover="handleDragOver"
             @drop="handlePrimaryUploadDrop"
           >
@@ -771,7 +867,7 @@ async function submitConfirmedVideo() {
               type="button"
               class="sv-upload-remove"
               :aria-label="isDealershipTemplate ? '删除主展厅素材' : '删除主外观照片'"
-              @click.stop="removePrimaryUpload"
+              @click.stop="handlePrimaryUploadRemove"
             >
               <Icon icon="mdi:close" />
             </button>
@@ -795,7 +891,7 @@ async function submitConfirmedVideo() {
               'is-filled': primaryInterior,
               'is-uploading': isLoading('upload-interior'),
             }"
-            @click="openInteriorPicker"
+            @click="handleInteriorCardClick"
             @dragover="handleDragOver"
             @drop="handleInteriorDrop"
           >
@@ -853,7 +949,7 @@ async function submitConfirmedVideo() {
               type="button"
               class="sv-upload-remove"
               aria-label="删除内饰照片"
-              @click.stop="removeInteriorUpload(primaryInterior.id)"
+              @click.stop="handleInteriorUploadRemove"
             >
               <Icon icon="mdi:close" />
             </button>
@@ -879,7 +975,7 @@ async function submitConfirmedVideo() {
             v-model="promotionForm.promotionText"
             rows="3"
             placeholder="限时优惠、金融方案等"
-            :disabled="disabled"
+            :disabled="isConfigurationLocked"
           />
         </label>
       </section>
@@ -903,7 +999,7 @@ async function submitConfirmedVideo() {
               resolveHumanTone(index),
               { 'is-active': activeDigitalHumanId === human.id },
             ]"
-            :disabled="disabled"
+            :disabled="isConfigurationLocked"
             @click="selectDigitalHuman(human)"
           >
             <span class="sv-human-avatar">
@@ -939,7 +1035,7 @@ async function submitConfirmedVideo() {
               v-model="activeBrand"
               :options="brandOptions"
               placeholder="如：宝马、奔驰、奥迪"
-              :disabled="disabled"
+              :disabled="isConfigurationLocked"
               :matched="Boolean(matchedBrand)"
               @select="handleBrandSelect"
               @clear="handleBrandClear"
@@ -952,7 +1048,7 @@ async function submitConfirmedVideo() {
               type="text"
               placeholder="如：2020、2021"
               maxlength="4"
-              :disabled="disabled"
+              :disabled="isConfigurationLocked"
             />
           </label>
           <label class="sv-field">
@@ -961,7 +1057,7 @@ async function submitConfirmedVideo() {
               v-model="activeDisplacement"
               type="text"
               placeholder="如：2.0T、1.5L、纯电"
-              :disabled="disabled"
+              :disabled="isConfigurationLocked"
             />
           </label>
           <label class="sv-field">
@@ -970,7 +1066,7 @@ async function submitConfirmedVideo() {
               v-model="activeSeries"
               :options="modelOptions"
               placeholder="如：A4L、530Li、E300L"
-              :disabled="disabled"
+              :disabled="isConfigurationLocked"
               :matched="Boolean(matchedBrand && activeSeries.trim())"
             />
           </label>
@@ -980,7 +1076,7 @@ async function submitConfirmedVideo() {
               v-model="activeSalesName"
               type="text"
               placeholder="如：5系、E级"
-              :disabled="disabled"
+              :disabled="isConfigurationLocked"
             />
           </label>
         </div>
@@ -999,7 +1095,7 @@ async function submitConfirmedVideo() {
           <span class="sv-language-select-icon" aria-hidden="true">
             <Icon icon="mdi:earth" />
           </span>
-          <select v-model="activeFormLanguage" :disabled="disabled">
+          <select v-model="activeFormLanguage" :disabled="isConfigurationLocked">
             <option
               v-for="option in languageOptions"
               :key="option.value"
@@ -1030,7 +1126,7 @@ async function submitConfirmedVideo() {
         <button
           type="button"
           class="sv-form-footer-btn sv-form-footer-btn--ghost"
-          :disabled="disabled || isGenerating"
+          :disabled="isConfigurationLocked"
           @click="goBackToTemplate"
         >
           取消
@@ -1039,7 +1135,7 @@ async function submitConfirmedVideo() {
           v-if="hasReusableDraft"
           type="button"
           class="sv-form-footer-btn sv-form-footer-btn--primary"
-          :disabled="disabled || isGenerating"
+          :disabled="isConfigurationLocked"
           @click="continueReview"
         >
           <Icon icon="mdi:arrow-right" aria-hidden="true" />
@@ -1064,20 +1160,7 @@ async function submitConfirmedVideo() {
       </div>
       </template>
 
-      <section
-        v-else-if="['task', 'result'].includes(currentStep)"
-        class="sv-section sv-section--task-hint"
-      >
-        <header class="sv-section-head">
-          <span class="sv-step-index">···</span>
-          <div class="sv-section-copy">
-            <h3>{{ currentStep === 'result' ? '视频已生成' : '视频生成中' }}</h3>
-            <p>可在右侧查看生成进度与结果，左侧表单将在任务结束后可继续编辑。</p>
-          </div>
-        </header>
-      </section>
-
-      <template v-else-if="currentStep === 'review' && scriptDraft">
+      <template v-if="showReviewPage">
       <section class="sv-section sv-script-review">
         <header class="sv-section-head">
           <span class="sv-step-index">5</span>
@@ -1092,7 +1175,7 @@ async function submitConfirmedVideo() {
             v-model="editableScriptText"
             rows="5"
             placeholder="请确认或修改数字人口播文案"
-            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
+            :disabled="isConfigurationLocked || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
           />
         </label>
         <div
@@ -1164,7 +1247,7 @@ async function submitConfirmedVideo() {
             type="button"
             class="sv-voice-card"
             :class="{ 'is-active': selectedVoiceId === voice.id }"
-            :disabled="disabled || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
+            :disabled="isConfigurationLocked || isLoading('audio') || isLoading('optimize') || isLoading('translate') || isLoading('task')"
             @click="selectVoice(voice.id)"
           >
             <strong>{{ voice.label }}</strong>
@@ -1189,7 +1272,7 @@ async function submitConfirmedVideo() {
               <span>{{ formatAudioDuration(preview.durationMs) }} · {{ resolveAudioPreviewLabel(preview.status) }}</span>
             </div>
             <div class="sv-audio-controls">
-              <audio :src="preview.audioUrl" controls preload="none" />
+              <AudioPreviewPlayer :src="preview.audioUrl" />
               <button
                 type="button"
                 class="sv-form-footer-btn sv-audio-confirm"
@@ -1198,7 +1281,7 @@ async function submitConfirmedVideo() {
                   'sv-form-footer-btn--ghost': !preview.canUseForVideo || confirmedAudioPreviewId === preview.audioPreviewId,
                   'is-confirmed': confirmedAudioPreviewId === preview.audioPreviewId,
                 }"
-                :disabled="!preview.canUseForVideo || disabled || isLoading('task')"
+                :disabled="!preview.canUseForVideo || isConfigurationLocked || isLoading('task')"
                 :title="preview.canUseForVideo ? '' : '音频时长需在 8–15 秒内才能确认'"
                 @click="toggleAudioConfirmation(preview.audioPreviewId, preview.canUseForVideo)"
               >
@@ -1219,11 +1302,11 @@ async function submitConfirmedVideo() {
         </div>
       </section>
 
-      <div class="sv-form-footer">
+      <div v-if="showReviewFooter" class="sv-form-footer">
         <button
           type="button"
           class="sv-form-footer-btn sv-form-footer-btn--ghost"
-          :disabled="disabled || isGenerating"
+          :disabled="isConfigurationLocked"
           @click="goBackToForm"
         >
           <Icon icon="mdi:arrow-left" aria-hidden="true" />
@@ -1300,6 +1383,18 @@ async function submitConfirmedVideo() {
   --sv-human-bg: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
   --sv-tip-bg: color-mix(in srgb, var(--sv-accent) 10%, #f8fbff);
   --sv-tip-text: #334155;
+}
+
+.sv-upload-panel.is-locked .sv-upload-card,
+.sv-upload-panel.is-locked .sv-human-card,
+.sv-upload-panel.is-locked .sv-voice-card,
+.sv-upload-panel.is-locked .sv-form-footer-btn,
+.sv-upload-panel.is-locked .sv-audio-confirm {
+  pointer-events: none;
+}
+
+.sv-upload-panel.is-locked .sv-section {
+  opacity: 0.88;
 }
 
 .sv-section {
@@ -1594,6 +1689,10 @@ async function submitConfirmedVideo() {
   line-height: 1.45;
 }
 
+.sv-upload-card.is-filled .sv-upload-preview {
+  pointer-events: none;
+}
+
 .sv-upload-preview {
   width: 100%;
   height: 148px;
@@ -1698,6 +1797,7 @@ async function submitConfirmedVideo() {
 .sv-upload-remove {
   top: 10px;
   right: 10px;
+  z-index: 5;
   width: 28px;
   height: 28px;
   border: 0;
@@ -2143,10 +2243,8 @@ async function submitConfirmedVideo() {
   font-size: 12px;
 }
 
-.sv-audio-controls audio {
-  width: 100%;
+.sv-audio-controls :deep(.audio-preview-player) {
   min-width: 0;
-  height: 36px;
 }
 
 .sv-audio-confirm {
@@ -2198,17 +2296,6 @@ async function submitConfirmedVideo() {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-}
-
-.sv-section--task-hint {
-  border-style: dashed;
-}
-
-.sv-section--task-hint .sv-section-copy p {
-  margin: 0;
-  color: var(--sv-text-soft);
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .sv-form-footer {

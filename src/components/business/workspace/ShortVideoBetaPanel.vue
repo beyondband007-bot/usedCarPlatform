@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { NButton, NModal, useMessage } from "naive-ui";
+import { useMessage } from "naive-ui";
 
 import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
-import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
@@ -12,11 +11,13 @@ import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoC
 import {
   getVideoTaskStatusLabel,
   getVideoWorkflowStageLabel,
-  VIDEO_OUTPUT_RATIO_LABEL,
+  VIDEO_OUTPUT_RATIO,
+  VIDEO_RESOLUTION,
+  formatVideoOutputRatioLabel,
 } from "@/constants/short-video";
 import type { VideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import { useAppStore } from "@/stores/app";
-import type { WorkspaceGenerateResult, WorkspaceRecentItem } from "@/types/workspace";
+import type { WorkspaceRecentItem } from "@/types/workspace";
 import {
   shortVideoTemplateCategories,
   shortVideoTemplateStyles,
@@ -27,24 +28,16 @@ import {
   recentStatusLabelMap,
 } from "@/utils/workspace-recent";
 import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
-import {
-  resolveVideoTaskDownloadUrl,
-  resolveVideoTaskMediaUrl,
-} from "@/utils/video-generation-result";
 
 const props = defineProps<{
-  playRequest?: number;
   isGenerating?: boolean;
-  sessionPreview?: WorkspaceGenerateResult | null;
-  generationResult?: WorkspaceGenerateResult | null;
   recentItems?: WorkspaceRecentItem[];
   recentLoading?: boolean;
   deletingRecentTaskIds?: string[];
-  initialView?: "templates" | "preview" | "generating" | "recent";
-  suppressPreviewPlayback?: boolean;
+  initialView?: "templates" | "generating" | "recent";
 }>();
 
-type ShortVideoView = "templates" | "preview" | "generating" | "recent";
+type ShortVideoView = "templates" | "generating" | "recent";
 
 const PENDING_RECENT_STATUSES = new Set([
   "waiting",
@@ -62,14 +55,11 @@ const message = useMessage();
 const appStore = useAppStore();
 const flow = inject<VideoGenerationFlow | null>(VIDEO_GENERATION_FLOW_KEY, null);
 
-const videoRef = ref<HTMLVideoElement | null>(null);
 const activeView = ref<ShortVideoView>("templates");
 const activeCategory = ref<ShortVideoTemplateCategory>("all");
 const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
-const previewTask = ref<VideoHistoryItem | null>(null);
-const templatePreviewSession = ref<VideoTemplate | null>(null);
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const recentDisplayItems = computed(() =>
@@ -123,29 +113,6 @@ const filteredTemplates = computed(() => {
   });
 });
 
-const availablePreviewVideo = computed(
-  () =>
-    props.generationResult?.previewVideo ??
-    props.sessionPreview?.previewVideo ??
-    (previewTask.value ? resolveVideoTaskMediaUrl(previewTask.value) : ""),
-);
-
-const activePreviewVideo = computed(() => {
-  if (activeView.value !== "preview") return "";
-  return availablePreviewVideo.value;
-});
-
-const activePreviewDownloadUrl = computed(() => {
-  if (previewTask.value) {
-    return resolveVideoTaskDownloadUrl(previewTask.value);
-  }
-  return (
-    props.generationResult?.downloadUrl ??
-    props.sessionPreview?.downloadUrl ??
-    activePreviewVideo.value
-  );
-});
-
 const generatingProgress = computed(() => {
   const task = currentTask.value;
   if (isDraftGenerating.value) return 8;
@@ -164,7 +131,15 @@ const generatingStatusLabel = computed(() => {
 
 const generatingDescription = computed(() => {
   if (isDraftGenerating.value) return "正在生成口播文案与视频任务参数，请稍候。";
-  return `输出 ${VIDEO_OUTPUT_RATIO_LABEL}，请稍候。`;
+  const ratio =
+    flow?.selectedTemplate.value?.outputRatio ??
+    currentTask.value?.outputRatio ??
+    VIDEO_OUTPUT_RATIO;
+  const resolution =
+    flow?.selectedTemplate.value?.videoResolution ??
+    currentTask.value?.resolution ??
+    VIDEO_RESOLUTION;
+  return `输出 ${ratio} · ${resolution}，请稍候。`;
 });
 
 const generatingErrorMessage = computed(() => {
@@ -173,13 +148,11 @@ const generatingErrorMessage = computed(() => {
   return task.error?.message ?? "视频生成失败，请稍后重试";
 });
 
-const showSessionPreviewTab = computed(() =>
-  Boolean(
-    props.sessionPreview?.previewVideo ||
-      props.generationResult?.previewVideo ||
-      previewTask.value,
-  ),
-);
+const isGenerationMode = computed(() => {
+  if (flow?.currentStep.value !== "task") return false;
+  if (!currentTask.value) return false;
+  return props.isGenerating || isPendingTask(currentTask.value);
+});
 
 function syncSelectedRecentItem() {
   const displayItems = recentDisplayItems.value;
@@ -200,13 +173,22 @@ watch(recentDisplayItems, syncSelectedRecentItem, { immediate: true });
 function resolveShortVideoView(
   preferred?: ShortVideoView | "recent" | "templates",
 ): ShortVideoView {
-  if (props.isGenerating || isPendingTask(currentTask.value)) return "generating";
-  if (preferred === "preview") return "preview";
+  const step = flow?.currentStep.value;
+  if (
+    (props.isGenerating || isPendingTask(currentTask.value)) &&
+    step === "task"
+  ) {
+    return "generating";
+  }
   if (preferred === "generating") return "generating";
   if (preferred === "recent") return "recent";
   if (preferred === "templates") return "templates";
-  if (flow?.currentStep.value === "template") return "templates";
   return "templates";
+}
+
+function shouldKeepTemplatesView() {
+  const step = flow?.currentStep.value;
+  return step === "template" || step === "form" || step === "review";
 }
 
 function isTemplateDisabled(template: VideoTemplate) {
@@ -230,30 +212,12 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
-function openTemplatePreview(item: VideoTemplate) {
+function handleTemplatePick(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
     message.info("该模板暂未开放，敬请期待！");
     return;
   }
-  templatePreviewSession.value = item;
-}
-
-function closeTemplatePreviewPlayer() {
-  templatePreviewSession.value = null;
-}
-
-function handleTemplatePreviewVisibleChange(show: boolean) {
-  if (!show) {
-    closeTemplatePreviewPlayer();
-  }
-}
-
-function confirmTemplateSelection() {
-  const item = templatePreviewSession.value;
-  if (!item) return;
   flow?.selectTemplate(item);
-  message.success(`已选择「${item.title}」`);
-  closeTemplatePreviewPlayer();
 }
 
 function openTemplatesView() {
@@ -265,40 +229,12 @@ function isPendingTask(task?: VideoHistoryItem | null) {
   return PENDING_RECENT_STATUSES.has(task.status);
 }
 
-async function pauseGeneratedVideo() {
-  await nextTick();
-  const video = videoRef.value;
-  if (!video) return;
-  video.pause();
-}
-
-async function playGeneratedVideo() {
-  if (props.suppressPreviewPlayback) return;
-
-  await nextTick();
-
-  const video = videoRef.value;
-  if (!video) return;
-
-  video.currentTime = 0;
-
-  try {
-    await video.play();
-  } catch {
-    // 浏览器可能阻止自动播放，保留控件供用户手动播放。
-  }
-}
-
 function openRecentView() {
   activeView.value = "recent";
 }
 
-function openPreviewView(task?: VideoHistoryItem | null) {
-  previewTask.value = task ?? currentTask.value;
-  activeView.value = "preview";
-  if (activePreviewVideo.value) {
-    void playGeneratedVideo();
-  }
+function openGeneratingView() {
+  activeView.value = "generating";
 }
 
 function shouldShowRecentStatus(item: WorkspaceRecentItem) {
@@ -334,79 +270,6 @@ function handleRecentPick(item: WorkspaceRecentItem) {
   emit("pickRecent", item);
 }
 
-async function handleCancelTask(taskId?: string) {
-  if (!flow) return;
-  if (taskId && flow.currentTask.value?.taskId !== taskId) {
-    await flow.trackTask(taskId);
-  }
-  const task = await flow.cancelCurrentTask();
-  if (task) {
-    message.info("任务已取消");
-    void flow.loadHistory();
-  } else if (flow.errorMessage.value) {
-    message.error(flow.errorMessage.value);
-  }
-}
-
-async function handleRegenerateTask(taskId?: string) {
-  if (!flow) return;
-  const targetId = taskId ?? currentTask.value?.taskId;
-  if (!targetId) return;
-  activeView.value = "generating";
-  const task = await flow.regenerateTask(targetId);
-  if (task) {
-    message.info("已重新提交视频生成");
-  } else if (flow.errorMessage.value) {
-    message.error(flow.errorMessage.value);
-  }
-}
-
-function canCancelTask(task?: VideoHistoryItem | null) {
-  if (!task || !flow) return false;
-  return flow.CANCELABLE_STATUSES.has(task.status);
-}
-
-function canRegenerateTask(task?: VideoHistoryItem | null) {
-  if (!task || !flow) return false;
-  return flow.REGENERATABLE_STATUSES.has(task.status);
-}
-
-watch(
-  () => props.suppressPreviewPlayback,
-  (suppressed) => {
-    if (suppressed) {
-      void pauseGeneratedVideo();
-    }
-  },
-);
-
-watch(
-  () => props.playRequest,
-  (request) => {
-    if (!request) return;
-    void playGeneratedVideo();
-  },
-);
-
-watch(
-  () => [props.generationResult?.previewVideo, props.sessionPreview?.previewVideo],
-  () => {
-    if (!activePreviewVideo.value || activeView.value !== "preview") return;
-    void playGeneratedVideo();
-  },
-);
-
-watch(
-  () => props.sessionPreview?.previewVideo,
-  (videoUrl) => {
-    if (!videoUrl || props.isGenerating) return;
-    activeView.value = "preview";
-    if (activeView.value === "preview") {
-      void playGeneratedVideo();
-    }
-  },
-);
-
 watch(
   () => props.initialView,
   (view) => {
@@ -417,13 +280,13 @@ watch(
 watch(
   () => props.isGenerating,
   (generating) => {
-    if (generating) {
+    if (generating && flow?.currentStep.value === "task") {
       activeView.value = "generating";
       return;
     }
 
-    if (activeView.value === "generating") {
-      activeView.value = availablePreviewVideo.value ? "preview" : "recent";
+    if (!generating && activeView.value === "generating") {
+      activeView.value = "templates";
     }
   },
   { immediate: true },
@@ -431,14 +294,14 @@ watch(
 
 watch(currentTask, (task) => {
   if (!task) return;
-  if (isPendingTask(task)) {
+  if (isPendingTask(task) && flow?.currentStep.value === "task") {
     activeView.value = "generating";
   }
 });
 
 onMounted(() => {
   void flow?.loadHistory();
-  if (flow?.currentStep.value === "template") {
+  if (shouldKeepTemplatesView()) {
     activeView.value = "templates";
   }
 });
@@ -446,12 +309,12 @@ onMounted(() => {
 watch(
   () => flow?.currentStep.value,
   (step) => {
-    if (step === "template") {
-      activeView.value = "templates";
+    if (step === "task" && isPendingTask(currentTask.value)) {
+      activeView.value = "generating";
       return;
     }
-    if (step === "task") {
-      activeView.value = "generating";
+    if (step === "template" || step === "form" || step === "review") {
+      activeView.value = "templates";
     }
   },
 );
@@ -463,87 +326,97 @@ watch(
     :class="appStore.isDarkMode ? 'theme-dark' : 'theme-light'"
     aria-label="短视频模板库"
   >
-    <section
-      v-if="activeView === 'generating'"
-      class="sv-state-panel sv-state-panel--generating"
-      aria-live="polite"
+    <div
+      v-if="isGenerationMode"
+      class="sv-generation-shell"
+      aria-label="视频生成状态"
     >
-      <div class="sv-generating-card">
-        <div class="sv-generating-visual" aria-hidden="true">
-          <span class="sv-generating-scan"></span>
-          <Icon icon="mdi:video-outline" />
-        </div>
-
-        <div class="sv-generating-copy">
-          <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成中" }}</p>
-          <h2>{{ generatingStatusLabel }}</h2>
-          <span>{{ generatingDescription }}</span>
-          <p v-if="generatingErrorMessage" class="sv-generating-error">
-            {{ generatingErrorMessage }}
-          </p>
-        </div>
-
-        <div
-          class="sv-generating-progress"
-          role="progressbar"
-          :aria-valuenow="generatingProgress"
-          aria-valuemin="0"
-          aria-valuemax="100"
-        >
-          <span :style="{ width: `${Math.max(generatingProgress, 8)}%` }"></span>
-        </div>
-
-        <div v-if="canCancelTask(currentTask) || canRegenerateTask(currentTask)" class="sv-generating-actions">
+      <header class="sv-generation-tabs">
+        <div class="sv-generation-tab-group" role="tablist" aria-label="视频生成视图">
           <button
-            v-if="canCancelTask(currentTask)"
             type="button"
-            class="sv-action-button sv-action-button--ghost"
-            @click="handleCancelTask(currentTask?.taskId)"
+            role="tab"
+            class="sv-generation-tab"
+            :class="{ 'is-active': activeView === 'generating' }"
+            :aria-selected="activeView === 'generating'"
+            @click="openGeneratingView"
           >
-            取消生成
+            正在生成
           </button>
           <button
-            v-if="canRegenerateTask(currentTask)"
             type="button"
-            class="sv-action-button"
-            @click="handleRegenerateTask()"
+            role="tab"
+            class="sv-generation-tab"
+            :class="{ 'is-active': activeView === 'recent' }"
+            :aria-selected="activeView === 'recent'"
+            @click="openRecentView"
           >
-            重新生成
+            最近生成
           </button>
         </div>
-      </div>
-    </section>
-
-    <section
-      v-else-if="activeView === 'preview' && activePreviewVideo"
-      class="sv-state-panel sv-state-panel--preview"
-    >
-      <header class="sv-preview-head">
-        <button type="button" class="sv-back-button" @click="openRecentView">
-          <Icon icon="mdi:arrow-left" />
-          返回最近生成
-        </button>
-        <a
-          v-if="activePreviewDownloadUrl"
-          class="sv-download-link"
-          :href="activePreviewDownloadUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          下载视频
-        </a>
       </header>
-      <video
-        ref="videoRef"
-        class="sv-preview-player"
-        controls
-        playsinline
-        preload="metadata"
-        :src="activePreviewVideo"
-      >
-        当前浏览器不支持视频播放。
-      </video>
-    </section>
+
+      <div class="sv-generation-body">
+        <section
+          v-if="activeView === 'generating'"
+          class="sv-generation-waiting"
+          aria-live="polite"
+        >
+          <div class="sv-generating-visual" aria-hidden="true">
+            <span class="sv-generating-scan"></span>
+            <Icon icon="mdi:video-outline" />
+          </div>
+
+          <div class="sv-generating-copy">
+            <p>{{ currentTask?.title || currentTask?.vehicleName || "视频生成" }}</p>
+            <h2>{{ generatingStatusLabel }}</h2>
+            <span>{{ generatingDescription }}</span>
+            <p v-if="generatingErrorMessage" class="sv-generating-error">
+              {{ generatingErrorMessage }}
+            </p>
+          </div>
+
+          <div
+            class="sv-generating-progress"
+            role="progressbar"
+            :aria-valuenow="generatingProgress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <span :style="{ width: `${Math.max(generatingProgress, 8)}%` }"></span>
+          </div>
+        </section>
+
+        <section
+          v-else
+          class="sv-recent-panel"
+          aria-label="最近生成"
+        >
+          <div v-if="recentLoading && !recentDisplayItems.length" class="sv-empty-state">
+            <Icon icon="mdi:loading" class="sv-spin" />
+            <span>正在加载最近生成</span>
+          </div>
+          <div v-else-if="!recentDisplayItems.length" class="sv-empty-state">
+            <Icon icon="mdi:video-off-outline" />
+            <span>暂无最近生成记录</span>
+          </div>
+          <div v-else class="sv-recent-flow">
+            <WorkspaceRecentImageCard
+              v-for="item in recentDisplayItems"
+              :key="item.id"
+              :item="item"
+              :selected="item.id === selectedRecentItemId"
+              :clickable="canOpenRecentVideo(item)"
+              :deleting="isDeletingRecent(item)"
+              :show-status="shouldShowRecentStatus(item)"
+              :status-label="statusLabelMap[item.status]"
+              @pick="handleRecentPick"
+              @delete="handleDeleteRecent"
+            />
+          </div>
+        </section>
+      </div>
+    </div>
 
     <section
       v-else
@@ -570,17 +443,6 @@ watch(
           @click="openTemplatesView"
         >
           模板库
-        </button>
-        <button
-          v-if="showSessionPreviewTab"
-          type="button"
-          role="tab"
-          class="sv-primary-tab sv-primary-tab--accent"
-          :class="{ 'is-active': activeView === 'preview' }"
-          :aria-selected="activeView === 'preview'"
-          @click="openPreviewView()"
-        >
-          预览视频
         </button>
       </header>
 
@@ -679,10 +541,10 @@ watch(
             }"
             role="button"
             tabindex="0"
-            :aria-label="`预览模板 ${item.title}`"
-            @click="openTemplatePreview(item)"
-            @keydown.enter.prevent="openTemplatePreview(item)"
-            @keydown.space.prevent="openTemplatePreview(item)"
+            :aria-label="`选择模板 ${item.title}`"
+            @click="handleTemplatePick(item)"
+            @keydown.enter.prevent="handleTemplatePick(item)"
+            @keydown.space.prevent="handleTemplatePick(item)"
           >
             <div class="sv-template-media">
               <PreloadImage
@@ -728,56 +590,6 @@ watch(
 
     </section>
   </section>
-
-  <NModal
-    v-if="templatePreviewSession"
-    :show="true"
-    preset="card"
-    :title="templatePreviewSession.title"
-    class="sv-template-preview-modal"
-    :bordered="false"
-    :segmented="{ content: true, footer: 'soft' }"
-    :mask-closable="true"
-    @update:show="handleTemplatePreviewVisibleChange"
-  >
-    <div class="sv-template-preview-body">
-      <div class="sv-template-preview-media">
-        <TemplatePreviewVideoPlayer
-          v-if="getTemplateVideoUrl(templatePreviewSession)"
-          :key="templatePreviewSession.templateId"
-          :src="getTemplateVideoUrl(templatePreviewSession)!"
-          :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
-          :template-id="templatePreviewSession.templateId"
-        />
-        <PreloadImage
-          v-else-if="getTemplatePosterUrl(templatePreviewSession)"
-          class="sv-template-preview-poster"
-          :src="getTemplatePosterUrl(templatePreviewSession)!"
-          :alt="templatePreviewSession.title"
-          fit="contain"
-        />
-        <div v-else class="sv-template-preview-placeholder">
-          <Icon icon="mdi:movie-open-outline" />
-        </div>
-      </div>
-
-      <div class="sv-template-preview-meta">
-        <div class="sv-template-preview-tags">
-          <span>{{ templatePreviewSession.typeLabel }}</span>
-          <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
-          <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
-        </div>
-        <p>{{ templatePreviewSession.stylePrompt }}</p>
-      </div>
-    </div>
-
-    <template #footer>
-      <div class="sv-template-preview-actions">
-        <NButton @click="closeTemplatePreviewPlayer">取消</NButton>
-        <NButton type="primary" @click="confirmTemplateSelection">使用此模板</NButton>
-      </div>
-    </template>
-  </NModal>
 </template>
 
 <style scoped lang="scss">
@@ -873,6 +685,76 @@ watch(
   padding-top: 12px;
 }
 
+.sv-generation-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sv-generation-tabs {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: 12px;
+  padding: 12px 16px 0;
+}
+
+.sv-generation-tab-group {
+  display: flex;
+  gap: 34px;
+}
+
+.sv-generation-tab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--sv-text-soft);
+  padding: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.sv-generation-tab:hover:not(.is-active) {
+  color: var(--sv-text);
+}
+
+.sv-generation-tab.is-active {
+  color: var(--sv-text);
+  font-weight: 800;
+}
+
+.sv-generation-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sv-generation-waiting {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 0;
+  flex: 1;
+  gap: 18px;
+  padding: clamp(24px, 3vw, 40px) 16px;
+}
+
+.sv-beta-panel.theme-light .sv-generation-tab {
+  color: #8a95a3;
+}
+
+.sv-beta-panel.theme-light .sv-generation-tab.is-active {
+  color: #111827;
+}
+
 .sv-primary-tabs {
   display: inline-flex;
   flex-shrink: 0;
@@ -880,7 +762,7 @@ watch(
   align-items: center;
   align-self: flex-start;
   min-height: 32px;
-  margin-inline: 16px;
+  margin-inline: 18px 16px;
   padding: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
@@ -912,7 +794,7 @@ watch(
   flex: 1;
   flex-direction: column;
   gap: 16px;
-  padding: 0 16px 20px;
+  padding: 0 16px 20px 18px;
 }
 
 .sv-gallery-toolbar {
@@ -1410,43 +1292,6 @@ watch(
   object-fit: contain;
 }
 
-.sv-state-panel--generating {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(16px, 2vw, 24px);
-}
-
-.sv-generating-card {
-  display: grid;
-  width: min(100%, 560px);
-  justify-items: center;
-  gap: 18px;
-  padding: clamp(24px, 3vw, 40px);
-  border: 1px solid var(--sv-border);
-  border-radius: 16px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sv-accent) 8%, transparent),
-      transparent 42%
-    ),
-    var(--sv-surface);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
-}
-
-.sv-beta-panel.theme-light .sv-generating-card {
-  border-color: #e1eaf5;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sv-accent) 10%, #ffffff),
-      #ffffff 48%
-    ),
-    #ffffff;
-  box-shadow: 0 10px 28px rgba(78, 111, 148, 0.08);
-}
-
 .sv-generating-visual {
   position: relative;
   display: grid;
@@ -1606,7 +1451,7 @@ watch(
 
 @media (max-width: 767px) {
   .sv-gallery {
-    padding-inline: 12px;
+    padding: 0 12px 20px 14px;
   }
 
   .sv-gallery-actions {
@@ -1645,47 +1490,6 @@ watch(
   color: #f87171;
   font-size: 13px;
   line-height: 1.5;
-}
-
-.sv-generating-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 2px;
-}
-
-.sv-action-button {
-  min-width: 112px;
-  padding: 10px 18px;
-  border: 1px solid color-mix(in srgb, var(--sv-accent) 40%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sv-accent) 16%, transparent);
-  color: var(--sv-text);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    transform 0.16s ease,
-    background 0.16s ease;
-}
-
-.sv-action-button:hover {
-  transform: translateY(-1px);
-}
-
-.sv-action-button--ghost {
-  border-color: var(--sv-border);
-  background: transparent;
-  color: var(--sv-text-soft);
-}
-
-.sv-beta-panel.theme-light .sv-action-button--ghost {
-  border-color: #d7e3f2;
-  background: #f8fbff;
-  color: #64748b;
 }
 
 .sv-download-link {
@@ -1873,12 +1677,6 @@ watch(
   color: var(--sv-text-soft);
   font-size: 13px;
   line-height: 1.55;
-}
-
-.sv-template-preview-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 </style>
 
