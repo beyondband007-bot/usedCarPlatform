@@ -196,6 +196,7 @@ export interface CreatedCreativeGeneration extends CreatedGenerationTask {
 
 export interface BatchVisualConfig {
   enableSceneChange: boolean
+  enableInteriorSceneChange?: boolean
   sceneOptionId?: string
   sceneReferenceImageUrl?: string
   sceneIndex: number
@@ -276,6 +277,8 @@ export interface BatchTaskList {
 export type BatchTaskItemKind =
   | 'exterior'
   | 'interior'
+  | 'interior_scene'
+  | 'interior_scene_clean'
   | 'interior_clean'
   | 'interior_collage'
   | 'interior_clean_collage'
@@ -2037,6 +2040,13 @@ export async function createRechargeOrder(payload: {
       payChannel: payload.payChannel,
       idempotencyKey: payload.idempotencyKey?.trim() || buildPaymentIdempotencyKey(),
     },
+  )
+  return normalizePaymentOrder(unwrapApiResponse(response))
+}
+
+export async function syncRechargeOrder(paymentOrderId: number | string) {
+  const response = await request.get<ApiResponse<PaymentOrderResult & Record<string, unknown>>>(
+    `/credits/payment-orders/${encodeURIComponent(paymentOrderId)}/sync`,
   )
   return normalizePaymentOrder(unwrapApiResponse(response))
 }

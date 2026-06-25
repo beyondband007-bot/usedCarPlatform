@@ -72,6 +72,8 @@ const paymentOrderResponseSchema = {
     status: { type: "string", enum: ["pending", "paid", "failed", "refunded"] },
     paidAt: { type: ["string", "null"] },
     notifyId: { type: ["string", "null"] },
+    payUrl: { type: ["string", "null"] },
+    qrCodeUrl: { type: ["string", "null"] },
     idempotentReplay: { type: "boolean" }
   }
 };
@@ -89,7 +91,7 @@ export function registerPaymentRoutes(
   app: FastifyInstance,
   options: RegisterPaymentRoutesOptions
 ): void {
-  const payment = new PaymentService(options.db, options.env.paymentCallbackSecret);
+  const payment = new PaymentService(options.db, options.env.paymentCallbackSecret, options.env);
 
   app.get(
     "/recharge-products",
@@ -257,5 +259,66 @@ export function registerPaymentRoutes(
         parseRequiredNumber(request.params.id, "id"),
         parseRequiredNumber(request.query.userId, "userId")
       )
+  );
+
+  app.get<{ Params: IdParam; Querystring: UserQuery }>(
+    "/payment-orders/:id/sync",
+    {
+      schema: {
+        tags: ["payments"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } }
+        },
+        querystring: {
+          type: "object",
+          required: ["userId"],
+          properties: { userId: { type: "string" } }
+        },
+        response: { 200: paymentOrderResponseSchema }
+      }
+    },
+    async (request) =>
+      payment.syncPaymentOrder(
+        parseRequiredNumber(request.params.id, "id"),
+        parseRequiredNumber(request.query.userId, "userId")
+      )
+  );
+
+  app.post<{ Body: Record<string, string> }>(
+    "/api/v1/alipay/notify",
+    { schema: { hide: true } },
+    async (request, reply) => {
+      try {
+        await payment.handleAlipayNotification(request.body);
+        return reply.type("text/plain").send("success");
+      } catch (error) {
+        request.log.error({ error }, "Alipay notification failed");
+        return reply.code(400).type("text/plain").send("failure");
+      }
+    }
+  );
+
+  app.post<{ Body: Record<string, unknown> }>(
+    "/api/v1/wechatpay/notify",
+    { schema: { hide: true } },
+    async (request, reply) => {
+      try {
+        await payment.handleWechatNotification(
+          {
+            "wechatpay-timestamp": request.headers["wechatpay-timestamp"] as string | undefined,
+            "wechatpay-nonce": request.headers["wechatpay-nonce"] as string | undefined,
+            "wechatpay-signature": request.headers["wechatpay-signature"] as string | undefined,
+            "wechatpay-serial": request.headers["wechatpay-serial"] as string | undefined
+          },
+          request.rawBody ?? JSON.stringify(request.body)
+        );
+        return reply.send({ code: "SUCCESS", message: "成功" });
+      } catch (error) {
+        request.log.error({ error }, "Wechat Pay notification failed");
+        return reply.code(400).send({ code: "FAIL", message: "失败" });
+      }
+    }
   );
 }

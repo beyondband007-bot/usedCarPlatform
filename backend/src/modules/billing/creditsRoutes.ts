@@ -213,3 +213,18 @@ creditsRoutes.post(
     );
   }),
 );
+
+creditsRoutes.get(
+  "/payment-orders/:id/sync",
+  asyncHandler(async (req, res) => {
+    const identity = await resolveProxyIdentity(req.query, req.headers);
+    const paymentOrderId = parseRequiredPositiveInteger(req.params.id, "id");
+    ok(
+      res,
+      await creditsClient.syncPaymentOrder({
+        paymentOrderId,
+        userId: identity.userId,
+      }),
+    );
+  }),
+);

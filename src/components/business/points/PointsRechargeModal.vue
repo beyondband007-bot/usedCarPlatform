@@ -1,22 +1,26 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { NModal, useMessage } from "naive-ui";
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 
-import { createRechargeOrder } from "@/api/visual-workbench";
+import {
+  createRechargeOrder,
+  syncRechargeOrder,
+  type CreditsPayChannel,
+} from "@/api/visual-workbench";
 import {
   calcPointsFromAmount,
   createLocalRechargeOrder,
-  defaultRecentRechargeOrders,
   pointsRechargePresets,
   type PointsRechargeOrderItem,
 } from "@/constants/points-recharge";
 import { useAppStore } from "@/stores/app";
 import { useCreditsStore } from "@/stores/credits";
 
-const props = defineProps<{
-  show: boolean;
-}>();
+const PAYMENT_EXPIRES_SECONDS = 3 * 60;
+const PAYMENT_POLL_INTERVAL_MS = 5000;
+
+const props = defineProps<{ show: boolean }>();
 
 const emit = defineEmits<{
   "update:show": [value: boolean];
@@ -29,12 +33,17 @@ const message = useMessage();
 
 const selectedAmount = ref(pointsRechargePresets[0].amount);
 const customAmount = ref(String(pointsRechargePresets[0].amount));
+const selectedPayChannel =
+  ref<Extract<CreditsPayChannel, "alipay" | "wechat">>("alipay");
 const isCreating = ref(false);
-const recentOrders = ref<PointsRechargeOrderItem[]>([
-  ...defaultRecentRechargeOrders,
-]);
-const latestOrder = ref<PointsRechargeOrderItem | null>(null);
+const showPaymentCode = ref(false);
+const paymentSecondsLeft = ref(PAYMENT_EXPIRES_SECONDS);
+const activePaymentOrderId = ref<number | string | null>(null);
+const activePaymentOrder = ref<PointsRechargeOrderItem | null>(null);
 const qrCodeUrl = ref("");
+
+let paymentPollTimer: ReturnType<typeof setInterval> | null = null;
+let paymentCountdownTimer: ReturnType<typeof setInterval> | null = null;
 
 const modalThemeClass = computed(() =>
   appStore.isDarkMode
@@ -49,43 +58,55 @@ const activeAmount = computed(() => {
 });
 
 const activePoints = computed(() => calcPointsFromAmount(activeAmount.value));
-
 const balanceLabel = computed(() =>
   creditsStore.availableBalance.toLocaleString("zh-CN"),
 );
-
 const customCardActive = computed(
   () => !pointsRechargePresets.some((preset) => preset.amount === activeAmount.value),
 );
-
-const currentDisplayOrder = computed(
-  () => latestOrder.value ?? recentOrders.value[0] ?? null,
+const paymentChannelName = computed(() =>
+  selectedPayChannel.value === "alipay" ? "支付宝" : "微信支付",
 );
-
-const orderStatusLabelMap: Record<PointsRechargeOrderItem["status"], string> = {
-  pending: "待扫码",
-  paid: "已支付",
-  failed: "支付失败",
-};
+const paymentChannelIcon = computed(() =>
+  selectedPayChannel.value === "alipay" ? "ri:alipay-fill" : "ri:wechat-fill",
+);
+const countdownLabel = computed(() => {
+  const minutes = Math.floor(paymentSecondsLeft.value / 60);
+  const seconds = paymentSecondsLeft.value % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+});
 
 watch(
   () => props.show,
   (visible) => {
     if (!visible) return;
-
     selectedAmount.value = pointsRechargePresets[0].amount;
     customAmount.value = String(pointsRechargePresets[0].amount);
-    latestOrder.value = recentOrders.value[0] ?? null;
-    qrCodeUrl.value = buildFallbackQrCode(
-      recentOrders.value[0]?.orderNo ?? "AI-CARXEN",
-    );
-    void creditsStore.hydrateRechargeProducts();
+    selectedPayChannel.value = "alipay";
+    void creditsStore.hydrateRechargeProducts(true);
     void creditsStore.hydrateAccounts();
   },
 );
 
-function close() {
+onBeforeUnmount(stopPaymentTimers);
+
+function stopPaymentTimers() {
+  if (paymentPollTimer) clearInterval(paymentPollTimer);
+  if (paymentCountdownTimer) clearInterval(paymentCountdownTimer);
+  paymentPollTimer = null;
+  paymentCountdownTimer = null;
+}
+
+function closeRechargeModal() {
   emit("update:show", false);
+}
+
+function closePaymentCode() {
+  stopPaymentTimers();
+  showPaymentCode.value = false;
+  activePaymentOrderId.value = null;
+  activePaymentOrder.value = null;
+  qrCodeUrl.value = "";
 }
 
 function selectPreset(amount: number) {
@@ -94,19 +115,14 @@ function selectPreset(amount: number) {
 }
 
 function activateCustomAmount() {
-  if (!customAmount.value) {
-    customAmount.value = String(activeAmount.value);
-  }
+  if (!customAmount.value) customAmount.value = String(activeAmount.value);
 }
 
 function handleCustomInput(event: Event) {
   const value = (event.target as HTMLInputElement).value.replace(/\D/g, "");
   customAmount.value = value;
-
   const parsed = Number.parseInt(value, 10);
-  if (Number.isFinite(parsed) && parsed > 0) {
-    selectedAmount.value = parsed;
-  }
+  if (Number.isFinite(parsed) && parsed > 0) selectedAmount.value = parsed;
 }
 
 function resolveProductId(amountYuan: number) {
@@ -118,76 +134,82 @@ function resolveProductId(amountYuan: number) {
   })?.id;
 }
 
-function buildFallbackQrCode(text: string) {
-  const safeText = text.replace(/[<>&"]/g, "");
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
-      <rect width="240" height="240" rx="20" fill="#ffffff"/>
-      <rect x="18" y="18" width="60" height="60" rx="10" fill="#111111"/>
-      <rect x="30" y="30" width="36" height="36" rx="6" fill="#ffffff"/>
-      <rect x="162" y="18" width="60" height="60" rx="10" fill="#111111"/>
-      <rect x="174" y="30" width="36" height="36" rx="6" fill="#ffffff"/>
-      <rect x="18" y="162" width="60" height="60" rx="10" fill="#111111"/>
-      <rect x="30" y="174" width="36" height="36" rx="6" fill="#ffffff"/>
-      <rect x="106" y="32" width="14" height="14" rx="3" fill="#111111"/>
-      <rect x="128" y="32" width="14" height="14" rx="3" fill="#111111"/>
-      <rect x="106" y="54" width="14" height="14" rx="3" fill="#111111"/>
-      <rect x="142" y="54" width="14" height="14" rx="3" fill="#111111"/>
-      <rect x="96" y="96" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="122" y="96" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="148" y="96" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="96" y="122" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="148" y="122" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="96" y="148" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="122" y="148" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="148" y="148" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="184" y="112" width="18" height="18" rx="4" fill="#111111"/>
-      <rect x="184" y="148" width="18" height="18" rx="4" fill="#111111"/>
-      <text x="120" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6b7280">${safeText}</text>
-    </svg>
-  `;
+function startPaymentTimers() {
+  stopPaymentTimers();
+  paymentSecondsLeft.value = PAYMENT_EXPIRES_SECONDS;
 
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  paymentCountdownTimer = setInterval(() => {
+    paymentSecondsLeft.value -= 1;
+    if (paymentSecondsLeft.value > 0) return;
+    closePaymentCode();
+    message.warning("订单码已过期，请重新发起支付");
+  }, 1000);
+
+  paymentPollTimer = setInterval(() => void pollPaymentStatus(), PAYMENT_POLL_INTERVAL_MS);
 }
 
-async function handleGeneratePaymentCode() {
-  if (isCreating.value) return;
+async function pollPaymentStatus() {
+  if (!activePaymentOrderId.value || !activePaymentOrder.value) return;
 
-  const amount = activeAmount.value;
-  if (amount < 1) {
+  try {
+    const order = await syncRechargeOrder(activePaymentOrderId.value);
+    if (order.status === "paid") {
+      activePaymentOrder.value.status = "paid";
+      stopPaymentTimers();
+      showPaymentCode.value = false;
+      await creditsStore.hydrateAccounts(true);
+      message.success("支付成功，积分已到账");
+      emit("success");
+      return;
+    }
+
+    if (order.status === "failed" || order.status === "refunded") {
+      activePaymentOrder.value.status = "failed";
+      stopPaymentTimers();
+      showPaymentCode.value = false;
+      message.error("支付未完成，请重新发起支付");
+    }
+  } catch {
+    // 短暂网络波动时保留订单码，下一轮继续查询。
+  }
+}
+
+async function handlePayNow() {
+  if (isCreating.value) return;
+  if (activeAmount.value < 1) {
     message.warning("请输入有效充值金额");
     return;
   }
 
+  if (!creditsStore.productsLoaded || creditsStore.isLoadingProducts) {
+    await creditsStore.hydrateRechargeProducts(true);
+  }
+
+  const productId = resolveProductId(activeAmount.value);
+  if (!productId) {
+    message.warning("充值套餐加载失败，请稍后重试");
+    return;
+  }
+
   isCreating.value = true;
-
   try {
-    const productId = resolveProductId(amount);
-    let orderNo = "";
-    let nextQrCodeUrl = "";
+    const order = await createRechargeOrder({
+      productId,
+      payChannel: selectedPayChannel.value,
+    });
+    if (!order.qrCodeUrl) throw new Error("支付平台未返回有效订单码");
 
-    if (productId) {
-      const order = await createRechargeOrder({
-        productId,
-        payChannel: "alipay",
-      });
-      orderNo = order.orderNo;
-      nextQrCodeUrl = order.qrCodeUrl ?? "";
-    } else {
-      orderNo = createLocalRechargeOrder(amount).orderNo;
-    }
+    const displayOrder = createLocalRechargeOrder(activeAmount.value);
+    displayOrder.orderNo = order.orderNo;
+    activePaymentOrderId.value = order.id;
+    activePaymentOrder.value = displayOrder;
+    qrCodeUrl.value = order.qrCodeUrl;
 
-    const nextOrder = createLocalRechargeOrder(amount);
-    nextOrder.orderNo = orderNo || nextOrder.orderNo;
-    latestOrder.value = nextOrder;
-    qrCodeUrl.value = nextQrCodeUrl || buildFallbackQrCode(nextOrder.orderNo);
-    recentOrders.value = [nextOrder, ...recentOrders.value].slice(0, 8);
-
-    message.success("支付宝付款码已生成，请扫码完成支付");
-    emit("success");
+    closeRechargeModal();
+    showPaymentCode.value = true;
+    startPaymentTimers();
   } catch (error) {
-    const text = error instanceof Error ? error.message : "生成付款码失败";
-    message.error(text);
+    message.error(error instanceof Error ? error.message : "创建支付订单失败");
   } finally {
     isCreating.value = false;
   }
@@ -211,13 +233,16 @@ async function handleGeneratePaymentCode() {
         type="button"
         class="points-recharge-modal__close"
         aria-label="关闭"
-        @click="close"
+        @click="closeRechargeModal"
       >
         <Icon icon="mdi:close" />
       </button>
 
       <header class="points-recharge-modal__topbar">
-        <h2 id="points-recharge-modal-title">积分充值</h2>
+        <div>
+          <h2 id="points-recharge-modal-title">积分充值</h2>
+          <p>选择充值金额与支付方式</p>
+        </div>
         <div class="points-recharge-modal__balance">
           <span>积分余额</span>
           <strong>{{ balanceLabel }}</strong>
@@ -252,180 +277,259 @@ async function handleGeneratePaymentCode() {
         <div class="points-recharge-modal__custom">
           <label for="points-recharge-custom-amount">输入自定义金额</label>
           <div class="points-recharge-modal__custom-row">
-            <input
-              id="points-recharge-custom-amount"
-              :value="customAmount"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="请输入充值金额"
-              @input="handleCustomInput"
-            />
-            <span>{{ activePoints.toLocaleString("zh-CN") }}积分</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="points-recharge-modal__content">
-        <div class="points-recharge-modal__orders">
-          <header class="points-recharge-modal__subhead">
-            <span class="points-recharge-modal__subhead-bar" />
-            <h3>近期充值订单</h3>
-          </header>
-
-          <ul v-if="recentOrders.length" class="points-recharge-modal__order-list">
-            <li
-              v-for="order in recentOrders"
-              :key="order.orderNo"
-              class="points-recharge-modal__order-item"
-            >
-              <div class="points-recharge-modal__order-main">
-                <strong>{{ order.amountYuan.toFixed(0) }}元</strong>
-                <span>{{ order.orderNo }}</span>
-              </div>
-              <div class="points-recharge-modal__order-side">
-                <strong>{{ order.points.toLocaleString("zh-CN") }}积分</strong>
-                <span>{{ orderStatusLabelMap[order.status] }}</span>
-              </div>
-            </li>
-          </ul>
-
-          <p v-else class="points-recharge-modal__empty">暂无充值订单</p>
-        </div>
-
-        <aside class="points-recharge-modal__pay-panel">
-          <div class="points-recharge-modal__pay-card">
-            <div class="points-recharge-modal__qr-frame">
-              <img
-                v-if="qrCodeUrl"
-                :src="qrCodeUrl"
-                class="points-recharge-modal__qr-image"
-                alt="支付二维码"
+            <div class="points-recharge-modal__amount-input">
+              <span>¥</span>
+              <input
+                id="points-recharge-custom-amount"
+                :value="customAmount"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="请输入充值金额"
+                @input="handleCustomInput"
               />
-              <div v-else class="points-recharge-modal__qr-placeholder">
-                <Icon icon="mdi:qrcode-scan" />
-              </div>
             </div>
-
-            <p class="points-recharge-modal__pay-tip">请扫码完成支付</p>
-
-            <div v-if="currentDisplayOrder" class="points-recharge-modal__pay-meta">
-              <strong>{{ currentDisplayOrder.amountYuan.toFixed(0) }}元</strong>
-              <span>{{ currentDisplayOrder.orderNo }}</span>
-            </div>
-
-            <button
-              type="button"
-              class="points-recharge-modal__submit"
-              :disabled="isCreating"
-              @click="handleGeneratePaymentCode"
-            >
-              <Icon icon="mdi:qrcode-scan" />
-              {{ isCreating ? "生成中..." : "生成支付宝付款码" }}
-            </button>
+            <strong>{{ activePoints.toLocaleString("zh-CN") }}积分</strong>
           </div>
-
-          <p class="points-recharge-modal__notice">
-            温馨提示: 积分不可兑换会员、不可转赠，也不可提现。积分充值后无限期拥有，不支持退款或反向兑换为人民币积分规则。
-          </p>
-        </aside>
+        </div>
       </section>
+
+      <section class="points-recharge-modal__payment-section">
+        <h3>支付方式</h3>
+        <div class="points-recharge-modal__payment-options">
+          <button
+            type="button"
+            class="points-recharge-modal__payment-option is-alipay"
+            :class="{ 'is-active': selectedPayChannel === 'alipay' }"
+            @click="selectedPayChannel = 'alipay'"
+          >
+            <span class="points-recharge-modal__payment-icon">
+              <Icon icon="ri:alipay-fill" />
+            </span>
+            <span>
+              <strong>支付宝支付</strong>
+              <small>使用支付宝扫码完成支付</small>
+            </span>
+            <Icon
+              class="points-recharge-modal__payment-check"
+              :icon="
+                selectedPayChannel === 'alipay'
+                  ? 'mdi:check-circle'
+                  : 'mdi:circle-outline'
+              "
+            />
+          </button>
+
+          <button
+            type="button"
+            class="points-recharge-modal__payment-option is-wechat"
+            :class="{ 'is-active': selectedPayChannel === 'wechat' }"
+            @click="selectedPayChannel = 'wechat'"
+          >
+            <span class="points-recharge-modal__payment-icon">
+              <Icon icon="ri:wechat-fill" />
+            </span>
+            <span>
+              <strong>微信支付</strong>
+              <small>使用微信扫码完成支付</small>
+            </span>
+            <Icon
+              class="points-recharge-modal__payment-check"
+              :icon="
+                selectedPayChannel === 'wechat'
+                  ? 'mdi:check-circle'
+                  : 'mdi:circle-outline'
+              "
+            />
+          </button>
+        </div>
+      </section>
+
+      <footer class="points-recharge-modal__footer">
+        <p>充值积分不支持提现、转赠或兑换现金。</p>
+        <button
+          type="button"
+          class="points-recharge-modal__submit"
+          :disabled="isCreating || creditsStore.isLoadingProducts"
+          @click="handlePayNow"
+        >
+          <Icon v-if="isCreating" icon="mdi:loading" class="is-spinning" />
+          <Icon v-else :icon="paymentChannelIcon" />
+          {{
+            creditsStore.isLoadingProducts
+              ? "正在加载充值套餐..."
+              : isCreating
+                ? "正在创建订单..."
+                : `立即支付 ¥${activeAmount}`
+          }}
+        </button>
+      </footer>
+    </div>
+  </NModal>
+
+  <NModal
+    :show="showPaymentCode"
+    :mask-closable="false"
+    transform-origin="center"
+    @update:show="!$event && closePaymentCode()"
+  >
+    <div
+      class="payment-code-modal"
+      :class="[modalThemeClass, `payment-code-modal--${selectedPayChannel}`]"
+      role="dialog"
+      aria-labelledby="payment-code-modal-title"
+    >
+      <button
+        type="button"
+        class="payment-code-modal__close"
+        aria-label="关闭订单码"
+        @click="closePaymentCode"
+      >
+        <Icon icon="mdi:close" />
+      </button>
+
+      <header class="payment-code-modal__header">
+        <span class="payment-code-modal__brand-icon">
+          <Icon :icon="paymentChannelIcon" />
+        </span>
+        <div>
+          <h2 id="payment-code-modal-title">{{ paymentChannelName }}订单码</h2>
+          <p>请使用{{ paymentChannelName }}扫描二维码完成支付</p>
+        </div>
+      </header>
+
+      <div class="payment-code-modal__countdown">
+        <span>订单码有效时间</span>
+        <strong>{{ countdownLabel }}</strong>
+      </div>
+
+      <div class="payment-code-modal__qr-frame">
+        <img :src="qrCodeUrl" alt="真实支付订单二维码" />
+        <span class="payment-code-modal__qr-logo">
+          <Icon :icon="paymentChannelIcon" />
+        </span>
+      </div>
+
+      <div class="payment-code-modal__amount">
+        <span>支付金额</span>
+        <strong>¥{{ activePaymentOrder?.amountYuan.toFixed(2) }}</strong>
+        <small>到账 {{ activePaymentOrder?.points.toLocaleString("zh-CN") }} 积分</small>
+      </div>
+
+      <div class="payment-code-modal__order">
+        <span>订单号</span>
+        <strong>{{ activePaymentOrder?.orderNo }}</strong>
+      </div>
+
+      <p class="payment-code-modal__status">
+        <span />
+        正在等待支付结果，请勿关闭页面
+      </p>
     </div>
   </NModal>
 </template>
 
 <style scoped lang="scss">
-.points-recharge-modal {
-  --prm-bg: rgba(255, 255, 255, 0.96);
-  --prm-panel: rgba(255, 255, 255, 0.86);
-  --prm-panel-strong: #ffffff;
+.points-recharge-modal,
+.payment-code-modal {
+  --prm-bg: rgba(255, 255, 255, 0.98);
+  --prm-panel: #ffffff;
+  --prm-panel-soft: #f7f7f8;
   --prm-border: rgba(15, 23, 42, 0.1);
-  --prm-border-strong: rgba(15, 23, 42, 0.18);
-  --prm-text: #111111;
-  --prm-muted: #6b7280;
-  --prm-soft: #f4f4f5;
+  --prm-border-strong: rgba(15, 23, 42, 0.2);
+  --prm-text: #171717;
+  --prm-muted: #747474;
   --prm-accent: #f3c543;
   --prm-accent-strong: #d0a42a;
-  --prm-accent-soft: rgba(243, 197, 67, 0.16);
-  --prm-shadow: 0 28px 72px rgba(15, 23, 42, 0.16);
-  --prm-font:
-    "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-
-  position: relative;
-  width: min(820px, calc(100vw - 40px));
-  padding: 26px 26px 20px;
-  border: 1px solid var(--prm-border);
-  border-radius: 18px;
-  background: var(--prm-bg);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--prm-shadow);
+  --prm-accent-soft: rgba(243, 197, 67, 0.13);
+  --prm-shadow: 0 28px 80px rgba(15, 23, 42, 0.2);
   color: var(--prm-text);
-  font-family: var(--prm-font);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
 }
 
 .points-recharge-modal--dark {
-  --prm-bg: rgba(20, 20, 20, 0.9);
-  --prm-panel: rgba(30, 30, 30, 0.9);
-  --prm-panel-strong: rgba(28, 28, 28, 0.98);
+  --prm-bg: rgba(24, 24, 24, 0.98);
+  --prm-panel: #222222;
+  --prm-panel-soft: #1c1c1c;
   --prm-border: rgba(255, 255, 255, 0.08);
-  --prm-border-strong: rgba(243, 197, 67, 0.72);
-  --prm-text: #f5f5f5;
-  --prm-muted: rgba(255, 255, 255, 0.6);
-  --prm-soft: rgba(255, 255, 255, 0.04);
+  --prm-border-strong: rgba(243, 197, 67, 0.62);
+  --prm-text: #f4f4f4;
+  --prm-muted: rgba(255, 255, 255, 0.56);
   --prm-accent: #f3c543;
-  --prm-accent-strong: #f7cf59;
-  --prm-accent-soft: rgba(243, 197, 67, 0.12);
-  --prm-shadow: 0 28px 84px rgba(0, 0, 0, 0.42);
+  --prm-accent-strong: #f6cf5c;
+  --prm-accent-soft: rgba(243, 197, 67, 0.1);
+  --prm-shadow: 0 30px 90px rgba(0, 0, 0, 0.56);
 }
 
-.points-recharge-modal__close {
+.points-recharge-modal {
+  position: relative;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 26px;
+  border: 1px solid var(--prm-border);
+  border-radius: 18px;
+  background: var(--prm-bg);
+  box-shadow: var(--prm-shadow);
+}
+
+.points-recharge-modal__close,
+.payment-code-modal__close {
   position: absolute;
-  top: 24px;
-  right: 24px;
+  z-index: 2;
+  top: 22px;
+  right: 22px;
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: 999px;
   background: var(--prm-accent);
-  color: #141414;
+  color: #171717;
   cursor: pointer;
   font-size: 18px;
   transition: transform 0.2s ease, filter 0.2s ease;
 }
 
-.points-recharge-modal__close:hover {
-  filter: brightness(1.02);
+.points-recharge-modal__close:hover,
+.payment-code-modal__close:hover {
+  filter: brightness(1.04);
   transform: rotate(90deg);
 }
 
 .points-recharge-modal__topbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   padding-right: 52px;
   margin-bottom: 22px;
 }
 
-.points-recharge-modal__topbar h2 {
+.points-recharge-modal__topbar h2,
+.payment-code-modal__header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+}
+
+.points-recharge-modal__topbar p,
+.payment-code-modal__header p {
+  margin: 6px 0 0;
+  color: var(--prm-muted);
+  font-size: 12px;
 }
 
 .points-recharge-modal__balance {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: 8px;
+  padding: 8px 13px;
   border-radius: 999px;
-  background: var(--prm-soft);
-  color: var(--prm-text);
-  font-size: 13px;
-  line-height: 1;
+  background: var(--prm-panel-soft);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .points-recharge-modal__balance span {
@@ -433,364 +537,434 @@ async function handleGeneratePaymentCode() {
 }
 
 .points-recharge-modal__balance strong {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
 }
 
 .points-recharge-modal__section {
-  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--prm-border);
 }
 
 .points-recharge-modal__presets {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .points-recharge-modal__preset {
   display: flex;
-  min-height: 82px;
+  min-height: 72px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 6px;
+  padding: 10px;
   border: 1px solid var(--prm-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--prm-panel);
   color: var(--prm-text);
   cursor: pointer;
   font-family: inherit;
-  text-align: center;
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    transform 0.2s ease;
 }
 
 .points-recharge-modal__preset:hover {
+  border-color: var(--prm-border-strong);
   transform: translateY(-1px);
 }
 
+.points-recharge-modal__preset.is-active {
+  border-color: var(--prm-accent-strong);
+  background: var(--prm-accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(243, 197, 67, 0.18);
+}
+
 .points-recharge-modal__preset strong {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.1;
+  font-size: 18px;
 }
 
 .points-recharge-modal__preset span {
   color: var(--prm-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-}
-
-.points-recharge-modal__preset.is-active {
-  border-color: var(--prm-border-strong);
-  background: var(--prm-accent-soft);
-  box-shadow: 0 0 0 1px rgba(243, 197, 67, 0.28);
-}
-
-.points-recharge-modal--light .points-recharge-modal__preset.is-active {
-  background: rgba(255, 255, 255, 0.92);
 }
 
 .points-recharge-modal__preset--custom strong {
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .points-recharge-modal__custom {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
-.points-recharge-modal__custom label {
+.points-recharge-modal__custom label,
+.points-recharge-modal__payment-section h3 {
   display: block;
-  margin-bottom: 8px;
-  color: var(--prm-muted);
+  margin: 0 0 9px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .points-recharge-modal__custom-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.points-recharge-modal__custom-row input {
-  flex: 1;
-  min-width: 0;
-  height: 46px;
-  padding: 0 14px;
-  border: 1px solid var(--prm-border);
-  border-radius: 12px;
-  background: var(--prm-panel-strong);
-  color: var(--prm-text);
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.points-recharge-modal__custom-row input::placeholder {
-  color: var(--prm-muted);
-}
-
-.points-recharge-modal__custom-row input:focus {
-  outline: none;
-  border-color: var(--prm-accent-strong);
-  box-shadow: 0 0 0 3px rgba(243, 197, 67, 0.14);
-}
-
-.points-recharge-modal__custom-row span {
-  flex-shrink: 0;
-  color: var(--prm-accent-strong);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.points-recharge-modal__content {
-  display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(220px, 0.95fr);
-  gap: 22px;
-  align-items: start;
-}
-
-.points-recharge-modal__orders {
-  min-width: 0;
-}
-
-.points-recharge-modal__subhead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.points-recharge-modal__subhead h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.points-recharge-modal__subhead-bar {
-  width: 4px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--prm-accent);
-}
-
-.points-recharge-modal__order-list {
-  display: grid;
-  gap: 10px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.points-recharge-modal__order-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 52px;
-  padding: 12px 14px;
-  border: 1px solid var(--prm-border);
-  border-radius: 12px;
-  background: var(--prm-panel);
-}
-
-.points-recharge-modal__order-main,
-.points-recharge-modal__order-side {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.points-recharge-modal__order-side {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.points-recharge-modal__order-main strong,
-.points-recharge-modal__order-side strong {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.points-recharge-modal__order-main span,
-.points-recharge-modal__order-side span {
-  color: var(--prm-muted);
-  font-size: 12px;
-  line-height: 1.35;
-  word-break: break-all;
-}
-
-.points-recharge-modal__pay-panel {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
   gap: 14px;
 }
 
-.points-recharge-modal__pay-card {
+.points-recharge-modal__amount-input {
   display: flex;
+  flex: 1;
+  height: 44px;
   align-items: center;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  padding: 0 13px;
   border: 1px solid var(--prm-border);
-  border-radius: 16px;
+  border-radius: 10px;
   background: var(--prm-panel);
 }
 
-.points-recharge-modal__qr-frame {
-  display: flex;
-  width: 160px;
-  height: 160px;
+.points-recharge-modal__amount-input:focus-within {
+  border-color: var(--prm-accent-strong);
+  box-shadow: 0 0 0 3px var(--prm-accent-soft);
+}
+
+.points-recharge-modal__amount-input span {
+  color: var(--prm-muted);
+  font-size: 16px;
+}
+
+.points-recharge-modal__amount-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 9px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--prm-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.points-recharge-modal__custom-row > strong {
+  color: var(--prm-accent-strong);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.points-recharge-modal__payment-section {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--prm-border);
+}
+
+.points-recharge-modal__payment-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.points-recharge-modal__payment-option {
+  display: grid;
+  grid-template-columns: 42px 1fr 20px;
+  align-items: center;
+  gap: 11px;
+  min-height: 68px;
+  padding: 11px 13px;
+  border: 1px solid var(--prm-border);
+  border-radius: 11px;
+  background: var(--prm-panel);
+  color: var(--prm-text);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.points-recharge-modal__payment-option.is-active {
+  border-color: var(--prm-accent-strong);
+  background: var(--prm-accent-soft);
+}
+
+.points-recharge-modal__payment-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
   align-items: center;
   justify-content: center;
-  padding: 10px;
-  border-radius: 16px;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 27px;
+}
+
+.is-alipay .points-recharge-modal__payment-icon {
+  color: #1677ff;
+}
+
+.is-wechat .points-recharge-modal__payment-icon {
+  color: #07c160;
+}
+
+.points-recharge-modal__payment-option > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.points-recharge-modal__payment-option strong {
+  font-size: 13px;
+}
+
+.points-recharge-modal__payment-option small {
+  color: var(--prm-muted);
+  font-size: 10px;
+}
+
+.points-recharge-modal__payment-check {
+  color: var(--prm-accent-strong);
+  font-size: 19px;
+}
+
+.points-recharge-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.points-recharge-modal__footer p {
+  margin: 0;
+  color: var(--prm-muted);
+  font-size: 10px;
+}
+
+.points-recharge-modal__submit {
+  display: inline-flex;
+  min-width: 210px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--prm-accent);
+  color: #171717;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.points-recharge-modal__submit:hover:not(:disabled) {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.points-recharge-modal__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.is-spinning {
+  animation: payment-spin 0.8s linear infinite;
+}
+
+.payment-code-modal {
+  position: relative;
+  width: min(390px, calc(100vw - 32px));
+  padding: 26px;
+  border: 1px solid var(--prm-border);
+  border-radius: 18px;
+  background: var(--prm-bg);
+  box-shadow: var(--prm-shadow);
+}
+
+.payment-code-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 42px;
+}
+
+.payment-code-modal__brand-icon {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #ffffff;
+  font-size: 30px;
+}
+
+.payment-code-modal--alipay .payment-code-modal__brand-icon,
+.payment-code-modal--alipay .payment-code-modal__qr-logo {
+  color: #1677ff;
+}
+
+.payment-code-modal--wechat .payment-code-modal__brand-icon,
+.payment-code-modal--wechat .payment-code-modal__qr-logo {
+  color: #07c160;
+}
+
+.payment-code-modal__countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 15px;
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: var(--prm-accent-soft);
+}
+
+.payment-code-modal__countdown span {
+  color: var(--prm-muted);
+  font-size: 11px;
+}
+
+.payment-code-modal__countdown strong {
+  color: var(--prm-accent-strong);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+.payment-code-modal__qr-frame {
+  position: relative;
+  width: 224px;
+  height: 224px;
+  padding: 12px;
+  margin: 0 auto;
+  border-radius: 15px;
   background: #ffffff;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 
-.points-recharge-modal__qr-image {
+.payment-code-modal__qr-frame img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.points-recharge-modal__qr-placeholder {
+.payment-code-modal__qr-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   display: inline-flex;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  color: #111111;
-  font-size: 48px;
+  border: 4px solid #ffffff;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 26px;
+  transform: translate(-50%, -50%);
 }
 
-.points-recharge-modal__pay-tip {
-  margin: 0;
-  color: var(--prm-text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.points-recharge-modal__pay-meta {
+.payment-code-modal__amount {
   display: flex;
-  width: 100%;
+  align-items: center;
   flex-direction: column;
   gap: 4px;
-  padding-top: 2px;
-  text-align: center;
+  padding: 16px 0;
 }
 
-.points-recharge-modal__pay-meta strong {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.points-recharge-modal__pay-meta span {
+.payment-code-modal__amount span,
+.payment-code-modal__amount small,
+.payment-code-modal__order span {
   color: var(--prm-muted);
-  font-size: 12px;
-  line-height: 1.35;
-  word-break: break-all;
+  font-size: 10px;
 }
 
-.points-recharge-modal__submit {
-  display: inline-flex;
-  width: 100%;
-  min-height: 44px;
+.payment-code-modal__amount strong {
+  font-size: 27px;
+  line-height: 1.2;
+}
+
+.payment-code-modal__order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: var(--prm-panel-soft);
+}
+
+.payment-code-modal__order strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-code-modal__status {
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 12px;
+  margin: 15px 0 0;
+  color: var(--prm-muted);
+  font-size: 10px;
+}
+
+.payment-code-modal__status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
   background: var(--prm-accent);
-  color: #111111;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  transition: filter 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 0 0 4px var(--prm-accent-soft);
+  animation: payment-pulse 1.6s ease-in-out infinite;
 }
 
-.points-recharge-modal__submit:hover:not(:disabled) {
-  filter: brightness(1.02);
-  transform: translateY(-1px);
+@keyframes payment-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.points-recharge-modal__submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
+@keyframes payment-pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 
-.points-recharge-modal__notice {
-  margin: 0;
-  color: var(--prm-muted);
-  font-size: 11px;
-  line-height: 1.55;
-  text-align: center;
-}
-
-.points-recharge-modal__empty {
-  margin: 0;
-  padding: 22px 16px;
-  border: 1px dashed var(--prm-border);
-  border-radius: 12px;
-  color: var(--prm-muted);
-  font-size: 13px;
-  text-align: center;
-}
-
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .points-recharge-modal {
-    width: min(820px, calc(100vw - 24px));
-    padding: 22px 18px 18px;
+    padding: 22px 18px;
   }
 
   .points-recharge-modal__presets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .points-recharge-modal__content {
+  .points-recharge-modal__payment-options {
     grid-template-columns: 1fr;
   }
 
-  .points-recharge-modal__pay-card {
-    max-width: 320px;
-    margin: 0 auto;
-  }
-}
-
-@media (max-width: 480px) {
-  .points-recharge-modal__topbar {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-right: 48px;
-  }
-
-  .points-recharge-modal__custom-row {
+  .points-recharge-modal__footer {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .points-recharge-modal__custom-row span {
-    text-align: right;
+  .points-recharge-modal__submit {
+    width: 100%;
   }
+}
 
-  .points-recharge-modal__order-item {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .points-recharge-modal__order-side {
-    align-items: flex-start;
-    text-align: left;
+@media (prefers-reduced-motion: reduce) {
+  .points-recharge-modal *,
+  .payment-code-modal * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style>

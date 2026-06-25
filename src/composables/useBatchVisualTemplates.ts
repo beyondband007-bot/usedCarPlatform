@@ -31,6 +31,8 @@ function normalizeLogoPlacements(
 function normalizeConfig(input: BatchVisualTemplateInput): BatchVisualConfig {
   return {
     enableSceneChange: input.enableSceneChange,
+    enableInteriorSceneChange:
+      input.enableSceneChange && input.enableInteriorSceneChange,
     sceneOptionId: input.enableSceneChange
       ? getBatchSceneOptionId(input.sceneCategory, input.sceneIndex)
       : undefined,
@@ -62,7 +64,7 @@ function mapInteriorFlags(config: BatchVisualConfig) {
 
   return {
     interiorCollage: collage,
-    interiorEnhance: collage && Boolean(config.enableInteriorClean),
+    interiorEnhance: Boolean(config.enableInteriorClean),
   }
 }
 
@@ -82,6 +84,10 @@ export function useBatchVisualTemplates() {
         id: item.presetId,
         name: item.name,
         enableSceneChange: item.visualConfig.enableSceneChange,
+        enableInteriorSceneChange: Boolean(
+          item.visualConfig.enableSceneChange &&
+          item.visualConfig.enableInteriorSceneChange,
+        ),
         sceneIndex: item.visualConfig.sceneIndex,
         sceneCategory: item.visualConfig.sceneCategory,
         outputRatio: item.visualConfig.outputRatio,
@@ -121,6 +127,10 @@ export function useBatchVisualTemplates() {
       id: created.presetId,
       name: created.name,
       enableSceneChange: created.visualConfig.enableSceneChange,
+      enableInteriorSceneChange: Boolean(
+        created.visualConfig.enableSceneChange &&
+        created.visualConfig.enableInteriorSceneChange,
+      ),
       sceneIndex: created.visualConfig.sceneIndex,
       sceneCategory: created.visualConfig.sceneCategory,
       outputRatio: created.visualConfig.outputRatio,
@@ -151,6 +161,10 @@ export function useBatchVisualTemplates() {
       id: updated.presetId,
       name: updated.name,
       enableSceneChange: updated.visualConfig.enableSceneChange,
+      enableInteriorSceneChange: Boolean(
+        updated.visualConfig.enableSceneChange &&
+        updated.visualConfig.enableInteriorSceneChange,
+      ),
       sceneIndex: updated.visualConfig.sceneIndex,
       sceneCategory: updated.visualConfig.sceneCategory,
       outputRatio: updated.visualConfig.outputRatio,

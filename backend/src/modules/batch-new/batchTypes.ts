@@ -2,6 +2,7 @@ import type { LogoPlacement, OutputRatio, TaskStatus } from "../../shared/types"
 
 export interface BatchVisualConfig {
   enableSceneChange?: boolean;
+  enableInteriorSceneChange?: boolean;
   sceneOptionId?: string;
   sceneReferenceImageUrl?: string;
   sceneIndex?: number;
@@ -56,6 +57,8 @@ export interface BatchItemSummary {
 export type BatchItemKind =
   | "exterior"
   | "interior"
+  | "interior_scene"
+  | "interior_scene_clean"
   | "interior_clean"
   | "interior_collage"
   | "interior_clean_collage";

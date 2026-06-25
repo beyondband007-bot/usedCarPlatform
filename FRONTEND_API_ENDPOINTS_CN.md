@@ -418,6 +418,7 @@ POST /api/v1/modules/batch-new/presets
   "name": "展厅批量上新",
   "visualConfig": {
     "enableSceneChange": true,
+    "enableInteriorSceneChange": false,
     "sceneOptionId": "white-studio",
     "sceneReferenceImageUrl": "https://...",
     "sceneIndex": 0,
@@ -454,6 +455,7 @@ POST /api/v1/modules/batch-new/tasks
   ],
   "visualConfig": {
     "enableSceneChange": true,
+    "enableInteriorSceneChange": false,
     "sceneOptionId": "white-studio",
     "sceneReferenceImageUrl": "https://...",
     "sceneIndex": 0,

@@ -34,11 +34,13 @@ describe("usedCarPlatform seed catalog", () => {
     );
   });
 
-  it("provides the three usedCarPlatform recharge products", () => {
+  it("provides the five usedCarPlatform recharge products shown by the recharge modal", () => {
     expect(seed.RECHARGE_PRODUCTS).toMatchObject([
-      { name: "Enterprise Basic", amount: "980.00", points: "20000.0000" },
-      { name: "Enterprise Team", amount: "3980.00", points: "100000.0000" },
-      { name: "Enterprise Flagship", amount: "9800.00", points: "800000.0000" }
+      { name: "积分充值 100 元", amount: "100.00", points: "10000.0000" },
+      { name: "积分充值 200 元", amount: "200.00", points: "20000.0000" },
+      { name: "积分充值 500 元", amount: "500.00", points: "50000.0000" },
+      { name: "积分充值 1000 元", amount: "1000.00", points: "100000.0000" },
+      { name: "积分充值 2000 元", amount: "2000.00", points: "200000.0000" }
     ]);
   });
 });

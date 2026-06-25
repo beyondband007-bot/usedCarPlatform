@@ -35,6 +35,8 @@ import {
   batchInteriorCleanCollagePrompt,
   batchInteriorCollagePrompt,
   batchInteriorPrompt,
+  batchInteriorSceneCleanPrompt,
+  batchInteriorScenePrompt,
   batchWallLogoScenePrompt,
   resolveBatchExteriorPrompt,
   resolveBatchExteriorPromptWithBrandedScene,
@@ -49,6 +51,10 @@ import {
   resolveBatchSceneReferenceImageUrl,
   shouldUploadBatchSceneFromLocalPath,
 } from "./batchScenes";
+import {
+  planInteriorTasks,
+  resolveInteriorProcessingKind,
+} from "./batchInteriorWorkflow";
 import type { BatchItemKind, BatchItemSummary, BatchVisualConfig, CreateBatchTaskRequest } from "./batchTypes";
 import { normalizeTaskResults, type GenerationTaskRecord } from "../tasks/tasksRepository";
 
@@ -59,41 +65,22 @@ const outputRatioOrDefault = (value?: string): OutputRatio => resolveOutputRatio
 const booleanFlag = (config: BatchVisualConfig, a: keyof BatchVisualConfig, b?: keyof BatchVisualConfig) =>
   config[a] === true || (b ? config[b] === true : false);
 
-const interiorGroupSizes = (count: number) => {
-  if (count < 2 || count > 10) {
-    throw errors.invalidParameter("interior collage requires 2-10 images", { count });
-  }
-  if (count <= 4) return [count];
-  if (count <= 8) {
-    const first = Math.ceil(count / 2);
-    return [first, count - first];
-  }
-  return count === 9 ? [3, 3, 3] : [4, 3, 3];
-};
-
-const splitInteriorAssetIds = (assetIds: string[]) => {
-  const sizes = interiorGroupSizes(assetIds.length);
-  let cursor = 0;
-  return sizes.map((size) => {
-    const group = assetIds.slice(cursor, cursor + size);
-    cursor += size;
-    return group;
-  });
-};
-
-const resolveInteriorItemKind = (config: BatchVisualConfig): BatchItemKind => {
-  const clean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
-  const collage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
-  if (clean && collage) return "interior_clean_collage";
-  if (collage) return "interior_collage";
-  return "interior_clean";
-};
-
 const resolveInteriorPrompt = (itemKind: BatchItemKind) => {
+  if (itemKind === "interior_scene_clean") return batchInteriorSceneCleanPrompt;
+  if (itemKind === "interior_scene") return batchInteriorScenePrompt;
   if (itemKind === "interior_clean_collage") return batchInteriorCleanCollagePrompt;
   if (itemKind === "interior_collage") return batchInteriorCollagePrompt;
   return batchInteriorPrompt;
 };
+
+const isInteriorSceneItemKind = (itemKind: BatchItemKind) =>
+  itemKind === "interior_scene" || itemKind === "interior_scene_clean";
+
+const isInteriorProcessingItemKind = (itemKind: BatchItemKind) =>
+  itemKind === "interior_clean" || isInteriorSceneItemKind(itemKind);
+
+const requiresInteriorProcessing = (config: BatchVisualConfig) =>
+  resolveInteriorProcessingKind(config) !== null;
 
 const requireBatchLogoAsset = async (config: BatchVisualConfig, userId: string) => {
   if (!config.useRecentLogo) return null;
@@ -146,6 +133,8 @@ const validateBatchLogoPlacements = (config: BatchVisualConfig) => {
 const deliveryTitleByKind: Record<BatchItemKind, string> = {
   exterior: "外观成片",
   interior: "内饰清洁",
+  interior_scene: "内饰场景",
+  interior_scene_clean: "内饰场景清洁",
   interior_clean: "内饰清洁",
   interior_collage: "内饰拼图",
   interior_clean_collage: "内饰清洁拼图",
@@ -211,6 +200,7 @@ class BatchService {
 
     const visualConfig: BatchVisualConfig = {
       enableSceneChange: true,
+      enableInteriorSceneChange: false,
       sceneOptionId: "white-studio",
       sceneIndex: 0,
       sceneCategory: "展厅灯光",
@@ -272,7 +262,12 @@ class BatchService {
     const batchId = createId("batch");
     const config = body.visualConfig;
     const interiorClean = booleanFlag(config, "enableInteriorClean", "interiorEnhance");
+    const interiorSceneChange = booleanFlag(config, "enableInteriorSceneChange");
     const interiorCollage = booleanFlag(config, "enableInteriorCollage", "interiorCollage");
+    const interiorProcessing = interiorSceneChange || interiorClean;
+    if (interiorSceneChange && !booleanFlag(config, "enableSceneChange")) {
+      throw errors.invalidParameter("interior scene change requires scene change");
+    }
     let total = 0;
 
     const logoPlacements = validateBatchLogoPlacements(config);
@@ -289,10 +284,15 @@ class BatchService {
       }
       await this.validateAssets(group.exteriorAssetIds, "car_exterior", subscription.userKey);
       total += group.exteriorAssetIds.length;
-      if (interiorClean || interiorCollage) {
+      if (interiorProcessing || interiorCollage) {
         const interiorAssetIds = group.interiorAssetIds ?? [];
+        if (!interiorAssetIds.length) {
+          throw errors.invalidParameter("interiorAssetIds is required when interior processing is enabled");
+        }
         await this.validateAssets(interiorAssetIds, "car_interior", subscription.userKey);
-        total += interiorCollage ? splitInteriorAssetIds(interiorAssetIds).length : interiorAssetIds.length;
+        const interiorPlan = planInteriorTasks(config, interiorAssetIds);
+        total +=
+          interiorPlan.processingItems.length + interiorPlan.collageItems.length;
       }
     }
 
@@ -342,26 +342,41 @@ class BatchService {
           subscription,
         });
       }
-      if (interiorClean || interiorCollage) {
+      if (interiorProcessing || interiorCollage) {
         const interiorAssetIds = group.interiorAssetIds ?? [];
-        const itemKind = resolveInteriorItemKind(config);
-        const interiorGroups = interiorCollage
-          ? splitInteriorAssetIds(interiorAssetIds)
-          : interiorAssetIds.map((assetId) => [assetId]);
-        for (const [interiorGroupIndex, assetIds] of interiorGroups.entries()) {
-          await this.createSubTask({
-            batchId,
-            groupTitle,
-            assetIds,
-            itemKind,
-            sortOrder: sortOrder++,
-            config,
-            subscription,
-            optionId:
-              interiorCollage && interiorGroups.length > 1
-                ? `${itemKind}-${interiorGroupIndex + 1}-of-${interiorGroups.length}`
-                : itemKind,
-          });
+        const interiorPlan = planInteriorTasks(config, interiorAssetIds);
+        if (interiorPlan.processingKind) {
+          for (const processingItem of interiorPlan.processingItems) {
+            await this.createSubTask({
+              batchId,
+              groupTitle,
+              assetIds: processingItem.assetIds,
+              itemKind: processingItem.itemKind,
+              sortOrder: sortOrder++,
+              config,
+              subscription,
+            });
+          }
+        }
+        if (interiorPlan.collageItems.length) {
+          for (const [
+            interiorGroupIndex,
+            collageItem,
+          ] of interiorPlan.collageItems.entries()) {
+            await this.createSubTask({
+              batchId,
+              groupTitle,
+              assetIds: collageItem.assetIds,
+              itemKind: collageItem.itemKind,
+              sortOrder: sortOrder++,
+              config,
+              subscription,
+              optionId:
+                interiorPlan.collageItems.length > 1
+                  ? `interior_collage-${interiorGroupIndex + 1}-of-${interiorPlan.collageItems.length}`
+                  : "interior_collage",
+            });
+          }
         }
       }
     }
@@ -770,10 +785,31 @@ class BatchService {
       return;
     }
 
-    const waiting = await batchRepository.listWaitingItems(batchId, 2);
+    const waiting = await batchRepository.listWaitingItems(batchId, 100);
+    let submittedCount = 0;
     for (const item of waiting) {
+      if (submittedCount >= 2) break;
       try {
-        await this.submitItem(batch, item);
+        const dependency = await this.resolveInteriorCollageDependencies(batch, item);
+        if (dependency.status === "pending") continue;
+        if (dependency.status === "failed") {
+          await tasksRepository.markFailed(
+            item.generationTaskId,
+            "BATCH_INTERIOR_DEPENDENCY_FAILED",
+            dependency.message,
+          );
+          await batchRepository.updateItemFromTask({
+            itemId: item.itemId,
+            status: "fail",
+            progress: 100,
+            resultCount: 0,
+            errorCode: "BATCH_INTERIOR_DEPENDENCY_FAILED",
+            errorMessage: dependency.message,
+          });
+          continue;
+        }
+        await this.submitItem(batch, item, dependency.inputUrls);
+        submittedCount += 1;
       } catch (error) {
         if (error instanceof Error && error.message.includes("no available kie api key")) break;
         await batchRepository.updateItemFromTask({
@@ -789,6 +825,65 @@ class BatchService {
 
     await batchRepository.recalcBatch(batchId);
     await batchRepository.recalcBatchBilling(batchId);
+  }
+
+  private async resolveInteriorCollageDependencies(
+    batch: BatchTaskRecord,
+    item: BatchItemSummary,
+  ): Promise<
+    | { status: "ready"; inputUrls?: string[] }
+    | { status: "pending" }
+    | { status: "failed"; message: string }
+  > {
+    if (
+      item.itemKind !== "interior_collage" ||
+      !requiresInteriorProcessing(batch.visualConfig)
+    ) {
+      return { status: "ready" };
+    }
+
+    const items = await batchRepository.listItems(batch.id);
+    const inputUrls: string[] = [];
+    for (const sourceAssetId of item.sourceAssetIds) {
+      const dependency = items.find(
+        (candidate) =>
+          candidate.groupTitle === item.groupTitle &&
+          isInteriorProcessingItemKind(candidate.itemKind) &&
+          candidate.sourceAssetIds.includes(sourceAssetId),
+      );
+      if (!dependency) {
+        return {
+          status: "failed",
+          message: `missing processed interior dependency for ${sourceAssetId}`,
+        };
+      }
+      if (dependency.status === "fail" || dependency.status === "canceled") {
+        return {
+          status: "failed",
+          message:
+            dependency.error?.message ??
+            `processed interior dependency failed for ${sourceAssetId}`,
+        };
+      }
+      if (dependency.status !== "success") {
+        return { status: "pending" };
+      }
+
+      const task = await tasksRepository.findById(
+        dependency.generationTaskId,
+        batch.userId,
+      );
+      const result = task ? normalizeTaskResults(task.resultJson)[0] : null;
+      if (!result?.url) {
+        return {
+          status: "failed",
+          message: `processed interior result is missing for ${sourceAssetId}`,
+        };
+      }
+      inputUrls.push(result.url);
+    }
+
+    return { status: "ready", inputUrls };
   }
 
   private async createSubTask(input: {
@@ -879,7 +974,11 @@ class BatchService {
     }
   }
 
-  private async submitItem(batch: BatchTaskRecord, item: BatchItemSummary) {
+  private async submitItem(
+    batch: BatchTaskRecord,
+    item: BatchItemSummary,
+    resolvedInputUrls?: string[],
+  ) {
     const config = batch.visualConfig;
     const task = await tasksRepository.findById(item.generationTaskId, batch.userId);
     if (!task) throw errors.taskNotFound();
@@ -892,8 +991,10 @@ class BatchService {
       sourceAssets.push(asset);
     }
 
-    const inputUrls: string[] = [];
-    const wallLogoSceneMode = item.itemKind === "exterior" && requiresBatchWallLogoScene(config);
+    const inputUrls: string[] = resolvedInputUrls ? [...resolvedInputUrls] : [];
+    const wallLogoSceneMode =
+      requiresBatchWallLogoScene(config) &&
+      (item.itemKind === "exterior" || isInteriorSceneItemKind(item.itemKind));
     const logoPlacements = resolveBatchLogoPlacements(config);
     let billing: FrozenGenerationBilling | null = null;
     let lease: KieAccountLease | null = null;
@@ -921,18 +1022,23 @@ class BatchService {
         scope: batchItemBillingScope(item.itemId),
       });
 
-      for (const asset of sourceAssets) {
-        const uploaded = await runKieOperation(() =>
-          kieClient.uploadLocalFileWithLease(
-            lease as KieAccountLease,
-            asset.localPath,
-            `used-car-platform/batch-new/${item.itemKind}`,
-          ),
-        );
-        inputUrls.push(uploaded.fileUrl);
+      if (!resolvedInputUrls) {
+        for (const asset of sourceAssets) {
+          const uploaded = await runKieOperation(() =>
+            kieClient.uploadLocalFileWithLease(
+              lease as KieAccountLease,
+              asset.localPath,
+              `used-car-platform/batch-new/${item.itemKind}`,
+            ),
+          );
+          inputUrls.push(uploaded.fileUrl);
+        }
       }
 
-      if (item.itemKind === "exterior" && booleanFlag(config, "enableSceneChange")) {
+      if (
+        (item.itemKind === "exterior" || isInteriorSceneItemKind(item.itemKind)) &&
+        booleanFlag(config, "enableSceneChange")
+      ) {
         if (wallLogoSceneMode) {
           if (!batch.brandedSceneUrl) {
             throw errors.invalidParameter("batch-new branded scene is not ready", {
