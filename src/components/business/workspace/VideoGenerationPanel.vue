@@ -770,6 +770,9 @@ async function submitConfirmedVideo() {
         </div>
         <div class="sv-template-summary-body">
           <h3>{{ selectedTemplate.title }}</h3>
+          <p v-if="selectedTemplate.previewSubtitle" class="sv-template-summary-subtitle">
+            {{ selectedTemplate.previewSubtitle }}
+          </p>
           <div class="sv-template-summary-tags">
             <span>{{ selectedTemplate.typeLabel }}</span>
             <span class="is-accent">{{ selectedTemplate.styleLabel }}</span>
@@ -1612,6 +1615,14 @@ async function submitConfirmedVideo() {
   color: var(--sv-text);
   font-size: 16px;
   font-weight: 700;
+}
+
+.sv-template-summary-subtitle {
+  margin: -2px 0 8px;
+  color: var(--sv-accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .sv-template-summary-tags {

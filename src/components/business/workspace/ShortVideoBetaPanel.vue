@@ -248,6 +248,11 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
+function resolveTemplateCardSubtitle(template: VideoTemplate): string {
+  if (template.previewSubtitle) return template.previewSubtitle;
+  return [template.typeLabel, template.styleLabel].filter(Boolean).join(" · ");
+}
+
 function openTemplatePreview(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
     message.info("该模板暂未开放，敬请期待！");
@@ -766,7 +771,19 @@ watch(
               >
                 <Icon icon="mdi:image-outline" />
               </div>
-              <strong class="sv-template-title">{{ item.title }}</strong>
+              <div class="sv-template-hover-scrim" aria-hidden="true" />
+              <div class="sv-template-overlay" aria-hidden="true" />
+              <div class="sv-template-caption">
+                <strong class="sv-template-caption__title">{{ item.title }}</strong>
+                <div
+                  v-if="resolveTemplateCardSubtitle(item)"
+                  class="sv-template-caption__hover-meta"
+                >
+                  <span class="sv-template-caption__subtitle">
+                    {{ resolveTemplateCardSubtitle(item) }}
+                  </span>
+                </div>
+              </div>
             </div>
           </article>
         </div>
@@ -1207,11 +1224,6 @@ watch(
   min-width: 0;
   width: 100%;
   cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.sv-template-card:hover:not(.is-disabled) {
-  transform: translateY(-2px);
 }
 
 .sv-template-card.is-selected .sv-template-media {
@@ -1401,15 +1413,30 @@ watch(
   background: var(--sv-surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   transition:
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+    box-shadow 0.28s ease,
+    transform 0.28s ease;
+  will-change: transform;
 }
 
 .sv-template-card:hover:not(.is-disabled) .sv-template-media,
 .sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
+  transform: scale(1.03);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
-    0 8px 24px rgba(0, 0, 0, 0.1);
+    0 0 0 1px color-mix(in srgb, var(--sv-accent) 24%, transparent),
+    0 14px 36px rgba(0, 0, 0, 0.18);
+}
+
+.sv-template-cover :deep(.preload-image),
+.sv-template-cover :deep(.preload-image__img),
+.sv-template-cover--video {
+  transition: filter 0.28s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-cover :deep(.preload-image__img),
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-cover :deep(.preload-image__img),
+.sv-template-card:hover:not(.is-disabled) .sv-template-cover--video,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-cover--video {
+  filter: brightness(1.05) contrast(1.04);
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1443,20 +1470,99 @@ watch(
   opacity: 1;
 }
 
-.sv-template-title {
+.sv-template-hover-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.28s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-hover-scrim,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-hover-scrim {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.sv-template-overlay {
   position: absolute;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 2;
-  display: block;
+  height: 36%;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.68) 100%);
+  pointer-events: none;
+  transition:
+    height 0.28s ease,
+    background 0.28s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-overlay,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-overlay {
+  height: 52%;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.82) 58%, rgba(0, 0, 0, 0.92) 100%);
+}
+
+.sv-template-caption {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.sv-template-caption__title {
   overflow: hidden;
-  padding: 32px 12px 10px;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.25;
+  max-width: 100%;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+.sv-template-caption__hover-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  max-width: 100%;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    max-height 0.3s ease,
+    opacity 0.26s ease,
+    transform 0.26s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-caption__hover-meta,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-caption__hover-meta {
+  max-height: 24px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sv-template-caption__subtitle {
+  overflow: hidden;
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.76);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
