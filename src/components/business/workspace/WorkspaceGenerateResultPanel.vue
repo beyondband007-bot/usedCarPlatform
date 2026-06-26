@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import type { WorkspaceGenerateResult } from "@/types/workspace";
@@ -22,11 +22,11 @@ const message = useMessage();
 const videoUrl = computed(() => props.result.previewVideo ?? props.result.downloadUrl);
 const videoDownloadUrl = computed(() => props.result.downloadUrl ?? videoUrl.value);
 const isVideoResult = computed(
-  () => props.result.mediaType === "video" && Boolean(videoUrl.value),
+  () =>
+    props.result.mediaType === "video" &&
+    (Boolean(videoUrl.value) || props.result.previewLoading),
 );
 const isDownloadingVideo = ref(false);
-
-
 
 const videoAspectRatio = computed(() => {
   const width = props.result.imageWidth ?? 16;
@@ -34,44 +34,54 @@ const videoAspectRatio = computed(() => {
   return `${width} / ${height}`;
 });
 
-const isVideoLoading = ref(true);
+const isVideoReady = ref(false);
 const measuredVideoAspectRatio = ref("");
 
 const resolvedVideoAspectRatio = computed(
   () => measuredVideoAspectRatio.value || videoAspectRatio.value,
 );
 
+const isPortraitVideo = computed(() => {
+  const [rawWidth, rawHeight] = resolvedVideoAspectRatio.value
+    .split("/")
+    .map((part) => Number(part.trim()));
 
+  if (!rawWidth || !rawHeight) return true;
+  return rawWidth < rawHeight;
+});
+
+const showVideoLoading = computed(
+  () => Boolean(props.result.previewLoading) || !isVideoReady.value,
+);
 
 function ensureVideoPaused() {
-
   const video = videoRef.value;
-
   if (!video) return;
-
   video.pause();
-
 }
-
-
 
 function handleVideoLoadStart() {
-
-  isVideoLoading.value = true;
-
+  isVideoReady.value = false;
 }
 
-
-
 function handleVideoLoadedMetadata() {
-  isVideoLoading.value = false;
-
   const video = videoRef.value;
   if (video?.videoWidth && video?.videoHeight) {
     measuredVideoAspectRatio.value = `${video.videoWidth} / ${video.videoHeight}`;
   }
+}
 
+function handleVideoCanPlay() {
+  isVideoReady.value = true;
   ensureVideoPaused();
+}
+
+function markVideoReadyIfPossible() {
+  const video = videoRef.value;
+  if (!video) return;
+  if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+    handleVideoCanPlay();
+  }
 }
 
 async function handleDownloadVideo() {
@@ -94,14 +104,31 @@ watch(videoUrl, async () => {
   await nextTick();
   const video = videoRef.value;
 
-  isVideoLoading.value = true;
+  isVideoReady.value = false;
   measuredVideoAspectRatio.value = "";
 
   if (!video) return;
 
   ensureVideoPaused();
-
   video.load();
+  markVideoReadyIfPossible();
+});
+
+watch(
+  () => props.result.previewLoading,
+  async (loading) => {
+    if (loading) {
+      isVideoReady.value = false;
+      return;
+    }
+
+    await nextTick();
+    markVideoReadyIfPossible();
+  },
+);
+
+onMounted(() => {
+  markVideoReadyIfPossible();
 });
 </script>
 
@@ -119,32 +146,56 @@ watch(videoUrl, async () => {
 
     <div class="video-preview-body" aria-label="视频预览区域">
       <div
-
-        class="video-preview-frame"
-
-        :style="{ aspectRatio: resolvedVideoAspectRatio }"
-
+        v-if="showVideoLoading"
+        class="video-preview-waiting"
+        aria-live="polite"
       >
-
-        <div v-if="isVideoLoading" class="video-preview-loading" aria-hidden="true">
-
-          <Icon icon="mdi:loading" class="video-preview-loading-icon" />
-
+        <div
+          class="video-preview-waiting-visual"
+          :class="{
+            'is-portrait': isPortraitVideo,
+            'is-landscape': !isPortraitVideo,
+          }"
+          :style="{ aspectRatio: resolvedVideoAspectRatio }"
+          aria-hidden="true"
+        >
+          <span class="video-preview-waiting-scan"></span>
+          <Icon icon="mdi:video-outline" />
         </div>
 
+        <div class="video-preview-waiting-copy">
+          <p>{{ result.ratioLabel }}</p>
+          <h2>视频加载中</h2>
+          <span>正在准备预览，请稍候</span>
+        </div>
+
+        <div
+          class="video-preview-waiting-progress"
+          role="progressbar"
+          aria-label="视频加载进度"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span></span>
+        </div>
+      </div>
+
+      <div
+        class="video-preview-frame"
+        :class="{ 'is-hidden': showVideoLoading }"
+        :style="{ aspectRatio: resolvedVideoAspectRatio }"
+      >
         <video
+          v-if="videoUrl"
           ref="videoRef"
           class="video-preview-player"
           controls
           playsinline
-          preload="metadata"
+          preload="auto"
           :src="videoUrl"
-
           @loadstart="handleVideoLoadStart"
-
           @loadedmetadata="handleVideoLoadedMetadata"
-
-          @canplay="ensureVideoPaused"
+          @canplay="handleVideoCanPlay"
         >
           当前浏览器不支持视频播放。
         </video>
@@ -156,7 +207,7 @@ watch(videoUrl, async () => {
       <button
         type="button"
         class="video-preview-download"
-        :disabled="isDownloadingVideo"
+        :disabled="isDownloadingVideo || showVideoLoading"
         @click="handleDownloadVideo"
       >
         <Icon icon="mdi:download-outline" class="video-preview-download-icon" />
@@ -177,7 +228,6 @@ watch(videoUrl, async () => {
 <style scoped lang="scss">
 .video-preview {
   display: flex;
-
   min-height: 0;
   flex: 1;
   flex-direction: column;
@@ -234,194 +284,253 @@ watch(videoUrl, async () => {
 }
 
 .video-preview-body {
+  position: relative;
   display: flex;
-  min-height: 0;
+  min-height: clamp(480px, 68vh, 920px);
   flex: 1;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: contain;
-  padding: 16px;
+  padding: clamp(20px, 3vh, 40px) clamp(20px, 3vw, 48px);
   border: 1px solid var(--assist-border, #e1eaf5);
   border-radius: 16px;
   background: transparent;
 }
 
-.video-preview-frame {
-
+.video-preview-waiting {
   position: relative;
-
-  display: flex;
-
-  width: auto;
-
-  height: 100%;
-
-  max-width: 100%;
-
-  max-height: 100%;
-
-  margin: 0 auto;
-
-  align-items: center;
-
-  justify-content: center;
-
-  overflow: hidden;
-
-  border-radius: 12px;
-
-  background: #050914;
-
-}
-
-
-
-.video-preview-loading {
-
-  position: absolute;
-
-  inset: 0;
-
   z-index: 1;
-
   display: grid;
+  align-content: center;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: clamp(20px, 2.8vh, 36px);
+  padding: clamp(28px, 4vh, 56px) clamp(16px, 2vw, 32px);
+}
 
+.video-preview-waiting-visual {
+  position: relative;
+  display: grid;
   place-items: center;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--assist-blue, #3b82f6) 28%, var(--assist-border, #e1eaf5));
+  border-radius: clamp(16px, 1.6vw, 24px);
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      color-mix(in srgb, var(--assist-blue, #3b82f6) 16%, transparent),
+      transparent 38%
+    ),
+    linear-gradient(180deg, #151922 0%, #0d1117 100%);
+}
 
+.video-preview-waiting-visual.is-portrait {
+  height: min(68vh, 820px);
+  width: auto;
+  max-width: min(92%, clamp(300px, 28vw, 520px));
+}
+
+.video-preview-waiting-visual.is-landscape {
+  width: min(92%, clamp(480px, 58vw, 960px));
+  height: auto;
+  max-height: min(52vh, 620px);
+}
+
+.video-preview-waiting-visual .iconify {
+  position: relative;
+  z-index: 1;
+  color: var(--assist-blue, #3b82f6);
+  font-size: clamp(56px, 8vmin, 112px);
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--assist-blue, #3b82f6) 18%, transparent));
+  animation: video-preview-pulse 1.6s ease-in-out infinite;
+}
+
+.video-preview-waiting-scan {
+  position: absolute;
+  inset: 12% 16%;
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.16) 48%,
+    rgba(59, 130, 246, 0.04) 52%,
+    transparent 100%
+  );
+  opacity: 0.75;
+  animation: video-preview-scan 1.8s linear infinite;
+}
+
+.video-preview-waiting-copy {
+  display: grid;
+  width: min(100%, clamp(360px, 52vw, 720px));
+  justify-items: center;
+  gap: clamp(8px, 1.2vh, 14px);
+  text-align: center;
+}
+
+.video-preview-waiting-copy p,
+.video-preview-waiting-copy h2,
+.video-preview-waiting-copy span {
+  margin: 0;
+}
+
+.video-preview-waiting-copy p {
+  color: var(--assist-blue, #3b82f6);
+  font-size: clamp(14px, 1.4vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.video-preview-waiting-copy h2 {
+  color: var(--assist-text);
+  font-size: clamp(26px, 3.2vw, 42px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.video-preview-waiting-copy span {
+  display: block;
+  max-width: min(100%, 560px);
+  color: var(--assist-muted);
+  font-size: clamp(15px, 1.5vw, 20px);
+  line-height: 1.65;
+}
+
+.video-preview-waiting-progress {
+  width: min(100%, clamp(360px, 52vw, 720px));
+  height: clamp(8px, 1vh, 12px);
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--assist-border, #e1eaf5) 70%, transparent);
+}
+
+.video-preview-waiting-progress span {
+  display: block;
+  width: 42%;
+  min-width: 8%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--assist-blue, #3b82f6),
+    color-mix(in srgb, var(--assist-blue, #3b82f6) 55%, white) 70%,
+    color-mix(in srgb, var(--assist-blue, #3b82f6) 25%, white)
+  );
+  animation: video-preview-progress 1.6s ease-in-out infinite;
+}
+
+.video-preview-frame {
+  position: relative;
+  display: flex;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
   background: #050914;
-
 }
 
-
-
-.video-preview-loading-icon {
-
-  width: 28px;
-
-  height: 28px;
-
-  color: #ffffff;
-
-  animation: video-preview-spin 0.8s linear infinite;
-
+.video-preview-frame.is-hidden {
+  position: absolute;
+  inset: 16px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
 }
-
-
-
-@keyframes video-preview-spin {
-
-  to {
-
-    transform: rotate(360deg);
-
-  }
-
-}
-
-
 
 .video-preview-player {
-
   display: block;
-
   width: 100%;
-
   height: 100%;
-
   border-radius: 12px;
-
   background: #050914;
-
   object-fit: contain;
-
 }
-
-
 
 .video-preview-player:fullscreen {
-
   width: 100%;
-
   height: 100%;
-
   border-radius: 0;
-
-  background: #000000;
-
-  object-fit: contain;
-
 }
-
-
-
-.video-preview-player:-webkit-full-screen {
-
-  width: 100%;
-
-  height: 100%;
-
-  border-radius: 0;
-
-  background: #000000;
-
-  object-fit: contain;
-
-}
-
 
 .video-preview-foot {
+  display: flex;
   flex-shrink: 0;
-  padding-top: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .video-preview-ratio {
-  margin: 0 0 12px;
-  color: var(--assist-text);
-  font-size: 14px;
-  font-weight: 900;
+  margin: 0;
+  color: var(--assist-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .video-preview-download {
-  display: flex;
-  width: calc(100% - 48px);
-  max-width: 320px;
-  height: 48px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  margin: 0 auto;
-  padding: 0 24px;
+  height: 40px;
   border: 0;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f5c84c 0%, #ffd766 100%);
-  color: #1e293b;
+  border-radius: 10px;
+  background: var(--assist-blue, #3b82f6);
+  color: #fff;
+  padding: 0 18px;
   font-family: inherit;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(245, 200, 76, 0.25);
-  transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
+  transition: opacity 0.2s ease;
 }
 
 .video-preview-download:disabled {
   cursor: not-allowed;
-  opacity: 0.72;
+  opacity: 0.55;
 }
 
 .video-preview-download-icon {
-  flex-shrink: 0;
   font-size: 18px;
 }
 
-.video-preview-download:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(245, 200, 76, 0.35);
+@keyframes video-preview-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
 }
 
-.video-preview-download:active:not(:disabled) {
-  transform: translateY(1px);
+@keyframes video-preview-scan {
+  0% {
+    transform: translateY(-120%);
+  }
+
+  100% {
+    transform: translateY(120%);
+  }
+}
+
+@keyframes video-preview-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
 }
 </style>

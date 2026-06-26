@@ -32,7 +32,7 @@ const emit = defineEmits<{
 const statusIconMap = recentStatusIconMap;
 
 function resolveMediaStyle() {
-  return resolveRecentFlowMediaStyle();
+  return resolveRecentFlowMediaStyle(props.item);
 }
 
 function resolveCardClass() {

@@ -4,9 +4,10 @@ import {
   formatVideoOutputRatioLabel,
   resolveVideoPreviewSize,
 } from '@/constants/short-video'
-import type { WorkspaceGenerateResult } from '@/types/workspace'
+import type { WorkspaceGenerateResult, WorkspaceRecentItem } from '@/types/workspace'
 import type { VideoGenerationTask } from '@/types/video-generation'
 import { formatDate } from '@/utils/dayjs'
+import { resolveRecentPlaceholderAspectRatio } from '@/utils/workspace-recent'
 
 export function resolveVideoTaskMediaUrl(task: VideoGenerationTask) {
   const videoItem = task.resultVideos?.[0]
@@ -46,6 +47,31 @@ export function buildVideoTaskRatioLabel(task: VideoGenerationTask) {
     resolveVideoTaskOutputRatio(task),
     resolveVideoTaskResolution(task),
   )
+}
+
+export function buildVideoPreviewLoadingResult(
+  item: WorkspaceRecentItem,
+): WorkspaceGenerateResult {
+  const title = item.title?.trim() || '短视频生成'
+  const aspectRatio = resolveRecentPlaceholderAspectRatio(item)
+  const [rawWidth, rawHeight] = aspectRatio
+    .split('/')
+    .map((part) => Number(part.trim()))
+
+  return {
+    taskId: item.taskId,
+    createdAt: item.createdAt,
+    statusText: `加载中 · ${title}`,
+    ratioLabel: item.ratioLabel ?? '视频加载中',
+    mediaType: 'video',
+    previewImage: '',
+    previewVideo: item.downloadUrl ?? '',
+    previewAlt: `${title}生成结果`,
+    downloadUrl: item.downloadUrl ?? '',
+    imageWidth: rawWidth || 9,
+    imageHeight: rawHeight || 16,
+    previewLoading: true,
+  }
 }
 
 export function buildWorkspaceResultFromVideoTask(

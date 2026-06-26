@@ -83,7 +83,14 @@ async function handleDownload() {
     @keydown.enter.prevent="handlePick"
     @keydown.space.prevent="handlePick"
   >
-    <div class="delivery-asset-media" :style="resolveRecentFlowMediaStyle()">
+    <div
+      class="delivery-asset-media"
+      :style="resolveRecentFlowMediaStyle({
+        outputRatio: asset.ratio,
+        imageWidth: asset.width,
+        imageHeight: asset.height,
+      })"
+    >
       <PreloadImage
         v-if="displayImage"
         class="delivery-asset-image"

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
-import { useMessage } from "naive-ui";
+import { NModal, useMessage } from "naive-ui";
 
-import WorkspaceRecentImageCard from "@/components/business/workspace/WorkspaceRecentImageCard.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
+import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
 import {
@@ -24,9 +24,16 @@ import {
 } from "@/constants/short-video-templates";
 import type { VideoHistoryItem, VideoTemplate } from "@/types/video-generation";
 import {
+  parseOutputRatioToCssAspect,
   recentStatusLabelMap,
+  resolveRecentDisplayImage,
 } from "@/utils/workspace-recent";
-import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
+import { formatDate } from "@/utils/dayjs";
+import {
+  distributeMasonryColumns,
+  estimateRecentHeightRatio,
+  resolveMasonryGridColumns,
+} from "@/utils/workspace-recent-layout";
 
 const props = defineProps<{
   isGenerating?: boolean;
@@ -59,11 +66,119 @@ const activeCategory = ref<ShortVideoTemplateCategory>("all");
 const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
+const templatePreviewSession = ref<VideoTemplate | null>(null);
+const templateGridRef = ref<HTMLElement | null>(null);
+const templateGridColumns = ref(2);
+const recentGridRef = ref<HTMLElement | null>(null);
+const recentGridColumns = ref(2);
+
+function estimateTemplateHeightRatio(item: VideoTemplate): number {
+  return item.outputRatio === "16:9" ? 9 / 16 : 16 / 9;
+}
+
+const templateColumns = computed(() =>
+  distributeMasonryColumns(
+    filteredTemplates.value,
+    templateGridColumns.value,
+    estimateTemplateHeightRatio,
+  ),
+);
+
+const recentColumns = computed(() =>
+  distributeMasonryColumns(
+    recentDisplayItems.value,
+    recentGridColumns.value,
+    estimateRecentHeightRatio,
+  ),
+);
+
+function resolveRecentCoverUrl(item: WorkspaceRecentItem): string | undefined {
+  return resolveRecentDisplayImage(item);
+}
+
+function resolveRecentAspectRatio(item: WorkspaceRecentItem): string | undefined {
+  return parseOutputRatioToCssAspect(item.outputRatio);
+}
+
+function formatRecentCreatedAt(item: WorkspaceRecentItem): string {
+  if (!item.createdAt) return "";
+  return formatDate(item.createdAt, "YYYY-MM-DD HH:mm");
+}
+
+let templateGridResizeObserver: ResizeObserver | null = null;
+let recentGridResizeObserver: ResizeObserver | null = null;
+
+function updateTemplateGridColumns() {
+  const width = templateGridRef.value?.clientWidth;
+  if (!width) return;
+  templateGridColumns.value = resolveMasonryGridColumns(width);
+}
+
+function updateRecentGridColumns() {
+  const width = recentGridRef.value?.clientWidth;
+  if (!width) return;
+  recentGridColumns.value = resolveMasonryGridColumns(width);
+}
+
+function observeTemplateGrid(el: HTMLElement | null) {
+  if (!el || !templateGridResizeObserver) return;
+  templateGridResizeObserver.disconnect();
+  templateGridResizeObserver.observe(el);
+}
+
+function observeRecentGrid(el: HTMLElement | null) {
+  if (!el || !recentGridResizeObserver) return;
+  recentGridResizeObserver.disconnect();
+  recentGridResizeObserver.observe(el);
+}
+
+onMounted(() => {
+  updateTemplateGridColumns();
+  updateRecentGridColumns();
+  if (typeof ResizeObserver === "undefined") return;
+
+  templateGridResizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry) {
+      templateGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
+    }
+  });
+  observeTemplateGrid(templateGridRef.value);
+
+  recentGridResizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry) {
+      recentGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
+    }
+  });
+  observeRecentGrid(recentGridRef.value);
+});
+
+watch(templateGridRef, (el) => {
+  if (!el) return;
+  updateTemplateGridColumns();
+  observeTemplateGrid(el);
+});
+
+watch(recentGridRef, (el) => {
+  if (!el) return;
+  updateRecentGridColumns();
+  observeRecentGrid(el);
+});
+
+onBeforeUnmount(() => {
+  if (templateGridResizeObserver) {
+    templateGridResizeObserver.disconnect();
+    templateGridResizeObserver = null;
+  }
+  if (recentGridResizeObserver) {
+    recentGridResizeObserver.disconnect();
+    recentGridResizeObserver = null;
+  }
+});
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
-const recentDisplayItems = computed(() =>
-  normalizeDisplayOrder(recentVideoItems.value),
-);
+const recentDisplayItems = computed(() => recentVideoItems.value);
 const statusLabelMap = recentStatusLabelMap;
 
 const currentTask = computed(() => flow?.currentTask.value ?? null);
@@ -112,14 +227,18 @@ const filteredTemplates = computed(() => {
   });
 });
 
+const isSubmittingVideoTask = computed(() => flow?.isLoading("task") ?? false);
+
 const generatingProgress = computed(() => {
   const task = currentTask.value;
+  if (isSubmittingVideoTask.value) return 8;
   if (isDraftGenerating.value) return 8;
   if (!task) return props.isGenerating ? 8 : 0;
   return Math.max(0, Math.min(100, task.progress ?? 0));
 });
 
 const generatingStatusLabel = computed(() => {
+  if (isSubmittingVideoTask.value) return "正在提交视频任务";
   const task = currentTask.value;
   if (isDraftGenerating.value) return "视频文案生成中";
   if (!task) return "正在准备视频任务";
@@ -129,6 +248,9 @@ const generatingStatusLabel = computed(() => {
 });
 
 const generatingDescription = computed(() => {
+  if (isSubmittingVideoTask.value) {
+    return "正在创建视频生成任务，请稍候。";
+  }
   if (isDraftGenerating.value) return "正在生成口播文案与视频任务参数，请稍候。";
   const ratio =
     flow?.selectedTemplate.value?.outputRatio ??
@@ -149,9 +271,16 @@ const generatingErrorMessage = computed(() => {
 
 const isGenerationMode = computed(() => {
   if (flow?.currentStep.value !== "task") return false;
+  if (isSubmittingVideoTask.value) return true;
   if (!currentTask.value) return false;
   return props.isGenerating || isPendingTask(currentTask.value);
 });
+
+function shouldShowGeneratingView() {
+  if (flow?.currentStep.value !== "task") return false;
+  if (isSubmittingVideoTask.value) return true;
+  return isPendingTask(currentTask.value) || props.isGenerating;
+}
 
 function syncSelectedRecentItem() {
   const displayItems = recentDisplayItems.value;
@@ -173,10 +302,7 @@ function resolveShortVideoView(
   preferred?: ShortVideoView | "recent" | "templates",
 ): ShortVideoView {
   const step = flow?.currentStep.value;
-  if (
-    (props.isGenerating || isPendingTask(currentTask.value)) &&
-    step === "task"
-  ) {
+  if (shouldShowGeneratingView() && step === "task") {
     return "generating";
   }
   if (preferred === "generating") return "generating";
@@ -211,16 +337,42 @@ function useVideoTemplateCover(template: VideoTemplate) {
   return shouldPreferVideoCover(template);
 }
 
-function handleTemplatePick(item: VideoTemplate) {
+function openTemplatePreview(item: VideoTemplate) {
   if (isTemplateDisabled(item)) {
     message.info("该模板暂未开放，敬请期待！");
     return;
   }
   flow?.selectTemplate(item);
+  templatePreviewSession.value = item;
+}
+
+function closeTemplatePreviewPlayer() {
+  templatePreviewSession.value = null;
+}
+
+function handleTemplatePreviewVisibleChange(show: boolean) {
+  if (!show) {
+    closeTemplatePreviewPlayer();
+  }
 }
 
 function openTemplatesView() {
   activeView.value = "templates";
+}
+
+function resetToDefaultView() {
+  activeView.value = "templates";
+}
+
+function syncActiveViewWithFlowState() {
+  if (isGenerationMode.value && shouldShowGeneratingView()) {
+    activeView.value = "generating";
+    return;
+  }
+
+  if (activeView.value === "generating") {
+    resetToDefaultView();
+  }
 }
 
 function isPendingTask(task?: VideoHistoryItem | null) {
@@ -273,6 +425,7 @@ watch(
   () => props.initialView,
   (view) => {
     activeView.value = resolveShortVideoView(view);
+    syncActiveViewWithFlowState();
   },
 );
 
@@ -284,17 +437,37 @@ watch(
       return;
     }
 
-    if (!generating && activeView.value === "generating") {
-      activeView.value = "templates";
+    if (!generating) {
+      syncActiveViewWithFlowState();
     }
   },
   { immediate: true },
 );
 
+watch(
+  () =>
+    [
+      isGenerationMode.value,
+      flow?.currentStep.value,
+      isSubmittingVideoTask.value,
+      currentTask.value?.status,
+    ] as const,
+  () => {
+    syncActiveViewWithFlowState();
+  },
+);
+
 watch(currentTask, (task) => {
-  if (!task) return;
+  if (!task) {
+    syncActiveViewWithFlowState();
+    return;
+  }
   if (isPendingTask(task) && flow?.currentStep.value === "task") {
     activeView.value = "generating";
+    return;
+  }
+  if (task.status === "success" || task.status === "fail" || task.status === "canceled") {
+    syncActiveViewWithFlowState();
   }
 });
 
@@ -308,12 +481,12 @@ onMounted(() => {
 watch(
   () => flow?.currentStep.value,
   (step) => {
-    if (step === "task" && isPendingTask(currentTask.value)) {
+    if (step === "task" && shouldShowGeneratingView()) {
       activeView.value = "generating";
       return;
     }
-    if (step === "template" || step === "form" || step === "review") {
-      activeView.value = "templates";
+    if (step === "template" || step === "form" || step === "review" || step === "result") {
+      syncActiveViewWithFlowState();
     }
   },
 );
@@ -399,19 +572,69 @@ watch(
             <Icon icon="mdi:video-off-outline" />
             <span>暂无最近生成记录</span>
           </div>
-          <div v-else class="sv-recent-flow">
-            <WorkspaceRecentImageCard
-              v-for="item in recentDisplayItems"
-              :key="item.id"
-              :item="item"
-              :selected="item.id === selectedRecentItemId"
-              :clickable="canOpenRecentVideo(item)"
-              :deleting="isDeletingRecent(item)"
-              :show-status="shouldShowRecentStatus(item)"
-              :status-label="statusLabelMap[item.status]"
-              @pick="handleRecentPick"
-              @delete="handleDeleteRecent"
-            />
+          <div
+            v-else
+            ref="recentGridRef"
+            class="sv-template-grid sv-recent-grid"
+          >
+            <div
+              v-for="(column, columnIndex) in recentColumns"
+              :key="`recent-column-${columnIndex}`"
+              class="sv-template-column"
+            >
+              <article
+                v-for="item in column"
+                :key="item.id"
+                class="sv-recent-card"
+                :class="{
+                  'is-selected': item.id === selectedRecentItemId,
+                  'is-clickable': canOpenRecentVideo(item),
+                }"
+                :role="canOpenRecentVideo(item) ? 'button' : undefined"
+                :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+                :aria-label="`查看 ${item.title}`"
+                @click="handleRecentPick(item)"
+                @keydown.enter.prevent="handleRecentPick(item)"
+                @keydown.space.prevent="handleRecentPick(item)"
+              >
+                <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
+                  <PreloadImage
+                    v-if="resolveRecentCoverUrl(item)"
+                    class="sv-recent-card-cover"
+                    :src="resolveRecentCoverUrl(item)!"
+                    :alt="item.title"
+                    loading="lazy"
+                    fit="cover"
+                  />
+                  <div v-else class="sv-recent-card-placeholder">
+                    <Icon icon="mdi:video-off-outline" />
+                  </div>
+                  <span
+                    v-if="shouldShowRecentStatus(item)"
+                    class="sv-recent-card-status"
+                    :class="`is-${item.status}`"
+                  >
+                    {{ statusLabelMap[item.status] }}
+                  </span>
+                  <div class="sv-recent-card-body">
+                    <strong class="sv-recent-card-title">{{ item.title }}</strong>
+                    <span class="sv-recent-card-time">{{ formatRecentCreatedAt(item) }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="sv-recent-card-delete"
+                  :aria-label="`删除${item.title}`"
+                  :disabled="isDeletingRecent(item)"
+                  @click.stop="handleDeleteRecent(item)"
+                >
+                  <Icon
+                    :icon="isDeletingRecent(item) ? 'mdi:loading' : 'mdi:trash-can-outline'"
+                    :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
+                  />
+                </button>
+              </article>
+            </div>
           </div>
         </section>
       </div>
@@ -458,24 +681,74 @@ watch(
           <Icon icon="mdi:video-off-outline" />
           <span>暂无最近生成记录</span>
         </div>
-        <div v-else class="sv-recent-flow">
-          <WorkspaceRecentImageCard
-            v-for="item in recentDisplayItems"
-            :key="item.id"
-            :item="item"
-            :selected="item.id === selectedRecentItemId"
-            :clickable="canOpenRecentVideo(item)"
-            :deleting="isDeletingRecent(item)"
-            :show-status="shouldShowRecentStatus(item)"
-            :status-label="statusLabelMap[item.status]"
-            @pick="handleRecentPick"
-            @delete="handleDeleteRecent"
-          />
+        <div
+          v-else
+          ref="recentGridRef"
+          class="sv-template-grid sv-recent-grid"
+        >
+          <div
+            v-for="(column, columnIndex) in recentColumns"
+            :key="`recent-column-${columnIndex}`"
+            class="sv-template-column"
+          >
+            <article
+              v-for="item in column"
+              :key="item.id"
+              class="sv-recent-card"
+              :class="{
+                'is-selected': item.id === selectedRecentItemId,
+                'is-clickable': canOpenRecentVideo(item),
+              }"
+              :role="canOpenRecentVideo(item) ? 'button' : undefined"
+              :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+              :aria-label="`查看 ${item.title}`"
+              @click="handleRecentPick(item)"
+              @keydown.enter.prevent="handleRecentPick(item)"
+              @keydown.space.prevent="handleRecentPick(item)"
+            >
+              <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
+                <PreloadImage
+                  v-if="resolveRecentCoverUrl(item)"
+                  class="sv-recent-card-cover"
+                  :src="resolveRecentCoverUrl(item)!"
+                  :alt="item.title"
+                  loading="lazy"
+                  fit="cover"
+                />
+                <div v-else class="sv-recent-card-placeholder">
+                  <Icon icon="mdi:video-off-outline" />
+                </div>
+                <span
+                  v-if="shouldShowRecentStatus(item)"
+                  class="sv-recent-card-status"
+                  :class="`is-${item.status}`"
+                >
+                  {{ statusLabelMap[item.status] }}
+                </span>
+                <div class="sv-recent-card-body">
+                  <strong class="sv-recent-card-title">{{ item.title }}</strong>
+                  <span class="sv-recent-card-time">{{ formatRecentCreatedAt(item) }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="sv-recent-card-delete"
+                :aria-label="`删除${item.title}`"
+                :disabled="isDeletingRecent(item)"
+                @click.stop="handleDeleteRecent(item)"
+              >
+                <Icon
+                  :icon="isDeletingRecent(item) ? 'mdi:loading' : 'mdi:trash-can-outline'"
+                  :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
+                />
+              </button>
+            </article>
+          </div>
         </div>
       </section>
 
       <section
-        v-else-if="activeView === 'templates'"
+        v-else
         class="sv-gallery"
         aria-label="短视频模板"
       >
@@ -529,22 +802,32 @@ watch(
           <Icon icon="mdi:movie-search-outline" />
           <span>未找到匹配模板，请调整筛选条件</span>
         </div>
-        <div v-else class="sv-template-grid">
-          <article
-            v-for="item in filteredTemplates"
-            :key="item.templateId"
-            class="sv-template-card"
-            :class="{
-              'is-selected': selectedTemplateId === item.templateId,
-              'is-disabled': isTemplateDisabled(item),
-            }"
-            role="button"
-            tabindex="0"
-            :aria-label="`选择模板 ${item.title}`"
-            @click="handleTemplatePick(item)"
-            @keydown.enter.prevent="handleTemplatePick(item)"
-            @keydown.space.prevent="handleTemplatePick(item)"
+        <div
+          v-else
+          ref="templateGridRef"
+          class="sv-template-grid"
+        >
+          <div
+            v-for="(column, columnIndex) in templateColumns"
+            :key="columnIndex"
+            class="sv-template-column"
           >
+            <article
+              v-for="item in column"
+              :key="item.templateId"
+              class="sv-template-card"
+              :class="{
+                'is-selected': selectedTemplateId === item.templateId,
+                'is-disabled': isTemplateDisabled(item),
+                'is-landscape': item.outputRatio === '16:9',
+              }"
+              role="button"
+              tabindex="0"
+              :aria-label="`预览模板 ${item.title}`"
+              @click="openTemplatePreview(item)"
+              @keydown.enter.prevent="openTemplatePreview(item)"
+              @keydown.space.prevent="openTemplatePreview(item)"
+            >
             <div class="sv-template-media">
               <PreloadImage
                 v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item)"
@@ -573,20 +856,67 @@ watch(
               >
                 <Icon icon="mdi:image-outline" />
               </div>
-              <span class="sv-template-duration">最长{{ item.durationSeconds }}秒</span>
-              <span v-if="isTemplateDisabled(item)" class="sv-template-badge is-soon">即将开放</span>
-              <span v-else-if="item.badge === 'hot'" class="sv-template-badge">热门</span>
-              <span v-else-if="item.badge === 'new'" class="sv-template-badge is-new">新品</span>
+              <strong class="sv-template-title">{{ item.title }}</strong>
             </div>
             <footer class="sv-template-foot">
               <strong>{{ item.title }}</strong>
               <span>{{ item.typeLabel }} · {{ item.styleLabel }}</span>
             </footer>
           </article>
+          </div>
         </div>
       </section>
 
     </section>
+
+    <NModal
+      v-if="templatePreviewSession"
+      :show="true"
+      preset="card"
+      :title="templatePreviewSession.title"
+      class="sv-template-preview-modal"
+      :bordered="false"
+      :segmented="{ content: true }"
+      :mask-closable="true"
+      @update:show="handleTemplatePreviewVisibleChange"
+    >
+      <div class="sv-template-preview-body">
+        <div class="sv-template-preview-media">
+          <TemplatePreviewVideoPlayer
+            v-if="getTemplateVideoUrl(templatePreviewSession)"
+            :key="templatePreviewSession.templateId"
+            :src="getTemplateVideoUrl(templatePreviewSession)!"
+            :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
+            :template-id="templatePreviewSession.templateId"
+          />
+          <PreloadImage
+            v-else-if="getTemplatePosterUrl(templatePreviewSession)"
+            class="sv-template-preview-poster"
+            :src="getTemplatePosterUrl(templatePreviewSession)!"
+            :alt="templatePreviewSession.title"
+            fit="contain"
+          />
+          <div v-else class="sv-template-preview-placeholder">
+            <Icon icon="mdi:movie-open-outline" />
+          </div>
+        </div>
+
+        <div class="sv-template-preview-meta">
+          <div class="sv-template-preview-tags">
+            <template v-if="templatePreviewSession.previewSubtitle">
+              <span>最长时长：{{ templatePreviewSession.durationSeconds }}s</span>
+              <span class="is-accent">视频内容：{{ templatePreviewSession.previewSubtitle }}</span>
+            </template>
+            <template v-else>
+              <span>{{ templatePreviewSession.typeLabel }}</span>
+              <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
+              <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+            </template>
+          </div>
+          <p>{{ templatePreviewSession.stylePrompt }}</p>
+        </div>
+      </div>
+    </NModal>
   </section>
 </template>
 
@@ -919,17 +1249,24 @@ watch(
 }
 
 .sv-template-grid {
-  display: grid;
+  display: flex;
   min-height: 0;
   flex: 1;
-  align-content: start;
-  gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.sv-template-column {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .sv-template-grid::-webkit-scrollbar {
@@ -950,102 +1287,29 @@ watch(
 }
 
 .sv-recent-panel {
+  display: flex;
   min-height: 0;
   flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 16px 20px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 16px 20px 18px;
 }
 
-.sv-recent-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sv-recent-panel::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.55);
-}
-
-.sv-beta-panel.theme-dark .sv-recent-panel {
-  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
-}
-
-.sv-beta-panel.theme-dark .sv-recent-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.sv-recent-flow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: max-content;
-  gap: 14px;
-  align-content: start;
-  align-items: start;
-}
-
-.sv-recent-flow :deep(.recent-flow-item) {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  min-width: 0;
-  height: auto;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:hover) {
-  z-index: 30;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 1):hover) {
-  transform-origin: left center;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 2):hover) {
-  transform-origin: center center;
-}
-
-.sv-recent-flow :deep(.recent-flow-item:nth-child(3n):hover) {
-  transform-origin: right center;
-}
-
-@media (max-width: 1023px) {
-  .sv-recent-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 1):hover),
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n + 2):hover),
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(3n):hover) {
-    transform-origin: center center;
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(2n + 1):hover) {
-    transform-origin: left center;
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:nth-child(2n):hover) {
-    transform-origin: right center;
-  }
-}
-
-@media (max-width: 640px) {
-  .sv-recent-flow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sv-recent-flow :deep(.recent-flow-item:hover) {
-    transform-origin: center center;
-  }
+.sv-recent-grid {
+  min-height: 0;
+  flex: 1;
 }
 
 .sv-template-card {
-  display: flex;
+  display: block;
   min-width: 0;
-  flex-direction: column;
-  gap: 10px;
+  width: 100%;
   cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) {
+  transform: translateY(-2px);
 }
 
 .sv-template-card.is-selected .sv-template-media {
@@ -1057,6 +1321,156 @@ watch(
   opacity: 0.58;
 }
 
+.sv-recent-card {
+  position: relative;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  cursor: default;
+  transition: transform 0.2s ease;
+}
+
+.sv-recent-card.is-clickable {
+  cursor: pointer;
+}
+
+.sv-recent-card.is-clickable:hover {
+  transform: translateY(-2px);
+}
+
+.sv-recent-card.is-selected .sv-recent-card-media {
+  box-shadow: 0 0 0 2px var(--sv-accent);
+}
+
+.sv-recent-card-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: var(--sv-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.sv-recent-card.is-clickable:hover .sv-recent-card-media {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.sv-recent-card-cover,
+.sv-recent-card-cover :deep(.preload-image),
+.sv-recent-card-cover :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.sv-recent-card-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--sv-text-soft);
+  font-size: 28px;
+}
+
+.sv-recent-card-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sv-recent-card-status.is-generating {
+  background: rgba(255, 193, 7, 0.92);
+  color: #7a4f00;
+}
+
+.sv-recent-card-status.is-fail {
+  background: rgba(239, 99, 99, 0.92);
+  color: #ffffff;
+}
+
+.sv-recent-card-body {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 28px 10px 10px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+.sv-recent-card-title {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-recent-card-time {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.sv-recent-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.sv-recent-card:hover .sv-recent-card-delete,
+.sv-recent-card:focus-within .sv-recent-card-delete {
+  opacity: 1;
+}
+
+.sv-recent-card-delete:hover:not(:disabled) {
+  background: rgba(239, 99, 99, 0.88);
+  color: #ffffff;
+}
+
+.sv-recent-card-delete--loading {
+  animation: sv-spin 0.9s linear infinite;
+}
+
 .sv-template-cover--placeholder {
   display: grid;
   place-items: center;
@@ -1066,32 +1480,27 @@ watch(
   font-size: 28px;
 }
 
-.sv-template-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.88);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.sv-template-badge.is-soon {
-  background: rgba(15, 23, 42, 0.78);
-}
-
-.sv-template-badge.is-new {
-  background: rgba(34, 197, 94, 0.88);
-}
-
 .sv-template-media {
   position: relative;
   overflow: hidden;
   aspect-ratio: 9 / 16;
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--sv-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-media,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.sv-template-card.is-landscape .sv-template-media {
+  aspect-ratio: 16 / 9;
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1099,6 +1508,7 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .sv-template-cover--poster {
@@ -1124,31 +1534,24 @@ watch(
   opacity: 1;
 }
 
-.sv-template-duration,
-.sv-template-likes {
+.sv-template-title {
   position: absolute;
-  bottom: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: block;
+  overflow: hidden;
+  padding: 32px 12px 10px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sv-template-duration {
-  left: 8px;
-}
-
-.sv-template-likes {
-  right: 8px;
-}
-
-.sv-template-foot,
 .sv-recent-foot {
   display: flex;
   flex-direction: column;
@@ -1156,7 +1559,6 @@ watch(
   min-width: 0;
 }
 
-.sv-template-foot strong,
 .sv-recent-foot strong {
   overflow: hidden;
   color: var(--sv-text);
@@ -1165,42 +1567,6 @@ watch(
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sv-template-foot span {
-  color: var(--sv-text-soft);
-  font-size: 12px;
-}
-
-.sv-template-foot p {
-  margin: 0;
-  color: var(--sv-text-soft);
-  font-size: 12px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.sv-template-creator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  color: var(--sv-text-soft);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sv-template-avatar {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  color: color-mix(in srgb, var(--sv-accent) 72%, #fff);
-  font-size: 16px;
 }
 
 .sv-recent-foot span:last-child,
@@ -1436,14 +1802,16 @@ watch(
 }
 
 @media (max-width: 1279px) {
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 14px;
   }
 }
 
 @media (max-width: 1023px) {
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 12px;
   }
 }
 
@@ -1462,13 +1830,13 @@ watch(
     width: 100%;
   }
 
-  .sv-template-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
+  .sv-template-grid,
+  .sv-template-column {
+    gap: 10px;
   }
 
-  .sv-recent-flow {
-    gap: 12px;
+  .sv-recent-panel {
+    padding: 0 12px 20px 14px;
   }
 }
 
@@ -1481,6 +1849,8 @@ watch(
 .sv-template-cover :deep(.hover-preview-video) {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .sv-generating-error {
@@ -1612,7 +1982,7 @@ watch(
 .sv-template-preview-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .sv-template-preview-media {
@@ -1624,10 +1994,14 @@ watch(
 
 .sv-template-preview-poster,
 .sv-template-preview-placeholder {
-  width: min(100%, 320px);
+  width: min(100%, 300px);
   aspect-ratio: 9 / 16;
   border-radius: 12px;
   background: var(--sv-surface);
+}
+
+.sv-template-preview-media :deep(.template-preview-video-player) {
+  max-height: min(60vh, 560px);
 }
 
 .sv-template-preview-poster :deep(.preload-image),
@@ -1647,13 +2021,14 @@ watch(
 .sv-template-preview-meta {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sv-template-preview-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .sv-template-preview-tags span {
@@ -1672,15 +2047,35 @@ watch(
 
 .sv-template-preview-meta p {
   margin: 0;
-  color: var(--sv-text-soft);
+  color: #4b5563;
   font-size: 13px;
+  font-weight: 400;
   line-height: 1.55;
 }
+
 </style>
 
 <style lang="scss">
 .sv-template-preview-modal {
-  width: min(480px, calc(100vw - 32px)) !important;
-  max-width: min(480px, calc(100vw - 32px)) !important;
+  width: min(440px, calc(100vw - 32px)) !important;
+  max-width: min(440px, calc(100vw - 32px)) !important;
+}
+
+.sv-template-preview-modal > .n-card-header {
+  padding: 18px 22px !important;
+}
+
+.sv-template-preview-modal > .n-card__content {
+  padding: 18px 22px 22px !important;
+  max-height: calc(100vh - 124px);
+  overflow: hidden;
+}
+
+.sv-template-preview-modal .sv-template-preview-meta p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
 }
 </style>
