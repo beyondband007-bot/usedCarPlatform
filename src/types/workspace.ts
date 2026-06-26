@@ -219,6 +219,7 @@ export type WorkspaceMenuTagVariant =
   | 'package'
   | 'planned'
   | 'beta'
+  | 'hot'
 
 export type SidebarCapabilityStatus = 'generating' | 'success' | 'fail'
 

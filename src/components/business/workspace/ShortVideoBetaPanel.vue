@@ -63,16 +63,14 @@ const searchQuery = ref("");
 const selectedRecentItemId = ref("");
 const templatePreviewSession = ref<VideoTemplate | null>(null);
 
-function isLandscapeTemplate(item: VideoTemplate): boolean {
-  return item.outputRatio === "16:9";
-}
-
-function isLandscapeRecent(item: WorkspaceRecentItem): boolean {
-  return item.outputRatio === "16:9";
-}
-
 function resolveRecentCoverUrl(item: WorkspaceRecentItem): string | undefined {
   return resolveRecentDisplayImage(item);
+}
+
+function resolveRecentVideoUrl(item: WorkspaceRecentItem): string | undefined {
+  if (item.mediaType !== "video" || item.status !== "success") return undefined;
+  const url = item.downloadUrl?.trim();
+  return url || undefined;
 }
 
 function formatRecentCreatedAt(item: WorkspaceRecentItem): string {
@@ -101,12 +99,20 @@ const categoryTypeMap: Record<Exclude<ShortVideoTemplateCategory, "all">, string
 };
 
 const visibleTemplateTypes = new Set(["dealership", "single-car", "vehicle-ad"]);
+const hiddenAllCategoryTemplateTypes = new Set(["vehicle-ad"]);
 
 const filteredTemplates = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
 
   return templateList.value.filter((item) => {
     if (!visibleTemplateTypes.has(item.type)) return false;
+
+    if (
+      activeCategory.value === "all" &&
+      hiddenAllCategoryTemplateTypes.has(item.type)
+    ) {
+      return false;
+    }
 
     if (activeCategory.value !== "all") {
       const mappedType = categoryTypeMap[activeCategory.value];
@@ -496,17 +502,20 @@ watch(
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
             >
-              <div class="sv-recent-card-media" :class="{ 'is-landscape': isLandscapeRecent(item) }">
-                <div
-                  v-if="isLandscapeRecent(item)"
-                  class="sv-media-backdrop"
-                  :style="resolveRecentCoverUrl(item) ? { backgroundImage: `url(${resolveRecentCoverUrl(item)})` } : {}"
-                  aria-hidden="true"
+              <div class="sv-recent-card-media">
+                <video
+                  v-if="resolveRecentVideoUrl(item)"
+                  class="sv-recent-card-cover sv-recent-card-cover--video"
+                  :src="resolveRecentVideoUrl(item)"
+                  :poster="resolveRecentCoverUrl(item)"
+                  muted
+                  playsinline
+                  preload="metadata"
+                  :aria-label="item.title"
                 />
                 <PreloadImage
-                  v-if="resolveRecentCoverUrl(item)"
+                  v-else-if="resolveRecentCoverUrl(item)"
                   class="sv-recent-card-cover"
-                  :class="{ 'is-landscape-content': isLandscapeRecent(item) }"
                   :src="resolveRecentCoverUrl(item)!"
                   :alt="item.title"
                   loading="lazy"
@@ -605,17 +614,20 @@ watch(
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
             >
-              <div class="sv-recent-card-media" :class="{ 'is-landscape': isLandscapeRecent(item) }">
-                <div
-                  v-if="isLandscapeRecent(item)"
-                  class="sv-media-backdrop"
-                  :style="resolveRecentCoverUrl(item) ? { backgroundImage: `url(${resolveRecentCoverUrl(item)})` } : {}"
-                  aria-hidden="true"
+              <div class="sv-recent-card-media">
+                <video
+                  v-if="resolveRecentVideoUrl(item)"
+                  class="sv-recent-card-cover sv-recent-card-cover--video"
+                  :src="resolveRecentVideoUrl(item)"
+                  :poster="resolveRecentCoverUrl(item)"
+                  muted
+                  playsinline
+                  preload="metadata"
+                  :aria-label="item.title"
                 />
                 <PreloadImage
-                  v-if="resolveRecentCoverUrl(item)"
+                  v-else-if="resolveRecentCoverUrl(item)"
                   class="sv-recent-card-cover"
-                  :class="{ 'is-landscape-content': isLandscapeRecent(item) }"
                   :src="resolveRecentCoverUrl(item)!"
                   :alt="item.title"
                   loading="lazy"
@@ -718,7 +730,6 @@ watch(
             :class="{
               'is-selected': selectedTemplateId === item.templateId,
               'is-disabled': isTemplateDisabled(item),
-              'is-landscape': isLandscapeTemplate(item),
             }"
               role="button"
               tabindex="0"
@@ -727,28 +738,10 @@ watch(
               @keydown.enter.prevent="openTemplatePreview(item)"
               @keydown.space.prevent="openTemplatePreview(item)"
             >
-            <div class="sv-template-media" :class="{ 'is-landscape': isLandscapeTemplate(item) }">
-              <div
-                v-if="isLandscapeTemplate(item) && getTemplatePosterUrl(item)"
-                class="sv-media-backdrop"
-                :style="{ backgroundImage: `url(${getTemplatePosterUrl(item)})` }"
-                aria-hidden="true"
-              />
-              <video
-                v-else-if="isLandscapeTemplate(item) && getTemplateVideoUrl(item)"
-                class="sv-media-backdrop sv-media-backdrop--video"
-                :src="getTemplateVideoUrl(item)"
-                muted
-                loop
-                autoplay
-                playsinline
-                preload="metadata"
-                aria-hidden="true"
-              />
+            <div class="sv-template-media">
               <PreloadImage
-                v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item) && (!isLandscapeTemplate(item) || !getTemplateVideoUrl(item))"
+                v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item)"
                 class="sv-template-cover sv-template-cover--poster"
-                :class="{ 'is-landscape-content': isLandscapeTemplate(item) }"
                 :src="getTemplatePosterUrl(item)!"
                 :alt="item.title"
                 loading="lazy"
@@ -760,8 +753,7 @@ watch(
                 class="sv-template-cover sv-template-cover--video"
                 :class="{
                   'is-poster-backed':
-                    Boolean(getTemplatePosterUrl(item)) && !useVideoTemplateCover(item) && !isLandscapeTemplate(item),
-                  'is-landscape-content': isLandscapeTemplate(item),
+                    Boolean(getTemplatePosterUrl(item)) && !useVideoTemplateCover(item),
                 }"
                 :src="getTemplateVideoUrl(item)!"
                 :alt="item.title"
@@ -1162,11 +1154,15 @@ watch(
 }
 
 .sv-template-grid {
+  --sv-grid-gap: 16px;
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(180px, calc((100% - 5 * var(--sv-grid-gap)) / 6)), 1fr)
+  );
+  gap: var(--sv-grid-gap);
   align-content: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1258,30 +1254,6 @@ watch(
   transition: box-shadow 0.2s ease;
 }
 
-.sv-recent-card-media.is-landscape,
-.sv-template-media.is-landscape {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sv-media-backdrop {
-  position: absolute;
-  inset: -16px;
-  background-color: var(--sv-surface);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  filter: blur(28px) brightness(0.55) saturate(1.25);
-  z-index: 0;
-}
-
-.sv-media-backdrop--video {
-  width: calc(100% + 32px);
-  height: calc(100% + 32px);
-  object-fit: cover;
-}
-
 .sv-recent-card.is-clickable:hover .sv-recent-card-media {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
@@ -1297,18 +1269,15 @@ watch(
   object-position: center;
 }
 
-.sv-recent-card-cover.is-landscape-content,
-.sv-recent-card-cover.is-landscape-content :deep(.preload-image),
-.sv-recent-card-cover.is-landscape-content :deep(.preload-image__img) {
+.sv-recent-card-cover--video {
   position: relative;
   z-index: 1;
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  max-height: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: contain;
-  border-radius: 6px;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: var(--sv-surface);
 }
 
 .sv-recent-card-placeholder {
@@ -1436,21 +1405,11 @@ watch(
     transform 0.2s ease;
 }
 
-.sv-template-media.is-landscape {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .sv-template-card:hover:not(.is-disabled) .sv-template-media,
 .sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
     0 8px 24px rgba(0, 0, 0, 0.1);
-}
-
-.sv-template-card.is-landscape .sv-template-media {
-  aspect-ratio: 9 / 16;
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1459,23 +1418,6 @@ watch(
   height: 100%;
   object-fit: cover;
   object-position: center;
-}
-
-.sv-template-cover.is-landscape-content,
-.sv-template-cover.is-landscape-content :deep(.preload-image),
-.sv-template-cover.is-landscape-content :deep(.preload-image__img),
-.sv-template-cover--video.is-landscape-content,
-.sv-template-cover--video.is-landscape-content :deep(video),
-.sv-template-cover--video.is-landscape-content :deep(img) {
-  position: relative;
-  z-index: 1;
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  max-height: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: contain;
-  border-radius: 6px;
 }
 
 .sv-template-cover--poster {
@@ -1491,25 +1433,13 @@ watch(
   opacity: 1;
 }
 
-.sv-template-cover--video.is-landscape-content {
-  position: relative;
-  inset: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sv-template-cover--video.is-poster-backed:not(.is-landscape-content) {
+.sv-template-cover--video.is-poster-backed {
   opacity: 0;
   transition: opacity 0.18s ease;
 }
 
-.sv-template-card:hover .sv-template-cover--video.is-poster-backed:not(.is-landscape-content),
-.sv-template-card:focus-within .sv-template-cover--video.is-poster-backed:not(.is-landscape-content) {
-  opacity: 1;
-}
-
-.sv-template-cover--video.is-landscape-content {
+.sv-template-card:hover .sv-template-cover--video.is-poster-backed,
+.sv-template-card:focus-within .sv-template-cover--video.is-poster-backed {
   opacity: 1;
 }
 
@@ -1782,13 +1712,13 @@ watch(
 
 @media (max-width: 1279px) {
   .sv-template-grid {
-    gap: 14px;
+    --sv-grid-gap: 14px;
   }
 }
 
 @media (max-width: 1023px) {
   .sv-template-grid {
-    gap: 12px;
+    --sv-grid-gap: 12px;
   }
 }
 
@@ -1808,7 +1738,7 @@ watch(
   }
 
   .sv-template-grid {
-    gap: 10px;
+    --sv-grid-gap: 10px;
   }
 
   .sv-recent-panel {

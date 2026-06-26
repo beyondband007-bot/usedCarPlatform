@@ -222,12 +222,9 @@ export const homeFooterNavColumns: HomeFooterNavColumn[] = [
   {
     title: '营销工具',
     items: [
-      { label: '去水印', workspaceCode: 'watermark-remove', tag: 'beta' },
-      { label: '创意生图', workspaceCode: 'creative-image', tag: 'beta' },
-      { label: '主图套版', disabled: true, tag: 'plan' },
-      { label: '短视频生成', workspaceCode: 'short-video', tag: 'beta' },
-      { label: '详情页物料', disabled: true, tag: 'plan' },
-      { label: '多平台分发', disabled: true, tag: 'plan' },
+      { label: '短视频生成', workspaceCode: 'short-video' },
+      { label: '去水印', workspaceCode: 'watermark-remove' },
+      { label: '创意生图', workspaceCode: 'creative-image' },
     ],
   },
 ]

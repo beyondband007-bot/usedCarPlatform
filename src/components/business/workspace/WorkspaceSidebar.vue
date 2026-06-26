@@ -296,6 +296,16 @@ function getStatusAriaLabel(
   color: var(--workspace-tag-planned-text, var(--workspace-muted, var(--app-text-muted, var(--app-text-soft))));
 }
 
+.sidebar-menu-item.tag-hot .sidebar-menu-tag {
+  background: color-mix(in srgb, #ef4444 18%, var(--workspace-panel-soft, var(--app-surface-soft)));
+  color: #ef4444;
+}
+
+.sidebar-menu-item.is-active.tag-hot .sidebar-menu-tag {
+  background: color-mix(in srgb, #ef4444 24%, transparent);
+  color: #f87171;
+}
+
 :global([data-theme='dark']) .sidebar-menu-item.tag-demo .sidebar-menu-tag {
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent);
   color: var(--workspace-accent-strong, #ffd75a);
@@ -304,6 +314,16 @@ function getStatusAriaLabel(
 :global([data-theme='dark']) .sidebar-menu-item.tag-beta .sidebar-menu-tag {
   background: color-mix(in srgb, var(--workspace-accent, #efc24c) 14%, transparent);
   color: var(--workspace-accent-strong, #ffd75a);
+}
+
+:global([data-theme='dark']) .sidebar-menu-item.tag-hot .sidebar-menu-tag {
+  background: color-mix(in srgb, #ef4444 22%, transparent);
+  color: #fca5a5;
+}
+
+:global([data-theme='dark']) .sidebar-menu-item.is-active.tag-hot .sidebar-menu-tag {
+  background: color-mix(in srgb, #ef4444 28%, transparent);
+  color: #fecaca;
 }
 
 </style>

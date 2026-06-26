@@ -467,7 +467,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '内饰',
     icon: 'mdi:image-multiple-outline',
     label: '内饰拼接',
-    tag: 'Beta',
+    tag: '',
     tagType: 'info',
     title: '内饰拼接',
     description: '上传车辆内饰图，演示座椅、仪表台与地毯区域的拼接增强效果。',
@@ -486,7 +486,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:water-off-outline',
     label: '去水印',
-    tag: 'Beta',
+    tag: '',
     tagType: 'info',
     title: '去水印',
     description: '上传带平台水印的车图，智能去除角标、文字与遮挡痕迹，保留车辆与背景细节。',
@@ -505,7 +505,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:image-edit-outline',
     label: '创意生图',
-    tag: 'Beta',
+    tag: '',
     tagType: 'info',
     title: '创意生图',
     description: '用提示词生成营销海报、主图背景与广告创意图，支持多种输出比例。',
@@ -562,7 +562,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:movie-open-outline',
     label: '短视频生成',
-    tag: 'Beta',
+    tag: 'Hot',
     tagType: 'info',
     title: '短视频生成',
     description:
@@ -681,6 +681,7 @@ function menuTagVariant(
   tagType: WorkspaceCapability['tagType'],
 ): WorkspaceMenuItem['tagVariant'] {
   if (tag === 'Beta') return 'beta'
+  if (tag === 'Hot') return 'hot'
   if (tag === '规划中') return 'planned'
   if (tagType === 'success') return 'available'
   if (tagType === 'warning') return 'demo'
@@ -706,40 +707,6 @@ function pickMenuItems(codes: string[]): WorkspaceMenuItem[] {
     .map(toMenuItem)
 }
 
-const futureSidebarItems: WorkspaceMenuItem[] = [
-  {
-    code: 'future-main-template',
-    icon: 'mdi:puzzle-outline',
-    label: '主图套版',
-    tag: '规划中',
-    tagVariant: 'planned',
-    disabled: true,
-  },
-  {
-    code: 'short-video',
-    icon: 'mdi:movie-open-outline',
-    label: '短视频生成',
-    tag: 'Beta',
-    tagVariant: 'beta',
-  },
-  {
-    code: 'future-detail-page',
-    icon: 'mdi:file-document-outline',
-    label: '详情页物料',
-    tag: '规划中',
-    tagVariant: 'planned',
-    disabled: true,
-  },
-  {
-    code: 'future-distribution',
-    icon: 'mdi:bullhorn-outline',
-    label: '多平台分发',
-    tag: '规划中',
-    tagVariant: 'planned',
-    disabled: true,
-  },
-]
-
 export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   {
     title: '场景更换',
@@ -764,6 +731,6 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   },
   {
     title: '营销工具',
-    items: [...pickMenuItems(['watermark-remove', 'creative-image']), ...futureSidebarItems],
+    items: pickMenuItems(['short-video', 'watermark-remove', 'creative-image']),
   },
 ]
