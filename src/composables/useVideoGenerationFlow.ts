@@ -54,6 +54,7 @@ import {
   getLocalDigitalHumans,
   getLocalVideoSceneTemplates,
   isLocalOnlyDigitalHumanId,
+  resolveTemplateDefaultDigitalHumanId,
 } from '@/constants/video-generation-local-assets'
 import { useCreditsStore } from '@/stores/credits'
 
@@ -506,14 +507,31 @@ export function useVideoGenerationFlow(ownerKey: string) {
     if (currentStep.value !== 'template') return
 
     const available = templateList.value.filter((item) => !isTemplateDisabled(item))
-    const preferred =
-      available.find((item) => item.type === 'dealership') ??
-      available.find((item) => item.type === 'single-car') ??
-      available[0]
+    const preferred = available[0]
 
     if (preferred) {
       selectTemplate(preferred)
     }
+  }
+
+  function applyTemplateDefaultDigitalHuman(template: VideoTemplate) {
+    const defaultId =
+      template.defaultDigitalHumanId ??
+      resolveTemplateDefaultDigitalHumanId(template.templateId)
+    if (!defaultId) return
+
+    const exists = digitalHumanList.value.some((item) => item.id === defaultId)
+    if (!exists) return
+
+    if (template.type === 'dealership') {
+      dealershipForm.value.digitalHumanId = defaultId
+      return
+    }
+    if (template.type === 'promotion') {
+      promotionForm.value.digitalHumanId = defaultId
+      return
+    }
+    singleCarForm.value.digitalHumanId = defaultId
   }
 
   function selectTemplate(template: VideoTemplate) {
@@ -536,6 +554,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
 
     selectedTemplate.value = template
+    applyTemplateDefaultDigitalHuman(template)
     scriptDraft.value = null
     confirmedScriptText.value = ''
     voiceOptions.value = []

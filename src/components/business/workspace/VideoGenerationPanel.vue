@@ -1746,9 +1746,36 @@ async function submitConfirmedVideo() {
 }
 
 .sv-upload-card--portrait {
-  width: min(100%, 360px);
+  width: min(100%, 240px);
+  min-height: 0;
   aspect-ratio: 9 / 16;
   justify-self: center;
+}
+
+.sv-upload-card--portrait.sv-upload-card--wide .sv-upload-preview,
+.sv-upload-card--portrait.sv-upload-card--wide .sv-upload-placeholder {
+  min-height: 0;
+  height: 100%;
+}
+
+.sv-upload-card--portrait .sv-upload-placeholder {
+  gap: 6px;
+  padding: 14px 12px;
+}
+
+.sv-upload-card--portrait .sv-upload-icon {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.sv-upload-card--portrait .sv-upload-placeholder strong {
+  font-size: 13px;
+}
+
+.sv-upload-card--portrait .sv-upload-placeholder span:last-child {
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .sv-upload-card:hover:not(.is-uploading) {

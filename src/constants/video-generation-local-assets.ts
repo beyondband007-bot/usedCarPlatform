@@ -594,6 +594,64 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
   // END generated digital humans 6-19
 ]
 
+/** 模板预览出镜数字人 → 左侧默认选中的数字人（非强绑定，用户可手动更换） */
+export const templateDefaultDigitalHumanById: Record<string, string> = {
+  'ref-video-001': 'dh-message-04',
+  'ref-video-002': 'dh-message-01',
+  'ref-video-003': 'dh-message-02',
+  'ref-video-006': 'dh-message-05',
+  'ref-video-008': 'dh-message-06',
+  'ref-video-009': 'dh-message-07',
+  'ref-video-010': 'dh-message-08',
+  'ref-video-011': 'dh-message-09',
+  'ref-video-012': 'dh-message-10',
+  'ref-video-013': 'dh-message-11',
+  'ref-video-014': 'dh-message-12',
+  'ref-video-015': 'dh-message-13',
+  'ref-video-004': 'dh-message-13',
+  'ref-video-007': 'dh-message-14',
+  'ref-video-016': 'dh-message-15',
+  'ref-video-017': 'dh-message-16',
+  'ref-video-018': 'dh-message-17',
+  'ref-video-019': 'dh-message-18',
+  'ref-video-020': 'dh-message-19',
+}
+
+export function resolveTemplateDefaultDigitalHumanId(templateId: string) {
+  return templateDefaultDigitalHumanById[templateId]
+}
+
+/** 生成质量优先展示的模板，按运营指定顺序排列 */
+export const featuredTemplateOrder: string[] = [
+  'ref-video-017',
+  'ref-video-018',
+  'ref-video-016',
+  'ref-video-004',
+  'ref-video-006',
+  'ref-video-003',
+  'ref-video-001',
+]
+
+function sortTemplatesByFeaturedOrder(templates: VideoTemplate[]): VideoTemplate[] {
+  const featuredIndex = new Map(
+    featuredTemplateOrder.map((templateId, index) => [templateId, index]),
+  )
+
+  return templates
+    .map((template, originalIndex) => ({ template, originalIndex }))
+    .sort((left, right) => {
+      const leftFeatured = featuredIndex.get(left.template.templateId)
+      const rightFeatured = featuredIndex.get(right.template.templateId)
+      if (leftFeatured !== undefined && rightFeatured !== undefined) {
+        return leftFeatured - rightFeatured
+      }
+      if (leftFeatured !== undefined) return -1
+      if (rightFeatured !== undefined) return 1
+      return left.originalIndex - right.originalIndex
+    })
+    .map(({ template }) => template)
+}
+
 function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate {
   return {
     id: scene.templateId,
@@ -620,11 +678,12 @@ function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate 
     status: scene.type === 'vehicle-ad' ? 'coming_soon' : 'available',
     generationReadiness: scene.type === 'vehicle-ad' ? 'unavailable' : 'ready',
     reason: scene.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : undefined,
+    defaultDigitalHumanId: resolveTemplateDefaultDigitalHumanId(scene.templateId),
   }
 }
 
 export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []): VideoTemplate[] {
-  return apiTemplates.length
+  const templates = apiTemplates.length
     ? apiTemplates.map((template) => {
       const local = localSceneDefinitionById[template.templateId]
       if (!local) return template
@@ -646,9 +705,14 @@ export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []):
         generationReadiness:
           local.type === 'vehicle-ad' ? 'unavailable' : template.generationReadiness,
         reason: local.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : template.reason,
+        defaultDigitalHumanId:
+          resolveTemplateDefaultDigitalHumanId(template.templateId) ??
+          template.defaultDigitalHumanId,
       }
     })
     : LOCAL_SCENE_DEFINITIONS.map(buildFallbackSceneTemplate)
+
+  return sortTemplatesByFeaturedOrder(templates)
 }
 
 export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHuman[] {

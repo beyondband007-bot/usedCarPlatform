@@ -80,6 +80,8 @@ export interface VideoTemplate {
   status?: 'available' | 'coming_soon'
   generationReadiness?: 'ready' | 'unavailable'
   reason?: string
+  /** 选择模板时左侧数字人的默认推荐，用户仍可手动更换 */
+  defaultDigitalHumanId?: string
 }
 
 export interface VideoTemplateCapability {
