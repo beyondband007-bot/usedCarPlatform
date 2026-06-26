@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { NModal, useMessage } from "naive-ui";
 
@@ -24,16 +24,11 @@ import {
 } from "@/constants/short-video-templates";
 import type { VideoHistoryItem, VideoTemplate } from "@/types/video-generation";
 import {
-  parseOutputRatioToCssAspect,
   recentStatusLabelMap,
   resolveRecentDisplayImage,
 } from "@/utils/workspace-recent";
 import { formatDate } from "@/utils/dayjs";
-import {
-  distributeMasonryColumns,
-  estimateRecentHeightRatio,
-  resolveMasonryGridColumns,
-} from "@/utils/workspace-recent-layout";
+
 
 const props = defineProps<{
   isGenerating?: boolean;
@@ -67,37 +62,17 @@ const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
 const templatePreviewSession = ref<VideoTemplate | null>(null);
-const templateGridRef = ref<HTMLElement | null>(null);
-const templateGridColumns = ref(2);
-const recentGridRef = ref<HTMLElement | null>(null);
-const recentGridColumns = ref(2);
 
-function estimateTemplateHeightRatio(item: VideoTemplate): number {
-  return item.outputRatio === "16:9" ? 9 / 16 : 16 / 9;
+function isLandscapeTemplate(item: VideoTemplate): boolean {
+  return item.outputRatio === "16:9";
 }
 
-const templateColumns = computed(() =>
-  distributeMasonryColumns(
-    filteredTemplates.value,
-    templateGridColumns.value,
-    estimateTemplateHeightRatio,
-  ),
-);
-
-const recentColumns = computed(() =>
-  distributeMasonryColumns(
-    recentDisplayItems.value,
-    recentGridColumns.value,
-    estimateRecentHeightRatio,
-  ),
-);
+function isLandscapeRecent(item: WorkspaceRecentItem): boolean {
+  return item.outputRatio === "16:9";
+}
 
 function resolveRecentCoverUrl(item: WorkspaceRecentItem): string | undefined {
   return resolveRecentDisplayImage(item);
-}
-
-function resolveRecentAspectRatio(item: WorkspaceRecentItem): string | undefined {
-  return parseOutputRatioToCssAspect(item.outputRatio);
 }
 
 function formatRecentCreatedAt(item: WorkspaceRecentItem): string {
@@ -105,77 +80,7 @@ function formatRecentCreatedAt(item: WorkspaceRecentItem): string {
   return formatDate(item.createdAt, "YYYY-MM-DD HH:mm");
 }
 
-let templateGridResizeObserver: ResizeObserver | null = null;
-let recentGridResizeObserver: ResizeObserver | null = null;
 
-function updateTemplateGridColumns() {
-  const width = templateGridRef.value?.clientWidth;
-  if (!width) return;
-  templateGridColumns.value = resolveMasonryGridColumns(width);
-}
-
-function updateRecentGridColumns() {
-  const width = recentGridRef.value?.clientWidth;
-  if (!width) return;
-  recentGridColumns.value = resolveMasonryGridColumns(width);
-}
-
-function observeTemplateGrid(el: HTMLElement | null) {
-  if (!el || !templateGridResizeObserver) return;
-  templateGridResizeObserver.disconnect();
-  templateGridResizeObserver.observe(el);
-}
-
-function observeRecentGrid(el: HTMLElement | null) {
-  if (!el || !recentGridResizeObserver) return;
-  recentGridResizeObserver.disconnect();
-  recentGridResizeObserver.observe(el);
-}
-
-onMounted(() => {
-  updateTemplateGridColumns();
-  updateRecentGridColumns();
-  if (typeof ResizeObserver === "undefined") return;
-
-  templateGridResizeObserver = new ResizeObserver((entries) => {
-    const entry = entries[0];
-    if (entry) {
-      templateGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
-    }
-  });
-  observeTemplateGrid(templateGridRef.value);
-
-  recentGridResizeObserver = new ResizeObserver((entries) => {
-    const entry = entries[0];
-    if (entry) {
-      recentGridColumns.value = resolveMasonryGridColumns(entry.contentRect.width);
-    }
-  });
-  observeRecentGrid(recentGridRef.value);
-});
-
-watch(templateGridRef, (el) => {
-  if (!el) return;
-  updateTemplateGridColumns();
-  observeTemplateGrid(el);
-});
-
-watch(recentGridRef, (el) => {
-  if (!el) return;
-  updateRecentGridColumns();
-  observeRecentGrid(el);
-});
-
-onBeforeUnmount(() => {
-  if (templateGridResizeObserver) {
-    templateGridResizeObserver.disconnect();
-    templateGridResizeObserver = null;
-  }
-  if (recentGridResizeObserver) {
-    recentGridResizeObserver.disconnect();
-    recentGridResizeObserver = null;
-  }
-});
 
 const recentVideoItems = computed(() => props.recentItems ?? []);
 const recentDisplayItems = computed(() => recentVideoItems.value);
@@ -574,41 +479,42 @@ watch(
           </div>
           <div
             v-else
-            ref="recentGridRef"
             class="sv-template-grid sv-recent-grid"
           >
-            <div
-              v-for="(column, columnIndex) in recentColumns"
-              :key="`recent-column-${columnIndex}`"
-              class="sv-template-column"
+            <article
+              v-for="item in recentDisplayItems"
+              :key="item.id"
+              class="sv-recent-card"
+              :class="{
+                'is-selected': item.id === selectedRecentItemId,
+                'is-clickable': canOpenRecentVideo(item),
+              }"
+              :role="canOpenRecentVideo(item) ? 'button' : undefined"
+              :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
+              :aria-label="`查看 ${item.title}`"
+              @click="handleRecentPick(item)"
+              @keydown.enter.prevent="handleRecentPick(item)"
+              @keydown.space.prevent="handleRecentPick(item)"
             >
-              <article
-                v-for="item in column"
-                :key="item.id"
-                class="sv-recent-card"
-                :class="{
-                  'is-selected': item.id === selectedRecentItemId,
-                  'is-clickable': canOpenRecentVideo(item),
-                }"
-                :role="canOpenRecentVideo(item) ? 'button' : undefined"
-                :tabindex="canOpenRecentVideo(item) ? 0 : undefined"
-                :aria-label="`查看 ${item.title}`"
-                @click="handleRecentPick(item)"
-                @keydown.enter.prevent="handleRecentPick(item)"
-                @keydown.space.prevent="handleRecentPick(item)"
-              >
-                <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
-                  <PreloadImage
-                    v-if="resolveRecentCoverUrl(item)"
-                    class="sv-recent-card-cover"
-                    :src="resolveRecentCoverUrl(item)!"
-                    :alt="item.title"
-                    loading="lazy"
-                    fit="cover"
-                  />
-                  <div v-else class="sv-recent-card-placeholder">
-                    <Icon icon="mdi:video-off-outline" />
-                  </div>
+              <div class="sv-recent-card-media" :class="{ 'is-landscape': isLandscapeRecent(item) }">
+                <div
+                  v-if="isLandscapeRecent(item)"
+                  class="sv-media-backdrop"
+                  :style="resolveRecentCoverUrl(item) ? { backgroundImage: `url(${resolveRecentCoverUrl(item)})` } : {}"
+                  aria-hidden="true"
+                />
+                <PreloadImage
+                  v-if="resolveRecentCoverUrl(item)"
+                  class="sv-recent-card-cover"
+                  :class="{ 'is-landscape-content': isLandscapeRecent(item) }"
+                  :src="resolveRecentCoverUrl(item)!"
+                  :alt="item.title"
+                  loading="lazy"
+                  fit="cover"
+                />
+                <div v-else class="sv-recent-card-placeholder">
+                  <Icon icon="mdi:video-off-outline" />
+                </div>
                   <span
                     v-if="shouldShowRecentStatus(item)"
                     class="sv-recent-card-status"
@@ -633,8 +539,7 @@ watch(
                     :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
                   />
                 </button>
-              </article>
-            </div>
+            </article>
           </div>
         </section>
       </div>
@@ -683,18 +588,12 @@ watch(
         </div>
         <div
           v-else
-          ref="recentGridRef"
           class="sv-template-grid sv-recent-grid"
         >
-          <div
-            v-for="(column, columnIndex) in recentColumns"
-            :key="`recent-column-${columnIndex}`"
-            class="sv-template-column"
-          >
-            <article
-              v-for="item in column"
-              :key="item.id"
-              class="sv-recent-card"
+          <article
+            v-for="item in recentDisplayItems"
+            :key="item.id"
+            class="sv-recent-card"
               :class="{
                 'is-selected': item.id === selectedRecentItemId,
                 'is-clickable': canOpenRecentVideo(item),
@@ -706,10 +605,17 @@ watch(
               @keydown.enter.prevent="handleRecentPick(item)"
               @keydown.space.prevent="handleRecentPick(item)"
             >
-              <div class="sv-recent-card-media" :style="{ aspectRatio: resolveRecentAspectRatio(item) }">
+              <div class="sv-recent-card-media" :class="{ 'is-landscape': isLandscapeRecent(item) }">
+                <div
+                  v-if="isLandscapeRecent(item)"
+                  class="sv-media-backdrop"
+                  :style="resolveRecentCoverUrl(item) ? { backgroundImage: `url(${resolveRecentCoverUrl(item)})` } : {}"
+                  aria-hidden="true"
+                />
                 <PreloadImage
                   v-if="resolveRecentCoverUrl(item)"
                   class="sv-recent-card-cover"
+                  :class="{ 'is-landscape-content': isLandscapeRecent(item) }"
                   :src="resolveRecentCoverUrl(item)!"
                   :alt="item.title"
                   loading="lazy"
@@ -742,8 +648,7 @@ watch(
                   :class="{ 'sv-recent-card-delete--loading': isDeletingRecent(item) }"
                 />
               </button>
-            </article>
-          </div>
+          </article>
         </div>
       </section>
 
@@ -804,23 +709,17 @@ watch(
         </div>
         <div
           v-else
-          ref="templateGridRef"
           class="sv-template-grid"
         >
-          <div
-            v-for="(column, columnIndex) in templateColumns"
-            :key="columnIndex"
-            class="sv-template-column"
-          >
-            <article
-              v-for="item in column"
-              :key="item.templateId"
-              class="sv-template-card"
-              :class="{
-                'is-selected': selectedTemplateId === item.templateId,
-                'is-disabled': isTemplateDisabled(item),
-                'is-landscape': item.outputRatio === '16:9',
-              }"
+          <article
+            v-for="item in filteredTemplates"
+            :key="item.templateId"
+            class="sv-template-card"
+            :class="{
+              'is-selected': selectedTemplateId === item.templateId,
+              'is-disabled': isTemplateDisabled(item),
+              'is-landscape': isLandscapeTemplate(item),
+            }"
               role="button"
               tabindex="0"
               :aria-label="`预览模板 ${item.title}`"
@@ -828,10 +727,28 @@ watch(
               @keydown.enter.prevent="openTemplatePreview(item)"
               @keydown.space.prevent="openTemplatePreview(item)"
             >
-            <div class="sv-template-media">
+            <div class="sv-template-media" :class="{ 'is-landscape': isLandscapeTemplate(item) }">
+              <div
+                v-if="isLandscapeTemplate(item) && getTemplatePosterUrl(item)"
+                class="sv-media-backdrop"
+                :style="{ backgroundImage: `url(${getTemplatePosterUrl(item)})` }"
+                aria-hidden="true"
+              />
+              <video
+                v-else-if="isLandscapeTemplate(item) && getTemplateVideoUrl(item)"
+                class="sv-media-backdrop sv-media-backdrop--video"
+                :src="getTemplateVideoUrl(item)"
+                muted
+                loop
+                autoplay
+                playsinline
+                preload="metadata"
+                aria-hidden="true"
+              />
               <PreloadImage
-                v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item)"
+                v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item) && (!isLandscapeTemplate(item) || !getTemplateVideoUrl(item))"
                 class="sv-template-cover sv-template-cover--poster"
+                :class="{ 'is-landscape-content': isLandscapeTemplate(item) }"
                 :src="getTemplatePosterUrl(item)!"
                 :alt="item.title"
                 loading="lazy"
@@ -843,7 +760,8 @@ watch(
                 class="sv-template-cover sv-template-cover--video"
                 :class="{
                   'is-poster-backed':
-                    Boolean(getTemplatePosterUrl(item)) && !useVideoTemplateCover(item),
+                    Boolean(getTemplatePosterUrl(item)) && !useVideoTemplateCover(item) && !isLandscapeTemplate(item),
+                  'is-landscape-content': isLandscapeTemplate(item),
                 }"
                 :src="getTemplateVideoUrl(item)!"
                 :alt="item.title"
@@ -858,12 +776,7 @@ watch(
               </div>
               <strong class="sv-template-title">{{ item.title }}</strong>
             </div>
-            <footer class="sv-template-foot">
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.typeLabel }} · {{ item.styleLabel }}</span>
-            </footer>
           </article>
-          </div>
         </div>
       </section>
 
@@ -1249,24 +1162,17 @@ watch(
 }
 
 .sv-template-grid {
-  display: flex;
+  display: grid;
   min-height: 0;
   flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
-  align-items: flex-start;
+  align-content: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
-}
-
-.sv-template-column {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .sv-template-grid::-webkit-scrollbar {
@@ -1352,6 +1258,30 @@ watch(
   transition: box-shadow 0.2s ease;
 }
 
+.sv-recent-card-media.is-landscape,
+.sv-template-media.is-landscape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sv-media-backdrop {
+  position: absolute;
+  inset: -16px;
+  background-color: var(--sv-surface);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: blur(28px) brightness(0.55) saturate(1.25);
+  z-index: 0;
+}
+
+.sv-media-backdrop--video {
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
+  object-fit: cover;
+}
+
 .sv-recent-card.is-clickable:hover .sv-recent-card-media {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--sv-accent) 30%, transparent),
@@ -1365,6 +1295,20 @@ watch(
   height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+.sv-recent-card-cover.is-landscape-content,
+.sv-recent-card-cover.is-landscape-content :deep(.preload-image),
+.sv-recent-card-cover.is-landscape-content :deep(.preload-image__img) {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .sv-recent-card-placeholder {
@@ -1492,6 +1436,12 @@ watch(
     transform 0.2s ease;
 }
 
+.sv-template-media.is-landscape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sv-template-card:hover:not(.is-disabled) .sv-template-media,
 .sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
   box-shadow:
@@ -1500,7 +1450,7 @@ watch(
 }
 
 .sv-template-card.is-landscape .sv-template-media {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 9 / 16;
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1509,6 +1459,23 @@ watch(
   height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+.sv-template-cover.is-landscape-content,
+.sv-template-cover.is-landscape-content :deep(.preload-image),
+.sv-template-cover.is-landscape-content :deep(.preload-image__img),
+.sv-template-cover--video.is-landscape-content,
+.sv-template-cover--video.is-landscape-content :deep(video),
+.sv-template-cover--video.is-landscape-content :deep(img) {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .sv-template-cover--poster {
@@ -1524,13 +1491,25 @@ watch(
   opacity: 1;
 }
 
-.sv-template-cover--video.is-poster-backed {
+.sv-template-cover--video.is-landscape-content {
+  position: relative;
+  inset: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sv-template-cover--video.is-poster-backed:not(.is-landscape-content) {
   opacity: 0;
   transition: opacity 0.18s ease;
 }
 
-.sv-template-card:hover .sv-template-cover--video.is-poster-backed,
-.sv-template-card:focus-within .sv-template-cover--video.is-poster-backed {
+.sv-template-card:hover .sv-template-cover--video.is-poster-backed:not(.is-landscape-content),
+.sv-template-card:focus-within .sv-template-cover--video.is-poster-backed:not(.is-landscape-content) {
+  opacity: 1;
+}
+
+.sv-template-cover--video.is-landscape-content {
   opacity: 1;
 }
 
@@ -1802,15 +1781,13 @@ watch(
 }
 
 @media (max-width: 1279px) {
-  .sv-template-grid,
-  .sv-template-column {
+  .sv-template-grid {
     gap: 14px;
   }
 }
 
 @media (max-width: 1023px) {
-  .sv-template-grid,
-  .sv-template-column {
+  .sv-template-grid {
     gap: 12px;
   }
 }
@@ -1830,27 +1807,13 @@ watch(
     width: 100%;
   }
 
-  .sv-template-grid,
-  .sv-template-column {
+  .sv-template-grid {
     gap: 10px;
   }
 
   .sv-recent-panel {
     padding: 0 12px 20px 14px;
   }
-}
-
-.sv-template-cover {
-  width: 100%;
-  height: 100%;
-}
-
-.sv-template-cover.hover-preview-video,
-.sv-template-cover :deep(.hover-preview-video) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
 }
 
 .sv-generating-error {

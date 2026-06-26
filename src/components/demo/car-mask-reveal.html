@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 汽车生成渐变过渡</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #05060a;
+      --surface: #0b0d14;
+      --primary: #5b6cff;
+      --primary-glow: rgba(91, 108, 255, 0.55);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --progress: 0%;
+      --scan-pos: 0%;
+      --reveal-width: 0%;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse at 50% 35%, rgba(91, 108, 255, 0.08) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 100%, rgba(91, 108, 255, 0.05) 0%, transparent 45%),
+        var(--bg);
+    }
+
+    /* 汽车展示区域 */
+    .car-stage {
+      position: relative;
+      width: min(92vw, 1100px);
+      aspect-ratio: 16 / 9;
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 40px 80px -20px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .car-container {
+      position: relative;
+      width: 88%;
+      height: 72%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .car-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .car-layer img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      transition: filter 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* 车身统一跟随扫描线 reveal：扫描线左侧显示完整当前阶段效果，右侧隐藏 */
+    .layer-outline,
+    .layer-hologram,
+    .layer-final {
+      mask-image: linear-gradient(
+        to right,
+        black 0%,
+        black calc(var(--reveal-width) - 3%),
+        transparent var(--reveal-width),
+        transparent 100%
+      );
+      -webkit-mask-image: linear-gradient(
+        to right,
+        black 0%,
+        black calc(var(--reveal-width) - 3%),
+        transparent var(--reveal-width),
+        transparent 100%
+      );
+      mask-size: 100% 100%;
+      -webkit-mask-size: 100% 100%;
+      mask-repeat: no-repeat;
+      -webkit-mask-repeat: no-repeat;
+    }
+
+    /* 0% - 30%：底层暗色轮廓 */
+    .layer-outline {
+      opacity: 0;
+      filter: blur(14px) brightness(0.25) saturate(0);
+      transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1), filter 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .layer-outline.is-visible {
+      opacity: 0.55;
+      filter: blur(8px) brightness(0.45) saturate(0.2);
+    }
+
+    /* 30% - 60%：全息蓝光体 */
+    .layer-hologram {
+      opacity: 0;
+      transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .layer-hologram img {
+      filter: hue-rotate(220deg) brightness(1.25) contrast(1.15) saturate(1.5);
+      mix-blend-mode: screen;
+    }
+
+    .layer-hologram.is-active {
+      opacity: 1;
+    }
+
+    /* 60% - 100%：清晰写实 */
+    .layer-final {
+      opacity: 0;
+      transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .layer-final img {
+      filter: brightness(1.05) contrast(1.05);
+    }
+
+    .layer-final.is-active {
+      opacity: 1;
+    }
+
+    /* 扫描线：更宽、更柔和、带呼吸感 */
+    .scan-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: var(--scan-pos);
+      width: 80px;
+      transform: translateX(-50%);
+      background: radial-gradient(
+        ellipse 60% 85% at center,
+        rgba(255, 255, 255, 0.9) 0%,
+        rgba(139, 168, 255, 0.55) 25%,
+        rgba(91, 108, 255, 0.2) 55%,
+        transparent 80%
+      );
+      filter: blur(6px);
+      box-shadow:
+        0 0 40px 12px rgba(91, 108, 255, 0.35),
+        0 0 80px 24px rgba(91, 108, 255, 0.12);
+      opacity: 0;
+      transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 10;
+      animation: scanPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes scanPulse {
+      0%, 100% { transform: translateX(-50%) scale(0.94, 0.98); }
+      50% { transform: translateX(-50%) scale(1.08, 1.03); }
+    }
+
+    .scan-line.is-visible {
+      opacity: 0.9;
+    }
+
+    .scan-label {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 700;
+      color: #8ba8ff;
+      text-shadow: 0 0 8px rgba(139, 168, 255, 0.8);
+      white-space: nowrap;
+      animation: labelBreathe 2.4s ease-in-out infinite;
+    }
+
+    @keyframes labelBreathe {
+      0%, 100% { opacity: 0.75; }
+      50% { opacity: 1; }
+    }
+
+    /* 水平扫光 */
+    .light-sweep {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 42%,
+        rgba(255, 255, 255, 0.04) 48%,
+        rgba(255, 255, 255, 0.14) 50%,
+        rgba(255, 255, 255, 0.04) 52%,
+        transparent 58%
+      );
+      background-size: 200% 100%;
+      background-position: 120% 0;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      z-index: 8;
+    }
+
+    .light-sweep.is-playing {
+      opacity: 1;
+      animation: sweep 3.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes sweep {
+      0% { background-position: 140% 0; }
+      100% { background-position: -40% 0; }
+    }
+
+    /* 底部微光 */
+    .floor-glow {
+      position: absolute;
+      bottom: 0;
+      left: 10%;
+      right: 10%;
+      height: 18%;
+      background: radial-gradient(ellipse at 50% 100%, rgba(91, 108, 255, 0.18) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 1s ease;
+      z-index: 1;
+    }
+
+    .floor-glow.is-visible {
+      opacity: 1;
+    }
+
+    /* UI */
+    .ui {
+      position: absolute;
+      bottom: 7vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92vw, 520px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 20;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .status.is-done::before {
+      background: #34d399;
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+      animation: none;
+    }
+
+    .percent {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
+
+    .percent strong {
+      color: var(--text);
+      font-size: 22px;
+      margin-right: 2px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--progress);
+      background: linear-gradient(90deg, var(--primary), #8ba8ff);
+      box-shadow: 0 0 14px var(--primary-glow);
+      border-radius: 999px;
+      transition: width 0.08s linear;
+    }
+
+    .hint {
+      text-align: center;
+      font-size: 12px;
+      color: rgba(148, 163, 184, 0.55);
+      margin-top: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    /* 初始入场 */
+    .car-stage {
+      opacity: 0;
+      transform: translateY(24px) scale(0.98);
+      animation: stageIn 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes stageIn {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .ui {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: uiIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
+    }
+
+    @keyframes uiIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="car-stage">
+      <div class="floor-glow" id="floorGlow"></div>
+
+      <div class="car-container" id="carContainer">
+        <div class="car-layer layer-outline" id="layerOutline">
+          <img data-role="car" src="" alt="SUV outline">
+        </div>
+
+        <div class="car-layer layer-hologram" id="layerHologram">
+          <img data-role="car" src="" alt="SUV hologram">
+        </div>
+
+        <div class="car-layer layer-final" id="layerFinal">
+          <img data-role="car" src="" alt="SUV final">
+        </div>
+
+        <div class="scan-line" id="scanLine">
+          <div class="scan-label" id="scanLabel">0%</div>
+        </div>
+        <div class="light-sweep" id="lightSweep"></div>
+      </div>
+    </div>
+
+    <div class="ui">
+      <div class="status-row">
+        <div class="status" id="statusText">解析中</div>
+        <div class="percent"><strong id="percentValue">0</strong>%</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+      <div class="hint">点击画面可重新播放生成动画</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ==========================
+      // 替换这里：改成你的 SUV 静态图片路径或 URL
+      // 当前已配置为同目录下的 suv-white.png，请把图片放到本文件同级目录
+      // ==========================
+      const CAR_IMAGE_URL = './image.png';
+
+      document.querySelectorAll('img[data-role="car"]').forEach((img) => {
+        img.src = CAR_IMAGE_URL;
+      });
+
+      const root = document.documentElement;
+      const statusText = document.getElementById('statusText');
+      const percentValue = document.getElementById('percentValue');
+      const layerOutline = document.getElementById('layerOutline');
+      const layerHologram = document.getElementById('layerHologram');
+      const layerFinal = document.getElementById('layerFinal');
+      const scanLine = document.getElementById('scanLine');
+      const scanLabel = document.getElementById('scanLabel');
+      const lightSweep = document.getElementById('lightSweep');
+      const floorGlow = document.getElementById('floorGlow');
+
+      const DURATION = 15000; // 总动画时长 ms（更慢更平滑）
+      let rafId = null;
+      let isPlaying = false;
+
+      const states = [
+        { threshold: 0, text: '解析中' },
+        { threshold: 30, text: '生成轮廓' },
+        { threshold: 60, text: '构建车体' },
+        { threshold: 85, text: '渲染材质' },
+        { threshold: 100, text: '生成完成' },
+      ];
+
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      function setProgress(p) {
+        const progress = Math.max(0, Math.min(100, p));
+
+        // 扫描线左侧统一显示当前阶段的车身，右侧隐藏
+        // reveal 比扫描线稍微滞后，形成柔和拖尾
+        let revealWidth = Math.max(0, progress - 4);
+        if (progress >= 100) {
+          revealWidth = 100;
+        }
+
+        root.style.setProperty('--progress', `${progress}%`);
+        root.style.setProperty('--scan-pos', `${progress}%`);
+        root.style.setProperty('--reveal-width', `${revealWidth}%`);
+        percentValue.textContent = Math.round(progress);
+        scanLabel.textContent = `${Math.round(progress)}%`;
+
+        // 状态文案
+        const current = states.slice().reverse().find(s => progress >= s.threshold);
+        statusText.textContent = current ? current.text : states[0].text;
+
+        // 阶段视觉：扫描线左侧显示完整当前阶段效果
+        if (progress > 0 && progress < 100) {
+          layerOutline.classList.add('is-visible');
+          floorGlow.classList.add('is-visible');
+          scanLine.classList.add('is-visible');
+        }
+
+        if (progress >= 30 && progress < 100) {
+          layerHologram.classList.add('is-active');
+        } else {
+          layerHologram.classList.remove('is-active');
+        }
+
+        if (progress >= 60) {
+          layerFinal.classList.add('is-active');
+        } else {
+          layerFinal.classList.remove('is-active');
+        }
+
+        if (progress >= 100) {
+          statusText.classList.add('is-done');
+          scanLine.classList.remove('is-visible');
+          layerOutline.classList.remove('is-visible');
+          layerHologram.classList.remove('is-active');
+        } else {
+          statusText.classList.remove('is-done');
+        }
+      }
+
+      function playSweep() {
+        lightSweep.classList.remove('is-playing');
+        void lightSweep.offsetWidth;
+        lightSweep.classList.add('is-playing');
+      }
+
+      function animate() {
+        if (isPlaying) return;
+        isPlaying = true;
+
+        const start = performance.now();
+        playSweep();
+
+        function frame(now) {
+          const elapsed = now - start;
+          const t = Math.min(1, elapsed / DURATION);
+          const eased = easeInOutCubic(t);
+          const progress = eased * 100;
+
+          setProgress(progress);
+
+          if (t < 1) {
+            rafId = requestAnimationFrame(frame);
+          } else {
+            isPlaying = false;
+            setTimeout(playSweep, 400);
+          }
+        }
+
+        rafId = requestAnimationFrame(frame);
+      }
+
+      function replay() {
+        if (rafId) cancelAnimationFrame(rafId);
+        isPlaying = false;
+        setProgress(0);
+        layerOutline.classList.remove('is-visible');
+        layerHologram.classList.remove('is-active');
+        layerFinal.classList.remove('is-active');
+        scanLine.classList.remove('is-visible');
+        floorGlow.classList.remove('is-visible');
+        statusText.classList.remove('is-done');
+        lightSweep.classList.remove('is-playing');
+        setTimeout(animate, 100);
+      }
+
+      document.body.addEventListener('click', replay);
+      document.body.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') replay();
+      });
+
+      // 自动播放
+      setTimeout(animate, 600);
+    })();
+  </script>
+</body>
+</html>

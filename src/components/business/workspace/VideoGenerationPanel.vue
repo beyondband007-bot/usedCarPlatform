@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, inject, onMounted, ref } from "vue";
 import { Icon } from "@iconify/vue";
-import { useMessage } from "naive-ui";
+import { NModal, useMessage } from "naive-ui";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
@@ -46,6 +46,9 @@ const appStore = useAppStore();
 const exteriorInputRef = ref<HTMLInputElement | null>(null);
 const interiorInputRef = ref<HTMLInputElement | null>(null);
 const dealershipInputRef = ref<HTMLInputElement | null>(null);
+const humanPreviewModalVisible = ref(false);
+const previewingDigitalHuman = ref<DigitalHuman | null>(null);
+const enlargedHumanPreview = ref<{ label: string; url: string } | null>(null);
 
 const ownerKey = computed(
   () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
@@ -130,6 +133,10 @@ const languageOptions = computed(() =>
 );
 
 const humanToneClasses = ["tone-warm", "tone-cool", "tone-neutral", "tone-warm"];
+
+const activeHumanPreviewImages = computed(
+  () => previewingDigitalHuman.value?.previewImages?.slice(0, 4) ?? [],
+);
 
 const isSingleCarTemplate = computed(
   () => selectedTemplate.value?.type === "single-car",
@@ -626,6 +633,12 @@ function resolveHumanTone(index: number) {
 function selectDigitalHuman(human: DigitalHuman) {
   if (isConfigurationLocked.value) return;
   activeDigitalHumanId.value = human.id;
+  previewingDigitalHuman.value = human;
+  humanPreviewModalVisible.value = Boolean(human.previewImages?.length);
+}
+
+function openHumanPreviewImage(item: { label: string; url: string }) {
+  enlargedHumanPreview.value = item;
 }
 
 async function submitDraft() {
@@ -1364,6 +1377,79 @@ async function submitConfirmedVideo() {
       </div>
       </template>
     </template>
+
+    <NModal
+      v-model:show="humanPreviewModalVisible"
+      preset="card"
+      :class="[
+        'sv-human-preview-modal',
+        appStore.isDarkMode ? 'sv-human-preview-modal--dark' : 'sv-human-preview-modal--light',
+      ]"
+      :style="{ width: 'min(980px, calc(100vw - 32px))' }"
+      :bordered="false"
+      :segmented="{ content: true }"
+    >
+      <template #header>
+        <div class="sv-human-preview-head">
+          <strong>{{ previewingDigitalHuman?.name }}</strong>
+          <span>四视图预览</span>
+        </div>
+      </template>
+
+      <div class="sv-human-preview-grid">
+        <figure
+          v-for="(item, index) in activeHumanPreviewImages"
+          :key="item.url"
+          class="sv-human-preview-item"
+        >
+          <button
+            type="button"
+            class="sv-human-preview-image-button"
+            :aria-label="`放大查看${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+            @click="openHumanPreviewImage(item)"
+          >
+            <PreloadImage
+              class="sv-human-preview-image"
+              :src="item.url"
+              :alt="`${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+              loading="eager"
+              fit="contain"
+            />
+          </button>
+          <figcaption>
+            <span>{{ index + 1 }}</span>
+            {{ item.label }}
+          </figcaption>
+        </figure>
+      </div>
+    </NModal>
+
+    <NModal
+      :show="Boolean(enlargedHumanPreview)"
+      preset="card"
+      class="sv-human-zoom-modal"
+      :class="appStore.isDarkMode ? 'sv-human-zoom-modal--dark' : 'sv-human-zoom-modal--light'"
+      :style="{ width: 'min(760px, calc(100vw - 32px))' }"
+      :bordered="false"
+      :segmented="{ content: true }"
+      @update:show="(show) => { if (!show) enlargedHumanPreview = null }"
+    >
+      <template #header>
+        <div class="sv-human-preview-head">
+          <strong>{{ previewingDigitalHuman?.name }}</strong>
+          <span>{{ enlargedHumanPreview?.label }}</span>
+        </div>
+      </template>
+
+      <PreloadImage
+        v-if="enlargedHumanPreview"
+        class="sv-human-zoom-image"
+        :src="enlargedHumanPreview.url"
+        :alt="`${previewingDigitalHuman?.name ?? '数字人'}${enlargedHumanPreview.label}`"
+        loading="eager"
+        fit="contain"
+      />
+    </NModal>
   </div>
 </template>
 
@@ -1899,6 +1985,127 @@ async function submitConfirmedVideo() {
 
 .sv-human-card.tone-cool .sv-human-avatar {
   background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+}
+
+.sv-human-preview-modal {
+  width: min(980px, calc(100vw - 32px));
+}
+
+:global(.sv-human-preview-modal.n-card) {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.sv-human-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sv-human-preview-head strong {
+  color: var(--sv-text, #0f172a);
+  font-size: 17px;
+}
+
+.sv-human-preview-head span {
+  color: var(--sv-text-soft, #64748b);
+  font-size: 13px;
+}
+
+.sv-human-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 210px));
+  justify-content: center;
+  gap: 16px;
+}
+
+.sv-human-preview-item {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.sv-human-preview-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.sv-human-preview-image,
+.sv-human-preview-image :deep(.preload-image),
+.sv-human-preview-image :deep(.preload-image__img) {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 300px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sv-card-bg, #f8fafc) 86%, #fff);
+  object-fit: contain;
+}
+
+.sv-human-preview-image-button:hover .sv-human-preview-image,
+.sv-human-preview-image-button:focus-visible .sv-human-preview-image {
+  box-shadow: 0 0 0 2px var(--sv-accent, #c99518);
+}
+
+.sv-human-preview-item figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--sv-text, #0f172a);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sv-human-preview-item figcaption span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--sv-accent-soft, rgba(239, 194, 76, 0.16));
+  color: var(--sv-accent, #c99518);
+  font-size: 12px;
+}
+
+.sv-human-preview-modal--dark .sv-human-preview-head strong,
+.sv-human-preview-modal--dark .sv-human-preview-item figcaption {
+  color: #fff;
+}
+
+.sv-human-preview-modal--dark .sv-human-preview-head span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.sv-human-zoom-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+:global(.sv-human-zoom-modal.n-card) {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.sv-human-zoom-modal--dark .sv-human-preview-head strong {
+  color: #fff;
+}
+
+.sv-human-zoom-modal--dark .sv-human-preview-head span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.sv-human-zoom-image,
+.sv-human-zoom-image :deep(.preload-image),
+.sv-human-zoom-image :deep(.preload-image__img) {
+  width: 100%;
+  max-height: min(72vh, 760px);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sv-card-bg, #f8fafc) 86%, #fff);
+  object-fit: contain;
 }
 
 .sv-language-select {
@@ -2493,6 +2700,10 @@ async function submitConfirmedVideo() {
   .sv-optimize-btn {
     width: 100%;
     min-width: 0;
+  }
+
+  .sv-human-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

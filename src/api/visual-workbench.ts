@@ -392,9 +392,13 @@ export interface RecentGenerationTask {
   thumbnail?: string | null
   previewImage?: string | null
   downloadUrl?: string | null
+  resultVideos?: GenerationResultImage[]
+  templateId?: string | null
+  scriptDraftId?: string | null
   ratioLabel?: string | null
   sceneLabel?: string | null
   outputRatio?: string | null
+  resolution?: string | null
   inputAssetId?: string | null
   inputAssetThumbnailUrl?: string | null
   inputAssetUrl?: string | null
@@ -495,6 +499,7 @@ function normalizeRecentGenerationTask(task: RecentGenerationTask): RecentGenera
     thumbnail: normalizeMediaUrl(task.thumbnail),
     previewImage: normalizeMediaUrl(task.previewImage),
     downloadUrl: normalizeMediaUrl(task.downloadUrl),
+    resultVideos: task.resultVideos?.map(normalizeGenerationResultImage),
     inputAssetThumbnailUrl: normalizeMediaUrl(task.inputAssetThumbnailUrl),
     inputAssetUrl: normalizeMediaUrl(task.inputAssetUrl),
   }

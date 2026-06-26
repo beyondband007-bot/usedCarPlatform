@@ -38,7 +38,7 @@ import {
 } from "@/utils/batch-task";
 import { formatDate } from "@/utils/dayjs";
 import { buildImagePreviewFromDeliveryAsset } from "@/utils/workspace-image-preview";
-import { normalizeDisplayOrder } from "@/utils/workspace-recent-layout";
+
 import {
   recentStatusIconMap,
   recentStatusLabelMap,
@@ -54,6 +54,7 @@ import {
   formatVideoOutputRatioLabel,
   isShortVideoModuleCode,
 } from "@/constants/short-video";
+import { localTemplateTitleById } from "@/constants/video-generation-local-assets";
 import type {
   WorkspaceBatchActiveJob,
   WorkspaceCapability,
@@ -501,9 +502,7 @@ function shouldShowRecentStatus(item: WorkspaceRecentItem) {
   return item.status !== "success";
 }
 
-const recentDisplayItems = computed(() =>
-  normalizeDisplayOrder(recentItems.value),
-);
+const recentDisplayItems = computed(() => recentItems.value);
 
 function syncSelectedRecentItem() {
   const displayItems = recentDisplayItems.value;
@@ -663,12 +662,14 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
   const isShortVideo = isShortVideoModuleCode(item.moduleCode);
   const isVideoUrl = (url?: string | null) =>
     typeof url === "string" && /\.(mp4|mov|webm)(?:[?#]|$)/i.test(url);
+  const resultVideo = item.resultVideos?.[0];
+  const templateTitle =
+    item.templateId ? localTemplateTitleById[item.templateId] : undefined;
   const coverUrl = isShortVideo
     ? [
+        resultVideo?.thumbnailUrl,
         item.thumbnail,
         item.previewImage,
-        item.inputAssetThumbnailUrl,
-        item.inputAssetUrl,
       ].find((url) => url && !isVideoUrl(url))
     : (item.previewImage ??
       item.thumbnail ??
@@ -681,7 +682,7 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
     id: item.id || item.taskId,
     taskId: item.taskId,
     moduleCode: item.moduleCode,
-    title: item.title,
+    title: isShortVideo ? (templateTitle ?? item.title) : item.title,
     status: mapRecentStatus(item),
     createdAt: formatDate(item.createdAt, "YYYY-MM-DD HH:mm"),
     updatedAt: item.updatedAt
@@ -689,10 +690,13 @@ function mapRecentItem(item: RecentGenerationTask): WorkspaceRecentItem {
       : undefined,
     thumbnail: coverUrl ?? undefined,
     previewImage: coverUrl ?? undefined,
-    downloadUrl: item.downloadUrl ?? undefined,
+    downloadUrl: item.downloadUrl ?? resultVideo?.url ?? undefined,
     mediaType: isShortVideo ? "video" : "image",
     ratioLabel: isShortVideo
-      ? formatVideoOutputRatioLabel(item.outputRatio, item.resolution)
+      ? formatVideoOutputRatioLabel(
+        item.outputRatio ?? undefined,
+        item.resolution ?? undefined,
+      )
       : (item.ratioLabel ??
         formatOutputRatioLabel(item.outputRatio) ??
         undefined),
@@ -2861,10 +2865,8 @@ defineExpose({
 .recent-layout--flow {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-auto-rows: max-content;
   gap: 10px;
   align-content: start;
-  align-items: start;
   padding: 0;
 }
 

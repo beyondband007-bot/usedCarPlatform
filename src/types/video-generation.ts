@@ -118,6 +118,10 @@ export interface DigitalHuman {
   ageStyle?: string
   previewUrl: string
   imageUrl?: string
+  previewImages?: Array<{
+    label: string
+    url: string
+  }>
   voiceStatus: 'ready' | 'not_configured'
   voiceModel?: string | null
 }

@@ -44,6 +44,45 @@ import scene08Video from '@/assets/video/video-generation/message-scene-ref-vide
 import { VIDEO_DURATION_SECONDS } from '@/constants/short-video'
 import type { DigitalHuman, VideoTemplate, VideoTemplateType } from '@/types/video-generation'
 
+const digitalHumanViewLabelByIndex: Record<number, string> = {
+  1: '正面',
+  2: '侧面',
+  3: '背面',
+  4: '脸部',
+}
+
+const digitalHumanImageModules = import.meta.glob('/src/assets/数字人形象/*.{png,jpg,jpeg,webp}', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
+
+const digitalHumanPreviewImagesById = Object.entries(digitalHumanImageModules).reduce<
+  Record<string, Array<{ label: string; url: string; viewIndex: number }>>
+>((result, [path, url]) => {
+  const match = path.match(/数字人(\d+)\((\d)\)\.(png|jpe?g|webp)$/i)
+  if (!match) return result
+
+  const humanNumber = Number(match[1])
+  const viewIndex = Number(match[2])
+  if (!Number.isFinite(humanNumber) || !(viewIndex in digitalHumanViewLabelByIndex)) {
+    return result
+  }
+
+  const id = `dh-message-${String(humanNumber).padStart(2, '0')}`
+  result[id] ??= []
+  result[id].push({
+    label: digitalHumanViewLabelByIndex[viewIndex],
+    url,
+    viewIndex,
+  })
+  return result
+}, {})
+
+Object.values(digitalHumanPreviewImagesById).forEach((items) => {
+  items.sort((left, right) => left.viewIndex - right.viewIndex)
+})
+
 interface LocalSceneDefinition {
   templateId: string
   title: string
@@ -567,9 +606,17 @@ export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHu
       ...localDigitalHumanDisplayById[human.id],
       previewUrl: localDigitalHumanDisplayById[human.id]?.previewUrl ?? human.previewUrl,
       imageUrl: localDigitalHumanDisplayById[human.id]?.imageUrl ?? human.imageUrl,
+      previewImages:
+        localDigitalHumanDisplayById[human.id]?.previewImages ?? human.previewImages,
     }))
   }
-  return LOCAL_DIGITAL_HUMANS
+  return LOCAL_DIGITAL_HUMANS.map((human) => ({
+    ...human,
+    previewImages: digitalHumanPreviewImagesById[human.id]?.map(({ label, url }) => ({
+      label,
+      url,
+    })),
+  }))
 }
 
 export function isLocalOnlyDigitalHumanId(digitalHumanId: string) {
@@ -580,12 +627,25 @@ export const localTemplatePreviewById: Record<string, string> = Object.fromEntri
   LOCAL_SCENE_DEFINITIONS.map((scene) => [scene.templateId, scene.videoUrl]),
 )
 
+export const localTemplateTitleById: Record<string, string> = Object.fromEntries(
+  LOCAL_SCENE_DEFINITIONS.map((scene) => [scene.templateId, scene.title]),
+)
+
 const localSceneDefinitionById: Record<string, LocalSceneDefinition> = Object.fromEntries(
   LOCAL_SCENE_DEFINITIONS.map((scene) => [scene.templateId, scene]),
 )
 
 const localDigitalHumanDisplayById: Record<string, Partial<DigitalHuman>> = Object.fromEntries(
-  LOCAL_DIGITAL_HUMANS.map((human) => [human.id, human]),
+  LOCAL_DIGITAL_HUMANS.map((human) => [
+    human.id,
+    {
+      ...human,
+      previewImages: digitalHumanPreviewImagesById[human.id]?.map(({ label, url }) => ({
+        label,
+        url,
+      })),
+    },
+  ]),
 )
 
 export function getLocalScenePreviewById(): Record<string, string> {

@@ -1,7 +1,7 @@
 import type { DeliveryResultItem } from '@/constants/delivery-results'
 import { formatDate } from '@/utils/dayjs'
 import { resolveRecentDisplayImage } from '@/utils/workspace-recent'
-import { normalizeDisplayOrder } from '@/utils/workspace-recent-layout'
+
 import type {
   WorkspaceDeliveryTaskPreview,
   WorkspaceGenerateResult,
@@ -128,10 +128,8 @@ function buildPreviewGalleryFromResultImages(
 function buildPreviewGalleryFromRecentItems(
   recentItems: WorkspaceRecentItem[],
 ): WorkspaceImagePreview[] {
-  const viewableItems = normalizeDisplayOrder(
-    recentItems.filter(
-      (item) => item.status === 'success' && Boolean(resolveRecentDisplayImage(item)),
-    ),
+  const viewableItems = recentItems.filter(
+    (item) => item.status === 'success' && Boolean(resolveRecentDisplayImage(item)),
   )
 
   return viewableItems

@@ -9,10 +9,7 @@ import {
   formatRecentCardCaption,
   resolveRecentDisplayImage,
 } from "@/utils/workspace-recent";
-import {
-  resolveRecentFlowClass,
-  resolveRecentFlowMediaStyle,
-} from "@/utils/workspace-recent-layout";
+import { resolveRecentDisplayGroup } from "@/utils/workspace-recent-layout";
 import type { WorkspaceRecentItem } from "@/types/workspace";
 
 const props = defineProps<{
@@ -31,17 +28,24 @@ const emit = defineEmits<{
 
 const statusIconMap = recentStatusIconMap;
 
-function resolveMediaStyle() {
-  return resolveRecentFlowMediaStyle(props.item);
-}
-
-function resolveCardClass() {
-  return resolveRecentFlowClass(props.item);
-}
-
 const recentCaption = computed(() => formatRecentCardCaption(props.item));
 const recentImageUrl = computed(() => resolveRecentDisplayImage(props.item));
 const recentBackdropUrl = computed(() => props.item.sceneBackgroundUrl);
+const displayBackdropUrl = computed(
+  () => recentBackdropUrl.value || recentImageUrl.value,
+);
+
+const isLandscape = computed(() => {
+  const { imageWidth, imageHeight, outputRatio } = props.item;
+  if (imageWidth && imageHeight) {
+    return imageWidth > imageHeight;
+  }
+  if (outputRatio) {
+    const [w, h] = outputRatio.split(":").map((part) => Number(part.trim()));
+    if (w && h) return w > h;
+  }
+  return resolveRecentDisplayGroup(props.item) === "landscape";
+});
 const recentVideoUrl = computed(() =>
   props.item.mediaType === "video" ? props.item.downloadUrl : undefined,
 );
@@ -56,7 +60,6 @@ function handlePick() {
   <article
     class="recent-card recent-card--image-only recent-flow-item"
     :class="[
-      resolveCardClass(),
       {
         'is-clickable': clickable,
         'is-selected': selected,
@@ -70,11 +73,11 @@ function handlePick() {
     @keydown.enter.prevent="handlePick"
     @keydown.space.prevent="handlePick"
   >
-    <div class="recent-media recent-media--flow" :style="resolveMediaStyle()">
+    <div class="recent-media recent-media--flow" :class="{ 'is-landscape': isLandscape }">
       <div
-        v-if="recentBackdropUrl"
+        v-if="isLandscape && displayBackdropUrl"
         class="recent-media-backdrop"
-        :style="{ backgroundImage: `url(${recentBackdropUrl})` }"
+        :style="{ backgroundImage: `url(${displayBackdropUrl})` }"
         aria-hidden="true"
       />
       <video
@@ -178,19 +181,18 @@ function handlePick() {
 
 .recent-media-backdrop {
   position: absolute;
-  inset: -10px;
+  inset: -16px;
   z-index: 0;
   background-position: center;
   background-size: cover;
-  opacity: 0.2;
-  transform: scale(1.04);
+  filter: blur(28px) brightness(0.55) saturate(1.25);
 }
 
 .recent-media-backdrop::after {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(15, 23, 42, 0.08));
+  background: rgba(15, 23, 42, 0.22);
 }
 
 .recent-media--flow :deep(.preload-image) {
