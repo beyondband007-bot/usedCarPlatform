@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -12,6 +12,8 @@ const props = withDefaults(
     /** 进入视口后再加载 video src，减少首屏并发请求 */
     lazy?: boolean;
     lazyRootMargin?: string;
+    /** 有静态封面时可延后到 hover 再挂载 src，避免列表并发拉取视频 */
+    deferSrcUntilHover?: boolean;
     /** 为 false 时仅展示首帧，不响应 hover 播放（用于左侧已选模板摘要） */
     interactive?: boolean;
   }>(),
@@ -22,7 +24,8 @@ const props = withDefaults(
     resetOnLeave: true,
     preload: "metadata",
     lazy: false,
-    lazyRootMargin: "100px",
+    lazyRootMargin: "80px",
+    deferSrcUntilHover: false,
     interactive: true,
   },
 );
@@ -31,15 +34,23 @@ const rootRef = ref<HTMLElement | null>(null);
 const videoRef = ref<HTMLVideoElement | null>(null);
 const isHovering = ref(false);
 const isInView = ref(!props.lazy);
+const shouldLoadVideo = ref(!props.deferSrcUntilHover);
 const prefersReducedMotion = ref(false);
 
 let activePreviewVideo: HTMLVideoElement | null = null;
 let reducedMotionMediaQuery: MediaQueryList | null = null;
 let intersectionObserver: IntersectionObserver | null = null;
 
-const resolvedSrc = computed(() => (isInView.value ? props.src : undefined));
+const shouldAttachSrc = computed(() => {
+  if (!props.src) return false;
+  if (props.lazy && !isInView.value) return false;
+  if (props.deferSrcUntilHover && !shouldLoadVideo.value) return false;
+  return true;
+});
+
+const resolvedSrc = computed(() => (shouldAttachSrc.value ? props.src : undefined));
 const resolvedPreload = computed(() =>
-  isInView.value ? props.preload : "none",
+  shouldAttachSrc.value ? props.preload : "none",
 );
 
 function handleReducedMotionChange(event: MediaQueryListEvent) {
@@ -61,6 +72,9 @@ function resetVideoPlayback() {
     activePreviewVideo = null;
   }
   isHovering.value = false;
+  if (props.deferSrcUntilHover) {
+    shouldLoadVideo.value = false;
+  }
 }
 
 function pauseActivePreview(except?: HTMLVideoElement) {
@@ -75,6 +89,12 @@ async function handleEnter() {
   if (props.disabled || prefersReducedMotion.value || !isInView.value || !props.interactive) {
     return;
   }
+
+  if (props.deferSrcUntilHover) {
+    shouldLoadVideo.value = true;
+  }
+
+  await nextTick();
 
   const video = videoRef.value;
   if (!video) return;
@@ -125,6 +145,7 @@ function setupLazyObserver() {
 watch(
   () => props.src,
   () => {
+    shouldLoadVideo.value = !props.deferSrcUntilHover;
     resetVideoPlayback();
   },
 );

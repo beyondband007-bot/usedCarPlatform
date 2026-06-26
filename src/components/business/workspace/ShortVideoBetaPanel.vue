@@ -7,7 +7,7 @@ import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
-import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
+import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl } from "@/constants/video-template-previews";
 import {
   getVideoTaskStatusLabel,
   getVideoWorkflowStageLabel,
@@ -242,10 +242,6 @@ function getTemplatePosterUrl(template: VideoTemplate) {
 
 function getTemplateVideoUrl(template: VideoTemplate) {
   return resolveTemplatePreviewUrl(template);
-}
-
-function useVideoTemplateCover(template: VideoTemplate) {
-  return shouldPreferVideoCover(template);
 }
 
 function resolveTemplateCardSubtitle(template: VideoTemplate): string {
@@ -745,7 +741,7 @@ watch(
             >
             <div class="sv-template-media">
               <PreloadImage
-                v-if="getTemplatePosterUrl(item) && !useVideoTemplateCover(item)"
+                v-if="getTemplatePosterUrl(item)"
                 class="sv-template-cover sv-template-cover--poster"
                 :src="getTemplatePosterUrl(item)!"
                 :alt="item.title"
@@ -757,16 +753,18 @@ watch(
                 v-if="getTemplateVideoUrl(item)"
                 class="sv-template-cover sv-template-cover--video"
                 :class="{
-                  'is-poster-backed':
-                    Boolean(getTemplatePosterUrl(item)) && !useVideoTemplateCover(item),
+                  'is-poster-backed': Boolean(getTemplatePosterUrl(item)),
                 }"
                 :src="getTemplateVideoUrl(item)!"
                 :alt="item.title"
                 :disabled="isTemplateDisabled(item)"
                 lazy
+                lazy-root-margin="60px"
+                :defer-src-until-hover="Boolean(getTemplatePosterUrl(item))"
+                :preload="getTemplatePosterUrl(item) ? 'none' : 'metadata'"
               />
               <div
-                v-if="!getTemplateVideoUrl(item) && (!getTemplatePosterUrl(item) || useVideoTemplateCover(item))"
+                v-if="!getTemplateVideoUrl(item) && !getTemplatePosterUrl(item)"
                 class="sv-template-cover sv-template-cover--placeholder"
               >
                 <Icon icon="mdi:image-outline" />
