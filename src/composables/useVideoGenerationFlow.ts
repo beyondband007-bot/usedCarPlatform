@@ -548,9 +548,6 @@ export function useVideoGenerationFlow(ownerKey: string) {
     clearPersistedDraftId()
     clearPersistedTaskId()
     stopPolling()
-    if (template.type === 'dealership') {
-      dealershipForm.value.dealershipName = template.title
-    }
     currentStep.value = 'form'
   }
 
@@ -643,8 +640,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
         ...dealershipForm.value,
         dealershipName:
           asString(templateInput.dealershipName) ||
-          dealershipForm.value.dealershipName ||
-          selectedTemplate.value.title,
+          dealershipForm.value.dealershipName,
         featuredVehicleNames:
           asString(templateInput.featuredVehicleNames) ||
           dealershipForm.value.featuredVehicleNames,

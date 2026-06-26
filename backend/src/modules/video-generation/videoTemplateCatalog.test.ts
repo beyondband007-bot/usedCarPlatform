@@ -10,10 +10,10 @@ import {
 
 const definitions = listVideoTemplateDefinitions();
 
-assert.equal(definitions.length, 6);
+assert.equal(definitions.length, 20);
 assert.equal(
   definitions.filter((item) => item.type === "single-car").length,
-  3,
+  8,
 );
 assert.equal(
   definitions.filter((item) => item.type === "promotion").length,
@@ -21,7 +21,7 @@ assert.equal(
 );
 assert.equal(
   definitions.filter((item) => item.type === "dealership").length,
-  3,
+  12,
 );
 assert.equal(
   videoTemplateCapabilities.find((item) => item.type === "market")?.status,
@@ -47,6 +47,11 @@ assert.deepEqual(videoGenerationWorkflowContract.outputRatioPolicy, {
 assert.equal(getVideoTemplateDefinition("ref-video-001")?.outputRatio, "16:9");
 assert.equal(getVideoTemplateDefinition("ref-video-002")?.outputRatio, "9:16");
 assert.equal(getVideoTemplateDefinition("ref-video-003")?.outputRatio, "9:16");
+assert.equal(getVideoTemplateDefinition("ref-video-006")?.outputRatio, "9:16");
+assert.equal(getVideoTemplateDefinition("ref-video-008")?.type, "dealership");
+assert.equal(getVideoTemplateDefinition("ref-video-015")?.type, "dealership");
+assert.equal(getVideoTemplateDefinition("ref-video-016")?.type, "single-car");
+assert.equal(getVideoTemplateDefinition("ref-video-020")?.type, "single-car");
 
 const supportedLanguageValues = videoGenerationWorkflowContract.supportedLanguages.map(
   (item): string => item.value,
@@ -151,9 +156,9 @@ console.log(
       runId: "video-template-contract-20260615-test-message",
       templateCount: definitions.length,
       typeCounts: {
-        singleCar: 3,
+        singleCar: 8,
         promotion: 0,
-        dealership: 3,
+        dealership: 12,
         market: 0,
       },
       fixedOutput: videoGenerationWorkflowContract.fixedOutput,

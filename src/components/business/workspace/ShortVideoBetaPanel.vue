@@ -13,7 +13,6 @@ import {
   getVideoWorkflowStageLabel,
   VIDEO_OUTPUT_RATIO,
   VIDEO_RESOLUTION,
-  formatVideoOutputRatioLabel,
 } from "@/constants/short-video";
 import type { VideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import { useAppStore } from "@/stores/app";
@@ -582,7 +581,6 @@ watch(
             <footer class="sv-template-foot">
               <strong>{{ item.title }}</strong>
               <span>{{ item.typeLabel }} · {{ item.styleLabel }}</span>
-              <p>{{ item.stylePrompt }}</p>
             </footer>
           </article>
         </div>

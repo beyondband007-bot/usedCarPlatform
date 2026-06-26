@@ -406,6 +406,10 @@ const digitalHumanDisplayById: Record<
     name: "数字人 4｜活力女声",
     ageStyle: "年轻女性 · 预设音色 EngagingGirl",
   },
+  "dh-message-05": {
+    name: "数字人 5｜车场介绍",
+    ageStyle: "车场销售形象 · 预设音色 Grounded Grace - 清亮女声",
+  },
 };
 
 const referenceMaterialDisplayById: Record<
@@ -499,6 +503,34 @@ const referenceMaterialDisplayById: Record<
         timeRange: "12-15s",
         visual: "数字人回到车辆旁或车场中做简短收尾。",
         assetRole: "digital_human|reference_style|vehicle_assets",
+      },
+    ],
+  },
+  "ref-video-006": {
+    title: "车场介绍 4｜规模现车",
+    referenceRole: "用于介绍车卖场规模感和现车充足感，适合作为二手车车场获客口播模板。",
+    styleTags: ["车场介绍", "规模感", "现车充足", "精品二手车", "数字人口播"],
+    stylePrompt: "精品二手车销售口播风格。数字人以车场销售身份介绍车卖场，重点表达车场规模大、现车充足、方便到店挑选，但要模糊表达，不说具体多少亩、多少台车。",
+    shotPlan15s: [
+      {
+        timeRange: "0-3s",
+        visual: "数字人在真实车场或展厅环境中开场，建立车卖场可信氛围。",
+        assetRole: "digital_human|reference_style|dealership_assets",
+      },
+      {
+        timeRange: "3-7s",
+        visual: "画面展示车辆排布、场地空间和到店看车环境，传达车源丰富但不出现具体数量承诺。",
+        assetRole: "digital_human|reference_style|dealership_assets",
+      },
+      {
+        timeRange: "7-12s",
+        visual: "数字人结合用户上传的车场图继续介绍现车可看、车型选择多，保持真实销售口播感。",
+        assetRole: "digital_human|reference_style|dealership_assets",
+      },
+      {
+        timeRange: "12-15s",
+        visual: "数字人回到主画面收尾，引导用户到店看实车、按实际车况确认。",
+        assetRole: "digital_human|reference_style|dealership_assets",
       },
     ],
   },
@@ -813,33 +845,62 @@ const buildScriptPrompt = (input: {
   ].filter(Boolean).join("\n");
 };
 
-const buildDeepSeekSystemPrompt = (input: {
+
+const videoTemplateNarrationInstructionById: Record<string, string> = {
+  "ref-video-006": "用于介绍车卖场，站在车场规模大、现车充足的角度；必须模糊表达，不要具体说多少亩、多少辆。",
+  "ref-video-008": "用于介绍车卖场，站在车场规模大、现车充足的角度；必须模糊表达，不要具体说多少亩、多少辆。",
+  "ref-video-009": "用于介绍车卖场，站在库存更新快、每周都有新货到的角度；不要夸大宣传。",
+  "ref-video-010": "用于介绍车卖场，站在车场规模大、现车充足的角度；必须模糊表达，不要具体说多少亩、多少辆。",
+  "ref-video-011": "用于介绍车卖场，站在只收精品车、不收中等事故以上事故车、车源优质的角度；避免绝对化承诺。",
+  "ref-video-012": "用于介绍车卖场，站在售后保障、海外客户也能找到人的角度；不要夸大宣传。",
+  "ref-video-013": "用于介绍车卖场，站在售后保障、海外客户也能找到人的角度；不要夸大宣传。",
+  "ref-video-014": "用于介绍车卖场，站在售后保障、海外客户也能找到人的角度；不要夸大宣传。",
+  "ref-video-015": "用于介绍车卖场，站在全天候运营、沟通及时的角度。",
+  "ref-video-007": "用于介绍用户上传的车辆，站在适合出口海外市场、符合目标国家需求、手续齐全好出关的角度。",
+  "ref-video-016": "用于介绍用户上传的车型，站在外观成色新、漆面光泽度好、看起来接近准新车的角度；不得使用绝对化表达。",
+  "ref-video-017": "用于介绍用户上传车辆，站在动力工况好、加速有力、机械素质过硬的角度；不要使用“完美”等过于绝对化的形容词。",
+  "ref-video-018": "用于介绍用户上传的车辆，站在内饰保养新、座椅磨损低、配置丰富实用的角度；不要使用和新车一模一样等类似词汇，需要加入“几乎”等模糊副词，不得绝对化表达。",
+  "ref-video-019": "用于介绍眼前这台二手车，站在已通过专业检测、报告可查、车况透明的角度。",
+  "ref-video-020": "用于介绍用户上传的车辆，站在车主卖车原因真实、车况来源透明的角度；不得出现具体行驶里程及未经用户确认的具体车辆数据，必须模糊化表达。",
+};
+
+const buildTemplateNarrationInstruction = (input: {
+  templateId?: string;
+  templateType: VideoTemplateType;
+  dealershipName?: string;
+}) => {
+  const instruction = input.templateId
+    ? videoTemplateNarrationInstructionById[input.templateId]
+    : "";
+  if (!instruction) return "";
+  if (input.templateType === "dealership") {
+    return `当前素材模板的口播要求：你是一个精品二手车销售，品牌名叫${input.dealershipName || "{用户填写的品牌名称}"}，请生成一段约15秒口播文案，${instruction}`;
+  }
+  return `当前素材模板的口播要求：你是一个精品二手车销售，请生成一段约15秒口播文案，${instruction}`;
+};
+
+export const buildDeepSeekSystemPrompt = (input: {
   language: VideoGenerationLanguage;
   templateType: VideoTemplateType;
+  templateId?: string;
+  dealershipName?: string;
 }) =>
   [
-    "你是汽车行业短视频口播文案策划，负责根据用户输入、上传图片摘要和预设参考风格生成数字人口播文案。",
+    "你是汽车行业短视频口播文案策划，根据用户输入、上传素材摘要和所选模板生成数字人口播文案。",
     "只输出 JSON，不输出 Markdown，不输出解释。",
     `目标语言为${getVideoGenerationLanguageLabel(input.language)}，scriptText、openingHook、sellingPoints、shotCues.voiceover 必须使用该语言。`,
-    `视频时长以上限 15 秒为准，口播音频必须自然控制在 8-15 秒之间，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
-    "如果信息量和时长冲突，必须优先压缩文案，宁可少讲一个卖点，也不能让自然语速口播超过 15 秒。",
-    `当前模板类型为${videoTemplateTypeLabels[input.templateType]}，必须围绕该模板目标组织内容。`,
-    "不能只复述用户输入的车名。先识别品牌、车型、年款、车型级别、市场定位、目标人群和使用场景，再提炼适合 8-15 秒口播的车型级通用卖点。",
-    "可以使用可靠的车型级常识介绍车辆定位、空间取向、舒适取向和典型使用场景；凡是依赖具体配置版本的信息，必须放入 uncertainItems，不能写成确定事实。",
-    "年款不代表新车。二手车口播禁止使用“全新”“新车”；车型名称未明确提供代际时，禁止擅自补充“第几代”。",
-    "禁止使用“公认、标杆、首选、领先、就是答案、闭眼买”等绝对化营销词；未由图片摘要确认时，不要断言座椅软硬、内饰用料或具体车内配置。",
-    "视频类型、场景氛围、镜头节奏、灯光和表达方式必须跟随用户选择的参考素材。",
-    "不得编造年份以外的新信息，不得编造公里数、价格、事故记录、过户次数、金融政策、官方配置和车况承诺。",
-    "除非用户明确提供，否则禁止出现：几万块、价格实惠、车况精品、准新车、无事故、原版原漆、包过户、金融优惠、老铁、抓紧。",
-    "口播可以有销售感，但必须保持专业克制，不使用夸张直播叫卖口吻。",
-    "如果用户上传图片摘要提供了外观、内饰、颜色、座舱或细节信息，可以用于文案；没有提供的信息不要假设。",
+    `口播音频必须自然控制在 8-15 秒内。${getVideoGenerationScriptLengthRule(input.language)}`,
+    `当前模板类型为${videoTemplateTypeLabels[input.templateType]}，内容和表达必须符合该模板目标。`,
+    "用户填写的信息和上传素材摘要是事实依据；未提供的信息不得编造，尤其是价格、里程、事故、过户、金融政策、具体配置和车况承诺。",
+    "二手车文案禁止使用“全新、新车、准新车、无事故、原版原漆、公认、标杆、首选、领先、闭眼买”等未经用户确认或绝对化的表达。",
+    "口播可以有销售感，但要专业、自然、克制；信息过多时优先保留主题和最可信的1-2个卖点。",
+    buildTemplateNarrationInstruction(input),
     "输出 JSON 字段：vehicleProfile, openingHook, scriptText, sellingPoints, shotCues, riskNotes。",
     "vehicleProfile 必须包含 brand, model, modelYear, vehicleClass, marketPositioning, targetUsers, useCases, recognizedHighlights, uncertainItems。",
-    "shotCues 必须正好 4 段，时间依次为 0-3s、3-7s、7-12s、12-15s，依次承担车型定位开场、外观卖点、内饰空间及使用场景、数字人收束。",
-    "shotCues 每项包含 timeRange, visual, voiceover, assetRole；assetRole 可包含 digital_human、reference_style、exterior、interior、user_reference。",
+    "shotCues 用于描述画面内容顺序，不固定具体秒数；每项包含 timeRange, visual, voiceover, assetRole，assetRole 可包含 digital_human、reference_style、exterior、interior、user_reference。",
   ].join("\n");
 
-const buildDeepSeekUserPrompt = (input: {
+export const buildDeepSeekUserPrompt = (input: {
   vehicleName: string;
   durationSeconds: number;
   referenceMaterial: ReferenceMaterialRecord;
@@ -854,41 +915,34 @@ const buildDeepSeekUserPrompt = (input: {
 }) => {
   const style = input.referenceMaterial.styleJson;
   return [
+    "用户本次生成信息：",
     `模板类型：${videoTemplateTypeLabels[input.templateType]}`,
     `内容主体：${input.vehicleName}`,
     `目标语言：${getVideoGenerationLanguageLabel(input.language)}`,
-    `视频时长：上限 ${input.durationSeconds} 秒。口播音频必须自然控制在 8-15 秒之间，只能短于或等于 15 秒，绝不能超过 15 秒。${getVideoGenerationScriptLengthRule(input.language)}`,
-    "如果卖点较多，优先保留车型定位、核心用途和一条最可信卖点，删掉次要描述，避免口播超时。",
+    `口播时长：自然控制在 8-${input.durationSeconds} 秒内。${getVideoGenerationScriptLengthRule(input.language)}`,
     input.promotionText ? `用户确认的优惠信息：${input.promotionText}` : "",
     input.dealershipName ? `车场名称：${input.dealershipName}` : "",
     input.featuredVehicleNames
       ? `主推车型：${input.featuredVehicleNames}`
       : "",
     `用户补充卖点：${input.sellingPointHints.length ? input.sellingPointHints.join("、") : "无"}`,
-    `车辆图片摘要：${input.vehicleImageSummary || "暂无"}`,
+    `用户提供的图片内容摘要：${input.vehicleImageSummary || "暂无"}`,
+    "",
+    "用户上传素材：",
     `上传素材摘要：${input.assetSummary}`,
     "",
-    "参考素材风格如下，最终文案和镜头必须跟随它：",
-    `参考素材标题：${input.referenceMaterial.title}`,
-    `视频类型：${input.referenceMaterial.videoType}`,
-    `风格标签：${style.styleTags.join("、")}`,
-    `场景风格：${style.sceneStyle}`,
-    `视觉质感：${style.visualTone}`,
-    `灯光：${style.lighting}`,
-    `镜头语言：${style.cameraLanguage}`,
-    `构图：${style.subjectComposition}`,
-    `节奏：${style.pacing}`,
-    `禁用方向：${style.avoid.join("、")}`,
-    `预设风格与场景 Prompt：${conciseStylePrompt(input.referenceMaterial.stylePrompt)}`,
-    toSceneShotPlanPrompt(input.referenceMaterial),
+    "所选模板配置：",
+    `模板名称：${input.referenceMaterial.title}`,
+    `模板视频类型：${input.referenceMaterial.videoType}`,
+    `模板核心提示词：${conciseStylePrompt(input.referenceMaterial.stylePrompt)}`,
+    `模板风格标签：${style.styleTags.join("、")}`,
+    `模板禁止项：${style.avoid.join("、")}`,
     "",
     "生成要求：",
-    "1. 先在 vehicleProfile 中给出车型级理解，不能只复述车名。",
-    "2. scriptText 必须自然包含车型定位、目标人群或使用场景，并讲出 1-2 个稳妥的车型卖点；时长优先，不能为了卖点完整而超时。",
-    "3. 未提供具体配置版本时，不得写死动力形式、排量、辅助驾驶、屏幕尺寸、座椅功能等配置。",
-    "4. 用户上传图片是车辆外观和内饰的事实依据；参考视频只决定风格、类型、场景和镜头节奏。",
-    "5. 这是二手车视频：禁止使用“全新”“新车”；输入未写明代际时，禁止补充第几代车型。",
-    "6. 避免“公认标杆、同级领先、就是答案、省心耐用、座椅柔软、用料考究”等无法仅凭车名确认的主观结论，优先讲车型定位、空间取向、舒适取向和使用场景。",
+    "1. scriptText 必须紧扣当前模板和内容主体，适合数字人自然口播。",
+    "2. 优先使用用户明确提供的信息；素材摘要没有确认的内容不要写成事实。",
+    "3. 信息较多时只保留主题、适用场景和1-2个最可信卖点，确保口播不超时。",
+    "4. shotCues 只描述建议的画面内容顺序，不需要固定时间分段。",
   ].filter(Boolean).join("\n");
 };
 
@@ -1208,11 +1262,13 @@ const mergeGeneratedDraft = (fallback: {
   const usedGeneratedScript =
     Boolean(generated.scriptText) &&
     !hasUnsupportedScriptClaims(generated.scriptText, fallback.vehicleName);
-  const generatedShotCues = usedGeneratedScript && generated.shotCues.length >= FIXED_SHOT_TIME_RANGES.length
-    ? generated.shotCues.slice(0, FIXED_SHOT_TIME_RANGES.length).map((cue, index) => ({
+  const generatedShotCues = usedGeneratedScript && generated.shotCues.length
+    ? generated.shotCues.map((cue, index) => ({
         ...cue,
-        timeRange: FIXED_SHOT_TIME_RANGES[index],
-        assetRole: cue.assetRole || fallback.shotCues[index].assetRole,
+        assetRole:
+          cue.assetRole ||
+          fallback.shotCues[index]?.assetRole ||
+          "digital_human|reference_style",
       }))
     : fallback.shotCues;
   return {
@@ -2370,6 +2426,8 @@ class VideoGenerationService {
         systemPrompt: buildDeepSeekSystemPrompt({
           language,
           templateType: templateDefinition.type,
+          templateId: referenceMaterialId,
+          dealershipName,
         }),
         userPrompt: buildDeepSeekUserPrompt({
           vehicleName,

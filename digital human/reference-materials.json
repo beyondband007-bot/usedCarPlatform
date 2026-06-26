@@ -384,6 +384,1203 @@
       "extractionStatus": "completed",
       "extractedAt": "2026-06-15T00:00:00+08:00",
       "extractionMethod": "deepseek_scene_prompt_and_15s_storyboard"
+    },
+    {
+      "id": "ref-video-006",
+      "title": "Scene 6 | Dealership Scale And Inventory",
+      "fileName": "message-scene-06-dealership-scale.mp4",
+      "originalName": "车场介绍数字人视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材1/车场介绍数字人视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6149215,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "30.00"
+      },
+      "videoType": "dealership_scale_inventory_pitch",
+      "referenceRole": "Dealership introduction focused on large lot feeling and sufficient in-stock vehicles, without stating exact acreage or inventory count.",
+      "previewImagePath": "digital human/reference-frames/ref-video-006-contact-sheet.jpg",
+      "analysisFramePaths": [],
+      "styleJson": {
+        "videoType": "dealership_scale_inventory_pitch",
+        "referenceRole": "Dealership introduction focused on large lot feeling and sufficient in-stock vehicles, without stating exact acreage or inventory count.",
+        "styleTags": [
+          "dealership intro",
+          "large lot feeling",
+          "sufficient inventory",
+          "digital human host",
+          "boutique used-car sales"
+        ],
+        "sceneStyle": "Boutique used-car sales narration style. The digital human introduces the dealership as a professional sales consultant, emphasizing a spacious lot feeling, sufficient vehicles available for viewing, and convenient on-site selection. Keep all scale claims qualitative and avoid exact numbers.",
+        "visualTone": "Realistic used-car short-video look; clean, credible, and sales-oriented without exaggerated promises.",
+        "lighting": "Follow the uploaded dealership image and selected digital human material; keep the face clear and the dealership/car rows readable.",
+        "cameraLanguage": "Digital-human narration combined with uploaded dealership images and narration audio. Keep medium framing, avoid close-up shots, avoid subtitles, and do not add background music.",
+        "subjectComposition": "Digital human is the host; uploaded dealership images are the factual scene reference; narration audio controls the speaking content and rhythm.",
+        "pacing": "Around 15 seconds, led by the generated narration audio.",
+        "applicableCarTypes": [
+          "used-car dealership",
+          "dealership display",
+          "lot introduction",
+          "store promotion"
+        ],
+        "avoid": [
+          "hardcoding Mixed placeholder numbers in template configuration",
+          "inventing exact acreage or inventory count",
+          "adding subtitles or background music",
+          "close-up shots",
+          "opening the hood",
+          "showing vehicle parts not provided by reference materials"
+        ]
+      },
+      "stylePrompt": "Boutique used-car sales narration style. The digital human introduces the dealership as a professional sales consultant, emphasizing a spacious lot feeling, sufficient vehicles available for viewing, and convenient on-site selection. Keep all scale claims qualitative and avoid exact acreage or inventory count. The final Seedance prompt should be assembled from runtime roles: selected digital human, uploaded dealership scene, and narration audio.",
+      "scenePrompt": "Introduce the user's dealership from the angle of spacious scale and sufficient in-stock vehicles. Use qualitative wording only; do not say how many acres or how many cars.",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "Digital human opens in a real dealership or lot environment and establishes a credible used-car sales tone.",
+          "assetRole": "digital_human|dealership_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "Show the dealership space, vehicle rows, and viewing environment to imply scale and inventory richness without exact numbers.",
+          "assetRole": "dealership_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "Digital human continues the sales explanation, connecting the user's dealership name and available viewing experience.",
+          "assetRole": "digital_human|dealership_assets|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "Digital human closes with a natural invitation to visit the store and inspect real vehicles.",
+          "assetRole": "digital_human|dealership_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-25T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-008",
+      "title": "车场介绍 5｜规模现车",
+      "fileName": "message-scene-ref-video-008-dealership.mp4",
+      "originalName": "视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材2-车场介绍/视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 2973700,
+        "duration": "00:00:14",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+      "previewImagePath": "digital human/reference-frames/ref-video-008-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-008-frame-01.jpg",
+        "digital human/reference-frames/ref-video-008-frame-02.jpg",
+        "digital human/reference-frames/ref-video-008-frame-03.jpg",
+        "digital human/reference-frames/ref-video-008-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+        "styleTags": [
+          "车场介绍",
+          "规模现车",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在车场规模大、现车充足的角度，但是要模糊表达，不要具体说多少亩，多少量。，",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-009",
+      "title": "车场介绍 6｜库存更新",
+      "fileName": "message-scene-ref-video-009-dealership.mp4",
+      "originalName": "视频素材.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材3-车场介绍/视频素材.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6478783,
+        "duration": "00:00:13",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "库存更新快、每周都有新货到，不夸大宣传",
+      "previewImagePath": "digital human/reference-frames/ref-video-009-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-009-frame-01.jpg",
+        "digital human/reference-frames/ref-video-009-frame-02.jpg",
+        "digital human/reference-frames/ref-video-009-frame-03.jpg",
+        "digital human/reference-frames/ref-video-009-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "库存更新快、每周都有新货到，不夸大宣传",
+        "styleTags": [
+          "车场介绍",
+          "库存更新",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“库存更新快、每周都有新货到，不夸大宣传”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。库存更新快、每周都有新货到，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在库存更新快、每周都有新货到的角度，不要夸大宣传。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“库存更新快、每周都有新货到，不夸大宣传”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-010",
+      "title": "车场介绍 7｜规模现车",
+      "fileName": "message-scene-ref-video-010-dealership.mp4",
+      "originalName": "视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材4-车场介绍/视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 7251432,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+      "previewImagePath": "digital human/reference-frames/ref-video-010-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-010-frame-01.jpg",
+        "digital human/reference-frames/ref-video-010-frame-02.jpg",
+        "digital human/reference-frames/ref-video-010-frame-03.jpg",
+        "digital human/reference-frames/ref-video-010-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+        "styleTags": [
+          "车场介绍",
+          "规模现车",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在车场规模大、现车充足的角度，但是要模糊表达，不要具体说多少亩，多少量。，",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-011",
+      "title": "车场介绍 8｜精品车源",
+      "fileName": "message-scene-ref-video-011-dealership.mp4",
+      "originalName": "视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材5-车场介绍/视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6980613,
+        "duration": "00:00:13",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺",
+      "previewImagePath": "digital human/reference-frames/ref-video-011-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-011-frame-01.jpg",
+        "digital human/reference-frames/ref-video-011-frame-02.jpg",
+        "digital human/reference-frames/ref-video-011-frame-03.jpg",
+        "digital human/reference-frames/ref-video-011-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺",
+        "styleTags": [
+          "车场介绍",
+          "精品车源",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在只收精品车，不收中等事故以上事故车（如泡水车、系统损伤车等）车源优质的角度。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-012",
+      "title": "车场介绍 9｜售后保障",
+      "fileName": "message-scene-ref-video-012-dealership.mp4",
+      "originalName": "5ae0235d0b1b666a84023abebd9ff2d8_raw.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材6-车场介绍/5ae0235d0b1b666a84023abebd9ff2d8_raw.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6077519,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "previewImagePath": "digital human/reference-frames/ref-video-012-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-012-frame-01.jpg",
+        "digital human/reference-frames/ref-video-012-frame-02.jpg",
+        "digital human/reference-frames/ref-video-012-frame-03.jpg",
+        "digital human/reference-frames/ref-video-012-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "styleTags": [
+          "车场介绍",
+          "售后保障",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-013",
+      "title": "车场介绍 10｜海外售后",
+      "fileName": "message-scene-ref-video-013-dealership.mp4",
+      "originalName": "参考视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材7-车场介绍/参考视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6196478,
+        "duration": "00:00:13",
+        "width": 1280,
+        "height": 720,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "previewImagePath": "digital human/reference-frames/ref-video-013-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-013-frame-01.jpg",
+        "digital human/reference-frames/ref-video-013-frame-02.jpg",
+        "digital human/reference-frames/ref-video-013-frame-03.jpg",
+        "digital human/reference-frames/ref-video-013-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "styleTags": [
+          "车场介绍",
+          "海外售后",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-014",
+      "title": "车场介绍 11｜服务保障",
+      "fileName": "message-scene-ref-video-014-dealership.mp4",
+      "originalName": "f3083524fad69d1bf4b68a19dd22f56e_raw.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材8-车场介绍/f3083524fad69d1bf4b68a19dd22f56e_raw.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 8280015,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "previewImagePath": "digital human/reference-frames/ref-video-014-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-014-frame-01.jpg",
+        "digital human/reference-frames/ref-video-014-frame-02.jpg",
+        "digital human/reference-frames/ref-video-014-frame-03.jpg",
+        "digital human/reference-frames/ref-video-014-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "styleTags": [
+          "车场介绍",
+          "服务保障",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-015",
+      "title": "车场介绍 12｜全天沟通",
+      "fileName": "message-scene-ref-video-015-dealership.mp4",
+      "originalName": "参考视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材9-车场介绍/参考视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 4368074,
+        "duration": "00:00:13",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "全天候运营、沟通及时",
+      "previewImagePath": "digital human/reference-frames/ref-video-015-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-015-frame-01.jpg",
+        "digital human/reference-frames/ref-video-015-frame-02.jpg",
+        "digital human/reference-frames/ref-video-015-frame-03.jpg",
+        "digital human/reference-frames/ref-video-015-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "全天候运营、沟通及时",
+        "styleTags": [
+          "车场介绍",
+          "全天沟通",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“全天候运营、沟通及时”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "车场介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。全天候运营、沟通及时。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在全天候运营、沟通及时的角度。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“全天候运营、沟通及时”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-007",
+      "title": "单车介绍 2｜出口海外",
+      "fileName": "message-scene-ref-video-007-single-car.mp4",
+      "originalName": "视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材10-单车介绍/视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 6037373,
+        "duration": "00:00:12",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "适合出口海外市场、符合目标国家需求、手续齐全好出关",
+      "previewImagePath": "digital human/reference-frames/ref-video-007-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-007-frame-01.jpg",
+        "digital human/reference-frames/ref-video-007-frame-02.jpg",
+        "digital human/reference-frames/ref-video-007-frame-03.jpg",
+        "digital human/reference-frames/ref-video-007-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "适合出口海外市场、符合目标国家需求、手续齐全好出关",
+        "styleTags": [
+          "单车介绍",
+          "出口海外",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“适合出口海外市场、符合目标国家需求、手续齐全好出关”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。适合出口海外市场、符合目标国家需求、手续齐全好出关。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍眼前这台二手车，站在适合出口海外市场、符合目标国家需求、手续齐全好出关的角度。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“适合出口海外市场、符合目标国家需求、手续齐全好出关”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-016",
+      "title": "单车介绍 3｜外观成色",
+      "fileName": "message-scene-ref-video-016-single-car.mp4",
+      "originalName": "参考视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材11-单车介绍/参考视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 3169558,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "外观成色新、漆面光泽度好，看起来接近准新但避免绝对化",
+      "previewImagePath": "digital human/reference-frames/ref-video-016-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-016-frame-01.jpg",
+        "digital human/reference-frames/ref-video-016-frame-02.jpg",
+        "digital human/reference-frames/ref-video-016-frame-03.jpg",
+        "digital human/reference-frames/ref-video-016-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "外观成色新、漆面光泽度好，看起来接近准新但避免绝对化",
+        "styleTags": [
+          "单车介绍",
+          "外观成色",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“外观成色新、漆面光泽度好，看起来接近准新但避免绝对化”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。外观成色新、漆面光泽度好，看起来接近准新但避免绝对化。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫“脸谱二手车”，帮我生成一个口播15秒文案，用于介绍用户上传的车型，站在外观成色新、漆面光泽度好、看起来像准新车的角度。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“外观成色新、漆面光泽度好，看起来接近准新但避免绝对化”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-017",
+      "title": "单车介绍 4｜动力工况",
+      "fileName": "message-scene-ref-video-017-single-car.mp4",
+      "originalName": "0c39fa7d89d5b1ab9a1180ccd63b8c36_raw.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材12-单车介绍/0c39fa7d89d5b1ab9a1180ccd63b8c36_raw.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 36990152,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词",
+      "previewImagePath": "digital human/reference-frames/ref-video-017-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-017-frame-01.jpg",
+        "digital human/reference-frames/ref-video-017-frame-02.jpg",
+        "digital human/reference-frames/ref-video-017-frame-03.jpg",
+        "digital human/reference-frames/ref-video-017-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词",
+        "styleTags": [
+          "单车介绍",
+          "动力工况",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫“脸谱二手车”，帮我生成一个口播15秒文案，用于介绍‘用户上传车辆’，站在动力工况好、加速有力、机械素质过硬的角度。不要使用完美等过于绝对化的形容词。。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-018",
+      "title": "单车介绍 5｜内饰配置",
+      "fileName": "message-scene-ref-video-018-single-car.mp4",
+      "originalName": "参考视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材13-单车介绍/参考视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 17550594,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "25.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "内饰保养新、座椅磨损低、配置丰富实用，使用“几乎”等模糊副词，不绝对化",
+      "previewImagePath": "digital human/reference-frames/ref-video-018-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-018-frame-01.jpg",
+        "digital human/reference-frames/ref-video-018-frame-02.jpg",
+        "digital human/reference-frames/ref-video-018-frame-03.jpg",
+        "digital human/reference-frames/ref-video-018-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "内饰保养新、座椅磨损低、配置丰富实用，使用“几乎”等模糊副词，不绝对化",
+        "styleTags": [
+          "单车介绍",
+          "内饰配置",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“内饰保养新、座椅磨损低、配置丰富实用，使用“几乎”等模糊副词，不绝对化”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。内饰保养新、座椅磨损低、配置丰富实用，使用“几乎”等模糊副词，不绝对化。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，帮我生成一个口播15秒文案，用于介绍\"用户上传的车辆\"，站在内饰保养新、座椅磨损低、配置丰富实用的角度。不使用和新车一模一样的类似词汇，需要加上模糊副词如几乎等，不得绝对化表达。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“内饰保养新、座椅磨损低、配置丰富实用，使用“几乎”等模糊副词，不绝对化”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-019",
+      "title": "单车介绍 6｜检测透明",
+      "fileName": "message-scene-ref-video-019-single-car.mp4",
+      "originalName": "预设视频.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材14-单车介绍/预设视频.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 18021312,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "25.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "已通过专业检测、报告可查、车况透明",
+      "previewImagePath": "digital human/reference-frames/ref-video-019-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-019-frame-01.jpg",
+        "digital human/reference-frames/ref-video-019-frame-02.jpg",
+        "digital human/reference-frames/ref-video-019-frame-03.jpg",
+        "digital human/reference-frames/ref-video-019-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "已通过专业检测、报告可查、车况透明",
+        "styleTags": [
+          "单车介绍",
+          "检测透明",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“已通过专业检测、报告可查、车况透明”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。已通过专业检测、报告可查、车况透明。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍眼前这台二手车，站在已通过专业检测、报告可查、车况透明的角度。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“已通过专业检测、报告可查、车况透明”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
+    },
+    {
+      "id": "ref-video-020",
+      "title": "单车介绍 7｜来源透明",
+      "fileName": "message-scene-ref-video-020-single-car.mp4",
+      "originalName": "749d7a8f0d33d0b0a92ee78509e0f5e5_raw.mp4",
+      "sourcePath": "D:/二手车生视频功能素材/素材15-单车介绍/749d7a8f0d33d0b0a92ee78509e0f5e5_raw.mp4",
+      "media": {
+        "mimeType": "video/mp4",
+        "sizeBytes": 11520254,
+        "duration": "00:00:15",
+        "width": 720,
+        "height": 1280,
+        "frameRate": "24.00"
+      },
+      "videoType": "single_car_pitch_custom",
+      "referenceRole": "车主卖车原因真实、车况来源透明，不出现具体里程和未经确认的具体车辆数据",
+      "previewImagePath": "digital human/reference-frames/ref-video-020-contact-sheet.jpg",
+      "analysisFramePaths": [
+        "digital human/reference-frames/ref-video-020-frame-01.jpg",
+        "digital human/reference-frames/ref-video-020-frame-02.jpg",
+        "digital human/reference-frames/ref-video-020-frame-03.jpg",
+        "digital human/reference-frames/ref-video-020-frame-04.jpg"
+      ],
+      "styleJson": {
+        "videoType": "single_car_pitch_custom",
+        "referenceRole": "车主卖车原因真实、车况来源透明，不出现具体里程和未经确认的具体车辆数据",
+        "styleTags": [
+          "单车介绍",
+          "来源透明",
+          "精品二手车",
+          "数字人口播"
+        ],
+        "sceneStyle": "精品二手车销售口播风格，围绕“车主卖车原因真实、车况来源透明，不出现具体里程和未经确认的具体车辆数据”组织画面和讲解。",
+        "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
+        "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
+        "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
+        "subjectComposition": "数字人作为销售讲解主体，用户上传素材作为事实依据。",
+        "pacing": "约15秒，由生成的口播音频控制节奏。",
+        "applicableCarTypes": [
+          "二手车",
+          "单车介绍"
+        ],
+        "avoid": [
+          "硬编码 Mixed 占位符到模板配置",
+          "编造价格、里程、事故、金融政策或具体车况承诺",
+          "字幕",
+          "背景音乐",
+          "特写",
+          "打开引擎盖",
+          "展示未提供参考图的部位"
+        ]
+      },
+      "stylePrompt": "精品二手车销售口播风格。车主卖车原因真实、车况来源透明，不出现具体里程和未经确认的具体车辆数据。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍眼前这台理想L8，站在车主卖车原因真实、车况来源透明的角度。不得出现具体使用行驶里程数及关于车辆的具体信息数据，模糊化表达。",
+      "shotPlan15s": [
+        {
+          "timeRange": "opening",
+          "visual": "数字人自然开场，建立真实可信的销售讲解氛围。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "围绕“车主卖车原因真实、车况来源透明，不出现具体里程和未经确认的具体车辆数据”展示用户上传素材中的关键信息。",
+          "assetRole": "user_assets|reference_style"
+        },
+        {
+          "timeRange": "middle",
+          "visual": "数字人继续口播讲解，节奏跟随生成音频，表达克制可信。",
+          "assetRole": "digital_human|narration_audio"
+        },
+        {
+          "timeRange": "ending",
+          "visual": "数字人自然收尾，引导以实车、实地或实际资料为准。",
+          "assetRole": "digital_human|user_assets|narration_audio"
+        }
+      ],
+      "extractionStatus": "completed",
+      "extractedAt": "2026-06-26T00:00:00+08:00",
+      "extractionMethod": "user_provided_prompt_and_video_material"
     }
   ]
 }

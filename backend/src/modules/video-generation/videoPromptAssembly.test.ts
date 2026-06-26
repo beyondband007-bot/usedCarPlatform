@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { buildSeedancePrompt } from "./videoGenerationService";
+import {
+  buildDeepSeekSystemPrompt,
+  buildDeepSeekUserPrompt,
+  buildSeedancePrompt,
+} from "./videoGenerationService";
 
 const singleCarPrompt = buildSeedancePrompt({
   outputRatio: "9:16",
@@ -89,6 +93,40 @@ const horizontalDealershipPrompt = buildSeedancePrompt({
   outputRatio: "16:9",
 });
 assert.match(horizontalDealershipPrompt, /16:9 横屏/);
+
+const deepSeekSystemPrompt = buildDeepSeekSystemPrompt({
+  language: "Chinese",
+  templateType: "dealership",
+});
+assert.match(deepSeekSystemPrompt, /输出 JSON 字段：vehicleProfile/);
+assert.match(deepSeekSystemPrompt, /shotCues 用于描述画面内容顺序，不固定具体秒数/);
+assert.doesNotMatch(deepSeekSystemPrompt, /shotCues 必须正好 4 段/);
+assert.doesNotMatch(deepSeekSystemPrompt, /0-3s、3-7s、7-12s、12-15s/);
+
+const deepSeekUserPrompt = buildDeepSeekUserPrompt({
+  vehicleName: "志诚二手车",
+  durationSeconds: 15,
+  referenceMaterial: {
+    title: "车场介绍 1｜开场总览",
+    videoType: "dealership_intro_overview",
+    stylePrompt: "真实二手车车场介绍风格。",
+    styleJson: {
+      styleTags: ["车场介绍", "环境总览"],
+      avoid: ["inventing price"],
+    },
+  } as never,
+  sellingPointHints: [],
+  vehicleImageSummary: "",
+  assetSummary: "车场/展厅图 1 张：865f2a2f4cc5667199fb8a0362256660.jpg",
+  language: "Chinese",
+  templateType: "dealership",
+  dealershipName: "志诚二手车",
+});
+assert.match(deepSeekUserPrompt, /用户上传素材/);
+assert.match(deepSeekUserPrompt, /车场名称：志诚二手车/);
+assert.match(deepSeekUserPrompt, /模板核心提示词：真实二手车车场介绍风格/);
+assert.doesNotMatch(deepSeekUserPrompt, /预设场景 15 秒分镜/);
+assert.doesNotMatch(deepSeekUserPrompt, /0-3s/);
 
 console.log(
   JSON.stringify(

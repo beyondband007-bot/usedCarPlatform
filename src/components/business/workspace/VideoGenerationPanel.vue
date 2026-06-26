@@ -406,7 +406,8 @@ const isSingleCarFormComplete = computed(() => {
 
 const isDealershipFormComplete = computed(() =>
   Boolean(
-    dealershipForm.value.digitalHumanId &&
+    dealershipForm.value.dealershipName.trim() &&
+      dealershipForm.value.digitalHumanId &&
       dealershipForm.value.language &&
       uploadedDealershipAssetCount.value > 0,
   ),
@@ -418,7 +419,9 @@ const isFormReadyForDraft = computed(() => {
   return false;
 });
 
-const languageStepIndex = computed(() => (isSingleCarTemplate.value ? "4" : "3"));
+const languageStepIndex = computed(() =>
+  isSingleCarTemplate.value || isDealershipTemplate.value ? "4" : "3",
+);
 
 const tipBannerText = computed(() => {
   const styleLabel = selectedTemplate.value?.styleLabel ?? "专业";
@@ -620,13 +623,6 @@ function resolveHumanTone(index: number) {
   return humanToneClasses[index % humanToneClasses.length];
 }
 
-function resolveHumanSubtitle(human: DigitalHuman) {
-  if (human.voiceStatus !== "ready") return "音色待配置";
-  if (human.ageStyle) return human.ageStyle;
-  if (human.gender === "female") return "优雅干练";
-  return "专业稳重";
-}
-
 function selectDigitalHuman(human: DigitalHuman) {
   if (isConfigurationLocked.value) return;
   activeDigitalHumanId.value = human.id;
@@ -766,7 +762,6 @@ async function submitConfirmedVideo() {
             <span class="is-accent">{{ selectedTemplate.styleLabel }}</span>
             <span>{{ selectedOutputRatio }} {{ selectedOutputRatio === "16:9" ? "横屏" : "竖屏" }}</span>
           </div>
-          <p>{{ selectedTemplate.stylePrompt }}</p>
         </div>
       </article>
 
@@ -1013,10 +1008,32 @@ async function submitConfirmedVideo() {
               <Icon v-else icon="mdi:account-outline" />
             </span>
             <strong>{{ human.name }}</strong>
-            <span>{{ resolveHumanSubtitle(human) }}</span>
           </button>
         </div>
         <p v-else class="sv-empty-tip">暂无可用数字人，请稍后重试</p>
+      </section>
+
+      <section v-if="isDealershipTemplate" class="sv-section sv-section--vehicle-form">
+        <header class="sv-section-head">
+          <span class="sv-step-index">3</span>
+          <div class="sv-section-copy">
+            <h3>填写品牌信息</h3>
+            <p>用于生成车场介绍口播文案</p>
+          </div>
+        </header>
+
+        <div class="sv-form-grid">
+          <label class="sv-field">
+            <span class="sv-field-label">品牌名称 <em>*</em></span>
+            <input
+              v-model="dealershipForm.dealershipName"
+              type="text"
+              placeholder="如：志诚二手车"
+              maxlength="60"
+              :disabled="isConfigurationLocked"
+            />
+          </label>
+        </div>
       </section>
 
       <section v-if="isSingleCarTemplate" class="sv-section sv-section--vehicle-form">
