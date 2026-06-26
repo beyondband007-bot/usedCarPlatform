@@ -1273,7 +1273,24 @@ watch(
 }
 
 .sv-recent-card-cover,
-.sv-recent-card-cover :deep(.preload-image),
+.sv-recent-card-cover--video {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.sv-recent-card-cover :deep(.preload-image) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .sv-recent-card-cover :deep(.preload-image__img) {
   width: 100%;
   height: 100%;
@@ -1282,17 +1299,13 @@ watch(
 }
 
 .sv-recent-card-cover--video {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
   background: var(--sv-surface);
 }
 
 .sv-recent-card-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   display: grid;
   place-items: center;
   width: 100%;
