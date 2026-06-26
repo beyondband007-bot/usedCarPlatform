@@ -387,7 +387,7 @@
     },
     {
       "id": "ref-video-006",
-      "title": "Scene 6 | Dealership Scale And Inventory",
+      "title": "车场介绍 4｜规模现车",
       "fileName": "message-scene-06-dealership-scale.mp4",
       "originalName": "车场介绍数字人视频.mp4",
       "sourcePath": "D:/二手车生视频功能素材/素材1/车场介绍数字人视频.mp4",
@@ -395,17 +395,17 @@
         "mimeType": "video/mp4",
         "sizeBytes": 6149215,
         "duration": "00:00:15",
-        "width": 720,
-        "height": 1280,
+        "width": 1280,
+        "height": 720,
         "frameRate": "30.00"
       },
-      "videoType": "dealership_scale_inventory_pitch",
-      "referenceRole": "Dealership introduction focused on large lot feeling and sufficient in-stock vehicles, without stating exact acreage or inventory count.",
+      "videoType": "dealership_intro_custom",
+      "referenceRole": "车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。",
       "previewImagePath": "digital human/reference-frames/ref-video-006-contact-sheet.jpg",
       "analysisFramePaths": [],
       "styleJson": {
-        "videoType": "dealership_scale_inventory_pitch",
-        "referenceRole": "Dealership introduction focused on large lot feeling and sufficient in-stock vehicles, without stating exact acreage or inventory count.",
+        "videoType": "dealership_intro_custom",
+        "referenceRole": "车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。",
         "styleTags": [
           "dealership intro",
           "large lot feeling",
@@ -413,7 +413,7 @@
           "digital human host",
           "boutique used-car sales"
         ],
-        "sceneStyle": "Boutique used-car sales narration style. The digital human introduces the dealership as a professional sales consultant, emphasizing a spacious lot feeling, sufficient vehicles available for viewing, and convenient on-site selection. Keep all scale claims qualitative and avoid exact numbers.",
+        "sceneStyle": "精品二手车销售口播风格，围绕“车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。”组织画面和讲解。",
         "visualTone": "Realistic used-car short-video look; clean, credible, and sales-oriented without exaggerated promises.",
         "lighting": "Follow the uploaded dealership image and selected digital human material; keep the face clear and the dealership/car rows readable.",
         "cameraLanguage": "Digital-human narration combined with uploaded dealership images and narration audio. Keep medium framing, avoid close-up shots, avoid subtitles, and do not add background music.",
@@ -434,7 +434,7 @@
           "showing vehicle parts not provided by reference materials"
         ]
       },
-      "stylePrompt": "Boutique used-car sales narration style. The digital human introduces the dealership as a professional sales consultant, emphasizing a spacious lot feeling, sufficient vehicles available for viewing, and convenient on-site selection. Keep all scale claims qualitative and avoid exact acreage or inventory count. The final Seedance prompt should be assembled from runtime roles: selected digital human, uploaded dealership scene, and narration audio.",
+      "stylePrompt": "精品二手车销售口播风格。车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "Introduce the user's dealership from the angle of spacious scale and sufficient in-stock vehicles. Use qualitative wording only; do not say how many acres or how many cars.",
       "shotPlan15s": [
         {
@@ -477,7 +477,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+      "referenceRole": "直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。",
       "previewImagePath": "digital human/reference-frames/ref-video-008-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-008-frame-01.jpg",
@@ -487,14 +487,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+        "referenceRole": "直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。",
         "styleTags": [
           "车场介绍",
           "规模现车",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -514,7 +514,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在车场规模大、现车充足的角度，但是要模糊表达，不要具体说多少亩，多少量。，",
       "shotPlan15s": [
         {
@@ -524,7 +524,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”展示用户上传素材中的关键信息。",
+          "visual": "围绕“直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -557,7 +557,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "库存更新快、每周都有新货到，不夸大宣传",
+      "referenceRole": "突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。",
       "previewImagePath": "digital human/reference-frames/ref-video-009-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-009-frame-01.jpg",
@@ -567,14 +567,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "库存更新快、每周都有新货到，不夸大宣传",
+        "referenceRole": "突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。",
         "styleTags": [
           "车场介绍",
           "库存更新",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“库存更新快、每周都有新货到，不夸大宣传”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -594,7 +594,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。库存更新快、每周都有新货到，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在库存更新快、每周都有新货到的角度，不要夸大宣传。",
       "shotPlan15s": [
         {
@@ -604,7 +604,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“库存更新快、每周都有新货到，不夸大宣传”展示用户上传素材中的关键信息。",
+          "visual": "围绕“突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -637,7 +637,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+      "referenceRole": "帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。",
       "previewImagePath": "digital human/reference-frames/ref-video-010-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-010-frame-01.jpg",
@@ -647,14 +647,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆",
+        "referenceRole": "帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。",
         "styleTags": [
           "车场介绍",
           "规模现车",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -674,7 +674,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在车场规模大、现车充足的角度，但是要模糊表达，不要具体说多少亩，多少量。，",
       "shotPlan15s": [
         {
@@ -684,7 +684,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆”展示用户上传素材中的关键信息。",
+          "visual": "围绕“帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -717,7 +717,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺",
+      "referenceRole": "突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。",
       "previewImagePath": "digital human/reference-frames/ref-video-011-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-011-frame-01.jpg",
@@ -727,14 +727,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺",
+        "referenceRole": "突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。",
         "styleTags": [
           "车场介绍",
           "精品车源",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -754,7 +754,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫脸谱二手车，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在只收精品车，不收中等事故以上事故车（如泡水车、系统损伤车等）车源优质的角度。",
       "shotPlan15s": [
         {
@@ -764,7 +764,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺”展示用户上传素材中的关键信息。",
+          "visual": "围绕“突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -797,7 +797,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "referenceRole": "突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。",
       "previewImagePath": "digital human/reference-frames/ref-video-012-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-012-frame-01.jpg",
@@ -807,14 +807,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "referenceRole": "突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。",
         "styleTags": [
           "车场介绍",
           "售后保障",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -834,7 +834,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
       "shotPlan15s": [
         {
@@ -844,7 +844,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "visual": "围绕“突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -877,7 +877,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "referenceRole": "帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。",
       "previewImagePath": "digital human/reference-frames/ref-video-013-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-013-frame-01.jpg",
@@ -887,14 +887,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "referenceRole": "帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。",
         "styleTags": [
           "车场介绍",
           "海外售后",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -914,7 +914,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
       "shotPlan15s": [
         {
@@ -924,7 +924,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "visual": "围绕“帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -957,7 +957,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+      "referenceRole": "展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。",
       "previewImagePath": "digital human/reference-frames/ref-video-014-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-014-frame-01.jpg",
@@ -967,14 +967,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "售后保障、海外客户也能找到人，不夸大宣传",
+        "referenceRole": "展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。",
         "styleTags": [
           "车场介绍",
           "服务保障",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“售后保障、海外客户也能找到人，不夸大宣传”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -994,7 +994,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。售后保障、海外客户也能找到人，不夸大宣传。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在售后保障、海外客户也能找到人的角度，不要夸大宣传。",
       "shotPlan15s": [
         {
@@ -1004,7 +1004,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“售后保障、海外客户也能找到人，不夸大宣传”展示用户上传素材中的关键信息。",
+          "visual": "围绕“展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -1037,7 +1037,7 @@
         "frameRate": "24.00"
       },
       "videoType": "dealership_intro_custom",
-      "referenceRole": "全天候运营、沟通及时",
+      "referenceRole": "展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。",
       "previewImagePath": "digital human/reference-frames/ref-video-015-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-015-frame-01.jpg",
@@ -1047,14 +1047,14 @@
       ],
       "styleJson": {
         "videoType": "dealership_intro_custom",
-        "referenceRole": "全天候运营、沟通及时",
+        "referenceRole": "展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。",
         "styleTags": [
           "车场介绍",
           "全天沟通",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“全天候运营、沟通及时”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -1074,7 +1074,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。全天候运营、沟通及时。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍我的车卖场，站在全天候运营、沟通及时的角度。",
       "shotPlan15s": [
         {
@@ -1084,7 +1084,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“全天候运营、沟通及时”展示用户上传素材中的关键信息。",
+          "visual": "围绕“展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -1117,7 +1117,7 @@
         "frameRate": "24.00"
       },
       "videoType": "single_car_pitch_custom",
-      "referenceRole": "适合出口海外市场、符合目标国家需求、手续齐全好出关",
+      "referenceRole": "适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。",
       "previewImagePath": "digital human/reference-frames/ref-video-007-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-007-frame-01.jpg",
@@ -1127,14 +1127,14 @@
       ],
       "styleJson": {
         "videoType": "single_car_pitch_custom",
-        "referenceRole": "适合出口海外市场、符合目标国家需求、手续齐全好出关",
+        "referenceRole": "适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。",
         "styleTags": [
           "单车介绍",
           "出口海外",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“适合出口海外市场、符合目标国家需求、手续齐全好出关”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -1154,7 +1154,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。适合出口海外市场、符合目标国家需求、手续齐全好出关。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫facemini，帮我生成一个口播15秒文案，用于介绍眼前这台二手车，站在适合出口海外市场、符合目标国家需求、手续齐全好出关的角度。",
       "shotPlan15s": [
         {
@@ -1164,7 +1164,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“适合出口海外市场、符合目标国家需求、手续齐全好出关”展示用户上传素材中的关键信息。",
+          "visual": "围绕“适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -1197,7 +1197,7 @@
         "frameRate": "24.00"
       },
       "videoType": "single_car_pitch_custom",
-      "referenceRole": "外观成色新、漆面光泽度好，看起来接近准新但避免绝对化",
+      "referenceRole": "展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。",
       "previewImagePath": "digital human/reference-frames/ref-video-016-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-016-frame-01.jpg",
@@ -1207,14 +1207,14 @@
       ],
       "styleJson": {
         "videoType": "single_car_pitch_custom",
-        "referenceRole": "外观成色新、漆面光泽度好，看起来接近准新但避免绝对化",
+        "referenceRole": "展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。",
         "styleTags": [
           "单车介绍",
           "外观成色",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“外观成色新、漆面光泽度好，看起来接近准新但避免绝对化”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -1234,7 +1234,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。外观成色新、漆面光泽度好，看起来接近准新但避免绝对化。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫“脸谱二手车”，帮我生成一个口播15秒文案，用于介绍用户上传的车型，站在外观成色新、漆面光泽度好、看起来像准新车的角度。",
       "shotPlan15s": [
         {
@@ -1244,7 +1244,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“外观成色新、漆面光泽度好，看起来接近准新但避免绝对化”展示用户上传素材中的关键信息。",
+          "visual": "围绕“展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
@@ -1277,7 +1277,7 @@
         "frameRate": "24.00"
       },
       "videoType": "single_car_pitch_custom",
-      "referenceRole": "动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词",
+      "referenceRole": "呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。",
       "previewImagePath": "digital human/reference-frames/ref-video-017-contact-sheet.jpg",
       "analysisFramePaths": [
         "digital human/reference-frames/ref-video-017-frame-01.jpg",
@@ -1287,14 +1287,14 @@
       ],
       "styleJson": {
         "videoType": "single_car_pitch_custom",
-        "referenceRole": "动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词",
+        "referenceRole": "呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。",
         "styleTags": [
           "单车介绍",
           "动力工况",
           "精品二手车",
           "数字人口播"
         ],
-        "sceneStyle": "精品二手车销售口播风格，围绕“动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词”组织画面和讲解。",
+        "sceneStyle": "精品二手车销售口播风格，围绕“呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。”组织画面和讲解。",
         "visualTone": "真实、可信、销售感克制，不编造用户未提供的信息。",
         "lighting": "跟随上传素材和数字人参考图，保持面部清晰、车辆或车场信息可读。",
         "cameraLanguage": "真人口播感，中景为主，不做特写，不加字幕，不打开引擎盖，不展示未提供参考图的部位。",
@@ -1314,7 +1314,7 @@
           "展示未提供参考图的部位"
         ]
       },
-      "stylePrompt": "精品二手车销售口播风格。动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
+      "stylePrompt": "精品二手车销售口播风格。呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。最终 Seedance 提示词由运行时选择的数字人、用户上传素材和口播音频动态组装，不在模板配置中固定 Mixed 编号。",
       "scenePrompt": "你是一个精品二手车销售，我的品牌名叫“脸谱二手车”，帮我生成一个口播15秒文案，用于介绍‘用户上传车辆’，站在动力工况好、加速有力、机械素质过硬的角度。不要使用完美等过于绝对化的形容词。。",
       "shotPlan15s": [
         {
@@ -1324,7 +1324,7 @@
         },
         {
           "timeRange": "middle",
-          "visual": "围绕“动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词”展示用户上传素材中的关键信息。",
+          "visual": "围绕“呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。”展示用户上传素材中的关键信息。",
           "assetRole": "user_assets|reference_style"
         },
         {
