@@ -248,7 +248,7 @@ const definitions: VideoTemplateDefinition[] = [
     referenceMaterialId: "ref-video-006",
     type: "dealership",
     style: "professional",
-    outputRatio: "9:16",
+    outputRatio: "16:9",
     badge: "new",
     inputRequirements: dealershipRequirements(),
   },

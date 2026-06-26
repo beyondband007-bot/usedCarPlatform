@@ -47,7 +47,7 @@ assert.deepEqual(videoGenerationWorkflowContract.outputRatioPolicy, {
 assert.equal(getVideoTemplateDefinition("ref-video-001")?.outputRatio, "16:9");
 assert.equal(getVideoTemplateDefinition("ref-video-002")?.outputRatio, "9:16");
 assert.equal(getVideoTemplateDefinition("ref-video-003")?.outputRatio, "9:16");
-assert.equal(getVideoTemplateDefinition("ref-video-006")?.outputRatio, "9:16");
+assert.equal(getVideoTemplateDefinition("ref-video-006")?.outputRatio, "16:9");
 assert.equal(getVideoTemplateDefinition("ref-video-008")?.type, "dealership");
 assert.equal(getVideoTemplateDefinition("ref-video-015")?.type, "dealership");
 assert.equal(getVideoTemplateDefinition("ref-video-016")?.type, "single-car");

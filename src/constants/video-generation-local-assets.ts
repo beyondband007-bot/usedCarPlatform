@@ -144,12 +144,12 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     typeLabel: '车场介绍',
     styleLabel: '规模现车',
     stylePrompt:
-      '精品二手车销售口播风格，重点表达车场规模大、现车充足、方便到店挑选；只做模糊表达，不说具体多少亩、多少辆。',
+      '车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。',
     description:
-      '适合介绍车卖场规模感和现车充足感，引导用户到店看实车，不夸大具体数量。',
+      '车辆品质源头价值营销，强调车源优质、层层质检合格，强化品牌形象。',
     badge: 'new',
     videoUrl: scene06Video,
-    outputRatio: '9:16',
+    outputRatio: '16:9',
   },
   // BEGIN generated material templates 2-15
   {
@@ -158,8 +158,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '规模现车',
-    stylePrompt: '车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆',
-    description: '车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆',
+    stylePrompt:
+      '直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。',
+    description:
+      '直观展示商家车源充足、选择丰富、更新稳定的经营实力，提升到店咨询与成交转化。',
     badge: 'new',
     videoUrl: scene08Video,
     outputRatio: '9:16',
@@ -170,8 +172,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '库存更新',
-    stylePrompt: '库存更新快、每周都有新货到，不夸大宣传',
-    description: '库存更新快、每周都有新货到，不夸大宣传',
+    stylePrompt:
+      '突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。',
+    description:
+      '突出车场库存更新节奏稳定，每周都有新车到店，营销客户随时都有新车源可看、可选。',
     badge: 'new',
     videoUrl: scene09Video,
     outputRatio: '9:16',
@@ -182,8 +186,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '规模现车',
-    stylePrompt: '车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆',
-    description: '车场规模大、现车充足，模糊表达规模和数量，不说具体多少亩、多少辆',
+    stylePrompt:
+      '帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。',
+    description:
+      '帮助商家通过真实车况展示与诚信经营表达，建立客户信任，减少看车顾虑。',
     badge: 'new',
     videoUrl: scene10Video,
     outputRatio: '9:16',
@@ -194,8 +200,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '精品车源',
-    stylePrompt: '只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺',
-    description: '只收精品车，不收中等事故以上事故车，突出车源优质但避免绝对化承诺',
+    stylePrompt:
+      '突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。',
+    description:
+      '突出“严选精品车，拒收泡水车、重大事故车”，展现车源优质、车况透明、买车更放心。',
     badge: 'new',
     videoUrl: scene11Video,
     outputRatio: '9:16',
@@ -206,8 +214,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '售后保障',
-    stylePrompt: '售后保障、海外客户也能找到人，不夸大宣传',
-    description: '售后保障、海外客户也能找到人，不夸大宣传',
+    stylePrompt:
+      '突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。',
+    description:
+      '突出买车后有问题能联系、能沟通、有人对接，让本地及海外客户都更安心。',
     badge: 'new',
     videoUrl: scene12Video,
     outputRatio: '9:16',
@@ -218,8 +228,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '海外售后',
-    stylePrompt: '售后保障、海外客户也能找到人，不夸大宣传',
-    description: '售后保障、海外客户也能找到人，不夸大宣传',
+    stylePrompt:
+      '帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。',
+    description:
+      '帮助商家通过真实车况呈现与合理价格说明，降低远程看车顾虑，让客户都能更安心咨询。',
     badge: 'new',
     videoUrl: scene13Video,
     outputRatio: '9:16',
@@ -230,8 +242,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '服务保障',
-    stylePrompt: '售后保障、海外客户也能找到人，不夸大宣传',
-    description: '售后保障、海外客户也能找到人，不夸大宣传',
+    stylePrompt:
+      '展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。',
+    description:
+      '展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。',
     badge: 'new',
     videoUrl: scene14Video,
     outputRatio: '9:16',
@@ -242,8 +256,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'dealership',
     typeLabel: '车场介绍',
     styleLabel: '全天沟通',
-    stylePrompt: '全天候运营、沟通及时',
-    description: '全天候运营、沟通及时',
+    stylePrompt:
+      '展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。',
+    description:
+      '展示全天候运营与及时沟通能力，提升客户信任度，营造品牌可靠的口碑形象。',
     badge: 'new',
     videoUrl: scene15Video,
     outputRatio: '9:16',
@@ -254,8 +270,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'single-car',
     typeLabel: '单车介绍',
     styleLabel: '出口海外',
-    stylePrompt: '适合出口海外市场、符合目标国家需求、手续齐全好出关',
-    description: '适合出口海外市场、符合目标国家需求、手续齐全好出关',
+    stylePrompt:
+      '适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。',
+    description:
+      '适配海外市场需求、手续资料相对齐全等优势，提升客户远程咨询与采购信心。',
     badge: 'new',
     videoUrl: scene07Video,
     outputRatio: '9:16',
@@ -266,8 +284,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'single-car',
     typeLabel: '单车介绍',
     styleLabel: '外观成色',
-    stylePrompt: '外观成色新、漆面光泽度好，看起来接近准新但避免绝对化',
-    description: '外观成色新、漆面光泽度好，看起来接近准新但避免绝对化',
+    stylePrompt:
+      '展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。',
+    description:
+      '展示车辆外观成色、漆面光泽与整体质感，提升客户看车兴趣与咨询意愿。',
     badge: 'new',
     videoUrl: scene16Video,
     outputRatio: '9:16',
@@ -278,8 +298,10 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     type: 'single-car',
     typeLabel: '单车介绍',
     styleLabel: '动力工况',
-    stylePrompt: '动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词',
-    description: '动力工况好、加速有力、机械素质过硬，不使用完美等绝对化形容词',
+    stylePrompt:
+      '呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。',
+    description:
+      '呈现车辆加速响应、行驶质感与核心工况，让客户更直观判断车辆状态，提升品牌形象。',
     badge: 'new',
     videoUrl: scene17Video,
     outputRatio: '9:16',
@@ -590,6 +612,7 @@ export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []):
         scenePrompt: template.scenePrompt ?? local.stylePrompt,
         thumbnailUrl: local.videoUrl,
         previewUrl: local.videoUrl,
+        outputRatio: local.outputRatio,
         status: local.type === 'vehicle-ad' ? 'coming_soon' : template.status,
         generationReadiness:
           local.type === 'vehicle-ad' ? 'unavailable' : template.generationReadiness,
