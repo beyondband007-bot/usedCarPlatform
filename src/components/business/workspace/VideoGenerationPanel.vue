@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import { computed, inject, onMounted, ref } from "vue";
 import { Icon } from "@iconify/vue";
-import { NModal, useMessage } from "naive-ui";
+import { useMessage } from "naive-ui";
 
 import PreloadImage from "@/components/common/PreloadImage.vue";
 import HoverPreviewVideo from "@/components/common/HoverPreviewVideo.vue";
@@ -20,7 +20,6 @@ import {
 } from "@/composables/useVideoGenerationFlow";
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
-import type { DigitalHuman } from "@/types/video-generation";
 import type { WorkspaceCapability } from "@/types/workspace";
 import {
   findCarBrandByName,
@@ -46,9 +45,6 @@ const appStore = useAppStore();
 const exteriorInputRef = ref<HTMLInputElement | null>(null);
 const interiorInputRef = ref<HTMLInputElement | null>(null);
 const dealershipInputRef = ref<HTMLInputElement | null>(null);
-const humanPreviewModalVisible = ref(false);
-const previewingDigitalHuman = ref<DigitalHuman | null>(null);
-const enlargedHumanPreview = ref<{ label: string; url: string } | null>(null);
 
 const ownerKey = computed(
   () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
@@ -66,7 +62,6 @@ const {
   currentStep,
   selectedTemplate,
   supportedLanguageOptions,
-  digitalHumanList,
   singleCarForm,
   promotionForm,
   dealershipForm,
@@ -132,12 +127,6 @@ const languageOptions = computed(() =>
     })),
 );
 
-const humanToneClasses = ["tone-warm", "tone-cool", "tone-neutral", "tone-warm"];
-
-const activeHumanPreviewImages = computed(
-  () => previewingDigitalHuman.value?.previewImages?.slice(0, 4) ?? [],
-);
-
 const isSingleCarTemplate = computed(
   () => selectedTemplate.value?.type === "single-car",
 );
@@ -152,6 +141,10 @@ const selectedOutputRatio = computed(() =>
 
 const isHorizontalDealershipTemplate = computed(
   () => isDealershipTemplate.value && selectedOutputRatio.value === "16:9",
+);
+
+const isVerticalDealershipTemplate = computed(
+  () => isDealershipTemplate.value && selectedOutputRatio.value === "9:16",
 );
 
 const dealershipOrientationLabel = computed(() =>
@@ -362,29 +355,6 @@ const isNonChineseLanguage = computed(
   () => !["Chinese", "Chinese,Yue"].includes(activeFormLanguage.value),
 );
 
-const activeDigitalHumanId = computed({
-  get() {
-    if (selectedTemplate.value?.type === "dealership") {
-      return dealershipForm.value.digitalHumanId;
-    }
-    if (selectedTemplate.value?.type === "promotion") {
-      return promotionForm.value.digitalHumanId;
-    }
-    return singleCarForm.value.digitalHumanId;
-  },
-  set(value) {
-    if (selectedTemplate.value?.type === "dealership") {
-      dealershipForm.value.digitalHumanId = value;
-      return;
-    }
-    if (selectedTemplate.value?.type === "promotion") {
-      promotionForm.value.digitalHumanId = value;
-      return;
-    }
-    singleCarForm.value.digitalHumanId = value;
-  },
-});
-
 const primaryExterior = computed(() => exteriorUploads.value[0] ?? null);
 const primaryInterior = computed(() => interiorUploads.value[0] ?? null);
 const primaryDealership = computed(() => dealershipUploads.value[0] ?? null);
@@ -427,7 +397,7 @@ const isFormReadyForDraft = computed(() => {
 });
 
 const languageStepIndex = computed(() =>
-  isSingleCarTemplate.value || isDealershipTemplate.value ? "4" : "3",
+  isSingleCarTemplate.value || isDealershipTemplate.value ? "3" : "2",
 );
 
 const tipBannerText = computed(() => {
@@ -626,21 +596,6 @@ async function handleDealershipDrop(event: DragEvent) {
   await uploadFilesFromDrop(files, uploadDealershipImages);
 }
 
-function resolveHumanTone(index: number) {
-  return humanToneClasses[index % humanToneClasses.length];
-}
-
-function selectDigitalHuman(human: DigitalHuman) {
-  if (isConfigurationLocked.value) return;
-  activeDigitalHumanId.value = human.id;
-  previewingDigitalHuman.value = human;
-  humanPreviewModalVisible.value = Boolean(human.previewImages?.length);
-}
-
-function openHumanPreviewImage(item: { label: string; url: string }) {
-  enlargedHumanPreview.value = item;
-}
-
 async function submitDraft() {
   const draft = await generateScriptDraft();
   if (!draft) {
@@ -796,8 +751,7 @@ async function submitConfirmedVideo() {
             class="sv-upload-card"
             :class="{
               'sv-upload-card--wide': isDealershipTemplate,
-              'sv-upload-card--landscape': isHorizontalDealershipTemplate,
-              'sv-upload-card--portrait': isDealershipTemplate && !isHorizontalDealershipTemplate,
+              'sv-upload-card--landscape': isDealershipTemplate,
               'is-filled': primaryUploadPreview,
               'is-uploading': isDealershipTemplate
                 ? isLoading('upload-dealership')
@@ -826,8 +780,20 @@ async function submitConfirmedVideo() {
               @change="handlePrimaryUploadFiles"
             />
 
+            <div
+              v-if="primaryUploadPreview && isVerticalDealershipTemplate"
+              class="sv-upload-content sv-upload-content--portrait"
+            >
+              <PreloadImage
+                class="sv-upload-preview"
+                :src="primaryUploadPreview.previewUrl"
+                alt="展厅车场素材预览"
+                fit="cover"
+              />
+            </div>
+
             <PreloadImage
-              v-if="primaryUploadPreview"
+              v-else-if="primaryUploadPreview"
               class="sv-upload-preview"
               :src="primaryUploadPreview.previewUrl"
               :alt="isDealershipTemplate ? '展厅车场素材预览' : '汽车外观预览'"
@@ -991,47 +957,9 @@ async function submitConfirmedVideo() {
         </label>
       </section>
 
-      <section class="sv-section">
-        <header class="sv-section-head">
-          <span class="sv-step-index">2</span>
-          <div class="sv-section-copy">
-            <h3>选择数字人形象</h3>
-            <p>选择口播视频的出镜数字人模特</p>
-          </div>
-        </header>
-
-        <div v-if="digitalHumanList.length" class="sv-human-grid">
-          <button
-            v-for="(human, index) in digitalHumanList"
-            :key="human.id"
-            type="button"
-            class="sv-human-card"
-            :class="[
-              resolveHumanTone(index),
-              { 'is-active': activeDigitalHumanId === human.id },
-            ]"
-            :disabled="isConfigurationLocked"
-            @click="selectDigitalHuman(human)"
-          >
-            <span class="sv-human-avatar">
-              <PreloadImage
-                v-if="human.previewUrl"
-                class="sv-human-photo"
-                :src="human.previewUrl"
-                :alt="`${human.name}正面特写`"
-                fit="cover"
-              />
-              <Icon v-else icon="mdi:account-outline" />
-            </span>
-            <strong>{{ human.name }}</strong>
-          </button>
-        </div>
-        <p v-else class="sv-empty-tip">暂无可用数字人，请稍后重试</p>
-      </section>
-
       <section v-if="isDealershipTemplate" class="sv-section sv-section--vehicle-form">
         <header class="sv-section-head">
-          <span class="sv-step-index">3</span>
+          <span class="sv-step-index">2</span>
           <div class="sv-section-copy">
             <h3>填写品牌信息</h3>
             <p>用于生成车场介绍口播文案</p>
@@ -1054,7 +982,7 @@ async function submitConfirmedVideo() {
 
       <section v-if="isSingleCarTemplate" class="sv-section sv-section--vehicle-form">
         <header class="sv-section-head">
-          <span class="sv-step-index">3</span>
+          <span class="sv-step-index">2</span>
           <div class="sv-section-copy">
             <h3>填写车型信息</h3>
             <p>五级车型信息，用于精准生成口播文案</p>
@@ -1381,78 +1309,6 @@ async function submitConfirmedVideo() {
       </template>
     </template>
 
-    <NModal
-      v-model:show="humanPreviewModalVisible"
-      preset="card"
-      :class="[
-        'sv-human-preview-modal',
-        appStore.isDarkMode ? 'sv-human-preview-modal--dark' : 'sv-human-preview-modal--light',
-      ]"
-      :style="{ width: 'min(980px, calc(100vw - 32px))' }"
-      :bordered="false"
-      :segmented="{ content: true }"
-    >
-      <template #header>
-        <div class="sv-human-preview-head">
-          <strong>{{ previewingDigitalHuman?.name }}</strong>
-          <span>四视图预览</span>
-        </div>
-      </template>
-
-      <div class="sv-human-preview-grid">
-        <figure
-          v-for="(item, index) in activeHumanPreviewImages"
-          :key="item.url"
-          class="sv-human-preview-item"
-        >
-          <button
-            type="button"
-            class="sv-human-preview-image-button"
-            :aria-label="`放大查看${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
-            @click="openHumanPreviewImage(item)"
-          >
-            <PreloadImage
-              class="sv-human-preview-image"
-              :src="item.url"
-              :alt="`${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
-              loading="eager"
-              fit="contain"
-            />
-          </button>
-          <figcaption>
-            <span>{{ index + 1 }}</span>
-            {{ item.label }}
-          </figcaption>
-        </figure>
-      </div>
-    </NModal>
-
-    <NModal
-      :show="Boolean(enlargedHumanPreview)"
-      preset="card"
-      class="sv-human-zoom-modal"
-      :class="appStore.isDarkMode ? 'sv-human-zoom-modal--dark' : 'sv-human-zoom-modal--light'"
-      :style="{ width: 'min(760px, calc(100vw - 32px))' }"
-      :bordered="false"
-      :segmented="{ content: true }"
-      @update:show="(show) => { if (!show) enlargedHumanPreview = null }"
-    >
-      <template #header>
-        <div class="sv-human-preview-head">
-          <strong>{{ previewingDigitalHuman?.name }}</strong>
-          <span>{{ enlargedHumanPreview?.label }}</span>
-        </div>
-      </template>
-
-      <PreloadImage
-        v-if="enlargedHumanPreview"
-        class="sv-human-zoom-image"
-        :src="enlargedHumanPreview.url"
-        :alt="`${previewingDigitalHuman?.name ?? '数字人'}${enlargedHumanPreview.label}`"
-        loading="eager"
-        fit="contain"
-      />
-    </NModal>
   </div>
 </template>
 
@@ -1742,40 +1598,29 @@ async function submitConfirmedVideo() {
 }
 
 .sv-upload-card--landscape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
   aspect-ratio: 16 / 9;
 }
 
-.sv-upload-card--portrait {
-  width: min(100%, 240px);
-  min-height: 0;
-  aspect-ratio: 9 / 16;
-  justify-self: center;
-}
-
-.sv-upload-card--portrait.sv-upload-card--wide .sv-upload-preview,
-.sv-upload-card--portrait.sv-upload-card--wide .sv-upload-placeholder {
-  min-height: 0;
+.sv-upload-content {
+  position: relative;
+  width: 100%;
   height: 100%;
 }
 
-.sv-upload-card--portrait .sv-upload-placeholder {
-  gap: 6px;
-  padding: 14px 12px;
+.sv-upload-content--portrait {
+  width: auto;
+  height: 100%;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
 }
 
-.sv-upload-card--portrait .sv-upload-icon {
-  width: 36px;
-  height: 36px;
-  font-size: 18px;
-}
-
-.sv-upload-card--portrait .sv-upload-placeholder strong {
-  font-size: 13px;
-}
-
-.sv-upload-card--portrait .sv-upload-placeholder span:last-child {
-  font-size: 11px;
-  line-height: 1.4;
+.sv-upload-content--portrait .sv-upload-preview {
+  min-height: 0;
+  height: 100%;
 }
 
 .sv-upload-card:hover:not(.is-uploading) {
@@ -1839,10 +1684,14 @@ async function submitConfirmedVideo() {
   height: 148px;
 }
 
+.sv-upload-card--wide .sv-upload-content {
+  height: 100%;
+}
+
 .sv-upload-card--wide .sv-upload-preview,
 .sv-upload-card--wide .sv-upload-placeholder {
   height: 100%;
-  min-height: 180px;
+  min-height: 0;
 }
 
 .sv-upload-preview--wide {
@@ -2026,11 +1875,25 @@ async function submitConfirmedVideo() {
 }
 
 .sv-human-preview-modal {
-  width: min(980px, calc(100vw - 32px));
+  width: 80vw;
+  height: 60vh;
+  max-width: none;
 }
 
 :global(.sv-human-preview-modal.n-card) {
-  width: min(980px, calc(100vw - 32px));
+  width: 80vw !important;
+  height: 60vh;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+}
+
+:global(.sv-human-preview-modal.n-card > .n-card__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .sv-human-preview-head {
@@ -2052,20 +1915,25 @@ async function submitConfirmedVideo() {
 
 .sv-human-preview-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 210px));
-  justify-content: center;
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
 }
 
 .sv-human-preview-item {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
   margin: 0;
+  min-height: 0;
 }
 
 .sv-human-preview-image-button {
   display: block;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -2077,16 +1945,17 @@ async function submitConfirmedVideo() {
 .sv-human-preview-image :deep(.preload-image),
 .sv-human-preview-image :deep(.preload-image__img) {
   width: 100%;
+  height: 100%;
+  min-height: 0;
   aspect-ratio: 3 / 4;
-  max-height: 300px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--sv-card-bg, #f8fafc) 86%, #fff);
+  background: #f8fafc;
   object-fit: contain;
 }
 
 .sv-human-preview-image-button:hover .sv-human-preview-image,
 .sv-human-preview-image-button:focus-visible .sv-human-preview-image {
-  box-shadow: 0 0 0 2px var(--sv-accent, #c99518);
+  box-shadow: 0 0 0 2px #c99518;
 }
 
 .sv-human-preview-item figcaption {
@@ -2094,7 +1963,7 @@ async function submitConfirmedVideo() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: var(--sv-text, #0f172a);
+  color: #0f172a;
   font-size: 13px;
   font-weight: 700;
 }
@@ -2106,13 +1975,12 @@ async function submitConfirmedVideo() {
   width: 20px;
   height: 20px;
   border-radius: 999px;
-  background: var(--sv-accent-soft, rgba(239, 194, 76, 0.16));
-  color: var(--sv-accent, #c99518);
+  background: rgba(239, 194, 76, 0.16);
+  color: #c99518;
   font-size: 12px;
 }
 
-.sv-human-preview-modal--dark .sv-human-preview-head strong,
-.sv-human-preview-modal--dark .sv-human-preview-item figcaption {
+.sv-human-preview-modal--dark .sv-human-preview-head strong {
   color: #fff;
 }
 

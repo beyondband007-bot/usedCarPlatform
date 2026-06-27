@@ -8,6 +8,7 @@ import PreloadImage from "@/components/common/PreloadImage.vue";
 import TemplatePreviewVideoPlayer from "@/components/business/workspace/TemplatePreviewVideoPlayer.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl } from "@/constants/video-template-previews";
+import { resolveTemplateDefaultDigitalHumanId } from "@/constants/video-generation-local-assets";
 import {
   getVideoTaskStatusLabel,
   getVideoWorkflowStageLabel,
@@ -22,7 +23,7 @@ import {
   shortVideoTemplateStyles,
   type ShortVideoTemplateCategory,
 } from "@/constants/short-video-templates";
-import type { VideoHistoryItem, VideoTemplate } from "@/types/video-generation";
+import type { VideoHistoryItem, VideoTemplate, DigitalHuman } from "@/types/video-generation";
 import {
   recentStatusLabelMap,
   resolveRecentDisplayImage,
@@ -62,6 +63,54 @@ const activeStyle = ref("all");
 const searchQuery = ref("");
 const selectedRecentItemId = ref("");
 const templatePreviewSession = ref<VideoTemplate | null>(null);
+const previewDigitalHumanId = ref("");
+const humanPreviewModalVisible = ref(false);
+const previewingDigitalHuman = ref<DigitalHuman | null>(null);
+const enlargedHumanPreview = ref<{ label: string; url: string } | null>(null);
+
+const digitalHumanList = computed(() => flow?.digitalHumanList.value ?? []);
+
+const isHumanSelectionLocked = computed(() => {
+  if (!flow) return true;
+  if (props.isGenerating) return true;
+  return ["review", "task", "result"].includes(flow.currentStep.value);
+});
+
+const activeHumanPreviewImages = computed(
+  () => previewingDigitalHuman.value?.previewImages?.slice(0, 4) ?? [],
+);
+
+function resolvePreviewDefaultDigitalHumanId(template: VideoTemplate): string {
+  const activeId =
+    flow?.selectedTemplate.value?.templateId === template.templateId
+      ? flow.activeDigitalHumanId.value
+      : "";
+  if (activeId && digitalHumanList.value.some((item) => item.id === activeId)) {
+    return activeId;
+  }
+
+  const defaultId =
+    template.defaultDigitalHumanId ??
+    resolveTemplateDefaultDigitalHumanId(template.templateId) ??
+    "";
+  if (!defaultId) return "";
+  return digitalHumanList.value.some((item) => item.id === defaultId) ? defaultId : "";
+}
+
+function handleSelectDigitalHuman(human: DigitalHuman) {
+  if (isHumanSelectionLocked.value) return;
+  previewDigitalHumanId.value = human.id;
+  previewingDigitalHuman.value = human;
+  humanPreviewModalVisible.value = Boolean(human.previewImages?.length);
+}
+
+function openHumanPreviewImage(item: { label: string; url: string }) {
+  enlargedHumanPreview.value = item;
+}
+
+function closeEnlargedHumanPreview() {
+  enlargedHumanPreview.value = null;
+}
 
 function resolveRecentCoverUrl(item: WorkspaceRecentItem): string | undefined {
   return resolveRecentDisplayImage(item);
@@ -254,12 +303,31 @@ function openTemplatePreview(item: VideoTemplate) {
     message.info("该模板暂未开放，敬请期待！");
     return;
   }
-  flow?.selectTemplate(item);
   templatePreviewSession.value = item;
+  previewDigitalHumanId.value = resolvePreviewDefaultDigitalHumanId(item);
+}
+
+function confirmTemplatePreview() {
+  const template = templatePreviewSession.value;
+  if (!template || !flow) return;
+
+  flow.selectTemplate(template);
+
+  const humanId = previewDigitalHumanId.value;
+  if (humanId) {
+    const human = digitalHumanList.value.find((item) => item.id === humanId);
+    if (human) {
+      flow.selectDigitalHuman(human);
+    }
+  }
+
+  closeTemplatePreviewPlayer();
+  message.success("已确认使用该模板");
 }
 
 function closeTemplatePreviewPlayer() {
   templatePreviewSession.value = null;
+  previewDigitalHumanId.value = "";
 }
 
 function handleTemplatePreviewVisibleChange(show: boolean) {
@@ -782,62 +850,189 @@ watch(
                   </span>
                 </div>
               </div>
+              <span
+                v-if="selectedTemplateId === item.templateId"
+                class="sv-template-selected-badge"
+                aria-hidden="true"
+              >
+                已选
+              </span>
             </div>
           </article>
         </div>
       </section>
 
     </section>
+  </section>
 
-    <NModal
-      v-if="templatePreviewSession"
-      :show="true"
-      preset="card"
-      :title="templatePreviewSession.title"
-      class="sv-template-preview-modal"
-      :bordered="false"
-      :segmented="{ content: true }"
-      :mask-closable="true"
-      @update:show="handleTemplatePreviewVisibleChange"
-    >
-      <div class="sv-template-preview-body">
-        <div class="sv-template-preview-media">
-          <TemplatePreviewVideoPlayer
-            v-if="getTemplateVideoUrl(templatePreviewSession)"
-            :key="templatePreviewSession.templateId"
-            :src="getTemplateVideoUrl(templatePreviewSession)!"
-            :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
-            :template-id="templatePreviewSession.templateId"
-          />
-          <PreloadImage
-            v-else-if="getTemplatePosterUrl(templatePreviewSession)"
-            class="sv-template-preview-poster"
-            :src="getTemplatePosterUrl(templatePreviewSession)!"
-            :alt="templatePreviewSession.title"
-            fit="contain"
-          />
-          <div v-else class="sv-template-preview-placeholder">
-            <Icon icon="mdi:movie-open-outline" />
+  <NModal
+    v-if="templatePreviewSession"
+    :show="true"
+    to="body"
+    :mask-closable="true"
+    transform-origin="center"
+    @update:show="handleTemplatePreviewVisibleChange"
+  >
+    <div class="sv-preview-dialog">
+      <header class="sv-preview-dialog__head">
+        <h3>{{ templatePreviewSession.title }}</h3>
+        <button type="button" aria-label="关闭" @click="closeTemplatePreviewPlayer">
+          <Icon icon="mdi:close" />
+        </button>
+      </header>
+
+      <div class="sv-preview-dialog__body">
+        <div class="sv-preview-dialog__main">
+          <div class="sv-preview-dialog__media">
+            <TemplatePreviewVideoPlayer
+              v-if="getTemplateVideoUrl(templatePreviewSession)"
+              :key="templatePreviewSession.templateId"
+              :src="getTemplateVideoUrl(templatePreviewSession)!"
+              :poster="getTemplatePosterUrl(templatePreviewSession) ?? undefined"
+              :template-id="templatePreviewSession.templateId"
+            />
+            <PreloadImage
+              v-else-if="getTemplatePosterUrl(templatePreviewSession)"
+              :src="getTemplatePosterUrl(templatePreviewSession)!"
+              :alt="templatePreviewSession.title"
+              fit="contain"
+            />
+            <div v-else class="sv-preview-dialog__video-empty">
+              <Icon icon="mdi:movie-open-outline" />
+            </div>
+          </div>
+
+          <div class="sv-preview-dialog__meta">
+            <div class="sv-preview-dialog__tags">
+              <template v-if="templatePreviewSession.previewSubtitle">
+                <span>最长时长：{{ templatePreviewSession.durationSeconds }}s</span>
+                <span class="is-accent">视频内容：{{ templatePreviewSession.previewSubtitle }}</span>
+              </template>
+              <template v-else>
+                <span>{{ templatePreviewSession.typeLabel }}</span>
+                <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
+                <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
+              </template>
+            </div>
+            <p v-if="templatePreviewSession.stylePrompt" class="sv-preview-dialog__copy">
+              {{ templatePreviewSession.stylePrompt }}
+            </p>
+            <button
+              type="button"
+              class="sv-preview-dialog__confirm"
+              :disabled="isHumanSelectionLocked"
+              @click="confirmTemplatePreview"
+            >
+              确认使用此模板
+            </button>
           </div>
         </div>
 
-        <div class="sv-template-preview-meta">
-          <div class="sv-template-preview-tags">
-            <template v-if="templatePreviewSession.previewSubtitle">
-              <span>最长时长：{{ templatePreviewSession.durationSeconds }}s</span>
-              <span class="is-accent">视频内容：{{ templatePreviewSession.previewSubtitle }}</span>
-            </template>
-            <template v-else>
-              <span>{{ templatePreviewSession.typeLabel }}</span>
-              <span class="is-accent">{{ templatePreviewSession.styleLabel }}</span>
-              <span>最长 {{ templatePreviewSession.durationSeconds }} 秒</span>
-            </template>
+        <div class="sv-preview-dialog__humans">
+          <h4>选择数字人形象</h4>
+          <p class="sv-preview-dialog__humans-tip">已按模板默认推荐，可手动更换</p>
+
+          <div v-if="digitalHumanList.length" class="sv-preview-dialog__humans-grid">
+            <button
+              v-for="human in digitalHumanList"
+              :key="human.id"
+              type="button"
+              class="sv-preview-dialog__human"
+              :class="{ 'is-active': previewDigitalHumanId === human.id }"
+              :disabled="isHumanSelectionLocked"
+              :title="human.name"
+              @click="handleSelectDigitalHuman(human)"
+            >
+              <span class="sv-preview-dialog__human-avatar">
+                <PreloadImage
+                  v-if="human.previewUrl"
+                  :src="human.previewUrl"
+                  :alt="human.name"
+                  fit="cover"
+                />
+                <Icon v-else icon="mdi:account-outline" />
+              </span>
+              <span class="sv-preview-dialog__human-name">{{ human.name }}</span>
+            </button>
           </div>
-          <p>{{ templatePreviewSession.stylePrompt }}</p>
+          <p v-else class="sv-preview-dialog__humans-empty">暂无可用数字人</p>
         </div>
       </div>
-    </NModal>
-  </section>
+    </div>
+  </NModal>
+
+  <NModal
+    v-model:show="humanPreviewModalVisible"
+    preset="card"
+    to="body"
+    transform-origin="center"
+    class="sv-human-preview-modal"
+    :style="{ width: '80vw', height: '60vh', maxWidth: 'none' }"
+    :bordered="false"
+    :segmented="{ content: true }"
+  >
+    <template #header>
+      <div class="sv-human-preview-head">
+        <strong>{{ previewingDigitalHuman?.name }}</strong>
+        <span>四视图预览</span>
+      </div>
+    </template>
+
+    <div class="sv-human-preview-grid">
+      <figure
+        v-for="(item, index) in activeHumanPreviewImages"
+        :key="item.url"
+        class="sv-human-preview-item"
+      >
+        <button
+          type="button"
+          class="sv-human-preview-image-button"
+          :aria-label="`放大查看${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+          @click="openHumanPreviewImage(item)"
+        >
+          <PreloadImage
+            class="sv-human-preview-image"
+            :src="item.url"
+            :alt="`${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+            loading="eager"
+            fit="contain"
+          />
+        </button>
+        <figcaption>
+          <span>{{ index + 1 }}</span>
+          {{ item.label }}
+        </figcaption>
+      </figure>
+    </div>
+  </NModal>
+
+  <NModal
+    :show="Boolean(enlargedHumanPreview)"
+    preset="card"
+    to="body"
+    transform-origin="center"
+    class="sv-human-zoom-modal"
+    :style="{ width: 'min(760px, calc(100vw - 32px))' }"
+    :bordered="false"
+    :segmented="{ content: true }"
+    @update:show="(show) => { if (!show) closeEnlargedHumanPreview() }"
+  >
+    <template #header>
+      <div class="sv-human-preview-head">
+        <strong>{{ previewingDigitalHuman?.name }}</strong>
+        <span>{{ enlargedHumanPreview?.label }}</span>
+      </div>
+    </template>
+
+    <PreloadImage
+      v-if="enlargedHumanPreview"
+      class="sv-human-zoom-image"
+      :src="enlargedHumanPreview.url"
+      :alt="`${previewingDigitalHuman?.name ?? '数字人'}${enlargedHumanPreview.label}`"
+      loading="eager"
+      fit="contain"
+    />
+  </NModal>
 </template>
 
 <style scoped lang="scss">
@@ -1218,6 +1413,7 @@ watch(
 }
 
 .sv-template-card {
+  position: relative;
   display: block;
   min-width: 0;
   width: 100%;
@@ -1225,7 +1421,12 @@ watch(
 }
 
 .sv-template-card.is-selected .sv-template-media {
-  box-shadow: 0 0 0 2px var(--sv-accent);
+  transform: none;
+}
+
+.sv-template-card:hover:not(.is-disabled) .sv-template-media,
+.sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
+  transform: scale(1.03);
 }
 
 .sv-template-card.is-disabled {
@@ -1421,20 +1622,9 @@ watch(
   overflow: hidden;
   aspect-ratio: 9 / 16;
   border-radius: 14px;
-  background: var(--sv-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition:
-    box-shadow 0.28s ease,
-    transform 0.28s ease;
+  background: transparent;
+  transition: transform 0.28s ease;
   will-change: transform;
-}
-
-.sv-template-card:hover:not(.is-disabled) .sv-template-media,
-.sv-template-card:focus-within:not(.is-disabled) .sv-template-media {
-  transform: scale(1.03);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--sv-accent) 24%, transparent),
-    0 14px 36px rgba(0, 0, 0, 0.18);
 }
 
 .sv-template-cover :deep(.preload-image),
@@ -1459,6 +1649,9 @@ watch(
 }
 
 .sv-template-cover--poster {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
 }
@@ -1482,37 +1675,11 @@ watch(
 }
 
 .sv-template-hover-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: rgba(0, 0, 0, 0);
-  pointer-events: none;
-  transition: background 0.28s ease;
-}
-
-.sv-template-card:hover:not(.is-disabled) .sv-template-hover-scrim,
-.sv-template-card:focus-within:not(.is-disabled) .sv-template-hover-scrim {
-  background: rgba(0, 0, 0, 0.14);
+  display: none;
 }
 
 .sv-template-overlay {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 2;
-  height: 36%;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.68) 100%);
-  pointer-events: none;
-  transition:
-    height 0.28s ease,
-    background 0.28s ease;
-}
-
-.sv-template-card:hover:not(.is-disabled) .sv-template-overlay,
-.sv-template-card:focus-within:not(.is-disabled) .sv-template-overlay {
-  height: 52%;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.82) 58%, rgba(0, 0, 0, 0.92) 100%);
+  display: none;
 }
 
 .sv-template-caption {
@@ -1540,7 +1707,9 @@ watch(
   letter-spacing: 0.2px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.72),
+    0 2px 10px rgba(0, 0, 0, 0.55);
 }
 
 .sv-template-caption__hover-meta {
@@ -1576,6 +1745,29 @@ watch(
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sv-template-selected-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--sv-accent);
+  color: #1a1205;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.4px;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.28),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.sv-beta-panel.theme-light .sv-template-selected-badge {
+  color: #ffffff;
 }
 
 .sv-recent-foot {
@@ -1989,103 +2181,447 @@ watch(
   font-weight: 700;
 }
 
-.sv-template-preview-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.sv-template-preview-media {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-}
-
-.sv-template-preview-poster,
-.sv-template-preview-placeholder {
-  width: min(100%, 300px);
-  aspect-ratio: 9 / 16;
-  border-radius: 12px;
-  background: var(--sv-surface);
-}
-
-.sv-template-preview-media :deep(.template-preview-video-player) {
-  max-height: min(60vh, 560px);
-}
-
-.sv-template-preview-poster :deep(.preload-image),
-.sv-template-preview-poster :deep(.preload-image__img) {
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-}
-
-.sv-template-preview-placeholder {
-  display: grid;
-  place-items: center;
-  color: var(--sv-text-soft);
-  font-size: 40px;
-}
-
-.sv-template-preview-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sv-template-preview-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-
-.sv-template-preview-tags span {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--sv-text-soft);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.sv-template-preview-tags span.is-accent {
-  background: color-mix(in srgb, var(--sv-accent) 18%, transparent);
-  color: var(--sv-accent);
-}
-
-.sv-template-preview-meta p {
-  margin: 0;
-  color: #4b5563;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.55;
-}
-
 </style>
 
 <style lang="scss">
-.sv-template-preview-modal {
-  width: min(440px, calc(100vw - 32px)) !important;
-  max-width: min(440px, calc(100vw - 32px)) !important;
+.sv-preview-dialog {
+  display: flex;
+  width: 60vw;
+  height: 60vh;
+  min-height: 60vh;
+  max-height: 60vh;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  color-scheme: light;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 }
 
-.sv-template-preview-modal > .n-card-header {
-  padding: 18px 22px !important;
+.sv-preview-dialog__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
 }
 
-.sv-template-preview-modal > .n-card__content {
-  padding: 18px 22px 22px !important;
-  max-height: calc(100vh - 124px);
+.sv-preview-dialog__head h3 {
+  margin: 0;
+  color: #111;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sv-preview-dialog__head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #666;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sv-preview-dialog__head button:hover {
+  background: #f5f5f5;
+}
+
+.sv-preview-dialog__body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+}
+
+.sv-preview-dialog__main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid #eee;
+  background: #fafafa;
+}
+
+.sv-preview-dialog__media {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
   overflow: hidden;
 }
 
-.sv-template-preview-modal .sv-template-preview-meta p {
-  margin: 0;
-  color: #4b5563;
-  font-size: 13px;
+.sv-preview-dialog__media .template-preview-video-shell {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.sv-preview-dialog__media .template-preview-video-player {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100% !important;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.sv-preview-dialog__media .preload-image,
+.sv-preview-dialog__media .preload-image__img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.sv-preview-dialog__video-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #999;
+  font-size: 48px;
+}
+
+.sv-preview-dialog__meta {
+  flex-shrink: 0;
+  padding: 10px 16px 14px;
+  border-top: 1px solid #eee;
+  background: #fff;
+}
+
+.sv-preview-dialog__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sv-preview-dialog__tags span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sv-preview-dialog__tags span.is-accent {
+  background: #fff7e6;
+  color: #b8860b;
+}
+
+.sv-preview-dialog__copy {
+  margin: 0 0 12px;
+  color: #334155;
+  font-size: 12px;
   font-weight: 400;
   line-height: 1.55;
+}
+
+.sv-preview-dialog__confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #d4a017;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.sv-preview-dialog__confirm:hover:not(:disabled) {
+  background: #e5b85c;
+}
+
+.sv-preview-dialog__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sv-preview-dialog__humans {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 16px 20px;
+  overflow: hidden;
+}
+
+.sv-preview-dialog__humans h4 {
+  margin: 0 0 4px;
+  color: #111;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sv-preview-dialog__humans-tip {
+  margin: 0 0 12px;
+  color: #888;
+  font-size: 12px;
+}
+
+.sv-preview-dialog__humans-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.65) #f1f5f9;
+}
+
+.sv-preview-dialog__humans-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sv-preview-dialog__humans-grid::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.sv-preview-dialog__humans-grid::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.65);
+}
+
+.sv-preview-dialog__humans-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.78);
+}
+
+.sv-preview-dialog__human {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 2px solid #eee;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.sv-preview-dialog__human:hover:not(:disabled) {
+  border-color: #d4a017;
+}
+
+.sv-preview-dialog__human.is-active {
+  border-color: #d4a017;
+  background: #fffbf0;
+}
+
+.sv-preview-dialog__human:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sv-preview-dialog__human-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #d4a017;
+  font-size: 24px;
+}
+
+.sv-preview-dialog__human-avatar .preload-image,
+.sv-preview-dialog__human-avatar .preload-image__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sv-preview-dialog__human-name {
+  overflow: hidden;
+  max-width: 100%;
+  color: #333;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  word-break: break-all;
+}
+
+.sv-preview-dialog__humans-empty {
+  margin: 0;
+  color: #999;
+  font-size: 13px;
+}
+
+.sv-human-preview-modal {
+  width: 80vw !important;
+  height: 60vh !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.sv-human-preview-modal > .n-card-header {
+  background: #fff !important;
+  border-bottom: 1px solid #eef2f7 !important;
+}
+
+.sv-human-preview-modal > .n-card-header .n-card-header__main,
+.sv-human-preview-modal > .n-card-header .n-card-header__extra,
+.sv-human-preview-modal > .n-card-header .n-base-close {
+  color: #0f172a !important;
+}
+
+.sv-human-preview-modal > .n-card__content {
+  padding: 28px 36px 24px !important;
+  overflow: hidden;
+  background: #fff !important;
+}
+
+.sv-human-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sv-human-preview-head strong {
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.sv-human-preview-head span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sv-human-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.sv-human-preview-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.sv-human-preview-modal .sv-human-preview-image-button {
+  display: block;
+  width: 100%;
+  height: min(420px, calc(60vh - 150px));
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: zoom-in;
+  outline: none;
+}
+
+.sv-human-preview-modal .sv-human-preview-image,
+.sv-human-preview-modal .sv-human-preview-image.preload-image,
+.sv-human-preview-modal .sv-human-preview-image .preload-image,
+.sv-human-preview-modal .sv-human-preview-image .preload-image.is-loaded,
+.sv-human-preview-modal .sv-human-preview-image .preload-image__img,
+.sv-human-preview-modal .sv-human-preview-image .preload-image.is-loaded .preload-image__img {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  border-radius: 10px;
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  object-fit: contain;
+}
+
+.sv-human-preview-modal .sv-human-preview-image-button:hover,
+.sv-human-preview-modal .sv-human-preview-image-button:focus-visible {
+  box-shadow: inset 0 0 0 2px #c99518;
+}
+
+.sv-human-preview-item figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sv-human-preview-item figcaption span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(239, 194, 76, 0.16);
+  color: #c99518;
+  font-size: 12px;
+}
+
+.sv-human-zoom-modal {
+  width: min(760px, calc(100vw - 32px)) !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.sv-human-zoom-modal > .n-card-header {
+  background: #fff !important;
+  border-bottom: 1px solid #eef2f7 !important;
+}
+
+.sv-human-zoom-modal > .n-card-header .n-card-header__main,
+.sv-human-zoom-modal > .n-card-header .n-card-header__extra,
+.sv-human-zoom-modal > .n-card-header .n-base-close {
+  color: #0f172a !important;
+}
+
+.sv-human-zoom-modal > .n-card__content {
+  background: #fff !important;
+}
+
+.sv-human-zoom-modal .sv-human-zoom-image,
+.sv-human-zoom-modal .sv-human-zoom-image.preload-image,
+.sv-human-zoom-modal .sv-human-zoom-image .preload-image,
+.sv-human-zoom-modal .sv-human-zoom-image .preload-image.is-loaded,
+.sv-human-zoom-modal .sv-human-zoom-image .preload-image__img,
+.sv-human-zoom-modal .sv-human-zoom-image .preload-image.is-loaded .preload-image__img {
+  width: 100%;
+  max-height: min(72vh, 760px);
+  border-radius: 10px;
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  object-fit: contain;
 }
 </style>

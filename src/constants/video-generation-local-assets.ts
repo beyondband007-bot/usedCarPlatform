@@ -45,10 +45,10 @@ import { VIDEO_DURATION_SECONDS } from '@/constants/short-video'
 import type { DigitalHuman, VideoTemplate, VideoTemplateType } from '@/types/video-generation'
 
 const digitalHumanViewLabelByIndex: Record<number, string> = {
-  1: '正面',
-  2: '侧面',
-  3: '背面',
-  4: '脸部',
+  1: '正视图',
+  2: '侧视图',
+  3: '背视图',
+  4: '面部图',
 }
 
 const digitalHumanImageModules = import.meta.glob('/src/assets/数字人形象/*.{png,jpg,jpeg,webp}', {

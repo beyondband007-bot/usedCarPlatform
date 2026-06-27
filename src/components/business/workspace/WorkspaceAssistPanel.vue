@@ -899,6 +899,20 @@ function focusGeneratingView() {
   }
 }
 
+function handleGenerationVideoTimeUpdate(event: Event) {
+  const video = event.currentTarget as HTMLVideoElement;
+  if (video.currentTime < 8) return;
+
+  video.currentTime = 0;
+  void video.play();
+}
+
+function restartGenerationVideo(event: Event) {
+  const video = event.currentTarget as HTMLVideoElement;
+  video.currentTime = 0;
+  void video.play();
+}
+
 function focusDeliveryBatchProcessingView() {
   if (!isDeliveryCapability.value || !isBatchProcessingView.value) return;
   activeTab.value = "batchProcessing";
@@ -1219,18 +1233,22 @@ defineExpose({
             class="generation-waiting"
             aria-live="polite"
           >
-            <div class="waiting-visual" aria-hidden="true">
-              <span class="waiting-scan"></span>
-              <Icon icon="mdi:image-sync-outline" />
-            </div>
-            <div class="waiting-copy">
-              <p>图片待处理</p>
-              <h2>{{ featureCompareContent.generatingTitle }}</h2>
-              <span>{{ featureCompareContent.generatingDesc }}</span>
-            </div>
-            <div class="waiting-progress" aria-hidden="true">
-              <span></span>
-            </div>
+            <span
+              class="generation-waiting-label"
+              aria-hidden="true"
+            >正在生成中…</span>
+            <video
+              class="generation-waiting-video"
+              src="/videos/generation-loading.mp4"
+              autoplay
+              muted
+              playsinline
+              preload="auto"
+              aria-hidden="true"
+              @timeupdate="handleGenerationVideoTimeUpdate"
+              @ended="restartGenerationVideo"
+            ></video>
+            <span class="sr-only">{{ featureCompareContent.generatingTitle }}</span>
           </section>
 
           <section
@@ -1551,18 +1569,22 @@ defineExpose({
             class="generation-waiting"
             aria-live="polite"
           >
-            <div class="waiting-visual" aria-hidden="true">
-              <span class="waiting-scan"></span>
-              <Icon icon="mdi:image-sync-outline" />
-            </div>
-            <div class="waiting-copy">
-              <p>图片待生成</p>
-              <h2>正在生成效果图</h2>
-              <span>AI 正在分析车辆素材并匹配场景光影，请稍候。</span>
-            </div>
-            <div class="waiting-progress" aria-hidden="true">
-              <span></span>
-            </div>
+            <span
+              class="generation-waiting-label"
+              aria-hidden="true"
+            >正在生成中…</span>
+            <video
+              class="generation-waiting-video"
+              src="/videos/generation-loading.mp4"
+              autoplay
+              muted
+              playsinline
+              preload="auto"
+              aria-hidden="true"
+              @timeupdate="handleGenerationVideoTimeUpdate"
+              @ended="restartGenerationVideo"
+            ></video>
+            <span class="sr-only">正在生成效果图，请稍候。</span>
           </section>
 
           <section
@@ -1985,148 +2007,83 @@ defineExpose({
 }
 
 .generation-waiting {
-  display: grid;
-  align-content: center;
-  justify-items: center;
+  position: relative;
   min-height: 0;
   flex: 1;
-  gap: 18px;
-  padding: clamp(24px, 3vw, 40px);
+  padding: 0;
   border: 1px solid var(--assist-border);
   border-radius: 14px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 8%, transparent),
-      transparent 42%
-    ),
-    var(--assist-card);
+  background: #000;
   box-shadow: var(--assist-shadow);
-}
-
-.waiting-visual {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(100%, 320px);
-  aspect-ratio: 16 / 10;
-  border: 1px dashed
-    color-mix(in srgb, var(--assist-blue) 28%, var(--assist-border));
-  border-radius: 18px;
-  background:
-    radial-gradient(
-      circle at 50% 42%,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0.02)
-    ),
-    var(--assist-card-strong);
   overflow: hidden;
 }
 
-.theme-light .waiting-visual {
-  background:
-    radial-gradient(
-      circle at 50% 42%,
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 13%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.88),
-      rgba(241, 247, 255, 0.82)
-    ),
-    var(--assist-card-strong);
+.generation-waiting-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.waiting-visual .iconify {
-  position: relative;
-  z-index: 2;
-  color: var(--assist-blue);
-  font-size: clamp(58px, 7vw, 92px);
-  filter: drop-shadow(
-    0 8px 24px
-      color-mix(in srgb, var(--workspace-accent, #efc24c) 18%, transparent)
-  );
-  animation: waiting-pulse 1.6s ease-in-out infinite;
-}
-
-.waiting-scan {
+.generation-waiting-label {
   position: absolute;
-  inset: 12% 16%;
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 16%, transparent) 48%,
-    color-mix(in srgb, var(--workspace-accent, #efc24c) 4%, transparent) 52%,
-    transparent 100%
-  );
-  opacity: 0.75;
-  animation: waiting-scan 1.8s linear infinite;
-}
-
-.waiting-copy {
-  display: grid;
-  width: min(100%, 520px);
-  justify-items: center;
-  gap: 6px;
-  text-align: center;
-}
-
-.waiting-copy p,
-.waiting-copy h2,
-.waiting-copy span {
-  margin: 0;
-}
-
-.waiting-copy p {
-  color: var(--assist-blue);
+  top: 16px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 7px 18px;
+  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, transparent);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  color: transparent;
   font-size: 13px;
   font-weight: 900;
-  letter-spacing: 0.04em;
-}
-
-.waiting-copy h2 {
-  color: var(--assist-text);
-  font-size: clamp(20px, 1.8vw, 28px);
+  letter-spacing: 0.1em;
   line-height: 1.2;
-  font-weight: 950;
-}
-
-.waiting-copy span {
-  width: 100%;
-  max-width: none;
-  color: var(--assist-muted);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.7;
-  white-space: nowrap;
-}
-
-.waiting-progress {
-  width: min(100%, 320px);
-  height: 8px;
-  border-radius: 999px;
-  background: color-mix(
-    in srgb,
-    var(--assist-blue) 12%,
-    var(--assist-border-soft)
+  background-image: linear-gradient(
+    110deg,
+    #bfa36f 0%,
+    #ffe8a8 25%,
+    #fff 50%,
+    #ffe8a8 75%,
+    #bfa36f 100%
   );
-  overflow: hidden;
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: generationLabelShimmer 2.4s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(239, 194, 76, 0.28));
+  pointer-events: none;
 }
 
-.waiting-progress span {
-  display: block;
-  width: 38%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--assist-blue), #63a6ff 60%, #9bc6ff);
-  animation: waiting-progress 1.5s ease-in-out infinite;
+@keyframes generationLabelShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.assist-panel.theme-light .generation-waiting-label {
+  border-color: color-mix(in srgb, var(--workspace-accent, #d4a63c) 40%, transparent);
+  background: rgba(255, 255, 255, 0.82);
+  filter: drop-shadow(0 0 8px rgba(212, 166, 60, 0.22));
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .delivery-result-head {
@@ -3346,44 +3303,4 @@ defineExpose({
   }
 }
 
-@keyframes waiting-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.82;
-  }
-  50% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-}
-
-@keyframes waiting-scan {
-  0% {
-    transform: translateY(-24%);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.85;
-  }
-  50% {
-    opacity: 0.95;
-  }
-  80% {
-    opacity: 0.7;
-  }
-  100% {
-    transform: translateY(24%);
-    opacity: 0;
-  }
-}
-
-@keyframes waiting-progress {
-  0% {
-    transform: translateX(-130%);
-  }
-  100% {
-    transform: translateX(330%);
-  }
-}
 </style>

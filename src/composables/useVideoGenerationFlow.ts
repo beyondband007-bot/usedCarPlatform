@@ -534,6 +534,21 @@ export function useVideoGenerationFlow(ownerKey: string) {
     singleCarForm.value.digitalHumanId = defaultId
   }
 
+  function selectDigitalHuman(human: DigitalHuman) {
+    if (!human.id || !selectedTemplate.value) return
+    if (!digitalHumanList.value.some((item) => item.id === human.id)) return
+
+    if (selectedTemplate.value.type === 'dealership') {
+      dealershipForm.value.digitalHumanId = human.id
+      return
+    }
+    if (selectedTemplate.value.type === 'promotion') {
+      promotionForm.value.digitalHumanId = human.id
+      return
+    }
+    singleCarForm.value.digitalHumanId = human.id
+  }
+
   function selectTemplate(template: VideoTemplate) {
     if (
       template.status === 'coming_soon' ||
@@ -1184,6 +1199,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     selectedTemplate,
     supportedLanguageOptions,
     digitalHumanList,
+    activeDigitalHumanId,
     selectedDigitalHuman,
     singleCarForm,
     promotionForm,
@@ -1212,6 +1228,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     isLoading,
     initializeFlow,
     selectTemplate,
+    selectDigitalHuman,
     goBackToTemplate,
     goBackToForm,
     continueReview,
