@@ -421,7 +421,8 @@ const selectedTemplateUseVideoCover = computed(() => {
 });
 
 const isTaskLocked = computed(() =>
-  ["task", "result"].includes(currentStep.value),
+  currentStep.value === "task" ||
+  (currentStep.value === "result" && Boolean(selectedTemplate.value)),
 );
 const isConfigurationLocked = computed(
   () => props.disabled || props.isGenerating || isTaskLocked.value,
@@ -491,13 +492,16 @@ const estimatedConfirmedAudioPoints = computed(() => {
 const showConfigurationPage = computed(() =>
   ["form", "task", "result"].includes(currentStep.value),
 );
+const showTemplateEntryPage = computed(
+  () => currentStep.value === "template" || (currentStep.value === "result" && !selectedTemplate.value),
+);
 const showReviewPage = computed(
   () =>
     ["review", "task", "result"].includes(currentStep.value) &&
     Boolean(scriptDraft.value),
 );
 const showConfigurationFooter = computed(
-  () => currentStep.value === "form" && !isConfigurationLocked.value,
+  () => currentStep.value === "form" || (currentStep.value === "result" && Boolean(selectedTemplate.value)),
 );
 const showReviewFooter = computed(() => showReviewPage.value && !isTaskLocked.value);
 
@@ -685,7 +689,7 @@ async function submitConfirmedVideo() {
       <span>正在加载视频生成配置</span>
     </div>
 
-    <template v-else-if="currentStep === 'template'">
+    <template v-else-if="showTemplateEntryPage">
       <section class="sv-section">
         <header class="sv-section-head">
           <span class="sv-step-index">1</span>

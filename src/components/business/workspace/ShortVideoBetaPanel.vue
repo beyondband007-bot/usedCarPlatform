@@ -47,6 +47,8 @@ const PENDING_RECENT_STATUSES = new Set([
   "queue",
   "generating",
 ]);
+const GENERATION_LOADING_VIDEO_URL = "/videos/generation-loading.mp4";
+let hasRequestedGenerationLoadingVideoPreload = false;
 
 const emit = defineEmits<{
   pickRecent: [item: WorkspaceRecentItem];
@@ -67,6 +69,17 @@ const previewDigitalHumanId = ref("");
 const humanPreviewModalVisible = ref(false);
 const previewingDigitalHuman = ref<DigitalHuman | null>(null);
 const enlargedHumanPreview = ref<{ label: string; url: string } | null>(null);
+
+function preloadGenerationLoadingVideo() {
+  if (hasRequestedGenerationLoadingVideoPreload || typeof document === "undefined") return;
+
+  hasRequestedGenerationLoadingVideoPreload = true;
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "video";
+  link.href = GENERATION_LOADING_VIDEO_URL;
+  document.head.appendChild(link);
+}
 
 const digitalHumanList = computed(() => flow?.digitalHumanList.value ?? []);
 
@@ -413,6 +426,7 @@ watch(
   () => props.isGenerating,
   (generating) => {
     if (generating && flow?.currentStep.value === "task") {
+      preloadGenerationLoadingVideo();
       activeView.value = "generating";
       return;
     }
@@ -452,6 +466,10 @@ watch(currentTask, (task) => {
 });
 
 onMounted(() => {
+  if (props.isGenerating) {
+    preloadGenerationLoadingVideo();
+  }
+
   void flow?.loadHistory();
   if (shouldKeepTemplatesView()) {
     activeView.value = "templates";
@@ -515,8 +533,15 @@ watch(
           aria-live="polite"
         >
           <div class="sv-generating-visual" aria-hidden="true">
-            <span class="sv-generating-scan"></span>
-            <Icon icon="mdi:video-outline" />
+            <video
+              class="sv-generating-video"
+              :src="GENERATION_LOADING_VIDEO_URL"
+              autoplay
+              loop
+              muted
+              playsinline
+              preload="auto"
+            ></video>
           </div>
 
           <div class="sv-generating-copy">
@@ -1101,16 +1126,6 @@ watch(
   color: #64748b;
 }
 
-.sv-beta-panel.theme-light .sv-generating-visual {
-  background:
-    radial-gradient(
-      circle at 50% 42%,
-      color-mix(in srgb, var(--sv-accent) 13%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
-}
-
 .sv-beta-panel.theme-light .sv-generating-progress {
   background: rgba(47, 107, 255, 0.08);
 }
@@ -1181,13 +1196,16 @@ watch(
 }
 
 .sv-generation-waiting {
-  display: grid;
-  align-content: center;
-  justify-items: center;
+  position: relative;
+  display: flex;
   min-height: 0;
   flex: 1;
-  gap: 18px;
-  padding: clamp(24px, 3vw, 40px) 16px;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(28px, 5vh, 64px) clamp(20px, 4vw, 72px);
+  border-radius: 0;
+  background: #050914;
 }
 
 .sv-beta-panel.theme-light .sv-generation-tab {
@@ -1875,52 +1893,28 @@ watch(
 }
 
 .sv-generating-visual {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(100%, 320px);
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  border: 1px dashed color-mix(in srgb, var(--sv-accent) 28%, var(--sv-border));
-  border-radius: 18px;
-  background:
-    radial-gradient(
-      circle at 50% 42%,
-      color-mix(in srgb, var(--sv-accent) 16%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(180deg, #151922 0%, #0d1117 100%);
-}
-
-.sv-generating-visual .iconify {
-  position: relative;
-  z-index: 1;
-  color: var(--sv-accent);
-  font-size: clamp(48px, 6vw, 72px);
-  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--sv-accent) 18%, transparent));
-  animation: sv-generating-pulse 1.6s ease-in-out infinite;
-}
-
-.sv-generating-scan {
   position: absolute;
-  inset: 12% 16%;
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(212, 176, 106, 0.16) 48%,
-    rgba(212, 176, 106, 0.04) 52%,
-    transparent 100%
-  );
-  opacity: 0.75;
-  animation: sv-scan 1.8s linear infinite;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: #050914;
+}
+
+.sv-generating-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .sv-generating-copy {
+  position: relative;
+  z-index: 1;
   display: grid;
   width: min(100%, 520px);
   justify-items: center;
   gap: 8px;
+  margin-bottom: clamp(28px, 5vh, 56px);
   text-align: center;
 }
 
@@ -1931,32 +1925,41 @@ watch(
 }
 
 .sv-generating-copy p {
-  color: var(--sv-accent);
+  color: #f0b935;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.02em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.42);
 }
 
 .sv-generating-copy h2 {
+  color: #fff;
   font-size: clamp(20px, 1.8vw, 28px);
   font-weight: 900;
   line-height: 1.25;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.48);
 }
 
 .sv-generating-copy span {
   display: block;
   max-width: 420px;
-  color: var(--sv-text-soft);
+  color: rgba(255, 255, 255, 0.82);
   font-size: 14px;
   line-height: 1.65;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.44);
 }
 
 .sv-generating-progress {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(18px, 3.2vh, 34px);
+  z-index: 1;
+  transform: translateX(-50%);
   width: min(100%, 320px);
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .sv-generating-progress span {
@@ -1988,29 +1991,6 @@ watch(
 
 .sv-spin {
   animation: sv-spin 0.9s linear infinite;
-}
-
-@keyframes sv-generating-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-
-  50% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-}
-
-@keyframes sv-scan {
-  0% {
-    transform: translateY(-100%);
-  }
-
-  100% {
-    transform: translateY(100%);
-  }
 }
 
 @keyframes sv-spin {

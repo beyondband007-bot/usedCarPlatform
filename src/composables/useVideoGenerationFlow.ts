@@ -229,8 +229,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     dealershipUploads.value = []
   }
 
-  function resetFlowToInitial() {
-    stopPolling()
+  function resetInputState() {
     selectedTemplate.value = null
     singleCarForm.value = createEmptySingleCarForm()
     promotionForm.value = createEmptyPromotionForm()
@@ -238,17 +237,31 @@ export function useVideoGenerationFlow(ownerKey: string) {
     clearUploads()
     scriptDraft.value = null
     confirmedScriptText.value = ''
+    translatedNarrationText.value = ''
     voiceOptions.value = []
     selectedVoiceId.value = ''
     draftInputFingerprint.value = ''
     draftNeedsRegeneration.value = false
     resetAudioConfirmation()
-    currentTask.value = null
     validationIssues.value = []
     errorMessage.value = ''
     clearPersistedDraftId()
+  }
+
+  function resetFlowToInitial() {
+    stopPolling()
+    resetInputState()
+    currentTask.value = null
     clearPersistedTaskId()
     currentStep.value = 'template'
+  }
+
+  function resetInputStateAfterSuccessfulTask() {
+    const completedTemplate = selectedTemplate.value
+    resetInputState()
+    selectedTemplate.value = completedTemplate
+    clearPersistedTaskId()
+    currentStep.value = 'result'
   }
 
   function invalidateDraftForInputChange() {
@@ -375,8 +388,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
 
     if (task.status === 'success') {
-      currentStep.value = 'result'
-      clearPersistedDraftId()
+      resetInputStateAfterSuccessfulTask()
     } else if (TERMINAL_STATUSES.has(task.status)) {
       stopPolling()
     }
@@ -1035,10 +1047,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
     const task = await getVideoGenerationTask(taskId)
     currentTask.value = task
     if (task.status === 'success') {
-      currentStep.value = 'result'
-      clearPersistedDraftId()
-      clearPersistedTaskId()
       stopPolling()
+      resetInputStateAfterSuccessfulTask()
     } else if (TERMINAL_STATUSES.has(task.status)) {
       clearPersistedTaskId()
       stopPolling()
