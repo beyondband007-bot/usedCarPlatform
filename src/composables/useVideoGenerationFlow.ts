@@ -131,9 +131,11 @@ export function useVideoGenerationFlow(ownerKey: string) {
   const errorMessage = ref('')
   const loadingMap = ref<Record<string, boolean>>({})
   let pollingTimer: ReturnType<typeof setTimeout> | null = null
+  let pollingTaskId = ''
 
   const draftStorageKey = getVideoGenerationDraftStorageKey(ownerKey)
   const taskStorageKey = getVideoGenerationTaskStorageKey(ownerKey)
+  const taskTemplateStorageKey = `${taskStorageKey}:template`
 
   const selectedDigitalHuman = computed(() =>
     digitalHumanList.value.find((item) => item.id === activeDigitalHumanId.value) ?? null,
@@ -189,9 +191,17 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
-  function persistTaskId(taskId: string) {
+  function persistTaskId(taskId: string, templateId?: string | null) {
     try {
       localStorage.setItem(taskStorageKey, taskId)
+      if (templateId) {
+        localStorage.setItem(
+          taskTemplateStorageKey,
+          JSON.stringify({ taskId, templateId }),
+        )
+      } else {
+        localStorage.removeItem(taskTemplateStorageKey)
+      }
     } catch {
       // ignore
     }
@@ -205,9 +215,11 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
-  function clearPersistedTaskId() {
+  function clearPersistedTaskId(taskId?: string) {
     try {
+      if (taskId && localStorage.getItem(taskStorageKey) !== taskId) return
       localStorage.removeItem(taskStorageKey)
+      localStorage.removeItem(taskTemplateStorageKey)
     } catch {
       // ignore
     }
@@ -256,12 +268,16 @@ export function useVideoGenerationFlow(ownerKey: string) {
     currentStep.value = 'template'
   }
 
-  function resetInputStateAfterSuccessfulTask() {
-    const completedTemplate = selectedTemplate.value
+  function resetInputStateForNextTask() {
+    const activeTemplate = selectedTemplate.value
     resetInputState()
-    selectedTemplate.value = completedTemplate
-    clearPersistedTaskId()
-    currentStep.value = 'result'
+    selectedTemplate.value = activeTemplate
+    if (activeTemplate) {
+      applyTemplateDefaultDigitalHuman(activeTemplate)
+      currentStep.value = 'form'
+    } else {
+      currentStep.value = 'template'
+    }
   }
 
   function invalidateDraftForInputChange() {
@@ -359,11 +375,13 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
-  function stopPolling() {
+  function stopPolling(taskId?: string) {
+    if (taskId && pollingTaskId !== taskId) return
     if (pollingTimer) {
       clearTimeout(pollingTimer)
       pollingTimer = null
     }
+    pollingTaskId = ''
   }
 
   function sleep(ms: number) {
@@ -373,32 +391,74 @@ export function useVideoGenerationFlow(ownerKey: string) {
   }
 
   async function waitForTaskCompletion(taskId: string) {
-    stopPolling()
-    persistTaskId(taskId)
+    const displayedTask = currentTask.value
+    const shouldOwnDisplayedTask =
+      !displayedTask ||
+      displayedTask.taskId === taskId ||
+      TERMINAL_STATUSES.has(displayedTask.status)
+    const stillOwnsDisplaySlot = () => {
+      const activeTask = currentTask.value
+      if (!activeTask || activeTask.taskId === taskId) return true
+      return (
+        shouldOwnDisplayedTask &&
+        Boolean(displayedTask) &&
+        activeTask.taskId === displayedTask?.taskId &&
+        TERMINAL_STATUSES.has(activeTask.status)
+      )
+    }
+
+    if (shouldOwnDisplayedTask) {
+      stopPolling()
+      persistTaskId(taskId)
+    }
+
     const deadline = Date.now() + GENERATION_TASK_POLL_MAX_MS
 
     let task = await getVideoGenerationTask(taskId)
-    currentTask.value = task
-    currentStep.value = task.status === 'success' ? 'result' : 'task'
+    if (shouldOwnDisplayedTask && stillOwnsDisplaySlot()) {
+      persistTaskId(taskId, task.templateId)
+      currentTask.value = task
+      currentStep.value = task.status === 'success' ? 'result' : 'task'
+    }
 
     while (!TERMINAL_STATUSES.has(task.status) && Date.now() < deadline) {
       await sleep(task.pollingRecommendedMs ?? VIDEO_TASK_POLL_MS)
       task = await getVideoGenerationTask(taskId)
-      currentTask.value = task
+      if (shouldOwnDisplayedTask && currentTask.value?.taskId === taskId) {
+        currentTask.value = task
+      }
     }
 
-    if (task.status === 'success') {
-      resetInputStateAfterSuccessfulTask()
-    } else if (TERMINAL_STATUSES.has(task.status)) {
-      stopPolling()
+    if (
+      TERMINAL_STATUSES.has(task.status) &&
+      shouldOwnDisplayedTask &&
+      currentTask.value?.taskId === taskId
+    ) {
+      clearPersistedTaskId(taskId)
+      stopPolling(taskId)
     }
 
     return task
   }
 
   async function trackTask(taskId: string) {
-    persistTaskId(taskId)
+    const displayedTask = currentTask.value
+    const canOwnDisplayedTask =
+      !displayedTask ||
+      displayedTask.taskId === taskId ||
+      TERMINAL_STATUSES.has(displayedTask.status)
     const task = await getVideoGenerationTask(taskId)
+
+    if (
+      !canOwnDisplayedTask ||
+      (currentTask.value &&
+        currentTask.value.taskId !== displayedTask?.taskId &&
+        currentTask.value.taskId !== taskId)
+    ) {
+      return task
+    }
+
+    persistTaskId(taskId, task.templateId)
     currentTask.value = task
     currentStep.value = task.status === 'success' ? 'result' : 'task'
     if (!TERMINAL_STATUSES.has(task.status)) {
@@ -484,7 +544,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
       if (taskId) {
         currentTask.value = await getVideoGenerationTask(taskId)
         if (currentTask.value && !TERMINAL_STATUSES.has(currentTask.value.status)) {
-          currentStep.value = 'task'
+          restoreTemplateForTask(currentTask.value)
+          currentStep.value = selectedTemplate.value ? 'form' : 'template'
           startPolling(taskId)
         } else {
           resetFlowToInitial()
@@ -524,6 +585,42 @@ export function useVideoGenerationFlow(ownerKey: string) {
     if (preferred) {
       selectTemplate(preferred)
     }
+  }
+
+  function readPersistedTaskTemplateId() {
+    try {
+      const raw = localStorage.getItem(taskTemplateStorageKey)
+      if (!raw) return ''
+      const stored = JSON.parse(raw) as {
+        taskId?: unknown
+        templateId?: unknown
+      }
+      if (stored.taskId !== readPersistedTaskId()) return ''
+      return asString(stored.templateId)
+    } catch {
+      return ''
+    }
+  }
+
+  function restoreTemplateForTask(task: VideoGenerationTask) {
+    const persistedTemplateId = readPersistedTaskTemplateId()
+    const template =
+      templateList.value.find(
+        (item) =>
+          item.templateId === task.templateId ||
+          item.id === task.templateId ||
+          item.referenceMaterialId === task.templateId ||
+          item.templateId === persistedTemplateId ||
+          item.id === persistedTemplateId ||
+          item.referenceMaterialId === persistedTemplateId,
+      ) ??
+      templateList.value.find(
+        (item) => item.type === task.templateType && !isTemplateDisabled(item),
+      )
+
+    if (!template) return
+    selectedTemplate.value = template
+    applyTemplateDefaultDigitalHuman(template)
   }
 
   function applyTemplateDefaultDigitalHuman(template: VideoTemplate) {
@@ -1008,7 +1105,9 @@ export function useVideoGenerationFlow(ownerKey: string) {
     }
   }
 
-  async function submitVideoTask() {
+  async function submitVideoTask(
+    onCreated?: (taskId: string, moduleCode: string) => void,
+  ) {
     if (!scriptDraft.value?.scriptDraftId) {
       errorMessage.value = '请先生成并确认口播草稿'
       return null
@@ -1023,16 +1122,42 @@ export function useVideoGenerationFlow(ownerKey: string) {
     setLoading('task', true)
     errorMessage.value = ''
     try {
+      const activeTemplate = selectedTemplate.value
       const created = await createVideoGenerationTask({
         scriptDraftId: scriptDraft.value.scriptDraftId,
         audioPreviewId: confirmedAudioPreview.value.audioPreviewId,
       })
       void creditsStore.hydrateAccounts(true)
-      const task = await getVideoGenerationTask(created.taskId)
-      currentTask.value = task
-      persistTaskId(task.taskId)
-      startPolling(task.taskId)
-      return task
+      const pendingTask: VideoGenerationTask = {
+        ...created,
+        templateId: created.templateId ?? activeTemplate?.templateId ?? null,
+        templateType: activeTemplate?.type ?? null,
+      }
+
+      currentTask.value = pendingTask
+      persistTaskId(pendingTask.taskId, pendingTask.templateId)
+      try {
+        onCreated?.(pendingTask.taskId, pendingTask.moduleCode)
+      } catch {
+        // Local persistence and polling still own recovery if registration fails.
+      }
+      resetInputStateForNextTask()
+
+      try {
+        const task = await getVideoGenerationTask(pendingTask.taskId)
+        if (currentTask.value?.taskId === pendingTask.taskId) {
+          currentTask.value = task
+        }
+        if (!TERMINAL_STATUSES.has(task.status)) {
+          startPolling(pendingTask.taskId)
+        } else {
+          clearPersistedTaskId(pendingTask.taskId)
+        }
+        return task
+      } catch {
+        startPolling(pendingTask.taskId)
+        return pendingTask
+      }
     } catch (error) {
       currentStep.value = previousStep === 'task' ? 'review' : previousStep
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
@@ -1045,24 +1170,33 @@ export function useVideoGenerationFlow(ownerKey: string) {
   async function refreshTask(taskId = currentTask.value?.taskId) {
     if (!taskId) return null
     const task = await getVideoGenerationTask(taskId)
+
+    // A newer submission may have replaced the displayed task while this
+    // request was in flight. Let the global task tracker own the older task.
+    if (currentTask.value?.taskId !== taskId) {
+      return task
+    }
+
     currentTask.value = task
     if (task.status === 'success') {
-      stopPolling()
-      resetInputStateAfterSuccessfulTask()
+      stopPolling(taskId)
+      clearPersistedTaskId(taskId)
     } else if (TERMINAL_STATUSES.has(task.status)) {
-      clearPersistedTaskId()
-      stopPolling()
+      clearPersistedTaskId(taskId)
+      stopPolling(taskId)
     }
     return task
   }
 
   function startPolling(taskId: string) {
     stopPolling()
+    pollingTaskId = taskId
     const poll = async () => {
       try {
         const task = await refreshTask(taskId)
+        if (pollingTaskId !== taskId) return
         if (!task || TERMINAL_STATUSES.has(task.status)) {
-          stopPolling()
+          stopPolling(taskId)
           return
         }
         pollingTimer = setTimeout(
@@ -1070,6 +1204,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
           task.pollingRecommendedMs ?? VIDEO_TASK_POLL_MS,
         )
       } catch (error) {
+        if (pollingTaskId !== taskId) return
         errorMessage.value = resolveVideoGenerationErrorMessage(error)
         pollingTimer = setTimeout(poll, VIDEO_TASK_POLL_MS)
       }
@@ -1094,11 +1229,16 @@ export function useVideoGenerationFlow(ownerKey: string) {
   async function cancelCurrentTask() {
     if (!currentTask.value?.taskId) return null
     if (!CANCELABLE_STATUSES.has(currentTask.value.status)) return null
+    const taskId = currentTask.value.taskId
     setLoading('cancel', true)
     try {
-      const task = await cancelVideoGenerationTask(currentTask.value.taskId)
+      const task = await cancelVideoGenerationTask(taskId)
+      if (currentTask.value?.taskId !== taskId) {
+        return task
+      }
       currentTask.value = task
-      stopPolling()
+      clearPersistedTaskId(taskId)
+      stopPolling(taskId)
       return task
     } catch (error) {
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
@@ -1110,12 +1250,16 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
   async function regenerateTask(taskId = currentTask.value?.taskId) {
     if (!taskId) return null
+    const displayedTaskId = currentTask.value?.taskId
     setLoading('regenerate', true)
     try {
       const created = await regenerateVideoGenerationTask(taskId)
       const task = await getVideoGenerationTask(created.taskId)
+      if (currentTask.value?.taskId !== displayedTaskId) {
+        return task
+      }
       currentTask.value = task
-      persistTaskId(task.taskId)
+      persistTaskId(task.taskId, task.templateId)
       currentStep.value = 'task'
       startPolling(task.taskId)
       return task

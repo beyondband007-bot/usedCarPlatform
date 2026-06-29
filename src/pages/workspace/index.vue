@@ -431,6 +431,11 @@ function trackRunningTask(taskId: string, moduleCode: string) {
   });
 }
 
+function handleVideoTaskCreated(taskId: string, moduleCode: string) {
+  trackRunningTask(taskId, moduleCode || VIDEO_GENERATION_MODULE_CODE);
+  void refreshRunningTaskSummary();
+}
+
 function untrackRunningTask(taskId: string) {
   if (!trackedRunningTasks.value[taskId]) return;
   const next = { ...trackedRunningTasks.value };
@@ -941,6 +946,27 @@ async function canStartGeneration() {
   }
 
   return true;
+}
+
+async function canStartVideoGeneration() {
+  await refreshRunningTaskSummary();
+
+  const currentVideoTask = videoFlow.currentTask.value;
+  const hasCurrentVideoTask =
+    currentVideoTask &&
+    ["waiting", "queued", "queue", "generating"].includes(
+      currentVideoTask.status,
+    );
+  const hasTrackedVideoTask = Object.values(trackedRunningTasks.value).some(
+    (moduleCode) => isShortVideoModuleCode(moduleCode),
+  );
+
+  if (hasCurrentVideoTask || hasTrackedVideoTask) {
+    message.warning("当前已有视频正在生成，请等待完成后再提交");
+    return false;
+  }
+
+  return canStartGeneration();
 }
 
 async function canStartBatchGeneration() {
@@ -2365,6 +2391,8 @@ onUnmounted(() => {
             :is-generating="activeModuleGenerating"
             :previewed-delivery-task-id="previewedDeliveryTaskId"
             :can-create-batch-task="canStartBatchGeneration"
+            :can-create-video-task="canStartVideoGeneration"
+            :on-video-task-created="handleVideoTaskCreated"
             :batch-active-jobs="batchActiveJobs"
             @select-option="selectedOptionId = $event"
             @generate="handleGenerate"

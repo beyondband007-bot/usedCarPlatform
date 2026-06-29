@@ -36,6 +36,8 @@ const props = defineProps<{
   capability: WorkspaceCapability;
   disabled?: boolean;
   isGenerating?: boolean;
+  canCreateTask?: () => boolean | Promise<boolean>;
+  onTaskCreated?: (taskId: string, moduleCode: string) => void;
 }>();
 
 const message = useMessage();
@@ -45,6 +47,7 @@ const appStore = useAppStore();
 const exteriorInputRef = ref<HTMLInputElement | null>(null);
 const interiorInputRef = ref<HTMLInputElement | null>(null);
 const dealershipInputRef = ref<HTMLInputElement | null>(null);
+const isSubmittingConfirmedVideo = ref(false);
 
 const ownerKey = computed(
   () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
@@ -425,14 +428,13 @@ const isTaskLocked = computed(() =>
   (currentStep.value === "result" && Boolean(selectedTemplate.value)),
 );
 const isConfigurationLocked = computed(
-  () => props.disabled || props.isGenerating || isTaskLocked.value,
+  () => props.disabled || isTaskLocked.value,
 );
 
 const canGenerateDraft = computed(
   () =>
     currentStep.value === "form" &&
     !isConfigurationLocked.value &&
-    !props.isGenerating &&
     !isLoading("draft") &&
     !isLoading("task") &&
     Boolean(selectedTemplate.value) &&
@@ -665,11 +667,29 @@ function toggleAudioConfirmation(audioPreviewId: string, canUseForVideo: boolean
 }
 
 async function submitConfirmedVideo() {
-  const task = await submitVideoTask();
-  if (task) {
-    message.success("已提交视频生成");
-  } else if (errorMessage.value) {
-    message.error(errorMessage.value);
+  if (isSubmittingConfirmedVideo.value) return;
+  isSubmittingConfirmedVideo.value = true;
+
+  try {
+    try {
+      if (props.canCreateTask && !(await props.canCreateTask())) {
+        return;
+      }
+    } catch (error) {
+      message.error(
+        error instanceof Error ? error.message : "并发任务校验失败，请稍后重试",
+      );
+      return;
+    }
+
+    const task = await submitVideoTask(props.onTaskCreated);
+    if (task) {
+      message.success("已提交视频生成");
+    } else if (errorMessage.value) {
+      message.error(errorMessage.value);
+    }
+  } finally {
+    isSubmittingConfirmedVideo.value = false;
   }
 }
 </script>

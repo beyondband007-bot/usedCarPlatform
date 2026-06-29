@@ -68,6 +68,8 @@ const props = defineProps<{
   isGenerating?: boolean;
   previewedDeliveryTaskId?: string | null;
   canCreateBatchTask?: () => boolean | Promise<boolean>;
+  canCreateVideoTask?: () => boolean | Promise<boolean>;
+  onVideoTaskCreated?: (taskId: string, moduleCode: string) => void;
   batchActiveJobs?: WorkspaceBatchActiveJob[];
 }>();
 
@@ -3113,8 +3115,9 @@ defineExpose({
       <div class="generate-panel-body generate-panel-body--short-video">
         <VideoGenerationPanel
           :capability="props.capability"
-          :disabled="props.isGenerating"
           :is-generating="props.isGenerating"
+          :can-create-task="props.canCreateVideoTask"
+          :on-task-created="props.onVideoTaskCreated"
         />
       </div>
     </template>

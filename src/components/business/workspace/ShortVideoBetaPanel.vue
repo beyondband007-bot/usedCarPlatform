@@ -243,16 +243,13 @@ const generatingErrorMessage = computed(() => {
 });
 
 const isGenerationMode = computed(() => {
-  if (flow?.currentStep.value !== "task") return false;
   if (isSubmittingVideoTask.value) return true;
-  if (!currentTask.value) return false;
-  return props.isGenerating || isPendingTask(currentTask.value);
+  return isPendingTask(currentTask.value);
 });
 
 function shouldShowGeneratingView() {
-  if (flow?.currentStep.value !== "task") return false;
   if (isSubmittingVideoTask.value) return true;
-  return isPendingTask(currentTask.value) || props.isGenerating;
+  return isPendingTask(currentTask.value);
 }
 
 function syncSelectedRecentItem() {
@@ -425,7 +422,7 @@ watch(
 watch(
   () => props.isGenerating,
   (generating) => {
-    if (generating && flow?.currentStep.value === "task") {
+    if (generating && shouldShowGeneratingView()) {
       preloadGenerationLoadingVideo();
       activeView.value = "generating";
       return;
@@ -456,7 +453,7 @@ watch(currentTask, (task) => {
     syncActiveViewWithFlowState();
     return;
   }
-  if (isPendingTask(task) && flow?.currentStep.value === "task") {
+  if (isPendingTask(task)) {
     activeView.value = "generating";
     return;
   }
@@ -479,7 +476,7 @@ onMounted(() => {
 watch(
   () => flow?.currentStep.value,
   (step) => {
-    if (step === "task" && shouldShowGeneratingView()) {
+    if (shouldShowGeneratingView()) {
       activeView.value = "generating";
       return;
     }
