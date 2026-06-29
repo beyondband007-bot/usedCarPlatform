@@ -64,6 +64,9 @@ import type {
   WorkspaceRecentItem,
 } from "@/types/workspace";
 
+const GENERATION_LOADING_VIDEO_URL = "/videos/generation-loading.mp4";
+let hasRequestedGenerationLoadingVideoPreload = false;
+
 const props = defineProps<{
   capability: WorkspaceCapability;
   selectedOptionId: string;
@@ -86,6 +89,17 @@ const emit = defineEmits<{
   pickTemplate: [payload: { capabilityCode: string; optionId: string }];
   pickRecent: [item: WorkspaceRecentItem];
 }>();
+
+function preloadGenerationLoadingVideo() {
+  if (hasRequestedGenerationLoadingVideoPreload || typeof document === "undefined") return;
+
+  hasRequestedGenerationLoadingVideoPreload = true;
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "video";
+  link.href = GENERATION_LOADING_VIDEO_URL;
+  document.head.appendChild(link);
+}
 
 function canOpenRecent(item: WorkspaceRecentItem) {
   return (
@@ -931,6 +945,7 @@ watch(
   () => props.isGenerating,
   (generating, wasGenerating) => {
     if (generating) {
+      preloadGenerationLoadingVideo();
       focusGeneratingView();
       if (!isBatchCapability.value) {
         void loadRecentItems({ force: true });
@@ -1073,6 +1088,10 @@ watch(
 );
 
 onMounted(() => {
+  if (props.isGenerating) {
+    preloadGenerationLoadingVideo();
+  }
+
   if (canLoadRecentTasks()) {
     void loadRecentItems();
   }
@@ -1239,7 +1258,7 @@ defineExpose({
             >正在生成中…</span>
             <video
               class="generation-waiting-video"
-              src="/videos/generation-loading.mp4"
+              :src="GENERATION_LOADING_VIDEO_URL"
               autoplay
               muted
               playsinline
@@ -1575,7 +1594,7 @@ defineExpose({
             >正在生成中…</span>
             <video
               class="generation-waiting-video"
-              src="/videos/generation-loading.mp4"
+              :src="GENERATION_LOADING_VIDEO_URL"
               autoplay
               muted
               playsinline
@@ -2032,7 +2051,7 @@ defineExpose({
   z-index: 2;
   transform: translateX(-50%);
   padding: 7px 18px;
-  border: 1px solid color-mix(in srgb, var(--workspace-accent, #efc24c) 28%, transparent);
+  border: 1px solid rgba(239, 194, 76, 0.28);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
@@ -2066,12 +2085,6 @@ defineExpose({
   100% {
     background-position: -200% 0;
   }
-}
-
-.assist-panel.theme-light .generation-waiting-label {
-  border-color: color-mix(in srgb, var(--workspace-accent, #d4a63c) 40%, transparent);
-  background: rgba(255, 255, 255, 0.82);
-  filter: drop-shadow(0 0 8px rgba(212, 166, 60, 0.22));
 }
 
 .sr-only {
