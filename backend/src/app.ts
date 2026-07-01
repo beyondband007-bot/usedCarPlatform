@@ -13,6 +13,7 @@ import { moduleRoutes } from "./modules/moduleRoutes";
 import { platformRoutes } from "./modules/platform/platformRoutes";
 import { tasksRoutes } from "./modules/tasks/tasksRoutes";
 import { userLogoRoutes } from "./modules/user-logo/userLogoRoutes";
+import { vehicleInfoRoutes } from "./modules/vehicle-info/vehicleInfoRoutes";
 import { errorHandler, notFoundHandler, requestIdMiddleware } from "./shared/response";
 
 export const createApp = () => {
@@ -85,6 +86,7 @@ export const createApp = () => {
   app.use("/api/v1/tasks", requireCurrentUser, tasksRoutes);
   app.use("/api/v1/modules", requireCurrentUser, moduleRoutes);
   app.use("/api/v1/user", requireCurrentUser, userLogoRoutes);
+  app.use("/api/v1/vehicle-info", requireCurrentUser, vehicleInfoRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

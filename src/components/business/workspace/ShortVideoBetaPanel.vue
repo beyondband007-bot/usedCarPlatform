@@ -85,7 +85,6 @@ const digitalHumanList = computed(() => flow?.digitalHumanList.value ?? []);
 
 const isHumanSelectionLocked = computed(() => {
   if (!flow) return true;
-  if (props.isGenerating) return true;
   return ["review", "task", "result"].includes(flow.currentStep.value);
 });
 
@@ -355,7 +354,11 @@ function resetToDefaultView() {
 }
 
 function syncActiveViewWithFlowState() {
-  if (isGenerationMode.value && shouldShowGeneratingView()) {
+  if (
+    activeView.value !== "templates" &&
+    isGenerationMode.value &&
+    shouldShowGeneratingView()
+  ) {
     activeView.value = "generating";
     return;
   }
@@ -422,7 +425,11 @@ watch(
 watch(
   () => props.isGenerating,
   (generating) => {
-    if (generating && shouldShowGeneratingView()) {
+    if (
+      generating &&
+      activeView.value !== "templates" &&
+      shouldShowGeneratingView()
+    ) {
       preloadGenerationLoadingVideo();
       activeView.value = "generating";
       return;
@@ -434,6 +441,12 @@ watch(
   },
   { immediate: true },
 );
+
+watch(isSubmittingVideoTask, (submitting) => {
+  if (!submitting) return;
+  preloadGenerationLoadingVideo();
+  activeView.value = "generating";
+});
 
 watch(
   () =>
@@ -454,7 +467,9 @@ watch(currentTask, (task) => {
     return;
   }
   if (isPendingTask(task)) {
-    activeView.value = "generating";
+    if (activeView.value !== "templates") {
+      activeView.value = "generating";
+    }
     return;
   }
   if (task.status === "success" || task.status === "fail" || task.status === "canceled") {
@@ -494,7 +509,7 @@ watch(
     aria-label="短视频模板库"
   >
     <div
-      v-if="isGenerationMode"
+      v-if="isGenerationMode && activeView !== 'templates'"
       class="sv-generation-shell"
       aria-label="视频生成状态"
     >
@@ -519,6 +534,15 @@ watch(
             @click="openRecentView"
           >
             最近生成
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="sv-generation-tab"
+            :aria-selected="false"
+            @click="openTemplatesView"
+          >
+            模板库
           </button>
         </div>
       </header>

@@ -1,0 +1,143 @@
+import { Router } from "express";
+import multer from "multer";
+import { ocr } from "tencentcloud-sdk-nodejs";
+
+import { env } from "../../config/env";
+import { asyncHandler } from "../../shared/asyncHandler";
+import { AppError } from "../../shared/errors";
+import { ok } from "../../shared/response";
+
+type ShowApiVinResponse = {
+  showapi_res_code?: number;
+  showapi_res_error?: string;
+  showapi_res_body?: {
+    ret_code?: number;
+    remark?: string;
+    data?: Array<Record<string, unknown>>;
+  };
+};
+
+export const vehicleInfoRoutes = Router();
+const vinImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 7 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    callback(null, ["image/jpeg", "image/png"].includes(file.mimetype));
+  },
+});
+
+vehicleInfoRoutes.post(
+  "/vin-ocr",
+  vinImageUpload.single("image"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      throw new AppError(400, 40001, "请上传 JPG、JPEG 或 PNG 图片");
+    }
+    if (!env.verification.tencentSecretId || !env.verification.tencentSecretKey) {
+      throw new AppError(503, 50302, "腾讯云 VIN OCR 服务尚未配置");
+    }
+
+    const OcrClient = ocr.v20181119.Client;
+    const client = new OcrClient({
+      credential: {
+        secretId: env.verification.tencentSecretId,
+        secretKey: env.verification.tencentSecretKey,
+      },
+      region: env.verification.tencentRegion,
+      profile: {
+        httpProfile: {
+          endpoint: "ocr.tencentcloudapi.com",
+          reqTimeout: 15,
+        },
+      },
+    });
+
+    try {
+      const result = await client.VinOCR({
+        ImageBase64: req.file.buffer.toString("base64"),
+      });
+      const vin = result.Vin?.trim().toUpperCase() ?? "";
+      if (!vin) {
+        throw new AppError(422, 42201, "图片中未识别到 VIN 车架号");
+      }
+      ok(res, { vin });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      const errorCode =
+        typeof error === "object" && error && "code" in error
+          ? String(error.code)
+          : "";
+      if (errorCode === "AuthFailure.UnauthorizedOperation") {
+        throw new AppError(403, 40320, "腾讯云密钥暂无 VIN OCR 调用权限");
+      }
+      if (errorCode === "FailedOperation.UnOpenError") {
+        throw new AppError(503, 50303, "腾讯云文字识别服务尚未开通");
+      }
+      throw new AppError(
+        502,
+        50222,
+        error instanceof Error ? error.message : "VIN 图片识别失败，请更换清晰图片后重试",
+      );
+    }
+  }),
+);
+
+vehicleInfoRoutes.post(
+  "/vin-query",
+  asyncHandler(async (req, res) => {
+    const vin = typeof req.body?.vin === "string" ? req.body.vin.trim().toUpperCase() : "";
+    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+      throw new AppError(400, 40001, "请输入正确的 17 位 VIN 车架号");
+    }
+    if (!env.showApiVin.appKey) {
+      throw new AppError(503, 50301, "VIN 查询服务尚未配置");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), env.showApiVin.timeoutMs);
+
+    try {
+      const url = new URL(env.showApiVin.baseUrl);
+      url.searchParams.set("appKey", env.showApiVin.appKey);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ vin }),
+        signal: controller.signal,
+      });
+      const payload = (await response.json()) as ShowApiVinResponse;
+      const responseBody = payload.showapi_res_body;
+      const result = responseBody?.data?.[0];
+      if (
+        !response.ok ||
+        payload.showapi_res_code !== 0 ||
+        responseBody?.ret_code !== 0 ||
+        !result
+      ) {
+        throw new AppError(
+          502,
+          50220,
+          responseBody?.remark ||
+            payload.showapi_res_error ||
+            "VIN 查询失败，请检查车架号后重试",
+        );
+      }
+
+      ok(res, { vin, ...result });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        502,
+        50221,
+        error instanceof Error && error.name === "AbortError"
+          ? "VIN 查询超时，请稍后重试"
+          : "VIN 查询服务暂时不可用",
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }),
+);

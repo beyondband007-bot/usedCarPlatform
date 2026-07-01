@@ -41,6 +41,11 @@ export const env = {
   sceneRefsDir: path.resolve(rootDir, process.env.SCENE_REFS_DIR ?? "storage/scene-refs"),
   maxUploadMb: toNumber(process.env.MAX_UPLOAD_MB, 20),
   ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
+  showApiVin: {
+    baseUrl: process.env.SHOWAPI_VIN_API_URL ?? "https://route.showapi.com/1142-2",
+    appKey: process.env.SHOWAPI_VIN_APP_KEY ?? "",
+    timeoutMs: toNumber(process.env.SHOWAPI_VIN_TIMEOUT_MS, 12_000),
+  },
 
   mysql: {
     host: process.env.MYSQL_HOST ?? "127.0.0.1",

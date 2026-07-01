@@ -34,6 +34,8 @@ import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { useVideoGenerationFlow } from "@/composables/useVideoGenerationFlow";
 import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityGeneratePanel.vue";
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
+import LanguageConversionStudio from "@/components/business/workspace/LanguageConversionStudio.vue";
+import LongVideoStudioPlaceholder from "@/components/business/workspace/LongVideoStudioPlaceholder.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
 import { DEFAULT_GENERATION_OUTPUT_RATIO } from "@/constants/output-ratio";
@@ -949,23 +951,6 @@ async function canStartGeneration() {
 }
 
 async function canStartVideoGeneration() {
-  await refreshRunningTaskSummary();
-
-  const currentVideoTask = videoFlow.currentTask.value;
-  const hasCurrentVideoTask =
-    currentVideoTask &&
-    ["waiting", "queued", "queue", "generating"].includes(
-      currentVideoTask.status,
-    );
-  const hasTrackedVideoTask = Object.values(trackedRunningTasks.value).some(
-    (moduleCode) => isShortVideoModuleCode(moduleCode),
-  );
-
-  if (hasCurrentVideoTask || hasTrackedVideoTask) {
-    message.warning("当前已有视频正在生成，请等待完成后再提交");
-    return false;
-  }
-
   return canStartGeneration();
 }
 
@@ -2338,6 +2323,8 @@ onUnmounted(() => {
           activeCode === 'interior-stitch',
         'workspace-page--creative-image': activeCode === 'creative-image',
         'workspace-page--short-video': activeCode === SHORT_VIDEO_CAPABILITY_CODE,
+        'workspace-page--long-video': activeCode === 'long-video',
+        'workspace-page--language-conversion': activeCode === 'language-conversion',
       },
     ]"
   >
@@ -2382,6 +2369,10 @@ onUnmounted(() => {
             @upload-reference="handleUploadCreativeReference"
             @remove-reference="handleRemoveCreativeReference"
           />
+          <LongVideoStudioPlaceholder v-else-if="activeCode === 'long-video'" />
+          <LanguageConversionStudio
+            v-else-if="activeCode === 'language-conversion'"
+          />
           <CapabilityGeneratePanel
             v-else
             ref="generatePanelRef"
@@ -2404,7 +2395,11 @@ onUnmounted(() => {
       </section>
 
       <div
-        v-if="activeCode !== 'creative-image'"
+        v-if="
+          activeCode !== 'creative-image' &&
+          activeCode !== 'long-video' &&
+          activeCode !== 'language-conversion'
+        "
         class="workspace-col workspace-col--assist"
       >
         <WorkspaceAssistPanel
@@ -2533,18 +2528,18 @@ onUnmounted(() => {
 
   @media (width >= 1024px) and (width < 1180px) {
     gap: 12px;
-    grid-template-columns: 220px 420px minmax(0, 1fr);
+    grid-template-columns: 208px 420px minmax(0, 1fr);
     padding: 12px;
   }
 
   @media (width >= 1180px) {
     gap: 14px;
-    grid-template-columns: 240px 440px minmax(420px, 1fr);
+    grid-template-columns: 228px 440px minmax(420px, 1fr);
     padding: 16px;
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px 500px minmax(520px, 1fr);
+    grid-template-columns: 248px 500px minmax(520px, 1fr);
     padding: 18px;
   }
 }
@@ -2651,29 +2646,29 @@ onUnmounted(() => {
 
 .workspace-page--feature-compare .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 220px 400px minmax(0, 1fr);
+    grid-template-columns: 208px 400px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 240px 420px minmax(420px, 1fr);
+    grid-template-columns: 228px 420px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px 440px minmax(520px, 1fr);
+    grid-template-columns: 248px 440px minmax(520px, 1fr);
   }
 }
 
 .workspace-page--short-video .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 220px 430px minmax(0, 1fr);
+    grid-template-columns: 208px 430px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 240px 460px minmax(420px, 1fr);
+    grid-template-columns: 228px 460px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px 480px minmax(680px, 1fr);
+    grid-template-columns: 248px 480px minmax(680px, 1fr);
   }
 }
 
@@ -2687,17 +2682,19 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-.workspace-page--creative-image .workspace-shell {
+.workspace-page--creative-image .workspace-shell,
+.workspace-page--long-video .workspace-shell,
+.workspace-page--language-conversion .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 208px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: 228px minmax(0, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-columns: 248px minmax(0, 1fr);
   }
 }
 

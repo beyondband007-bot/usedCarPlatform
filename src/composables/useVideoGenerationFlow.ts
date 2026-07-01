@@ -269,15 +269,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
   }
 
   function resetInputStateForNextTask() {
-    const activeTemplate = selectedTemplate.value
     resetInputState()
-    selectedTemplate.value = activeTemplate
-    if (activeTemplate) {
-      applyTemplateDefaultDigitalHuman(activeTemplate)
-      currentStep.value = 'form'
-    } else {
-      currentStep.value = 'template'
-    }
+    currentStep.value = 'template'
   }
 
   function invalidateDraftForInputChange() {
@@ -1117,15 +1110,18 @@ export function useVideoGenerationFlow(ownerKey: string) {
       return null
     }
 
-    const previousStep = currentStep.value
-    currentStep.value = 'task'
+    const scriptDraftId = scriptDraft.value.scriptDraftId
+    const audioPreviewId = confirmedAudioPreview.value.audioPreviewId
+    const activeTemplate = selectedTemplate.value
+
     setLoading('task', true)
     errorMessage.value = ''
+    resetInputStateForNextTask()
+
     try {
-      const activeTemplate = selectedTemplate.value
       const created = await createVideoGenerationTask({
-        scriptDraftId: scriptDraft.value.scriptDraftId,
-        audioPreviewId: confirmedAudioPreview.value.audioPreviewId,
+        scriptDraftId,
+        audioPreviewId,
       })
       void creditsStore.hydrateAccounts(true)
       const pendingTask: VideoGenerationTask = {
@@ -1141,8 +1137,6 @@ export function useVideoGenerationFlow(ownerKey: string) {
       } catch {
         // Local persistence and polling still own recovery if registration fails.
       }
-      resetInputStateForNextTask()
-
       try {
         const task = await getVideoGenerationTask(pendingTask.taskId)
         if (currentTask.value?.taskId === pendingTask.taskId) {
@@ -1159,7 +1153,6 @@ export function useVideoGenerationFlow(ownerKey: string) {
         return pendingTask
       }
     } catch (error) {
-      currentStep.value = previousStep === 'task' ? 'review' : previousStep
       errorMessage.value = resolveVideoGenerationErrorMessage(error)
       return null
     } finally {

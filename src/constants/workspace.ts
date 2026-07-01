@@ -574,6 +574,40 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     actionLabel: '生成视频',
     cost: 2000,
   }),
+  createCapability({
+    code: 'long-video',
+    apiCode: 'long-video-generation',
+    kind: 'future',
+    groupTitle: '营销工具',
+    icon: 'mdi:filmstrip-box-multiple',
+    label: '长视频生成',
+    tag: '',
+    tagType: 'info',
+    title: '长视频生成',
+    description: '面向长时内容创作的视频生成工作台。',
+    uploadTitle: '视频素材',
+    uploadHint: '长视频生成能力框架',
+    middleBlocks: onlyActions,
+    options: [],
+    actionLabel: '生成长视频',
+  }),
+  createCapability({
+    code: 'language-conversion',
+    apiCode: 'video-language-conversion',
+    kind: 'future',
+    groupTitle: '营销工具',
+    icon: 'mdi:translate',
+    label: '语言转换',
+    tag: '',
+    tagType: 'info',
+    title: '视频语言转换',
+    description: '上传视频并将原始语音转换为目标语言。',
+    uploadTitle: '原始视频',
+    uploadHint: 'MP4 / MOV / WebM',
+    middleBlocks: onlyActions,
+    options: [],
+    actionLabel: '开始转换',
+  }),
 ]
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
@@ -731,6 +765,11 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
   },
   {
     title: '营销工具',
-    items: pickMenuItems(['short-video', 'watermark-remove', 'creative-image']),
+    items: pickMenuItems([
+      'short-video',
+      'language-conversion',
+      'watermark-remove',
+      'creative-image',
+    ]),
   },
 ]
