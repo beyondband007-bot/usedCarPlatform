@@ -24,8 +24,6 @@ const sourceFile = ref<File | null>(null)
 const sourceVideoUrl = ref('')
 const sourceLanguage = ref('auto')
 const targetLanguage = ref('en-US')
-const preserveSpeakerVoice = ref(true)
-const preserveBackgroundAudio = ref(true)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
@@ -100,8 +98,8 @@ function handleSubmit() {
     sourceFileName: sourceFile.value.name,
     sourceLanguage: sourceLanguage.value,
     targetLanguage: targetLanguage.value,
-    preserveSpeakerVoice: preserveSpeakerVoice.value,
-    preserveBackgroundAudio: preserveBackgroundAudio.value,
+    preserveSpeakerVoice: true,
+    preserveBackgroundAudio: true,
   })
   message.info('前端字段已准备完成，等待后端转换接口接入')
 }
@@ -291,17 +289,6 @@ onUnmounted(() => {
                 {{ item.label }}
               </option>
             </select>
-          </label>
-        </div>
-
-        <div class="language-options">
-          <label>
-            <input v-model="preserveSpeakerVoice" type="checkbox" />
-            <span><strong>保留原说话人音色</strong><small>尽量还原声线与说话风格</small></span>
-          </label>
-          <label>
-            <input v-model="preserveBackgroundAudio" type="checkbox" />
-            <span><strong>保留背景音乐和环境音</strong><small>仅替换视频中的人声语言</small></span>
           </label>
         </div>
 
@@ -636,37 +623,6 @@ onUnmounted(() => {
   opacity: 0.45;
 }
 
-.language-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.language-options > label {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 12px;
-  border: 1px solid var(--lc-border);
-  border-radius: 11px;
-  cursor: pointer;
-}
-
-.language-options span {
-  display: grid;
-  gap: 4px;
-}
-
-.language-options strong {
-  font-size: 12px;
-}
-
-.language-options small {
-  color: var(--lc-muted);
-  font-size: 11px;
-}
-
 .start-conversion {
   display: flex;
   width: 100%;
@@ -856,7 +812,6 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
-  .language-options,
   .compare-stage {
     grid-template-columns: 1fr;
   }
