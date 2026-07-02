@@ -10,8 +10,6 @@ import {
 import { RouterView, useRoute } from "vue-router";
 
 import { syncDocumentTheme } from "@/composables/useDocumentTheme";
-import BackOfficeLayout from "@/layouts/BackOfficeLayout.vue";
-import BackOfficeLoginPage from "@/pages/back-office-login/index.vue";
 import { useAppStore } from "@/stores/app";
 
 const appStore = useAppStore();
@@ -101,15 +99,7 @@ const themeOverrides = computed<GlobalThemeOverrides>(() =>
     <NMessageProvider>
       <NDialogProvider>
         <div class="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
-          <BackOfficeLoginPage v-if="route.path === '/back-office/login'" />
-          <BackOfficeLayout
-            v-else-if="
-              route.path.startsWith('/back-office') ||
-              route.path.startsWith('/reusable-credits-console') ||
-              route.path.startsWith('/credits-admin')
-            "
-          />
-          <RouterView v-else v-slot="{ Component }">
+          <RouterView v-slot="{ Component }">
             <component :is="Component" v-if="Component" />
             <div v-else class="route-boot-shell" aria-hidden="true" />
           </RouterView>

@@ -220,6 +220,7 @@ const trackedRunningTasks = ref<Record<string, string>>({});
 let batchPollTimer: number | null = null;
 let globalGenerationPollTimer: number | null = null;
 let isRefreshingRunningTasks = false;
+let isBatchPollInFlight = false;
 /** 正在由 resolve* 主动轮询的任务，全局轮询跳过以免重复打 KIE */
 const activelyResolvingTaskIds = new Set<string>();
 /** 已弹出过完成提示的任务，避免 resolve 与全局轮询重复 toast */
@@ -694,21 +695,31 @@ function shouldPollBatchJobs() {
   );
 }
 
+async function pollBatchJobs() {
+  if (isBatchPollInFlight) return;
+  if (!shouldPollBatchJobs()) {
+    stopBatchPolling();
+    return;
+  }
+
+  isBatchPollInFlight = true;
+  try {
+    const batchIds = batchActiveJobs.value
+      .filter((job) => !isTerminalBatchStatus(job.status))
+      .map((job) => job.batchId);
+    await Promise.allSettled(batchIds.map((batchId) => refreshBatchJob(batchId)));
+  } finally {
+    isBatchPollInFlight = false;
+    if (!shouldPollBatchJobs()) stopBatchPolling();
+  }
+}
+
 function startBatchPolling() {
   stopBatchPolling();
   if (!shouldPollBatchJobs()) return;
 
   batchPollTimer = window.setInterval(() => {
-    if (!shouldPollBatchJobs()) {
-      stopBatchPolling();
-      return;
-    }
-
-    for (const job of batchActiveJobs.value) {
-      if (!isTerminalBatchStatus(job.status)) {
-        void refreshBatchJob(job.batchId);
-      }
-    }
+    void pollBatchJobs();
   }, BATCH_TASK_POLL_MS);
 }
 

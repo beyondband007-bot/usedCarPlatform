@@ -38,10 +38,7 @@ const siteLogoSrc = computed(() =>
 );
 
 const creditsBalanceText = computed(() => {
-  if (creditsStore.accountsLoaded) {
-    return Number(creditsStore.availableBalance ?? 0).toLocaleString("zh-CN");
-  }
-  return authStore.credits;
+  return creditsStore.balanceText;
 });
 
 watch(

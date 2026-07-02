@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 
-import CreditsAdminPage from '@/pages/credits-admin/index.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -196,13 +195,17 @@ function handleApplicationContextChange(context: {
       </header>
 
       <div class="back-office-content">
-        <CreditsAdminPage
-          :active-console-page="activeNavKey"
-          :password-reset-request-key="passwordResetRequestKey"
-          :selected-application-code="selectedApplicationCode"
-          @update:selected-application-code="selectedApplicationCode = $event"
-          @application-context-change="handleApplicationContextChange"
-        />
+        <RouterView v-slot="{ Component }">
+          <component
+            :is="Component"
+            v-if="Component"
+            :active-console-page="activeNavKey"
+            :password-reset-request-key="passwordResetRequestKey"
+            :selected-application-code="selectedApplicationCode"
+            @update:selected-application-code="selectedApplicationCode = $event"
+            @application-context-change="handleApplicationContextChange"
+          />
+        </RouterView>
       </div>
     </main>
   </div>

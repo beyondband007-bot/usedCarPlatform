@@ -19,7 +19,6 @@ import { clearAccountPersistentCache } from '@/utils/workspace-session-cache'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
 const USER_KEY = 'ai-car-studio:user-info'
-const POINTS_SUMMARY_KEY = 'ai-car-studio:points-summary'
 
 interface AuthState {
   token: string
@@ -28,20 +27,6 @@ interface AuthState {
   permissions: string[]
   remember: boolean
   initialized: boolean
-}
-
-function readPointsText() {
-  if (typeof window === 'undefined') return '100,000'
-
-  const raw = window.localStorage.getItem(POINTS_SUMMARY_KEY)
-  if (!raw) return '100,000'
-
-  try {
-    const parsed = JSON.parse(raw) as { currentPoints?: number }
-    return Number(parsed.currentPoints ?? 0).toLocaleString('zh-CN')
-  } catch {
-    return '100,000'
-  }
 }
 
 function readToken() {
@@ -70,7 +55,7 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isLoggedIn: (state) => Boolean(state.token && state.userInfo),
     userName: (state) => state.userInfo?.displayName ?? state.userInfo?.username ?? '未登录',
-    credits: () => readPointsText(),
+    credits: () => '—',
   },
   actions: {
     async hydrate() {
