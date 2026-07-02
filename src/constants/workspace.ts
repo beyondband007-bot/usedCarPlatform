@@ -767,6 +767,8 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
     title: '营销工具',
     items: pickMenuItems([
       'short-video',
+      'long-video',
+      'language-conversion',
       'watermark-remove',
       'creative-image',
     ]),
