@@ -16,6 +16,8 @@ const subscriptionStore = useSubscriptionStore()
 const rechargeStore = useRechargeStore()
 const selectedPlan = ref<SubscriptionPlanCode>('team')
 const pollingTimer = ref<ReturnType<typeof window.setInterval> | null>(null)
+const pollingAttempts = ref(0)
+const MAX_POLL_ATTEMPTS = 60 // 3秒 × 60 = 3分钟
 const showQrModal = ref(false)
 const orderReady = ref(false)
 
@@ -36,6 +38,7 @@ function stopPolling() {
     window.clearInterval(pollingTimer.value)
     pollingTimer.value = null
   }
+  pollingAttempts.value = 0
 }
 
 async function startRecharge() {
@@ -43,7 +46,19 @@ async function startRecharge() {
   orderReady.value = false
   await rechargeStore.createRechargeOrder(selectedPlan.value)
   showQrModal.value = true
+  pollingAttempts.value = 0
   pollingTimer.value = window.setInterval(async () => {
+    // 防止并发：上一次请求未完成时跳过
+    if (rechargeStore.polling) return
+
+    // 超时保护：超过最大次数后停止
+    if (pollingAttempts.value >= MAX_POLL_ATTEMPTS) {
+      stopPolling()
+      showQrModal.value = false
+      return
+    }
+    pollingAttempts.value++
+
     const result = await rechargeStore.pollActiveOrder()
     if (result?.status === 'success' || result?.status === 'failed') {
       stopPolling()

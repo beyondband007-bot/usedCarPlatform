@@ -126,11 +126,11 @@ function handleCustomInput(event: Event) {
 }
 
 function resolveProductId(amountYuan: number) {
-  const amountCents = amountYuan * 100;
+  const amountCents = Math.round(amountYuan * 100);
   return creditsStore.rechargeProducts.find((product) => {
-    if (product.priceCents === amountCents) return true;
+    if (typeof product.priceCents === "number") return product.priceCents === amountCents;
     const priceText = product.priceText?.replace(/[^\d.]/g, "");
-    return Number(priceText) === amountYuan;
+    return Math.round(Number(priceText) * 100) === amountCents;
   })?.id;
 }
 
@@ -157,9 +157,9 @@ async function pollPaymentStatus() {
       activePaymentOrder.value.status = "paid";
       stopPaymentTimers();
       showPaymentCode.value = false;
-      await creditsStore.hydrateAccounts(true);
       message.success("支付成功，积分已到账");
       emit("success");
+      void creditsStore.hydrateAccounts(true);
       return;
     }
 

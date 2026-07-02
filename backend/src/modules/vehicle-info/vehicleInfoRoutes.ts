@@ -17,6 +17,12 @@ type ShowApiVinResponse = {
   };
 };
 
+type JisuVinResponse = {
+  status?: number;
+  msg?: string;
+  result?: Record<string, unknown>;
+};
+
 export const vehicleInfoRoutes = Router();
 const vinImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -89,8 +95,71 @@ vehicleInfoRoutes.post(
     if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
       throw new AppError(400, 40001, "请输入正确的 17 位 VIN 车架号");
     }
-    if (!env.showApiVin.appKey) {
+    if (!env.jisuVin.appKey) {
       throw new AppError(503, 50301, "VIN 查询服务尚未配置");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), env.jisuVin.timeoutMs);
+
+    try {
+      const url = new URL(env.jisuVin.baseUrl);
+      url.searchParams.set("appkey", env.jisuVin.appKey);
+      url.searchParams.set("vin", vin);
+
+      const response = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      const payload = (await response.json()) as JisuVinResponse;
+      if (!response.ok || payload.status !== 0 || !payload.result) {
+        throw new AppError(
+          502,
+          50220,
+          payload.msg || "VIN 查询失败，请检查车架号后重试",
+        );
+      }
+
+      const result = payload.result;
+      ok(res, {
+        ...result,
+        vin,
+        brand_name: result.brand,
+        year: result.yeartype,
+        sale_name: result.name,
+        model_name: result.sizetype,
+        car_line: result.typename,
+        effluent_standard: result.environmentalstandards,
+        engine_type: result.enginemodel,
+        transmission_type: result.gearbox,
+        fuel_Type: result.fueltype,
+        output_volume: result.displacement,
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        502,
+        50221,
+        error instanceof Error && error.name === "AbortError"
+          ? "VIN 查询超时，请稍后重试"
+          : "VIN 查询服务暂时不可用",
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }),
+);
+
+// 万维易源兼容接口：暂不在前端展示或调用，仅为后续切换保留。
+vehicleInfoRoutes.post(
+  "/vin-query/showapi",
+  asyncHandler(async (req, res) => {
+    const vin = typeof req.body?.vin === "string" ? req.body.vin.trim().toUpperCase() : "";
+    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+      throw new AppError(400, 40001, "请输入正确的 17 位 VIN 车架号");
+    }
+    if (!env.showApiVin.appKey) {
+      throw new AppError(503, 50301, "万维易源 VIN 查询服务尚未配置");
     }
 
     const controller = new AbortController();
@@ -99,12 +168,9 @@ vehicleInfoRoutes.post(
     try {
       const url = new URL(env.showApiVin.baseUrl);
       url.searchParams.set("appKey", env.showApiVin.appKey);
-
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-        },
+        headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ vin }),
         signal: controller.signal,
       });
@@ -125,7 +191,6 @@ vehicleInfoRoutes.post(
             "VIN 查询失败，请检查车架号后重试",
         );
       }
-
       ok(res, { vin, ...result });
     } catch (error) {
       if (error instanceof AppError) throw error;

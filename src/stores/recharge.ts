@@ -5,9 +5,6 @@ import { checkPayStatus, createOrder, getPayQRCode, getRechargeRecords } from '@
 import type { PayStatus, RechargeOrder } from '@/types/recharge'
 import type { SubscriptionPlanCode } from '@/types/subscription'
 
-import { usePointsStore } from './points'
-import { useSubscriptionStore } from './subscription'
-
 export const useRechargeStore = defineStore('recharge', () => {
   const orders = ref<RechargeOrder[]>([])
   const activeOrder = ref<RechargeOrder | null>(null)
@@ -32,26 +29,16 @@ export const useRechargeStore = defineStore('recharge', () => {
     if (!activeOrder.value) return null
 
     polling.value = true
-    const result = await checkPayStatus(activeOrder.value.orderId)
-    activeOrder.value = { ...activeOrder.value, status: result.status }
-    orders.value = orders.value.map((item) =>
-      item.orderId === activeOrder.value?.orderId ? { ...item, status: result.status } : item,
-    )
-    if (result.status === 'success') {
-      const pointsStore = usePointsStore()
-      const subscriptionStore = useSubscriptionStore()
-      const order = activeOrder.value
-      if (order) {
-        await subscriptionStore.activatePlan(order.plan)
-        await pointsStore.applyRecharge({
-          amount: order.amount,
-          points: order.giftPoints,
-          title: `${order.plan} 套餐充值`,
-        })
-      }
+    try {
+      const result = await checkPayStatus(activeOrder.value.orderId)
+      activeOrder.value = { ...activeOrder.value, status: result.status }
+      orders.value = orders.value.map((item) =>
+        item.orderId === activeOrder.value?.orderId ? { ...item, status: result.status } : item,
+      )
+      return result
+    } finally {
+      polling.value = false
     }
-    polling.value = false
-    return result
   }
 
   function reset() {

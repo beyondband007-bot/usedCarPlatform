@@ -7,8 +7,9 @@ import HoverPreviewVideo from '@/components/common/HoverPreviewVideo.vue'
 import PreloadImage from '@/components/common/PreloadImage.vue'
 import {
   queryVehicleByVin,
+  normalizeVehicleInfo,
   recognizeVinFromImage,
-  type VinVehicleInfo,
+  type VehicleBasicInfo,
 } from '@/api/vehicle-info'
 import { VIDEO_GENERATION_FLOW_KEY } from '@/constants/video-generation'
 import {
@@ -33,8 +34,9 @@ const uploadedFiles = ref<Record<string, LocalUploadPreview>>({})
 const vin = ref('')
 const vinLoading = ref(false)
 const vinOcrLoading = ref(false)
-const vehicleInfo = ref<VinVehicleInfo | null>(null)
-const showMoreVehicleInfo = ref(false)
+const vehicleInfo = ref<VehicleBasicInfo | null>(null)
+const vehicleInfoDraft = ref<VehicleBasicInfo | null>(null)
+const isEditingVehicleInfo = ref(false)
 const templateSearch = ref('')
 const activeWorkflowStep = computed(() => {
   if (currentView.value === 'vehicle-template') return 2
@@ -148,100 +150,75 @@ const currentUploadSlots = computed(() =>
   isVenueFlow.value ? venueUploadSlots : uploadSlots,
 )
 
-const coreVehicleFields = [
-  ['brand_name', '品牌'],
-  ['year', '年款'],
-  ['sale_name', '车款名称'],
-  ['model_name', '车型'],
-  ['car_line', '车系'],
-  ['effluent_standard', '排放标准'],
-  ['engine_type', '发动机型号'],
-  ['transmission_type', '变速箱类型'],
-  ['fuel_Type', '燃油类型'],
-  ['output_volume', '排量'],
-] as const
+type EditableVehicleField =
+  | 'brandName'
+  | 'year'
+  | 'fullModelName'
+  | 'vehicleLevel'
+  | 'seriesName'
+  | 'emissionStandard'
+  | 'engineModel'
+  | 'gearbox'
+  | 'fuelType'
+  | 'displacement'
 
-const vehicleFieldLabels: Record<string, string> = {
-  vin: '车架号',
-  assembly_factory: '制造厂',
-  sale_name: '车款名称',
-  engine_type: '发动机型号',
-  effluent_standard: '排放标准',
-  model_name: '车型',
-  brand_name: '品牌',
-  car_type: '车辆类型',
-  power: '功率',
-  year: '年款',
-  made_month: '生产月份',
-  jet_type: '喷油类型',
-  transmission_type: '变速箱类型',
-  fuel_Type: '燃油类型',
-  cylinder_number: '发动机气缸数',
-  drive_style: '驱动类型',
-  car_line: '车系',
-  fuel_num: '燃油标号',
-  guiding_price: '新车指导价',
-  made_year: '生产年',
-  output_volume: '排量',
-  stop_year: '停产年',
-  air_bag: '安全气囊',
-  cylinder_form: '气缸形式',
-  seat_num: '座位数',
-  vehicle_level: '车辆级别',
-  car_body: '轿车结构',
-  door_num: '车门数',
-  manufacturer: '制造商',
-  gears_num: '档位数',
-  car_weight: '整备质量',
-}
+const coreVehicleFields: ReadonlyArray<readonly [EditableVehicleField, string]> = [
+  ['brandName', '品牌'],
+  ['year', '年款'],
+  ['fullModelName', '车款名称'],
+  ['vehicleLevel', '车辆级别'],
+  ['seriesName', '车系'],
+  ['emissionStandard', '排放标准'],
+  ['engineModel', '发动机型号'],
+  ['gearbox', '变速箱'],
+  ['fuelType', '燃油类型'],
+  ['displacement', '排量'],
+] as const
 
 const displayedCoreFields = computed(() =>
   coreVehicleFields.map(([key, label]) => ({
     key,
     label,
-    value: formatVehicleValue(vehicleInfo.value?.[key], key),
+    editValue: vehicleInfoDraft.value?.[key] ?? '',
+    value: key === 'year'
+      ? formatYear(vehicleInfo.value?.year)
+      : displayValue(vehicleInfo.value?.[key]),
   })),
 )
 
-const remainingVehicleFields = computed(() => {
-  if (!vehicleInfo.value) return []
-  const coreKeys = new Set<string>(coreVehicleFields.map(([key]) => key))
-  return Object.entries(vehicleInfo.value)
-    .filter(
-      ([key]) =>
-        !coreKeys.has(key) &&
-        !['showapi_fee_code'].includes(key),
-    )
-    .map(([key, value]) => ({
-      key,
-      label: vehicleFieldLabels[key] ?? key,
-      value: formatVehicleValue(value, key),
-    }))
-    .filter((item) => item.value !== '—')
-})
-
-function formatVehicleValue(value: unknown, key?: string): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'string' && /^-+$/.test(value.trim())) return '—'
-  if (key === 'car_weight') return `${value} kg`
-  if (key === 'power') return `${value} kW`
-  if (key === 'guiding_price') return `${value} 万元`
-  if (key === 'output_volume') return `${value} L`
-  if (key === 'made_month') return `${value} 月`
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => formatVehicleValue(item))
-      .filter((item) => item !== '—')
-      .join('；') || '—'
-  }
-  if (typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([childKey, childValue]) =>
-        `${vehicleFieldLabels[childKey] ?? childKey}：${formatVehicleValue(childValue, childKey)}`,
-      )
-      .join('；')
-  }
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === '' || value === '-') return '-'
   return String(value)
+}
+
+function formatYear(value?: string): string {
+  const year = displayValue(value)
+  if (year === '-') return year
+  return year.endsWith('款') ? year : `${year}款`
+}
+
+function startEditingVehicleInfo() {
+  if (!vehicleInfo.value) return
+  vehicleInfoDraft.value = { ...vehicleInfo.value }
+  isEditingVehicleInfo.value = true
+}
+
+function cancelEditingVehicleInfo() {
+  vehicleInfoDraft.value = null
+  isEditingVehicleInfo.value = false
+}
+
+function updateVehicleInfoDraft(key: EditableVehicleField, event: Event) {
+  if (!vehicleInfoDraft.value) return
+  vehicleInfoDraft.value[key] = (event.target as HTMLInputElement).value
+}
+
+function saveVehicleInfo() {
+  if (!vehicleInfoDraft.value) return
+  vehicleInfo.value = { ...vehicleInfoDraft.value }
+  vehicleInfoDraft.value = null
+  isEditingVehicleInfo.value = false
+  message.success('车辆信息已更新')
 }
 
 function openProjectType(index: number) {
@@ -300,13 +277,6 @@ function handleNextStep() {
     }
     return
   }
-  const missingSlots = currentUploadSlots.value.filter(
-    (slot) => !uploadedFiles.value[slot.label],
-  )
-  if (missingSlots.length) {
-    message.error(`请先上传完整素材：${missingSlots.map((slot) => slot.label).join('、')}`)
-    return
-  }
   if (currentView.value === 'vehicle-upload') {
     currentView.value = 'vehicle-info'
   }
@@ -335,9 +305,10 @@ async function handleVinQuery() {
 
   vinLoading.value = true
   vehicleInfo.value = null
-  showMoreVehicleInfo.value = false
+  cancelEditingVehicleInfo()
   try {
-    vehicleInfo.value = await queryVehicleByVin(normalizedVin)
+    const result = await queryVehicleByVin(normalizedVin)
+    vehicleInfo.value = normalizeVehicleInfo(result)
     vin.value = normalizedVin
   } catch (error) {
     message.error(error instanceof Error ? error.message : 'VIN 查询失败，请稍后重试')
@@ -585,7 +556,7 @@ async function handleVinImageChange(event: Event) {
             </span>
           </template>
           <template v-else>
-            <strong>{{ slot.label }}<em>*</em></strong>
+            <strong>{{ slot.label }}</strong>
             <span>点击上传</span>
             <small>{{ slot.accept }}</small>
           </template>
@@ -637,10 +608,24 @@ async function handleVinImageChange(event: Event) {
         <header>
           <div>
             <h2>车辆基础信息</h2>
-            <p>信息来源：万维易源 VIN 车辆信息</p>
+            <p>信息来源于第三方，仅供参考；如信息不准确，请手动编辑。</p>
           </div>
           <div class="vehicle-vin-state">
-            <span class="vehicle-vin">{{ vehicleInfo.vin }}</span>
+            <span class="vehicle-vin">{{ vin }}</span>
+            <div class="vehicle-info-actions">
+              <template v-if="isEditingVehicleInfo">
+                <button type="button" class="vehicle-edit-button is-cancel" @click="cancelEditingVehicleInfo">
+                  取消
+                </button>
+                <button type="button" class="vehicle-edit-button is-save" @click="saveVehicleInfo">
+                  保存
+                </button>
+              </template>
+              <button v-else type="button" class="vehicle-edit-button" @click="startEditingVehicleInfo">
+                <Icon icon="mdi:pencil-outline" aria-hidden="true" />
+                编辑信息
+              </button>
+            </div>
           </div>
         </header>
 
@@ -650,30 +635,18 @@ async function handleVinImageChange(event: Event) {
             :key="item.key"
           >
             <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
+            <dd v-if="isEditingVehicleInfo">
+              <input
+                class="vehicle-info-input"
+                type="text"
+                :value="item.editValue"
+                :aria-label="item.label"
+                @input="updateVehicleInfoDraft(item.key, $event)"
+              />
+            </dd>
+            <dd v-else>{{ item.value }}</dd>
           </div>
         </dl>
-
-        <button
-          v-if="remainingVehicleFields.length"
-          type="button"
-          class="more-info-button"
-          @click="showMoreVehicleInfo = !showMoreVehicleInfo"
-        >
-          {{ showMoreVehicleInfo ? '收起更多信息' : '查看更多信息' }}
-          <Icon :icon="showMoreVehicleInfo ? 'mdi:chevron-up' : 'mdi:chevron-down'" />
-        </button>
-
-        <dl v-if="showMoreVehicleInfo" class="vehicle-info-grid is-more">
-          <div
-            v-for="item in remainingVehicleFields"
-            :key="item.key"
-          >
-            <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
-          </div>
-        </dl>
-
       </section>
     </template>
 
@@ -1610,6 +1583,38 @@ h1 {
   gap: 7px;
 }
 
+.vehicle-info-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vehicle-edit-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--lv-primary) 45%, var(--lv-border));
+  border-radius: 8px;
+  background: var(--lv-panel);
+  color: var(--lv-primary);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.vehicle-edit-button.is-save {
+  border-color: var(--lv-primary);
+  background: var(--lv-primary);
+  color: #fff;
+}
+
+.vehicle-edit-button.is-cancel {
+  border-color: var(--lv-border);
+  color: var(--lv-muted);
+}
+
 .vehicle-info-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1641,30 +1646,22 @@ h1 {
   word-break: break-word;
 }
 
-.more-info-button {
-  display: flex;
-  margin: 20px auto 0;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  color: var(--lv-primary);
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 700;
+.vehicle-info-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--lv-border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--lv-panel);
+  color: var(--lv-text);
+  font: inherit;
+  font-weight: 600;
 }
 
-.vehicle-info-grid.is-more {
-  margin-top: 16px;
-  border-top: 1px solid var(--lv-border);
-}
-
-.vehicle-info-grid.is-more dd {
-  overflow: visible;
-  line-height: 1.65;
-  text-overflow: clip;
-  white-space: normal;
-  word-break: break-all;
+.vehicle-info-input:focus {
+  border-color: var(--lv-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
 }
 
 .template-heading {

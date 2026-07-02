@@ -46,6 +46,11 @@ export const env = {
     appKey: process.env.SHOWAPI_VIN_APP_KEY ?? "",
     timeoutMs: toNumber(process.env.SHOWAPI_VIN_TIMEOUT_MS, 12_000),
   },
+  jisuVin: {
+    baseUrl: process.env.JISU_VIN_API_URL ?? "https://api.jisuapi.com/vin/query",
+    appKey: process.env.JISU_VIN_APP_KEY ?? "",
+    timeoutMs: toNumber(process.env.JISU_VIN_TIMEOUT_MS, 12_000),
+  },
 
   mysql: {
     host: process.env.MYSQL_HOST ?? "127.0.0.1",
