@@ -3,6 +3,7 @@ import { ref } from 'vue'
 const WECHAT_UA = /MicroMessenger/i
 const IOS_UA = /iPhone|iPad|iPod/i
 const H5_MEDIA_QUERY = '(max-width: 767px)'
+const LEGACY_CREDITS_IDENTITY_KEY = 'ai-car-studio:credits-identity'
 
 export const isH5ViewportRef = ref(
   typeof window !== 'undefined' ? window.matchMedia(H5_MEDIA_QUERY).matches : false,
@@ -64,6 +65,14 @@ function bindWeChatVideoAutoplay() {
 }
 
 export function initBrowserEnv() {
+  // Older builds cached a client-controlled billing identity. It is no longer
+  // used and should be removed as soon as the updated application starts.
+  try {
+    window.localStorage.removeItem(LEGACY_CREDITS_IDENTITY_KEY)
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+
   const root = document.documentElement
   const wechat = isWeChatBrowser()
   const ios = isIOSDevice()

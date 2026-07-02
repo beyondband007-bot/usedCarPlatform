@@ -22,6 +22,7 @@ const ACCOUNT_STORAGE_KEYS = [
   'ai-car-studio:user-info',
   'ai-car-studio:subscription-state',
   'ai-car-studio:points-summary',
+  // Legacy key retained only so logout also cleans data written by older builds.
   'ai-car-studio:credits-identity',
 ]
 

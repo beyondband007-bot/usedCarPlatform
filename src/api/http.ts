@@ -1,7 +1,6 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from 'axios'
 
 import { clearWorkspaceLogoCache } from '@/composables/useWorkspaceLogo'
-import { resetCreditsIdentity, toCreditsHeaders } from '@/utils/credits-identity'
 import { clearAccountPersistentCache } from '@/utils/workspace-session-cache'
 
 const TOKEN_KEY = 'ai-car-studio:auth-token'
@@ -134,11 +133,6 @@ http.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    const creditsHeaders = toCreditsHeaders()
-    for (const [key, value] of Object.entries(creditsHeaders)) {
-      config.headers[key] = value
-    }
-
     return config
   },
   (error) => Promise.reject(error),
@@ -161,7 +155,6 @@ http.interceptors.response.use(
         case 401:
           clearAccountPersistentCache()
           clearWorkspaceLogoCache()
-          resetCreditsIdentity()
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'
           }

@@ -16,7 +16,6 @@ import { flagshipSubAccountFallback } from '@/constants/flagship-sub-accounts'
 import { useAuthStore } from '@/stores/auth'
 import { useCreditsStore } from '@/stores/credits'
 import { useSubscriptionStore } from '@/stores/subscription'
-import { getCreditsIdentity } from '@/utils/credits-identity'
 import {
   canUseFlagshipSubAccountSwitch,
   type PointsAccountScopeMode,
@@ -242,7 +241,13 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
     loadError.value = null
 
     try {
-      const identity = getCreditsIdentity()
+      const currentUser = authStore.userInfo
+      const currentCreditsUserId = currentUser?.creditsUserId
+      const accountScope = currentUser?.accountScope
+      const tenantId =
+        accountScope === 'tenant'
+          ? currentUser?.creditsTenantId ?? undefined
+          : undefined
       const targetCreditsUserId = activeTargetCreditsUserId.value ?? undefined
       const activeFilters = options.filters?.value
       const { from, to } = resolveDateRange(activeFilters)
@@ -252,8 +257,8 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
         getCreditsTransactions({
           page: options.currentPage?.value ?? 1,
           pageSize: options.pageSize?.value ?? 10,
-          accountScope: identity.accountScope,
-          tenantId: identity.tenantId ?? undefined,
+          accountScope,
+          tenantId,
           targetCreditsUserId,
           txnType: activeFilters?.txnType || undefined,
           bizSource: activeFilters?.bizSource || undefined,
@@ -266,10 +271,11 @@ export function usePointsQuery(options: UsePointsQueryOptions = {}) {
         transactionResult.account
         ?? accounts.find(
           (account) =>
-            account.accountScope === identity.accountScope
-            && (identity.tenantId == null || String(account.tenantId) === String(identity.tenantId)),
+            currentCreditsUserId != null
+            && String(account.userId) === String(currentCreditsUserId)
+            && (!accountScope || account.accountScope === accountScope)
+            && (tenantId == null || String(account.tenantId) === String(tenantId)),
         )
-        ?? accounts[0]
         ?? null
 
       records.value = transactionResult.items

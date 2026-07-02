@@ -9,9 +9,10 @@ import {
   type CreditsTransaction,
   type RechargeProduct,
 } from '@/api/visual-workbench'
-import { getCreditsIdentity } from '@/utils/credits-identity'
+import { useAuthStore } from '@/stores/auth'
 
 export const useCreditsStore = defineStore('credits', () => {
+  const authStore = useAuthStore()
   const accounts = ref<CreditsAccount[]>([])
   const transactions = ref<CreditsTransaction[]>([])
   const rechargeProducts = ref<RechargeProduct[]>([])
@@ -27,12 +28,20 @@ export const useCreditsStore = defineStore('credits', () => {
   const lastError = ref<string | null>(null)
 
   const activeAccount = computed<CreditsAccount | null>(() => {
-    const identity = getCreditsIdentity()
+    const user = authStore.userInfo
+    if (!user?.creditsUserId) return null
+
     const matched = accounts.value.find(
-      (account) => String(account.userId) === String(identity.userId)
-        && account.accountScope === identity.accountScope,
+      (account) =>
+        String(account.userId) === String(user.creditsUserId)
+        && (!user.accountScope || account.accountScope === user.accountScope)
+        && (
+          user.accountScope !== 'tenant'
+          || user.creditsTenantId == null
+          || String(account.tenantId) === String(user.creditsTenantId)
+        ),
     )
-    return matched ?? accounts.value[0] ?? null
+    return matched ?? null
   })
 
   const availableBalance = computed(() => activeAccount.value?.availableBalance ?? 0)
@@ -56,12 +65,14 @@ export const useCreditsStore = defineStore('credits', () => {
   async function loadTransactions(params?: { pageSize?: number }) {
     isLoadingTransactions.value = true
     try {
-      const identity = getCreditsIdentity()
+      const user = authStore.userInfo
       const result = await getCreditsTransactions({
         page: 1,
         pageSize: params?.pageSize ?? 50,
-        accountScope: identity.accountScope,
-        tenantId: identity.tenantId ?? undefined,
+        accountScope: user?.accountScope,
+        tenantId: user?.accountScope === 'tenant'
+          ? user.creditsTenantId ?? undefined
+          : undefined,
       })
       transactions.value = result.items
       transactionsLoaded.value = true

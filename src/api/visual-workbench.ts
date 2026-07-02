@@ -962,7 +962,7 @@ export async function createInteriorCleanTask(payload: {
 
 // ===================== Reusable Credits Platform 代理接口 =====================
 // 详见 文档/积分文档.md 第 2/8 节。
-// 请求头 x-credits-user-id / x-credits-account-scope 由 http.ts 拦截器自动注入。
+// 当前用户的积分账户身份由服务端根据登录凭证解析，前端不发送计费身份头。
 
 export type CreditsAccountStatus = 'active' | 'frozen' | 'closed' | string
 

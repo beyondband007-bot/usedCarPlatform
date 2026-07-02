@@ -1,6 +1,7 @@
 import { creditsClient, type BillingTaskResponse } from "./creditsClient";
 import { resolveBillingIdentity, type BillingRequestContext } from "./billingIdentity";
 import { tasksRepository, type GenerationTaskRecord } from "../tasks/tasksRepository";
+import { AppError } from "../../shared/errors";
 
 type BillingBody = {
   userId?: unknown;
@@ -37,6 +38,35 @@ const billingIdempotencyKey = (
   operation: "estimate" | "freeze" | "settle" | "refund",
   scope: ReturnType<typeof resolveBillingScope>,
 ) => `${operation}:${scope.idempotencyType}:${scope.idempotencyId}`;
+
+const isBillingUnavailable = (error: unknown) =>
+  error instanceof AppError && error.code === 50201;
+
+const isIdempotencyInProgress = (error: unknown) =>
+  error instanceof AppError
+  && error.statusCode === 409
+  && error.message.toLowerCase().includes("already processing");
+
+const isAmbiguousFreezeError = (error: unknown) =>
+  isBillingUnavailable(error) || isIdempotencyInProgress(error);
+
+const runIdempotentBillingMutation = async <T>(
+  operation: () => Promise<T>,
+  maxAttempts = 2,
+) => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isAmbiguousFreezeError(error) || attempt === maxAttempts) throw error;
+    }
+  }
+
+  throw lastError;
+};
 
 const snapshotTaskBilling = async (
   taskId: string,
@@ -91,12 +121,20 @@ export const freezeGenerationBilling = async (input: {
 
   let frozen;
   try {
-    frozen = await creditsClient.freeze({
-      userId: identity.userId,
-      billingTaskId: estimate.billingTaskId,
-      idempotencyKey: freezeKey,
-    });
+    frozen = await runIdempotentBillingMutation(() =>
+      creditsClient.freeze({
+        userId: identity.userId,
+        billingTaskId: estimate.billingTaskId,
+        idempotencyKey: freezeKey,
+      }),
+    );
   } catch (error) {
+    // The credits service may have committed the freeze even when its response
+    // timed out. Preserve that uncertainty so a later reconciliation can replay
+    // the same idempotent freeze before refunding the failed generation task.
+    if (isAmbiguousFreezeError(error)) {
+      await snapshotTaskBilling(input.taskId, estimatedBilling, "freeze_unknown");
+    }
     throw error;
   }
 
@@ -149,7 +187,7 @@ export const shouldFinalizeGenerationBilling = (task: GenerationTaskRecord) => {
   if (finalBillingStatuses.has(task.billingStatus)) return false;
   if (task.status === "success") return ["frozen", "settle_failed"].includes(task.billingStatus);
   if (task.status === "fail" || task.status === "canceled") {
-    return ["frozen", "refund_failed"].includes(task.billingStatus);
+    return ["frozen", "freeze_unknown", "refund_failed"].includes(task.billingStatus);
   }
   return false;
 };
@@ -185,6 +223,17 @@ export const finalizeGenerationBilling = async (
   };
 
   try {
+    if (task.billingStatus === "freeze_unknown") {
+      const frozen = await runIdempotentBillingMutation(() =>
+        creditsClient.freeze({
+          userId: billing.identity.userId,
+          billingTaskId: billing.task.billingTaskId,
+          idempotencyKey: billingIdempotencyKey("freeze", scope),
+        }),
+      );
+      await snapshotTaskBilling(task.id, { ...billing, task: frozen }, frozen.status);
+    }
+
     if (task.status === "success") {
       const settled = await creditsClient.settle({
         userId: billing.identity.userId,
@@ -211,7 +260,12 @@ export const finalizeGenerationBilling = async (
       creditsTenantId: billing.identity.tenantId ?? null,
       accountScope: billing.identity.accountScope,
       billingTaskId: billing.task.billingTaskId,
-      billingStatus: task.status === "success" ? "settle_failed" : "refund_failed",
+      billingStatus:
+        task.billingStatus === "freeze_unknown"
+          ? "freeze_unknown"
+          : task.status === "success"
+            ? "settle_failed"
+            : "refund_failed",
       estimatedPoints: task.estimatedPoints ?? null,
       settledPoints: task.settledPoints ?? null,
     });
