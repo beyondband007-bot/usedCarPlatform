@@ -1187,7 +1187,7 @@ function enterCreativeNewChatMode() {
 
 const selectedOptionId = ref(activeCapability.value.options[0]?.id ?? "");
 
-watch(activeCode, (code, previousCode) => {
+watch(activeCode, () => {
   const capability = activeCapability.value;
   const hasSelected = capability.options.some(
     (item) => item.id === selectedOptionId.value,
