@@ -113,6 +113,8 @@ export interface GenerationResultImage {
   sourceUrl?: string
   localPath?: string
   thumbnailUrl?: string | null
+  width?: number
+  height?: number
   contentType?: string
   size?: number
 }
@@ -129,6 +131,8 @@ export interface GenerationTaskDetail {
   resolution: string
   resultImages: GenerationResultImage[]
   resultVideos?: GenerationResultImage[]
+  thumbnail?: string
+  previewImage?: string
   videoUrl?: string
   previewVideo?: string
   downloadUrl?: string
