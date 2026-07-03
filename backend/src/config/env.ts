@@ -43,6 +43,8 @@ export const env = {
   ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
   showApiVin: {
     baseUrl: process.env.SHOWAPI_VIN_API_URL ?? "https://route.showapi.com/1142-2",
+    ocrBaseUrl:
+      process.env.SHOWAPI_VIN_OCR_API_URL ?? "https://route.showapi.com/1333-6",
     appKey: process.env.SHOWAPI_VIN_APP_KEY ?? "",
     timeoutMs: toNumber(process.env.SHOWAPI_VIN_TIMEOUT_MS, 12_000),
   },

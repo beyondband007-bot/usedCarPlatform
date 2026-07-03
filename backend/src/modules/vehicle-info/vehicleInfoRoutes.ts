@@ -1,6 +1,5 @@
 import { Router } from "express";
 import multer from "multer";
-import { ocr } from "tencentcloud-sdk-nodejs";
 
 import { env } from "../../config/env";
 import { asyncHandler } from "../../shared/asyncHandler";
@@ -10,7 +9,7 @@ import { ok } from "../../shared/response";
 type ShowApiVinResponse = {
   showapi_res_code?: number;
   showapi_res_error?: string;
-  showapi_res_body?: {
+  showapi_res_body?: Record<string, unknown> & {
     ret_code?: number;
     remark?: string;
     data?: Array<Record<string, unknown>>;
@@ -21,6 +20,15 @@ type JisuVinResponse = {
   status?: number;
   msg?: string;
   result?: Record<string, unknown>;
+};
+
+type ShowApiVinOcrResponse = {
+  showapi_res_code?: number;
+  showapi_res_error?: string;
+  showapi_res_body?: {
+    ret_code?: number;
+    vin_code?: string;
+  };
 };
 
 export const vehicleInfoRoutes = Router();
@@ -39,51 +47,53 @@ vehicleInfoRoutes.post(
     if (!req.file) {
       throw new AppError(400, 40001, "请上传 JPG、JPEG 或 PNG 图片");
     }
-    if (!env.verification.tencentSecretId || !env.verification.tencentSecretKey) {
-      throw new AppError(503, 50302, "腾讯云 VIN OCR 服务尚未配置");
+    if (!env.showApiVin.appKey) {
+      throw new AppError(503, 50302, "万维易源 VIN OCR 服务尚未配置");
     }
 
-    const OcrClient = ocr.v20181119.Client;
-    const client = new OcrClient({
-      credential: {
-        secretId: env.verification.tencentSecretId,
-        secretKey: env.verification.tencentSecretKey,
-      },
-      region: env.verification.tencentRegion,
-      profile: {
-        httpProfile: {
-          endpoint: "ocr.tencentcloudapi.com",
-          reqTimeout: 15,
-        },
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), env.showApiVin.timeoutMs);
 
     try {
-      const result = await client.VinOCR({
-        ImageBase64: req.file.buffer.toString("base64"),
+      const url = new URL(env.showApiVin.ocrBaseUrl);
+      url.searchParams.set("appKey", env.showApiVin.appKey);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          img_base64: req.file.buffer.toString("base64"),
+        }),
+        signal: controller.signal,
       });
-      const vin = result.Vin?.trim().toUpperCase() ?? "";
-      if (!vin) {
-        throw new AppError(422, 42201, "图片中未识别到 VIN 车架号");
+      const payload = (await response.json()) as ShowApiVinOcrResponse;
+      const responseBody = payload.showapi_res_body;
+      const vin = responseBody?.vin_code?.trim().toUpperCase() ?? "";
+      if (
+        !response.ok ||
+        payload.showapi_res_code !== 0 ||
+        responseBody?.ret_code !== 0
+      ) {
+        throw new AppError(
+          502,
+          50222,
+          payload.showapi_res_error || "VIN 图片识别失败，请更换清晰图片后重试",
+        );
+      }
+      if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+        throw new AppError(422, 42201, "图片中未识别到有效的 VIN 车架号");
       }
       ok(res, { vin });
     } catch (error) {
       if (error instanceof AppError) throw error;
-      const errorCode =
-        typeof error === "object" && error && "code" in error
-          ? String(error.code)
-          : "";
-      if (errorCode === "AuthFailure.UnauthorizedOperation") {
-        throw new AppError(403, 40320, "腾讯云密钥暂无 VIN OCR 调用权限");
-      }
-      if (errorCode === "FailedOperation.UnOpenError") {
-        throw new AppError(503, 50303, "腾讯云文字识别服务尚未开通");
-      }
       throw new AppError(
         502,
         50222,
-        error instanceof Error ? error.message : "VIN 图片识别失败，请更换清晰图片后重试",
+        error instanceof Error && error.name === "AbortError"
+          ? "VIN 图片识别超时，请稍后重试"
+          : "VIN 图片识别服务暂时不可用",
       );
+    } finally {
+      clearTimeout(timeout);
     }
   }),
 );
@@ -176,11 +186,13 @@ vehicleInfoRoutes.post(
       });
       const payload = (await response.json()) as ShowApiVinResponse;
       const responseBody = payload.showapi_res_body;
-      const result = responseBody?.data?.[0];
+      const result =
+        responseBody?.data?.[0] ??
+        (responseBody && typeof responseBody === "object" ? responseBody : null);
       if (
         !response.ok ||
         payload.showapi_res_code !== 0 ||
-        responseBody?.ret_code !== 0 ||
+        (responseBody?.ret_code !== undefined && responseBody.ret_code !== 0) ||
         !result
       ) {
         throw new AppError(
