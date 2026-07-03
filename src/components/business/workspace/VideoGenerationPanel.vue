@@ -9,6 +9,9 @@ import AudioPreviewPlayer from "@/components/business/workspace/AudioPreviewPlay
 import VehicleLookupField from "@/components/business/workspace/VehicleLookupField.vue";
 import { VIDEO_GENERATION_FLOW_KEY } from "@/constants/video-generation";
 import { resolveTemplatePosterUrl, resolveTemplatePreviewUrl, shouldPreferVideoCover } from "@/constants/video-template-previews";
+import vehicleAdStyleLighting from "@/assets/img/video-generation/vehicle-ad/vehicle-ad-style-lighting.png";
+import vehicleAdStylePremium from "@/assets/img/video-generation/vehicle-ad/vehicle-ad-style-premium.png";
+import vehicleAdStyleSpeed from "@/assets/img/video-generation/vehicle-ad/vehicle-ad-style-speed.png";
 import {
   MAX_DEALERSHIP_IMAGES,
   MAX_VIDEO_EXTERIOR_IMAGES,
@@ -68,6 +71,7 @@ const {
   singleCarForm,
   promotionForm,
   dealershipForm,
+  vehicleAdForm,
   exteriorUploads,
   interiorUploads,
   dealershipUploads,
@@ -107,6 +111,31 @@ const {
 } = flow;
 
 const acceptTypes = "image/jpeg,image/png,image/webp";
+const vehicleAdEstimatedPoints = 2250;
+
+const vehicleAdEffectOptions = [
+  {
+    value: "premium",
+    label: "高级质感",
+    description: "干净高级的商业车片氛围，突出漆面、线条和品质感",
+    icon: "mdi:diamond-stone",
+    image: vehicleAdStylePremium,
+  },
+  {
+    value: "speed",
+    label: "速度动感",
+    description: "更强运动感和镜头推进，适合性能、年轻化卖点",
+    icon: "mdi:speedometer",
+    image: vehicleAdStyleSpeed,
+  },
+  {
+    value: "lighting",
+    label: "灯光氛围",
+    description: "强调灯光、夜景和视觉冲击，适合做吸睛广告封面感",
+    icon: "mdi:spotlight-beam",
+    image: vehicleAdStyleLighting,
+  },
+] as const;
 
 const preferredLanguageHints: Record<string, { hint: string; badge?: string }> = {
   Chinese: { hint: "普通话", badge: "默认" },
@@ -136,6 +165,10 @@ const isSingleCarTemplate = computed(
 
 const isDealershipTemplate = computed(
   () => selectedTemplate.value?.type === "dealership",
+);
+
+const isVehicleAdTemplate = computed(
+  () => selectedTemplate.value?.type === "vehicle-ad",
 );
 
 const selectedOutputRatio = computed(() =>
@@ -393,7 +426,19 @@ const isDealershipFormComplete = computed(() =>
   ),
 );
 
+const selectedVehicleAdEffect = computed(
+  () =>
+    vehicleAdEffectOptions.find(
+      (option) => option.value === vehicleAdForm.value.effectStyle,
+    ) ?? null,
+);
+
+const isVehicleAdFormComplete = computed(() =>
+  Boolean(vehicleAdForm.value.effectStyle && uploadedExteriorAssetCount.value > 0),
+);
+
 const isFormReadyForDraft = computed(() => {
+  if (isVehicleAdTemplate.value) return isVehicleAdFormComplete.value;
   if (isDealershipTemplate.value) return isDealershipFormComplete.value;
   if (isSingleCarTemplate.value) return isSingleCarFormComplete.value;
   return false;
@@ -404,6 +449,9 @@ const languageStepIndex = computed(() =>
 );
 
 const tipBannerText = computed(() => {
+  if (isVehicleAdTemplate.value) {
+    return `该模板不生成口播和数字人，预计生成 15 秒视频，确认提交后将消耗 ${vehicleAdEstimatedPoints} 积分`;
+  }
   const styleLabel = selectedTemplate.value?.styleLabel ?? "专业";
   return `系统将自动注入该模板对应的内置专业提示词，生成匹配「${styleLabel}」风格的口播文案`;
 });
@@ -505,7 +553,9 @@ const showReviewPage = computed(
 const showConfigurationFooter = computed(
   () => currentStep.value === "form" || (currentStep.value === "result" && Boolean(selectedTemplate.value)),
 );
-const showReviewFooter = computed(() => showReviewPage.value && !isTaskLocked.value);
+const showReviewFooter = computed(
+  () => showReviewPage.value && !isTaskLocked.value && !isVehicleAdTemplate.value,
+);
 
 function formatAudioDuration(durationMs?: number | null) {
   if (!durationMs) return "--";
@@ -611,7 +661,11 @@ async function submitDraft() {
     }
     return;
   }
-  message.success("口播文案已生成，请确认文案并试听音色");
+  message.success(
+    isVehicleAdTemplate.value
+      ? "已确认生成信息，可以生成视频"
+      : "口播文案已生成，请确认文案并试听音色",
+  );
 }
 
 async function submitAudioPreview() {
@@ -766,7 +820,15 @@ async function submitConfirmedVideo() {
           <span class="sv-step-index">1</span>
           <div class="sv-section-copy">
             <h3>上传素材照片</h3>
-            <p>{{ isDealershipTemplate ? `拖拽或点击${dealershipUploadTitle}` : "拖拽或点击上传汽车外观和内饰照片" }}</p>
+            <p>
+              {{
+                isDealershipTemplate
+                  ? `拖拽或点击${dealershipUploadTitle}`
+                  : isVehicleAdTemplate
+                    ? "拖拽或点击上传汽车外观照片，内饰照片可选"
+                    : "拖拽或点击上传汽车外观和内饰照片"
+              }}
+            </p>
           </div>
         </header>
 
@@ -962,6 +1024,42 @@ async function submitConfirmedVideo() {
         </div>
       </section>
 
+      <section v-if="isVehicleAdTemplate" class="sv-section">
+        <header class="sv-section-head">
+          <span class="sv-step-index">2</span>
+          <div class="sv-section-copy">
+            <h3>选择广告效果</h3>
+            <p>选择一个视觉方向，系统会据此生成车辆动态广告</p>
+          </div>
+        </header>
+
+        <div class="sv-effect-grid">
+          <button
+            v-for="option in vehicleAdEffectOptions"
+            :key="option.value"
+            type="button"
+            class="sv-effect-card"
+            :class="{ 'is-active': vehicleAdForm.effectStyle === option.value }"
+            :disabled="isConfigurationLocked"
+            @click="vehicleAdForm.effectStyle = option.value"
+          >
+            <PreloadImage
+              class="sv-effect-image"
+              :src="option.image"
+              :alt="option.label"
+              fit="cover"
+            />
+            <span class="sv-effect-body">
+              <span class="sv-effect-title">
+                <Icon :icon="option.icon" aria-hidden="true" />
+                <strong>{{ option.label }}</strong>
+              </span>
+              <span>{{ option.description }}</span>
+            </span>
+          </button>
+        </div>
+      </section>
+
       <section v-if="selectedTemplate.type === 'promotion'" class="sv-section">
         <header class="sv-section-head">
           <span class="sv-step-index">+</span>
@@ -1067,7 +1165,7 @@ async function submitConfirmedVideo() {
         </div>
       </section>
 
-      <section class="sv-section">
+      <section v-if="!isVehicleAdTemplate" class="sv-section">
         <header class="sv-section-head">
           <span class="sv-step-index">{{ languageStepIndex }}</span>
           <div class="sv-section-copy">
@@ -1124,7 +1222,7 @@ async function submitConfirmedVideo() {
           @click="continueReview"
         >
           <Icon icon="mdi:arrow-right" aria-hidden="true" />
-          继续确认文案
+          {{ isVehicleAdTemplate ? "生成视频" : "继续确认文案" }}
         </button>
         <button
           v-else
@@ -1140,13 +1238,92 @@ async function submitConfirmedVideo() {
             aria-hidden="true"
           />
           <Icon v-else icon="mdi:auto-fix" aria-hidden="true" />
-          {{ draftNeedsRegeneration ? "重新生成文案" : "生成文案" }}
+          {{
+            isVehicleAdTemplate
+              ? "生成视频"
+              : (draftNeedsRegeneration ? "重新生成文案" : "生成文案")
+          }}
         </button>
       </div>
       </template>
 
       <template v-if="showReviewPage">
-      <section class="sv-section sv-script-review">
+      <section v-if="isVehicleAdTemplate" class="sv-section sv-vehicle-ad-review">
+        <header class="sv-section-head">
+          <span class="sv-step-index">3</span>
+          <div class="sv-section-copy">
+            <h3>生成视频</h3>
+            <p>本模板无数字人、无口播，直接按所选效果生成车辆广告视频</p>
+          </div>
+        </header>
+
+        <article class="sv-ad-confirm-card">
+          <PreloadImage
+            v-if="selectedVehicleAdEffect"
+            class="sv-ad-confirm-image"
+            :src="selectedVehicleAdEffect.image"
+            :alt="selectedVehicleAdEffect.label"
+            fit="cover"
+          />
+          <div class="sv-ad-confirm-body">
+            <span class="sv-ad-confirm-kicker">已选择效果</span>
+            <strong>{{ selectedVehicleAdEffect?.label ?? "未选择" }}</strong>
+            <p>{{ selectedVehicleAdEffect?.description ?? "请返回上一步选择广告效果" }}</p>
+          </div>
+        </article>
+
+        <div class="sv-ad-summary-grid">
+          <article>
+            <Icon icon="mdi:camera-outline" aria-hidden="true" />
+            <strong>{{ uploadedExteriorAssetCount }}</strong>
+            <span>外观素材</span>
+          </article>
+          <article>
+            <Icon icon="mdi:image-multiple-outline" aria-hidden="true" />
+            <strong>{{ interiorUploads.length }}</strong>
+            <span>内饰素材</span>
+          </article>
+          <article>
+            <Icon icon="mdi:timer-outline" aria-hidden="true" />
+            <strong>15s</strong>
+            <span>生成时长</span>
+          </article>
+          <article>
+            <Icon icon="mdi:credit-card-check-outline" aria-hidden="true" />
+            <strong>{{ vehicleAdEstimatedPoints }}</strong>
+            <span>预计积分</span>
+          </article>
+        </div>
+
+        <div v-if="!isTaskLocked" class="sv-form-footer">
+          <button
+            type="button"
+            class="sv-form-footer-btn sv-form-footer-btn--ghost"
+            :disabled="isConfigurationLocked"
+            @click="goBackToForm"
+          >
+            <Icon icon="mdi:arrow-left" aria-hidden="true" />
+            上一步
+          </button>
+          <button
+            type="button"
+            class="sv-form-footer-btn sv-form-footer-btn--primary"
+            :disabled="!canSubmitVideoTask || isLoading('task')"
+            @click="submitConfirmedVideo"
+          >
+            <Icon
+              v-if="isLoading('task')"
+              icon="mdi:loading"
+              class="vg-spin"
+              aria-hidden="true"
+            />
+            <Icon v-else icon="mdi:movie-check-outline" aria-hidden="true" />
+            生成视频（{{ vehicleAdEstimatedPoints }}积分）
+          </button>
+        </div>
+      </section>
+
+      <section v-if="!isVehicleAdTemplate" class="sv-section sv-script-review">
         <header class="sv-section-head">
           <span class="sv-step-index">5</span>
           <div class="sv-section-copy">
@@ -1216,7 +1393,7 @@ async function submitConfirmedVideo() {
         </div>
       </section>
 
-      <section class="sv-section sv-audio-preview">
+      <section v-if="!isVehicleAdTemplate" class="sv-section sv-audio-preview">
         <header class="sv-section-head">
           <span class="sv-step-index">6</span>
           <div class="sv-section-copy">
@@ -2279,6 +2456,155 @@ async function submitConfirmedVideo() {
   font-size: 13px;
 }
 
+.sv-effect-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sv-effect-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sv-card-bg) 94%, #000);
+  color: var(--sv-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.sv-effect-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--sv-accent) 46%, var(--sv-card-border));
+}
+
+.sv-effect-card.is-active {
+  border-color: color-mix(in srgb, var(--sv-accent) 68%, var(--sv-card-border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--sv-accent) 14%, transparent);
+}
+
+.sv-effect-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sv-effect-image,
+.sv-effect-image :deep(.preload-image),
+.sv-effect-image :deep(.preload-image__img) {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.sv-effect-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sv-effect-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sv-text);
+}
+
+.sv-effect-title .iconify {
+  color: var(--sv-accent);
+  font-size: 16px;
+}
+
+.sv-effect-title strong {
+  font-size: 14px;
+}
+
+.sv-ad-confirm-card {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sv-card-bg) 94%, #000);
+}
+
+.sv-ad-confirm-image,
+.sv-ad-confirm-image :deep(.preload-image),
+.sv-ad-confirm-image :deep(.preload-image__img) {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.sv-ad-confirm-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sv-ad-confirm-kicker {
+  color: var(--sv-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sv-ad-confirm-body strong {
+  color: var(--sv-text);
+  font-size: 18px;
+}
+
+.sv-ad-confirm-body p {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sv-ad-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sv-ad-summary-grid article {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sv-card-bg) 94%, #000);
+}
+
+.sv-ad-summary-grid .iconify {
+  color: var(--sv-accent);
+  font-size: 18px;
+}
+
+.sv-ad-summary-grid strong {
+  color: var(--sv-text);
+  font-size: 18px;
+}
+
+.sv-ad-summary-grid span {
+  color: var(--sv-text-soft);
+  font-size: 12px;
+}
+
 .sv-script-review textarea {
   min-height: 132px;
   line-height: 1.65;
@@ -2572,6 +2898,14 @@ async function submitConfirmedVideo() {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .sv-effect-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sv-ad-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .sv-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2588,7 +2922,9 @@ async function submitConfirmedVideo() {
 @media (max-width: 767px) {
   .sv-upload-grid,
   .sv-form-grid,
-  .sv-voice-grid {
+  .sv-voice-grid,
+  .sv-effect-grid,
+  .sv-ad-confirm-card {
     grid-template-columns: 1fr;
   }
 

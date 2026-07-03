@@ -22,7 +22,10 @@ import {
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
-import { videoGenerationPointsByAudioSeconds } from "../billing/generationPointRules";
+import {
+  videoGenerationPointsByAudioSeconds,
+  videoGenerationPointsByDurationSeconds,
+} from "../billing/generationPointRules";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { tasksService } from "../tasks/tasksService";
@@ -140,6 +143,7 @@ interface CreateScriptDraftInput {
   dealershipName?: unknown;
   dealershipImageAssetIds?: unknown;
   featuredVehicleNames?: unknown;
+  effectStyle?: unknown;
 }
 
 interface CreateVideoTaskInput {
@@ -1455,6 +1459,83 @@ const deriveSeedanceDurationSeconds = (audioDurationMs: number | null) => {
   );
 };
 
+type VehicleAdEffectStyle = "premium" | "speed" | "lighting";
+
+const VEHICLE_AD_NO_DIGITAL_HUMAN_ID = "__vehicle_ad_no_digital_human";
+
+const vehicleAdEffectProfiles: Record<
+  VehicleAdEffectStyle,
+  {
+    label: string;
+    visualDirection: string;
+    cameraLanguage: string;
+  }
+> = {
+  premium: {
+    label: "高级质感",
+    visualDirection:
+      "premium commercial car film, restrained luxury, glossy paint reflections, clean studio or urban night backdrop",
+    cameraLanguage:
+      "low-angle stable push-in, elegant three-quarter hero framing, slow orbit, refined body contour highlights",
+  },
+  speed: {
+    label: "速度动感",
+    visualDirection:
+      "dynamic automotive action ad, controlled speed feeling, crisp vehicle body with background motion streaks",
+    cameraLanguage:
+      "tracking shot, fast push-in, wheel and headlight close-ups, energetic transitions while the car identity stays locked",
+  },
+  lighting: {
+    label: "灯光氛围",
+    visualDirection:
+      "dramatic lighting reveal, dark premium studio, light sweep across hood and side panels, headlight glow",
+    cameraLanguage:
+      "slow cinematic reveal, rim light, front three-quarter hero shot, atmospheric but realistic lighting movement",
+  },
+};
+
+const normalizeVehicleAdEffectStyle = (value: unknown): VehicleAdEffectStyle => {
+  if (typeof value !== "string") {
+    throw errors.invalidParameter("effectStyle is required");
+  }
+  const normalized = value.trim();
+  if (
+    normalized !== "premium" &&
+    normalized !== "speed" &&
+    normalized !== "lighting"
+  ) {
+    throw errors.invalidParameter("effectStyle is invalid", {
+      effectStyle: value,
+      supported: ["premium", "speed", "lighting"],
+    });
+  }
+  return normalized;
+};
+
+export const buildVehicleAdVisualPrompt = (input: {
+  effectStyle: VehicleAdEffectStyle;
+  outputRatio: VideoGenerationOutputRatio;
+  durationSeconds?: number;
+  exteriorCount: number;
+  interiorCount: number;
+  userReferenceCount: number;
+}) => {
+  const effect = vehicleAdEffectProfiles[input.effectStyle];
+  const durationSeconds = input.durationSeconds ?? VIDEO_DURATION_SECONDS;
+  return [
+    `Generate a ${durationSeconds}-second ${input.outputRatio} 720p pure vehicle advertising video.`,
+    `Selected effect style: ${effect.label}.`,
+    `Visual direction: ${effect.visualDirection}.`,
+    `Camera language: ${effect.cameraLanguage}.`,
+    `Reference assets: ${input.exteriorCount} exterior vehicle image(s), ${input.interiorCount} interior image(s), ${input.userReferenceCount} supplemental reference image(s).`,
+    "Hard subject lock: keep the original vehicle model, color, body structure, wheels, headlights, windows, license plate area, and brand badge position unchanged.",
+    "Use the uploaded exterior images as the primary vehicle identity reference. Use interior images only for interior/detail moments if provided.",
+    "No digital human, no voiceover, no subtitles, no captions, no price text, no offer text, no watermark, no extra people.",
+    "Do not invent mileage, configuration, vehicle condition, price, discount, warranty, or market claims.",
+    "Avoid distorted vehicle anatomy, changed logos, extra wheels, floating parts, cheap fantasy effects, unreadable Chinese text, or any UI overlay.",
+  ].join("\n");
+};
+
 const isChineseNarrationLanguage = (language: VideoGenerationLanguage) =>
   language === "Chinese" || language === "Chinese,Yue";
 
@@ -2341,7 +2422,6 @@ class VideoGenerationService {
       );
     }
     const referenceMaterialId = templateId || legacyReferenceMaterialId;
-    if (!digitalHumanId) throw errors.invalidParameter("digitalHumanId is required");
     if (!referenceMaterialId) throw errors.invalidParameter("templateId is required");
     const templateDefinition =
       getVideoTemplateDefinition(referenceMaterialId);
@@ -2356,6 +2436,119 @@ class VideoGenerationService {
         { templateId: referenceMaterialId },
       );
     }
+    if (templateDefinition.type !== "vehicle-ad" && !digitalHumanId) {
+      throw errors.invalidParameter("digitalHumanId is required");
+    }
+
+    if (templateDefinition.type === "vehicle-ad") {
+      const effectStyle = normalizeVehicleAdEffectStyle(body.effectStyle);
+      const durationSeconds = normalizeDuration(body.durationSeconds);
+      const outputRatio = templateDefinition.outputRatio;
+      const referenceMaterial = await this.getReferenceMaterial(referenceMaterialId);
+      const uploadedAssets = await this.validateUploadedAssets(
+        body,
+        userId,
+        templateDefinition.type,
+      );
+      const vehicleName =
+        normalizeOptionalTextField(body.vehicleName, "vehicleName", 80) ||
+        "汽车广告";
+      const finalVideoPrompt = buildVehicleAdVisualPrompt({
+        effectStyle,
+        outputRatio,
+        durationSeconds,
+        exteriorCount: uploadedAssets.vehicleExteriorAssets.length,
+        interiorCount: uploadedAssets.vehicleInteriorAssets.length,
+        userReferenceCount: uploadedAssets.userReferenceAssets.length,
+      });
+      const effectProfile = vehicleAdEffectProfiles[effectStyle];
+      const scriptText = `${effectProfile.label} vehicle ad visual prompt`;
+      const promptBundle = {
+        effectStyle,
+        effectLabel: effectProfile.label,
+        visualPrompt: finalVideoPrompt,
+        stylePrompt: conciseStylePrompt(referenceMaterial.stylePrompt),
+        sceneShotPlanPrompt: toSceneShotPlanPrompt(referenceMaterial),
+      };
+      const requiredInputs = {
+        vehicle: {
+          vehicleName,
+          structured: null,
+          language: null,
+        },
+        template: {
+          id: referenceMaterialId,
+          type: templateDefinition.type,
+          typeLabel: videoTemplateTypeLabels[templateDefinition.type],
+          effectStyle,
+          effectLabel: effectProfile.label,
+          generationMode: "pure_vehicle_effect",
+        },
+        digitalHuman: null,
+        referenceMaterial: {
+          id: referenceMaterial.id,
+          templateId: referenceMaterial.id,
+          title: referenceMaterial.title,
+          videoType: referenceMaterial.videoType,
+          stylePrompt: conciseStylePrompt(referenceMaterial.stylePrompt),
+          scenePrompt: referenceMaterial.scenePrompt ?? referenceMaterial.stylePrompt,
+          shotPlan15s: referenceMaterial.shotPlan15s ?? [],
+          generationMode: "preset_prompt_only",
+          previewUrl: toPublicReferencePreviewUrl(referenceMaterial.id),
+        },
+        script: {
+          scriptText,
+          shotCues: [],
+          generator: "vehicle_ad_visual_prompt",
+        },
+        uploadedReferences: {
+          vehicleExteriorAssets: uploadedAssets.vehicleExteriorAssets.map(summarizeAsset),
+          vehicleInteriorAssets: uploadedAssets.vehicleInteriorAssets.map(summarizeAsset),
+          userReferenceAssets: uploadedAssets.userReferenceAssets.map(summarizeAsset),
+          dealershipAssets: [],
+        },
+      };
+      const scriptDraftId = createId("video_script");
+      const riskNotes = [
+        "Vehicle ad generation uses uploaded vehicle images as visual references only.",
+        "No digital human, voiceover, subtitles, price, offer, mileage, configuration, or condition claims are generated.",
+      ];
+      const response = {
+        scriptDraftId,
+        templateId: referenceMaterialId,
+        templateType: templateDefinition.type,
+        status: "ready_for_video_generation",
+        vehicleName,
+        structuredVehicle: null,
+        language: null,
+        durationSeconds,
+        outputRatio,
+        videoResolution: VIDEO_GENERATION_RESOLUTION,
+        requiredInputs,
+        promptBundle,
+        finalVideoPrompt,
+        riskNotes,
+      };
+
+      await videoScriptDraftRepository.create({
+        id: scriptDraftId,
+        userId,
+        vehicleName,
+        digitalHumanId: VEHICLE_AD_NO_DIGITAL_HUMAN_ID,
+        referenceMaterialId,
+        durationSeconds: VIDEO_DURATION_SECONDS,
+        outputRatio,
+        videoResolution: VIDEO_GENERATION_RESOLUTION,
+        scriptText,
+        finalVideoPrompt,
+        requiredInputs,
+        promptBundle,
+        riskNotes,
+      });
+
+      return response;
+    }
+
     const language = normalizeVideoGenerationLanguage(body.language);
     const promotionText = normalizeOptionalTextField(
       body.promotionText,
@@ -2894,8 +3087,6 @@ class VideoGenerationService {
     if (!scriptDraftId) {
       throw errors.invalidParameter("scriptDraftId is required");
     }
-    const audioPreviewId = normalizeAudioPreviewId(body.audioPreviewId);
-
     const draft = await videoScriptDraftRepository.findById(scriptDraftId, userId);
     if (!draft) throw errors.videoScriptDraftNotFound();
 
@@ -2915,6 +3106,232 @@ class VideoGenerationService {
         ? templateInput.type
         : templateDefinition?.type ?? "single-car") as VideoTemplateType;
     const outputRatio = templateDefinition?.outputRatio ?? draft.outputRatio;
+
+    if (templateType === "vehicle-ad") {
+      const effectStyle = normalizeVehicleAdEffectStyle(templateInput.effectStyle);
+      const [exteriorAssets, interiorAssets, userReferenceAssets] =
+        await Promise.all([
+          this.validateAssetIds({
+            userId,
+            assetIds: ids.exteriorIds.slice(0, 5),
+            role: "vehicleExteriorAssetIds",
+            allowedPurposes: ["car_exterior"],
+            minCount: 1,
+            maxCount: 5,
+          }),
+          this.validateAssetIds({
+            userId,
+            assetIds: ids.interiorIds.slice(0, 5),
+            role: "vehicleInteriorAssetIds",
+            allowedPurposes: ["car_interior"],
+            minCount: 0,
+            maxCount: 5,
+          }),
+          this.validateAssetIds({
+            userId,
+            assetIds: ids.userReferenceIds.slice(0, 4),
+            role: "userReferenceAssetIds",
+            allowedPurposes: ["video_reference_image", "car_exterior", "car_interior"],
+            minCount: 0,
+            maxCount: 4,
+          }),
+        ]);
+      const selectedVehicleAssets = [
+        ...exteriorAssets,
+        ...interiorAssets,
+        ...userReferenceAssets,
+      ];
+      const seedancePrompt = buildVehicleAdVisualPrompt({
+        effectStyle,
+        outputRatio,
+        durationSeconds: VIDEO_DURATION_SECONDS,
+        exteriorCount: exteriorAssets.length,
+        interiorCount: interiorAssets.length,
+        userReferenceCount: userReferenceAssets.length,
+      });
+      const taskId = createId("task");
+      let taskCreated = false;
+      let billing: FrozenGenerationBilling | null = null;
+      let billingFreezeFailed = false;
+
+      try {
+        await tasksRepository.createWaitingTask({
+          id: taskId,
+          userId: subscription.userKey,
+          moduleCode: "video-generation",
+          inputAssetId: exteriorAssets[0]?.id ?? null,
+          optionId: scriptDraftId,
+          outputRatio,
+          resolution: VIDEO_GENERATION_RESOLUTION,
+          logoAssetId: null,
+          prompt: seedancePrompt,
+          subscriptionUserKey: subscription.userKey,
+          subscriptionPlanCode: subscription.planCode,
+        });
+        taskCreated = true;
+
+        try {
+          billing = await freezeGenerationBilling({
+            taskId,
+            functionCode: "video-generation",
+            estimatedPoints: videoGenerationPointsByDurationSeconds(
+              VIDEO_DURATION_SECONDS,
+            ),
+            body: {},
+            context,
+          });
+        } catch (error) {
+          billingFreezeFailed = true;
+          await tasksRepository.markFailed(
+            taskId,
+            "BILLING_FREEZE_FAILED",
+            error instanceof Error ? error.message : "billing freeze failed",
+          );
+          throw error;
+        }
+
+        const vehicleVirtualAssets = await Promise.all(
+          selectedVehicleAssets.map((asset) =>
+            arkVirtualAssetService.ensureLocalFileAsset({
+              userId: subscription.userKey,
+              assetType: "Image",
+              filePath: asset.localPath,
+              publicUrl: asset.publicUrl,
+              fileName: asset.fileName,
+            }),
+          ),
+        );
+        const inputAssetUris = vehicleVirtualAssets
+          .map((item) => item.assetUri)
+          .filter((item): item is string => typeof item === "string" && item.startsWith("asset://"));
+        if (inputAssetUris.length > 12) {
+          throw errors.invalidParameter("Seedance supports at most 12 reference files", {
+            inputCount: inputAssetUris.length,
+          });
+        }
+        if (inputAssetUris.length !== selectedVehicleAssets.length) {
+          throw errors.generationFailed("ark virtual asset uri is missing", {
+            expectedInputCount: selectedVehicleAssets.length,
+            actualInputCount: inputAssetUris.length,
+          });
+        }
+        const referenceContents: ArkReferenceContent[] = inputAssetUris.map((url) => ({
+          type: "image_url",
+          role: "reference_image",
+          image_url: { url },
+        }));
+        const publicSourceUrls = vehicleVirtualAssets.map((item) => item.publicUrl);
+
+        const arkTask = await arkClient.createSeedanceVideoTask({
+          prompt: seedancePrompt,
+          referenceContents,
+          referenceImageUrls: inputAssetUris,
+          referenceAudioUrls: [],
+          ratio: outputRatio,
+          resolution: VIDEO_GENERATION_RESOLUTION,
+          duration: VIDEO_DURATION_SECONDS,
+          generateAudio: false,
+        });
+
+        await tasksRepository.markSubmitted({
+          id: taskId,
+          kieTaskId: arkTask.taskId,
+          kieAccountHash: "ark",
+          model: env.ark.videoModel,
+          role: "primary",
+          attemptNo: 1,
+          requestJson: {
+            provider: "ark",
+            model: env.ark.videoModel,
+            moduleCode: "video-generation",
+            scriptDraftId,
+            audioPreviewId: null,
+            vehicleName: draft.vehicleName,
+            templateId: draft.referenceMaterialId,
+            templateType,
+            effectStyle,
+            prompt: seedancePrompt,
+            projectName: env.ark.projectName,
+            inputAssetUris,
+            publicSourceUrls,
+            referenceImageAssetUris: inputAssetUris,
+            referenceAudioAssetUris: [],
+            referenceContents,
+            mediaInputs: {
+              effectStyle,
+              vehicleAssets: selectedVehicleAssets.map((asset, index) => ({
+                tag: `{{Mixed ${index + 1}}}`,
+                assetId: asset.id,
+                purpose: asset.purpose,
+                assetUri: vehicleVirtualAssets[index].assetUri,
+                publicSourceUrl: vehicleVirtualAssets[index].publicUrl,
+                providerAssetId: vehicleVirtualAssets[index].providerAssetId,
+              })),
+              digitalHuman: null,
+              narrationAudio: null,
+            },
+            aspectRatio: outputRatio,
+            videoResolution: VIDEO_GENERATION_RESOLUTION,
+            duration: VIDEO_DURATION_SECONDS,
+            generateAudio: false,
+            audioHandling:
+              "Vehicle ad generation is pure visual generation and does not send narration audio.",
+          },
+          responseJson: arkTask.raw,
+        });
+
+        return {
+          taskId,
+          scriptDraftId,
+          moduleCode: "video-generation",
+          status: "queued",
+          progress: 5,
+          kieTaskId: arkTask.taskId,
+          model: env.ark.videoModel,
+          durationSeconds: VIDEO_DURATION_SECONDS,
+          templateId: draft.referenceMaterialId,
+          templateType,
+          effectStyle,
+          language: null,
+          outputRatio,
+          videoResolution: VIDEO_GENERATION_RESOLUTION,
+          generateAudio: false,
+          narrationAudio: null,
+          inputReferenceCount: inputAssetUris.length,
+          mediaSummary: {
+            digitalHumanCount: 0,
+            narrationAudioCount: 0,
+            styleVideoCount: 0,
+            stylePromptApplied: true,
+            exteriorImageCount: exteriorAssets.length,
+            interiorImageCount: interiorAssets.length,
+            dealershipImageCount: 0,
+            userReferenceImageCount: userReferenceAssets.length,
+          },
+          ...toBillingResponseFields(billing),
+          pollingUrl: `/api/v1/modules/video-generation/tasks/${taskId}`,
+          createdAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        if (billing) {
+          try {
+            await refundFrozenGenerationBilling(taskId, billing);
+          } catch {
+            await markGenerationBillingRefundFailed(taskId, billing);
+          }
+        }
+        if (taskCreated && !billingFreezeFailed) {
+          await tasksRepository.markFailed(
+            taskId,
+            "VIDEO_GENERATION_CREATE_FAILED",
+            buildVideoTaskErrorMessage(error),
+          );
+        }
+        throw error;
+      }
+    }
+
+    const audioPreviewId = normalizeAudioPreviewId(body.audioPreviewId);
     const confirmedAudioPreview = await this.validateAudioPreviewForTask({
       audioPreviewId,
       userId,

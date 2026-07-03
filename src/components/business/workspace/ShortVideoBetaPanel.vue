@@ -151,6 +151,9 @@ const templateList = computed(() => flow?.templateList.value ?? []);
 const selectedTemplateId = computed(
   () => flow?.selectedTemplate.value?.templateId ?? "",
 );
+const isVehicleAdPreviewTemplate = computed(
+  () => templatePreviewSession.value?.type === "vehicle-ad",
+);
 const templatesLoading = computed(() => flow?.isLoading("bootstrap") ?? false);
 
 const categoryTypeMap: Record<Exclude<ShortVideoTemplateCategory, "all">, string> = {
@@ -289,8 +292,7 @@ function isTemplateDisabled(template: VideoTemplate) {
   return (
     template.status === "coming_soon" ||
     template.generationReadiness === "unavailable" ||
-    template.type === "market" ||
-    template.type === "vehicle-ad"
+    template.type === "market"
   );
 }
 
@@ -322,7 +324,7 @@ function confirmTemplatePreview() {
 
   flow.selectTemplate(template);
 
-  const humanId = previewDigitalHumanId.value;
+  const humanId = template.type === "vehicle-ad" ? "" : previewDigitalHumanId.value;
   if (humanId) {
     const human = digitalHumanList.value.find((item) => item.id === humanId);
     if (human) {
@@ -927,7 +929,10 @@ watch(
         </button>
       </header>
 
-      <div class="sv-preview-dialog__body">
+      <div
+        class="sv-preview-dialog__body"
+        :class="{ 'sv-preview-dialog__body--vehicle-ad': isVehicleAdPreviewTemplate }"
+      >
         <div class="sv-preview-dialog__main">
           <div class="sv-preview-dialog__media">
             <TemplatePreviewVideoPlayer
@@ -974,7 +979,7 @@ watch(
           </div>
         </div>
 
-        <div class="sv-preview-dialog__humans">
+        <div v-if="!isVehicleAdPreviewTemplate" class="sv-preview-dialog__humans">
           <h4>选择数字人形象</h4>
           <p class="sv-preview-dialog__humans-tip">已按模板默认推荐，可手动更换</p>
 
@@ -2242,6 +2247,14 @@ watch(
   min-height: 0;
   flex: 1;
   grid-template-columns: 1fr 1fr;
+}
+
+.sv-preview-dialog__body--vehicle-ad {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sv-preview-dialog__body--vehicle-ad .sv-preview-dialog__main {
+  border-right: 0;
 }
 
 .sv-preview-dialog__main {

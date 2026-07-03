@@ -13,7 +13,11 @@ const definitions = listVideoTemplateDefinitions();
 assert.equal(definitions.length, 20);
 assert.equal(
   definitions.filter((item) => item.type === "single-car").length,
-  8,
+  7,
+);
+assert.equal(
+  definitions.filter((item) => item.type === "vehicle-ad").length,
+  1,
 );
 assert.equal(
   definitions.filter((item) => item.type === "promotion").length,
@@ -51,6 +55,7 @@ assert.equal(getVideoTemplateDefinition("ref-video-006")?.outputRatio, "9:16");
 assert.equal(getVideoTemplateDefinition("ref-video-008")?.type, "dealership");
 assert.equal(getVideoTemplateDefinition("ref-video-015")?.type, "dealership");
 assert.equal(getVideoTemplateDefinition("ref-video-016")?.type, "single-car");
+assert.equal(getVideoTemplateDefinition("ref-video-005")?.type, "vehicle-ad");
 assert.equal(getVideoTemplateDefinition("ref-video-020")?.type, "single-car");
 
 const supportedLanguageValues = videoGenerationWorkflowContract.supportedLanguages.map(
@@ -100,6 +105,31 @@ assert.ok(
   invalidSingleCar.issues.some(
     (issue) => issue.field === "vehicleExteriorAssetIds" && issue.code === "required",
   ),
+);
+
+const vehicleAd = getVideoTemplateDefinition("ref-video-005");
+assert.ok(vehicleAd);
+assert.equal(
+  validateVideoTemplateInputs(vehicleAd, {
+    vehicleExteriorAssetIds: ["asset_exterior_01"],
+    vehicleInteriorAssetIds: [],
+    userReferenceAssetIds: [],
+    effectStyle: "premium",
+  }).valid,
+  true,
+);
+assert.equal(
+  validateVideoTemplateInputs(vehicleAd, {
+    vehicleExteriorAssetIds: ["asset_exterior_01"],
+    effectStyle: "unknown",
+  }).valid,
+  false,
+);
+assert.equal(
+  validateVideoTemplateInputs(vehicleAd, {
+    effectStyle: "premium",
+  }).valid,
+  false,
 );
 
 const dealership = getVideoTemplateDefinition("ref-video-001");
@@ -156,9 +186,10 @@ console.log(
       runId: "video-template-contract-20260615-test-message",
       templateCount: definitions.length,
       typeCounts: {
-        singleCar: 8,
+        singleCar: 7,
         promotion: 0,
         dealership: 12,
+        vehicleAd: 1,
         market: 0,
       },
       fixedOutput: videoGenerationWorkflowContract.fixedOutput,

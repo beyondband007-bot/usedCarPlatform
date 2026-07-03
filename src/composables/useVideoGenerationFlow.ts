@@ -43,6 +43,7 @@ import type {
   VideoHistoryItem,
   VideoAudioPreview,
   OptimizeNarrationResult,
+  VehicleAdFormData,
   VideoScriptDraft,
   VideoTemplate,
   VideoVoiceOption,
@@ -92,6 +93,12 @@ function createEmptyDealershipForm(): DealershipFormData {
   }
 }
 
+function createEmptyVehicleAdForm(): VehicleAdFormData {
+  return {
+    effectStyle: '',
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -112,6 +119,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
   const singleCarForm = ref<SingleCarFormData>(createEmptySingleCarForm())
   const promotionForm = ref<PromotionFormData>(createEmptyPromotionForm())
   const dealershipForm = ref<DealershipFormData>(createEmptyDealershipForm())
+  const vehicleAdForm = ref<VehicleAdFormData>(createEmptyVehicleAdForm())
   const exteriorUploads = ref<VideoUploadPreviewItem[]>([])
   const interiorUploads = ref<VideoUploadPreviewItem[]>([])
   const referenceUploads = ref<VideoUploadPreviewItem[]>([])
@@ -145,9 +153,11 @@ export function useVideoGenerationFlow(ownerKey: string) {
     audioPreviews.value.find((item) => item.audioPreviewId === confirmedAudioPreviewId.value) ?? null,
   )
 
-  const canSubmitVideoTask = computed(
-    () => Boolean(scriptDraft.value?.scriptDraftId && confirmedAudioPreview.value?.canUseForVideo),
-  )
+  const canSubmitVideoTask = computed(() => {
+    if (!scriptDraft.value?.scriptDraftId) return false
+    if (selectedTemplate.value?.type === 'vehicle-ad') return true
+    return Boolean(confirmedAudioPreview.value?.canUseForVideo)
+  })
 
   const currentInputFingerprint = computed(() => JSON.stringify(buildValidatePayload()))
   const hasReusableDraft = computed(
@@ -158,6 +168,9 @@ export function useVideoGenerationFlow(ownerKey: string) {
   )
 
   const activeDigitalHumanId = computed(() => {
+    if (selectedTemplate.value?.type === 'vehicle-ad') {
+      return ''
+    }
     if (selectedTemplate.value?.type === 'dealership') {
       return dealershipForm.value.digitalHumanId
     }
@@ -171,8 +184,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     () =>
       selectedTemplate.value?.status === 'coming_soon' ||
       selectedTemplate.value?.generationReadiness === 'unavailable' ||
-      selectedTemplate.value?.type === 'market' ||
-      selectedTemplate.value?.type === 'vehicle-ad',
+      selectedTemplate.value?.type === 'market',
   )
 
   function setLoading(key: string, value: boolean) {
@@ -246,6 +258,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     singleCarForm.value = createEmptySingleCarForm()
     promotionForm.value = createEmptyPromotionForm()
     dealershipForm.value = createEmptyDealershipForm()
+    vehicleAdForm.value = createEmptyVehicleAdForm()
     clearUploads()
     scriptDraft.value = null
     confirmedScriptText.value = ''
@@ -563,8 +576,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     return (
       template.status === 'coming_soon' ||
       template.generationReadiness === 'unavailable' ||
-      template.type === 'market' ||
-      template.type === 'vehicle-ad'
+      template.type === 'market'
     )
   }
 
@@ -617,6 +629,8 @@ export function useVideoGenerationFlow(ownerKey: string) {
   }
 
   function applyTemplateDefaultDigitalHuman(template: VideoTemplate) {
+    if (template.type === 'vehicle-ad') return
+
     const defaultId =
       template.defaultDigitalHumanId ??
       resolveTemplateDefaultDigitalHumanId(template.templateId)
@@ -638,6 +652,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
 
   function selectDigitalHuman(human: DigitalHuman) {
     if (!human.id || !selectedTemplate.value) return
+    if (selectedTemplate.value.type === 'vehicle-ad') return
     if (!digitalHumanList.value.some((item) => item.id === human.id)) return
 
     if (selectedTemplate.value.type === 'dealership') {
@@ -655,8 +670,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     if (
       template.status === 'coming_soon' ||
       template.generationReadiness === 'unavailable' ||
-      template.type === 'market' ||
-      template.type === 'vehicle-ad'
+      template.type === 'market'
     ) {
       return
     }
@@ -770,6 +784,38 @@ export function useVideoGenerationFlow(ownerKey: string) {
     const uploadedReferences = asRecord(requiredInputs.uploadedReferences)
     const language = asString(vehicle.language) || 'Chinese'
     const digitalHumanId = asString(digitalHuman.id)
+
+    if (selectedTemplate.value.type === 'vehicle-ad') {
+      const effectStyle = asString(templateInput.effectStyle)
+      vehicleAdForm.value = {
+        effectStyle:
+          effectStyle === 'premium' || effectStyle === 'speed' || effectStyle === 'lighting'
+            ? effectStyle
+            : vehicleAdForm.value.effectStyle,
+      }
+      if (!exteriorUploads.value.length) {
+        exteriorUploads.value = restoreUploadItemsFromDraft(
+          uploadedReferences.vehicleExteriorAssets,
+          'car_exterior',
+        )
+      }
+      if (!interiorUploads.value.length) {
+        interiorUploads.value = restoreUploadItemsFromDraft(
+          uploadedReferences.vehicleInteriorAssets,
+          'car_interior',
+        )
+      }
+      if (!referenceUploads.value.length) {
+        referenceUploads.value = restoreUploadItemsFromDraft(
+          uploadedReferences.userReferenceAssets,
+          'video_reference_image',
+        )
+      }
+      confirmedScriptText.value = ''
+      translatedNarrationText.value = ''
+      currentStep.value = 'form'
+      return true
+    }
 
     if (selectedTemplate.value.type === 'dealership') {
       dealershipForm.value = {
@@ -910,6 +956,24 @@ export function useVideoGenerationFlow(ownerKey: string) {
       }
     }
 
+    if (template.type === 'vehicle-ad') {
+      return {
+        templateId: template.templateId,
+        templateType: template.type,
+        vehicleExteriorAssetIds: exteriorUploads.value
+          .filter((item) => item.asset?.assetId)
+          .map((item) => item.asset!.assetId),
+        vehicleInteriorAssetIds: interiorUploads.value
+          .filter((item) => item.asset?.assetId)
+          .map((item) => item.asset!.assetId),
+        userReferenceAssetIds: referenceUploads.value
+          .filter((item) => item.asset?.assetId)
+          .map((item) => item.asset!.assetId),
+        durationSeconds: VIDEO_DURATION_SECONDS,
+        effectStyle: vehicleAdForm.value.effectStyle,
+      }
+    }
+
     const form =
       template.type === 'promotion' ? promotionForm.value : singleCarForm.value
 
@@ -977,8 +1041,11 @@ export function useVideoGenerationFlow(ownerKey: string) {
         throw new Error(validation.issues[0]?.message ?? '表单校验未通过')
       }
 
+      const isVehicleAd = selectedTemplate.value.type === 'vehicle-ad'
       const digitalHumanId = String(payload.digitalHumanId ?? '')
-      await ensureDigitalHumanVoiceReady(digitalHumanId)
+      if (!isVehicleAd) {
+        await ensureDigitalHumanVoiceReady(digitalHumanId)
+      }
 
       const draft = await createVideoScriptDraft(buildDraftPayload())
       scriptDraft.value = draft
@@ -986,7 +1053,12 @@ export function useVideoGenerationFlow(ownerKey: string) {
         draft.requiredInputs.script?.scriptText ?? ''
       translatedNarrationText.value = ''
       resetAudioConfirmation()
-      await loadVoiceOptions(digitalHumanId)
+      if (isVehicleAd) {
+        voiceOptions.value = []
+        selectedVoiceId.value = ''
+      } else {
+        await loadVoiceOptions(digitalHumanId)
+      }
       draftInputFingerprint.value = JSON.stringify(payload)
       draftNeedsRegeneration.value = false
       currentStep.value = 'review'
@@ -1105,14 +1177,17 @@ export function useVideoGenerationFlow(ownerKey: string) {
       errorMessage.value = '请先生成并确认口播草稿'
       return null
     }
-    if (!confirmedAudioPreview.value?.audioPreviewId) {
+    const activeTemplate = selectedTemplate.value
+    const isVehicleAd = activeTemplate?.type === 'vehicle-ad'
+    if (!isVehicleAd && !confirmedAudioPreview.value?.audioPreviewId) {
       errorMessage.value = '请先试听并确认 8-15 秒内的音频'
       return null
     }
 
     const scriptDraftId = scriptDraft.value.scriptDraftId
-    const audioPreviewId = confirmedAudioPreview.value.audioPreviewId
-    const activeTemplate = selectedTemplate.value
+    const audioPreviewId = isVehicleAd
+      ? undefined
+      : confirmedAudioPreview.value?.audioPreviewId
 
     setLoading('task', true)
     errorMessage.value = ''
@@ -1351,6 +1426,7 @@ export function useVideoGenerationFlow(ownerKey: string) {
     singleCarForm,
     promotionForm,
     dealershipForm,
+    vehicleAdForm,
     exteriorUploads,
     interiorUploads,
     referenceUploads,

@@ -4,6 +4,7 @@ import {
   buildDeepSeekSystemPrompt,
   buildDeepSeekUserPrompt,
   buildSeedancePrompt,
+  buildVehicleAdVisualPrompt,
 } from "./videoGenerationService";
 
 const singleCarPrompt = buildSeedancePrompt({
@@ -128,6 +129,23 @@ assert.match(deepSeekUserPrompt, /模板核心提示词：真实二手车车场�
 assert.doesNotMatch(deepSeekUserPrompt, /预设场景 15 秒分镜/);
 assert.doesNotMatch(deepSeekUserPrompt, /0-3s/);
 
+const vehicleAdPrompt = buildVehicleAdVisualPrompt({
+  effectStyle: "speed",
+  outputRatio: "9:16",
+  durationSeconds: 15,
+  exteriorCount: 3,
+  interiorCount: 1,
+  userReferenceCount: 1,
+});
+assert.match(vehicleAdPrompt, /pure vehicle advertising video/);
+assert.match(vehicleAdPrompt, /Selected effect style: 速度动感/);
+assert.match(vehicleAdPrompt, /3 exterior vehicle image/);
+assert.match(vehicleAdPrompt, /Hard subject lock/);
+assert.match(vehicleAdPrompt, /no voiceover/);
+assert.match(vehicleAdPrompt, /no subtitles/);
+assert.match(vehicleAdPrompt, /No digital human/);
+assert.match(vehicleAdPrompt, /Do not invent mileage/);
+
 console.log(
   JSON.stringify(
     {
@@ -142,6 +160,10 @@ console.log(
         dealership: ["{{Mixed 1}}"],
         digitalHuman: "{{Mixed 2}}",
         narration: "{{Mixed 3}}",
+      },
+      vehicleAd: {
+        effectStyle: "speed",
+        generateAudio: false,
       },
       status: "passed",
     },

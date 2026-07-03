@@ -15,6 +15,8 @@ export type VideoTemplateStyle =
 
 export type VideoGenerationLanguage = string
 
+export type VehicleAdEffectStyle = 'premium' | 'speed' | 'lighting'
+
 export type VideoTaskStatus = GenerationTaskStatus
 
 export type VideoWorkflowStage =
@@ -254,7 +256,7 @@ export interface VideoScriptDraftScript {
 }
 
 export interface VideoScriptDraftRequiredInputs {
-  digitalHuman?: Record<string, unknown>
+  digitalHuman?: Record<string, unknown> | null
   referenceMaterial?: Record<string, unknown>
   script?: VideoScriptDraftScript
   uploadedReferences?: Record<string, unknown>
@@ -285,14 +287,23 @@ export interface DealershipFormData {
   featuredVehicleNames: string
 }
 
-export type VideoFormData = SingleCarFormData | PromotionFormData | DealershipFormData
+export interface VehicleAdFormData {
+  effectStyle: VehicleAdEffectStyle | ''
+}
+
+export type VideoFormData =
+  | SingleCarFormData
+  | PromotionFormData
+  | DealershipFormData
+  | VehicleAdFormData
 
 export interface CreateVideoScriptDraftPayload {
   templateId: string
   templateType?: VideoTemplateType
-  digitalHumanId: string
-  language: VideoGenerationLanguage
+  digitalHumanId?: string
+  language?: VideoGenerationLanguage
   durationSeconds?: number
+  effectStyle?: VehicleAdEffectStyle
   brand?: string
   modelYear?: string
   displacement?: string
@@ -363,7 +374,7 @@ export interface VideoGenerationTask {
   resolution?: string
   createdAt?: string
   updatedAt?: string
-  language?: VideoGenerationLanguage
+  language?: VideoGenerationLanguage | null
   billingTaskId?: number | string | null
   billingStatus?: string | null
   estimatedCost?: number | null

@@ -4,7 +4,8 @@ export type VideoTemplateType =
   | "dealership"
   | "single-car"
   | "promotion"
-  | "market";
+  | "market"
+  | "vehicle-ad";
 
 export type VideoTemplateStyle =
   | "calm"
@@ -219,6 +220,26 @@ const dealershipRequirements = (): VideoTemplateInputRequirement[] => [
   userReferenceRequirement,
 ];
 
+const vehicleAdEffectStyleRequirement: VideoTemplateInputRequirement = {
+  key: "effectStyle",
+  label: "generation effect",
+  type: "text",
+  required: true,
+  options: [
+    { value: "premium", label: "高级质感" },
+    { value: "speed", label: "速度动感" },
+    { value: "lighting", label: "灯光氛围" },
+  ],
+  placeholder: "premium / speed / lighting",
+};
+
+const vehicleAdRequirements = (): VideoTemplateInputRequirement[] => [
+  exteriorRequirement,
+  interiorRequirement,
+  userReferenceRequirement,
+  vehicleAdEffectStyleRequirement,
+];
+
 const definitions: VideoTemplateDefinition[] = [
   {
     referenceMaterialId: "ref-video-017",
@@ -350,11 +371,11 @@ const definitions: VideoTemplateDefinition[] = [
   },
   {
     referenceMaterialId: "ref-video-005",
-    type: "single-car",
+    type: "vehicle-ad",
     style: "professional",
     outputRatio: "9:16",
     badge: "new",
-    inputRequirements: singleCarRequirements(),
+    inputRequirements: vehicleAdRequirements(),
   },
   {
     referenceMaterialId: "ref-video-007",
@@ -394,6 +415,7 @@ export const videoTemplateTypeLabels: Record<VideoTemplateType, string> = {
   "single-car": "单车品介绍",
   promotion: "促销活动",
   market: "行情资讯",
+  "vehicle-ad": "车辆广告",
 };
 
 export const videoTemplateStyleLabels: Record<VideoTemplateStyle, string> = {
@@ -419,6 +441,12 @@ export const videoTemplateCapabilities = [
   {
     type: "promotion" as const,
     label: videoTemplateTypeLabels.promotion,
+    status: "available" as const,
+    generationReadiness: "ready" as const,
+  },
+  {
+    type: "vehicle-ad" as const,
+    label: videoTemplateTypeLabels["vehicle-ad"],
     status: "available" as const,
     generationReadiness: "ready" as const,
   },

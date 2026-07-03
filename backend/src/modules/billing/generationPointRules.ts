@@ -21,6 +21,9 @@ export const shortVideoGenerationPoints = (videoCount = 1) =>
 export const videoGenerationPointsByAudioSeconds = (audioSeconds = 15) =>
   formatPoints(Math.max(0, audioSeconds) * VIDEO_GENERATION_POINTS_PER_SECOND);
 
+export const videoGenerationPointsByDurationSeconds = (durationSeconds = 15) =>
+  formatPoints(Math.max(0, durationSeconds) * VIDEO_GENERATION_POINTS_PER_SECOND);
+
 export const batchExteriorItemGenerationPoints = (config: BatchVisualConfig) => {
   const lightConsistencyPoints =
     isEnabled(config.enableLightConsistency) || isEnabled(config.lightConsistency)

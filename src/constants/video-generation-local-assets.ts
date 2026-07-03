@@ -394,9 +394,9 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     title: '车辆广告｜动态展示',
     type: 'vehicle-ad',
     typeLabel: '车辆广告',
-    styleLabel: '暂未开放',
-    stylePrompt: '车辆广告模板暂未开放，敬请期待。',
-    description: '适合用车辆动态镜头制作广告展示，当前模板暂未开放。',
+    styleLabel: '特效广告',
+    stylePrompt: '基于车辆外观与内饰图片生成 15 秒纯车辆动态广告，无数字人、无口播。',
+    description: '选择广告效果后生成车辆动态展示视频，适合投放短视频平台和车源广告。',
     badge: 'new',
     videoUrl: scene05Video,
     outputRatio: '9:16',
@@ -679,9 +679,9 @@ function buildFallbackSceneTemplate(scene: LocalSceneDefinition): VideoTemplate 
     inputRequirements: [],
     requiredFields: [],
     optionalFields: [],
-    status: scene.type === 'vehicle-ad' ? 'coming_soon' : 'available',
-    generationReadiness: scene.type === 'vehicle-ad' ? 'unavailable' : 'ready',
-    reason: scene.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : undefined,
+    status: 'available',
+    generationReadiness: 'ready',
+    reason: undefined,
     defaultDigitalHumanId: resolveTemplateDefaultDigitalHumanId(scene.templateId),
   }
 }
@@ -705,10 +705,9 @@ export function getLocalVideoSceneTemplates(apiTemplates: VideoTemplate[] = []):
         thumbnailUrl: local.videoUrl,
         previewUrl: local.videoUrl,
         outputRatio: local.outputRatio,
-        status: local.type === 'vehicle-ad' ? 'coming_soon' : template.status,
-        generationReadiness:
-          local.type === 'vehicle-ad' ? 'unavailable' : template.generationReadiness,
-        reason: local.type === 'vehicle-ad' ? '该模板暂未开放，敬请期待！' : template.reason,
+        status: template.status,
+        generationReadiness: template.generationReadiness,
+        reason: template.reason,
         defaultDigitalHumanId:
           resolveTemplateDefaultDigitalHumanId(template.templateId) ??
           template.defaultDigitalHumanId,
