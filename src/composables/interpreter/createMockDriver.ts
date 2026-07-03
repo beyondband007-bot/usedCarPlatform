@@ -6,7 +6,7 @@
  * - 跨标签信令走 BroadcastChannel
  * - "自动剧本"推进内置对话脚本模拟 ASR+TMT 输出
  * - "手动模式"用内置词典 DICT 模拟翻译
- * - 视频/音频挂载为空实现(UI 用 mock 头像)
+ * - 默认不连后端/TRTC,但会用浏览器 getUserMedia 做本地设备预览与权限验证
  */
 import {
   INTERPRETER_DICT,
@@ -84,6 +84,11 @@ export function createMockDriver(options: CreateMockDriverOptions): InterpreterD
   let autoRunning = false
   let lineSeq = 0
   let disposed = false
+  let localVideoEl: HTMLElement | null = null
+  let localPreviewVideo: HTMLVideoElement | null = null
+  let localMediaStream: MediaStream | null = null
+  let desiredMicOn = true
+  let desiredCamOn = true
 
   function connectChannel(rid: string) {
     if (channel) channel.close()
@@ -161,6 +166,115 @@ export function createMockDriver(options: CreateMockDriverOptions): InterpreterD
     autoRunning = true
     autoIdx = 0
     pushNextScriptLine()
+  }
+
+  function mediaErrorMessage(error: unknown) {
+    if (error instanceof DOMException) {
+      if (error.name === 'NotAllowedError') {
+        return '摄像头或麦克风权限被拒绝，请在浏览器地址栏重新允许设备权限'
+      }
+      if (error.name === 'NotFoundError') {
+        return '未检测到可用的摄像头或麦克风设备'
+      }
+      if (error.name === 'NotReadableError') {
+        return '摄像头或麦克风正被其他应用占用，请关闭占用后重试'
+      }
+      if (error.name === 'OverconstrainedError') {
+        return '当前摄像头或麦克风不满足采集参数，请更换设备后重试'
+      }
+      return `${error.name}: ${error.message}`
+    }
+    if (error instanceof Error) return error.message
+    return String(error)
+  }
+
+  function emitMediaError(message: string, error?: unknown) {
+    emit({
+      type: 'error',
+      scope: 'media',
+      message: error ? `${message}: ${mediaErrorMessage(error)}` : message,
+      recoverable: true,
+    })
+  }
+
+  function ensureLocalPreviewVideo() {
+    if (!localVideoEl) return null
+    if (localPreviewVideo && localPreviewVideo.parentElement === localVideoEl) {
+      return localPreviewVideo
+    }
+    localVideoEl.replaceChildren()
+    const video = document.createElement('video')
+    video.autoplay = true
+    video.muted = true
+    video.playsInline = true
+    video.setAttribute('aria-label', '本地摄像头预览')
+    localVideoEl.appendChild(video)
+    localPreviewVideo = video
+    return video
+  }
+
+  function applyMediaTrackState() {
+    localMediaStream?.getAudioTracks().forEach((track) => {
+      track.enabled = desiredMicOn
+    })
+    localMediaStream?.getVideoTracks().forEach((track) => {
+      track.enabled = desiredCamOn
+    })
+  }
+
+  async function ensureLocalMediaStream() {
+    if (localMediaStream) {
+      applyMediaTrackState()
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      emitMediaError('当前浏览器不支持摄像头/麦克风能力，请使用最新版 Chrome、Edge 或 Safari')
+      return
+    }
+    if (
+      !window.isSecureContext &&
+      location.hostname !== 'localhost' &&
+      location.hostname !== '127.0.0.1'
+    ) {
+      emitMediaError('浏览器要求在 HTTPS 环境下开启摄像头和麦克风')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+        },
+      })
+      if (disposed) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      localMediaStream = stream
+      applyMediaTrackState()
+      const video = ensureLocalPreviewVideo()
+      if (video) {
+        video.srcObject = stream
+        await video.play().catch(() => {
+          // 浏览器自动播放策略偶发拦截时,保留 srcObject,等待用户下一次交互恢复。
+        })
+      }
+    } catch (error) {
+      emitMediaError('本地设备启动失败', error)
+    }
+  }
+
+  function stopLocalMediaStream() {
+    localMediaStream?.getTracks().forEach((track) => track.stop())
+    localMediaStream = null
+    if (localPreviewVideo) {
+      localPreviewVideo.srcObject = null
+      localPreviewVideo.remove()
+      localPreviewVideo = null
+    }
   }
 
   return {
@@ -245,21 +359,33 @@ export function createMockDriver(options: CreateMockDriverOptions): InterpreterD
     dispose() {
       disposed = true
       stopAuto()
+      stopLocalMediaStream()
       channel?.close()
       channel = null
       listeners.clear()
     },
 
-    async attachMedia(_targets: MediaMountTargets) {
-      // mock 不接管真实视频,UI 直接展示头像
+    async attachMedia(targets: MediaMountTargets) {
+      localVideoEl = targets.localVideoEl
+      await ensureLocalMediaStream()
     },
 
-    toggleMic(_on: boolean) {
-      // mock 无实体音轨
+    toggleMic(on: boolean) {
+      desiredMicOn = on
+      if (!localMediaStream && on) {
+        void ensureLocalMediaStream()
+        return
+      }
+      applyMediaTrackState()
     },
 
-    toggleCam(_on: boolean) {
-      // mock 无实体视频轨
+    toggleCam(on: boolean) {
+      desiredCamOn = on
+      if (!localMediaStream && on) {
+        void ensureLocalMediaStream()
+        return
+      }
+      applyMediaTrackState()
     },
 
     setMode(next: CallMode) {

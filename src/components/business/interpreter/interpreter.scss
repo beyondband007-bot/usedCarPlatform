@@ -980,6 +980,75 @@
     padding-right: 360px;
     text-align: center;
   }
+  .remote-video-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: #050505;
+  }
+  .remote-video-layer video,
+  .local-video-layer video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    display: block;
+  }
+  .main-video-fallback {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition:
+      opacity 0.22s ease,
+      transform 0.22s ease;
+  }
+  .remote-video-layer:has(video) + .main-video-fallback {
+    opacity: 0;
+    transform: scale(0.98);
+    pointer-events: none;
+  }
+  .media-status-card {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(420px, calc(100% - 420px));
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 12px;
+    line-height: 1.45;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(16px);
+  }
+  .media-status-card svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: var(--i-accent);
+  }
+  .media-status-card:not(.error) svg {
+    animation: iSpin 1s linear infinite;
+  }
+  .media-status-card.error {
+    border-color: rgba(239, 68, 68, 0.38);
+    background: rgba(69, 10, 10, 0.72);
+    color: rgba(255, 226, 226, 0.96);
+  }
+  .media-status-card.error svg {
+    color: var(--i-danger);
+  }
+  @keyframes iSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .main-video-avatar {
     width: 140px;
     height: 140px;
@@ -1123,7 +1192,15 @@
     overflow: hidden;
     z-index: 4;
   }
+  .local-video-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
   .pip-mock-avatar {
+    position: relative;
+    z-index: 1;
     width: 52px;
     height: 52px;
     border-radius: 50%;
@@ -1133,9 +1210,20 @@
     font-size: 18px;
     font-weight: 600;
     color: #fff;
+    opacity: 0;
+    transform: scale(0.88);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+  .pip-mock-avatar.show,
+  .local-video-layer:not(:has(video)) + .pip-mock-avatar {
+    opacity: 1;
+    transform: scale(1);
   }
   .pip-label {
     position: absolute;
+    z-index: 2;
     bottom: 6px;
     left: 8px;
     font-size: 10px;

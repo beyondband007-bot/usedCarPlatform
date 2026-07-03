@@ -65,7 +65,33 @@ export function createTencentDriver(
   let localVideoEl: HTMLElement | null = null
   let remoteVideoEl: HTMLElement | null = null
   let mediaAttached = false
+  let roomEntered = false
+  let localAudioStarted = false
+  let localVideoStarted = false
+  let desiredMicOn = true
+  let desiredCamOn = true
   let disposed = false
+
+  function formatRtcError(error: unknown) {
+    if (error instanceof Error) return error.message
+    if (typeof error === 'object' && error) {
+      const maybe = error as { message?: unknown; code?: unknown; name?: unknown }
+      const parts = [maybe.name, maybe.code, maybe.message]
+        .filter((item) => item != null && item !== '')
+        .map(String)
+      if (parts.length) return parts.join(' · ')
+    }
+    return String(error)
+  }
+
+  function emitMediaError(message: string, error: unknown, recoverable = true) {
+    emit({
+      type: 'error',
+      scope: 'media',
+      message: `${message}: ${formatRtcError(error)}`,
+      recoverable,
+    })
+  }
 
   // ============================================================
   // WebSocket
@@ -201,55 +227,114 @@ export function createTencentDriver(
       emit({ type: 'quality-change', level, role: perspective })
     })
 
+    trtcClient.on(TRTC.EVENT.PERMISSION_STATE_CHANGE, (event) => {
+      if (event.camera === 'denied' || event.microphone === 'denied') {
+        emit({
+          type: 'error',
+          scope: 'media',
+          message: '摄像头或麦克风权限被拒绝，请在浏览器地址栏重新允许设备权限',
+          recoverable: true,
+        })
+      }
+    })
+
     return trtcClient
   }
 
   async function enterTrtcRoom() {
     const client = await initTrtc()
-    await client.enterRoom({
-      roomId: hashRoomId(roomId),
-      sdkAppId,
-      userId,
-      userSig,
-      // 默认 mode 由 SDK 选择;这里显式指定视频通话模式
-    })
-    // 开始本地流(先关麦克风/摄像头,等 UI 调 toggleMic/Cam 打开)
-    if (localVideoEl) {
-      try {
-        await client.startLocalVideo({ view: localVideoEl })
-        await client.startLocalAudio()
-      } catch (e) {
-        emit({
-          type: 'error',
-          scope: 'media',
-          message: `本地媒体启动失败,请检查摄像头/麦克风权限: ${String(e)}`,
-          recoverable: false,
-        })
-      }
+    if (!roomEntered) {
+      await client.enterRoom({
+        strRoomId: roomId,
+        sdkAppId,
+        userId,
+        userSig,
+        autoReceiveAudio: true,
+        autoReceiveVideo: false,
+        // 默认 mode 由 SDK 选择;这里显式指定视频通话模式
+      })
+      roomEntered = true
     }
+    await ensureLocalMedia()
   }
 
   async function leaveTrtcRoom() {
     if (!trtcClient) return
     try {
+      await Promise.allSettled([
+        localVideoStarted ? trtcClient.stopLocalVideo() : Promise.resolve(),
+        localAudioStarted ? trtcClient.stopLocalAudio() : Promise.resolve(),
+      ])
+      localVideoStarted = false
+      localAudioStarted = false
       await trtcClient.exitRoom()
+      roomEntered = false
     } catch {
       // ignore
     }
   }
 
-  /**
-   * TRTC v5 的 roomId 支持字符串型 strRoomId 或数字型 roomId。
-   * 后端返回的 roomId 是 6 位字母数字(如 Z6C784),此处直接用 strRoomId。
-   */
-  function hashRoomId(rid: string): number {
-    // 兼容层:若后端将来给数字型房间号,此处替换;当前接口仍用 strRoomId,
-    // 由 enterRoom 的 strRoomId 参数承接。为保持类型简单,此函数返回一个稳定 hash。
-    let h = 0
-    for (let i = 0; i < rid.length; i += 1) {
-      h = (h * 31 + rid.charCodeAt(i)) | 0
+  async function ensureLocalVideo() {
+    if (!trtcClient || !localVideoEl || localVideoStarted || !desiredCamOn) return
+    try {
+      await trtcClient.startLocalVideo({
+        view: localVideoEl,
+        option: {
+          fillMode: 'cover',
+          mirror: 'view',
+          profile: '480p',
+        },
+      })
+      localVideoStarted = true
+      await trtcClient.updateLocalVideo({ mute: false })
+    } catch (error) {
+      emitMediaError('本地摄像头启动失败，请检查摄像头权限或设备占用情况', error)
     }
-    return Math.abs(h)
+  }
+
+  async function ensureLocalAudio() {
+    if (!trtcClient || localAudioStarted || !desiredMicOn) return
+    try {
+      await trtcClient.startLocalAudio()
+      localAudioStarted = true
+      await trtcClient.updateLocalAudio({ mute: false })
+    } catch (error) {
+      emitMediaError('本地麦克风启动失败，请检查麦克风权限或设备占用情况', error)
+    }
+  }
+
+  async function ensureLocalMedia() {
+    await Promise.all([ensureLocalVideo(), ensureLocalAudio()])
+  }
+
+  async function setLocalAudioEnabled(on: boolean) {
+    desiredMicOn = on
+    if (!trtcClient) return
+    if (!localAudioStarted && on) {
+      await ensureLocalAudio()
+      return
+    }
+    if (!localAudioStarted) return
+    try {
+      await trtcClient.updateLocalAudio({ mute: !on })
+    } catch (error) {
+      emitMediaError('切换麦克风失败', error)
+    }
+  }
+
+  async function setLocalVideoEnabled(on: boolean) {
+    desiredCamOn = on
+    if (!trtcClient) return
+    if (!localVideoStarted && on) {
+      await ensureLocalVideo()
+      return
+    }
+    if (!localVideoStarted) return
+    try {
+      await trtcClient.updateLocalVideo({ mute: !on })
+    } catch (error) {
+      emitMediaError('切换摄像头失败', error)
+    }
   }
 
   // ============================================================
@@ -284,33 +369,24 @@ export function createTencentDriver(
       remoteVideoEl = targets.remoteVideoEl
       if (!mediaAttached && roomId && userSig) {
         mediaAttached = true
-        await enterTrtcRoom()
+        try {
+          await enterTrtcRoom()
+        } catch (error) {
+          mediaAttached = false
+          emitMediaError('进入 TRTC 房间失败', error, false)
+          throw error
+        }
+      } else if (trtcClient && roomEntered) {
+        await ensureLocalMedia()
       }
     },
 
     toggleMic(on: boolean) {
-      if (!trtcClient) return
-      // TRTC v5:updateLocalAudio 或 muteLocalAudio
-      trtcClient.updateLocalAudio({ mute: !on }).catch((e) => {
-        emit({
-          type: 'error',
-          scope: 'media',
-          message: `切换麦克风失败: ${String(e)}`,
-          recoverable: true,
-        })
-      })
+      void setLocalAudioEnabled(on)
     },
 
     toggleCam(on: boolean) {
-      if (!trtcClient) return
-      trtcClient.updateLocalVideo({ mute: !on }).catch((e) => {
-        emit({
-          type: 'error',
-          scope: 'media',
-          message: `切换摄像头失败: ${String(e)}`,
-          recoverable: true,
-        })
-      })
+      void setLocalVideoEnabled(on)
     },
 
     setMode(_mode: CallMode) {

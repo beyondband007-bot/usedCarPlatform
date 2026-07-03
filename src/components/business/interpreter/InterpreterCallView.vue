@@ -20,7 +20,12 @@ const manualOtherText = ref("");
 const manualSelfOutput = ref("");
 const manualOtherOutput = ref("");
 const bodyRef = ref<HTMLElement | null>(null);
+const localVideoRef = ref<HTMLElement | null>(null);
+const remoteVideoRef = ref<HTMLElement | null>(null);
 const userScrolledUp = ref(false);
+const mediaMounting = ref(false);
+const mediaMounted = ref(false);
+const mediaError = ref("");
 
 // ---- 派生 ----
 const timerText = computed(() => props.session.fmtTimer(state.callElapsed));
@@ -29,6 +34,42 @@ const remoteShort = computed(() => props.session.langInfo(props.session.remotePa
 const localName = computed(() => props.session.localParty.value.name);
 const remoteName = computed(() => props.session.remoteParty.value.name);
 const remoteLangName = computed(() => props.session.langInfo(props.session.remoteParty.value.lang).name);
+const mediaStatusText = computed(() => {
+  if (mediaError.value) return mediaError.value;
+  if (mediaMounting.value) return "正在连接摄像头与麦克风...";
+  if (mediaMounted.value) return "音视频已接入";
+  return "等待媒体设备接入";
+});
+
+function resolveMediaPreflightError() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return "当前浏览器不支持摄像头/麦克风能力，请使用最新版 Chrome、Edge 或 Safari。";
+  }
+  if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    return "浏览器要求在 HTTPS 环境下开启摄像头和麦克风。";
+  }
+  return "";
+}
+
+async function mountMedia() {
+  if (mediaMounted.value || mediaMounting.value) return;
+  const localVideoEl = localVideoRef.value;
+  const remoteVideoEl = remoteVideoRef.value;
+  if (!localVideoEl || !remoteVideoEl) return;
+
+  mediaError.value = props.session.driver.kind === "tencent" ? resolveMediaPreflightError() : "";
+  if (mediaError.value) return;
+
+  mediaMounting.value = true;
+  try {
+    await props.session.attachMedia({ localVideoEl, remoteVideoEl });
+    mediaMounted.value = true;
+  } catch (error) {
+    mediaError.value = `音视频接入失败：${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    mediaMounting.value = false;
+  }
+}
 
 // ---- 字幕滚动跟随 ----
 function scrollToBottom() {
@@ -89,11 +130,19 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener("click", onDocClick);
   document.addEventListener("keydown", onKeydown);
+  void nextTick(mountMedia);
 });
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocClick);
   document.removeEventListener("keydown", onKeydown);
 });
+
+watch(
+  () => state.lastError,
+  (error) => {
+    if (error?.scope === "media") mediaError.value = error.message;
+  },
+);
 </script>
 
 <template>
@@ -149,15 +198,23 @@ onBeforeUnmount(() => {
       <div class="signal-bars"><span /><span /><span /><span /></div>
 
       <div class="main-video-mock">
-        <div
-          class="main-video-avatar"
-          :style="{ background: props.session.gradientOf(props.session.remoteParty.value.color) }"
-        >
-          {{ props.session.remoteParty.value.initial }}
+        <div ref="remoteVideoRef" class="remote-video-layer" aria-label="远端视频画面" />
+        <div class="main-video-fallback">
+          <div
+            class="main-video-avatar"
+            :style="{ background: props.session.gradientOf(props.session.remoteParty.value.color) }"
+          >
+            {{ props.session.remoteParty.value.initial }}
+          </div>
+          <div class="video-pulse" />
+          <div class="main-video-name">{{ remoteName }}</div>
+          <div class="main-video-lang">{{ remoteLangName }} · 受邀方</div>
         </div>
-        <div class="video-pulse" />
-        <div class="main-video-name">{{ remoteName }}</div>
-        <div class="main-video-lang">{{ remoteLangName }} · 受邀方</div>
+      </div>
+
+      <div v-if="mediaError || mediaMounting" class="media-status-card" :class="{ error: mediaError }">
+        <Icon :icon="mediaError ? 'lucide:triangle-alert' : 'lucide:loader-2'" />
+        <span>{{ mediaStatusText }}</span>
       </div>
 
       <div class="call-center-sub" :class="{ hide: !state.subOn }">
@@ -165,13 +222,18 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="call-pip">
+        <div ref="localVideoRef" class="local-video-layer" aria-label="本地视频预览" />
         <div
           class="pip-mock-avatar"
+          :class="{ show: !state.camOn }"
           :style="{ background: props.session.gradientOf(props.session.localParty.value.color) }"
         >
           {{ props.session.localParty.value.initial }}
         </div>
-        <div class="pip-label">我 · {{ localName }}</div>
+        <div class="pip-label">
+          我 · {{ localName }}
+          <span v-if="!state.camOn"> · 摄像头已关</span>
+        </div>
       </div>
 
       <button
