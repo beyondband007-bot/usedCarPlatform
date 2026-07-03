@@ -1460,6 +1460,9 @@ watch(
 }
 
 .sv-template-card.is-selected .sv-template-media {
+  box-shadow:
+    0 0 0 3px #d4a017,
+    0 10px 26px rgba(212, 160, 23, 0.32);
   transform: none;
 }
 
@@ -1662,7 +1665,7 @@ watch(
   aspect-ratio: 9 / 16;
   border-radius: 14px;
   background: transparent;
-  transition: transform 0.28s ease;
+  transition: transform 0.28s ease, box-shadow 0.2s ease;
   will-change: transform;
 }
 
