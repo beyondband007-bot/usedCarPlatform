@@ -2205,10 +2205,10 @@
       <div>
         <p class="eyebrow">ENTERPRISE VEHICLE ASSET CENTER</p>
         <h1>车辆库</h1>
-        <p>统一管理车辆与车场素材，入库一次，后续生成视频可直接选择调用。</p>
+        <p>统一管理车辆与车场素材，一期先沉淀素材与模板库，视频生成能力后续迭代接入。</p>
       </div>
       <div class="actions">
-        <button class="btn ghost" id="openPicker" type="button">模拟工作台调用</button>
+        <button class="btn ghost" id="openPicker" type="button">查看模板库</button>
         <button class="btn ghost can-freeze" id="openDealerEntry" type="button">新增车场</button>
         <button class="btn primary can-freeze" id="openAddVehicle" type="button">新增车辆</button>
       </div>
@@ -2245,7 +2245,7 @@
     <div class="library-tabs" aria-label="车辆库分类">
       <button class="library-tab active" type="button" data-library-tab="vehicles">车辆</button>
       <button class="library-tab" type="button" data-library-tab="lots">车场</button>
-      <button class="library-tab" type="button" data-library-tab="records">生成记录</button>
+      <button class="library-tab" type="button" data-library-tab="records">模板库</button>
     </div>
 
     <div class="library-panel active" id="library-vehicles">
@@ -2262,12 +2262,12 @@
             <option>素材完整度</option>
             <option>创建时间</option>
           </select>
-          <button class="btn accent can-freeze" id="toolbarGenerate" type="button">生成视频</button>
+          <button class="btn accent can-freeze" id="toolbarGenerate" type="button">查看模板</button>
         </div>
 
         <div class="chips" aria-label="车辆筛选">
           <button class="chip active" type="button">全部车辆</button>
-          <button class="chip" type="button">可直接生成</button>
+          <button class="chip" type="button">素材完整</button>
           <button class="chip" type="button">缺车头/车尾图</button>
           <button class="chip" type="button">缺主驾驶图</button>
           <button class="chip" type="button">缺前/后排视频</button>
@@ -2275,7 +2275,7 @@
         </div>
 
         <div class="status-strip">
-          <div><span>可直接生成</span><strong>21 辆</strong></div>
+          <div><span>素材完整</span><strong>21 辆</strong></div>
           <div><span>待补核心素材</span><strong>15 辆</strong></div>
           <div><span>车辆草稿</span><strong>3 辆</strong></div>
           <div><span>容量预警</span><strong>2 辆</strong></div>
@@ -2283,7 +2283,7 @@
 
         <div class="empty-panel">
           <h2>还没有车辆素材</h2>
-          <p class="vin">通过 VIN 创建车辆档案，并上传外观、内饰、视频素材。后续生成视频时，可以直接从素材库调用。</p>
+          <p class="vin">通过 VIN 创建车辆档案，并上传车头、车尾、主驾驶、前排视频、后排视频。后续模板库可直接读取这些素材规则。</p>
           <button class="btn primary can-freeze" id="openAddVehicleEmpty" type="button">新增第一辆车</button>
         </div>
 
@@ -2291,7 +2291,7 @@
           <button class="vehicle-card active" type="button" data-index="0">
             <div class="vehicle-cover">
               <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=760&q=80" alt="宝马 5系" />
-              <span class="badge ready">可生成视频</span>
+              <span class="badge ready">素材完整</span>
             </div>
             <div class="vehicle-body">
               <h3>宝马 5系 2021款 530Li</h3>
@@ -2302,14 +2302,14 @@
                 <span>5/5</span>
               </div>
               <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>前/后排视频 ✓</span></div>
-              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">查看模板</span><span class="btn ghost">管理</span></div>
             </div>
           </button>
 
           <button class="vehicle-card" type="button" data-index="1">
             <div class="vehicle-cover">
               <img src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=760&q=80" alt="奔驰 C级" />
-              <span class="badge warn">缺内饰图</span>
+              <span class="badge warn">缺主驾驶图</span>
             </div>
             <div class="vehicle-body">
               <h3>奔驰 C级 2020款 C260L</h3>
@@ -2338,14 +2338,14 @@
                 <span>3/5</span>
               </div>
               <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>缺前/后排视频</span></div>
-              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">查看模板</span><span class="btn ghost">管理</span></div>
             </div>
           </button>
 
           <button class="vehicle-card" type="button" data-index="3">
             <div class="vehicle-cover">
               <img src="https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=760&q=80" alt="特斯拉 Model 3" />
-              <span class="badge ready">可生成视频</span>
+              <span class="badge ready">素材完整</span>
             </div>
             <div class="vehicle-body">
               <h3>特斯拉 Model 3 2023款</h3>
@@ -2356,7 +2356,7 @@
                 <span>5/5</span>
               </div>
               <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>前/后排视频 ✓</span></div>
-              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">查看模板</span><span class="btn ghost">管理</span></div>
             </div>
           </button>
 
@@ -2374,7 +2374,7 @@
                 <span>3/5</span>
               </div>
               <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>缺前/后排视频</span></div>
-              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">查看模板</span><span class="btn ghost">管理</span></div>
             </div>
           </button>
 
@@ -2411,7 +2411,7 @@
             <span class="tag" id="detailScore">核心素材 5/5</span>
           </div>
           <div class="detail-actions">
-            <button class="btn accent can-freeze" id="openGenerateFlow" type="button">生成视频</button>
+            <button class="btn accent can-freeze" id="openGenerateFlow" type="button">查看模板</button>
             <button class="btn ghost can-freeze" id="openUploadManager" type="button">上传素材</button>
             <button class="btn ghost" id="openEditVehicle" type="button">编辑信息</button>
           </div>
@@ -2419,7 +2419,7 @@
           <div class="tabs">
             <button class="tab active" type="button" data-tab="overview">概览</button>
             <button class="tab" type="button" data-tab="images">全部素材</button>
-            <button class="tab" type="button" data-tab="records">生成记录</button>
+            <button class="tab" type="button" data-tab="records">模板建议</button>
           </div>
 
           <div class="tab-panel active" id="tab-overview">
@@ -2427,7 +2427,7 @@
               <div class="info-item"><span>品牌车系</span><strong>宝马 / 5系</strong></div>
               <div class="info-item"><span>年款车型</span><strong>2021款 530Li</strong></div>
               <div class="info-item"><span>动力类型</span><strong>2.0T 汽油</strong></div>
-              <div class="info-item"><span>最近使用</span><strong>今天 13:42</strong></div>
+              <div class="info-item"><span>最近更新</span><strong>今天 13:42</strong></div>
               <div class="info-item"><span>容量占用</span><strong>186MB</strong></div>
             </div>
           </div>
@@ -2436,18 +2436,18 @@
             <div class="material-grid">
               <div class="material"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="外观正前" /><span>外观正前</span></div>
               <div class="material"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="侧面" /><span>外观侧面</span></div>
-              <div class="material"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="内饰" /><span>内饰中控</span></div>
-              <div class="material"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="座椅" /><span>内饰座椅</span></div>
-              <div class="material"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="细节" /><span>车身细节</span></div>
-              <div class="material"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="视频缩略图" /><span>绕车视频</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="主驾驶" /><span>主驾驶图</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="车尾" /><span>车尾图</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="前排视频" /><span>前排视频</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="后排视频" /><span>后排视频</span></div>
             </div>
           </div>
 
           <div class="tab-panel" id="tab-records">
             <div class="timeline">
-              <div class="task"><strong>数字人讲车短视频</strong><span>今天 13:42 · 已完成 · 消耗 88 积分</span></div>
-              <div class="task"><strong>数字人长视频脚本</strong><span>昨天 16:20 · 已完成 · 已保存草稿</span></div>
-              <div class="task"><strong>长视频脚本草稿</strong><span>2026-06-30 · 草稿已保存</span></div>
+              <div class="task"><strong>竖屏讲车模板</strong><span>推荐 · 需要 5 个车辆核心素材 · 适合短视频场景</span></div>
+              <div class="task"><strong>展厅介绍模板</strong><span>可选 · 需要车场图片/视频 · 适合门店品牌展示</span></div>
+              <div class="task"><strong>质感图文模板</strong><span>可选 · 仅展示模板结构，一期不发起生成</span></div>
             </div>
           </div>
         </div>
@@ -2459,7 +2459,7 @@
       <div class="toolbar">
         <div>
           <h2 style="margin:0 0 4px">车场素材</h2>
-          <p class="vin" style="margin:0">车场图片与视频可在多辆车的视频中重复使用。</p>
+          <p class="vin" style="margin:0">车场图片与视频先作为素材资产沉淀，后续可被模板和生成链路复用。</p>
         </div>
         <button class="btn primary can-freeze" id="openDealerEntryFromLot" type="button">新增车场</button>
       </div>
@@ -2497,14 +2497,14 @@
     <section class="library-panel" id="library-records">
       <div class="toolbar">
         <div>
-          <h2 style="margin:0 0 4px">生成记录</h2>
-          <p class="vin" style="margin:0">统一查看草稿、生成中、已完成和失败任务。</p>
+          <h2 style="margin:0 0 4px">模板库</h2>
+          <p class="vin" style="margin:0">一期只维护模板信息和所需素材规则，不在这里提交生成任务。</p>
         </div>
       </div>
       <div class="record-grid">
-        <article class="record-card"><span class="badge ready">已完成</span><h3>宝马 530Li 讲车视频</h3><p>竖屏讲车模板 · 专业女声 · 今天 13:42</p><button class="btn ghost" type="button">查看结果</button></article>
-        <article class="record-card"><span class="badge">生成中 68%</span><h3>特斯拉 Model 3 展厅介绍</h3><p>科技感模板 · 活力男声 · 预计还需 2 分钟</p><button class="btn ghost" type="button">查看进度</button></article>
-        <article class="record-card"><span class="badge warn">草稿</span><h3>奥迪 A6L 车辆介绍</h3><p>已选车辆与素材 · 尚未提交生成</p><button class="btn accent" type="button">继续编辑</button></article>
+        <article class="record-card"><span class="badge ready">启用中</span><h3>竖屏快速讲车</h3><p>9:16 · 需要 3 图 2 视频 · 适合抖音/视频号</p><button class="btn ghost" type="button">查看模板</button></article>
+        <article class="record-card"><span class="badge ready">启用中</span><h3>展厅品牌介绍</h3><p>16:9 · 需要车场图/视频 · 用于门店形象展示</p><button class="btn ghost" type="button">查看模板</button></article>
+        <article class="record-card"><span class="badge warn">待完善</span><h3>高端质感展示</h3><p>9:16 · 建议更多车辆细节素材 · 后续迭代开放</p><button class="btn accent" type="button">编辑模板</button></article>
       </div>
     </section>
   </main>
@@ -2514,7 +2514,7 @@
       <header class="overlay-head">
         <div>
           <h2>新增车场</h2>
-          <p class="vin" style="margin-top:4px">上传一次，可在多辆车的视频中重复使用</p>
+          <p class="vin" style="margin-top:4px">上传一次，作为企业素材资产沉淀，后续可被模板复用</p>
         </div>
         <button class="close" type="button" data-close="dealerModal">×</button>
       </header>
@@ -2802,7 +2802,7 @@
                   <button class="slot-card" type="button" data-upload-kind="后排视频"><b>▶</b><strong>后排视频</strong><span>必传 · 10–30 秒</span></button>
                 </div>
                 <button class="optional-upload" type="button" data-upload-kind="批量车辆素材">＋ 批量选择素材，上传后自动识别类型</button>
-                <button class="optional-upload" type="button" data-upload-kind="车辆补充素材">＋ 补充素材（选填）：侧面、仪表盘、后备箱或其他视频</button>
+                  <button class="optional-upload" type="button" data-upload-kind="车辆补充素材">＋ 补充素材（选填）：侧面、后备箱或其他视频</button>
               </section>
             </div>
 
@@ -2848,7 +2848,7 @@
                   <div><span>所属车场</span><strong>虹桥精品展厅</strong></div>
                   <div><span>核心素材</span><strong>5 / 5 已齐全</strong></div>
                   <div><span>补充素材</span><strong>0 个</strong></div>
-                  <div><span>入库状态</span><strong style="color:#168452">可生成视频</strong></div>
+                  <div><span>入库状态</span><strong style="color:#168452">素材完整</strong></div>
                 </div>
               </section>
             </div>
@@ -2893,10 +2893,10 @@
         <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,#22c55e,#16a34a); display:grid; place-items:center; font-size:30px; color:#fff">✓</div>
         <div>
           <h2 style="margin:0 0 6px">车辆已成功入库</h2>
-          <p style="margin:0; color:var(--muted); font-size:14px">斯柯达 明锐 2009款 1.6L 自动逸致版 已加入您的云端车库，可随时管理与生成视频。</p>
+          <p style="margin:0; color:var(--muted); font-size:14px">斯柯达 明锐 2009款 1.6L 自动逸致版 已加入您的云端车库，可随时管理素材并查看适配模板。</p>
         </div>
         <div style="display:flex; flex-direction:column; gap:10px; width:100%; padding:0 4px">
-          <button class="btn primary" type="button" id="postAddGenerate" style="justify-content:center">✦ 立即生成长视频</button>
+          <button class="btn primary" type="button" id="postAddGenerate" style="justify-content:center">查看模板库</button>
           <button class="btn ghost" type="button" id="goUploadAfterAdd" style="justify-content:center">继续补充车辆素材</button>
           <button class="btn ghost" type="button" data-close="postAddModal" style="justify-content:center; color:var(--muted)">稍后再说，返回车库</button>
         </div>
@@ -2909,7 +2909,7 @@
       <header class="overlay-head">
         <div>
           <h2>从车辆素材库选择</h2>
-          <p class="vin" style="margin-top:4px">模拟视觉工作台上传区调用车库素材</p>
+          <p class="vin" style="margin-top:4px">预览当前车辆素材是否满足模板要求</p>
         </div>
         <button class="close" type="button" data-close="pickerDrawer">×</button>
       </header>
@@ -2921,36 +2921,36 @@
         <div class="picker-list">
           <button class="picker-vehicle active" type="button">
             <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=260&q=80" alt="宝马" />
-            <span><strong>宝马 5系 2021款 530Li</strong><span>外观 12 · 内饰 6 · 视频 2</span></span>
+            <span><strong>宝马 5系 2021款 530Li</strong><span>车头/车尾/主驾图齐全 · 前后排视频齐全</span></span>
             <span class="badge ready">可用</span>
           </button>
           <button class="picker-vehicle" type="button">
             <img src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=260&q=80" alt="奔驰" />
-            <span><strong>奔驰 C级 2020款 C260L</strong><span>外观 5 · 内饰 0 · 视频 0</span></span>
-            <span class="badge warn">缺内饰</span>
+            <span><strong>奔驰 C级 2020款 C260L</strong><span>缺主驾驶图 · 缺前/后排视频</span></span>
+            <span class="badge warn">待补素材</span>
           </button>
         </div>
 
         <div class="chips" style="padding:0">
-          <button class="chip active" type="button">外观</button>
-          <button class="chip" type="button">内饰</button>
-          <button class="chip" type="button">视频</button>
+          <button class="chip active" type="button">车辆图片</button>
+          <button class="chip" type="button">车辆视频</button>
+          <button class="chip" type="button">车场素材</button>
           <button class="chip" type="button">全部</button>
         </div>
 
         <div class="select-grid">
-          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="外观正前" /><span>外观正前</span></button>
-          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="外观侧面" /><span>外观侧面</span></button>
-          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="车身细节" /><span>车身细节</span></button>
-          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="内饰中控" /><span>内饰中控</span></button>
-          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="内饰座椅" /><span>内饰座椅</span></button>
-          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="绕车视频" /><span>绕车视频</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="车头图" /><span>车头图</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="车尾图" /><span>车尾图</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="主驾驶图" /><span>主驾驶图</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="前排视频" /><span>前排视频</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="后排视频" /><span>后排视频</span></button>
+          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=300&q=80" alt="车场图片" /><span>车场图片</span></button>
         </div>
       </div>
       <footer class="overlay-foot">
-        <span class="vin" style="margin-right:auto; align-self:center">已选：外观 2，内饰 1</span>
+        <span class="vin" style="margin-right:auto; align-self:center">模板匹配：车辆核心素材 5/5，车场素材可选</span>
         <button class="btn ghost" type="button" data-close="pickerDrawer">取消</button>
-        <button class="btn primary" id="confirmPicker" type="button">确认使用</button>
+        <button class="btn primary" id="confirmPicker" type="button">确认查看</button>
       </footer>
     </aside>
   </div>
@@ -2969,21 +2969,21 @@
           <span>本车素材占用 186MB，企业库剩余 596MB。本次模拟上传 128MB 后预计使用 556MB / 1GB。</span>
         </div>
         <div class="upload-lanes" style="margin-top:14px">
-          <button class="upload-lane" type="button" data-upload-kind="外观照片">
-            <strong>外观照片</strong>
-            <span>车头、车尾、侧面、45 度角。已上传 12 张，建议至少 6 张。</span>
+          <button class="upload-lane" type="button" data-upload-kind="车头图">
+            <strong>车头图</strong>
+            <span>必传图片槽位，已上传 1 张。</span>
           </button>
-          <button class="upload-lane" type="button" data-upload-kind="内饰照片">
-            <strong>内饰照片</strong>
-            <span>中控、座椅、方向盘、仪表盘。已上传 6 张，建议至少 4 张。</span>
+          <button class="upload-lane" type="button" data-upload-kind="车尾图">
+            <strong>车尾图</strong>
+            <span>必传图片槽位，已上传 1 张。</span>
           </button>
-          <button class="upload-lane" type="button" data-upload-kind="细节照片">
-            <strong>细节照片</strong>
-            <span>轮毂、灯组、铭牌、后备箱等。已上传 3 张，可选。</span>
+          <button class="upload-lane" type="button" data-upload-kind="主驾驶图">
+            <strong>主驾驶图</strong>
+            <span>必传图片槽位，已上传 1 张。</span>
           </button>
-          <button class="upload-lane" type="button" data-upload-kind="视频素材">
-            <strong>视频素材</strong>
-            <span>绕车、内饰展示、启动车辆。已上传 2 个，支持 MP4 / MOV。</span>
+          <button class="upload-lane" type="button" data-upload-kind="前后排视频">
+            <strong>前排视频 / 后排视频</strong>
+            <span>必传视频槽位，已上传 2 个，支持 MP4 / MOV。</span>
           </button>
         </div>
 
@@ -2992,15 +2992,15 @@
           <div class="table-row head"><span>预览</span><span>素材名称</span><span>类型</span><span>大小</span><span>操作</span></div>
           <div class="table-row">
             <img class="table-thumb" src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=220&q=80" alt="外观正前" />
-            <strong>外观正前-主图.jpg</strong><span>外观</span><span>4.8MB</span><button class="btn ghost" type="button">设主图</button>
+            <strong>车头图.jpg</strong><span>图片</span><span>4.8MB</span><button class="btn ghost" type="button">设主图</button>
           </div>
           <div class="table-row">
-            <img class="table-thumb" src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=220&q=80" alt="内饰中控" />
-            <strong>内饰中控.jpg</strong><span>内饰</span><span>3.2MB</span><button class="btn ghost" type="button">改标签</button>
+            <img class="table-thumb" src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=220&q=80" alt="主驾驶图" />
+            <strong>主驾驶图.jpg</strong><span>图片</span><span>3.2MB</span><button class="btn ghost" type="button">改标签</button>
           </div>
           <div class="table-row">
-            <img class="table-thumb" src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=220&q=80" alt="绕车视频" />
-            <strong>绕车展示.mp4</strong><span>视频</span><span>76MB</span><button class="btn ghost" type="button">删除</button>
+            <img class="table-thumb" src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=220&q=80" alt="前排视频" />
+            <strong>前排视频.mp4</strong><span>视频</span><span>76MB</span><button class="btn ghost" type="button">删除</button>
           </div>
         </div>
       </div>
@@ -3231,19 +3231,19 @@
   </div>
 
   <div class="modal-backdrop" id="generateModal">
-    <section class="modal modal-wide" aria-label="生成视频弹窗">
+    <section class="modal modal-wide" aria-label="模板库弹窗">
       <header class="overlay-head">
         <div>
-          <h2>生成视频</h2>
-          <p class="vin" style="margin-top:4px" id="newGenerateVehicleName">宝马 5系 2021款 530Li · 选择车辆与素材</p>
+          <h2>模板库</h2>
+          <p class="vin" style="margin-top:4px" id="newGenerateVehicleName">宝马 5系 2021款 530Li · 查看可用模板与素材要求</p>
         </div>
         <button class="close" type="button" data-close="generateModal">×</button>
       </header>
       <div class="overlay-body">
         <div class="steps" id="newGenSteps">
-          <div class="step active" data-new-gen-indicator="1">1. 车辆与素材</div>
-          <div class="step" data-new-gen-indicator="2">2. 数字人与模板</div>
-          <div class="step" data-new-gen-indicator="3">3. 介绍信息</div>
+          <div class="step active" data-new-gen-indicator="1">1. 模板列表</div>
+          <div class="step" data-new-gen-indicator="2">2. 素材要求</div>
+          <div class="step" data-new-gen-indicator="3">3. 模板说明</div>
         </div>
 
         <div class="gen-panel active" data-new-gen-panel="1">
@@ -3253,77 +3253,77 @@
               <div>
                 <h3 id="newGenCarTitle">宝马 5系 2021款 530Li</h3>
                 <p class="vin">VIN：LBV******123456 · 核心素材 5/5 已齐全</p>
-                <div class="detail-tags"><span class="tag">车辆已入库</span><span class="tag">可生成</span><span class="tag">已关联虹桥精品展厅</span></div>
+                <div class="detail-tags"><span class="tag">车辆已入库</span><span class="tag">素材完整</span><span class="tag">已关联虹桥精品展厅</span></div>
               </div>
             </div>
-            <div class="field">
-              <label>车辆</label>
-              <select id="newGenVehicleSelect"><option>宝马 5系 2021款 530Li</option><option>奥迪 A6L 2022款 45TFSI</option><option>特斯拉 Model 3 2023款</option></select>
+            <div>
+              <h3 style="margin:0 0 8px">可用模板</h3>
+              <p class="vin" style="margin:0 0 12px">一期只展示模板结构、适用场景和素材要求，不在此处提交视频生成。</p>
             </div>
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
-              <h3 style="margin:0">选择本次使用的素材</h3>
-              <span class="vin">已选 5 个核心素材</span>
-            </div>
-            <div class="select-grid">
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="车头图" /><span>车头图</span></button>
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="车尾图" /><span>车尾图</span></button>
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="主驾驶图" /><span>主驾驶图</span></button>
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="前排视频" /><span>前排视频</span></button>
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="后排视频" /><span>后排视频</span></button>
-              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=300&q=80" alt="车场素材" /><span>车场素材</span></button>
-            </div>
-            <div class="entry-mode-tabs">
-              <button class="entry-mode active" type="button"><strong>使用库内素材</strong><span>车辆与车场素材均会保留关联关系。</span></button>
-              <button class="entry-mode" type="button" data-upload-kind="本次临时素材"><strong>临时补充素材</strong><span>上传后可选择“仅本次使用”或“同时保存到车辆库”。</span></button>
+            <div class="template-grid">
+              <button class="template-card active" type="button">
+                <div>
+                  <strong>竖屏快速讲车</strong>
+                  <span>适合短视频平台的车辆素材展示模板</span>
+                  <div class="template-meta"><em>9:16</em><em>约 45 秒</em><em>需要 3 图 2 视频</em></div>
+                </div>
+              </button>
+              <button class="template-card" type="button">
+                <div>
+                  <strong>展厅品牌介绍</strong>
+                  <span>以车场素材作为开场，突出门店环境</span>
+                  <div class="template-meta"><em>16:9</em><em>约 60 秒</em><em>需要车场图/视频</em></div>
+                </div>
+              </button>
+              <button class="template-card" type="button">
+                <div>
+                  <strong>高端质感展示</strong>
+                  <span>偏品牌质感的慢节奏展示模板</span>
+                  <div class="template-meta"><em>9:16</em><em>后续开放</em><em>建议补充细节素材</em></div>
+                </div>
+              </button>
             </div>
           </div>
         </div>
 
         <div class="gen-panel" data-new-gen-panel="2">
           <div class="form-block">
-            <h3 style="margin:0">选择数字人</h3>
-            <div class="template-grid">
-              <button class="template-card active" type="button"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=520&q=80" alt="专业女声讲解" /><div><strong>专业女声讲解</strong><span>沉稳可信 · 普通话</span></div></button>
-              <button class="template-card" type="button"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=520&q=80" alt="门店销售男声" /><div><strong>门店销售男声</strong><span>热情自然 · 普通话</span></div></button>
-              <button class="template-card" type="button"><img src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=520&q=80" alt="粤语讲解员" /><div><strong>粤语讲解员</strong><span>亲切自然 · 粤语</span></div></button>
+            <h3 style="margin:0">模板素材要求</h3>
+            <div class="select-grid">
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="车头图" /><span>车头图 · 已有</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="车尾图" /><span>车尾图 · 已有</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="主驾驶图" /><span>主驾驶图 · 已有</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="前排视频" /><span>前排视频 · 已有</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="后排视频" /><span>后排视频 · 已有</span></button>
+              <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=300&q=80" alt="车场素材" /><span>车场素材 · 可选</span></button>
             </div>
-            <h3 style="margin:8px 0 0">选择视频模板</h3>
-            <div class="template-grid">
-              <button class="template-card active" type="button"><div><strong>竖屏快速讲车</strong><span>数字人开场 + 车辆素材轮播</span><div class="template-meta"><em>9:16</em><em>约 45 秒</em><em>5–8 个素材</em></div></div></button>
-              <button class="template-card" type="button"><div><strong>展厅深度介绍</strong><span>车场开场 + 内外饰重点讲解</span><div class="template-meta"><em>16:9</em><em>约 90 秒</em><em>需要车场素材</em></div></div></button>
-              <button class="template-card" type="button"><div><strong>高端质感展示</strong><span>慢节奏转场 + 配置亮点字幕</span><div class="template-meta"><em>9:16</em><em>约 60 秒</em><em>建议 8 个素材</em></div></div></button>
+            <div class="entry-mode-tabs">
+              <button class="entry-mode active" type="button"><strong>一期校验规则</strong><span>只判断车辆/车场素材是否满足模板要求。</span></button>
+              <button class="entry-mode" type="button"><strong>后续生成规则</strong><span>数字人、文案、积分消耗和任务进度留到下一迭代。</span></button>
             </div>
-            <details>
-              <summary style="cursor:pointer; font-weight:900">高级设置：配音语速与情感</summary>
-              <div class="vehicle-form-grid" style="margin-top:12px">
-                <div class="field"><label>语速</label><select><option>正常（1.0x）</option><option>稍快（1.2x）</option></select></div>
-                <div class="field"><label>情感</label><select><option>专业解说</option><option>热情推销</option><option>温和介绍</option></select></div>
-              </div>
-            </details>
           </div>
         </div>
 
         <div class="gen-panel" data-new-gen-panel="3">
           <div class="form-block">
             <div>
-              <h3 style="margin:0 0 4px">车辆介绍信息</h3>
-              <p class="vin" style="margin:0">输入已有介绍或简单卖点，AI 可以润色；留空也可根据车辆档案直接生成。</p>
+              <h3 style="margin:0 0 4px">模板说明</h3>
+              <p class="vin" style="margin:0">后端一期只需要维护模板基础信息和素材槽位要求，前端负责展示模板可用状态。</p>
             </div>
-            <textarea class="copy-textarea" id="newCopyText" placeholder="例如：一手车、无重大事故、2.0T、全景天窗、空间宽敞，适合家用……">这台宝马 530Li 车况很好，黑色外观，米色内饰，配置丰富，欢迎到店试驾。</textarea>
-            <div class="copy-actions">
-              <span class="copy-hint">介绍内容会自动结合车辆档案生成口播</span>
-              <div class="copy-mode-actions">
-                <button class="btn ghost" id="newAiGenerate" type="button">AI 从零生成</button>
-                <button class="btn accent" id="newAiPolish" type="button">✦ AI 优化现有内容</button>
-              </div>
+            <div class="table-panel">
+              <div class="table-row head"><span>配置项</span><span>当前值</span><span>说明</span></div>
+              <div class="table-row"><strong>模板状态</strong><span>启用中</span><span>可在车辆详情和模板库中展示</span></div>
+              <div class="table-row"><strong>适用比例</strong><span>9:16</span><span>仅作为模板属性展示</span></div>
+              <div class="table-row"><strong>素材要求</strong><span>3 图 2 视频</span><span>匹配车辆核心素材槽位</span></div>
+              <div class="table-row"><strong>生成能力</strong><span>后续迭代</span><span>当前不创建生成任务</span></div>
             </div>
-            <div class="capacity-alert"><span>生成摘要：宝马 530Li · 核心素材 5 个 + 车场素材 1 个 · 专业女声 · 竖屏快速讲车 · 预计消耗 88 积分，约 3 分钟完成。</span></div>
+            <div class="capacity-alert"><span>当前版本只做模板库：不选择数字人、不输入介绍文案、不消耗积分、不产生生成记录。</span></div>
           </div>
         </div>
       </div>
       <footer class="overlay-foot">
-        <span class="gen-footer-info" id="newGenFooterInfo">已选车辆和 6 个素材</span>
-        <button class="btn ghost" type="button" data-close="generateModal">取消</button>
+        <span class="gen-footer-info" id="newGenFooterInfo">正在查看模板列表</span>
+        <button class="btn ghost" type="button" data-close="generateModal">关闭</button>
         <button class="btn ghost" id="newGenPrevBtn" type="button" disabled>← 上一步</button>
         <button class="btn primary" id="newGenNextBtn" type="button">下一步 →</button>
       </footer>
@@ -3469,7 +3469,7 @@
       updateVehicleStep(1);
       $("#addModal").classList.add("show");
     });
-    $("#openPicker").addEventListener("click", () => $("#pickerDrawer").classList.add("show"));
+    $("#openPicker").addEventListener("click", openGenerateFlow);
     $("#openDealerEntry").addEventListener("click", () => $("#dealerModal").classList.add("show"));
     $("#openDealerEntryFromLot").addEventListener("click", () => $("#dealerModal").classList.add("show"));
     $("#openAddVehicleEmpty").addEventListener("click", () => {
@@ -3531,7 +3531,7 @@
       const item = activeVehicle();
       $("#generateVehicleName").textContent = `${item.title} · ${genStepHints[0]}`;
       updateGenStep(1);
-      $("#newGenerateVehicleName").textContent = `${item.title} · 选择车辆与素材`;
+      $("#newGenerateVehicleName").textContent = `${item.title} · 查看可用模板与素材要求`;
       $("#newGenCarTitle").textContent = item.title;
       updateNewGenStep(1);
       $("#generateModal").classList.add("show");
@@ -3609,7 +3609,7 @@
 
     $("#saveDealerInfo").addEventListener("click", () => {
       $("#dealerModal").classList.remove("show");
-      showToast("车场已入库，可在生成视频时直接调用");
+      showToast("车场已入库，可在模板库中作为车场素材使用");
     });
 
     $("#saveLotDraft").addEventListener("click", () => {
@@ -3637,7 +3637,7 @@
 
     $("#confirmPicker").addEventListener("click", () => {
       $("#pickerDrawer").classList.remove("show");
-      showToast("已将车库素材带入当前生成表单");
+      showToast("已确认当前车辆素材满足模板要求");
     });
 
     $$(".select-item").forEach((item) => {
@@ -3797,12 +3797,12 @@
       showToast("车辆草稿已保存，可稍后继续");
     });
 
-    // ── Three-step generation flow ────────────────────────────────────
+    // ── Three-step template library flow ──────────────────────────────
     let newGenCurrentStep = 1;
     const newGenFooter = [
-      "已选车辆和 6 个素材",
-      "已选专业女声与竖屏快速讲车模板",
-      "介绍信息已填写，可提交生成",
+      "正在查看模板列表",
+      "正在核对模板需要的素材槽位",
+      "当前仅保存模板偏好，不创建生成任务",
     ];
 
     function updateNewGenStep(step) {
@@ -3816,7 +3816,7 @@
         indicator.classList.toggle("done", indicatorStep < step);
       });
       $("#newGenPrevBtn").disabled = step === 1;
-      $("#newGenNextBtn").textContent = step === 3 ? "提交生成 ✦" : "下一步 →";
+      $("#newGenNextBtn").textContent = step === 3 ? "保存模板偏好" : "下一步 →";
       $("#newGenNextBtn").classList.toggle("accent", step === 3);
       $("#newGenFooterInfo").textContent = newGenFooter[step - 1];
     }
@@ -3830,18 +3830,8 @@
         updateNewGenStep(newGenCurrentStep + 1);
       } else {
         $("#generateModal").classList.remove("show");
-        showToast("生成任务已创建，可在生成记录中查看进度");
+        showToast("模板偏好已保存，视频生成能力将在后续迭代接入");
       }
-    });
-
-    $("#newAiGenerate").addEventListener("click", () => {
-      $("#newCopyText").value = "这台宝马 5系 530Li 外观沉稳大气，2.0T 动力充沛，空间宽敞，配置丰富。车辆保养记录完整，适合商务和家庭使用，欢迎到店看车试驾。";
-      showToast("已根据车辆档案生成介绍，可继续修改");
-    });
-
-    $("#newAiPolish").addEventListener("click", () => {
-      $("#newCopyText").value = "今天带大家看一台车况出色的宝马 530Li。黑色车身搭配米色内饰，质感沉稳；2.0T 动力充沛，空间和舒适配置也很适合商务与家庭使用。车辆已完成检查，欢迎到店看车试驾。";
-      showToast("AI 已优化现有介绍，可撤销或继续编辑");
     });
 
     $("#freezeToggle").addEventListener("click", () => {
