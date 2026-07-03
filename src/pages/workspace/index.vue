@@ -2480,6 +2480,8 @@ onUnmounted(() => {
   --workspace-line-strong: rgba(239, 194, 76, 0.42);
   --workspace-muted: #969186;
   --workspace-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+
+  border: 0 !important;
 }
 
 .workspace-page.theme-light {

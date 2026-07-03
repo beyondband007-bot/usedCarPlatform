@@ -232,6 +232,15 @@ html:has(.app-layout--points) {
   scrollbar-gutter: auto;
 }
 
+/*
+ * 工作台部分业务组件包含暗色主题的全局选择器。Vue scoped 样式在组合
+ * :global(html[data-theme="dark"]) 时可能把组件边框规则错误提升到 html，
+ * 令 100dvh 根容器额外增加上下 2px，并触发无意义的页面滚动条。
+ */
+html[data-theme="dark"] {
+  border: 0 !important;
+}
+
 html.is-mobile {
   --h5-bottom-inset: max(env(safe-area-inset-bottom, 0px), 12px);
 }
