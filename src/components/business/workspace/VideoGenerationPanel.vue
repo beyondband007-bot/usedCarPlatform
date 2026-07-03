@@ -543,7 +543,7 @@ const showConfigurationPage = computed(() =>
   ["form", "task", "result"].includes(currentStep.value),
 );
 const showTemplateEntryPage = computed(
-  () => currentStep.value === "template" || (currentStep.value === "result" && !selectedTemplate.value),
+  () => currentStep.value === "template" || !selectedTemplate.value,
 );
 const showReviewPage = computed(
   () =>
