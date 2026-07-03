@@ -14,6 +14,7 @@ import { platformRoutes } from "./modules/platform/platformRoutes";
 import { tasksRoutes } from "./modules/tasks/tasksRoutes";
 import { userLogoRoutes } from "./modules/user-logo/userLogoRoutes";
 import { vehicleInfoRoutes } from "./modules/vehicle-info/vehicleInfoRoutes";
+import { vehicleLibraryRoutes } from "./modules/vehicle-library/vehicleLibraryRoutes";
 import { errorHandler, notFoundHandler, requestIdMiddleware } from "./shared/response";
 
 export const createApp = () => {
@@ -84,6 +85,7 @@ export const createApp = () => {
   app.use("/api/v1/enterprise", requireCurrentUser, enterpriseRoutes);
   app.use("/api/v1/platform", platformRoutes);
   app.use("/api/v1/tasks", requireCurrentUser, tasksRoutes);
+  app.use("/api/v1/vehicle-library", requireCurrentUser, vehicleLibraryRoutes);
   app.use("/api/v1/modules", requireCurrentUser, moduleRoutes);
   app.use("/api/v1/user", requireCurrentUser, userLogoRoutes);
   app.use("/api/v1/vehicle-info", requireCurrentUser, vehicleInfoRoutes);

@@ -9,6 +9,9 @@ docs/*
 !docs/视频生成前端接口协作说明.md
 !docs/credits-platform-new-app-integration-guide.md
 !docs/credits-platform-new-app-integration-guide.zh-CN.md
+!docs/vehicle-library-database-spec-and-build-plan.md
+!docs/vehicle-library-database-design.md
+!docs/vehicle-library-database-design.zh-CN.md
 digital human/*-three-view.png
 digital human/male-02-four-view.png
 .env

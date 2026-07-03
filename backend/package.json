@@ -27,6 +27,7 @@
     "video-prompt-assembly-test": "tsx src/modules/video-generation/videoPromptAssembly.test.ts",
     "batch-branded-scene-url-test": "tsx src/modules/batch-new/batchBrandedScene.test.ts",
     "batch-interior-workflow-test": "tsx src/modules/batch-new/batchInteriorWorkflow.test.ts",
+    "vehicle-library-contract-test": "tsx src/modules/vehicle-library/vehicleLibraryContract.test.ts",
     "print:application-contract-seed": "tsx scripts/print-application-contract-seed.ts",
     "phase11:smoke": "node scripts/phase11-e2e-smoke.mjs"
   },
