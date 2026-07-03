@@ -9,6 +9,7 @@ import { creativeImageRoutes } from "./creative-image/creativeImageRoutes";
 import { deliveryRoutes } from "./delivery/deliveryRoutes";
 import { interiorCollageRoutes } from "./interior-collage/interiorCollageRoutes";
 import { interiorCleanRoutes } from "./interior-clean/interiorCleanRoutes";
+import { languageConversionRoutes } from "./language-conversion/languageConversionRoutes";
 import { watermarkRemoveRoutes } from "./watermark-remove/watermarkRemoveRoutes";
 import { lightConsistencyRoutes } from "./light-consistency/lightConsistencyRoutes";
 import { outdoorSceneRoutes } from "./outdoor-scene/outdoorSceneRoutes";
@@ -36,6 +37,7 @@ moduleRoutes.use("/watermark-remove", watermarkRemoveRoutes);
 moduleRoutes.use("/creative-image", creativeImageRoutes);
 moduleRoutes.use("/short-video", shortVideoRoutes);
 moduleRoutes.use("/video-generation", videoGenerationRoutes);
+moduleRoutes.use("/language-conversion", languageConversionRoutes);
 moduleRoutes.use("/batch-new", batchRoutes);
 moduleRoutes.use("/delivery", deliveryRoutes);
 

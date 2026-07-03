@@ -2,6 +2,10 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useMessage } from 'naive-ui'
+import {
+  createLanguageConversionTask,
+  getLanguageConversionTask,
+} from '@/api/language-conversion'
 
 import originalExampleVideo from '@/assets/video/语言转换/处理前.mp4'
 import convertedExampleVideo from '@/assets/video/语言转换/处理后.mp4'
@@ -9,6 +13,7 @@ import {
   languageConversionLanguages,
   type CreateLanguageConversionPayload,
 } from '@/types/language-conversion'
+import type { LanguageConversionTask } from '@/types/language-conversion'
 
 const emit = defineEmits<{
   submit: [payload: CreateLanguageConversionPayload]
@@ -24,6 +29,9 @@ const sourceFile = ref<File | null>(null)
 const sourceVideoUrl = ref('')
 const sourceLanguage = ref('auto')
 const targetLanguage = ref('en-US')
+const activeTask = ref<LanguageConversionTask | null>(null)
+const isSubmitting = ref(false)
+const pollTimer = ref<number | null>(null)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
@@ -48,6 +56,21 @@ const originalPreviewVideoUrl = computed(
   () => sourceVideoUrl.value || originalExampleVideo,
 )
 const resultPreviewVideoUrl = convertedExampleVideo
+const convertedVideoUrl = computed(() =>
+  sourceFile.value && activeTask.value?.resultVideoUrl
+    ? activeTask.value.resultVideoUrl
+    : resultPreviewVideoUrl,
+)
+const resultDownloadUrl = computed(() => activeTask.value?.resultVideoUrl || '')
+const showResultVideo = computed(
+  () => !sourceFile.value || activeTask.value?.status === 'success',
+)
+const conversionStatusText = computed(() => {
+  if (!activeTask.value) return ''
+  if (activeTask.value.status === 'success') return '转换完成'
+  if (activeTask.value.status === 'failed') return activeTask.value.errorMessage || '转换失败'
+  return `转换中 ${activeTask.value.progress}%`
+})
 
 function openFilePicker() {
   fileInputRef.value?.click()
@@ -65,7 +88,10 @@ function handleFileChange(event: Event) {
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   sourceFile.value = file
   sourceVideoUrl.value = URL.createObjectURL(file)
+  activeTask.value = null
+  stopPolling()
   currentTime.value = 0
+  duration.value = 0
   void nextTick(syncVideoSources)
 }
 
@@ -74,8 +100,10 @@ function removeSourceVideo() {
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   sourceFile.value = null
   sourceVideoUrl.value = ''
+  activeTask.value = null
   currentTime.value = 0
   duration.value = 0
+  stopPolling()
 }
 
 function swapLanguages() {
@@ -85,7 +113,7 @@ function swapLanguages() {
   targetLanguage.value = previous
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!sourceFile.value) {
     message.error('请先上传需要转换的视频')
     return
@@ -94,14 +122,63 @@ function handleSubmit() {
     message.error('当前语言和目标语言不能相同')
     return
   }
-  emit('submit', {
+  const payload: CreateLanguageConversionPayload = {
     sourceFileName: sourceFile.value.name,
     sourceLanguage: sourceLanguage.value,
     targetLanguage: targetLanguage.value,
     preserveSpeakerVoice: true,
     preserveBackgroundAudio: true,
-  })
-  message.info('前端字段已准备完成，等待后端转换接口接入')
+  }
+  emit('submit', payload)
+  isSubmitting.value = true
+  activeTask.value = null
+  stopPolling()
+  try {
+    const task = await createLanguageConversionTask({
+      ...payload,
+      sourceFile: sourceFile.value,
+    })
+    activeTask.value = task
+    message.success('语言转换任务已提交')
+    startPolling(task.taskId)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '语言转换任务提交失败')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function startPolling(taskId: string) {
+  stopPolling()
+  pollTimer.value = window.setInterval(() => {
+    void refreshTask(taskId)
+  }, 5000)
+  void refreshTask(taskId)
+}
+
+function stopPolling() {
+  if (pollTimer.value !== null) {
+    window.clearInterval(pollTimer.value)
+    pollTimer.value = null
+  }
+}
+
+async function refreshTask(taskId: string) {
+  try {
+    const task = await getLanguageConversionTask(taskId)
+    activeTask.value = task
+    if (task.status === 'success') {
+      stopPolling()
+      message.success('语言转换完成')
+      void nextTick(syncVideoSources)
+    } else if (task.status === 'failed') {
+      stopPolling()
+      message.error(task.errorMessage || '语言转换失败')
+    }
+  } catch (error) {
+    stopPolling()
+    message.error(error instanceof Error ? error.message : '语言转换状态查询失败')
+  }
 }
 
 function syncVideoSources() {
@@ -167,7 +244,13 @@ function handleOriginalTimeUpdate() {
 
 function handleMetadata(event: Event) {
   const video = event.target as HTMLVideoElement
-  duration.value = Math.max(duration.value, video.duration || 0)
+  if (sourceFile.value) {
+    if (video === originalVideoRef.value) {
+      duration.value = video.duration || 0
+    }
+  } else {
+    duration.value = Math.max(duration.value, video.duration || 0)
+  }
   updateAudioState()
 }
 
@@ -187,8 +270,19 @@ async function toggleFullscreen() {
   await compareStageRef.value.requestFullscreen()
 }
 
+function downloadResultVideo() {
+  if (!resultDownloadUrl.value) return
+  const link = document.createElement('a')
+  link.href = resultDownloadUrl.value
+  link.download = `${activeTask.value?.taskId || 'language-conversion'}-result.mp4`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 onUnmounted(() => {
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
+  stopPolling()
 })
 </script>
 
@@ -295,12 +389,15 @@ onUnmounted(() => {
         <button
           type="button"
           class="start-conversion"
-          :disabled="!canSubmit"
+          :disabled="!canSubmit || isSubmitting || activeTask?.status === 'processing'"
           @click="handleSubmit"
         >
           <Icon icon="mdi:translate" />
           开始转换
         </button>
+        <p v-if="conversionStatusText" class="conversion-status">
+          {{ conversionStatusText }}
+        </p>
       </section>
     </div>
 
@@ -334,9 +431,9 @@ onUnmounted(() => {
         <article>
           <span>处理后视频</span>
           <video
-            v-if="!sourceFile"
+            v-if="showResultVideo"
             ref="resultVideoRef"
-            :src="resultPreviewVideoUrl"
+            :src="convertedVideoUrl"
             playsinline
             preload="metadata"
             @loadedmetadata="handleMetadata"
@@ -393,6 +490,15 @@ onUnmounted(() => {
         </div>
         <button type="button" aria-label="全屏" @click="toggleFullscreen">
           <Icon icon="mdi:fullscreen" />
+        </button>
+        <button
+          v-if="resultDownloadUrl"
+          type="button"
+          class="download-result"
+          aria-label="下载生成视频"
+          @click="downloadResultVideo"
+        >
+          <Icon icon="mdi:download" />
         </button>
       </div>
     </section>
@@ -644,6 +750,12 @@ onUnmounted(() => {
   background: var(--lc-surface);
   color: var(--lc-muted);
   cursor: not-allowed;
+}
+
+.conversion-status {
+  margin: 10px 0 0;
+  color: var(--lc-muted);
+  font-size: 12px;
 }
 
 .compare-card {
