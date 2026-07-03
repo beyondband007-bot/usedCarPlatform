@@ -1,0 +1,3855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>车辆素材库原型</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --line: #dbe3ee;
+      --line-strong: #b8c5d6;
+      --text: #172033;
+      --muted: #66758a;
+      --soft: #8b99aa;
+      --accent: #d89b18;
+      --accent-dark: #9a6c0a;
+      --green: #0b8f63;
+      --red: #bf3d35;
+      --blue: #316dca;
+      --shadow: 0 18px 48px rgba(32, 49, 75, 0.12);
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 24px;
+      height: 68px;
+      padding: 0 32px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 8px;
+      background: #151b28;
+      color: #f0c75d;
+      font-size: 14px;
+    }
+
+    .nav {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav a {
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .nav a.active {
+      background: #fff4d4;
+      color: var(--accent-dark);
+    }
+
+    .account {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .permission-pill {
+      padding: 7px 10px;
+      border: 1px solid #e7c573;
+      border-radius: 999px;
+      background: #fff8e8;
+      color: #8a5e05;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .avatar {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 50%;
+      background: #22304a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .page {
+      padding: 26px 32px 40px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+
+    .hero p:last-child {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 15px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: #eef3f8;
+      color: var(--text);
+      font-weight: 900;
+    }
+
+    .btn.primary {
+      background: #151b28;
+      color: #fff;
+    }
+
+    .btn.accent {
+      background: var(--accent);
+      color: #1f1702;
+    }
+
+    .btn.ghost {
+      border-color: var(--line);
+      background: var(--panel);
+      color: var(--muted);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1.2fr repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 10px 28px rgba(28, 46, 70, 0.06);
+    }
+
+    .metric label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 23px;
+    }
+
+    .metric small {
+      display: block;
+      margin-top: 7px;
+      color: var(--soft);
+      font-weight: 700;
+    }
+
+    .meter {
+      height: 9px;
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e5ebf2;
+    }
+
+    .meter span {
+      display: block;
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), #e2ad2f);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 372px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .main-panel, .detail-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .main-panel {
+      min-height: 650px;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--soft);
+    }
+
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 16px 4px;
+    }
+
+    .chip {
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .chip.active {
+      border-color: #e0b448;
+      background: #fff5d8;
+      color: #8a5e05;
+    }
+
+    .vehicle-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .vehicle-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .vehicle-card:hover, .vehicle-card.active {
+      border-color: #d9ad43;
+      box-shadow: 0 14px 34px rgba(69, 86, 110, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .vehicle-cover {
+      position: relative;
+      height: 140px;
+      background: #dce5ef;
+    }
+
+    .vehicle-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .vehicle-cover .badge {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+    }
+
+    .badge.ready { color: var(--green); }
+    .badge.warn { color: #a76b00; }
+    .badge.frozen { color: var(--red); }
+
+    .vehicle-body {
+      padding: 13px;
+    }
+
+    .vehicle-body h3 {
+      margin: 0 0 7px;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .vin {
+      margin: 0;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .completeness {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      margin: 13px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .mini-meter {
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e7edf4;
+    }
+
+    .mini-meter span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .asset-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .asset-row span {
+      padding: 8px 6px;
+      border-radius: 8px;
+      background: #f5f8fb;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .card-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .card-actions .btn {
+      min-height: 34px;
+      padding: 0 8px;
+      font-size: 13px;
+    }
+
+    .detail-panel {
+      position: sticky;
+      top: 86px;
+      overflow: hidden;
+    }
+
+    .detail-cover {
+      height: 190px;
+      background: #dde6ef;
+    }
+
+    .detail-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .detail-body {
+      padding: 16px;
+    }
+
+    .detail-body h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    .detail-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .tag {
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: #f0f4f8;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .detail-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab {
+      flex: 1;
+      min-height: 40px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .tab.active {
+      color: var(--accent-dark);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
+    .tab-panel {
+      display: none;
+      padding-top: 14px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .info-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .info-item {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .info-item span:first-child {
+      color: var(--soft);
+      font-weight: 900;
+    }
+
+    .material-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .material {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .material img {
+      width: 100%;
+      height: 72px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .material span {
+      display: block;
+      padding: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .task {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .task strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .task span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .freeze-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 13px 16px;
+      border: 1px solid #f0bd74;
+      border-radius: 8px;
+      background: #fff4e5;
+      color: #814b05;
+      font-weight: 900;
+    }
+
+    body.frozen .freeze-bar {
+      display: flex;
+    }
+
+    body.frozen .can-freeze {
+      pointer-events: none;
+      opacity: 0.45;
+    }
+
+    body.frozen .nav a.active {
+      background: #fff1f1;
+      color: var(--red);
+    }
+
+    .drawer-backdrop, .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      background: rgba(13, 23, 38, 0.42);
+      overflow: hidden;
+    }
+
+    .drawer-backdrop.show, .modal-backdrop.show {
+      display: block;
+    }
+
+    .drawer {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 520px;
+      height: 100%;
+      overflow-y: auto;
+      background: #fff;
+      box-shadow: -22px 0 54px rgba(11, 20, 34, 0.24);
+    }
+
+    .drawer .template-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .drawer .steps {
+      grid-template-columns: 1fr;
+    }
+
+    .drawer .table-row {
+      grid-template-columns: 76px minmax(0, 1fr) 70px 64px;
+    }
+
+    .drawer .table-row > :last-child {
+      display: none;
+    }
+
+    .drawer .overlay-foot {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+    }
+
+    .modal .overlay-foot {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+    }
+
+    .modal {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(720px, calc(100vw - 40px));
+      max-height: 86vh;
+      overflow-y: auto;
+      transform: translate(-50%, -50%);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 30px 80px rgba(11, 20, 34, 0.28);
+    }
+
+    .modal.modal-wide {
+      width: min(1040px, calc(100vw - 48px));
+    }
+
+    .overlay-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .overlay-head h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .close {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: #eef3f8;
+      color: var(--muted);
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .overlay-body {
+      padding: 20px;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .step {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .step.active {
+      border-color: #e0b448;
+      background: #fff5d8;
+      color: #8a5e05;
+    }
+
+    .vehicle-wizard-modal {
+      width: min(1180px, calc(100vw - clamp(20px, 6vw, 96px)));
+      max-height: min(90vh, 900px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+    }
+
+    .vehicle-wizard-modal .overlay-head {
+      align-items: flex-start;
+      padding: clamp(16px, 2.1vw, 24px) clamp(18px, 2.3vw, 28px);
+    }
+
+    .vehicle-wizard-modal .overlay-head h2 {
+      font-size: clamp(22px, 2.1vw, 28px);
+    }
+
+    .vehicle-wizard-modal .overlay-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .vehicle-wizard-modal .overlay-body {
+      min-height: 0;
+      overflow-y: auto;
+      padding: clamp(16px, 2vw, 24px) clamp(18px, 2.3vw, 28px);
+      background: #fbfdff;
+    }
+
+    .wizard-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .wizard-step {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .wizard-step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      left: calc(100% + 4px);
+      right: -14px;
+      top: 50%;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .wizard-step b {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 1px solid #cbd7e6;
+      border-radius: 50%;
+      background: #fff;
+      color: #7890aa;
+    }
+
+    .wizard-step.active {
+      color: #1664e6;
+    }
+
+    .wizard-step.active b {
+      border-color: #1664e6;
+      background: linear-gradient(180deg, #2c7bff, #1158d8);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(33, 110, 236, 0.28);
+    }
+
+    .wizard-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+      gap: clamp(14px, 2vw, 24px);
+      align-items: start;
+    }
+
+    .wizard-main {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .wizard-card {
+      padding: clamp(14px, 1.5vw, 18px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .wizard-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-weight: 900;
+    }
+
+    .wizard-title strong {
+      font-size: 16px;
+    }
+
+    .wizard-title span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .wizard-required {
+      color: var(--red);
+    }
+
+    .entry-choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .entry-choice {
+      position: relative;
+      display: grid;
+      grid-template-columns: 50px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-height: 100px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+    }
+
+    .entry-choice.active {
+      border-color: #256fff;
+      box-shadow: 0 0 0 1px #256fff inset;
+    }
+
+    .entry-choice.active::after {
+      content: "✓";
+      position: absolute;
+      top: -9px;
+      right: 10px;
+      display: grid;
+      width: 22px;
+      height: 22px;
+      place-items: center;
+      border-radius: 50%;
+      background: #256fff;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .entry-choice-icon {
+      display: grid;
+      width: 50px;
+      height: 50px;
+      place-items: center;
+      border-radius: 8px;
+      background: #eef5ff;
+      color: #256fff;
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .entry-choice:nth-child(2) .entry-choice-icon {
+      background: #eaf8f1;
+      color: #17a66b;
+    }
+
+    .entry-choice:nth-child(3) .entry-choice-icon {
+      background: #f3f0ff;
+      color: #6754d8;
+    }
+
+    .entry-choice strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .entry-choice span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .vin-query-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .vin-input-wrap {
+      position: relative;
+    }
+
+    .vin-input-wrap input {
+      width: 100%;
+      padding-right: 92px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+    }
+
+    .vin-count {
+      position: absolute;
+      right: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .vin-clear {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #b4c0ce;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .vin-support {
+      margin-top: 8px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .recognition-result {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.3fr) auto;
+      gap: 14px;
+      align-items: center;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border: 1px solid #cdeee2;
+      border-radius: 8px;
+      background: #f5fffb;
+    }
+
+    .recognition-result strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .recognition-result span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .success-mark {
+      display: inline-grid;
+      width: 22px;
+      height: 22px;
+      margin-right: 8px;
+      place-items: center;
+      border-radius: 50%;
+      background: #27ad75;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .confidence-pill {
+      padding: 8px 12px;
+      border: 1px solid #bbe8d2;
+      border-radius: 8px;
+      background: #eafaf2;
+      color: #18895d;
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .vehicle-form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px 16px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .vehicle-form-grid .field {
+      grid-template-columns: 58px minmax(0, 1fr);
+      align-items: center;
+    }
+
+    .vehicle-form-grid .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .vehicle-form-grid .field.full input {
+      padding-right: 56px;
+    }
+
+    .field-with-count {
+      position: relative;
+    }
+
+    .field-with-count span {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .vehicle-form-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      grid-column: 1 / -1;
+      padding-top: 2px;
+    }
+
+    .material-checklist {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(72px, 1fr));
+      gap: 10px;
+    }
+
+    .material-need {
+      position: relative;
+      display: grid;
+      gap: 6px;
+      place-items: center;
+      min-height: 92px;
+      padding: 10px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .material-need b {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .material-need span {
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .material-need.required::after {
+      content: "";
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+    }
+
+    .wizard-sidebar {
+      display: grid;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+    }
+
+    .side-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .side-card h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      font-size: 15px;
+    }
+
+    .progress-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .progress-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .progress-row b {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      border-radius: 50%;
+      background: #eef3f8;
+      color: #7890aa;
+      font-size: 12px;
+    }
+
+    .progress-row.active {
+      color: #1664e6;
+    }
+
+    .progress-row.active b {
+      background: #1f6eed;
+      color: #fff;
+    }
+
+    .progress-row strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .tip-list {
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .tip-list p {
+      margin: 0;
+    }
+
+    .time-card {
+      border-color: #efca83;
+      background: #fff8eb;
+      text-align: center;
+    }
+
+    .time-card strong {
+      display: block;
+      margin: 6px 0;
+      color: #a36a00;
+      font-size: 24px;
+    }
+
+    .vehicle-wizard-modal .overlay-foot {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px clamp(18px, 2.3vw, 28px);
+      background: #fff;
+    }
+
+    .draft-action {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .draft-action b {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .draft-action strong {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .wizard-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 1080px) {
+      .wizard-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .wizard-sidebar {
+        position: static;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .entry-choice-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .material-checklist {
+        grid-template-columns: repeat(4, minmax(72px, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .vehicle-wizard-modal {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+      }
+
+      .wizard-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 16px;
+      }
+
+      .wizard-step:not(:last-child)::after {
+        display: none;
+      }
+
+      .vin-query-row,
+      .recognition-result,
+      .vehicle-form-grid,
+      .wizard-sidebar,
+      .vehicle-wizard-modal .overlay-foot {
+        grid-template-columns: 1fr;
+      }
+
+      .vehicle-form-grid .field {
+        grid-template-columns: 1fr;
+      }
+
+      .vehicle-form-actions,
+      .wizard-actions {
+        justify-content: stretch;
+      }
+
+      .vehicle-form-actions .btn,
+      .wizard-actions .btn {
+        flex: 1 1 140px;
+      }
+
+      .material-checklist {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .form-block {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .field input, .field select {
+      height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: 0;
+    }
+
+    .result-card {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      gap: 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .result-card img {
+      width: 160px;
+      height: 110px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .entry-mode-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .entry-mode {
+      display: grid;
+      gap: 5px;
+      min-height: 78px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+    }
+
+    .entry-mode strong {
+      font-size: 16px;
+    }
+
+    .entry-mode span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .entry-mode.active {
+      border-color: #e0b448;
+      background: #fff7df;
+      color: #835a05;
+    }
+
+    .mode-panel {
+      display: none;
+    }
+
+    .mode-panel.active {
+      display: grid;
+      gap: 14px;
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .manual-grid .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .vin-precision-panel {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .vin-precision-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .vin-precision-row .field {
+      gap: 6px;
+    }
+
+    .vin-precision-copy {
+      display: grid;
+      gap: 8px;
+    }
+
+    .vin-precision-copy h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .vin-precision-copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .vin-precision-action {
+      min-height: 42px;
+      white-space: nowrap;
+    }
+
+    .vin-precision-hint {
+      margin: 0;
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .vehicle-basic-card {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .vehicle-basic-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .vehicle-basic-head h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .vehicle-basic-head p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .vehicle-basic-actions {
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+    }
+
+    .vehicle-basic-vin {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #eef5ff;
+      color: var(--blue);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+    }
+
+    .vehicle-basic-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0;
+    }
+
+    .vehicle-basic-grid + .vehicle-basic-grid {
+      border-top: 1px solid var(--line);
+    }
+
+    .vehicle-basic-item {
+      display: grid;
+      gap: 8px;
+      padding: 18px 16px;
+    }
+
+    .vehicle-basic-item span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .vehicle-basic-item strong {
+      font-size: 15px;
+    }
+
+    .vehicle-upload-step {
+      display: grid;
+      gap: 12px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .vehicle-upload-step h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .vehicle-upload-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .upload-lanes {
+      display: grid;
+      gap: 12px;
+    }
+
+    .upload-lane {
+      padding: 14px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .upload-lane strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .upload-lane span {
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .overlay-foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .picker-list {
+      display: grid;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .picker-vehicle {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+    }
+
+    .picker-vehicle.active {
+      border-color: #d9ad43;
+      background: #fffaf0;
+    }
+
+    .picker-vehicle img {
+      width: 74px;
+      height: 52px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .picker-vehicle strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .picker-vehicle span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .select-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .select-item {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: #eef3f8;
+    }
+
+    .select-item.selected {
+      border-color: var(--accent);
+    }
+
+    .select-item img {
+      width: 100%;
+      height: 92px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .select-item span {
+      display: block;
+      padding: 7px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .select-item::after {
+      content: "";
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: rgba(17, 24, 39, 0.24);
+    }
+
+    .select-item.selected::after {
+      background: var(--accent);
+      box-shadow: inset 0 0 0 4px #fff;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      z-index: 70;
+      display: none;
+      transform: translateX(-50%);
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #151b28;
+      color: #fff;
+      font-weight: 900;
+      box-shadow: 0 16px 40px rgba(11, 20, 34, 0.28);
+    }
+
+    .toast.show {
+      display: block;
+    }
+
+    .quick-workflows {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .workflow-card {
+      display: grid;
+      gap: 7px;
+      min-height: 126px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 10px 28px rgba(28, 46, 70, 0.06);
+      text-align: left;
+    }
+
+    .workflow-card strong {
+      font-size: 20px;
+    }
+
+    .workflow-card span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    .workflow-card b {
+      color: var(--accent-dark);
+      font-size: 12px;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 0 16px 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .status-strip div {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .status-strip span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .status-strip strong {
+      font-size: 16px;
+    }
+
+    .table-panel {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 96px 86px 88px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .table-row:last-child {
+      border-bottom: 0;
+    }
+
+    .table-row.head {
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .table-thumb {
+      width: 72px;
+      height: 48px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .progress-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .check-dot {
+      display: grid;
+      width: 26px;
+      height: 26px;
+      place-items: center;
+      border-radius: 50%;
+      background: #e7f6ef;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .check-dot.warn {
+      background: #fff3d8;
+      color: #a76b00;
+    }
+
+    .check-item strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 14px;
+    }
+
+    .check-item span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .template-card {
+      overflow: hidden;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+    }
+
+    .template-card.active {
+      border-color: var(--accent);
+    }
+
+    .template-card img {
+      width: 100%;
+      height: 118px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .template-card div {
+      padding: 10px;
+    }
+
+    .template-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .template-card span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .capacity-alert {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid #efbe75;
+      border-radius: 8px;
+      background: #fff7e8;
+      color: #7c4c05;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .empty-panel {
+      display: none;
+      margin: 16px;
+      padding: 42px 24px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: #fbfcfe;
+      text-align: center;
+    }
+
+    body.empty .vehicle-grid,
+    body.empty .status-strip {
+      display: none;
+    }
+
+    body.empty .empty-panel {
+      display: block;
+    }
+
+    /* ─── Generate modal: 4-step panels ─── */
+    #generateModal .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .step.done { border-color: #27ad75; background: #eafaf2; color: #18895d; }
+    .gen-panel { display: none; }
+    .gen-panel.active { display: block; }
+
+    /* ─── Voice cards (配音效果) ─── */
+    .voice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .voice-card {
+      position: relative; padding: 14px;
+      border: 2px solid var(--line); border-radius: 8px;
+      background: #fff; text-align: left; cursor: pointer;
+      transition: border-color .18s, background .18s;
+    }
+    .voice-card.active { border-color: var(--accent); background: #fff8ea; }
+    .voice-card strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .voice-card > span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; line-height: 1.5; margin-bottom: 10px; }
+    .voice-preview { display: flex; align-items: center; gap: 8px; }
+    .play-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      min-height: 28px; padding: 0 10px; border-radius: 6px;
+      background: #eef3f8; color: var(--text);
+      font-size: 12px; font-weight: 900;
+      transition: background .15s, color .15s;
+    }
+    .play-btn.playing { background: var(--accent); color: #1f1702; }
+    .voice-duration { color: var(--soft); font-size: 11px; font-weight: 800; }
+
+    /* ─── Scene grid (场景模块库) ─── */
+    .scene-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+    .scene-card {
+      position: relative; overflow: hidden;
+      border: 2px solid transparent; border-radius: 8px;
+      background: #eef3f8; cursor: pointer;
+      transition: border-color .18s;
+    }
+    .scene-card.active { border-color: var(--accent); }
+    .scene-card img { width: 100%; height: 76px; object-fit: cover; display: block; }
+    .scene-card span { display: block; padding: 6px 8px; font-size: 12px; font-weight: 900; }
+    .scene-card::after {
+      content: ""; position: absolute; right: 6px; top: 6px;
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid #fff; background: rgba(17,24,39,.24);
+    }
+    .scene-card.active::after { background: var(--accent); box-shadow: inset 0 0 0 3px #fff; }
+
+    /* ─── Copy textarea & publish (文案与发布) ─── */
+    .copy-textarea {
+      width: 100%; min-height: 130px; padding: 12px;
+      border: 1px solid var(--line); border-radius: 8px;
+      font: inherit; font-size: 14px; color: var(--text);
+      resize: vertical; outline: none; background: #fff;
+    }
+    .copy-textarea:focus { border-color: var(--accent); }
+    .copy-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .copy-hint { color: var(--soft); font-size: 12px; font-weight: 800; }
+    .publish-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    .publish-opt {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fff;
+      font-size: 13px; font-weight: 900;
+      cursor: pointer; transition: border-color .18s, background .18s;
+    }
+    .publish-opt.active { border-color: var(--accent); background: #fff8ea; }
+    .publish-opt input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+
+    /* ─── Generate modal footer ─── */
+    .gen-footer-info { color: var(--muted); font-size: 12px; font-weight: 800; align-self: center; margin-right: auto; }
+    .library-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 22px 0 14px;
+      padding: 6px;
+      width: fit-content;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .library-tab {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 22px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .library-tab.active {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .library-panel,
+    .vehicle-step-panel {
+      display: none;
+    }
+
+    .library-panel.active,
+    .vehicle-step-panel.active {
+      display: block;
+    }
+
+    #addModalLegacy,
+    #generateModalLegacy {
+      display: none !important;
+    }
+
+    .lot-grid,
+    .record-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .lot-card,
+    .record-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .lot-card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+    }
+
+    .lot-card-body,
+    .record-card {
+      padding: 16px;
+    }
+
+    .lot-card-body h3,
+    .record-card h3 {
+      margin: 0 0 6px;
+    }
+
+    .lot-card-body p,
+    .record-card p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .slot-card {
+      min-height: 136px;
+      border: 1px dashed #aab7c7;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 14px 10px;
+      color: var(--muted);
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .slot-card b {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      margin: 0 auto 9px;
+      border-radius: 50%;
+      background: #e8eef5;
+      color: var(--ink);
+      font-size: 20px;
+    }
+
+    .slot-card strong,
+    .slot-card span {
+      display: block;
+    }
+
+    .slot-card strong {
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .slot-card span {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .optional-upload {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .step-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .step-summary > div {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .step-summary span,
+    .step-summary strong {
+      display: block;
+    }
+
+    .step-summary span {
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .template-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .template-meta em {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #eef3f8;
+      color: var(--muted);
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 800;
+    }
+
+    .copy-mode-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #generateModal .steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    @media (max-width: 900px) {
+      .lot-grid,
+      .record-grid,
+      .slot-grid,
+      .step-summary {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">AI</span>
+      <span>二手车智能平台</span>
+    </div>
+    <nav class="nav" aria-label="大客户顶部导航">
+      <a href="#">首页</a>
+      <a href="#">视觉工作台</a>
+      <a class="active" href="#">车辆素材库</a>
+      <a href="#">企业套餐</a>
+      <a href="#">积分查询</a>
+    </nav>
+    <div class="account">
+      <span class="permission-pill">大客户权限已开启</span>
+      <button class="btn ghost" id="freezeToggle" type="button">切换冻结态</button>
+      <span class="avatar">企</span>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">ENTERPRISE VEHICLE ASSET CENTER</p>
+        <h1>车辆库</h1>
+        <p>统一管理车辆与车场素材，入库一次，后续生成视频可直接选择调用。</p>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="openPicker" type="button">模拟工作台调用</button>
+        <button class="btn ghost can-freeze" id="openDealerEntry" type="button">新增车场</button>
+        <button class="btn primary can-freeze" id="openAddVehicle" type="button">新增车辆</button>
+      </div>
+    </section>
+
+    <div class="freeze-bar">
+      <span>车辆素材库已冻结：当前企业服务已到期，暂不可新增、上传或调用素材，已有素材仍可查看。</span>
+      <button class="btn ghost" type="button">联系客户经理</button>
+    </div>
+
+    <section class="metrics">
+      <article class="metric">
+        <label>企业服务</label>
+        <strong id="serviceStatus">服务有效</strong>
+        <small>车辆素材库权限：menu:vehicle-library</small>
+      </article>
+      <article class="metric">
+        <label>已用容量</label>
+        <strong>428MB / 1GB</strong>
+        <div class="meter"><span></span></div>
+      </article>
+      <article class="metric">
+        <label>车辆数</label>
+        <strong>36 辆</strong>
+        <small>本月新增 8 辆</small>
+      </article>
+      <article class="metric">
+        <label>素材数</label>
+        <strong>284 个</strong>
+        <small>图片 252，视频 32</small>
+      </article>
+    </section>
+
+    <div class="library-tabs" aria-label="车辆库分类">
+      <button class="library-tab active" type="button" data-library-tab="vehicles">车辆</button>
+      <button class="library-tab" type="button" data-library-tab="lots">车场</button>
+      <button class="library-tab" type="button" data-library-tab="records">生成记录</button>
+    </div>
+
+    <div class="library-panel active" id="library-vehicles">
+    <section class="layout">
+      <div class="main-panel">
+        <div class="toolbar">
+          <label class="search">
+            <span>搜索</span>
+            <input type="search" placeholder="VIN / 车型 / 车辆备注" />
+          </label>
+          <select class="btn ghost" aria-label="排序">
+            <option>最近更新</option>
+            <option>最近使用</option>
+            <option>素材完整度</option>
+            <option>创建时间</option>
+          </select>
+          <button class="btn accent can-freeze" id="toolbarGenerate" type="button">生成视频</button>
+        </div>
+
+        <div class="chips" aria-label="车辆筛选">
+          <button class="chip active" type="button">全部车辆</button>
+          <button class="chip" type="button">可直接生成</button>
+          <button class="chip" type="button">缺车头/车尾图</button>
+          <button class="chip" type="button">缺主驾驶图</button>
+          <button class="chip" type="button">缺前/后排视频</button>
+          <button class="chip" type="button">最近使用</button>
+        </div>
+
+        <div class="status-strip">
+          <div><span>可直接生成</span><strong>21 辆</strong></div>
+          <div><span>待补核心素材</span><strong>15 辆</strong></div>
+          <div><span>车辆草稿</span><strong>3 辆</strong></div>
+          <div><span>容量预警</span><strong>2 辆</strong></div>
+        </div>
+
+        <div class="empty-panel">
+          <h2>还没有车辆素材</h2>
+          <p class="vin">通过 VIN 创建车辆档案，并上传外观、内饰、视频素材。后续生成视频时，可以直接从素材库调用。</p>
+          <button class="btn primary can-freeze" id="openAddVehicleEmpty" type="button">新增第一辆车</button>
+        </div>
+
+        <div class="vehicle-grid" id="vehicleGrid">
+          <button class="vehicle-card active" type="button" data-index="0">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=760&q=80" alt="宝马 5系" />
+              <span class="badge ready">可生成视频</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>宝马 5系 2021款 530Li</h3>
+              <p class="vin">VIN：LBV******123456</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:82%"></span></div>
+                <span>5/5</span>
+              </div>
+              <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>前/后排视频 ✓</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+
+          <button class="vehicle-card" type="button" data-index="1">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=760&q=80" alt="奔驰 C级" />
+              <span class="badge warn">缺内饰图</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>奔驰 C级 2020款 C260L</h3>
+              <p class="vin">VIN：LE4******998812</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:45%; background:#d6981c"></span></div>
+                <span>2/5</span>
+              </div>
+              <div class="asset-row"><span>缺主驾图</span><span>缺前排视频</span><span>缺后排视频</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">补充素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+
+          <button class="vehicle-card" type="button" data-index="2">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=760&q=80" alt="奥迪 A6L" />
+              <span class="badge warn">缺前/后排视频</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>奥迪 A6L 2022款 45TFSI</h3>
+              <p class="vin">VIN：LFV******660219</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:68%"></span></div>
+                <span>3/5</span>
+              </div>
+              <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>缺前/后排视频</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+
+          <button class="vehicle-card" type="button" data-index="3">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=760&q=80" alt="特斯拉 Model 3" />
+              <span class="badge ready">可生成视频</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>特斯拉 Model 3 2023款</h3>
+              <p class="vin">VIN：LRW******762501</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:91%"></span></div>
+                <span>5/5</span>
+              </div>
+              <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>前/后排视频 ✓</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+
+          <button class="vehicle-card" type="button" data-index="4">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=760&q=80" alt="丰田 凯美瑞" />
+              <span class="badge warn">缺视频素材</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>丰田 凯美瑞 2021款 2.5G</h3>
+              <p class="vin">LVG******510087</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:73%"></span></div>
+                <span>3/5</span>
+              </div>
+              <div class="asset-row"><span>车头/车尾 ✓</span><span>主驾 ✓</span><span>缺前/后排视频</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">使用素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+
+          <button class="vehicle-card" type="button" data-index="5">
+            <div class="vehicle-cover">
+              <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=760&q=80" alt="保时捷 Macan" />
+              <span class="badge warn">待补充</span>
+            </div>
+            <div class="vehicle-body">
+              <h3>保时捷 Macan 2019款 2.0T</h3>
+              <p class="vin">WP1******882134</p>
+              <div class="completeness">
+                <span>核心素材</span>
+                <div class="mini-meter"><span style="width:38%; background:#d6981c"></span></div>
+                <span>1/5</span>
+              </div>
+              <div class="asset-row"><span>缺车尾图</span><span>缺主驾图</span><span>缺前/后排视频</span></div>
+              <div class="card-actions"><span class="btn accent can-freeze">补充素材</span><span class="btn ghost">管理</span></div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <aside class="detail-panel">
+        <div class="detail-cover">
+          <img id="detailImage" src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=760&q=80" alt="车辆详情主图" />
+        </div>
+        <div class="detail-body">
+          <h2 id="detailTitle">宝马 5系 2021款 530Li</h2>
+          <p class="vin" id="detailVin">VIN：LBV******123456</p>
+          <div class="detail-tags">
+            <span class="tag" id="detailNote">黑色宝马530 - 门店A</span>
+            <span class="tag">VIN 查询入库</span>
+            <span class="tag" id="detailScore">核心素材 5/5</span>
+          </div>
+          <div class="detail-actions">
+            <button class="btn accent can-freeze" id="openGenerateFlow" type="button">生成视频</button>
+            <button class="btn ghost can-freeze" id="openUploadManager" type="button">上传素材</button>
+            <button class="btn ghost" id="openEditVehicle" type="button">编辑信息</button>
+          </div>
+
+          <div class="tabs">
+            <button class="tab active" type="button" data-tab="overview">概览</button>
+            <button class="tab" type="button" data-tab="images">全部素材</button>
+            <button class="tab" type="button" data-tab="records">生成记录</button>
+          </div>
+
+          <div class="tab-panel active" id="tab-overview">
+            <div class="info-list">
+              <div class="info-item"><span>品牌车系</span><strong>宝马 / 5系</strong></div>
+              <div class="info-item"><span>年款车型</span><strong>2021款 530Li</strong></div>
+              <div class="info-item"><span>动力类型</span><strong>2.0T 汽油</strong></div>
+              <div class="info-item"><span>最近使用</span><strong>今天 13:42</strong></div>
+              <div class="info-item"><span>容量占用</span><strong>186MB</strong></div>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-images">
+            <div class="material-grid">
+              <div class="material"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="外观正前" /><span>外观正前</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="侧面" /><span>外观侧面</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="内饰" /><span>内饰中控</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="座椅" /><span>内饰座椅</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="细节" /><span>车身细节</span></div>
+              <div class="material"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="视频缩略图" /><span>绕车视频</span></div>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-records">
+            <div class="timeline">
+              <div class="task"><strong>数字人讲车短视频</strong><span>今天 13:42 · 已完成 · 消耗 88 积分</span></div>
+              <div class="task"><strong>数字人长视频脚本</strong><span>昨天 16:20 · 已完成 · 已保存草稿</span></div>
+              <div class="task"><strong>长视频脚本草稿</strong><span>2026-06-30 · 草稿已保存</span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+    </div>
+
+    <section class="library-panel" id="library-lots">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0 0 4px">车场素材</h2>
+          <p class="vin" style="margin:0">车场图片与视频可在多辆车的视频中重复使用。</p>
+        </div>
+        <button class="btn primary can-freeze" id="openDealerEntryFromLot" type="button">新增车场</button>
+      </div>
+      <div class="lot-grid">
+        <article class="lot-card">
+          <img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=800&q=80" alt="虹桥精品展厅" />
+          <div class="lot-card-body">
+            <span class="badge ready">素材完整</span>
+            <h3>虹桥精品展厅</h3>
+            <p>场地图片 1 张 · 场地视频 1 个 · 已关联 18 辆车</p>
+            <button class="btn ghost" type="button">管理素材</button>
+          </div>
+        </article>
+        <article class="lot-card">
+          <img src="https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=800&q=80" alt="浦东室外车场" />
+          <div class="lot-card-body">
+            <span class="badge ready">素材完整</span>
+            <h3>浦东室外车场</h3>
+            <p>场地图片 1 张 · 场地视频 1 个 · 已关联 11 辆车</p>
+            <button class="btn ghost" type="button">管理素材</button>
+          </div>
+        </article>
+        <article class="lot-card">
+          <div style="height:180px; display:grid; place-items:center; background:#eef3f8; color:var(--muted); font-weight:900">尚未上传视频</div>
+          <div class="lot-card-body">
+            <span class="badge warn">待补视频</span>
+            <h3>松江交付区</h3>
+            <p>场地图片 1 张 · 场地视频 0 个 · 草稿</p>
+            <button class="btn accent" type="button">补充素材</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="library-panel" id="library-records">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0 0 4px">生成记录</h2>
+          <p class="vin" style="margin:0">统一查看草稿、生成中、已完成和失败任务。</p>
+        </div>
+      </div>
+      <div class="record-grid">
+        <article class="record-card"><span class="badge ready">已完成</span><h3>宝马 530Li 讲车视频</h3><p>竖屏讲车模板 · 专业女声 · 今天 13:42</p><button class="btn ghost" type="button">查看结果</button></article>
+        <article class="record-card"><span class="badge">生成中 68%</span><h3>特斯拉 Model 3 展厅介绍</h3><p>科技感模板 · 活力男声 · 预计还需 2 分钟</p><button class="btn ghost" type="button">查看进度</button></article>
+        <article class="record-card"><span class="badge warn">草稿</span><h3>奥迪 A6L 车辆介绍</h3><p>已选车辆与素材 · 尚未提交生成</p><button class="btn accent" type="button">继续编辑</button></article>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="dealerModal">
+    <section class="modal" aria-label="车场入库弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>新增车场</h2>
+          <p class="vin" style="margin-top:4px">上传一次，可在多辆车的视频中重复使用</p>
+        </div>
+        <button class="close" type="button" data-close="dealerModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="form-block">
+          <div class="field">
+            <label>车场名称 <span class="wizard-required">*</span></label>
+            <input id="dealerNameInput" value="虹桥精品展厅" placeholder="便于后续选择，如虹桥精品展厅" />
+          </div>
+          <div class="field">
+            <label>备注</label>
+            <input value="" placeholder="选填，如适用车型、拍摄区域说明" />
+          </div>
+          <div class="upload-lanes">
+            <button class="upload-lane" type="button" data-upload-kind="车场图片">
+              <strong>车场图片 <span class="wizard-required">*</span></strong>
+              <span>上传 1 张清晰场地图片，支持 JPG / PNG / WebP。</span>
+            </button>
+            <button class="upload-lane" type="button" data-upload-kind="车场视频">
+              <strong>车场视频 <span class="wizard-required">*</span></strong>
+              <span>上传 1 个场地展示视频，建议 10–30 秒，支持 MP4 / MOV。</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <button class="btn ghost" type="button" data-close="dealerModal">取消</button>
+        <button class="btn ghost" id="saveLotDraft" type="button">保存草稿</button>
+        <button class="btn primary" id="saveDealerInfo" type="button">确认入库</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="addModalLegacy" aria-hidden="true">
+    <section class="modal vehicle-wizard-modal" aria-label="新增车辆原型弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>新增车辆</h2>
+          <p>通过 VIN、行驶证或手动方式快速完成车辆入库</p>
+        </div>
+        <button class="close" type="button" data-close="addModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="wizard-steps" aria-label="新增车辆步骤">
+          <div class="wizard-step active"><b>1</b><span>选择录入方式</span></div>
+          <div class="wizard-step"><b>2</b><span>智能识别</span></div>
+          <div class="wizard-step"><b>3</b><span>确认信息</span></div>
+          <div class="wizard-step"><b>4</b><span>上传素材</span></div>
+        </div>
+        <div class="wizard-layout">
+          <div class="wizard-main">
+            <section class="wizard-card">
+              <div class="wizard-title">
+                <strong>1. 录入方式</strong>
+                <span><span class="wizard-required">*</span> 选择一种适合的方式开始</span>
+              </div>
+              <div class="entry-choice-grid">
+                <button class="entry-choice active" type="button" data-entry-mode="vin">
+                  <span class="entry-choice-icon">VIN</span>
+                  <span>
+                    <strong>VIN 录入</strong>
+                    <span>输入 17 位 VIN，自动识别车型信息</span>
+                  </span>
+                </button>
+                <button class="entry-choice" type="button" data-entry-mode="image">
+                  <span class="entry-choice-icon">图</span>
+                  <span>
+                    <strong>图片识别</strong>
+                    <span>上传行驶证 / VIN 铭牌，自动 OCR 识别</span>
+                  </span>
+                </button>
+                <button class="entry-choice" type="button" data-entry-mode="manual">
+                  <span class="entry-choice-icon">写</span>
+                  <span>
+                    <strong>手动录入</strong>
+                    <span>适用于无 VIN 或识别失败场景</span>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <section class="wizard-card">
+              <div class="wizard-title">
+                <strong>2. 智能识别</strong>
+                <span><span class="wizard-required">*</span> 输入或上传，系统将自动识别车辆信息</span>
+              </div>
+              <div class="mode-panel active" id="vinAutoPanel">
+                <div class="vin-query-row">
+                  <div class="field">
+                    <label for="vinInput">输入 VIN 码</label>
+                    <div class="vin-input-wrap">
+                      <input id="vinInput" value="LBV************12345" />
+                      <span class="vin-count">17/17</span>
+                      <span class="vin-clear">×</span>
+                    </div>
+                  </div>
+                  <button class="btn primary" id="mockWanweiVinQuery" type="button">⌕ 立即查询</button>
+                  <button class="btn ghost" type="button" data-upload-kind="VIN 自动识别图片">☁ 上传图片识别</button>
+                </div>
+                <p class="vin-support">支持 VIN 码、行驶证照片、车辆铭牌照片</p>
+                <div class="recognition-result">
+                  <div>
+                    <strong><span class="success-mark">✓</span>识别成功</strong>
+                    <span>识别用时 1.2 秒</span>
+                  </div>
+                  <div>
+                    <strong>明锐 2009款 1.6L 自动逸致版</strong>
+                    <span>斯柯达 · 明锐 · 2009</span>
+                  </div>
+                  <span class="confidence-pill">识别置信度 96%</span>
+                </div>
+              </div>
+              <div class="mode-panel" id="imageInputPanel">
+                <button class="upload-lane" type="button" data-upload-kind="行驶证/VIN 图片识别">
+                  <strong>上传行驶证 / VIN 铭牌图片</strong>
+                  <span>图片清晰、完整、避免反光遮挡，识别后自动带出车辆信息。</span>
+                </button>
+              </div>
+              <div class="mode-panel" id="manualInputPanel">
+                <div class="manual-grid">
+                  <div class="field">
+                    <label>品牌</label>
+                    <input value="斯柯达" />
+                  </div>
+                  <div class="field">
+                    <label>车系</label>
+                    <input value="明锐" />
+                  </div>
+                  <div class="field">
+                    <label>年款</label>
+                    <input value="2009款" />
+                  </div>
+                  <div class="field">
+                    <label>车型</label>
+                    <input value="1.6L 自动逸致版" />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="wizard-card">
+              <div class="wizard-title">
+                <strong>3. 车辆基础信息</strong>
+                <span>识别结果，支持编辑</span>
+              </div>
+              <div class="vehicle-form-grid">
+                <div class="field">
+                  <label>品牌</label>
+                  <select><option>斯柯达</option></select>
+                </div>
+                <div class="field">
+                  <label>车系</label>
+                  <select><option>明锐</option></select>
+                </div>
+                <div class="field">
+                  <label>车型</label>
+                  <select><option>1.6L 自动逸致版</option></select>
+                </div>
+                <div class="field">
+                  <label>年款</label>
+                  <select><option>2009款</option></select>
+                </div>
+                <div class="field">
+                  <label>能源类型</label>
+                  <select><option>汽油</option></select>
+                </div>
+                <div class="field">
+                  <label>排量</label>
+                  <select><option>1.6L</option></select>
+                </div>
+                <div class="field">
+                  <label>变速箱</label>
+                  <select><option>自动</option></select>
+                </div>
+                <div class="field">
+                  <label>车辆级别</label>
+                  <select><option>紧凑型车</option></select>
+                </div>
+                <div class="field">
+                  <label>颜色</label>
+                  <select><option>黑色</option></select>
+                </div>
+                <div class="field full">
+                  <label>备注</label>
+                  <div class="field-with-count">
+                    <input value="" placeholder="选填，如车辆亮点、配置补充等" />
+                    <span>0/100</span>
+                  </div>
+                </div>
+                <div class="vehicle-form-actions">
+                  <button class="btn ghost" type="button">↻ 重新识别</button>
+                  <button class="btn ghost" id="openManualEntryFromVin" type="button">✎ 编辑信息</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="wizard-card">
+              <div class="wizard-title">
+                <strong>4. 下一步：上传车辆素材</strong>
+                <span>推荐</span>
+              </div>
+              <div class="material-checklist">
+                <div class="material-need required"><b>🚙</b><span>外观前45°<br>必传</span></div>
+                <div class="material-need required"><b>🚗</b><span>车尾<br>必传</span></div>
+                <div class="material-need required"><b>▰</b><span>主驾<br>必传</span></div>
+                <div class="material-need required"><b>▣</b><span>前排视频<br>必传</span></div>
+                <div class="material-need required"><b>▣</b><span>后排视频<br>必传</span></div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="wizard-sidebar">
+            <section class="side-card">
+              <h3>▣ 入库进度</h3>
+              <div class="progress-list">
+                <div class="progress-row active"><b>1</b><span><strong>选择录入方式</strong>选择最便捷的方式开始录入</span></div>
+                <div class="progress-row"><b>2</b><span><strong>智能识别</strong>系统自动识别车辆信息</span></div>
+                <div class="progress-row"><b>3</b><span><strong>确认信息</strong>核对并编辑车辆基础信息</span></div>
+                <div class="progress-row"><b>4</b><span><strong>上传素材</strong>上传图片与视频素材</span></div>
+              </div>
+            </section>
+            <section class="side-card">
+              <h3>ℹ 识别说明</h3>
+              <div class="tip-list">
+                <p>1. 输入 17 位标准 VIN 码，识别更精准</p>
+                <p>2. 图片需清晰、完整，避免反光遮挡</p>
+                <p>3. 识别结果仅供参考，请核对确认</p>
+              </div>
+            </section>
+            <section class="side-card">
+              <h3>✔ 素材建议</h3>
+              <div class="tip-list">
+                <p>◎ 请上传 4 张必传图片和 2 段必传视频</p>
+                <p>◎ 图片清晰，光线充足，角度完整</p>
+                <p>◎ 视频建议 10-30 秒，横屏拍摄</p>
+              </div>
+            </section>
+            <section class="side-card time-card">
+              <h3>◷ 预计用时</h3>
+              <strong>2-3 分钟</strong>
+              <div class="tip-list"><p>完成信息填写与素材上传</p></div>
+            </section>
+          </aside>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <div class="draft-action">
+          <b>▣</b>
+          <span><strong>保存草稿</strong>随时保存，稍后继续</span>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn ghost" type="button" disabled>← 上一步</button>
+          <button class="btn primary" type="button">下一步</button>
+          <button class="btn primary" id="finishAddLegacy" type="button">✓ 确认入库</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="addModal">
+    <section class="modal vehicle-wizard-modal" aria-label="新增车辆弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>新增车辆</h2>
+          <p>先归类固定素材，再识别车辆信息，三步完成入库</p>
+        </div>
+        <button class="close" type="button" data-close="addModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="wizard-steps" aria-label="新增车辆步骤">
+          <div class="wizard-step active" data-vehicle-step-indicator="1"><b>1</b><span>上传素材</span></div>
+          <div class="wizard-step" data-vehicle-step-indicator="2"><b>2</b><span>车辆信息</span></div>
+          <div class="wizard-step" data-vehicle-step-indicator="3"><b>3</b><span>确认入库</span></div>
+        </div>
+        <div class="wizard-layout">
+          <div class="wizard-main">
+            <div class="vehicle-step-panel active" data-vehicle-step="1">
+              <section class="wizard-card">
+                <div class="wizard-title"><strong>上传五类核心素材</strong><span>可逐个上传，也可批量选择后再归类</span></div>
+                <div class="slot-grid">
+                  <button class="slot-card" type="button" data-upload-kind="车头图"><b>车</b><strong>车头图</strong><span>必传 · 1 张</span></button>
+                  <button class="slot-card" type="button" data-upload-kind="车尾图"><b>尾</b><strong>车尾图</strong><span>必传 · 1 张</span></button>
+                  <button class="slot-card" type="button" data-upload-kind="主驾驶图"><b>驾</b><strong>主驾驶图</strong><span>必传 · 1 张</span></button>
+                  <button class="slot-card" type="button" data-upload-kind="前排视频"><b>▶</b><strong>前排视频</strong><span>必传 · 10–30 秒</span></button>
+                  <button class="slot-card" type="button" data-upload-kind="后排视频"><b>▶</b><strong>后排视频</strong><span>必传 · 10–30 秒</span></button>
+                </div>
+                <button class="optional-upload" type="button" data-upload-kind="批量车辆素材">＋ 批量选择素材，上传后自动识别类型</button>
+                <button class="optional-upload" type="button" data-upload-kind="车辆补充素材">＋ 补充素材（选填）：侧面、仪表盘、后备箱或其他视频</button>
+              </section>
+            </div>
+
+            <div class="vehicle-step-panel" data-vehicle-step="2">
+              <section class="wizard-card">
+                <div class="wizard-title"><strong>智能识别车辆</strong><span>VIN 查询与图片识别汇总为一个入口</span></div>
+                <div class="vin-query-row">
+                  <div class="field">
+                    <label for="vehicleVinInput">输入 17 位 VIN</label>
+                    <div class="vin-input-wrap"><input id="vehicleVinInput" value="LBV******123456" /><span class="vin-count">17/17</span></div>
+                  </div>
+                  <button class="btn primary" id="vehicleVinQuery" type="button">查询车型</button>
+                  <button class="btn ghost" type="button" data-upload-kind="VIN 铭牌或行驶证图片">上传图片识别</button>
+                </div>
+                <p class="vin-support">图片识别流程：OCR 获取 VIN → 确认 VIN → 查询车型。系统将同时检查重复 VIN。</p>
+                <div class="recognition-result">
+                  <div><strong><span class="success-mark">✓</span>识别成功</strong><span>未发现重复车辆</span></div>
+                  <div><strong>斯柯达 明锐 2009款</strong><span>1.6L 自动逸致版</span></div>
+                  <span class="confidence-pill">VIN 已确认</span>
+                </div>
+              </section>
+              <section class="wizard-card">
+                <div class="wizard-title"><strong>核对车辆信息</strong><span>识别结果均可修改</span></div>
+                <div class="vehicle-form-grid">
+                  <div class="field"><label>品牌</label><input value="斯柯达" /></div>
+                  <div class="field"><label>车系</label><input value="明锐" /></div>
+                  <div class="field"><label>年款</label><input value="2009款" /></div>
+                  <div class="field"><label>车型</label><input value="1.6L 自动逸致版" /></div>
+                  <div class="field"><label>颜色</label><input value="黑色" /></div>
+                  <div class="field"><label>所属车场</label><select><option>虹桥精品展厅</option><option>浦东室外车场</option><option>暂不关联</option></select></div>
+                  <div class="field full"><label>车辆备注</label><input placeholder="选填，如重点车源、到店日期或车辆亮点" /></div>
+                </div>
+                <button class="btn ghost" id="manualEntryNew" type="button">识别失败？切换为手动录入</button>
+              </section>
+            </div>
+
+            <div class="vehicle-step-panel" data-vehicle-step="3">
+              <section class="wizard-card">
+                <div class="wizard-title"><strong>确认入库信息</strong><span>确认后仍可在车辆详情中修改</span></div>
+                <div class="step-summary">
+                  <div><span>车辆</span><strong>斯柯达 明锐 2009款</strong></div>
+                  <div><span>VIN</span><strong>LBV******123456</strong></div>
+                  <div><span>所属车场</span><strong>虹桥精品展厅</strong></div>
+                  <div><span>核心素材</span><strong>5 / 5 已齐全</strong></div>
+                  <div><span>补充素材</span><strong>0 个</strong></div>
+                  <div><span>入库状态</span><strong style="color:#168452">可生成视频</strong></div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <aside class="wizard-sidebar">
+            <section class="side-card">
+              <h3>入库原则</h3>
+              <div class="progress-list">
+                <div class="progress-row active"><b>1</b><span><strong>固定槽位</strong>素材入库时直接完成归类</span></div>
+                <div class="progress-row"><b>2</b><span><strong>VIN 防重</strong>避免同一车辆重复建档</span></div>
+                <div class="progress-row"><b>3</b><span><strong>支持草稿</strong>素材未齐也可以稍后继续</span></div>
+              </div>
+            </section>
+            <section class="side-card">
+              <h3>素材要求</h3>
+              <div class="tip-list"><p>图片清晰、主体完整，避免反光和遮挡。</p><p>视频建议 10–30 秒，保持画面稳定。</p><p>补充素材不影响车辆完成入库。</p></div>
+            </section>
+            <section class="side-card time-card"><h3>预计用时</h3><strong>2–3 分钟</strong><div class="tip-list"><p>完成素材归类和车辆信息确认</p></div></section>
+          </aside>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <div class="draft-action"><span><strong>可保存草稿</strong>素材未齐时也不会丢失已填内容</span></div>
+        <div class="wizard-actions">
+          <button class="btn ghost" id="vehicleDraftBtn" type="button">保存草稿</button>
+          <button class="btn ghost" id="vehiclePrevBtn" type="button" disabled>← 上一步</button>
+          <button class="btn primary" id="vehicleNextBtn" type="button">下一步 →</button>
+          <button class="btn primary" id="finishAdd" type="button" style="display:none">确认入库</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <!-- 入库成功弹窗 -->
+  <div class="modal-backdrop" id="postAddModal">
+    <section class="modal" style="max-width:480px; text-align:center" aria-label="入库成功">
+      <header class="overlay-head" style="justify-content:flex-end; padding-bottom:0; border:none">
+        <button class="close" type="button" data-close="postAddModal">×</button>
+      </header>
+      <div class="overlay-body" style="padding-top:8px; display:grid; gap:14px; place-items:center">
+        <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,#22c55e,#16a34a); display:grid; place-items:center; font-size:30px; color:#fff">✓</div>
+        <div>
+          <h2 style="margin:0 0 6px">车辆已成功入库</h2>
+          <p style="margin:0; color:var(--muted); font-size:14px">斯柯达 明锐 2009款 1.6L 自动逸致版 已加入您的云端车库，可随时管理与生成视频。</p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px; width:100%; padding:0 4px">
+          <button class="btn primary" type="button" id="postAddGenerate" style="justify-content:center">✦ 立即生成长视频</button>
+          <button class="btn ghost" type="button" id="goUploadAfterAdd" style="justify-content:center">继续补充车辆素材</button>
+          <button class="btn ghost" type="button" data-close="postAddModal" style="justify-content:center; color:var(--muted)">稍后再说，返回车库</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="drawer-backdrop" id="pickerDrawer">
+    <aside class="drawer" aria-label="从车辆素材库选择">
+      <header class="overlay-head">
+        <div>
+          <h2>从车辆素材库选择</h2>
+          <p class="vin" style="margin-top:4px">模拟视觉工作台上传区调用车库素材</p>
+        </div>
+        <button class="close" type="button" data-close="pickerDrawer">×</button>
+      </header>
+      <div class="overlay-body">
+        <label class="search">
+          <span>搜索</span>
+          <input type="search" placeholder="VIN / 车型 / 备注" />
+        </label>
+        <div class="picker-list">
+          <button class="picker-vehicle active" type="button">
+            <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=260&q=80" alt="宝马" />
+            <span><strong>宝马 5系 2021款 530Li</strong><span>外观 12 · 内饰 6 · 视频 2</span></span>
+            <span class="badge ready">可用</span>
+          </button>
+          <button class="picker-vehicle" type="button">
+            <img src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=260&q=80" alt="奔驰" />
+            <span><strong>奔驰 C级 2020款 C260L</strong><span>外观 5 · 内饰 0 · 视频 0</span></span>
+            <span class="badge warn">缺内饰</span>
+          </button>
+        </div>
+
+        <div class="chips" style="padding:0">
+          <button class="chip active" type="button">外观</button>
+          <button class="chip" type="button">内饰</button>
+          <button class="chip" type="button">视频</button>
+          <button class="chip" type="button">全部</button>
+        </div>
+
+        <div class="select-grid">
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="外观正前" /><span>外观正前</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="外观侧面" /><span>外观侧面</span></button>
+          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="车身细节" /><span>车身细节</span></button>
+          <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="内饰中控" /><span>内饰中控</span></button>
+          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="内饰座椅" /><span>内饰座椅</span></button>
+          <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="绕车视频" /><span>绕车视频</span></button>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <span class="vin" style="margin-right:auto; align-self:center">已选：外观 2，内饰 1</span>
+        <button class="btn ghost" type="button" data-close="pickerDrawer">取消</button>
+        <button class="btn primary" id="confirmPicker" type="button">确认使用</button>
+      </footer>
+    </aside>
+  </div>
+
+  <div class="modal-backdrop" id="uploadModal">
+    <section class="modal" aria-label="素材管理弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>素材管理</h2>
+          <p class="vin" style="margin-top:4px" id="uploadVehicleName">宝马 5系 2021款 530Li</p>
+        </div>
+        <button class="close" type="button" data-close="uploadModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="capacity-alert" id="capacityAlert">
+          <span>本车素材占用 186MB，企业库剩余 596MB。本次模拟上传 128MB 后预计使用 556MB / 1GB。</span>
+        </div>
+        <div class="upload-lanes" style="margin-top:14px">
+          <button class="upload-lane" type="button" data-upload-kind="外观照片">
+            <strong>外观照片</strong>
+            <span>车头、车尾、侧面、45 度角。已上传 12 张，建议至少 6 张。</span>
+          </button>
+          <button class="upload-lane" type="button" data-upload-kind="内饰照片">
+            <strong>内饰照片</strong>
+            <span>中控、座椅、方向盘、仪表盘。已上传 6 张，建议至少 4 张。</span>
+          </button>
+          <button class="upload-lane" type="button" data-upload-kind="细节照片">
+            <strong>细节照片</strong>
+            <span>轮毂、灯组、铭牌、后备箱等。已上传 3 张，可选。</span>
+          </button>
+          <button class="upload-lane" type="button" data-upload-kind="视频素材">
+            <strong>视频素材</strong>
+            <span>绕车、内饰展示、启动车辆。已上传 2 个，支持 MP4 / MOV。</span>
+          </button>
+        </div>
+
+        <h3 style="margin:20px 0 10px">素材列表</h3>
+        <div class="table-panel">
+          <div class="table-row head"><span>预览</span><span>素材名称</span><span>类型</span><span>大小</span><span>操作</span></div>
+          <div class="table-row">
+            <img class="table-thumb" src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=220&q=80" alt="外观正前" />
+            <strong>外观正前-主图.jpg</strong><span>外观</span><span>4.8MB</span><button class="btn ghost" type="button">设主图</button>
+          </div>
+          <div class="table-row">
+            <img class="table-thumb" src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=220&q=80" alt="内饰中控" />
+            <strong>内饰中控.jpg</strong><span>内饰</span><span>3.2MB</span><button class="btn ghost" type="button">改标签</button>
+          </div>
+          <div class="table-row">
+            <img class="table-thumb" src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=220&q=80" alt="绕车视频" />
+            <strong>绕车展示.mp4</strong><span>视频</span><span>76MB</span><button class="btn ghost" type="button">删除</button>
+          </div>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <button class="btn ghost" id="openCapacityModal" type="button">模拟容量不足</button>
+        <button class="btn ghost" type="button" data-close="uploadModal">关闭</button>
+        <button class="btn primary" id="mockUploadDone" type="button">完成上传</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="generateModalLegacy" aria-hidden="true">
+    <section class="modal modal-wide" aria-label="一键生成视频弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>一键生成视频</h2>
+          <p class="vin" style="margin-top:4px" id="generateVehicleName">宝马 5系 2021款 530Li · 选择素材和数字人模块</p>
+        </div>
+        <button class="close" type="button" data-close="generateModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="steps" id="genSteps">
+          <div class="step active">1. 选择素材</div>
+          <div class="step">2. 数字人 &amp; 场景</div>
+          <div class="step">3. 配音效果</div>
+          <div class="step">4. 文案与发布</div>
+        </div>
+
+        <!-- 步骤 1：选择素材 -->
+        <div class="gen-panel active" id="genPanel1">
+          <div class="form-block">
+            <div class="result-card">
+              <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=420&q=80" alt="当前车辆" />
+              <div>
+                <h3>宝马 5系 2021款 530Li</h3>
+                <p class="vin">VIN：LBV******123456 · 完整度 82% · 外观 12 / 内饰 6 / 视频 2</p>
+                <div class="detail-tags" style="margin-bottom:0">
+                  <span class="tag">车辆信息已入库</span>
+                  <span class="tag">可生成视频</span>
+                  <span class="tag">建议选择 6-10 张素材</span>
+                </div>
+              </div>
+            </div>
+            <h3 style="margin:8px 0 0">选择视频素材</h3>
+            <div class="entry-mode-tabs">
+              <button class="entry-mode active" type="button" data-video-source="library">
+                <strong>从素材库选择</strong>
+                <span>使用当前车辆已入库的外观、内饰、细节和视频素材。</span>
+              </button>
+              <button class="entry-mode" type="button" data-video-source="upload">
+                <strong>自定义上传</strong>
+                <span>临时上传本次生成所需素材，不影响原车库资料。</span>
+              </button>
+            </div>
+            <div class="mode-panel active" id="videoLibraryPanel">
+              <div class="chips" style="padding:0">
+                <button class="chip active" type="button">推荐素材</button>
+                <button class="chip" type="button">外观</button>
+                <button class="chip" type="button">内饰</button>
+                <button class="chip" type="button">视频</button>
+              </div>
+              <div class="select-grid">
+                <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="外观正前" /><span>外观正前</span></button>
+                <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="外观侧面" /><span>外观侧面</span></button>
+                <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="内饰中控" /><span>内饰中控</span></button>
+                <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="内饰座椅" /><span>内饰座椅</span></button>
+                <button class="select-item" type="button"><img src="https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=300&q=80" alt="车身细节" /><span>车身细节</span></button>
+                <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="绕车视频" /><span>绕车视频</span></button>
+              </div>
+            </div>
+            <div class="mode-panel" id="videoUploadPanel">
+              <div class="upload-lanes">
+                <button class="upload-lane" type="button" data-upload-kind="自定义外观照片"><strong>上传外观照片</strong><span>支持 JPG / PNG / WebP，建议车头、车尾、侧面和 45 度角。</span></button>
+                <button class="upload-lane" type="button" data-upload-kind="自定义内饰照片"><strong>上传内饰照片</strong><span>支持 JPG / PNG / WebP，建议中控、座椅、方向盘和仪表盘。</span></button>
+                <button class="upload-lane" type="button" data-upload-kind="自定义视频素材"><strong>上传视频素材</strong><span>支持 MP4 / MOV，用于绕车、内饰展示、启动展示等镜头。</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 2：数字人 & 场景 -->
+        <div class="gen-panel" id="genPanel2">
+          <div class="form-block">
+            <h3 style="margin:0 0 10px">选择数字人讲解员</h3>
+            <div class="template-grid">
+              <button class="template-card active" type="button">
+                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=520&q=80" alt="专业女声" />
+                <div><strong>专业女声讲解</strong><span>普通话 · 稳重可信 · 推荐</span></div>
+              </button>
+              <button class="template-card" type="button">
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=520&q=80" alt="男声销售" />
+                <div><strong>门店销售男声</strong><span>普通话 · 热情促成</span></div>
+              </button>
+              <button class="template-card" type="button">
+                <img src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=520&q=80" alt="粤语讲解" />
+                <div><strong>粤语讲解员</strong><span>粤语 · 华南市场</span></div>
+              </button>
+            </div>
+            <h3 style="margin:16px 0 4px">选择场景背景</h3>
+            <p style="margin:0; color:var(--muted); font-size:13px; font-weight:800">数字人所在的环境场景，影响视频整体风格与氛围</p>
+            <div class="scene-grid">
+              <button class="scene-card active" type="button"><img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=400&q=80" alt="豪华展厅" /><span>豪华展厅</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=400&q=80" alt="户外路边" /><span>户外路边</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1480428033426-29cd9b46c6e7?auto=format&fit=crop&w=400&q=80" alt="城市街道" /><span>城市街道</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80" alt="山景公路" /><span>山景公路</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1519642918688-7e43b19245d8?auto=format&fit=crop&w=400&q=80" alt="夜景都市" /><span>夜景都市</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=400&q=80" alt="科技影棚" /><span>科技影棚</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80" alt="海景路边" /><span>海景路边</span></button>
+              <button class="scene-card" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=400&q=80" alt="纯色影棚" /><span>纯色影棚</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 3：配音效果 -->
+        <div class="gen-panel" id="genPanel3">
+          <div class="form-block">
+            <div style="margin-bottom:14px">
+              <h3 style="margin:0 0 4px">选择配音方案</h3>
+              <p style="margin:0; color:var(--muted); font-size:13px; font-weight:800">点击「试听」预览配音效果，确认后视频将使用该声音合成口播</p>
+            </div>
+            <div class="voice-grid">
+              <div class="voice-card active" data-voice="0">
+                <strong>专业女声 · 推荐</strong>
+                <span>普通话 · 稳重可信<br>适合豪华车、高客单价车源</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="0">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+              <div class="voice-card" data-voice="1">
+                <strong>销售男声</strong>
+                <span>普通话 · 热情促成<br>适合家用车、性价比车型</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="1">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+              <div class="voice-card" data-voice="2">
+                <strong>播音女声</strong>
+                <span>普通话 · 正式权威<br>适合企业宣传、品牌视频</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="2">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+              <div class="voice-card" data-voice="3">
+                <strong>活力男声</strong>
+                <span>普通话 · 年轻活泼<br>适合新能源、运动型车</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="3">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+              <div class="voice-card" data-voice="4">
+                <strong>粤语女声</strong>
+                <span>粤语 · 亲切自然<br>适合华南地区受众</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="4">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+              <div class="voice-card" data-voice="5">
+                <strong>英文解说</strong>
+                <span>English · 专业沉稳<br>适合出口车源、国际受众</span>
+                <div class="voice-preview">
+                  <button class="play-btn" type="button" data-play="5">▶ 试听</button>
+                  <span class="voice-duration">0:08</span>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:18px; padding:14px; border:1px solid var(--line); border-radius:8px; background:#f9fbfd">
+              <h3 style="margin:0 0 10px; font-size:14px">配音参数调整</h3>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px">
+                <div class="field">
+                  <label>语速</label>
+                  <select><option>正常（1.0x）</option><option>稍快（1.2x）</option><option>稍慢（0.8x）</option></select>
+                </div>
+                <div class="field">
+                  <label>情感风格</label>
+                  <select><option>专业解说</option><option>热情推销</option><option>温和介绍</option><option>权威发布</option></select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤 4：文案与发布 -->
+        <div class="gen-panel" id="genPanel4">
+          <div class="form-block">
+            <div>
+              <h3 style="margin:0 0 4px">口播文案</h3>
+              <p style="margin:0 0 10px; color:var(--muted); font-size:13px; font-weight:800">输入文案方向后 AI 自动生成，也可直接编辑口播内容</p>
+            </div>
+            <div class="field">
+              <label>文案方向（AI 参考）</label>
+              <input id="copyDirection" value="突出车况、配置、空间和到店咨询引导，生成自然讲车口播。" />
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:6px; color:var(--muted); font-size:13px; font-weight:900">口播正文</label>
+              <textarea class="copy-textarea" id="copyText">大家好，今天给大家介绍这台宝马5系2021款530Li，成色非常好，外观黑色，内饰米色，整体车况非常棒。发动机2.0T动力充沛，驾驶感受舒适。车内配置丰富，全景天窗、真皮座椅、无钥匙进入一应俱全。有意向的朋友欢迎到店看车，我们提供完善的售后服务保障。</textarea>
+              <div class="copy-actions">
+                <span class="copy-hint">已输入 <span id="copyCount">86</span> 字 · 建议 60-150 字</span>
+                <div style="display:flex; gap:8px">
+                  <button class="btn ghost" type="button" id="clearCopy">清空</button>
+                  <button class="btn accent" type="button" id="aiGenCopy">✦ AI 一键生成文案</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 style="margin:0 0 8px; font-size:14px">发布平台（选填）</h3>
+              <div class="publish-opts">
+                <label class="publish-opt active"><input type="checkbox" checked /> 抖音</label>
+                <label class="publish-opt active"><input type="checkbox" checked /> 视频号</label>
+                <label class="publish-opt"><input type="checkbox" /> 快手</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="overlay-foot">
+        <span class="gen-footer-info" id="genFooterInfo">已选：素材库素材 4 个 · 支持继续自定义上传</span>
+        <button class="btn ghost" type="button" data-close="generateModal">取消</button>
+        <button class="btn ghost" id="genPrevBtn" type="button" disabled>← 上一步</button>
+        <button class="btn primary" id="genNextBtn" type="button">下一步 →</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="generateModal">
+    <section class="modal modal-wide" aria-label="生成视频弹窗">
+      <header class="overlay-head">
+        <div>
+          <h2>生成视频</h2>
+          <p class="vin" style="margin-top:4px" id="newGenerateVehicleName">宝马 5系 2021款 530Li · 选择车辆与素材</p>
+        </div>
+        <button class="close" type="button" data-close="generateModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="steps" id="newGenSteps">
+          <div class="step active" data-new-gen-indicator="1">1. 车辆与素材</div>
+          <div class="step" data-new-gen-indicator="2">2. 数字人与模板</div>
+          <div class="step" data-new-gen-indicator="3">3. 介绍信息</div>
+        </div>
+
+        <div class="gen-panel active" data-new-gen-panel="1">
+          <div class="form-block">
+            <div class="result-card">
+              <img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=420&q=80" alt="当前车辆" />
+              <div>
+                <h3 id="newGenCarTitle">宝马 5系 2021款 530Li</h3>
+                <p class="vin">VIN：LBV******123456 · 核心素材 5/5 已齐全</p>
+                <div class="detail-tags"><span class="tag">车辆已入库</span><span class="tag">可生成</span><span class="tag">已关联虹桥精品展厅</span></div>
+              </div>
+            </div>
+            <div class="field">
+              <label>车辆</label>
+              <select id="newGenVehicleSelect"><option>宝马 5系 2021款 530Li</option><option>奥迪 A6L 2022款 45TFSI</option><option>特斯拉 Model 3 2023款</option></select>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+              <h3 style="margin:0">选择本次使用的素材</h3>
+              <span class="vin">已选 5 个核心素材</span>
+            </div>
+            <div class="select-grid">
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=300&q=80" alt="车头图" /><span>车头图</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&w=300&q=80" alt="车尾图" /><span>车尾图</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80" alt="主驾驶图" /><span>主驾驶图</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1532581140115-3e355d1ed1de?auto=format&fit=crop&w=300&q=80" alt="前排视频" /><span>前排视频</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=300&q=80" alt="后排视频" /><span>后排视频</span></button>
+              <button class="select-item selected" type="button"><img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=300&q=80" alt="车场素材" /><span>车场素材</span></button>
+            </div>
+            <div class="entry-mode-tabs">
+              <button class="entry-mode active" type="button"><strong>使用库内素材</strong><span>车辆与车场素材均会保留关联关系。</span></button>
+              <button class="entry-mode" type="button" data-upload-kind="本次临时素材"><strong>临时补充素材</strong><span>上传后可选择“仅本次使用”或“同时保存到车辆库”。</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="gen-panel" data-new-gen-panel="2">
+          <div class="form-block">
+            <h3 style="margin:0">选择数字人</h3>
+            <div class="template-grid">
+              <button class="template-card active" type="button"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=520&q=80" alt="专业女声讲解" /><div><strong>专业女声讲解</strong><span>沉稳可信 · 普通话</span></div></button>
+              <button class="template-card" type="button"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=520&q=80" alt="门店销售男声" /><div><strong>门店销售男声</strong><span>热情自然 · 普通话</span></div></button>
+              <button class="template-card" type="button"><img src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=520&q=80" alt="粤语讲解员" /><div><strong>粤语讲解员</strong><span>亲切自然 · 粤语</span></div></button>
+            </div>
+            <h3 style="margin:8px 0 0">选择视频模板</h3>
+            <div class="template-grid">
+              <button class="template-card active" type="button"><div><strong>竖屏快速讲车</strong><span>数字人开场 + 车辆素材轮播</span><div class="template-meta"><em>9:16</em><em>约 45 秒</em><em>5–8 个素材</em></div></div></button>
+              <button class="template-card" type="button"><div><strong>展厅深度介绍</strong><span>车场开场 + 内外饰重点讲解</span><div class="template-meta"><em>16:9</em><em>约 90 秒</em><em>需要车场素材</em></div></div></button>
+              <button class="template-card" type="button"><div><strong>高端质感展示</strong><span>慢节奏转场 + 配置亮点字幕</span><div class="template-meta"><em>9:16</em><em>约 60 秒</em><em>建议 8 个素材</em></div></div></button>
+            </div>
+            <details>
+              <summary style="cursor:pointer; font-weight:900">高级设置：配音语速与情感</summary>
+              <div class="vehicle-form-grid" style="margin-top:12px">
+                <div class="field"><label>语速</label><select><option>正常（1.0x）</option><option>稍快（1.2x）</option></select></div>
+                <div class="field"><label>情感</label><select><option>专业解说</option><option>热情推销</option><option>温和介绍</option></select></div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="gen-panel" data-new-gen-panel="3">
+          <div class="form-block">
+            <div>
+              <h3 style="margin:0 0 4px">车辆介绍信息</h3>
+              <p class="vin" style="margin:0">输入已有介绍或简单卖点，AI 可以润色；留空也可根据车辆档案直接生成。</p>
+            </div>
+            <textarea class="copy-textarea" id="newCopyText" placeholder="例如：一手车、无重大事故、2.0T、全景天窗、空间宽敞，适合家用……">这台宝马 530Li 车况很好，黑色外观，米色内饰，配置丰富，欢迎到店试驾。</textarea>
+            <div class="copy-actions">
+              <span class="copy-hint">介绍内容会自动结合车辆档案生成口播</span>
+              <div class="copy-mode-actions">
+                <button class="btn ghost" id="newAiGenerate" type="button">AI 从零生成</button>
+                <button class="btn accent" id="newAiPolish" type="button">✦ AI 优化现有内容</button>
+              </div>
+            </div>
+            <div class="capacity-alert"><span>生成摘要：宝马 530Li · 核心素材 5 个 + 车场素材 1 个 · 专业女声 · 竖屏快速讲车 · 预计消耗 88 积分，约 3 分钟完成。</span></div>
+          </div>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <span class="gen-footer-info" id="newGenFooterInfo">已选车辆和 6 个素材</span>
+        <button class="btn ghost" type="button" data-close="generateModal">取消</button>
+        <button class="btn ghost" id="newGenPrevBtn" type="button" disabled>← 上一步</button>
+        <button class="btn primary" id="newGenNextBtn" type="button">下一步 →</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="editModal">
+    <section class="modal" aria-label="编辑车辆信息弹窗">
+      <header class="overlay-head">
+        <h2>编辑车辆信息</h2>
+        <button class="close" type="button" data-close="editModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="form-block">
+          <div class="field"><label>车辆备注名</label><input id="editNote" value="黑色宝马530 - 门店A" /></div>
+          <div class="field"><label>车身颜色</label><input value="黑色" /></div>
+          <div class="field"><label>门店归属</label><select><option>门店A</option><option>门店B</option><option>线上车源组</option></select></div>
+          <div class="field"><label>销售标签</label><input value="准新车 / 高配 / 可贷款" /></div>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <button class="btn ghost" type="button" data-close="editModal">取消</button>
+        <button class="btn primary" id="saveVehicleEdit" type="button">保存信息</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="drawer-backdrop" id="capacityModal">
+    <aside class="drawer" aria-label="容量不足抽屉">
+      <header class="overlay-head">
+        <h2>容量不足</h2>
+        <button class="close" type="button" data-close="capacityModal">×</button>
+      </header>
+      <div class="overlay-body">
+        <div class="capacity-alert">
+          <span>当前剩余 84MB，本次上传约 128MB，已超过企业素材库容量。你可以清理旧素材或联系客户经理扩容。</span>
+        </div>
+        <h3 style="margin:20px 0 10px">建议清理</h3>
+        <div class="table-panel">
+          <div class="table-row head"><span>预览</span><span>素材名称</span><span>类型</span><span>大小</span><span>操作</span></div>
+          <div class="table-row"><img class="table-thumb" src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=220&q=80" alt="旧视频" /><strong>旧版绕车视频.mov</strong><span>视频</span><span>126MB</span><button class="btn ghost" type="button">清理</button></div>
+          <div class="table-row"><img class="table-thumb" src="https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=220&q=80" alt="重复图" /><strong>重复外观图-副本.jpg</strong><span>外观</span><span>18MB</span><button class="btn ghost" type="button">清理</button></div>
+        </div>
+      </div>
+      <footer class="overlay-foot">
+        <button class="btn ghost" type="button">联系扩容</button>
+        <button class="btn primary" id="mockCleanup" type="button">一键清理示例素材</button>
+      </footer>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast">已完成</div>
+
+  <script>
+    const vehicles = [
+      {
+        title: "宝马 5系 2021款 530Li",
+        vin: "VIN：LBV******123456",
+        note: "黑色宝马530 - 门店A",
+        score: "核心素材 5/5",
+        image: "https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=760&q=80",
+      },
+      {
+        title: "奔驰 C级 2020款 C260L",
+        vin: "VIN：LE4******998812",
+        note: "白色奔驰C - 门店B",
+        score: "核心素材 2/5",
+        image: "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&w=760&q=80",
+      },
+      {
+        title: "奥迪 A6L 2022款 45TFSI",
+        vin: "VIN：LFV******660219",
+        note: "奥迪A6L - 重点车源",
+        score: "核心素材 3/5",
+        image: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=760&q=80",
+      },
+      {
+        title: "特斯拉 Model 3 2023款",
+        vin: "VIN：LRW******762501",
+        note: "准新新能源",
+        score: "核心素材 5/5",
+        image: "https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=760&q=80",
+      },
+      {
+        title: "丰田 凯美瑞 2021款 2.5G",
+        vin: "VIN：LVG******510087",
+        note: "家用车推荐",
+        score: "核心素材 3/5",
+        image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=760&q=80",
+      },
+      {
+        title: "保时捷 Macan 2019款 2.0T",
+        vin: "VIN：WP1******882134",
+        note: "高客单价车源",
+        score: "核心素材 1/5",
+        image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=760&q=80",
+      },
+    ];
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+    let selectedVehicleIndex = 0;
+
+    function showToast(text) {
+      const toast = $("#toast");
+      toast.textContent = text;
+      toast.classList.add("show");
+      window.setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    $$("#vehicleGrid .vehicle-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        $$("#vehicleGrid .vehicle-card").forEach((item) => item.classList.remove("active"));
+        card.classList.add("active");
+        selectedVehicleIndex = Number(card.dataset.index);
+        const item = vehicles[selectedVehicleIndex];
+        $("#detailTitle").textContent = item.title;
+        $("#detailVin").textContent = item.vin;
+        $("#detailNote").textContent = item.note;
+        $("#detailScore").textContent = item.score;
+        $("#detailImage").src = item.image;
+      });
+    });
+
+    $$(".chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const group = chip.parentElement;
+        group.querySelectorAll(".chip").forEach((item) => item.classList.remove("active"));
+        chip.classList.add("active");
+      });
+    });
+
+    $$(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        $$(".tab").forEach((item) => item.classList.remove("active"));
+        $$(".tab-panel").forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        $(`#tab-${tab.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    $("#openAddVehicle").addEventListener("click", () => {
+      updateVehicleStep(1);
+      $("#addModal").classList.add("show");
+    });
+    $("#openPicker").addEventListener("click", () => $("#pickerDrawer").classList.add("show"));
+    $("#openDealerEntry").addEventListener("click", () => $("#dealerModal").classList.add("show"));
+    $("#openDealerEntryFromLot").addEventListener("click", () => $("#dealerModal").classList.add("show"));
+    $("#openAddVehicleEmpty").addEventListener("click", () => {
+      updateVehicleStep(1);
+      $("#addModal").classList.add("show");
+    });
+
+    function activeVehicle() {
+      return vehicles[selectedVehicleIndex] ?? vehicles[0];
+    }
+
+    function openUploadManager() {
+      const item = activeVehicle();
+      $("#uploadVehicleName").textContent = item.title;
+      $("#uploadModal").classList.add("show");
+    }
+
+    // ── 4-step generate wizard ────────────────────────────────────────
+    let genCurrentStep = 1;
+    const GEN_TOTAL_STEPS = 4;
+    const genStepHints = [
+      "选择素材",
+      "数字人 & 场景",
+      "配音效果 · 请点击「试听」确认配音",
+      "文案与发布",
+    ];
+    const genFooterInfo = [
+      "已选：素材库素材 4 个 · 支持继续自定义上传",
+      "数字人：专业女声讲解 · 场景：豪华展厅",
+      "配音：专业女声 · 语速正常 · 专业解说",
+      "文案已填写 · 点击「生成视频」提交任务",
+    ];
+
+    function updateGenStep(n) {
+      genCurrentStep = n;
+      // panels
+      for (let i = 1; i <= GEN_TOTAL_STEPS; i++) {
+        $(`#genPanel${i}`).classList.toggle("active", i === n);
+      }
+      // step indicators
+      $$('#genSteps .step').forEach((s, idx) => {
+        s.classList.toggle('active', idx + 1 === n);
+        s.classList.toggle('done', idx + 1 < n);
+      });
+      // footer
+      $("#genFooterInfo").textContent = genFooterInfo[n - 1];
+      $("#genPrevBtn").disabled = n === 1;
+      const nextBtn = $("#genNextBtn");
+      if (n === GEN_TOTAL_STEPS) {
+        nextBtn.textContent = "生成视频 ✦";
+        nextBtn.classList.add("accent");
+      } else {
+        nextBtn.textContent = "下一步 →";
+        nextBtn.classList.remove("accent");
+      }
+    }
+
+    function openGenerateFlow() {
+      const item = activeVehicle();
+      $("#generateVehicleName").textContent = `${item.title} · ${genStepHints[0]}`;
+      updateGenStep(1);
+      $("#newGenerateVehicleName").textContent = `${item.title} · 选择车辆与素材`;
+      $("#newGenCarTitle").textContent = item.title;
+      updateNewGenStep(1);
+      $("#generateModal").classList.add("show");
+    }
+
+    $("#genNextBtn").addEventListener("click", () => {
+      if (genCurrentStep < GEN_TOTAL_STEPS) {
+        const next = genCurrentStep + 1;
+        updateGenStep(next);
+        const item = activeVehicle();
+        $("#generateVehicleName").textContent = `${item.title} · ${genStepHints[next - 1]}`;
+      } else {
+        // final step — submit
+        $("#generateModal").classList.remove("show");
+        showToast("已创建生成任务，素材、数字人、配音和文案数据已自动带入");
+      }
+    });
+
+    $("#genPrevBtn").addEventListener("click", () => {
+      if (genCurrentStep > 1) {
+        const prev = genCurrentStep - 1;
+        updateGenStep(prev);
+        const item = activeVehicle();
+        $("#generateVehicleName").textContent = `${item.title} · ${genStepHints[prev - 1]}`;
+      }
+    });
+
+    $("#openUploadManager").addEventListener("click", openUploadManager);
+    $("#openGenerateFlow").addEventListener("click", openGenerateFlow);
+    $("#toolbarGenerate").addEventListener("click", openGenerateFlow);
+    $("#openEditVehicle").addEventListener("click", () => {
+      $("#editNote").value = activeVehicle().note;
+      $("#editModal").classList.add("show");
+    });
+    $("#openCapacityModal").addEventListener("click", () => {
+      $("#uploadModal").classList.remove("show");
+      $("#capacityModal").classList.add("show");
+    });
+    $$("[data-close]").forEach((button) => {
+      button.addEventListener("click", () => {
+        $(`#${button.dataset.close}`).classList.remove("show");
+      });
+    });
+
+    $("#finishAdd").addEventListener("click", () => {
+      $("#addModal").classList.remove("show");
+      $("#postAddModal").classList.add("show");
+    });
+
+    $("#goUploadAfterAdd").addEventListener("click", () => {
+      $("#postAddModal").classList.remove("show");
+      openUploadManager();
+    });
+
+    $("#postAddGenerate").addEventListener("click", () => {
+      $("#postAddModal").classList.remove("show");
+      openGenerateFlow();
+    });
+
+    $("#mockWanweiVinQuery").addEventListener("click", () => {
+      showToast("已通过万维 VIN 精准查询获取车辆信息");
+    });
+
+    $("#vehicleVinQuery").addEventListener("click", () => {
+      showToast("VIN 查询成功，且未发现重复车辆");
+    });
+
+    $("#manualEntryNew").addEventListener("click", () => {
+      showToast("已切换为手动录入，识别结果仍会保留");
+    });
+
+    $("#openManualEntryFromVin").addEventListener("click", () => {
+      document.querySelector('[data-entry-mode="manual"]').click();
+    });
+
+    $("#saveDealerInfo").addEventListener("click", () => {
+      $("#dealerModal").classList.remove("show");
+      showToast("车场已入库，可在生成视频时直接调用");
+    });
+
+    $("#saveLotDraft").addEventListener("click", () => {
+      $("#dealerModal").classList.remove("show");
+      showToast("车场草稿已保存，可稍后补充素材");
+    });
+
+    $("#mockUploadDone").addEventListener("click", () => {
+      $("#uploadModal").classList.remove("show");
+      showToast("素材已上传，车辆完整度已更新");
+    });
+
+    $("#mockCleanup").addEventListener("click", () => {
+      $("#capacityModal").classList.remove("show");
+      showToast("已清理 144MB，可继续上传素材");
+    });
+
+    $("#saveVehicleEdit").addEventListener("click", () => {
+      const item = activeVehicle();
+      item.note = $("#editNote").value || item.note;
+      $("#detailNote").textContent = item.note;
+      $("#editModal").classList.remove("show");
+      showToast("车辆信息已保存");
+    });
+
+    $("#confirmPicker").addEventListener("click", () => {
+      $("#pickerDrawer").classList.remove("show");
+      showToast("已将车库素材带入当前生成表单");
+    });
+
+    $$(".select-item").forEach((item) => {
+      item.addEventListener("click", () => item.classList.toggle("selected"));
+    });
+
+    $$("[data-entry-mode]").forEach((item) => {
+      item.addEventListener("click", () => {
+        const mode = item.dataset.entryMode;
+        $$("[data-entry-mode]").forEach((button) => button.classList.remove("active"));
+        item.classList.add("active");
+        $("#vinAutoPanel").classList.toggle("active", mode === "vin");
+        $("#imageInputPanel").classList.toggle("active", mode === "image");
+        $("#manualInputPanel").classList.toggle("active", mode === "manual");
+      });
+    });
+
+    $$("[data-video-source]").forEach((item) => {
+      item.addEventListener("click", () => {
+        const source = item.dataset.videoSource;
+        $$("[data-video-source]").forEach((button) => button.classList.remove("active"));
+        item.classList.add("active");
+        $("#videoLibraryPanel").classList.toggle("active", source === "library");
+        $("#videoUploadPanel").classList.toggle("active", source === "upload");
+      });
+    });
+
+    $$(".template-card").forEach((item) => {
+      item.addEventListener("click", () => {
+        const group = item.parentElement;
+        group.querySelectorAll(".template-card").forEach((card) => card.classList.remove("active"));
+        item.classList.add("active");
+      });
+    });
+
+    $$("[data-upload-kind]").forEach((item) => {
+      item.addEventListener("click", () => {
+        const kind = item.dataset.uploadKind;
+        showToast(`${kind}已加入上传队列`);
+      });
+    });
+
+    // ── Voice card selection & trial playback ────────────────────────
+    $$(".voice-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".play-btn")) return; // play btn handled separately
+        $$(".voice-card").forEach((c) => c.classList.remove("active"));
+        card.classList.add("active");
+      });
+    });
+
+    $$(".play-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isPlaying = btn.classList.contains("playing");
+        // stop all others
+        $$(".play-btn").forEach((b) => {
+          b.classList.remove("playing");
+          b.textContent = "▶ 试听";
+        });
+        if (!isPlaying) {
+          btn.classList.add("playing");
+          btn.textContent = "■ 停止";
+          // auto-stop after simulated 8 seconds
+          setTimeout(() => {
+            btn.classList.remove("playing");
+            btn.textContent = "▶ 试听";
+          }, 8000);
+          showToast("正在试听配音效果…");
+        }
+      });
+    });
+
+    // ── Scene card selection ──────────────────────────────────────────
+    $$(".scene-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        $$(".scene-card").forEach((c) => c.classList.remove("active"));
+        card.classList.add("active");
+      });
+    });
+
+    // ── Copy textarea character counter ──────────────────────────────
+    const copyText = $("#copyText");
+    const copyCount = $("#copyCount");
+    if (copyText && copyCount) {
+      copyText.addEventListener("input", () => {
+        copyCount.textContent = copyText.value.length;
+      });
+    }
+
+    // ── Clear copy ────────────────────────────────────────────────────
+    const clearCopyBtn = $("#clearCopy");
+    if (clearCopyBtn) {
+      clearCopyBtn.addEventListener("click", () => {
+        copyText.value = "";
+        copyCount.textContent = "0";
+      });
+    }
+
+    // ── AI generate copy ─────────────────────────────────────────────
+    const aiGenCopyBtn = $("#aiGenCopy");
+    if (aiGenCopyBtn) {
+      aiGenCopyBtn.addEventListener("click", () => {
+        aiGenCopyBtn.disabled = true;
+        aiGenCopyBtn.textContent = "✦ 生成中…";
+        setTimeout(() => {
+          const direction = ($("#copyDirection")?.value || "").trim();
+          const generated = direction
+            ? `大家好，今天给大家介绍这台宝马5系2021款530Li，车况非常好。外观黑色，内饰米色，整体保养记录完整。2.0T发动机动力充沛，搭配8AT变速箱换挡顺滑，驾驶感受十分舒适。车内配置丰富，全景天窗、真皮座椅、无钥匙进入一应俱全，性价比非常高。有意向的朋友欢迎到店亲自体验，我们提供完善的验车和售后保障！`
+            : `这台宝马5系2021款530Li，成色极佳，车龄短、公里数低，全车无任何隐患。豪华配置加上优惠到店价，是刚需买家入手豪华车的绝佳选择。欢迎到店看车试驾，放心购、安心开。`;
+          copyText.value = generated;
+          copyCount.textContent = generated.length;
+          aiGenCopyBtn.disabled = false;
+          aiGenCopyBtn.textContent = "✦ AI 一键生成文案";
+          showToast("AI 文案已生成，可继续编辑修改");
+        }, 1800);
+      });
+    }
+
+    // ── Library category navigation ───────────────────────────────────
+    $$("[data-library-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.libraryTab;
+        $$("[data-library-tab]").forEach((item) => item.classList.toggle("active", item === button));
+        $$(".library-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `library-${target}`));
+      });
+    });
+
+    // ── Three-step vehicle entry ──────────────────────────────────────
+    let vehicleCurrentStep = 1;
+
+    function updateVehicleStep(step) {
+      vehicleCurrentStep = step;
+      $$("[data-vehicle-step]").forEach((panel) => {
+        panel.classList.toggle("active", Number(panel.dataset.vehicleStep) === step);
+      });
+      $$("[data-vehicle-step-indicator]").forEach((indicator) => {
+        const indicatorStep = Number(indicator.dataset.vehicleStepIndicator);
+        indicator.classList.toggle("active", indicatorStep === step);
+        indicator.classList.toggle("done", indicatorStep < step);
+      });
+      $("#vehiclePrevBtn").disabled = step === 1;
+      $("#vehicleNextBtn").style.display = step === 3 ? "none" : "inline-flex";
+      $("#finishAdd").style.display = step === 3 ? "inline-flex" : "none";
+    }
+
+    $("#vehiclePrevBtn").addEventListener("click", () => {
+      if (vehicleCurrentStep > 1) updateVehicleStep(vehicleCurrentStep - 1);
+    });
+
+    $("#vehicleNextBtn").addEventListener("click", () => {
+      if (vehicleCurrentStep < 3) updateVehicleStep(vehicleCurrentStep + 1);
+    });
+
+    $("#vehicleDraftBtn").addEventListener("click", () => {
+      $("#addModal").classList.remove("show");
+      showToast("车辆草稿已保存，可稍后继续");
+    });
+
+    // ── Three-step generation flow ────────────────────────────────────
+    let newGenCurrentStep = 1;
+    const newGenFooter = [
+      "已选车辆和 6 个素材",
+      "已选专业女声与竖屏快速讲车模板",
+      "介绍信息已填写，可提交生成",
+    ];
+
+    function updateNewGenStep(step) {
+      newGenCurrentStep = step;
+      $$("[data-new-gen-panel]").forEach((panel) => {
+        panel.classList.toggle("active", Number(panel.dataset.newGenPanel) === step);
+      });
+      $$("[data-new-gen-indicator]").forEach((indicator) => {
+        const indicatorStep = Number(indicator.dataset.newGenIndicator);
+        indicator.classList.toggle("active", indicatorStep === step);
+        indicator.classList.toggle("done", indicatorStep < step);
+      });
+      $("#newGenPrevBtn").disabled = step === 1;
+      $("#newGenNextBtn").textContent = step === 3 ? "提交生成 ✦" : "下一步 →";
+      $("#newGenNextBtn").classList.toggle("accent", step === 3);
+      $("#newGenFooterInfo").textContent = newGenFooter[step - 1];
+    }
+
+    $("#newGenPrevBtn").addEventListener("click", () => {
+      if (newGenCurrentStep > 1) updateNewGenStep(newGenCurrentStep - 1);
+    });
+
+    $("#newGenNextBtn").addEventListener("click", () => {
+      if (newGenCurrentStep < 3) {
+        updateNewGenStep(newGenCurrentStep + 1);
+      } else {
+        $("#generateModal").classList.remove("show");
+        showToast("生成任务已创建，可在生成记录中查看进度");
+      }
+    });
+
+    $("#newAiGenerate").addEventListener("click", () => {
+      $("#newCopyText").value = "这台宝马 5系 530Li 外观沉稳大气，2.0T 动力充沛，空间宽敞，配置丰富。车辆保养记录完整，适合商务和家庭使用，欢迎到店看车试驾。";
+      showToast("已根据车辆档案生成介绍，可继续修改");
+    });
+
+    $("#newAiPolish").addEventListener("click", () => {
+      $("#newCopyText").value = "今天带大家看一台车况出色的宝马 530Li。黑色车身搭配米色内饰，质感沉稳；2.0T 动力充沛，空间和舒适配置也很适合商务与家庭使用。车辆已完成检查，欢迎到店看车试驾。";
+      showToast("AI 已优化现有介绍，可撤销或继续编辑");
+    });
+
+    $("#freezeToggle").addEventListener("click", () => {
+      document.body.classList.toggle("frozen");
+      const frozen = document.body.classList.contains("frozen");
+      $("#serviceStatus").textContent = frozen ? "服务冻结" : "服务有效";
+      showToast(frozen ? "已切换到服务冻结态" : "已恢复服务有效态");
+    });
+  </script>
+</body>
+</html>
