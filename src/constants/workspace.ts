@@ -581,7 +581,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:filmstrip-box-multiple',
     label: '长视频生成',
-    tag: '',
+    tag: '开发中',
     tagType: 'info',
     title: '长视频生成',
     description: '面向长时内容创作的视频生成工作台。',
@@ -615,7 +615,7 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:account-voice',
     label: '同声传译',
-    tag: 'Beta',
+    tag: '开发中',
     tagType: 'info',
     title: '同声传译洽谈室',
     description: '与海外买家多语言实时视频洽谈,模型即时识别并双向翻译。',
@@ -733,6 +733,7 @@ function menuTagVariant(
 ): WorkspaceMenuItem['tagVariant'] {
   if (tag === 'Beta') return 'beta'
   if (tag === 'Hot') return 'hot'
+  if (tag === '开发中') return 'planned'
   if (tag === '规划中') return 'planned'
   if (tagType === 'success') return 'available'
   if (tagType === 'warning') return 'demo'
@@ -748,6 +749,9 @@ function toMenuItem(capability: WorkspaceCapability): WorkspaceMenuItem {
     tag: capability.tag,
     tagType: capability.tagType,
     tagVariant: menuTagVariant(capability.tag, capability.tagType),
+    disabled:
+      capability.code === 'long-video' ||
+      capability.code === 'simultaneous-interpretation',
   }
 }
 
