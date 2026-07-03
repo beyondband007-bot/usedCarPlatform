@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
 import { useMessage } from "naive-ui";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import WorkspaceImagePreviewPanel from "@/components/business/workspace/WorkspaceImagePreviewPanel.vue";
 import type { WorkspaceGenerateResult } from "@/types/workspace";
@@ -72,8 +72,11 @@ function handleVideoLoadedMetadata() {
 }
 
 function handleVideoCanPlay() {
+  const wasReady = isVideoReady.value;
   isVideoReady.value = true;
-  ensureVideoPaused();
+  if (!wasReady) {
+    ensureVideoPaused();
+  }
 }
 
 function markVideoReadyIfPossible() {
@@ -97,6 +100,25 @@ async function handleDownloadVideo() {
     message.error("视频下载失败，请稍后重试");
   } finally {
     isDownloadingVideo.value = false;
+  }
+}
+
+function handleVideoShortcut(event: KeyboardEvent) {
+  if (event.code !== "Space") return;
+
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  if (target?.matches("input, textarea, select, [contenteditable='true']")) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  const video = videoRef.value;
+  video?.blur();
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
   }
 }
 
@@ -129,6 +151,13 @@ watch(
 
 onMounted(() => {
   markVideoReadyIfPossible();
+  window.addEventListener("keydown", handleVideoShortcut, true);
+  window.addEventListener("keyup", handleVideoShortcut, true);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleVideoShortcut, true);
+  window.removeEventListener("keyup", handleVideoShortcut, true);
 });
 </script>
 
@@ -231,7 +260,7 @@ onMounted(() => {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .video-preview-head {
@@ -254,9 +283,9 @@ onMounted(() => {
 }
 
 .video-preview-meta h2 {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--assist-text);
-  font-size: clamp(18px, 1.5vw, 24px);
+  font-size: clamp(17px, 1.25vw, 21px);
   font-weight: 950;
   line-height: 1.35;
 }
@@ -286,13 +315,13 @@ onMounted(() => {
 .video-preview-body {
   position: relative;
   display: flex;
-  min-height: clamp(480px, 68vh, 920px);
+  min-height: 0;
   flex: 1;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: contain;
-  padding: clamp(20px, 3vh, 40px) clamp(20px, 3vw, 48px);
+  padding: clamp(12px, 1.8vh, 24px) clamp(14px, 2vw, 30px);
   border: 1px solid var(--assist-border, #e1eaf5);
   border-radius: 16px;
   background: transparent;
@@ -307,8 +336,8 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   min-height: 0;
-  gap: clamp(20px, 2.8vh, 36px);
-  padding: clamp(28px, 4vh, 56px) clamp(16px, 2vw, 32px);
+  gap: clamp(12px, 1.7vh, 20px);
+  padding: clamp(12px, 1.8vh, 22px) clamp(12px, 1.5vw, 20px);
 }
 
 .video-preview-waiting-visual {
@@ -328,22 +357,22 @@ onMounted(() => {
 }
 
 .video-preview-waiting-visual.is-portrait {
-  height: min(68vh, 820px);
+  height: min(42vh, 480px);
   width: auto;
-  max-width: min(92%, clamp(300px, 28vw, 520px));
+  max-width: min(86%, 320px);
 }
 
 .video-preview-waiting-visual.is-landscape {
-  width: min(92%, clamp(480px, 58vw, 960px));
+  width: min(86%, 720px);
   height: auto;
-  max-height: min(52vh, 620px);
+  max-height: min(38vh, 420px);
 }
 
 .video-preview-waiting-visual .iconify {
   position: relative;
   z-index: 1;
   color: var(--assist-blue, #3b82f6);
-  font-size: clamp(56px, 8vmin, 112px);
+  font-size: clamp(40px, 5vmin, 64px);
   filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--assist-blue, #3b82f6) 18%, transparent));
   animation: video-preview-pulse 1.6s ease-in-out infinite;
 }
@@ -367,7 +396,7 @@ onMounted(() => {
   display: grid;
   width: min(100%, clamp(360px, 52vw, 720px));
   justify-items: center;
-  gap: clamp(8px, 1.2vh, 14px);
+  gap: 6px;
   text-align: center;
 }
 
@@ -379,14 +408,14 @@ onMounted(() => {
 
 .video-preview-waiting-copy p {
   color: var(--assist-blue, #3b82f6);
-  font-size: clamp(14px, 1.4vw, 18px);
+  font-size: clamp(12px, 1vw, 14px);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .video-preview-waiting-copy h2 {
   color: var(--assist-text);
-  font-size: clamp(26px, 3.2vw, 42px);
+  font-size: clamp(20px, 2vw, 28px);
   font-weight: 900;
   line-height: 1.25;
 }
@@ -395,13 +424,13 @@ onMounted(() => {
   display: block;
   max-width: min(100%, 560px);
   color: var(--assist-muted);
-  font-size: clamp(15px, 1.5vw, 20px);
-  line-height: 1.65;
+  font-size: clamp(12px, 1vw, 14px);
+  line-height: 1.5;
 }
 
 .video-preview-waiting-progress {
-  width: min(100%, clamp(360px, 52vw, 720px));
-  height: clamp(8px, 1vh, 12px);
+  width: min(82%, 520px);
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--assist-border, #e1eaf5) 70%, transparent);
