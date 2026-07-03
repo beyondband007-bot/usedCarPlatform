@@ -6,6 +6,8 @@ import { useRoute } from 'vue-router'
 
 
 
+import InterpreterFloatingWidget from '@/components/business/interpreter/InterpreterFloatingWidget.vue'
+
 import VisitorWorkbenchModal from '@/components/business/home/VisitorWorkbenchModal.vue'
 
 import AppHeader from '@/components/layout/AppHeader.vue'
@@ -138,6 +140,8 @@ const {
       @dismiss="closeVisitorModal"
 
     />
+
+    <InterpreterFloatingWidget />
 
   </div>
 

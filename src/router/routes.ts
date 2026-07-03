@@ -132,6 +132,14 @@ export const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    path: '/interpreter/join',
+    name: 'InterpreterJoin',
+    component: () => import('@/pages/interpreter-join/index.vue'),
+    meta: {
+      title: '加入同声传译会议',
+    },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/home',
   },

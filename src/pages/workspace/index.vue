@@ -36,6 +36,7 @@ import CapabilityGeneratePanel from "@/components/business/workspace/CapabilityG
 import CreativeImageStudioPanel from "@/components/business/workspace/CreativeImageStudioPanel.vue";
 import LanguageConversionStudio from "@/components/business/workspace/LanguageConversionStudio.vue";
 import LongVideoStudioPlaceholder from "@/components/business/workspace/LongVideoStudioPlaceholder.vue";
+import SimultaneousInterpretationStudio from "@/components/business/workspace/SimultaneousInterpretationStudio.vue";
 import WorkspaceAssistPanel from "@/components/business/workspace/WorkspaceAssistPanel.vue";
 import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.vue";
 import { DEFAULT_GENERATION_OUTPUT_RATIO } from "@/constants/output-ratio";
@@ -2336,6 +2337,8 @@ onUnmounted(() => {
         'workspace-page--short-video': activeCode === SHORT_VIDEO_CAPABILITY_CODE,
         'workspace-page--long-video': activeCode === 'long-video',
         'workspace-page--language-conversion': activeCode === 'language-conversion',
+        'workspace-page--simultaneous-interpretation':
+          activeCode === 'simultaneous-interpretation',
       },
     ]"
   >
@@ -2356,7 +2359,9 @@ onUnmounted(() => {
         :class="{
           'workspace-col--batch': activeCapability.kind === 'batch',
           'workspace-col--delivery': activeCapability.kind === 'delivery',
-          'workspace-col--studio': activeCode === 'creative-image',
+          'workspace-col--studio':
+            activeCode === 'creative-image' ||
+            activeCode === 'simultaneous-interpretation',
         }"
       >
         <div class="workspace-col-scroll">
@@ -2384,6 +2389,9 @@ onUnmounted(() => {
           <LanguageConversionStudio
             v-else-if="activeCode === 'language-conversion'"
           />
+          <SimultaneousInterpretationStudio
+            v-else-if="activeCode === 'simultaneous-interpretation'"
+          />
           <CapabilityGeneratePanel
             v-else
             ref="generatePanelRef"
@@ -2409,7 +2417,8 @@ onUnmounted(() => {
         v-if="
           activeCode !== 'creative-image' &&
           activeCode !== 'long-video' &&
-          activeCode !== 'language-conversion'
+          activeCode !== 'language-conversion' &&
+          activeCode !== 'simultaneous-interpretation'
         "
         class="workspace-col workspace-col--assist"
       >
@@ -2695,7 +2704,8 @@ onUnmounted(() => {
 
 .workspace-page--creative-image .workspace-shell,
 .workspace-page--long-video .workspace-shell,
-.workspace-page--language-conversion .workspace-shell {
+.workspace-page--language-conversion .workspace-shell,
+.workspace-page--simultaneous-interpretation .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
     grid-template-columns: 208px minmax(0, 1fr);
   }
@@ -2709,7 +2719,8 @@ onUnmounted(() => {
   }
 }
 
-.workspace-page--creative-image .workspace-col--main {
+.workspace-page--creative-image .workspace-col--main,
+.workspace-page--simultaneous-interpretation .workspace-col--main {
   border: 0;
   border-radius: 0;
   background: transparent;

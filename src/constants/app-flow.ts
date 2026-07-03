@@ -81,6 +81,7 @@ export const workspaceFlowModules = [
       'short-video',
       'long-video',
       'language-conversion',
+      'simultaneous-interpretation',
       'watermark-remove',
       'creative-image',
     ],

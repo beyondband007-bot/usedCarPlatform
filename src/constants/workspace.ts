@@ -608,6 +608,23 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     options: [],
     actionLabel: '开始转换',
   }),
+  createCapability({
+    code: 'simultaneous-interpretation',
+    apiCode: 'simultaneous-interpretation',
+    kind: 'future',
+    groupTitle: '营销工具',
+    icon: 'mdi:account-voice',
+    label: '同声传译',
+    tag: 'Beta',
+    tagType: 'info',
+    title: '同声传译洽谈室',
+    description: '与海外买家多语言实时视频洽谈,模型即时识别并双向翻译。',
+    uploadTitle: '',
+    uploadHint: '',
+    middleBlocks: onlyActions,
+    options: [],
+    actionLabel: '发起会议',
+  }),
 ]
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
@@ -769,6 +786,7 @@ export const workspaceMenuGroups: WorkspaceMenuGroup[] = [
       'short-video',
       'long-video',
       'language-conversion',
+      'simultaneous-interpretation',
       'watermark-remove',
       'creative-image',
     ]),
