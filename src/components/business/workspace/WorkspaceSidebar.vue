@@ -143,7 +143,7 @@ function getStatusAriaLabel(
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 18px 14px 20px;
+  padding: 18px 10px 20px;
 }
 
 .sidebar-group-title {
@@ -170,8 +170,8 @@ function getStatusAriaLabel(
   width: 100%;
   align-items: center;
   grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 10px 10px 10px 8px;
+  gap: 8px;
+  padding: 10px 8px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;

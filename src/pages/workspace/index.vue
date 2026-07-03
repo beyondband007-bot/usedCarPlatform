@@ -2550,18 +2550,18 @@ onUnmounted(() => {
 
   @media (width >= 1024px) and (width < 1180px) {
     gap: 12px;
-    grid-template-columns: 208px 420px minmax(0, 1fr);
+    grid-template-columns: 184px 420px minmax(0, 1fr);
     padding: 12px;
   }
 
   @media (width >= 1180px) {
     gap: 14px;
-    grid-template-columns: 228px 440px minmax(420px, 1fr);
+    grid-template-columns: 200px 440px minmax(420px, 1fr);
     padding: 16px;
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 248px 500px minmax(520px, 1fr);
+    grid-template-columns: 216px 500px minmax(520px, 1fr);
     padding: 18px;
   }
 }
@@ -2668,29 +2668,29 @@ onUnmounted(() => {
 
 .workspace-page--feature-compare .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 208px 400px minmax(0, 1fr);
+    grid-template-columns: 184px 400px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 228px 420px minmax(420px, 1fr);
+    grid-template-columns: 200px 420px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 248px 440px minmax(520px, 1fr);
+    grid-template-columns: 216px 440px minmax(520px, 1fr);
   }
 }
 
 .workspace-page--short-video .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 208px 430px minmax(0, 1fr);
+    grid-template-columns: 184px 430px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 228px 460px minmax(420px, 1fr);
+    grid-template-columns: 200px 460px minmax(420px, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 248px 480px minmax(680px, 1fr);
+    grid-template-columns: 216px 480px minmax(680px, 1fr);
   }
 }
 
@@ -2709,15 +2709,15 @@ onUnmounted(() => {
 .workspace-page--language-conversion .workspace-shell,
 .workspace-page--simultaneous-interpretation .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
-    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-columns: 184px minmax(0, 1fr);
   }
 
   @media (width >= 1180px) {
-    grid-template-columns: 228px minmax(0, 1fr);
+    grid-template-columns: 200px minmax(0, 1fr);
   }
 
   @media (width >= 1536px) {
-    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-columns: 216px minmax(0, 1fr);
   }
 }
 
