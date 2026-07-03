@@ -83,6 +83,10 @@ Object.values(digitalHumanPreviewImagesById).forEach((items) => {
   items.sort((left, right) => left.viewIndex - right.viewIndex)
 })
 
+function resolveDigitalHumanFaceUrl(digitalHumanId: string) {
+  return digitalHumanPreviewImagesById[digitalHumanId]?.find((item) => item.viewIndex === 4)?.url
+}
+
 interface LocalSceneDefinition {
   templateId: string
   title: string
@@ -720,7 +724,10 @@ export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHu
     return apiHumans.map((human) => ({
       ...human,
       ...localDigitalHumanDisplayById[human.id],
-      previewUrl: localDigitalHumanDisplayById[human.id]?.previewUrl ?? human.previewUrl,
+      previewUrl:
+        resolveDigitalHumanFaceUrl(human.id) ??
+        localDigitalHumanDisplayById[human.id]?.previewUrl ??
+        human.previewUrl,
       imageUrl: localDigitalHumanDisplayById[human.id]?.imageUrl ?? human.imageUrl,
       previewImages:
         localDigitalHumanDisplayById[human.id]?.previewImages ?? human.previewImages,
@@ -728,6 +735,7 @@ export function getLocalDigitalHumans(apiHumans: DigitalHuman[] = []): DigitalHu
   }
   return LOCAL_DIGITAL_HUMANS.map((human) => ({
     ...human,
+    previewUrl: resolveDigitalHumanFaceUrl(human.id) ?? human.previewUrl,
     previewImages: digitalHumanPreviewImagesById[human.id]?.map(({ label, url }) => ({
       label,
       url,
@@ -756,6 +764,7 @@ const localDigitalHumanDisplayById: Record<string, Partial<DigitalHuman>> = Obje
     human.id,
     {
       ...human,
+      previewUrl: resolveDigitalHumanFaceUrl(human.id) ?? human.previewUrl,
       previewImages: digitalHumanPreviewImagesById[human.id]?.map(({ label, url }) => ({
         label,
         url,
