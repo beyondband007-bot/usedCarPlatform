@@ -160,7 +160,7 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
       '强调车源优质、层层质检合格，突出车商对车辆品质的重视，让用户直观感受车商的靠谱。',
     badge: 'new',
     videoUrl: scene06Video,
-    outputRatio: '9:16',
+    outputRatio: '16:9',
   },
   // BEGIN generated material templates 2-15
   {
