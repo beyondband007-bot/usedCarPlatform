@@ -2,21 +2,32 @@ import { normalizeApiErrorMessage, request } from '@/api/http'
 import type { ApiResponse } from '@/api/visual-workbench'
 
 export interface VinApiData extends Record<string, unknown> {
+  carid?: number
   vin?: string
   brand?: string
+  brand_name?: string
   manufacturer?: string
   typename?: string
+  car_line?: string
   yeartype?: string
+  year?: string
   name?: string
+  sale_name?: string
   sizetype?: string
+  model_name?: string
   bodytype?: string
   environmentalstandards?: string
+  effluent_standard?: string
   enginemodel?: string
+  engine_type?: string
   displacement?: string
+  output_volume?: string
   displacementml?: string | number | null
   fueltype?: string
+  fuel_Type?: string
   fuelgrade?: string
   gearbox?: string
+  transmission_type?: string
   geartype?: string
   gearnum?: string | number | null
   drivemode?: string
@@ -29,6 +40,16 @@ export interface VinApiData extends Record<string, unknown> {
   wheelbase?: string | number | null
   seatnum?: string | number | null
   doornum?: string | number | null
+  carlist?: VinVehicleCandidate[]
+}
+
+export interface VinVehicleCandidate {
+  carid: number
+  typeid?: number
+  name: string
+  typename?: string
+  price?: string
+  displacement?: string
 }
 
 export interface VehicleBasicInfo {
@@ -69,20 +90,20 @@ const toNumberOrNull = (
 }
 
 export const normalizeVehicleInfo = (data: VinApiData): VehicleBasicInfo => ({
-  brandName: data.brand || '',
+  brandName: data.brand || data.brand_name || '',
   manufacturerName: data.manufacturer || '',
-  seriesName: data.typename || '',
-  year: data.yeartype || '',
-  fullModelName: data.name || '',
-  vehicleLevel: data.sizetype || '',
+  seriesName: data.typename || data.car_line || '',
+  year: data.yeartype || data.year || '',
+  fullModelName: data.name || data.sale_name || '',
+  vehicleLevel: data.sizetype || data.model_name || '',
   bodyType: data.bodytype || '',
-  emissionStandard: data.environmentalstandards || '',
-  engineModel: data.enginemodel || '',
-  displacement: data.displacement || '',
+  emissionStandard: data.environmentalstandards || data.effluent_standard || '',
+  engineModel: data.enginemodel || data.engine_type || '',
+  displacement: data.displacement || data.output_volume || '',
   displacementMl: toNumberOrNull(data.displacementml),
-  fuelType: data.fueltype || '',
+  fuelType: data.fueltype || data.fuel_Type || '',
   fuelGrade: data.fuelgrade || '',
-  gearbox: data.gearbox || '',
+  gearbox: data.gearbox || data.transmission_type || '',
   gearboxType: data.geartype || '',
   gearCount: toNumberOrNull(data.gearnum),
   driveMode: data.drivemode || '',

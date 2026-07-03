@@ -10,6 +10,7 @@ import {
   normalizeVehicleInfo,
   recognizeVinFromImage,
   type VehicleBasicInfo,
+  type VinVehicleCandidate,
 } from '@/api/vehicle-info'
 import { VIDEO_GENERATION_FLOW_KEY } from '@/constants/video-generation'
 import {
@@ -35,8 +36,8 @@ const vin = ref('')
 const vinLoading = ref(false)
 const vinOcrLoading = ref(false)
 const vehicleInfo = ref<VehicleBasicInfo | null>(null)
-const vehicleInfoDraft = ref<VehicleBasicInfo | null>(null)
-const isEditingVehicleInfo = ref(false)
+const vehicleCandidates = ref<VinVehicleCandidate[]>([])
+const selectedVehicleCandidateId = ref<number | null>(null)
 const templateSearch = ref('')
 const activeWorkflowStep = computed(() => {
   if (currentView.value === 'vehicle-template') return 2
@@ -179,46 +180,34 @@ const displayedCoreFields = computed(() =>
   coreVehicleFields.map(([key, label]) => ({
     key,
     label,
-    editValue: vehicleInfoDraft.value?.[key] ?? '',
-    value: key === 'year'
-      ? formatYear(vehicleInfo.value?.year)
-      : displayValue(vehicleInfo.value?.[key]),
+    value: vehicleInfo.value?.[key] ?? '',
   })),
 )
 
-function displayValue(value: unknown): string {
-  if (value === null || value === undefined || value === '' || value === '-') return '-'
-  return String(value)
+function startManualVehicleInfoInput() {
+  vehicleInfo.value = normalizeVehicleInfo({})
+  vehicleCandidates.value = []
+  selectedVehicleCandidateId.value = null
+  message.info('已切换为手动录入，请填写车辆信息')
 }
 
-function formatYear(value?: string): string {
-  const year = displayValue(value)
-  if (year === '-') return year
-  return year.endsWith('款') ? year : `${year}款`
-}
-
-function startEditingVehicleInfo() {
+function updateVehicleInfo(key: EditableVehicleField, event: Event) {
   if (!vehicleInfo.value) return
-  vehicleInfoDraft.value = { ...vehicleInfo.value }
-  isEditingVehicleInfo.value = true
+  vehicleInfo.value[key] = (event.target as HTMLInputElement).value
 }
 
-function cancelEditingVehicleInfo() {
-  vehicleInfoDraft.value = null
-  isEditingVehicleInfo.value = false
+function extractCandidateYear(name: string): string {
+  return name.match(/(?:19|20)\d{2}(?=款)/)?.[0] ?? ''
 }
 
-function updateVehicleInfoDraft(key: EditableVehicleField, event: Event) {
-  if (!vehicleInfoDraft.value) return
-  vehicleInfoDraft.value[key] = (event.target as HTMLInputElement).value
-}
-
-function saveVehicleInfo() {
-  if (!vehicleInfoDraft.value) return
-  vehicleInfo.value = { ...vehicleInfoDraft.value }
-  vehicleInfoDraft.value = null
-  isEditingVehicleInfo.value = false
-  message.success('车辆信息已更新')
+function selectVehicleCandidate(candidate: VinVehicleCandidate) {
+  if (!vehicleInfo.value) return
+  selectedVehicleCandidateId.value = candidate.carid
+  vehicleInfo.value.fullModelName = candidate.name
+  vehicleInfo.value.seriesName = candidate.typename || vehicleInfo.value.seriesName
+  vehicleInfo.value.year = extractCandidateYear(candidate.name) || vehicleInfo.value.year
+  vehicleInfo.value.displacement = candidate.displacement || vehicleInfo.value.displacement
+  vehicleInfo.value.guidePrice = candidate.price || vehicleInfo.value.guidePrice
 }
 
 function openProjectType(index: number) {
@@ -305,10 +294,16 @@ async function handleVinQuery() {
 
   vinLoading.value = true
   vehicleInfo.value = null
-  cancelEditingVehicleInfo()
+  vehicleCandidates.value = []
+  selectedVehicleCandidateId.value = null
   try {
     const result = await queryVehicleByVin(normalizedVin)
     vehicleInfo.value = normalizeVehicleInfo(result)
+    vehicleCandidates.value = result.carlist ?? []
+    selectedVehicleCandidateId.value =
+      vehicleCandidates.value.find((candidate) => candidate.carid === result.carid)?.carid ??
+      vehicleCandidates.value[0]?.carid ??
+      null
     vin.value = normalizedVin
   } catch (error) {
     message.error(error instanceof Error ? error.message : 'VIN 查询失败，请稍后重试')
@@ -601,6 +596,10 @@ async function handleVinImageChange(event: Event) {
             <Icon :icon="vinLoading ? 'mdi:loading' : 'mdi:magnify'" :class="{ 'is-spinning': vinLoading }" />
             {{ vinLoading ? '查询中' : '查询车辆' }}
           </button>
+          <button type="button" class="vin-manual-button" @click="startManualVehicleInfoInput">
+            <Icon icon="mdi:pencil-outline" aria-hidden="true" />
+            手动录入
+          </button>
         </div>
       </section>
 
@@ -608,26 +607,50 @@ async function handleVinImageChange(event: Event) {
         <header>
           <div>
             <h2>车辆基础信息</h2>
-            <p>信息来源于第三方，仅供参考；如信息不准确，请手动编辑。</p>
+            <p>识别结果仅供参考，所有信息均可直接修改。</p>
           </div>
-          <div class="vehicle-vin-state">
-            <span class="vehicle-vin">{{ vin }}</span>
-            <div class="vehicle-info-actions">
-              <template v-if="isEditingVehicleInfo">
-                <button type="button" class="vehicle-edit-button is-cancel" @click="cancelEditingVehicleInfo">
-                  取消
-                </button>
-                <button type="button" class="vehicle-edit-button is-save" @click="saveVehicleInfo">
-                  保存
-                </button>
-              </template>
-              <button v-else type="button" class="vehicle-edit-button" @click="startEditingVehicleInfo">
-                <Icon icon="mdi:pencil-outline" aria-hidden="true" />
-                编辑信息
-              </button>
-            </div>
-          </div>
+          <span v-if="vin" class="vehicle-vin">{{ vin }}</span>
         </header>
+
+        <section v-if="vehicleCandidates.length" class="vehicle-candidate-section">
+          <div class="vehicle-candidate-heading">
+            <div>
+              <strong>请选择准确车型与年款</strong>
+              <span>VIN 匹配到 {{ vehicleCandidates.length }} 个相近结果，请根据实车信息确认</span>
+            </div>
+            <span class="vehicle-candidate-count">
+              <Icon icon="mdi:format-list-bulleted" aria-hidden="true" />
+              {{ vehicleCandidates.length }} 个候选
+            </span>
+          </div>
+          <div class="vehicle-candidate-grid">
+            <label
+              v-for="(candidate, index) in vehicleCandidates"
+              :key="candidate.carid"
+              class="vehicle-candidate-card"
+              :class="{ 'is-selected': selectedVehicleCandidateId === candidate.carid }"
+            >
+              <input
+                type="radio"
+                name="vehicle-candidate"
+                :value="candidate.carid"
+                :checked="selectedVehicleCandidateId === candidate.carid"
+                @change="selectVehicleCandidate(candidate)"
+              />
+              <span class="vehicle-candidate-radio" aria-hidden="true"></span>
+              <span class="vehicle-candidate-content">
+                <span class="vehicle-candidate-name">
+                  {{ candidate.name }}
+                  <em v-if="index === 0">推荐</em>
+                </span>
+                <span class="vehicle-candidate-meta">
+                  <span v-if="candidate.displacement">{{ candidate.displacement }}</span>
+                  <span v-if="candidate.price">指导价 {{ candidate.price }}</span>
+                </span>
+              </span>
+            </label>
+          </div>
+        </section>
 
         <dl class="vehicle-info-grid">
           <div
@@ -635,16 +658,16 @@ async function handleVinImageChange(event: Event) {
             :key="item.key"
           >
             <dt>{{ item.label }}</dt>
-            <dd v-if="isEditingVehicleInfo">
+            <dd>
               <input
                 class="vehicle-info-input"
                 type="text"
-                :value="item.editValue"
+                :value="item.value"
                 :aria-label="item.label"
-                @input="updateVehicleInfoDraft(item.key, $event)"
+                :placeholder="`请输入${item.label}`"
+                @input="updateVehicleInfo(item.key, $event)"
               />
             </dd>
-            <dd v-else>{{ item.value }}</dd>
           </div>
         </dl>
       </section>
@@ -1543,6 +1566,12 @@ h1 {
   opacity: 0.72;
 }
 
+.vin-query-form > .vin-manual-button {
+  border: 1px solid color-mix(in srgb, var(--lv-primary) 36%, var(--lv-border));
+  background: var(--lv-primary-soft);
+  color: var(--lv-primary);
+}
+
 .is-spinning {
   animation: vin-spin 0.9s linear infinite;
 }
@@ -1577,49 +1606,142 @@ h1 {
   letter-spacing: 0.06em;
 }
 
-.vehicle-vin-state {
-  display: grid;
-  justify-items: end;
-  gap: 7px;
+.vehicle-candidate-section {
+  padding: 20px 0 4px;
 }
 
-.vehicle-info-actions {
+.vehicle-candidate-heading {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
-.vehicle-edit-button {
+.vehicle-candidate-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.vehicle-candidate-heading strong {
+  color: var(--lv-text);
+  font-size: 14px;
+}
+
+.vehicle-candidate-heading > div > span {
+  color: var(--lv-muted);
+  font-size: 12px;
+}
+
+.vehicle-candidate-count {
   display: inline-flex;
-  min-height: 32px;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: center;
   gap: 5px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--lv-primary) 45%, var(--lv-border));
-  border-radius: 8px;
-  background: var(--lv-panel);
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--lv-primary-soft);
   color: var(--lv-primary);
-  cursor: pointer;
-  font-family: inherit;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.vehicle-edit-button.is-save {
-  border-color: var(--lv-primary);
-  background: var(--lv-primary);
-  color: #fff;
+.vehicle-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.vehicle-edit-button.is-cancel {
-  border-color: var(--lv-border);
+.vehicle-candidate-card {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-surface);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.vehicle-candidate-card:hover {
+  border-color: color-mix(in srgb, var(--lv-primary) 50%, var(--lv-border));
+}
+
+.vehicle-candidate-card.is-selected {
+  border-color: var(--lv-primary);
+  background: color-mix(in srgb, var(--lv-primary-soft) 42%, var(--lv-panel));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-primary) 8%, transparent);
+}
+
+.vehicle-candidate-card > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vehicle-candidate-radio {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  border: 1.5px solid color-mix(in srgb, var(--lv-muted) 65%, var(--lv-border));
+  border-radius: 50%;
+  background: var(--lv-panel);
+  box-shadow: inset 0 0 0 3px var(--lv-panel);
+}
+
+.vehicle-candidate-card.is-selected .vehicle-candidate-radio {
+  border-color: var(--lv-primary);
+  background: var(--lv-primary);
+}
+
+.vehicle-candidate-content {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.vehicle-candidate-name {
+  color: var(--lv-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.vehicle-candidate-name em {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--lv-primary);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+
+.vehicle-candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
   color: var(--lv-muted);
+  font-size: 11px;
 }
 
 .vehicle-info-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
-  margin: 0;
+  margin: 16px 0 0;
+  border-top: 1px solid var(--lv-border);
 }
 
 .vehicle-info-grid div {
@@ -1647,13 +1769,15 @@ h1 {
 }
 
 .vehicle-info-input {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: 8px 10px;
+  height: 40px;
+  padding: 0 11px;
   border: 1px solid var(--lv-border);
   border-radius: 8px;
   outline: none;
-  background: var(--lv-panel);
+  background: var(--lv-surface);
   color: var(--lv-text);
   font: inherit;
   font-weight: 600;
@@ -1662,6 +1786,11 @@ h1 {
 .vehicle-info-input:focus {
   border-color: var(--lv-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
+}
+
+.vehicle-info-input::placeholder {
+  color: color-mix(in srgb, var(--lv-muted) 65%, transparent);
+  font-weight: 400;
 }
 
 .template-heading {
@@ -1935,6 +2064,10 @@ h1 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .vehicle-candidate-grid {
+    grid-template-columns: 1fr;
+  }
+
   .vehicle-info-grid div:nth-child(n + 4) {
     border-top: 1px solid var(--lv-border);
   }
@@ -2003,6 +2136,10 @@ h1 {
 
   .vehicle-info-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-candidate-heading {
+    align-items: flex-start;
   }
 
   .vehicle-info-grid div:nth-child(n + 3) {
