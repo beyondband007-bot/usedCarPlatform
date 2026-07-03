@@ -108,6 +108,7 @@ function resolveNavPermission(path: string) {
   if (path === "/home") return "menu:home";
   if (path === "/workspace" || path.startsWith("/workspace/"))
     return "menu:workspace";
+  if (path === "/vehicle-library") return "";
   if (path === "/pricing") return "menu:pricing";
   if (path === "/points" || path === "/credits") return "menu:points";
   if (path === "/recharge" || path === "/package-points")

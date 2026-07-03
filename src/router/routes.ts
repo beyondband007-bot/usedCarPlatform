@@ -62,6 +62,15 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'vehicle-library',
+        name: 'VehicleLibrary',
+        component: () => import('@/pages/vehicle-library/index.vue'),
+        meta: {
+          title: '车辆素材库',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'credits',
         name: 'Credits',
         component: () => import('@/pages/points/index.vue'),
