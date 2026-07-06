@@ -229,6 +229,13 @@ const parseVehiclePayload = (body: Record<string, unknown>, existing?: VehicleRo
   };
 };
 
+// check-then-insert 在并发下仍可能撞 uk_vehicles_library_vin，把数据库重复键错误
+// 转成 409，而不是落到兜底的 500。
+const isDuplicateEntryError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  (error as { errno?: number }).errno === 1062;
+
 const assertAssetMediaType = (mimeType: string, mediaType: "image" | "video") => {
   if (mediaType === "image" && !isImageMimeType(mimeType)) {
     throw errors.invalidParameter("asset must be an image for this vehicle library slot", {
@@ -462,12 +469,20 @@ export class VehicleLibraryService {
     const payload = parseVehiclePayload(body);
     await this.assertSameLibraryLot(library.id, payload.lotId);
     await this.assertVinAvailable(library.id, payload.vin);
-    const vehicle = await vehicleLibraryRepository.createVehicle({
-      id: createId("vehicle"),
-      libraryId: library.id,
-      ...payload,
-      createdByUserId: current.user.id,
-    });
+    let vehicle;
+    try {
+      vehicle = await vehicleLibraryRepository.createVehicle({
+        id: createId("vehicle"),
+        libraryId: library.id,
+        ...payload,
+        createdByUserId: current.user.id,
+      });
+    } catch (error) {
+      if (isDuplicateEntryError(error)) {
+        throw errors.conflict("VIN already exists in this vehicle library", { vin: payload.vin });
+      }
+      throw error;
+    }
     if (!vehicle) throw errors.generationFailed("failed to create vehicle");
     return serializeVehicle(vehicle);
   }
@@ -487,12 +502,19 @@ export class VehicleLibraryService {
     const payload = parseVehiclePayload(body, existing);
     await this.assertSameLibraryLot(library.id, payload.lotId);
     await this.assertVinAvailable(library.id, payload.vin, vehicleId);
-    await vehicleLibraryRepository.updateVehicle({
-      vehicleId,
-      libraryId: library.id,
-      ...payload,
-      updatedByUserId: current.user.id,
-    });
+    try {
+      await vehicleLibraryRepository.updateVehicle({
+        vehicleId,
+        libraryId: library.id,
+        ...payload,
+        updatedByUserId: current.user.id,
+      });
+    } catch (error) {
+      if (isDuplicateEntryError(error)) {
+        throw errors.conflict("VIN already exists in this vehicle library", { vin: payload.vin });
+      }
+      throw error;
+    }
     return this.getVehicle(current, vehicleId, { libraryId: library.id });
   }
 

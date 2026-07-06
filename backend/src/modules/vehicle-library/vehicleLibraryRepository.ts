@@ -566,11 +566,14 @@ export class VehicleLibraryRepository extends Repository {
   }
 
   async archiveVehicle(vehicleId: string, libraryId: string, userId: string) {
+    // vin participates in uk_vehicles_library_vin, which also covers
+    // soft-deleted rows; clear it so the VIN can be registered again.
     await this.execute(
       `UPDATE vehicles
        SET status = 'archived',
            deleted_at = CURRENT_TIMESTAMP(3),
-           updated_by_user_id = :userId
+           updated_by_user_id = :userId,
+           vin = NULL
        WHERE id = :vehicleId
          AND library_id = :libraryId
          AND deleted_at IS NULL`,

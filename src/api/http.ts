@@ -48,6 +48,10 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '文件过大，请压缩后重试',
   },
   {
+    matches: ['vin already exists'],
+    text: '该 VIN 已存在于车辆库中，请勿重复录入',
+  },
+  {
     matches: [
       'requires a car_exterior asset',
       'requires a car_interior asset',
