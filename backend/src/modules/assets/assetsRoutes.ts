@@ -23,12 +23,22 @@ const storage = multer.diskStorage({
   },
 });
 
+// Multer only supports a single fileSize limit, so it is set to the (larger)
+// video limit; non-video files are checked against the stricter image limit
+// after the upload finishes.
 const upload = multer({
   storage,
   limits: {
-    fileSize: env.maxUploadMb * 1024 * 1024,
+    fileSize: Math.max(env.maxUploadMb, env.maxVideoUploadMb) * 1024 * 1024,
   },
 });
+
+const maxUploadBytesFor = (mimeType: string) => {
+  const limitMb = mimeType.toLowerCase().startsWith("video/")
+    ? env.maxVideoUploadMb
+    : env.maxUploadMb;
+  return { limitMb, limitBytes: limitMb * 1024 * 1024 };
+};
 
 export const assetsRoutes = Router();
 
@@ -44,6 +54,12 @@ assetsRoutes.post(
 
     if (!req.file) {
       throw errors.invalidParameter("file is required");
+    }
+
+    const { limitMb, limitBytes } = maxUploadBytesFor(req.file.mimetype);
+    if (req.file.size > limitBytes) {
+      await fs.promises.unlink(req.file.path).catch(() => undefined);
+      throw errors.fileTooLarge({ maxUploadMb: limitMb, size: req.file.size });
     }
 
     const asset = await assetsService.saveUploadedFile(req.file, purpose, current.user.id);

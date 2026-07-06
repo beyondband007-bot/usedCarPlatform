@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
+import { MulterError } from "multer";
 
-import { AppError } from "./errors";
+import { AppError, errors } from "./errors";
 import { createId } from "./ids";
 
 export const ok = <T>(res: Response, data: T) =>
@@ -26,6 +27,13 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction,
 ) => {
+  if (error instanceof MulterError) {
+    error =
+      error.code === "LIMIT_FILE_SIZE"
+        ? errors.fileTooLarge()
+        : errors.invalidParameter(`upload failed: ${error.message}`, { code: error.code });
+  }
+
   if (error instanceof AppError) {
     res.status(error.statusCode).json({
       code: error.code,

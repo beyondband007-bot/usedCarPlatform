@@ -40,6 +40,7 @@ export const env = {
   packagesDir: path.resolve(rootDir, process.env.PACKAGES_DIR ?? "storage/packages"),
   sceneRefsDir: path.resolve(rootDir, process.env.SCENE_REFS_DIR ?? "storage/scene-refs"),
   maxUploadMb: toNumber(process.env.MAX_UPLOAD_MB, 20),
+  maxVideoUploadMb: toNumber(process.env.MAX_VIDEO_UPLOAD_MB, 200),
   ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
   showApiVin: {
     baseUrl: process.env.SHOWAPI_VIN_API_URL ?? "https://route.showapi.com/1142-2",

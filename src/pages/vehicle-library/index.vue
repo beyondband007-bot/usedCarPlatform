@@ -31,6 +31,10 @@ import {
 
 import './vehicle-library.scss'
 
+// 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
+const MAX_IMAGE_UPLOAD_MB = 20
+const MAX_VIDEO_UPLOAD_MB = 200
+
 type LibraryTab = 'vehicles' | 'lots' | 'templates'
 type DetailTab = 'overview' | 'assets'
 type VehicleFilter = 'all' | 'complete' | 'missing-exterior' | 'missing-driver' | 'missing-video'
@@ -414,6 +418,16 @@ function openLotModal() {
   showLotModal.value = true
 }
 
+function withUploadFailReason(label: string, error: unknown) {
+  return error instanceof Error && error.message ? `${label}（${error.message}）` : label
+}
+
+function uploadSizeError(file: File, mediaType: 'image' | 'video') {
+  const limitMb = mediaType === 'image' ? MAX_IMAGE_UPLOAD_MB : MAX_VIDEO_UPLOAD_MB
+  if (file.size <= limitMb * 1024 * 1024) return ''
+  return `文件不能超过 ${limitMb}MB，请压缩后重试`
+}
+
 function selectLotFile(mediaType: 'image' | 'video', event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
@@ -422,6 +436,11 @@ function selectLotFile(mediaType: 'image' | 'video', event: Event) {
   const valid = mediaType === 'image' ? file.type.startsWith('image/') : file.type.startsWith('video/')
   if (!valid) {
     lotError.value = `请选择${mediaType === 'image' ? '图片' : '视频'}文件`
+    return
+  }
+  const sizeError = uploadSizeError(file, mediaType)
+  if (sizeError) {
+    lotError.value = `${mediaType === 'image' ? '车场图片' : '车场视频'}${sizeError}`
     return
   }
   lotForm[mediaType] = file
@@ -443,16 +462,16 @@ async function saveLot() {
       try {
         const asset = await uploadAsset(lotForm.image, 'car_exterior')
         await putVehicleLotMaterial(lot.id, 'lot_image', { assetId: asset.assetId })
-      } catch {
-        failedMaterials.push('车场图片')
+      } catch (error) {
+        failedMaterials.push(withUploadFailReason('车场图片', error))
       }
     }
     if (lotForm.video) {
       try {
         const asset = await uploadAsset(lotForm.video, 'car_interior')
         await putVehicleLotMaterial(lot.id, 'lot_video', { assetId: asset.assetId })
-      } catch {
-        failedMaterials.push('车场视频')
+      } catch (error) {
+        failedMaterials.push(withUploadFailReason('车场视频', error))
       }
     }
     operationMessage.value = failedMaterials.length
@@ -482,6 +501,11 @@ function selectMaterialFile(slot: (typeof uploadSlots)[number], event: Event) {
     : file.type.startsWith('video/')
   if (!validType) {
     vinError.value = `${slot.label}请选择${slot.mediaType === 'image' ? '图片' : '视频'}文件`
+    return
+  }
+  const sizeError = uploadSizeError(file, slot.mediaType)
+  if (sizeError) {
+    vinError.value = `${slot.label}${sizeError}`
     return
   }
   materialFiles[slot.code] = file
@@ -561,8 +585,8 @@ async function uploadExistingVehicleMaterials() {
       try {
         const asset = await uploadAsset(file, slot.purpose)
         await putVehicleMaterial(vehicle.id, slot.code, { assetId: asset.assetId })
-      } catch {
-        failedSlots.push(slot.label)
+      } catch (error) {
+        failedSlots.push(withUploadFailReason(slot.label, error))
       }
     }
     operationMessage.value = failedSlots.length
@@ -713,8 +737,8 @@ async function saveVehicle() {
       try {
         const asset = await uploadAsset(file, slot.purpose)
         await putVehicleMaterial(vehicle.id, slot.code, { assetId: asset.assetId })
-      } catch {
-        failedSlots.push(slot.label)
+      } catch (error) {
+        failedSlots.push(withUploadFailReason(slot.label, error))
       }
     }
     const savedText = isEditing ? '车辆信息已更新' : '车辆已入库'

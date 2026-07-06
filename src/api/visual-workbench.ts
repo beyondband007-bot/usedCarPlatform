@@ -596,7 +596,8 @@ export async function uploadAsset(file: File, purpose: AssetPurpose) {
   const response = await request.post<ApiResponse<UploadedAsset>>(
     '/assets/upload',
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    // 大视频上传耗时远超全局 20s 超时，上传请求不设超时。
+    { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 },
   )
 
   return normalizeUploadedAsset(unwrapApiResponse(response))

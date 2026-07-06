@@ -44,6 +44,10 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '所选素材不存在或已失效，请重新上传后重试',
   },
   {
+    matches: ['file is too large'],
+    text: '文件过大，请压缩后重试',
+  },
+  {
     matches: [
       'requires a car_exterior asset',
       'requires a car_interior asset',
