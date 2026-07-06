@@ -403,6 +403,18 @@ export class VehicleLibraryRepository extends Repository {
     );
   }
 
+  async detachVehiclesFromLot(lotId: string, libraryId: string, userId: string) {
+    await this.execute(
+      `UPDATE vehicles
+       SET lot_id = NULL,
+           updated_by_user_id = :userId
+       WHERE lot_id = :lotId
+         AND library_id = :libraryId
+         AND deleted_at IS NULL`,
+      { lotId, libraryId, userId },
+    );
+  }
+
   async archiveLot(lotId: string, libraryId: string, userId: string) {
     await this.execute(
       `UPDATE vehicle_lots

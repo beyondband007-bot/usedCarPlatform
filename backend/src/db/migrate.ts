@@ -841,6 +841,14 @@ const run = async () => {
     await pool.query(
       `UPDATE vehicles SET vin = NULL WHERE deleted_at IS NOT NULL AND vin IS NOT NULL`,
     );
+    // 历史数据中指向已删除场地的车辆会卡在 lot 归属校验上，统一解绑。
+    await pool.query(
+      `UPDATE vehicles v
+       JOIN vehicle_lots vl ON vl.id = v.lot_id
+       SET v.lot_id = NULL
+       WHERE vl.deleted_at IS NOT NULL
+         AND v.deleted_at IS NULL`,
+    );
 
     await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
     await addIndexIfMissing("assets", "idx_assets_user_purpose_created", "(user_id, purpose, created_at)");

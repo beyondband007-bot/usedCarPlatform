@@ -402,6 +402,10 @@ export class VehicleLibraryService {
 
   async deleteLot(current: CurrentUserSession, lotId: string, query?: Record<string, unknown>) {
     const library = await this.getLibraryForRequest(current, query?.libraryId);
+    const lot = await vehicleLibraryRepository.findLotById(lotId, library.id);
+    if (!lot) throw errors.invalidParameter("vehicle lot not found", { lotId });
+    // 先解绑场内车辆，否则这些车辆会带着已删场地 id 卡在 lot 归属校验上。
+    await vehicleLibraryRepository.detachVehiclesFromLot(lotId, library.id, current.user.id);
     await vehicleLibraryRepository.archiveLot(lotId, library.id, current.user.id);
     return { deleted: true };
   }
