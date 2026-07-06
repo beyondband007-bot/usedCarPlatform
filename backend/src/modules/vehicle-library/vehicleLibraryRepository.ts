@@ -180,25 +180,19 @@ export const mapMaterialRow = (row: VehicleLibraryMaterialRow) => ({
   updatedAt: row.updated_at.toISOString(),
 });
 
-const ownerScopeSql = (scope: LibraryScope) => {
-  if (scope.tenantId) {
-    return "(tenant_id = :tenantId OR owner_user_id = :userId)";
-  }
-  return "owner_user_id = :userId";
-};
+// Data isolation is per account: every query scopes to owner_user_id only.
+// tenant_id is stored for enterprise attribution but never widens read/write access.
+const ownerScopeSql = (_scope: LibraryScope) => "owner_user_id = :userId";
 
 export class VehicleLibraryRepository extends Repository {
   // Intentionally not filtered by status: a frozen/disabled default library must
   // still be returned (and block writes) instead of silently creating a fresh
   // active library that bypasses the freeze.
   async findDefaultLibraryForScope(scope: LibraryScope) {
-    const scopeClause = scope.tenantId
-      ? "tenant_id = :tenantId"
-      : "tenant_id IS NULL AND owner_user_id = :userId";
     const rows = await this.query<VehicleLibraryRow[]>(
       `SELECT *
        FROM vehicle_libraries
-       WHERE ${scopeClause}
+       WHERE owner_user_id = :userId
        ORDER BY created_at ASC
        LIMIT 1`,
       { ...scope },

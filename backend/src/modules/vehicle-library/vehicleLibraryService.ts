@@ -280,7 +280,7 @@ export class VehicleLibraryService {
     if (existing) return existing;
     // 用 scope 派生的确定性主键创建默认库：并发首访时两个请求会算出同一个 id，
     // 其中一个 INSERT 命中主键冲突后回退到再次查询，避免为同一用户建出多个默认库。
-    const scopeKey = scope.tenantId ? `t:${scope.tenantId}` : `u:${current.user.id}`;
+    const scopeKey = `u:${current.user.id}`;
     const defaultLibraryId = `vehicle_lib_${createHash("sha1").update(scopeKey).digest("hex").slice(0, 40)}`;
     try {
       const created = await vehicleLibraryRepository.createLibrary({

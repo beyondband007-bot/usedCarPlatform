@@ -18,7 +18,7 @@ The first implementation must solve persistence and retrieval. Video generation 
 
 ## In Scope
 
-- One or more vehicle libraries owned by an app user and optionally attached to an enterprise tenant.
+- One or more vehicle libraries owned by an app user. Enterprise `tenant_id` is stored for affiliation only; data is never shared across accounts in the same tenant.
 - Lot/dealership records with one required image slot and one required video slot.
 - Vehicle records with normalized structured vehicle fields and optional VIN.
 - Fixed material slots for vehicle and lot media.
@@ -74,14 +74,14 @@ The first pass may follow the source SQL's "indexes first, application-enforced 
 
 ### `vehicle_libraries`
 
-Purpose: top-level saved vehicle workspace for a user or enterprise tenant.
+Purpose: top-level saved vehicle workspace for a single app user account.
 
 Required fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
 | `id` | `VARCHAR(64)` | primary key |
-| `tenant_id` | `VARCHAR(64) NULL` | current user's `enterpriseTenantId` when using tenant scope |
+| `tenant_id` | `VARCHAR(64) NULL` | optional enterprise affiliation; does not grant cross-account access |
 | `owner_user_id` | `VARCHAR(64)` | creator/opening user |
 | `name` | `VARCHAR(100)` | default `Vehicle Library` |
 | `status` | `VARCHAR(20)` | `active`, `frozen`, `disabled` |
@@ -263,8 +263,9 @@ Completeness rule: an owner is `complete` when every required slot for that owne
 
 - Every endpoint requires current login.
 - The service must create or return a default active library for the current user when the frontend first opens the vehicle library.
-- Tenant scope is allowed only when the current session has `enterpriseTenantId`; otherwise `tenant_id` must be `NULL`.
-- `owner_user_id` is always the user who opened or created the library.
+- Data access is always scoped to `owner_user_id = current.user.id`, for both personal and enterprise accounts.
+- When the session has `enterpriseTenantId`, new libraries may store it in `tenant_id` for reporting; otherwise `tenant_id` is `NULL`.
+- `owner_user_id` is always the user who opened or created the library and is the isolation key for all reads and writes.
 - `brand` and `series` are required for vehicles.
 - VIN is optional. If present, trim, uppercase, and validate as 17 characters excluding `I`, `O`, and `Q`.
 - A vehicle's `lot_id`, when provided, must belong to the same `library_id`.
@@ -554,7 +555,7 @@ Files:
 
 Tasks:
 
-- Enforce current-user and tenant scope.
+- Enforce per-account scope via `owner_user_id` (not tenant-wide sharing).
 - Ensure default library for current user.
 - Validate same-library `lot_id`.
 - Validate asset ownership through `assetsRepository.findById(assetId, current.user.id)`.

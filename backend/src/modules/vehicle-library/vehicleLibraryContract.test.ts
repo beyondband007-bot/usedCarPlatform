@@ -95,8 +95,17 @@ async function testRepositoryOwnershipScopeSql() {
       userId: "user_b",
       tenantId: "tenant_1",
     });
-    assert.match(captured.calls[1].sql, /tenant_id = :tenantId OR owner_user_id = :userId/);
-    assert.equal(captured.calls[1].params?.tenantId, "tenant_1");
+    assert.match(captured.calls[1].sql, /owner_user_id = :userId/);
+    assert.doesNotMatch(captured.calls[1].sql, /tenant_id = :tenantId/);
+    assert.equal(captured.calls[1].params?.userId, "user_b");
+
+    await vehicleLibraryRepository.findDefaultLibraryForScope({
+      userId: "user_c",
+      tenantId: "tenant_1",
+    });
+    assert.match(captured.calls[2].sql, /owner_user_id = :userId/);
+    assert.doesNotMatch(captured.calls[2].sql, /tenant_id = :tenantId/);
+    assert.equal(captured.calls[2].params?.userId, "user_c");
   } finally {
     captured.restore();
   }

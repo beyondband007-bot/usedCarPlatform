@@ -14,7 +14,7 @@ This design covers the database and API foundation only. It intentionally exclud
 
 In scope:
 
-- User or tenant-scoped vehicle libraries.
+- Per-account (`owner_user_id`) vehicle libraries; enterprise `tenant_id` is affiliation metadata only, not a shared data scope.
 - Lot/dealership records.
 - Vehicle records.
 - Fixed material slots for vehicle and lot media.
@@ -69,15 +69,15 @@ vehicle_libraries
 
 The backend derives scope from the authenticated user session:
 
-- Personal user: `tenant_id IS NULL` and `owner_user_id = current.user.id`.
-- Enterprise user: `tenant_id = current.user.enterpriseTenantId`.
+- **All accounts (personal and enterprise) are isolated by `owner_user_id = current.user.id`.** Each account can only access libraries it owns.
+- `tenant_id` records enterprise affiliation (billing, reporting, audit) but **does not widen data access**. Users in the same enterprise cannot see each other's vehicles, lots, or materials.
 
-The service creates or returns the current user's default active library when `/api/v1/vehicle-library/me` is called.
+The service creates or returns the **current account's** default active library when `/api/v1/vehicle-library/me` is called (default library ID is derived from `user.id`, not shared per tenant).
 
 Access rules:
 
 - All vehicle-library APIs require login.
-- A caller can only access libraries in their personal or tenant scope.
+- A caller can only access libraries where `owner_user_id` matches the current user.
 - Vehicle, lot, material, and recognition operations must resolve through an accessible library first.
 - `asset_id` links require `assets.user_id = current.user.id`.
 - A vehicle `lot_id` must belong to the same `library_id`.
@@ -93,8 +93,8 @@ Important columns:
 | Column | Meaning |
 | --- | --- |
 | `id` | Application-generated primary key. |
-| `tenant_id` | Enterprise tenant scope, nullable for personal users. |
-| `owner_user_id` | User who opened or created the library. |
+| `tenant_id` | Optional enterprise tenant marker (null for personal users); used for affiliation and reporting, not cross-account data sharing. |
+| `owner_user_id` | Owning account; **primary isolation dimension**. |
 | `name` | Display name. Defaults to `Vehicle Library`. |
 | `status` | `active`, `frozen`, `disabled`. |
 | `quota_bytes` | Capacity limit. `0` means unlimited. |

@@ -14,7 +14,7 @@
 
 本期包含：
 
-- 按用户或企业租户隔离的车辆素材库。
+- 按账号（`owner_user_id`）隔离的车辆素材库；企业 `tenant_id` 仅作归属标记，不跨账号共享数据。
 - 车场/门店记录。
 - 车辆记录。
 - 车辆与车场的固定素材槽位。
@@ -69,15 +69,15 @@ vehicle_libraries 车辆素材库
 
 后端从当前登录用户会话推导数据范围：
 
-- 个人用户：`tenant_id IS NULL` 且 `owner_user_id = current.user.id`。
-- 企业用户：`tenant_id = current.user.enterpriseTenantId`。
+- **所有账号（个人 / 企业）统一按 `owner_user_id = current.user.id` 隔离**，每个账号只能访问自己创建或开通的素材库。
+- `tenant_id` 仅记录企业归属（套餐、统计、审计），**不参与数据可见范围**；同企业下不同账号互不可见对方的车辆、车场与素材。
 
-前端首次调用 `/api/v1/vehicle-library/me` 时，服务会创建或返回当前用户可用的默认启用素材库。
+前端首次调用 `/api/v1/vehicle-library/me` 时，服务会创建或返回**当前登录账号**的默认启用素材库（默认库 ID 由 `user.id` 派生，不按租户共享）。
 
 访问规则：
 
 - 所有车辆素材库接口都必须登录。
-- 调用方只能访问自己个人范围或企业租户范围内的素材库。
+- 调用方只能访问 `owner_user_id` 等于当前用户的素材库。
 - 车辆、车场、素材和识别记录都必须先通过可访问的 `library_id` 解析。
 - 关联 `asset_id` 前必须确认 `assets.user_id = current.user.id`。
 - 车辆的 `lot_id` 必须属于同一个 `library_id`。
@@ -93,8 +93,8 @@ vehicle_libraries 车辆素材库
 | 字段 | 含义 |
 | --- | --- |
 | `id` | 应用层生成的主键。 |
-| `tenant_id` | 企业租户范围；个人用户为空。 |
-| `owner_user_id` | 开通或创建素材库的用户。 |
+| `tenant_id` | 可选企业租户标记（个人用户为空）；用于归属与统计，不用于跨账号数据共享。 |
+| `owner_user_id` | 素材库所属账号；**数据隔离的主键维度**。 |
 | `name` | 展示名称，默认 `Vehicle Library`。 |
 | `status` | `active`、`frozen`、`disabled`。 |
 | `quota_bytes` | 容量上限，`0` 表示不限制。 |
