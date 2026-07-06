@@ -7,13 +7,16 @@ import {
   createVehicle,
   createVehicleLot,
   deleteVehicle,
+  deleteVehicleLot,
   getVehicle,
+  getVehicleLot,
   getVehicleLibraryHome,
   getVehicleLots,
   getVehicles,
   putVehicleMaterial,
   putVehicleLotMaterial,
   updateVehicle,
+  updateVehicleLot,
   type UpsertVehiclePayload,
   type VehicleLibraryHome,
   type VehicleLibraryMaterial,
@@ -103,6 +106,21 @@ const showVehicleModal = ref(false)
 const editingVehicleId = ref<string | null>(null)
 const showMaterialModal = ref(false)
 const showLotModal = ref(false)
+const showLotManageModal = ref(false)
+const managingLot = ref<VehicleLot | null>(null)
+const savingLotManage = ref(false)
+const deletingLot = ref(false)
+const deleteLotTarget = ref<VehicleLot | null>(null)
+const lotManageError = ref('')
+const lotManageForm = reactive({ name: '' })
+const lotManageFiles = reactive<{ image: File | null; video: File | null }>({
+  image: null,
+  video: null,
+})
+const lotManagePreviews = reactive<{ image: string | null; video: string | null }>({
+  image: null,
+  video: null,
+})
 const showTemplateModal = ref(false)
 const vinLoading = ref(false)
 const vinOcrLoading = ref(false)
@@ -510,6 +528,127 @@ async function saveLot() {
   }
 }
 
+function lotMaterialUrl(lot: VehicleLot, slotCode: 'lot_image' | 'lot_video') {
+  const material = (lot.materials ?? []).find(
+    (item) => item.slotCode === slotCode && item.status === 'active',
+  )
+  return material?.assetThumbnailUrl ?? material?.assetUrl ?? null
+}
+
+function releaseLotManagePreview(mediaType: 'image' | 'video') {
+  const url = lotManagePreviews[mediaType]
+  if (!url) return
+  URL.revokeObjectURL(url)
+  lotManagePreviews[mediaType] = null
+}
+
+async function openLotManageModal(lot: VehicleLot) {
+  lotManageError.value = ''
+  lotManageFiles.image = null
+  lotManageFiles.video = null
+  releaseLotManagePreview('image')
+  releaseLotManagePreview('video')
+  lotManageForm.name = lot.name
+  // 详情接口带回素材清单，用于展示已上传的车场图片/视频。
+  const detailed = await getVehicleLot(lot.id).catch(() => lot)
+  managingLot.value = detailed
+  lotManageForm.name = detailed.name
+  showLotManageModal.value = true
+}
+
+function selectLotManageFile(mediaType: 'image' | 'video', event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  input.value = ''
+  if (!file) return
+  const valid = mediaType === 'image' ? file.type.startsWith('image/') : file.type.startsWith('video/')
+  if (!valid) {
+    lotManageError.value = `请选择${mediaType === 'image' ? '图片' : '视频'}文件`
+    return
+  }
+  const sizeError = uploadSizeError(file, mediaType)
+  if (sizeError) {
+    lotManageError.value = `${mediaType === 'image' ? '车场图片' : '车场视频'}${sizeError}`
+    return
+  }
+  lotManageFiles[mediaType] = file
+  releaseLotManagePreview(mediaType)
+  lotManagePreviews[mediaType] = URL.createObjectURL(file)
+  lotManageError.value = ''
+}
+
+function lotManagePreviewUrl(mediaType: 'image' | 'video') {
+  if (lotManagePreviews[mediaType]) return lotManagePreviews[mediaType]
+  if (!managingLot.value) return null
+  return lotMaterialUrl(managingLot.value, mediaType === 'image' ? 'lot_image' : 'lot_video')
+}
+
+async function saveLotManage() {
+  const lot = managingLot.value
+  if (!lot) return
+  const name = lotManageForm.name.trim()
+  if (!name) {
+    lotManageError.value = '请输入车场名称'
+    return
+  }
+  savingLotManage.value = true
+  lotManageError.value = ''
+  const failedMaterials: string[] = []
+  try {
+    if (name !== lot.name) {
+      await updateVehicleLot(lot.id, { name })
+    }
+    if (lotManageFiles.image) {
+      try {
+        const asset = await uploadAsset(lotManageFiles.image, 'car_exterior')
+        await putVehicleLotMaterial(lot.id, 'lot_image', { assetId: asset.assetId })
+      } catch (error) {
+        failedMaterials.push(withUploadFailReason('车场图片', error))
+      }
+    }
+    if (lotManageFiles.video) {
+      try {
+        const asset = await uploadAsset(lotManageFiles.video, 'car_interior')
+        await putVehicleLotMaterial(lot.id, 'lot_video', { assetId: asset.assetId })
+      } catch (error) {
+        failedMaterials.push(withUploadFailReason('车场视频', error))
+      }
+    }
+    operationMessage.value = failedMaterials.length
+      ? `车场已更新；${failedMaterials.join('、')}上传失败，可稍后重试。`
+      : '车场信息已更新。'
+    showLotManageModal.value = false
+    managingLot.value = null
+    releaseLotManagePreview('image')
+    releaseLotManagePreview('video')
+    await loadLibraryData()
+  } catch (error) {
+    lotManageError.value = error instanceof Error ? error.message : '车场保存失败'
+  } finally {
+    savingLotManage.value = false
+  }
+}
+
+async function confirmDeleteLot() {
+  const lot = deleteLotTarget.value
+  if (!lot) return
+  deletingLot.value = true
+  try {
+    await deleteVehicleLot(lot.id)
+    operationMessage.value = '车场已删除。'
+    deleteLotTarget.value = null
+    showLotManageModal.value = false
+    managingLot.value = null
+    releaseLotManagePreview('image')
+    releaseLotManagePreview('video')
+    await loadLibraryData()
+  } catch (error) {
+    lotManageError.value = error instanceof Error ? error.message : '车场删除失败'
+  } finally {
+    deletingLot.value = false
+  }
+}
+
 function openVehicleRow(vehicleId: string) {
   selectVehicle(vehicleId)
 }
@@ -639,6 +778,8 @@ function resetExistingMaterials() {
 
 onBeforeUnmount(() => {
   resetMaterialFiles()
+  releaseLotManagePreview('image')
+  releaseLotManagePreview('video')
   if (vehicleSearchTimer) clearTimeout(vehicleSearchTimer)
 })
 
@@ -1009,7 +1150,7 @@ onMounted(loadLibraryData)
             <div class="lot-body">
               <h3>{{ lot.name }}</h3>
               <p>{{ lot.address || lot.remark || '暂无车场说明' }}</p>
-              <NButton class="vl-button ghost" attr-type="button">管理素材</NButton>
+              <NButton class="vl-button ghost" attr-type="button" @click="openLotManageModal(lot)">管理素材</NButton>
             </div>
           </article>
         </div>
@@ -1201,6 +1342,81 @@ onMounted(loadLibraryData)
           <NButton class="vl-button primary" attr-type="button" :disabled="savingLot" @click="saveLot">
             <Icon :icon="savingLot ? 'mdi:loading' : 'mdi:check'" :class="{ spinning: savingLot }" />
             {{ savingLot ? '正在入库' : '确认入库' }}
+          </NButton>
+        </footer>
+      </section>
+    </div>
+
+    <div v-if="showLotManageModal && managingLot" class="vl-modal-backdrop"
+      @click.self="!savingLotManage && (showLotManageModal = false)">
+      <section class="vl-modal compact-modal">
+        <header><div><h2>管理车场</h2><p>更新车场名称，或替换车场图片与视频。</p></div>
+          <button type="button" title="关闭" :disabled="savingLotManage" @click="showLotManageModal = false"><Icon icon="mdi:close" /></button>
+        </header>
+        <div class="modal-body">
+          <label class="wide-field"><span>车场名称 *</span><input v-model="lotManageForm.name" placeholder="请输入车场名称" /></label>
+          <div class="upload-lanes">
+            <label class="lot-upload-card" :class="{ 'has-preview': lotManagePreviewUrl('image') }">
+              <input type="file" accept="image/jpeg,image/png,image/webp" :disabled="savingLotManage" @change="selectLotManageFile('image', $event)" />
+              <template v-if="lotManagePreviewUrl('image')">
+                <img class="material-preview-image" :src="lotManagePreviewUrl('image')!" alt="车场图片预览" />
+                <span class="material-preview-label">车场图片{{ lotManageFiles.image ? ' · 待替换' : ' · 已上传' }}</span>
+              </template>
+              <template v-else>
+                <Icon icon="mdi:image-plus-outline" /><strong>车场图片</strong>
+                <span>JPG / PNG / WebP</span>
+              </template>
+            </label>
+            <label class="lot-upload-card" :class="{ 'has-preview': lotManagePreviewUrl('video') }">
+              <input type="file" accept="video/mp4,video/quicktime" :disabled="savingLotManage" @change="selectLotManageFile('video', $event)" />
+              <template v-if="lotManagePreviewUrl('video')">
+                <video class="material-preview-image" :src="lotManagePreviewUrl('video')!" muted preload="auto" @loadedmetadata="showVideoFirstFrame" />
+                <span class="material-preview-label">车场视频{{ lotManageFiles.video ? ' · 待替换' : ' · 已上传' }}</span>
+              </template>
+              <template v-else>
+                <Icon icon="mdi:video-plus-outline" /><strong>车场视频</strong>
+                <span>MP4 / MOV，建议 10-30 秒</span>
+              </template>
+            </label>
+          </div>
+          <p v-if="lotManageError" class="form-error">{{ lotManageError }}</p>
+        </div>
+        <footer>
+          <NButton class="vl-button danger" attr-type="button" :disabled="savingLotManage || deletingLot" @click="deleteLotTarget = managingLot">
+            <Icon icon="mdi:trash-can-outline" />删除车场
+          </NButton>
+          <NButton class="vl-button ghost" attr-type="button" :disabled="savingLotManage" @click="showLotManageModal = false">取消</NButton>
+          <NButton class="vl-button primary" attr-type="button" :disabled="savingLotManage" @click="saveLotManage">
+            <Icon :icon="savingLotManage ? 'mdi:loading' : 'mdi:check'" :class="{ spinning: savingLotManage }" />
+            {{ savingLotManage ? '正在保存' : '保存修改' }}
+          </NButton>
+        </footer>
+      </section>
+    </div>
+
+    <div v-if="deleteLotTarget" class="vl-modal-backdrop" @click.self="!deletingLot && (deleteLotTarget = null)">
+      <section class="vl-modal compact-modal delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-lot-title">
+        <header>
+          <div>
+            <h2 id="delete-lot-title">确认删除车场？</h2>
+            <p>{{ deleteLotTarget.name }}</p>
+          </div>
+          <button type="button" title="关闭" :disabled="deletingLot" @click="deleteLotTarget = null">
+            <Icon icon="mdi:close" />
+          </button>
+        </header>
+        <div class="modal-body delete-confirm-content">
+          <Icon icon="mdi:alert-circle-outline" />
+          <div>
+            <strong>删除后，车场及其素材将从车辆库移除。</strong>
+            <p>该车场下的车辆会自动解除关联，操作无法撤销。</p>
+          </div>
+        </div>
+        <footer>
+          <NButton class="vl-button ghost" attr-type="button" :disabled="deletingLot" @click="deleteLotTarget = null">取消</NButton>
+          <NButton class="vl-button danger" attr-type="button" :disabled="deletingLot" @click="confirmDeleteLot">
+            <Icon :icon="deletingLot ? 'mdi:loading' : 'mdi:trash-can-outline'" :class="{ spinning: deletingLot }" />
+            {{ deletingLot ? '正在删除' : '确认删除' }}
           </NButton>
         </footer>
       </section>
