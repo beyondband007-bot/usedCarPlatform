@@ -17,6 +17,7 @@ import {
   type UpsertVehiclePayload,
   type VehicleLibraryHome,
   type VehicleLibraryMaterial,
+  type VehicleListParams,
   type VehicleLot,
   type VehicleMaterialSlotCode,
   type VehicleRecord,
@@ -229,22 +230,39 @@ const mapVehicle = (record: VehicleRecord): Vehicle => {
   }
 }
 
+// 车辆列表是服务端分页，筛选/排序/搜索都必须交给后端，否则只会作用在当前页 10 条上。
+function vehicleQueryParams() {
+  const params: VehicleListParams = {
+    sort: sortBy.value === 'complete' ? 'complete' : 'updated',
+  }
+  const trimmedKeyword = keyword.value.trim()
+  if (trimmedKeyword) params.search = trimmedKeyword
+  if (activeFilter.value === 'complete') {
+    params.materialStatus = 'complete'
+  } else if (activeFilter.value === 'missing-exterior') {
+    params.missing = 'exterior'
+  } else if (activeFilter.value === 'missing-driver') {
+    params.missing = 'driver'
+  } else if (activeFilter.value === 'missing-video') {
+    params.missing = 'video'
+  }
+  return params
+}
+
+async function refreshHomeAndLots() {
+  const [home, lotPage] = await Promise.all([
+    getVehicleLibraryHome(),
+    getVehicleLots({ page: 1, pageSize: 100 }),
+  ])
+  libraryHome.value = home
+  lots.value = lotPage.items
+}
+
 async function loadLibraryData() {
   loading.value = true
   loadError.value = ''
   try {
-    const [home, vehiclePageResult, lotPage] = await Promise.all([
-      getVehicleLibraryHome(),
-      getVehicles({ page: 1, pageSize: vehiclePageSize }),
-      getVehicleLots({ page: 1, pageSize: 100 }),
-    ])
-    libraryHome.value = home
-    vehicleRecords.value = vehiclePageResult.items
-    vehicles.value = vehiclePageResult.items.map(mapVehicle)
-    vehicleTotal.value = vehiclePageResult.total
-    vehiclePage.value = 1
-    lots.value = lotPage.items
-    activeVehicleId.value = vehicles.value[0]?.id ?? null
+    await Promise.all([refreshHomeAndLots(), loadVehiclePage()])
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '车辆库加载失败'
   } finally {
@@ -252,17 +270,11 @@ async function loadLibraryData() {
   }
 }
 
-const filteredVehicles = computed(() => {
-  const normalizedKeyword = keyword.value.trim().toLowerCase()
-  return vehicles.value
-    .filter((vehicle) => {
-      if (activeFilter.value === 'complete' && vehicle.completed !== 5) return false
-      if (activeFilter.value !== 'all' && activeFilter.value !== 'complete' && !vehicle.missing.includes(activeFilter.value)) return false
-      return !normalizedKeyword
-        || `${vehicle.title} ${vehicle.vin} ${vehicle.note}`.toLowerCase().includes(normalizedKeyword)
-    })
-    .sort((a, b) => sortBy.value === 'complete' ? b.score - a.score : b.id.localeCompare(a.id))
-})
+// 服务端已完成筛选与排序，此处仅作为当前页数据的直通视图。
+const filteredVehicles = computed(() => vehicles.value)
+const hasActiveVehicleQuery = computed(
+  () => activeFilter.value !== 'all' || Boolean(keyword.value.trim()),
+)
 
 const filters: Array<{ value: VehicleFilter; label: string }> = [
   { value: 'all', label: '全部车辆' },
@@ -352,8 +364,13 @@ async function loadVehiclePage() {
   const result = await getVehicles({
     page: vehiclePage.value,
     pageSize: vehiclePageSize,
-    search: keyword.value.trim() || undefined,
+    ...vehicleQueryParams(),
   })
+  // 删除末页最后一条后当前页会越界，回退到第 1 页由 watcher 重新拉取。
+  if (!result.items.length && vehiclePage.value > 1) {
+    vehiclePage.value = 1
+    return
+  }
   vehicleRecords.value = result.items
   vehicles.value = result.items.map(mapVehicle)
   vehicleTotal.value = result.total
@@ -362,19 +379,25 @@ async function loadVehiclePage() {
   }
 }
 
+async function reloadFromFirstPage() {
+  try {
+    if (vehiclePage.value !== 1) {
+      vehiclePage.value = 1
+    } else {
+      await loadVehiclePage()
+    }
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '车辆查询失败'
+  }
+}
+
 watch(keyword, () => {
   if (vehicleSearchTimer) clearTimeout(vehicleSearchTimer)
-  vehicleSearchTimer = setTimeout(async () => {
-    try {
-      if (vehiclePage.value !== 1) {
-        vehiclePage.value = 1
-      } else {
-        await loadVehiclePage()
-      }
-    } catch (error) {
-      loadError.value = error instanceof Error ? error.message : '车辆查询失败'
-    }
-  }, 300)
+  vehicleSearchTimer = setTimeout(reloadFromFirstPage, 300)
+})
+
+watch([activeFilter, sortBy], () => {
+  void reloadFromFirstPage()
 })
 
 watch(vehiclePage, async () => {
@@ -903,8 +926,8 @@ onMounted(loadLibraryData)
             </div>
             <div v-if="!filteredVehicles.length && !loading && !loadError" class="empty-state">
               <Icon icon="mdi:car-plus" />
-              <h2>{{ vehicles.length ? '没有匹配的车辆' : '车辆库还是空的' }}</h2>
-              <p>{{ vehicles.length ? '尝试更换筛选条件或搜索关键词。' : '点击“新增车辆”录入第一辆车。' }}</p>
+              <h2>{{ hasActiveVehicleQuery ? '没有匹配的车辆' : '车辆库还是空的' }}</h2>
+              <p>{{ hasActiveVehicleQuery ? '尝试更换筛选条件或搜索关键词。' : '点击“新增车辆”录入第一辆车。' }}</p>
             </div>
           </div>
 

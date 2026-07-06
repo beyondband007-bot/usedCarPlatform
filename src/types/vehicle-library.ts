@@ -208,6 +208,8 @@ export interface VehicleListParams extends VehicleLibraryListParams {
   status?: VehicleRecordStatus
   materialStatus?: VehicleMaterialStatus
   lotId?: string
+  missing?: 'exterior' | 'driver' | 'video'
+  sort?: 'updated' | 'complete'
 }
 
 export interface VehicleQueryParams {
