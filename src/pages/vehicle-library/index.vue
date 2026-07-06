@@ -41,7 +41,7 @@ const MAX_VIDEO_UPLOAD_MB = 200
 
 type LibraryTab = 'vehicles' | 'lots' | 'templates'
 type DetailTab = 'overview' | 'assets'
-type VehicleFilter = 'all' | 'complete' | 'missing-exterior' | 'missing-driver' | 'missing-video'
+type VehicleFilter = 'all' | 'incomplete' | 'complete' | 'missing-exterior' | 'missing-driver' | 'missing-video'
 type UploadSlotCode = Exclude<VehicleMaterialSlotCode, 'lot_image' | 'lot_video'>
 
 const uploadSlots: Array<{
@@ -84,6 +84,8 @@ interface Vehicle {
   energy: string
   updated: string
   size: string
+  brandLabel: string
+  gapSummary: string
 }
 
 const vehicles = ref<Vehicle[]>([])
@@ -92,16 +94,25 @@ const lots = ref<VehicleLot[]>([])
 const libraryHome = ref<VehicleLibraryHome | null>(null)
 const loading = ref(true)
 const loadError = ref('')
+const lotLoading = ref(false)
+const lotLoadError = ref('')
+const lotKeyword = ref('')
+const lotPage = ref(1)
+const lotTotal = ref(0)
+const lotPageSize = 10
 const vehiclePage = ref(1)
 const vehicleTotal = ref(0)
 const vehiclePageSize = 10
 
 const activeLibraryTab = ref<LibraryTab>('vehicles')
 const activeDetailTab = ref<DetailTab>('assets')
-const activeFilter = ref<VehicleFilter>('all')
+const activeFilter = ref<VehicleFilter>('incomplete')
 const activeVehicleId = ref<string | null>(null)
 const keyword = ref('')
-const sortBy = ref('updated')
+const sortBy = ref('complete')
+const focusAlmostComplete = ref(false)
+const showCompletedSlots = ref(false)
+const advanceAfterMaterialSave = ref(false)
 const showVehicleModal = ref(false)
 const editingVehicleId = ref<string | null>(null)
 const showMaterialModal = ref(false)
@@ -112,7 +123,7 @@ const savingLotManage = ref(false)
 const deletingLot = ref(false)
 const deleteLotTarget = ref<VehicleLot | null>(null)
 const lotManageError = ref('')
-const lotManageForm = reactive({ name: '' })
+const lotManageForm = reactive({ name: '', address: '' })
 const lotManageFiles = reactive<{ image: File | null; video: File | null }>({
   image: null,
   video: null,
@@ -135,6 +146,7 @@ const operationMessage = ref('')
 const lotError = ref('')
 const lotForm = reactive({
   name: '',
+  address: '',
   image: null as File | null,
   video: null as File | null,
 })
@@ -189,6 +201,14 @@ const activeVehicle = computed(
   () => vehicles.value.find((vehicle) => vehicle.id === activeVehicleId.value) ?? vehicles.value[0],
 )
 
+const activeVehiclePendingSlots = computed(
+  () => activeVehicle.value?.slotStates.filter((slot) => !slot.done) ?? [],
+)
+
+const activeVehicleDoneSlots = computed(
+  () => activeVehicle.value?.slotStates.filter((slot) => slot.done) ?? [],
+)
+
 const formatBytes = (bytes: number) => {
   if (!bytes) return '0 B'
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -201,6 +221,54 @@ const normalizePriceInTenThousands = (value: string) => {
   if (!normalized || normalized === '-') return null
   const numberValue = Number(normalized)
   return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : null
+}
+
+function hashVehiclePaletteKey(brand: string, series: string) {
+  const seed = `${brand.trim()}|${series.trim()}`
+  let hash = 0
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+function getLotThumbLabel(name: string) {
+  const text = name.trim()
+  return text ? text.slice(0, 2) : '场'
+}
+
+function getLotMonogramStyle(name: string) {
+  const hue = hashVehiclePaletteKey(name, 'lot') % 360
+  return {
+    '--monogram-bg': `hsl(${hue} 38% 24%)`,
+    '--monogram-text': `hsl(${hue} 48% 78%)`,
+  }
+}
+
+function lotSummaryText(lot: VehicleLot) {
+  return lot.address || lot.remark || '暂无车场说明'
+}
+
+function getVehicleBrandLabel(brand: string, series: string) {
+  const brandText = brand.trim()
+  if (brandText) return brandText
+  const seriesText = series.trim()
+  return seriesText || '未知品牌'
+}
+
+function getVehicleMonogramStyle(brand: string, series: string) {
+  const hue = hashVehiclePaletteKey(brand, series) % 360
+  return {
+    '--monogram-bg': `hsl(${hue} 38% 24%)`,
+    '--monogram-text': `hsl(${hue} 48% 78%)`,
+  }
+}
+
+function formatGapSummary(slotStates: VehicleSlotState[]) {
+  const missing = slotStates.filter((slot) => !slot.done).map((slot) => slot.label)
+  if (!missing.length) return '素材齐全'
+  if (missing.length >= 5) return '缺：全部核心素材'
+  return `缺：${missing.join('、')}`
 }
 
 const mapVehicle = (record: VehicleRecord): Vehicle => {
@@ -245,6 +313,8 @@ const mapVehicle = (record: VehicleRecord): Vehicle => {
     energy: [record.displacement, record.energyType].filter(Boolean).join(' ') || '待补充',
     updated: new Date(record.updatedAt).toLocaleString('zh-CN'),
     size: formatBytes(size),
+    brandLabel: getVehicleBrandLabel(record.brand, record.series),
+    gapSummary: formatGapSummary(slotStates),
   }
 }
 
@@ -257,6 +327,8 @@ function vehicleQueryParams() {
   if (trimmedKeyword) params.search = trimmedKeyword
   if (activeFilter.value === 'complete') {
     params.materialStatus = 'complete'
+  } else if (activeFilter.value === 'incomplete') {
+    params.materialStatus = 'incomplete'
   } else if (activeFilter.value === 'missing-exterior') {
     params.missing = 'exterior'
   } else if (activeFilter.value === 'missing-driver') {
@@ -267,20 +339,37 @@ function vehicleQueryParams() {
   return params
 }
 
-async function refreshHomeAndLots() {
-  const [home, lotPage] = await Promise.all([
-    getVehicleLibraryHome(),
-    getVehicleLots({ page: 1, pageSize: 100 }),
-  ])
-  libraryHome.value = home
-  lots.value = lotPage.items
+async function refreshLibraryHome() {
+  libraryHome.value = await getVehicleLibraryHome()
+}
+
+async function loadLotPage() {
+  lotLoading.value = true
+  lotLoadError.value = ''
+  try {
+    const result = await getVehicleLots({
+      page: lotPage.value,
+      pageSize: lotPageSize,
+      search: lotKeyword.value.trim() || undefined,
+    })
+    if (!result.items.length && lotPage.value > 1) {
+      lotPage.value = 1
+      return
+    }
+    lots.value = result.items
+    lotTotal.value = result.total
+  } catch (error) {
+    lotLoadError.value = error instanceof Error ? error.message : '车场查询失败'
+  } finally {
+    lotLoading.value = false
+  }
 }
 
 async function loadLibraryData() {
   loading.value = true
   loadError.value = ''
   try {
-    await Promise.all([refreshHomeAndLots(), loadVehiclePage()])
+    await Promise.all([refreshLibraryHome(), loadVehiclePage(), loadLotPage()])
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '车辆库加载失败'
   } finally {
@@ -290,11 +379,20 @@ async function loadLibraryData() {
 
 // 服务端已完成筛选与排序，此处仅作为当前页数据的直通视图。
 const filteredVehicles = computed(() => vehicles.value)
+const pendingVehicleCount = computed(() =>
+  Math.max(0, (libraryHome.value?.stats.activeVehicles ?? 0) - (libraryHome.value?.stats.completeVehicles ?? 0)),
+)
+const showTaskBanner = computed(
+  () => activeLibraryTab.value === 'vehicles' && pendingVehicleCount.value > 0,
+)
 const hasActiveVehicleQuery = computed(
-  () => activeFilter.value !== 'all' || Boolean(keyword.value.trim()),
+  () => activeFilter.value !== 'incomplete' || Boolean(keyword.value.trim()),
 )
 
+const hasActiveLotQuery = computed(() => Boolean(lotKeyword.value.trim()))
+
 const filters: Array<{ value: VehicleFilter; label: string }> = [
+  { value: 'incomplete', label: '待补素材' },
   { value: 'all', label: '全部车辆' },
   { value: 'complete', label: '素材完整' },
   { value: 'missing-exterior', label: '缺车头/车尾图' },
@@ -309,6 +407,33 @@ const sortOptions = [
 function selectVehicle(id: string) {
   activeVehicleId.value = id
   activeDetailTab.value = 'assets'
+}
+
+type StatsFilter = 'all' | 'complete' | 'incomplete' | 'lots'
+
+function applyStatsFilter(target: StatsFilter) {
+  focusAlmostComplete.value = false
+  if (target === 'lots') {
+    activeLibraryTab.value = 'lots'
+    return
+  }
+  activeLibraryTab.value = 'vehicles'
+  activeFilter.value = target
+}
+
+function filterAlmostCompleteMaterials() {
+  activeLibraryTab.value = 'vehicles'
+  focusAlmostComplete.value = true
+  activeFilter.value = 'incomplete'
+  sortBy.value = 'complete'
+}
+
+function isStatsStatActive(target: StatsFilter) {
+  if (target === 'lots') return activeLibraryTab.value === 'lots'
+  if (activeLibraryTab.value !== 'vehicles') return false
+  if (target === 'all') return activeFilter.value === 'all'
+  if (target === 'complete') return activeFilter.value === 'complete'
+  return activeFilter.value === 'incomplete' || activeFilter.value.startsWith('missing-')
 }
 
 function resetVehicleForm() {
@@ -378,6 +503,7 @@ async function openEditVehicleModal(vehicleId: string) {
 }
 
 let vehicleSearchTimer: ReturnType<typeof setTimeout> | undefined
+let lotSearchTimer: ReturnType<typeof setTimeout> | undefined
 async function loadVehiclePage() {
   const result = await getVehicles({
     page: vehiclePage.value,
@@ -392,8 +518,26 @@ async function loadVehiclePage() {
   vehicleRecords.value = result.items
   vehicles.value = result.items.map(mapVehicle)
   vehicleTotal.value = result.total
-  if (!vehicles.value.some((vehicle) => vehicle.id === activeVehicleId.value)) {
+  if (advanceAfterMaterialSave.value) {
+    const nextPending = vehicles.value.find((vehicle) => vehicle.completed < 5)
+    activeVehicleId.value = nextPending?.id ?? vehicles.value[0]?.id ?? null
+    activeDetailTab.value = 'assets'
+    showCompletedSlots.value = false
+    advanceAfterMaterialSave.value = false
+  } else if (!vehicles.value.some((vehicle) => vehicle.id === activeVehicleId.value)) {
     activeVehicleId.value = vehicles.value[0]?.id ?? null
+  }
+}
+
+async function reloadLotsFromFirstPage() {
+  try {
+    if (lotPage.value !== 1) {
+      lotPage.value = 1
+    } else {
+      await loadLotPage()
+    }
+  } catch (error) {
+    lotLoadError.value = error instanceof Error ? error.message : '车场查询失败'
   }
 }
 
@@ -414,7 +558,15 @@ watch(keyword, () => {
   vehicleSearchTimer = setTimeout(reloadFromFirstPage, 300)
 })
 
+watch(lotKeyword, () => {
+  if (lotSearchTimer) clearTimeout(lotSearchTimer)
+  lotSearchTimer = setTimeout(reloadLotsFromFirstPage, 300)
+})
+
 watch([activeFilter, sortBy], () => {
+  if (activeFilter.value !== 'incomplete' || sortBy.value !== 'complete') {
+    focusAlmostComplete.value = false
+  }
   void reloadFromFirstPage()
 })
 
@@ -424,6 +576,18 @@ watch(vehiclePage, async () => {
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '车辆查询失败'
   }
+})
+
+watch(lotPage, async () => {
+  try {
+    await loadLotPage()
+  } catch (error) {
+    lotLoadError.value = error instanceof Error ? error.message : '车场查询失败'
+  }
+})
+
+watch(activeVehicleId, () => {
+  showCompletedSlots.value = (activeVehicle.value?.completed ?? 0) === 5
 })
 
 function openAssetPreview(slot: VehicleSlotState) {
@@ -453,6 +617,7 @@ async function confirmDeleteVehicle() {
 
 function openLotModal() {
   lotForm.name = ''
+  lotForm.address = ''
   lotForm.image = null
   lotForm.video = null
   lotError.value = ''
@@ -490,6 +655,7 @@ function selectLotFile(mediaType: 'image' | 'video', event: Event) {
 
 async function saveLot() {
   const name = lotForm.name.trim()
+  const address = lotForm.address.trim()
   if (!name) {
     lotError.value = '请输入车场名称'
     return
@@ -498,7 +664,10 @@ async function saveLot() {
   lotError.value = ''
   const failedMaterials: string[] = []
   try {
-    const lot = await createVehicleLot({ name })
+    const lot = await createVehicleLot({
+      name,
+      address: address || null,
+    })
     if (lotForm.image) {
       try {
         const asset = await uploadAsset(lotForm.image, 'car_exterior')
@@ -549,10 +718,12 @@ async function openLotManageModal(lot: VehicleLot) {
   releaseLotManagePreview('image')
   releaseLotManagePreview('video')
   lotManageForm.name = lot.name
+  lotManageForm.address = lot.address ?? ''
   // 详情接口带回素材清单，用于展示已上传的车场图片/视频。
   const detailed = await getVehicleLot(lot.id).catch(() => lot)
   managingLot.value = detailed
   lotManageForm.name = detailed.name
+  lotManageForm.address = detailed.address ?? ''
   showLotManageModal.value = true
 }
 
@@ -587,6 +758,7 @@ async function saveLotManage() {
   const lot = managingLot.value
   if (!lot) return
   const name = lotManageForm.name.trim()
+  const address = lotManageForm.address.trim()
   if (!name) {
     lotManageError.value = '请输入车场名称'
     return
@@ -595,8 +767,11 @@ async function saveLotManage() {
   lotManageError.value = ''
   const failedMaterials: string[] = []
   try {
-    if (name !== lot.name) {
-      await updateVehicleLot(lot.id, { name })
+    if (name !== lot.name || address !== (lot.address ?? '').trim()) {
+      await updateVehicleLot(lot.id, {
+        name,
+        address: address || null,
+      })
     }
     if (lotManageFiles.image) {
       try {
@@ -719,13 +894,50 @@ function showVideoFirstFrame(event: Event) {
   }
 }
 
-function openMaterialModal() {
-  if (!activeVehicle.value) return
+function openMaterialModalForVehicle(vehicleId: string) {
+  selectVehicle(vehicleId)
   vinError.value = ''
   resetMaterialFiles()
-  const record = vehicleRecords.value.find((item) => item.id === activeVehicle.value?.id)
+  const record = vehicleRecords.value.find((item) => item.id === vehicleId)
   setExistingMaterials(record?.materials ?? [])
   showMaterialModal.value = true
+}
+
+function openMaterialModal() {
+  if (!activeVehicle.value) return
+  openMaterialModalForVehicle(activeVehicle.value.id)
+}
+
+function selectNextPendingVehicle(afterVehicleId: string) {
+  const list = vehicles.value
+  const currentIdx = list.findIndex((vehicle) => vehicle.id === afterVehicleId)
+  const current = list[currentIdx]
+
+  if (current && current.completed < 5) {
+    activeVehicleId.value = afterVehicleId
+    activeDetailTab.value = 'assets'
+    showCompletedSlots.value = false
+    return
+  }
+
+  const nextOnPage =
+    list.slice(currentIdx + 1).find((vehicle) => vehicle.completed < 5)
+    ?? list.find((vehicle) => vehicle.completed < 5 && vehicle.id !== afterVehicleId)
+
+  if (nextOnPage) {
+    activeVehicleId.value = nextOnPage.id
+    activeDetailTab.value = 'assets'
+    showCompletedSlots.value = false
+    return
+  }
+
+  if (vehiclePage.value * vehiclePageSize < vehicleTotal.value) {
+    advanceAfterMaterialSave.value = true
+    vehiclePage.value += 1
+    return
+  }
+
+  activeVehicleId.value = list[0]?.id ?? null
 }
 
 async function uploadExistingVehicleMaterials() {
@@ -756,8 +968,9 @@ async function uploadExistingVehicleMaterials() {
       : '车辆素材已保存。'
     showMaterialModal.value = false
     resetMaterialFiles()
+    const savedVehicleId = vehicle.id
     await loadLibraryData()
-    activeVehicleId.value = vehicle.id
+    selectNextPendingVehicle(savedVehicleId)
   } finally {
     savingMaterials.value = false
   }
@@ -955,28 +1168,66 @@ onMounted(loadLibraryData)
       </section>
       <p v-if="operationMessage" class="operation-message">{{ operationMessage }}</p>
 
-      <section class="stats-ribbon">
-        <div class="stat">
+      <section class="stats-ribbon" aria-label="车辆库统计">
+        <button
+          type="button"
+          class="stat stat-clickable"
+          :class="{ active: isStatsStatActive('all') }"
+          @click="applyStatsFilter('all')"
+        >
           <span>车辆总数</span>
           <strong>{{ libraryHome?.stats.activeVehicles ?? 0 }}<em>辆</em></strong>
-        </div>
-        <div class="stat ok">
+        </button>
+        <button
+          type="button"
+          class="stat stat-clickable ok"
+          :class="{ active: isStatsStatActive('complete') }"
+          @click="applyStatsFilter('complete')"
+        >
           <span>素材完整</span>
           <strong>{{ libraryHome?.stats.completeVehicles ?? 0 }}<em>辆</em></strong>
-        </div>
-        <div class="stat warn">
+        </button>
+        <button
+          type="button"
+          class="stat stat-clickable warn"
+          :class="{ active: isStatsStatActive('incomplete') }"
+          @click="applyStatsFilter('incomplete')"
+        >
           <span>待补素材</span>
-          <strong>{{ Math.max(0, (libraryHome?.stats.activeVehicles ?? 0) - (libraryHome?.stats.completeVehicles ?? 0)) }}<em>辆</em></strong>
-        </div>
-        <div class="stat">
+          <strong>{{ pendingVehicleCount }}<em>辆</em></strong>
+        </button>
+        <button
+          type="button"
+          class="stat stat-clickable"
+          :class="{ active: isStatsStatActive('lots') }"
+          @click="applyStatsFilter('lots')"
+        >
           <span>车场</span>
           <strong>{{ libraryHome?.stats.activeLots ?? 0 }}<em>个</em></strong>
-        </div>
+        </button>
         <div class="stat capacity">
           <span>已用容量</span>
           <strong>{{ formatBytes(libraryHome?.stats.usedBytes ?? 0) }}<em>/ {{ libraryHome?.stats.quotaBytes ? formatBytes(libraryHome.stats.quotaBytes) : '不限' }}</em></strong>
           <div class="capacity-meter"><i :style="{ width: libraryHome?.stats.quotaBytes ? `${Math.min(100, libraryHome.stats.usedBytes / libraryHome.stats.quotaBytes * 100)}%` : '0%' }" /></div>
         </div>
+      </section>
+
+      <section v-if="showTaskBanner" class="task-banner" role="status" aria-live="polite">
+        <div class="task-banner-copy">
+          <Icon icon="mdi:clipboard-list-outline" aria-hidden="true" />
+          <p>
+            还有 <strong>{{ pendingVehicleCount }}</strong> 辆待补素材，建议从「只差 1 项」的车辆开始收尾。
+          </p>
+        </div>
+        <button
+          type="button"
+          class="task-banner-action"
+          :class="{ active: focusAlmostComplete }"
+          @click="filterAlmostCompleteMaterials"
+        >
+          <Icon icon="mdi:filter-variant" aria-hidden="true" />
+          筛选「只差 1 项」
+        </button>
       </section>
 
       <template v-if="activeLibraryTab === 'vehicles'">
@@ -1012,6 +1263,7 @@ onMounted(loadLibraryData)
                     <th class="col-thumb">图片</th>
                     <th>年款车型</th>
                     <th>VIN</th>
+                    <th>缺口摘要</th>
                     <th>素材进度</th>
                     <th class="col-actions">操作</th>
                   </tr>
@@ -1025,11 +1277,19 @@ onMounted(loadLibraryData)
                     <td class="col-thumb">
                       <div class="row-thumb">
                         <img v-if="vehicle.image" :src="vehicle.image" :alt="vehicle.title" />
-                        <Icon v-else icon="mdi:car-outline" />
+                        <span
+                          v-else
+                          class="row-thumb-monogram"
+                          :style="getVehicleMonogramStyle(vehicle.brand, vehicle.series)"
+                          :aria-label="vehicle.brandLabel"
+                        >{{ vehicle.brandLabel }}</span>
                       </div>
                     </td>
                     <td class="cell-model">{{ vehicle.model }}</td>
                     <td class="cell-vin">{{ vehicle.vin }}</td>
+                    <td class="cell-gap-summary" :class="{ complete: vehicle.completed === 5 }">
+                      {{ vehicle.gapSummary }}
+                    </td>
                     <td>
                       <div class="row-slots" :class="{ complete: vehicle.completed === 5 }" :aria-label="`核心素材 ${vehicle.completed}/5`">
                         <div class="slot-track">
@@ -1040,18 +1300,28 @@ onMounted(loadLibraryData)
                       </div>
                     </td>
                     <td class="col-actions">
-                      <span
-                        class="row-edit-trigger"
-                        role="button"
-                        tabindex="0"
-                        aria-label="编辑车辆信息"
-                        title="编辑车辆信息"
-                        @click.stop="openEditVehicleModal(vehicle.id)"
-                        @keydown.enter.stop="openEditVehicleModal(vehicle.id)"
-                        @keydown.space.prevent.stop="openEditVehicleModal(vehicle.id)"
-                      >
-                        <Icon icon="mdi:pencil-outline" />
-                      </span>
+                      <div class="row-action-group">
+                        <button
+                          v-if="vehicle.completed < 5"
+                          type="button"
+                          class="row-upload-trigger"
+                          @click.stop="openMaterialModalForVehicle(vehicle.id)"
+                        >
+                          补素材
+                        </button>
+                        <span
+                          class="row-edit-trigger"
+                          role="button"
+                          tabindex="0"
+                          aria-label="编辑车辆信息"
+                          title="编辑车辆信息"
+                          @click.stop="openEditVehicleModal(vehicle.id)"
+                          @keydown.enter.stop="openEditVehicleModal(vehicle.id)"
+                          @keydown.space.prevent.stop="openEditVehicleModal(vehicle.id)"
+                        >
+                          <Icon icon="mdi:pencil-outline" />
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -1075,7 +1345,12 @@ onMounted(loadLibraryData)
           <aside v-if="activeVehicle" class="vehicle-detail">
             <div class="detail-cover">
               <img v-if="activeVehicle.image" :src="activeVehicle.image" :alt="activeVehicle.title" />
-              <Icon v-else icon="mdi:car-outline" />
+              <span
+                v-else
+                class="detail-cover-monogram"
+                :style="getVehicleMonogramStyle(activeVehicle.brand, activeVehicle.series)"
+                :aria-label="activeVehicle.brandLabel"
+              >{{ activeVehicle.brandLabel }}</span>
               <span class="status-badge" :class="activeVehicle.statusTone">{{ activeVehicle.status }}</span>
             </div>
             <div class="detail-body">
@@ -1094,7 +1369,7 @@ onMounted(loadLibraryData)
               </div>
               <div class="detail-actions">
                 <NButton class="vl-button primary" attr-type="button" @click="openMaterialModal">
-                  <Icon icon="mdi:cloud-upload-outline" />上传素材
+                  <Icon icon="mdi:cloud-upload-outline" />补素材
                 </NButton>
                 <NButton class="icon-button" attr-type="button" title="编辑信息" @click="openEditVehicleModal(activeVehicle.id)"><Icon icon="mdi:pencil-outline" /></NButton>
               </div>
@@ -1107,22 +1382,47 @@ onMounted(loadLibraryData)
               </div>
               <div v-if="activeDetailTab === 'assets'" class="slot-checklist">
                 <div
-                  v-for="slot in activeVehicle.slotStates"
+                  v-for="slot in activeVehiclePendingSlots"
                   :key="slot.code"
-                  class="slot-item"
-                  :class="{ done: slot.done, previewable: slot.done && slot.url }"
-                  :role="slot.done && slot.url ? 'button' : undefined"
-                  :tabindex="slot.done && slot.url ? 0 : undefined"
-                  @click="openAssetPreview(slot)"
-                  @keydown.enter="openAssetPreview(slot)"
-                  @keydown.space.prevent="openAssetPreview(slot)"
+                  class="slot-item pending-action"
+                  role="button"
+                  tabindex="0"
+                  @click="openMaterialModal"
+                  @keydown.enter="openMaterialModal"
+                  @keydown.space.prevent="openMaterialModal"
                 >
                   <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-outline' : 'mdi:video-outline'" />
                   <span>{{ slot.label }}</span>
-                  <b>{{ slot.done ? '已上传' : '待补充' }}</b>
+                  <b>点击补充</b>
+                </div>
+                <button
+                  v-if="activeVehicleDoneSlots.length"
+                  type="button"
+                  class="slot-done-toggle"
+                  :aria-expanded="showCompletedSlots"
+                  @click="showCompletedSlots = !showCompletedSlots"
+                >
+                  <span>已上传 {{ activeVehicleDoneSlots.length }} 项</span>
+                  <Icon :icon="showCompletedSlots ? 'mdi:chevron-up' : 'mdi:chevron-down'" />
+                </button>
+                <div v-if="showCompletedSlots" class="slot-done-list">
+                  <div
+                    v-for="slot in activeVehicleDoneSlots"
+                    :key="slot.code"
+                    class="slot-item done previewable"
+                    role="button"
+                    tabindex="0"
+                    @click="openAssetPreview(slot)"
+                    @keydown.enter="openAssetPreview(slot)"
+                    @keydown.space.prevent="openAssetPreview(slot)"
+                  >
+                    <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-outline' : 'mdi:video-outline'" />
+                    <span>{{ slot.label }}</span>
+                    <b>已上传</b>
+                  </div>
                 </div>
                 <p class="slot-checklist-hint">
-                  {{ activeVehicle.completed === 5 ? '核心素材已齐全，可直接套用模板生成视频。' : `还差 ${5 - activeVehicle.completed} 项核心素材，补齐后即可生成视频。` }}
+                  {{ activeVehicle.completed === 5 ? '核心素材已齐全，可直接套用模板生成视频。' : `还差 ${5 - activeVehicle.completed} 项核心素材，点击待补项或「补素材」继续上传。` }}
                 </p>
               </div>
               <div v-else-if="activeDetailTab === 'overview'" class="info-list">
@@ -1137,24 +1437,97 @@ onMounted(loadLibraryData)
         </section>
       </template>
 
-      <section v-else-if="activeLibraryTab === 'lots'" class="content-panel">
-        <div class="section-heading"><div><h2>车场素材</h2><p>车场图片与视频作为企业资产沉淀，后续可被模板和生成链路复用。</p></div>
-          <NButton class="vl-button primary" attr-type="button" @click="openLotModal"><Icon icon="mdi:garage-plus" />新增车场</NButton></div>
-        <div v-if="lots.length" class="lot-grid">
-          <article v-for="lot in lots" :key="lot.id">
-            <div class="lot-cover">
-              <img v-if="lot.coverAsset?.thumbnailUrl || lot.coverAsset?.url" :src="lot.coverAsset.thumbnailUrl || lot.coverAsset.url || ''" :alt="lot.name" />
-              <Icon v-else icon="mdi:garage" />
-              <span class="status-badge" :class="lot.materialStatus === 'complete' ? 'ready' : 'warn'">{{ lot.materialStatus === 'complete' ? '素材完整' : '待补充素材' }}</span>
+      <section v-else-if="activeLibraryTab === 'lots'" class="lot-workspace">
+        <div class="vehicle-main-panel">
+          <div class="lot-panel-heading">
+            <div>
+              <h2>车场素材</h2>
+              <p>车场图片与视频作为企业资产沉淀，后续可被模板和生成链路复用。</p>
             </div>
-            <div class="lot-body">
-              <h3>{{ lot.name }}</h3>
-              <p>{{ lot.address || lot.remark || '暂无车场说明' }}</p>
-              <NButton class="vl-button ghost" attr-type="button" @click="openLotManageModal(lot)">管理素材</NButton>
-            </div>
-          </article>
+            <NButton class="vl-button primary" attr-type="button" @click="openLotModal">
+              <Icon icon="mdi:garage-plus" />新增车场
+            </NButton>
+          </div>
+
+          <div class="vehicle-toolbar">
+            <label class="vehicle-search">
+              <Icon icon="mdi:magnify" />
+              <input v-model="lotKeyword" type="search" placeholder="车场名称 / 地址" />
+            </label>
+          </div>
+
+          <div v-if="lotLoadError" class="empty-state">
+            <Icon icon="mdi:alert-circle-outline" />
+            <h2>车场加载失败</h2>
+            <p>{{ lotLoadError }}</p>
+          </div>
+          <div v-else-if="lotLoading && !lots.length" class="empty-state">
+            <Icon icon="mdi:loading" class="spinning" />
+            <h2>正在加载车场</h2>
+          </div>
+          <div v-else-if="lots.length" class="vehicle-table-wrap">
+            <table class="vehicle-table lot-table">
+              <thead>
+                <tr>
+                  <th class="col-thumb">图片</th>
+                  <th>车场名称</th>
+                  <th>地址 / 说明</th>
+                  <th>素材状态</th>
+                  <th class="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="lot in lots" :key="lot.id">
+                  <td class="col-thumb">
+                    <div class="row-thumb">
+                      <img
+                        v-if="lot.coverAsset?.thumbnailUrl || lot.coverAsset?.url"
+                        :src="lot.coverAsset.thumbnailUrl || lot.coverAsset.url || ''"
+                        :alt="lot.name"
+                      />
+                      <span
+                        v-else
+                        class="row-thumb-monogram"
+                        :style="getLotMonogramStyle(lot.name)"
+                        :aria-label="lot.name"
+                      >{{ getLotThumbLabel(lot.name) }}</span>
+                    </div>
+                  </td>
+                  <td class="cell-model">{{ lot.name }}</td>
+                  <td class="cell-lot-summary">{{ lotSummaryText(lot) }}</td>
+                  <td>
+                    <span class="status-badge" :class="lot.materialStatus === 'complete' ? 'ready' : 'warn'">
+                      {{ lot.materialStatus === 'complete' ? '素材完整' : '待补充素材' }}
+                    </span>
+                  </td>
+                  <td class="col-actions">
+                    <button
+                      type="button"
+                      class="row-upload-trigger"
+                      :class="{ ghost: lot.materialStatus === 'complete' }"
+                      @click="openLotManageModal(lot)"
+                    >
+                      {{ lot.materialStatus === 'complete' ? '管理' : '补素材' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="lotTotal > lotPageSize" class="vehicle-pagination">
+            <NPagination
+              v-model:page="lotPage"
+              :page-size="lotPageSize"
+              :item-count="lotTotal"
+              show-quick-jumper
+            />
+          </div>
+          <div v-if="!lots.length && !lotLoading && !lotLoadError" class="empty-state">
+            <Icon icon="mdi:garage-plus" />
+            <h2>{{ hasActiveLotQuery ? '没有匹配的车场' : '暂无车场' }}</h2>
+            <p>{{ hasActiveLotQuery ? '尝试更换搜索关键词。' : '点击“新增车场”创建第一条真实数据。' }}</p>
+          </div>
         </div>
-        <div v-else class="empty-state"><Icon icon="mdi:garage-plus" /><h2>暂无车场</h2><p>点击“新增车场”创建第一条真实数据。</p></div>
       </section>
 
       <section v-else class="content-panel">
@@ -1323,6 +1696,7 @@ onMounted(loadLibraryData)
         </header>
         <div class="modal-body">
           <label class="wide-field"><span>车场名称 *</span><input v-model="lotForm.name" placeholder="请输入车场名称" /></label>
+          <label class="wide-field"><span>车场地址</span><input v-model="lotForm.address" placeholder="请输入车场地址，如：湖北省武汉市江夏区雄楚大道114号" /></label>
           <div class="upload-lanes">
             <label class="lot-upload-card">
               <input type="file" accept="image/jpeg,image/png,image/webp" :disabled="savingLot" @change="selectLotFile('image', $event)" />
@@ -1350,11 +1724,12 @@ onMounted(loadLibraryData)
     <div v-if="showLotManageModal && managingLot" class="vl-modal-backdrop"
       @click.self="!savingLotManage && (showLotManageModal = false)">
       <section class="vl-modal compact-modal">
-        <header><div><h2>管理车场</h2><p>更新车场名称，或替换车场图片与视频。</p></div>
+        <header><div><h2>管理车场</h2><p>更新车场名称与地址，或替换车场图片与视频。</p></div>
           <button type="button" title="关闭" :disabled="savingLotManage" @click="showLotManageModal = false"><Icon icon="mdi:close" /></button>
         </header>
         <div class="modal-body">
           <label class="wide-field"><span>车场名称 *</span><input v-model="lotManageForm.name" placeholder="请输入车场名称" /></label>
+          <label class="wide-field"><span>车场地址</span><input v-model="lotManageForm.address" placeholder="请输入车场地址" /></label>
           <div class="upload-lanes">
             <label class="lot-upload-card" :class="{ 'has-preview': lotManagePreviewUrl('image') }">
               <input type="file" accept="image/jpeg,image/png,image/webp" :disabled="savingLotManage" @change="selectLotManageFile('image', $event)" />

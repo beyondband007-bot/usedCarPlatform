@@ -837,6 +837,8 @@ const run = async () => {
     await addColumnIfMissing("vehicles", "body_type", "VARCHAR(80) NULL AFTER car_type");
     await addColumnIfMissing("vehicles", "fuel_grade", "VARCHAR(40) NULL AFTER energy_type");
     await addColumnIfMissing("vehicles", "emission_standard", "VARCHAR(80) NULL AFTER vehicle_level");
+    await addColumnIfMissing("vehicle_lots", "address", "VARCHAR(255) NULL AFTER name");
+    await addColumnIfMissing("vehicle_lots", "remark", "VARCHAR(500) NULL AFTER address");
     // 软删除车辆残留的 vin 会占用 uk_vehicles_library_vin，导致同 VIN 无法重新入库。
     await pool.query(
       `UPDATE vehicles SET vin = NULL WHERE deleted_at IS NOT NULL AND vin IS NOT NULL`,
