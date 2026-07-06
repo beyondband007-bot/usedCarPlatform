@@ -86,7 +86,31 @@ const conversionProgress = computed(() => {
   if (activeTask.value?.status === 'failed') return 0
   return Math.min(100, Math.max(0, activeTask.value?.progress ?? 0))
 })
+const isAwaitingConversion = computed(
+  () => Boolean(sourceFile.value) && !activeTask.value,
+)
 const isTaskProcessing = computed(() => activeTask.value?.status === 'processing')
+
+const processingStageText = computed(() => {
+  if (isAwaitingConversion.value) return '等待开始转换'
+  if (activeTask.value?.status === 'failed') return '转换失败，请重试'
+  const progress = conversionProgress.value
+  if (progress < 20) return '语音分离中…'
+  if (progress < 45) return '翻译生成中…'
+  if (progress < 70) return '语音合成中…'
+  if (progress < 90) return '口型对齐中…'
+  return '视频渲染中…'
+})
+
+const processingHintText = computed(() =>
+  isAwaitingConversion.value
+    ? '选择目标语言后，点击「开始转换」'
+    : '转换完成后，处理后的视频将在这里显示',
+)
+
+const processingRingLabel = computed(() =>
+  isAwaitingConversion.value ? '待开始' : `${conversionProgress.value}%`,
+)
 
 function openFilePicker() {
   fileInputRef.value?.click()
@@ -398,24 +422,6 @@ onUnmounted(() => {
             @play="handlePlaySync('original')"
             @pause="handlePauseSync('original')"
           />
-          <footer class="video-inline-controls">
-            <button type="button" class="inline-upload-button" @click="openFilePicker">
-              <Icon icon="mdi:tray-arrow-up" />
-              {{ sourceFile ? '更换视频' : '上传视频' }}
-            </button>
-            <label>
-              <span>当前语言</span>
-              <select v-model="sourceLanguage">
-                <option
-                  v-for="item in availableSourceLanguages"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </option>
-              </select>
-            </label>
-          </footer>
         </article>
         <article class="video-player">
           <span>处理后视频</span>
@@ -441,12 +447,53 @@ onUnmounted(() => {
             @play="handlePlaySync('result')"
             @pause="handlePauseSync('result')"
           />
-          <div v-else class="result-waiting-state">
-            <Icon icon="mdi:movie-open-clock-outline" />
-            <strong>等待转换结果</strong>
-            <small>转换完成后，处理后的视频将在这里显示</small>
+          <div v-else class="result-processing-state">
+            <video
+              class="processing-bg"
+              :src="originalPreviewVideoUrl"
+              muted
+              playsinline
+              preload="metadata"
+            />
+            <div class="processing-overlay" />
+            <div class="processing-content">
+              <div class="progress-ring">
+                <svg viewBox="0 0 100 100">
+                  <circle class="progress-ring-track" cx="50" cy="50" r="44" />
+                  <circle
+                    class="progress-ring-fill"
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    :stroke-dasharray="`${conversionProgress * 2.7646} 276.46`"
+                  />
+                </svg>
+                <span class="progress-ring-value">{{ processingRingLabel }}</span>
+              </div>
+              <strong :key="processingStageText" class="processing-stage">{{ processingStageText }}</strong>
+              <small class="processing-hint">{{ processingHintText }}</small>
+            </div>
           </div>
-          <footer class="video-inline-controls result-controls">
+        </article>
+        <footer class="video-inline-controls">
+          <button type="button" class="inline-upload-button" @click="openFilePicker">
+            <Icon icon="mdi:tray-arrow-up" />
+            {{ sourceFile ? '更换视频' : '上传视频' }}
+          </button>
+          <label>
+            <span>当前语言</span>
+            <select v-model="sourceLanguage">
+              <option
+                v-for="item in availableSourceLanguages"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </option>
+            </select>
+          </label>
+        </footer>
+        <footer class="video-inline-controls result-controls">
             <label>
               <span>目标语言</span>
               <select v-model="targetLanguage">
@@ -473,7 +520,6 @@ onUnmounted(() => {
               <progress :value="conversionProgress" max="100">{{ conversionProgress }}%</progress>
             </div>
           </footer>
-        </article>
       </div>
     </section>
     </div>
@@ -586,6 +632,7 @@ onUnmounted(() => {
   --lc-muted: var(--workspace-text-secondary, var(--app-text-soft));
   --lc-player-stage: var(--workspace-panel, var(--app-surface));
   --lc-player-background: var(--workspace-panel, var(--app-surface));
+  --lc-processing-overlay: rgba(255, 255, 255, 0.78);
 
   display: flex;
   min-height: 100%;
@@ -1085,10 +1132,20 @@ onUnmounted(() => {
   min-height: 0;
   flex: 1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 14px;
   padding: 14px;
   border-radius: 15px;
   background: var(--lc-player-stage);
+}
+
+.compare-stage > .video-player {
+  min-height: 0;
+}
+
+.compare-stage > .video-inline-controls {
+  align-self: start;
+  border-radius: 11px;
 }
 
 .compare-stage article {
@@ -1123,12 +1180,13 @@ onUnmounted(() => {
 
 .video-player {
   display: flex;
+  height: 100%;
   min-height: 0;
   flex-direction: column;
 }
 
 .video-player > video,
-.video-player > .result-waiting-state {
+.video-player > .result-processing-state {
   height: 0;
   min-height: 0;
   flex: 1;
@@ -1217,29 +1275,105 @@ onUnmounted(() => {
   opacity: 0.4;
 }
 
-.result-waiting-state {
+.result-processing-state {
+  position: relative;
   display: grid;
   width: 100%;
   min-height: 0;
   place-content: center;
   justify-items: center;
-  gap: 8px;
-  padding: 24px;
-  box-sizing: border-box;
-  color: rgba(255, 255, 255, 0.72);
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--lc-player-background);
+  color: var(--lc-text);
   text-align: center;
 }
 
-.result-waiting-state svg {
-  font-size: 34px;
+.processing-bg {
+  position: absolute;
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  border: 0;
+  filter: blur(14px) saturate(0.55) brightness(0.82);
+  object-fit: cover;
+  opacity: 0.55;
+  animation: processing-breathe 5s ease-in-out infinite;
 }
 
-.result-waiting-state strong {
-  color: #fff;
-  font-size: 14px;
+@keyframes processing-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
 }
 
-.result-waiting-state small {
+.processing-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--lc-processing-overlay);
+}
+
+.processing-content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 24px;
+}
+
+.progress-ring {
+  position: relative;
+  width: 84px;
+  height: 84px;
+}
+
+.progress-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring circle {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.progress-ring-track {
+  stroke: var(--lc-border);
+}
+
+.progress-ring-fill {
+  stroke: var(--lc-primary);
+  transition: stroke-dasharray 0.4s ease-out;
+}
+
+.progress-ring-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.processing-stage {
+  font-size: 15px;
+  font-weight: 700;
+  animation: processing-text-fade 0.35s ease;
+}
+
+@keyframes processing-text-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.processing-hint {
+  color: var(--lc-muted);
   font-size: 12px;
 }
 
@@ -1416,6 +1550,7 @@ onUnmounted(() => {
 .history-compare {
   flex: none;
   height: min(62vh, 560px);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 :global(html[data-theme='dark']) .language-studio,
@@ -1423,6 +1558,7 @@ onUnmounted(() => {
   --lc-primary: #66a0ff;
   --lc-player-stage: #0b1019;
   --lc-player-background: #05080d;
+  --lc-processing-overlay: rgba(5, 8, 13, 0.82);
 }
 
 @media (width < 1180px) {
@@ -1484,6 +1620,7 @@ onUnmounted(() => {
 
   .compare-stage {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   }
 
   .video-inline-controls,

@@ -26,6 +26,11 @@ export const topNavigation: NavItem[] = [
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
+  {
+    path: '/vehicle-library',
+    label: '车辆库',
+    icon: 'mdi:car-multiple',
+  },
   { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
   { path: '/login', label: '企业账号登录', icon: 'mdi:account-key-outline' },
@@ -35,6 +40,7 @@ export const topNavigation: NavItem[] = [
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   { path: '/workspace', label: '视觉工作台' },
+  { path: '/vehicle-library', label: '车辆库' },
   { path: '/pricing', label: '企业套餐' },
   { path: '/credits', label: '积分查询' },
   { path: '/reusable-credits-console', label: 'Reusable Credits Console' },

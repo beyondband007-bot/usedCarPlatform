@@ -34,6 +34,12 @@ import {
   imageMatchesOutputRatio,
   readImageFileDimensions,
 } from "@/utils/image-orientation";
+import {
+  normalizeVehicleInfo,
+  queryVehicleByVinShowApi,
+  recognizeVinFromImage,
+  type VehicleBasicInfo,
+} from "@/api/vehicle-info";
 
 const props = defineProps<{
   capability: WorkspaceCapability;
@@ -51,6 +57,10 @@ const exteriorInputRef = ref<HTMLInputElement | null>(null);
 const interiorInputRef = ref<HTMLInputElement | null>(null);
 const dealershipInputRef = ref<HTMLInputElement | null>(null);
 const isSubmittingConfirmedVideo = ref(false);
+const vinInput = ref("");
+const vinLoading = ref(false);
+const vinOcrLoading = ref(false);
+const vinError = ref("");
 
 const ownerKey = computed(
   () => authStore.userInfo?.id ?? authStore.userInfo?.username ?? "guest",
@@ -589,6 +599,78 @@ function handleBrandClear() {
   activeSeries.value = "";
 }
 
+function normalizeVinInput(event: Event) {
+  vinInput.value = (event.target as HTMLInputElement).value.toUpperCase();
+}
+
+function normalizeVinModelYear(year: string) {
+  return year.match(/(?:19|20)\d{2}/)?.[0] ?? year.trim();
+}
+
+function fillShortVideoFormFromVin(result: VehicleBasicInfo) {
+  const form =
+    selectedTemplate.value?.type === "promotion"
+      ? promotionForm.value
+      : singleCarForm.value;
+
+  form.brand = result.brandName;
+  form.modelYear = normalizeVinModelYear(result.year);
+  form.displacement = result.displacement.trim() || result.fuelType.trim();
+  form.salesName = result.seriesName;
+  form.series = result.modelName || result.fullModelName;
+}
+
+async function recognizeShortVideoVin(vinValue = vinInput.value) {
+  const vin = vinValue.trim().toUpperCase();
+  vinError.value = "";
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+    vinError.value = "请输入 17 位标准 VIN 码（不包含 I、O、Q）";
+    return;
+  }
+
+  vinLoading.value = true;
+  try {
+    const result = normalizeVehicleInfo(await queryVehicleByVinShowApi(vin));
+    vinInput.value = vin;
+    fillShortVideoFormFromVin(result);
+    message.success("车辆信息已自动填充");
+  } catch (error) {
+    vinError.value =
+      error instanceof Error ? error.message : "VIN 查询失败，请稍后重试";
+  } finally {
+    vinLoading.value = false;
+  }
+}
+
+async function recognizeShortVideoVinImage(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  vinError.value = "";
+  if (!["image/jpeg", "image/png"].includes(file.type)) {
+    vinError.value = "仅支持 JPG、JPEG 或 PNG 图片";
+    return;
+  }
+  if (file.size > 7 * 1024 * 1024) {
+    vinError.value = "VIN 图片大小不能超过 7MB";
+    return;
+  }
+
+  vinOcrLoading.value = true;
+  try {
+    const vin = await recognizeVinFromImage(file);
+    vinInput.value = vin;
+    await recognizeShortVideoVin(vin);
+  } catch (error) {
+    vinError.value =
+      error instanceof Error ? error.message : "VIN 图片识别失败";
+  } finally {
+    vinOcrLoading.value = false;
+  }
+}
+
 function handleDragOver(event: DragEvent) {
   event.preventDefault();
 }
@@ -1110,6 +1192,66 @@ async function submitConfirmedVideo() {
             <p>五级车型信息，用于精准生成口播文案</p>
           </div>
         </header>
+
+        <div class="sv-vin-panel">
+          <div class="sv-vin-panel-head">
+            <span class="sv-vin-panel-icon" aria-hidden="true">
+              <Icon icon="mdi:barcode-scan" />
+            </span>
+            <div>
+              <strong>VIN 智能识别</strong>
+              <p>输入 17 位 VIN 或上传图片，自动填充下方车型信息</p>
+            </div>
+          </div>
+          <div class="sv-vin-row">
+            <label class="sv-vin-field">
+              <span class="sv-field-label">VIN 码</span>
+              <input
+                v-model="vinInput"
+                type="text"
+                maxlength="17"
+                placeholder="请输入 17 位 VIN"
+                :disabled="isConfigurationLocked || vinLoading || vinOcrLoading"
+                @input="normalizeVinInput"
+                @keyup.enter="recognizeShortVideoVin()"
+              />
+            </label>
+            <button
+              type="button"
+              class="sv-vin-query-btn"
+              :disabled="isConfigurationLocked || vinLoading || vinOcrLoading"
+              @click="recognizeShortVideoVin()"
+            >
+              <Icon
+                :icon="vinLoading ? 'mdi:loading' : 'mdi:magnify'"
+                :class="{ 'vg-spin': vinLoading }"
+                aria-hidden="true"
+              />
+              {{ vinLoading ? "查询中" : "立即查询" }}
+            </button>
+          </div>
+          <div class="sv-vin-secondary">
+            <label
+              class="sv-vin-image-btn"
+              :class="{ 'is-loading': vinOcrLoading, 'is-disabled': isConfigurationLocked || vinLoading || vinOcrLoading }"
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                :disabled="isConfigurationLocked || vinLoading || vinOcrLoading"
+                @change="recognizeShortVideoVinImage"
+              />
+              <Icon
+                :icon="vinOcrLoading ? 'mdi:loading' : 'mdi:image-search-outline'"
+                :class="{ 'vg-spin': vinOcrLoading }"
+                aria-hidden="true"
+              />
+              {{ vinOcrLoading ? "识别并查询中" : "上传图片识别 VIN" }}
+            </label>
+            <span>支持 JPG、PNG，识别后自动查询车辆信息</span>
+          </div>
+          <p v-if="vinError" class="sv-vin-error">{{ vinError }}</p>
+        </div>
 
         <div class="sv-form-grid">
           <label class="sv-field">
@@ -2324,6 +2466,163 @@ async function submitConfirmedVideo() {
   color: #0f172a;
 }
 
+.sv-vin-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--sv-accent) 24%, var(--sv-card-border));
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sv-accent) 7%, transparent),
+      transparent 72%
+    ),
+    var(--sv-card-bg);
+}
+
+.sv-vin-panel-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sv-vin-panel-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--sv-accent-soft);
+  color: var(--sv-accent);
+  font-size: 20px;
+}
+
+.sv-vin-panel-head strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--sv-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sv-vin-panel-head p {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sv-vin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.sv-vin-field {
+  display: grid;
+  gap: 8px;
+}
+
+.sv-vin-field input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 10px;
+  background: var(--sv-input-bg, #fff);
+  color: var(--sv-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  outline: none;
+}
+
+.sv-vin-field input:focus {
+  border-color: color-mix(in srgb, var(--sv-accent) 56%, var(--sv-card-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sv-accent) 16%, transparent);
+}
+
+.sv-vin-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.sv-theme-dark .sv-vin-field input {
+  color: #000;
+}
+
+.sv-theme-dark .sv-vin-field input::placeholder {
+  color: #64748b;
+}
+
+.sv-vin-query-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 112px;
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sv-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sv-vin-query-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sv-vin-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  color: var(--sv-text-soft);
+  font-size: 12px;
+}
+
+.sv-vin-image-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--sv-card-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sv-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sv-vin-image-btn.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.sv-vin-image-btn input {
+  display: none;
+}
+
+.sv-vin-error {
+  margin: 0;
+  color: #f87171;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .sv-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2908,6 +3207,10 @@ async function submitConfirmedVideo() {
 
   .sv-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sv-vin-row {
+    grid-template-columns: 1fr;
   }
 
   .sv-field--wide {
