@@ -12,6 +12,23 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
   return response.data
 }
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin
+
+function normalizeMediaUrl(url?: string) {
+  const value = url?.trim()
+  if (!value) return undefined
+  return new URL(value, apiOrigin).toString()
+}
+
+function normalizeTask(task: LanguageConversionTask): LanguageConversionTask {
+  return {
+    ...task,
+    sourceVideoUrl: normalizeMediaUrl(task.sourceVideoUrl) ?? task.sourceVideoUrl,
+    resultVideoUrl: normalizeMediaUrl(task.resultVideoUrl),
+  }
+}
+
 export async function createLanguageConversionTask(
   payload: CreateLanguageConversionPayload & { sourceFile: File },
 ) {
@@ -28,7 +45,15 @@ export async function createLanguageConversionTask(
     form,
     { timeout: 0 },
   )
-  return unwrapApiResponse(response)
+  return normalizeTask(unwrapApiResponse(response))
+}
+
+export async function listLanguageConversionTasks() {
+  const response = await request.get<ApiResponse<LanguageConversionTask[]>>(
+    '/modules/language-conversion/tasks',
+    { timeout: 0 },
+  )
+  return unwrapApiResponse(response).map(normalizeTask)
 }
 
 export async function getLanguageConversionTask(taskId: string) {
@@ -36,5 +61,5 @@ export async function getLanguageConversionTask(taskId: string) {
     `/modules/language-conversion/tasks/${encodeURIComponent(taskId)}`,
     { timeout: 0 },
   )
-  return unwrapApiResponse(response)
+  return normalizeTask(unwrapApiResponse(response))
 }

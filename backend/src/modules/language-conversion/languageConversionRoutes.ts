@@ -55,6 +55,14 @@ languageConversionRoutes.post(
 );
 
 languageConversionRoutes.get(
+  "/tasks",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    ok(res, languageConversionService.listTasks(current.user.id));
+  }),
+);
+
+languageConversionRoutes.get(
   "/tasks/:taskId",
   asyncHandler(async (req, res) => {
     const current = getRequiredCurrentUser(req);

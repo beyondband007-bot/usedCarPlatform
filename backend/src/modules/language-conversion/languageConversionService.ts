@@ -119,6 +119,12 @@ class LanguageConversionService {
     return task;
   }
 
+  listTasks(userId: string) {
+    return [...tasks.values()]
+      .filter((task) => task.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   private runWorker(
     taskId: string,
     videoPath: string,

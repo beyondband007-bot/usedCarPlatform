@@ -2721,6 +2721,20 @@ onUnmounted(() => {
   }
 }
 
+.workspace-page--language-conversion .workspace-col-scroll {
+  display: flex;
+  flex-direction: column;
+
+  @media (width >= 1180px) {
+    overflow: hidden;
+  }
+}
+
+.workspace-page--language-conversion .workspace-col-scroll > :deep(*) {
+  flex: 1;
+  min-height: 0;
+}
+
 .workspace-page--creative-image .workspace-col--main,
 .workspace-page--simultaneous-interpretation .workspace-col--main {
   border: 0;

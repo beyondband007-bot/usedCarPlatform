@@ -29,9 +29,14 @@ export interface LanguageConversionTask {
   progress: number
   sourceLanguage: string
   targetLanguage: string
+  sourceFileName: string
   sourceVideoUrl: string
   resultVideoUrl?: string
+  mpsTaskId?: string
+  outputBucket?: string
   errorMessage?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export const languageConversionLanguages: LanguageConversionLanguage[] = [
