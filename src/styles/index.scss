@@ -228,7 +228,8 @@ html {
 /* 内部容器自行滚动时，取消 html 右侧预留槽位，避免露出底色竖条 */
 html:has(.app-layout--auth),
 html:has(.app-layout--pricing),
-html:has(.app-layout--points) {
+html:has(.app-layout--points),
+html:has(.app-layout--login) {
   scrollbar-gutter: auto;
 }
 
@@ -239,6 +240,16 @@ html:has(.app-layout--points) {
  */
 html[data-theme="dark"] {
   border: 0 !important;
+}
+
+/*
+ * 同类泄漏还会把组件背景色错误提升到 html：暗色主题泄漏白色（AppHeader），
+ * 亮色主题泄漏金色 #ffb800（CapabilityGeneratePanel），在右侧滚动条槽位
+ * 露出白/金竖条。重复属性选择器提高优先级，强制还原主题背景。
+ */
+html[data-theme="dark"][data-theme],
+html[data-theme="light"][data-theme] {
+  background: var(--app-bg) !important;
 }
 
 html.is-mobile {
