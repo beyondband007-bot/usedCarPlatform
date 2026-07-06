@@ -174,46 +174,57 @@ const serializeRecognition = (row: VehicleRecognitionRecordRow) => ({
 });
 
 const parseVehiclePayload = (body: Record<string, unknown>, existing?: VehicleRow) => {
-  const vin = normalizeVin(body.vin ?? existing?.vin ?? null);
+  // A key that is present in the body (even with a null value) is an explicit
+  // instruction to overwrite; only absent/undefined keys fall back to the
+  // existing record. Otherwise fields could never be cleared via PATCH.
+  const has = (key: string) => key in body && body[key] !== undefined;
+  const pickString = (key: string, fallback: string | null | undefined) =>
+    has(key) ? parseOptionalString(body[key]) : fallback ?? null;
+
+  const vin = normalizeVin(has("vin") ? body.vin : existing?.vin ?? null);
   assertValidVin(vin);
   const identifyType = assertValue(
-    parseOptionalString(body.identifyType ?? existing?.identify_type) ?? "manual",
+    (has("identifyType") ? parseOptionalString(body.identifyType) : existing?.identify_type) ??
+      "manual",
     ["manual", "vin_text", "vin_image"] as const,
     "identifyType",
   );
   const status = assertValue(
-    parseOptionalString(body.status ?? existing?.status) ?? "active",
+    (has("status") ? parseOptionalString(body.status) : existing?.status) ?? "active",
     ["active", "sold", "archived"] as const,
     "status",
   );
   return {
-    lotId: parseOptionalString(body.lotId ?? existing?.lot_id ?? null),
+    lotId: pickString("lotId", existing?.lot_id),
     vin,
     identifyType,
-    brand: parseRequiredString(body.brand ?? existing?.brand, "brand"),
-    series: parseRequiredString(body.series ?? existing?.series, "series"),
-    model: parseOptionalString(body.model ?? existing?.model ?? null),
-    modelName: parseOptionalString(body.modelName ?? existing?.model_name ?? null),
-    modelYear: parseOptionalString(body.modelYear ?? existing?.model_year ?? null),
-    carType: parseOptionalString(body.carType ?? existing?.car_type ?? null),
-    bodyType: parseOptionalString(body.bodyType ?? existing?.body_type ?? null),
-    energyType: parseOptionalString(body.energyType ?? existing?.energy_type ?? null),
-    fuelGrade: parseOptionalString(body.fuelGrade ?? existing?.fuel_grade ?? null),
-    displacement: parseOptionalString(body.displacement ?? existing?.displacement ?? null),
-    transmission: parseOptionalString(body.transmission ?? existing?.transmission ?? null),
-    vehicleLevel: parseOptionalString(body.vehicleLevel ?? existing?.vehicle_level ?? null),
-    emissionStandard: parseOptionalString(
-      body.emissionStandard ?? existing?.emission_standard ?? null,
-    ),
-    color: parseOptionalString(body.color ?? existing?.color ?? null),
-    mileageKm: parseOptionalInteger(body.mileageKm ?? existing?.mileage_km ?? null, "mileageKm"),
-    firstRegistrationDate: parseOptionalDateString(
-      body.firstRegistrationDate ?? toDateOnly(existing?.first_registration_date) ?? null,
-      "firstRegistrationDate",
-    ),
-    guidePrice: parseOptionalNumber(body.guidePrice ?? existing?.guide_price ?? null, "guidePrice"),
-    salePrice: parseOptionalNumber(body.salePrice ?? existing?.sale_price ?? null, "salePrice"),
-    remark: parseOptionalString(body.remark ?? existing?.remark ?? null),
+    brand: parseRequiredString(has("brand") ? body.brand : existing?.brand, "brand"),
+    series: parseRequiredString(has("series") ? body.series : existing?.series, "series"),
+    model: pickString("model", existing?.model),
+    modelName: pickString("modelName", existing?.model_name),
+    modelYear: pickString("modelYear", existing?.model_year),
+    carType: pickString("carType", existing?.car_type),
+    bodyType: pickString("bodyType", existing?.body_type),
+    energyType: pickString("energyType", existing?.energy_type),
+    fuelGrade: pickString("fuelGrade", existing?.fuel_grade),
+    displacement: pickString("displacement", existing?.displacement),
+    transmission: pickString("transmission", existing?.transmission),
+    vehicleLevel: pickString("vehicleLevel", existing?.vehicle_level),
+    emissionStandard: pickString("emissionStandard", existing?.emission_standard),
+    color: pickString("color", existing?.color),
+    mileageKm: has("mileageKm")
+      ? parseOptionalInteger(body.mileageKm, "mileageKm")
+      : existing?.mileage_km ?? null,
+    firstRegistrationDate: has("firstRegistrationDate")
+      ? parseOptionalDateString(body.firstRegistrationDate, "firstRegistrationDate")
+      : toDateOnly(existing?.first_registration_date),
+    guidePrice: has("guidePrice")
+      ? parseOptionalNumber(body.guidePrice, "guidePrice")
+      : existing?.guide_price ?? null,
+    salePrice: has("salePrice")
+      ? parseOptionalNumber(body.salePrice, "salePrice")
+      : existing?.sale_price ?? null,
+    remark: pickString("remark", existing?.remark),
     status,
   };
 };
