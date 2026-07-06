@@ -39,7 +39,6 @@ const activeTask = ref<LanguageConversionTask | null>(null)
 const isSubmitting = ref(false)
 const pollTimer = ref<number | null>(null)
 const pollFailures = ref(0)
-const isDragging = ref(false)
 const isDownloading = ref(false)
 
 const activeView = ref<'convert' | 'history'>('convert')
@@ -57,7 +56,6 @@ const availableTargetLanguages = computed(() =>
     (item) => item.status === 'available' && item.value !== 'auto',
   ),
 )
-const canSwapLanguages = computed(() => sourceLanguage.value !== 'auto')
 const canSubmit = computed(
   () =>
     Boolean(sourceFile.value) &&
@@ -118,27 +116,6 @@ function handleFileChange(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   acceptSourceFile(file)
-}
-
-function handleDrop(event: DragEvent) {
-  isDragging.value = false
-  acceptSourceFile(event.dataTransfer?.files?.[0])
-}
-
-function removeSourceVideo() {
-  pauseBoth()
-  if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
-  sourceFile.value = null
-  sourceVideoUrl.value = ''
-  activeTask.value = null
-  stopPolling()
-}
-
-function swapLanguages() {
-  if (!canSwapLanguages.value) return
-  const previous = sourceLanguage.value
-  sourceLanguage.value = targetLanguage.value
-  targetLanguage.value = previous
 }
 
 async function handleSubmit() {
