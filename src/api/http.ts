@@ -52,6 +52,14 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '该 VIN 已存在于车辆库中，请勿重复录入',
   },
   {
+    matches: ['vehicle library is not active'],
+    text: '车辆库已被冻结或停用，暂时无法修改，请联系平台处理',
+  },
+  {
+    matches: ['vehicle library storage quota exceeded'],
+    text: '车辆库存储空间不足，请清理素材后重试或联系平台扩容',
+  },
+  {
     matches: [
       'requires a car_exterior asset',
       'requires a car_interior asset',

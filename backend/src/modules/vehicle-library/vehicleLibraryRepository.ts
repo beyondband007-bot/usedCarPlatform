@@ -188,15 +188,17 @@ const ownerScopeSql = (scope: LibraryScope) => {
 };
 
 export class VehicleLibraryRepository extends Repository {
-  async findActiveLibraryForScope(scope: LibraryScope) {
+  // Intentionally not filtered by status: a frozen/disabled default library must
+  // still be returned (and block writes) instead of silently creating a fresh
+  // active library that bypasses the freeze.
+  async findDefaultLibraryForScope(scope: LibraryScope) {
     const scopeClause = scope.tenantId
       ? "tenant_id = :tenantId"
       : "tenant_id IS NULL AND owner_user_id = :userId";
     const rows = await this.query<VehicleLibraryRow[]>(
       `SELECT *
        FROM vehicle_libraries
-       WHERE status = 'active'
-         AND ${scopeClause}
+       WHERE ${scopeClause}
        ORDER BY created_at ASC
        LIMIT 1`,
       { ...scope },

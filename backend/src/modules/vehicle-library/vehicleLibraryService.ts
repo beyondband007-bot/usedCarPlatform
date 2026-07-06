@@ -28,7 +28,6 @@ import {
   parseRequiredString,
   vehicleRequiredSlotCodes,
   type VehicleIdentifyType,
-  type VehicleLibraryStatus,
   type VehicleLotStatus,
   type VehicleMaterialStatus,
   type VehicleOwnerType,
@@ -261,9 +260,21 @@ export class VehicleLibraryService {
     if (!lot) throw errors.invalidParameter("vehicle lot not found", { ownerId });
   }
 
+  assertLibraryWritable(library: VehicleLibraryRow) {
+    if (library.status !== "active") {
+      throw errors.forbidden("vehicle library is not active", { status: library.status });
+    }
+  }
+
+  async getWritableLibraryForRequest(current: CurrentUserSession, libraryId?: unknown) {
+    const library = await this.getLibraryForRequest(current, libraryId);
+    this.assertLibraryWritable(library);
+    return library;
+  }
+
   async ensureDefaultLibrary(current: CurrentUserSession) {
     const scope = getScope(current.user);
-    const existing = await vehicleLibraryRepository.findActiveLibraryForScope(scope);
+    const existing = await vehicleLibraryRepository.findDefaultLibraryForScope(scope);
     if (existing) return existing;
     const created = await vehicleLibraryRepository.createLibrary({
       id: createId("vehicle_lib"),
@@ -304,6 +315,8 @@ export class VehicleLibraryService {
     };
   }
 
+  // quotaBytes 与 status 属于平台管控字段，不接受终端用户 API 传入，
+  // 否则用户可以自行扩容或解冻被平台冻结的库。
   async createLibrary(current: CurrentUserSession, body: Record<string, unknown>) {
     const scope = getScope(current.user);
     const created = await vehicleLibraryRepository.createLibrary({
@@ -311,7 +324,6 @@ export class VehicleLibraryService {
       tenantId: scope.tenantId,
       ownerUserId: current.user.id,
       name: parseOptionalString(body.name) ?? DEFAULT_LIBRARY_NAME,
-      quotaBytes: parseOptionalInteger(body.quotaBytes, "quotaBytes") ?? 0,
       remark: parseOptionalString(body.remark),
     });
     if (!created) throw errors.generationFailed("failed to create vehicle library");
@@ -319,19 +331,11 @@ export class VehicleLibraryService {
   }
 
   async updateLibrary(current: CurrentUserSession, libraryId: string, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, libraryId);
-    const status = body.status
-      ? assertValue(String(body.status), ["active", "frozen", "disabled"] as const, "status")
-      : undefined;
+    const library = await this.getWritableLibraryForRequest(current, libraryId);
     await vehicleLibraryRepository.updateLibrary({
       libraryId: library.id,
       name: parseOptionalString(body.name) ?? library.name,
       remark: body.remark === undefined ? library.remark : parseOptionalString(body.remark),
-      status,
-      quotaBytes:
-        body.quotaBytes === undefined
-          ? Number(library.quota_bytes)
-          : parseOptionalInteger(body.quotaBytes, "quotaBytes") ?? 0,
     });
     const updated = await this.getLibraryForRequest(current, library.id);
     return serializeLibrary(updated);
@@ -360,7 +364,7 @@ export class VehicleLibraryService {
   }
 
   async createLot(current: CurrentUserSession, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const lot = await vehicleLibraryRepository.createLot({
       id: createId("vehicle_lot"),
       libraryId: library.id,
@@ -382,7 +386,7 @@ export class VehicleLibraryService {
   }
 
   async updateLot(current: CurrentUserSession, lotId: string, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const existing = await vehicleLibraryRepository.findLotById(lotId, library.id);
     if (!existing) throw errors.invalidParameter("vehicle lot not found", { lotId });
     const status = body.status
@@ -401,7 +405,7 @@ export class VehicleLibraryService {
   }
 
   async deleteLot(current: CurrentUserSession, lotId: string, query?: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, query?.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, query?.libraryId);
     const lot = await vehicleLibraryRepository.findLotById(lotId, library.id);
     if (!lot) throw errors.invalidParameter("vehicle lot not found", { lotId });
     // 先解绑场内车辆，否则这些车辆会带着已删场地 id 卡在 lot 归属校验上。
@@ -469,7 +473,7 @@ export class VehicleLibraryService {
   }
 
   async createVehicle(current: CurrentUserSession, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const payload = parseVehiclePayload(body);
     await this.assertSameLibraryLot(library.id, payload.lotId);
     await this.assertVinAvailable(library.id, payload.vin);
@@ -500,7 +504,7 @@ export class VehicleLibraryService {
   }
 
   async updateVehicle(current: CurrentUserSession, vehicleId: string, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const existing = await vehicleLibraryRepository.findVehicleById(vehicleId, library.id);
     if (!existing) throw errors.invalidParameter("vehicle not found", { vehicleId });
     const payload = parseVehiclePayload(body, existing);
@@ -523,7 +527,7 @@ export class VehicleLibraryService {
   }
 
   async deleteVehicle(current: CurrentUserSession, vehicleId: string, query?: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, query?.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, query?.libraryId);
     await vehicleLibraryRepository.archiveVehicle(vehicleId, library.id, current.user.id);
     return { deleted: true };
   }
@@ -555,13 +559,32 @@ export class VehicleLibraryService {
     slotCode: string,
     body: Record<string, unknown>,
   ) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const slot = getMaterialSlotDefinition(ownerType, slotCode);
     await this.assertOwnerExists(ownerType, ownerId, library.id);
     const assetId = parseRequiredString(body.assetId, "assetId");
     const asset = await assetsRepository.findById(assetId, current.user.id);
     if (!asset) throw errors.assetNotFound();
     assertAssetMediaType(asset.mimeType, slot.mediaType);
+    // 配额强制：quota_bytes 为 0 表示不限；替换素材时旧文件的空间会被释放。
+    const quotaBytes = Number(library.quota_bytes);
+    if (quotaBytes > 0) {
+      const currentMaterials = await vehicleLibraryRepository.listMaterials(
+        ownerType,
+        ownerId,
+        library.id,
+      );
+      const replacedSize =
+        currentMaterials.find((item) => item.slotCode === slot.code)?.fileSize ?? 0;
+      const projectedBytes = Number(library.used_bytes) - replacedSize + (asset.size ?? 0);
+      if (projectedBytes > quotaBytes) {
+        throw errors.conflict("vehicle library storage quota exceeded", {
+          quotaBytes,
+          usedBytes: Number(library.used_bytes),
+          fileSize: asset.size ?? 0,
+        });
+      }
+    }
     const metadata = parseJsonObject(body.metadata);
     await vehicleLibraryRepository.upsertMaterial({
       id: createId("vehicle_mat"),
@@ -594,7 +617,7 @@ export class VehicleLibraryService {
     slotCode: string,
     query?: Record<string, unknown>,
   ) {
-    const library = await this.getLibraryForRequest(current, query?.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, query?.libraryId);
     getMaterialSlotDefinition(ownerType, slotCode);
     await this.assertOwnerExists(ownerType, ownerId, library.id);
     await vehicleLibraryRepository.deleteMaterialSlot({
@@ -612,7 +635,7 @@ export class VehicleLibraryService {
   }
 
   async recognizeVinText(current: CurrentUserSession, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const vin = normalizeVin(body.vin ?? body.inputVin);
     assertValidVin(vin);
     if (!vin) throw errors.invalidParameter("vin is required");
@@ -642,7 +665,7 @@ export class VehicleLibraryService {
   }
 
   async recognizeVinImage(current: CurrentUserSession, body: Record<string, unknown>) {
-    const library = await this.getLibraryForRequest(current, body.libraryId);
+    const library = await this.getWritableLibraryForRequest(current, body.libraryId);
     const assetId = parseRequiredString(body.assetId ?? body.sourceAssetId, "assetId");
     const asset = await assetsRepository.findById(assetId, current.user.id);
     if (!asset) throw errors.assetNotFound();

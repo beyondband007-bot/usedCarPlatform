@@ -8,7 +8,6 @@ import type {
   VehicleLibrary,
   VehicleLibraryHome,
   VehicleLibraryMaterial,
-  VehicleLibraryStatus,
   VehicleListParams,
   VehicleLot,
   VehicleLibraryListParams,
@@ -50,7 +49,6 @@ export async function getVehicleLibraryHome() {
 
 export async function createVehicleLibrary(payload: {
   name?: string
-  quotaBytes?: number
   remark?: string | null
 }) {
   const response = await request.post<ApiResponse<VehicleLibrary>>(
@@ -60,13 +58,12 @@ export async function createVehicleLibrary(payload: {
   return unwrapApiResponse(response)
 }
 
+// quotaBytes / status 属于平台管控字段，用户端接口不支持修改。
 export async function updateVehicleLibrary(
   libraryId: string,
   payload: {
     name?: string
-    quotaBytes?: number
     remark?: string | null
-    status?: VehicleLibraryStatus
   },
 ) {
   const response = await request.patch<ApiResponse<VehicleLibrary>>(
