@@ -122,11 +122,16 @@ const serializeVehicle = (
   brand: row.brand,
   series: row.series,
   model: row.model,
+  modelName: row.model_name,
   modelYear: row.model_year,
+  carType: row.car_type,
+  bodyType: row.body_type,
   energyType: row.energy_type,
+  fuelGrade: row.fuel_grade,
   displacement: row.displacement,
   transmission: row.transmission,
   vehicleLevel: row.vehicle_level,
+  emissionStandard: row.emission_standard,
   color: row.color,
   mileageKm: row.mileage_km,
   firstRegistrationDate: toIso(row.first_registration_date),
@@ -188,11 +193,18 @@ const parseVehiclePayload = (body: Record<string, unknown>, existing?: VehicleRo
     brand: parseRequiredString(body.brand ?? existing?.brand, "brand"),
     series: parseRequiredString(body.series ?? existing?.series, "series"),
     model: parseOptionalString(body.model ?? existing?.model ?? null),
+    modelName: parseOptionalString(body.modelName ?? existing?.model_name ?? null),
     modelYear: parseOptionalString(body.modelYear ?? existing?.model_year ?? null),
+    carType: parseOptionalString(body.carType ?? existing?.car_type ?? null),
+    bodyType: parseOptionalString(body.bodyType ?? existing?.body_type ?? null),
     energyType: parseOptionalString(body.energyType ?? existing?.energy_type ?? null),
+    fuelGrade: parseOptionalString(body.fuelGrade ?? existing?.fuel_grade ?? null),
     displacement: parseOptionalString(body.displacement ?? existing?.displacement ?? null),
     transmission: parseOptionalString(body.transmission ?? existing?.transmission ?? null),
     vehicleLevel: parseOptionalString(body.vehicleLevel ?? existing?.vehicle_level ?? null),
+    emissionStandard: parseOptionalString(
+      body.emissionStandard ?? existing?.emission_standard ?? null,
+    ),
     color: parseOptionalString(body.color ?? existing?.color ?? null),
     mileageKm: parseOptionalInteger(body.mileageKm ?? existing?.mileage_km ?? null, "mileageKm"),
     firstRegistrationDate: parseOptionalDateString(
@@ -325,6 +337,10 @@ export class VehicleLibraryService {
     };
   }
 
+  async queryVehicles(current: CurrentUserSession, query: Record<string, unknown>) {
+    return this.listVehicles(current, query);
+  }
+
   async createLot(current: CurrentUserSession, body: Record<string, unknown>) {
     const library = await this.getLibraryForRequest(current, body.libraryId);
     const lot = await vehicleLibraryRepository.createLot({
@@ -387,12 +403,27 @@ export class VehicleLibraryService {
       page,
       pageSize,
       search: parseOptionalString(query.search),
+      vin: parseOptionalString(query.vin),
+      brand: parseOptionalString(query.brand),
+      modelYear: parseOptionalString(query.modelYear),
+      model: parseOptionalString(query.model),
       status,
       materialStatus,
       lotId: parseOptionalString(query.lotId),
     });
+    const materials = await vehicleLibraryRepository.listMaterialsForOwners(
+      "vehicle",
+      result.items.map((row) => row.id),
+      library.id,
+    );
+    const materialsByVehicleId = new Map<string, ReturnType<typeof mapMaterialRow>[]>();
+    for (const material of materials) {
+      const list = materialsByVehicleId.get(material.ownerId) ?? [];
+      list.push(material);
+      materialsByVehicleId.set(material.ownerId, list);
+    }
     return {
-      items: result.items.map((row) => serializeVehicle(row)),
+      items: result.items.map((row) => serializeVehicle(row, materialsByVehicleId.get(row.id) ?? [])),
       page,
       pageSize,
       total: result.total,

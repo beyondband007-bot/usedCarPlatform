@@ -141,6 +141,13 @@ vehicleLibraryRoutes.post(
 );
 
 vehicleLibraryRoutes.get(
+  "/vehicles/query",
+  asyncHandler(async (req, res) => {
+    ok(res, await vehicleLibraryService.queryVehicles(getRequiredCurrentUser(req), req.query));
+  }),
+);
+
+vehicleLibraryRoutes.get(
   "/vehicles/:vehicleId",
   asyncHandler(async (req, res) => {
     ok(

@@ -276,6 +276,7 @@ PUT    /lots/:lotId/materials/:slotCode
 DELETE /lots/:lotId/materials/:slotCode
 
 GET    /vehicles
+GET    /vehicles/query?vin=&brand=&modelYear=&model=&page=&pageSize=
 POST   /vehicles
 GET    /vehicles/:vehicleId
 PATCH  /vehicles/:vehicleId

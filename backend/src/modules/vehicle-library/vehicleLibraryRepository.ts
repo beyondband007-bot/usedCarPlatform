@@ -62,11 +62,16 @@ export type VehicleRow = RowDataPacket & {
   brand: string;
   series: string;
   model: string | null;
+  model_name: string | null;
   model_year: string | null;
+  car_type: string | null;
+  body_type: string | null;
   energy_type: string | null;
+  fuel_grade: string | null;
   displacement: string | null;
   transmission: string | null;
   vehicle_level: string | null;
+  emission_standard: string | null;
   color: string | null;
   mileage_km: number | null;
   first_registration_date: Date | string | null;
@@ -415,6 +420,10 @@ export class VehicleLibraryRepository extends Repository {
     input: PageInput & {
       libraryId: string;
       search?: string | null;
+      vin?: string | null;
+      brand?: string | null;
+      modelYear?: string | null;
+      model?: string | null;
       status?: string | null;
       materialStatus?: string | null;
       lotId?: string | null;
@@ -423,6 +432,10 @@ export class VehicleLibraryRepository extends Repository {
     const params = {
       libraryId: input.libraryId,
       search: input.search ? `%${input.search}%` : null,
+      vin: input.vin ? `%${input.vin}%` : null,
+      brand: input.brand ? `%${input.brand}%` : null,
+      modelYear: input.modelYear ? `%${input.modelYear}%` : null,
+      model: input.model ? `%${input.model}%` : null,
       status: input.status ?? null,
       materialStatus: input.materialStatus ?? null,
       lotId: input.lotId ?? null,
@@ -433,8 +446,12 @@ export class VehicleLibraryRepository extends Repository {
       "v.library_id = :libraryId",
       "v.deleted_at IS NULL",
       input.search
-        ? "(v.brand LIKE :search OR v.series LIKE :search OR v.model LIKE :search OR v.vin LIKE :search)"
+        ? "(v.brand LIKE :search OR v.series LIKE :search OR v.model LIKE :search OR v.model_name LIKE :search OR v.vin LIKE :search OR v.remark LIKE :search)"
         : "",
+      input.vin ? "v.vin LIKE :vin" : "",
+      input.brand ? "v.brand LIKE :brand" : "",
+      input.modelYear ? "v.model_year LIKE :modelYear" : "",
+      input.model ? "(v.model LIKE :model OR v.model_name LIKE :model)" : "",
       input.status ? "v.status = :status" : "",
       input.materialStatus ? "v.material_status = :materialStatus" : "",
       input.lotId ? "v.lot_id = :lotId" : "",
@@ -500,12 +517,14 @@ export class VehicleLibraryRepository extends Repository {
   async createVehicle(input: Record<string, unknown>) {
     await this.execute(
       `INSERT INTO vehicles
-        (id, library_id, lot_id, vin, identify_type, brand, series, model, model_year, energy_type,
-         displacement, transmission, vehicle_level, color, mileage_km, first_registration_date,
+        (id, library_id, lot_id, vin, identify_type, brand, series, model, model_name, model_year,
+         car_type, body_type, energy_type, fuel_grade, displacement, transmission, vehicle_level, emission_standard,
+         color, mileage_km, first_registration_date,
          guide_price, sale_price, remark, created_by_user_id)
        VALUES
-        (:id, :libraryId, :lotId, :vin, :identifyType, :brand, :series, :model, :modelYear, :energyType,
-         :displacement, :transmission, :vehicleLevel, :color, :mileageKm, :firstRegistrationDate,
+        (:id, :libraryId, :lotId, :vin, :identifyType, :brand, :series, :model, :modelName, :modelYear,
+         :carType, :bodyType, :energyType, :fuelGrade, :displacement, :transmission, :vehicleLevel, :emissionStandard,
+         :color, :mileageKm, :firstRegistrationDate,
          :guidePrice, :salePrice, :remark, :createdByUserId)`,
       input,
     );
@@ -521,11 +540,16 @@ export class VehicleLibraryRepository extends Repository {
            brand = :brand,
            series = :series,
            model = :model,
+           model_name = :modelName,
            model_year = :modelYear,
+           car_type = :carType,
+           body_type = :bodyType,
            energy_type = :energyType,
+           fuel_grade = :fuelGrade,
            displacement = :displacement,
            transmission = :transmission,
            vehicle_level = :vehicleLevel,
+           emission_standard = :emissionStandard,
            color = :color,
            mileage_km = :mileageKm,
            first_registration_date = :firstRegistrationDate,
@@ -552,6 +576,32 @@ export class VehicleLibraryRepository extends Repository {
          AND deleted_at IS NULL`,
       { vehicleId, libraryId, userId },
     );
+  }
+
+  async listMaterialsForOwners(ownerType: VehicleOwnerType, ownerIds: string[], libraryId: string) {
+    if (!ownerIds.length) return [];
+    const params: Record<string, unknown> = { ownerType, libraryId };
+    const placeholders = ownerIds.map((ownerId, index) => {
+      const key = `owner${index}`;
+      params[key] = ownerId;
+      return `:${key}`;
+    });
+    const rows = await this.query<VehicleLibraryMaterialRow[]>(
+      `SELECT vlm.*,
+              a.public_url AS asset_url,
+              a.thumbnail_url AS asset_thumbnail_url,
+              a.mime_type AS asset_mime_type
+       FROM vehicle_library_materials vlm
+       LEFT JOIN assets a ON a.id = vlm.asset_id
+       WHERE vlm.owner_type = :ownerType
+         AND vlm.owner_id IN (${placeholders.join(", ")})
+         AND vlm.library_id = :libraryId
+         AND vlm.deleted_at IS NULL
+         AND vlm.status <> 'deleted'
+       ORDER BY vlm.sort_order ASC, vlm.created_at ASC`,
+      params,
+    );
+    return rows.map(mapMaterialRow);
   }
 
   async listMaterials(ownerType: VehicleOwnerType, ownerId: string, libraryId: string) {

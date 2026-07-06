@@ -15,6 +15,7 @@ import type {
   VehicleMaterialSlotCode,
   VehicleRecognitionRecord,
   VehicleRecord,
+  VehicleQueryParams,
 } from '@/types/vehicle-library'
 
 export type {
@@ -32,6 +33,7 @@ export type {
   VehicleMaterialSlotCode,
   VehicleRecognitionRecord,
   VehicleRecord,
+  VehicleQueryParams,
 } from '@/types/vehicle-library'
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
@@ -140,6 +142,14 @@ export async function deleteVehicleLotMaterial(
 export async function getVehicles(params?: VehicleListParams) {
   const response = await request.get<ApiResponse<PageResult<VehicleRecord>>>(
     '/vehicle-library/vehicles',
+    { params },
+  )
+  return unwrapApiResponse(response)
+}
+
+export async function queryVehicles(params?: VehicleQueryParams) {
+  const response = await request.get<ApiResponse<PageResult<VehicleRecord>>>(
+    '/vehicle-library/vehicles/query',
     { params },
   )
   return unwrapApiResponse(response)

@@ -104,11 +104,16 @@ export interface VehicleRecord {
   brand: string
   series: string
   model?: string | null
+  modelName?: string | null
   modelYear?: string | null
+  carType?: string | null
+  bodyType?: string | null
   energyType?: string | null
+  fuelGrade?: string | null
   displacement?: string | null
   transmission?: string | null
   vehicleLevel?: string | null
+  emissionStandard?: string | null
   color?: string | null
   mileageKm?: number | null
   firstRegistrationDate?: string | null
@@ -159,11 +164,16 @@ export interface UpsertVehiclePayload {
   brand: string
   series: string
   model?: string | null
+  modelName?: string | null
   modelYear?: string | null
+  carType?: string | null
+  bodyType?: string | null
   energyType?: string | null
+  fuelGrade?: string | null
   displacement?: string | null
   transmission?: string | null
   vehicleLevel?: string | null
+  emissionStandard?: string | null
   color?: string | null
   mileageKm?: number | null
   firstRegistrationDate?: string | null
@@ -198,4 +208,14 @@ export interface VehicleListParams extends VehicleLibraryListParams {
   status?: VehicleRecordStatus
   materialStatus?: VehicleMaterialStatus
   lotId?: string
+}
+
+export interface VehicleQueryParams {
+  libraryId?: string
+  vin?: string
+  brand?: string
+  modelYear?: string
+  model?: string
+  page?: number
+  pageSize?: number
 }

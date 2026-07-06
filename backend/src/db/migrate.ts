@@ -832,6 +832,12 @@ const run = async () => {
     await addColumnIfMissing("batch_task_items", "error_code", "VARCHAR(120) NULL");
     await makeColumnNullable("generation_tasks", "input_asset_id", "VARCHAR(64) NULL");
 
+    await addColumnIfMissing("vehicles", "model_name", "VARCHAR(160) NULL AFTER model");
+    await addColumnIfMissing("vehicles", "car_type", "VARCHAR(80) NULL AFTER model_year");
+    await addColumnIfMissing("vehicles", "body_type", "VARCHAR(80) NULL AFTER car_type");
+    await addColumnIfMissing("vehicles", "fuel_grade", "VARCHAR(40) NULL AFTER energy_type");
+    await addColumnIfMissing("vehicles", "emission_standard", "VARCHAR(80) NULL AFTER vehicle_level");
+
     await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
     await addIndexIfMissing("assets", "idx_assets_user_purpose_created", "(user_id, purpose, created_at)");
 
