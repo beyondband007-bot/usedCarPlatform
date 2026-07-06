@@ -441,6 +441,8 @@ export class VehicleLibraryRepository extends Repository {
       status?: string | null;
       materialStatus?: string | null;
       lotId?: string | null;
+      missing?: "exterior" | "driver" | "video" | null;
+      sort?: "updated" | "complete" | null;
     },
   ) {
     const params = {
@@ -456,6 +458,33 @@ export class VehicleLibraryRepository extends Repository {
       limit: input.pageSize,
       offset: (input.page - 1) * input.pageSize,
     };
+    // 统计车辆在指定素材槽位上已上传（active）的数量，供缺料筛选与完整度排序使用。
+    const activeSlotCount = (slots: string[]) =>
+      `(SELECT COUNT(DISTINCT m.slot_code)
+        FROM vehicle_library_materials m
+        WHERE m.owner_type = 'vehicle'
+          AND m.owner_id = v.id
+          AND m.status = 'active'
+          AND m.deleted_at IS NULL
+          AND m.slot_code IN (${slots.map((slot) => `'${slot}'`).join(", ")}))`;
+    const exteriorCount = activeSlotCount(["front_image", "rear_image"]);
+    const driverCount = activeSlotCount(["driver_image"]);
+    const videoCount = activeSlotCount(["front_row_video", "rear_row_video"]);
+    const coreSlotCount = activeSlotCount([
+      "front_image",
+      "rear_image",
+      "driver_image",
+      "front_row_video",
+      "rear_row_video",
+    ]);
+    const missingClause =
+      input.missing === "exterior"
+        ? `${exteriorCount} < 2`
+        : input.missing === "driver"
+          ? `${driverCount} < 1`
+          : input.missing === "video"
+            ? `${videoCount} < 2`
+            : "";
     const clauses = [
       "v.library_id = :libraryId",
       "v.deleted_at IS NULL",
@@ -469,8 +498,13 @@ export class VehicleLibraryRepository extends Repository {
       input.status ? "v.status = :status" : "",
       input.materialStatus ? "v.material_status = :materialStatus" : "",
       input.lotId ? "v.lot_id = :lotId" : "",
+      missingClause,
     ].filter(Boolean);
     const where = clauses.join(" AND ");
+    const orderBy =
+      input.sort === "complete"
+        ? `${coreSlotCount} DESC, v.updated_at DESC, v.id DESC`
+        : "v.updated_at DESC, v.id DESC";
     const selectSql = `SELECT v.*,
                               vl.name AS lot_name,
                               cover.asset_id AS cover_asset_id,
@@ -486,7 +520,7 @@ export class VehicleLibraryRepository extends Repository {
                         AND cover.deleted_at IS NULL
                        LEFT JOIN assets a ON a.id = cover.asset_id
                        WHERE ${where}
-                       ORDER BY v.created_at DESC, v.id DESC
+                       ORDER BY ${orderBy}
                        LIMIT :limit OFFSET :offset`;
     const countSql = `SELECT COUNT(*) total FROM vehicles v WHERE ${where}`;
     const [items, countRows] = await Promise.all([

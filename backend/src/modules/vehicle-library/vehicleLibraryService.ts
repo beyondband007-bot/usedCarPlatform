@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { assetsRepository } from "../assets/assetsRepository";
@@ -276,14 +278,24 @@ export class VehicleLibraryService {
     const scope = getScope(current.user);
     const existing = await vehicleLibraryRepository.findDefaultLibraryForScope(scope);
     if (existing) return existing;
-    const created = await vehicleLibraryRepository.createLibrary({
-      id: createId("vehicle_lib"),
-      tenantId: scope.tenantId,
-      ownerUserId: current.user.id,
-      name: DEFAULT_LIBRARY_NAME,
-    });
-    if (!created) throw errors.generationFailed("failed to create vehicle library");
-    return created;
+    // 用 scope 派生的确定性主键创建默认库：并发首访时两个请求会算出同一个 id，
+    // 其中一个 INSERT 命中主键冲突后回退到再次查询，避免为同一用户建出多个默认库。
+    const scopeKey = scope.tenantId ? `t:${scope.tenantId}` : `u:${current.user.id}`;
+    const defaultLibraryId = `vehicle_lib_${createHash("sha1").update(scopeKey).digest("hex").slice(0, 40)}`;
+    try {
+      const created = await vehicleLibraryRepository.createLibrary({
+        id: defaultLibraryId,
+        tenantId: scope.tenantId,
+        ownerUserId: current.user.id,
+        name: DEFAULT_LIBRARY_NAME,
+      });
+      if (created) return created;
+    } catch (error) {
+      if (!isDuplicateEntryError(error)) throw error;
+    }
+    const library = await vehicleLibraryRepository.findDefaultLibraryForScope(scope);
+    if (!library) throw errors.generationFailed("failed to create vehicle library");
+    return library;
   }
 
   async getLibraryForRequest(current: CurrentUserSession, libraryId?: unknown) {
@@ -297,20 +309,16 @@ export class VehicleLibraryService {
   }
 
   async getHome(current: CurrentUserSession) {
+    // used_bytes 在每次素材增删时通过 refreshOwnerCompleteness 增量维护，
+    // 读接口不再触发全量 UPDATE，避免读请求带写副作用与行锁压力。
     const library = await this.ensureDefaultLibrary(current);
-    await vehicleLibraryRepository.recalculateLibraryUsedBytes(library.id);
-    const refreshed = await vehicleLibraryRepository.findLibraryByIdForScope(
-      library.id,
-      getScope(current.user),
-    );
     const stats = await vehicleLibraryRepository.getLibraryStats(library.id);
-    const source = refreshed ?? library;
     return {
-      library: serializeLibrary(source),
+      library: serializeLibrary(library),
       stats: {
         ...stats,
-        usedBytes: Number(source.used_bytes),
-        quotaBytes: Number(source.quota_bytes),
+        usedBytes: Number(library.used_bytes),
+        quotaBytes: Number(library.quota_bytes),
       },
     };
   }
@@ -424,6 +432,14 @@ export class VehicleLibraryService {
     if (materialStatus) {
       assertValue(materialStatus, ["incomplete", "complete"] as const, "materialStatus");
     }
+    const missingInput = parseOptionalString(query.missing);
+    const missing = missingInput
+      ? assertValue(missingInput, ["exterior", "driver", "video"] as const, "missing")
+      : null;
+    const sortInput = parseOptionalString(query.sort);
+    const sort = sortInput
+      ? assertValue(sortInput, ["updated", "complete"] as const, "sort")
+      : null;
     const result = await vehicleLibraryRepository.listVehicles({
       libraryId: library.id,
       page,
@@ -436,6 +452,8 @@ export class VehicleLibraryService {
       status,
       materialStatus,
       lotId: parseOptionalString(query.lotId),
+      missing,
+      sort,
     });
     const materials = await vehicleLibraryRepository.listMaterialsForOwners(
       "vehicle",
