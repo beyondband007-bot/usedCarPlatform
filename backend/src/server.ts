@@ -2,6 +2,7 @@ import { env } from "./config/env";
 import { checkMysqlConnection } from "./db/mysql";
 import { createApp } from "./app";
 import { syncCreditFunctionCatalog } from "./modules/billing/creditFunctionSync";
+import { languageConversionService } from "./modules/language-conversion/languageConversionService";
 import { kieKeyPool } from "./providers/kie/kieKeyPool";
 
 const start = async () => {
@@ -9,6 +10,7 @@ const start = async () => {
   await kieKeyPool.syncAccounts();
   await kieKeyPool.reconcileConcurrency();
   await syncCreditFunctionCatalog();
+  await languageConversionService.reconcileInterruptedProcessingTasks();
 
   const app = createApp();
   app.listen(env.port, () => {

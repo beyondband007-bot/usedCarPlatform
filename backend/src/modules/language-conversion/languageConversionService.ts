@@ -6,13 +6,15 @@ import readline from "node:readline";
 import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
-
-type LanguageConversionStatus = "processing" | "success" | "failed";
+import {
+  languageConversionRepository,
+  type LanguageConversionTaskRecord,
+} from "./languageConversionRepository";
 
 type LanguageConversionTask = {
   taskId: string;
   userId: string;
-  status: LanguageConversionStatus;
+  status: LanguageConversionTaskRecord["status"];
   progress: number;
   sourceLanguage: string;
   targetLanguage: string;
@@ -31,8 +33,6 @@ type WorkerEvent = {
   event?: string;
   [key: string]: any;
 };
-
-const tasks = new Map<string, LanguageConversionTask>();
 
 const languageMap: Record<string, string> = {
   auto: "zh",
@@ -55,15 +55,23 @@ const publicPathFor = (absolutePath: string) => {
   return `/results/${relative}`;
 };
 
-const now = () => new Date().toISOString();
-
-const updateTask = (taskId: string, patch: Partial<LanguageConversionTask>) => {
-  const task = tasks.get(taskId);
-  if (!task) return null;
-  const updated = { ...task, ...patch, updatedAt: now() };
-  tasks.set(taskId, updated);
-  return updated;
-};
+const toTaskResponse = (record: LanguageConversionTaskRecord): LanguageConversionTask => ({
+  taskId: record.id,
+  userId: record.userId,
+  status: record.status,
+  progress: record.progress,
+  sourceLanguage: record.sourceLanguage,
+  targetLanguage: record.targetLanguage,
+  sourceFileName: record.sourceFileName,
+  sourceVideoUrl: record.sourceVideoUrl,
+  resultVideoUrl: record.resultVideoUrl ?? undefined,
+  localResultPath: record.localResultPath ?? undefined,
+  mpsTaskId: record.mpsTaskId ?? undefined,
+  outputBucket: record.outputBucket ?? undefined,
+  errorMessage: record.errorMessage ?? undefined,
+  createdAt: record.createdAt.toISOString(),
+  updatedAt: record.updatedAt.toISOString(),
+});
 
 const parseWorkerLine = (line: string): WorkerEvent | null => {
   try {
@@ -74,8 +82,25 @@ const parseWorkerLine = (line: string): WorkerEvent | null => {
   }
 };
 
+const STALE_PROCESSING_MS = 15 * 60 * 1000;
+const INTERRUPTED_PROCESSING_MESSAGE =
+  "Language conversion was interrupted by a server restart. Please submit the task again.";
+const STALE_PROCESSING_MESSAGE =
+  "Language conversion timed out or was interrupted. Please submit the task again.";
+
 class LanguageConversionService {
-  createTask(input: {
+  private readonly workerEventChains = new Map<string, Promise<void>>();
+
+  async reconcileInterruptedProcessingTasks() {
+    await languageConversionRepository.failInterruptedProcessing(INTERRUPTED_PROCESSING_MESSAGE);
+  }
+
+  async reconcileStaleProcessingTasks() {
+    const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS);
+    await languageConversionRepository.failStaleProcessing(staleBefore, STALE_PROCESSING_MESSAGE);
+  }
+
+  async createTask(input: {
     userId: string;
     file: Express.Multer.File;
     sourceLanguage: unknown;
@@ -95,8 +120,8 @@ class LanguageConversionService {
     const outputDir = path.join(env.resultsDir, "language-conversion", taskId);
     fs.mkdirSync(outputDir, { recursive: true });
 
-    const task: LanguageConversionTask = {
-      taskId,
+    const record = await languageConversionRepository.create({
+      id: taskId,
       userId: input.userId,
       status: "processing",
       progress: 5,
@@ -104,25 +129,59 @@ class LanguageConversionService {
       targetLanguage,
       sourceFileName: input.file.originalname,
       sourceVideoUrl: `/uploads/language-conversion/${path.basename(input.file.path)}`,
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    tasks.set(taskId, task);
+    });
+    if (!record) throw errors.generationFailed("failed to create language conversion task");
 
     this.runWorker(taskId, input.file.path, outputDir, sourceLanguage, targetLanguage);
-    return task;
+    return toTaskResponse(record);
   }
 
-  getTask(taskId: string, userId: string) {
-    const task = tasks.get(taskId);
-    if (!task || task.userId !== userId) throw errors.taskNotFound();
-    return task;
+  async getTask(taskId: string, userId: string) {
+    await this.reconcileStaleProcessingTasks();
+    const record = await languageConversionRepository.findById(taskId, userId);
+    if (!record) throw errors.taskNotFound();
+    return toTaskResponse(record);
   }
 
-  listTasks(userId: string) {
-    return [...tasks.values()]
-      .filter((task) => task.userId === userId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async listTasks(userId: string) {
+    await this.reconcileStaleProcessingTasks();
+    const records = await languageConversionRepository.listByUserId(userId);
+    return records.map(toTaskResponse);
+  }
+
+  private async updateTask(
+    taskId: string,
+    patch: Partial<Omit<LanguageConversionTaskRecord, "id" | "userId" | "createdAt" | "updatedAt">>,
+    options?: { onlyIfProcessing?: boolean },
+  ) {
+    if (options?.onlyIfProcessing) {
+      await languageConversionRepository.updateIfProcessing(taskId, patch);
+      return;
+    }
+    await languageConversionRepository.update(taskId, patch);
+  }
+
+  private enqueueWorkerEvent(taskId: string, event: WorkerEvent) {
+    const previous = this.workerEventChains.get(taskId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(() => this.handleWorkerEvent(taskId, event))
+      .catch((error) => {
+        console.error(`[language-conversion] failed to handle worker event for ${taskId}:`, error);
+      });
+
+    this.workerEventChains.set(taskId, next);
+    void next.finally(() => {
+      if (this.workerEventChains.get(taskId) === next) {
+        this.workerEventChains.delete(taskId);
+      }
+    });
+  }
+
+  private async drainWorkerEvents(taskId: string) {
+    const pending = this.workerEventChains.get(taskId);
+    if (!pending) return;
+    await pending.catch(() => undefined);
   }
 
   private runWorker(
@@ -154,7 +213,7 @@ class LanguageConversionService {
     stdout.on("line", (line) => {
       const event = parseWorkerLine(line);
       if (!event?.event) return;
-      this.handleWorkerEvent(taskId, event);
+      this.enqueueWorkerEvent(taskId, event);
     });
 
     let stderr = "";
@@ -164,77 +223,111 @@ class LanguageConversionService {
     });
 
     child.once("error", (error) => {
-      updateTask(taskId, {
-        status: "failed",
-        progress: 100,
-        errorMessage: error.message,
-      });
+      void this.updateTask(
+        taskId,
+        {
+          status: "failed",
+          progress: 100,
+          errorMessage: error.message,
+        },
+        { onlyIfProcessing: true },
+      );
     });
 
     child.once("close", (code) => {
-      const current = tasks.get(taskId);
-      if (!current || current.status !== "processing") return;
-      updateTask(taskId, {
-        status: "failed",
-        progress: 100,
-        errorMessage: `language conversion worker exited with code ${code}: ${stderr.slice(-1200)}`,
-      });
+      void (async () => {
+        await this.drainWorkerEvents(taskId);
+        const current = await languageConversionRepository.findById(taskId);
+        if (!current || current.status !== "processing") return;
+        await this.updateTask(
+          taskId,
+          {
+            status: "failed",
+            progress: 100,
+            errorMessage: `language conversion worker exited with code ${code}: ${stderr.slice(-1200)}`,
+          },
+          { onlyIfProcessing: true },
+        );
+      })();
     });
   }
 
-  private handleWorkerEvent(taskId: string, event: WorkerEvent) {
+  private async handleWorkerEvent(taskId: string, event: WorkerEvent) {
+    const workerPatch = { onlyIfProcessing: true as const };
+
     if (event.event === "cos_bucket_selected") {
-      updateTask(taskId, { outputBucket: String(event.bucket ?? ""), progress: 10 });
+      await this.updateTask(
+        taskId,
+        { outputBucket: String(event.bucket ?? ""), progress: 10 },
+        workerPatch,
+      );
       return;
     }
     if (event.event === "upload_started") {
-      updateTask(taskId, { progress: 15 });
+      await this.updateTask(taskId, { progress: 15 }, workerPatch);
       return;
     }
     if (event.event === "upload_finished") {
-      updateTask(taskId, { progress: 25 });
+      await this.updateTask(taskId, { progress: 25 }, workerPatch);
       return;
     }
     if (event.event === "mps_submitted") {
-      updateTask(taskId, { mpsTaskId: String(event.taskId ?? ""), progress: 35 });
+      await this.updateTask(
+        taskId,
+        { mpsTaskId: String(event.taskId ?? ""), progress: 35 },
+        workerPatch,
+      );
       return;
     }
     if (event.event === "mps_poll") {
       const poll = Number(event.poll ?? 1);
       const progress = Math.min(90, 35 + poll * 3);
-      updateTask(taskId, { progress });
+      await this.updateTask(taskId, { progress }, workerPatch);
       return;
     }
     if (event.event === "downloaded") {
       const localPath = String(event.path ?? "");
-      updateTask(taskId, {
-        localResultPath: localPath,
-        resultVideoUrl: localPath ? publicPathFor(localPath) : undefined,
-        progress: 95,
-      });
+      await this.updateTask(
+        taskId,
+        {
+          localResultPath: localPath || null,
+          resultVideoUrl: localPath ? publicPathFor(localPath) : null,
+          progress: 95,
+        },
+        workerPatch,
+      );
       return;
     }
     if (event.event === "finished") {
       const final = event.final ?? {};
       const downloads = Array.isArray(final.downloads) ? final.downloads : [];
       const firstDownload = downloads[0] as { path?: string } | undefined;
-      const localPath = firstDownload?.path ?? tasks.get(taskId)?.localResultPath;
-      updateTask(taskId, {
-        status: "success",
-        progress: 100,
-        outputBucket: String(final.outputBucket ?? tasks.get(taskId)?.outputBucket ?? ""),
-        mpsTaskId: String(final.mpsTaskId ?? tasks.get(taskId)?.mpsTaskId ?? ""),
-        localResultPath: localPath,
-        resultVideoUrl: localPath ? publicPathFor(localPath) : tasks.get(taskId)?.resultVideoUrl,
-      });
+      const current = await languageConversionRepository.findById(taskId);
+      const localPath = firstDownload?.path ?? current?.localResultPath ?? null;
+      await this.updateTask(
+        taskId,
+        {
+          status: "success",
+          progress: 100,
+          outputBucket: String(final.outputBucket ?? current?.outputBucket ?? ""),
+          mpsTaskId: String(final.mpsTaskId ?? current?.mpsTaskId ?? ""),
+          localResultPath: localPath,
+          resultVideoUrl: localPath ? publicPathFor(localPath) : current?.resultVideoUrl ?? null,
+        },
+        workerPatch,
+      );
       return;
     }
     if (event.event === "failed") {
-      updateTask(taskId, {
-        status: "failed",
-        progress: 100,
-        errorMessage: String(event.message ?? "language conversion failed"),
-      });
+      await this.updateTask(
+        taskId,
+        {
+          status: "failed",
+          progress: 100,
+          errorMessage: String(event.message ?? "language conversion failed"),
+        },
+        workerPatch,
+      );
     }
   }
 }

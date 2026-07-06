@@ -842,4 +842,24 @@ export const migrations = [
     INDEX idx_vehicle_recognition_vin (recognized_vin),
     INDEX idx_vehicle_recognition_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS language_conversion_tasks (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    status VARCHAR(24) NOT NULL,
+    progress INT NOT NULL DEFAULT 0,
+    source_language VARCHAR(16) NOT NULL,
+    target_language VARCHAR(16) NOT NULL,
+    source_file_name VARCHAR(255) NOT NULL,
+    source_video_url VARCHAR(1024) NOT NULL,
+    result_video_url VARCHAR(1024) NULL,
+    local_result_path VARCHAR(1024) NULL,
+    mps_task_id VARCHAR(128) NULL,
+    output_bucket VARCHAR(255) NULL,
+    error_message TEXT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    INDEX idx_language_conversion_tasks_user_created (user_id, created_at),
+    INDEX idx_language_conversion_tasks_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];

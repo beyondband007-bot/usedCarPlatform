@@ -44,7 +44,7 @@ languageConversionRoutes.post(
     const current = getRequiredCurrentUser(req);
     if (!req.file) throw errors.invalidParameter("file is required");
 
-    const task = languageConversionService.createTask({
+    const task = await languageConversionService.createTask({
       userId: current.user.id,
       file: req.file,
       sourceLanguage: req.body.sourceLanguage,
@@ -58,7 +58,7 @@ languageConversionRoutes.get(
   "/tasks",
   asyncHandler(async (req, res) => {
     const current = getRequiredCurrentUser(req);
-    ok(res, languageConversionService.listTasks(current.user.id));
+    ok(res, await languageConversionService.listTasks(current.user.id));
   }),
 );
 
@@ -66,7 +66,7 @@ languageConversionRoutes.get(
   "/tasks/:taskId",
   asyncHandler(async (req, res) => {
     const current = getRequiredCurrentUser(req);
-    const task = languageConversionService.getTask(String(req.params.taskId), current.user.id);
+    const task = await languageConversionService.getTask(String(req.params.taskId), current.user.id);
     ok(res, task);
   }),
 );
