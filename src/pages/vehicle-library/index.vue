@@ -35,7 +35,7 @@ import {
 
 import './vehicle-library.scss'
 import { getVehicleIdentifyTypeLabel, getVehicleLibraryServiceStatusLabel } from '@/constants/vehicle-library'
-import type { VehicleLibraryStatus } from '@/types/vehicle-library'
+import type { VehicleIdentifyType, VehicleLibraryStatus } from '@/types/vehicle-library'
 
 // 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
 const MAX_IMAGE_UPLOAD_MB = 20
@@ -1458,6 +1458,14 @@ onMounted(loadLibraryData)
               <Icon icon="mdi:car-plus" />
               <h2>{{ vehicleEmptyState.title }}</h2>
               <p>{{ vehicleEmptyState.description }}</p>
+              <NButton
+                v-if="!hasVehiclesInLibrary"
+                class="vl-button primary empty-state-action"
+                attr-type="button"
+                @click="openVehicleModal"
+              >
+                <Icon icon="mdi:car-2-plus" />新增第一辆车
+              </NButton>
             </div>
           </div>
 
@@ -1656,6 +1664,14 @@ onMounted(loadLibraryData)
             <Icon icon="mdi:garage-plus" />
             <h2>{{ hasActiveLotQuery ? '没有匹配的车场' : '暂无车场' }}</h2>
             <p>{{ hasActiveLotQuery ? '尝试更换搜索关键词。' : '点击“新增车场”创建第一条真实数据。' }}</p>
+            <NButton
+              v-if="!hasActiveLotQuery"
+              class="vl-button primary empty-state-action"
+              attr-type="button"
+              @click="openLotModal"
+            >
+              <Icon icon="mdi:garage-plus" />新增车场
+            </NButton>
           </div>
         </div>
       </section>
