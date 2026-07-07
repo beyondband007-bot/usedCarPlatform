@@ -126,13 +126,15 @@ function acceptSourceFile(file?: File) {
     message.error('视频文件不能超过 500MB')
     return
   }
-  pauseBoth()
+  pausePreviewVideos()
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   sourceFile.value = file
   sourceVideoUrl.value = URL.createObjectURL(file)
   activeTask.value = null
   stopPolling()
-  void nextTick(syncVideoSources)
+  void nextTick(() => {
+    if (originalVideoRef.value) originalVideoRef.value.currentTime = 0
+  })
 }
 
 function handleFileChange(event: Event) {
@@ -198,7 +200,6 @@ async function refreshTask(taskId: string) {
     if (task.status === 'success') {
       stopPolling()
       message.success('语言转换完成')
-      void nextTick(syncVideoSources)
     } else if (task.status === 'failed') {
       stopPolling()
       message.error(task.errorMessage || '语言转换失败')
@@ -220,54 +221,11 @@ async function refreshTask(taskId: string) {
   }
 }
 
-function syncVideoSources() {
-  const original = originalVideoRef.value
-  const result = resultVideoRef.value
-  if (!original || !result) return
-  original.currentTime = 0
-  result.currentTime = 0
-}
-
-function pauseBoth() {
+function pausePreviewVideos() {
   originalVideoRef.value?.pause()
   resultVideoRef.value?.pause()
-}
-
-// 双视频联动：进度、播放、暂停均同步；状态判断保证不会来回循环触发
-function syncTime(video: HTMLVideoElement | null, pairedVideo: HTMLVideoElement | null) {
-  if (!video || !pairedVideo) return
-  if (Math.abs(pairedVideo.currentTime - video.currentTime) > 0.15) {
-    pairedVideo.currentTime = video.currentTime
-  }
-}
-
-function syncPlay(pairedVideo: HTMLVideoElement | null) {
-  if (pairedVideo?.paused) {
-    void pairedVideo.play().catch(() => {})
-  }
-}
-
-function syncPause(pairedVideo: HTMLVideoElement | null) {
-  if (pairedVideo && !pairedVideo.paused) {
-    pairedVideo.pause()
-  }
-}
-
-function pairedVideoOf(kind: 'original' | 'result') {
-  return kind === 'original' ? resultVideoRef.value : originalVideoRef.value
-}
-
-function handleTimeSync(kind: 'original' | 'result') {
-  const video = kind === 'original' ? originalVideoRef.value : resultVideoRef.value
-  syncTime(video, pairedVideoOf(kind))
-}
-
-function handlePlaySync(kind: 'original' | 'result') {
-  syncPlay(pairedVideoOf(kind))
-}
-
-function handlePauseSync(kind: 'original' | 'result') {
-  syncPause(pairedVideoOf(kind))
+  previewOriginalRef.value?.pause()
+  previewResultRef.value?.pause()
 }
 
 const shortLanguageLabels: Record<string, string> = {
@@ -318,8 +276,7 @@ function openHistoryPreview(task: LanguageConversionTask) {
 
 function handlePreviewVisibleChange(visible: boolean) {
   if (visible) return
-  previewOriginalRef.value?.pause()
-  previewResultRef.value?.pause()
+  pausePreviewVideos()
   previewTask.value = null
 }
 
@@ -417,10 +374,6 @@ onUnmounted(() => {
             controls
             playsinline
             preload="metadata"
-            @timeupdate="handleTimeSync('original')"
-            @seeked="handleTimeSync('original')"
-            @play="handlePlaySync('original')"
-            @pause="handlePauseSync('original')"
           />
         </article>
         <article class="video-player">
@@ -442,10 +395,6 @@ onUnmounted(() => {
             controls
             playsinline
             preload="metadata"
-            @timeupdate="handleTimeSync('result')"
-            @seeked="handleTimeSync('result')"
-            @play="handlePlaySync('result')"
-            @pause="handlePauseSync('result')"
           />
           <div v-else class="result-processing-state">
             <video
@@ -588,10 +537,6 @@ onUnmounted(() => {
             controls
             playsinline
             preload="metadata"
-            @timeupdate="syncTime(previewOriginalRef, previewResultRef)"
-            @seeked="syncTime(previewOriginalRef, previewResultRef)"
-            @play="syncPlay(previewResultRef)"
-            @pause="syncPause(previewResultRef)"
           />
         </article>
         <article class="video-player">
@@ -611,10 +556,6 @@ onUnmounted(() => {
             controls
             playsinline
             preload="metadata"
-            @timeupdate="syncTime(previewResultRef, previewOriginalRef)"
-            @seeked="syncTime(previewResultRef, previewOriginalRef)"
-            @play="syncPlay(previewOriginalRef)"
-            @pause="syncPause(previewOriginalRef)"
           />
         </article>
       </div>
