@@ -301,7 +301,11 @@ html[data-theme="light"] .detail-cover-monogram { filter: saturate(0.9) brightne
 .recognition-success strong, .recognition-success span { display: block; }
 .recognition-success span { margin-top: 3px; font-size: 12px; }
 .vehicle-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+.vehicle-form-grid-advanced { margin-top: 13px; }
 .vehicle-form-grid .full { grid-column: 1 / -1; }
+.form-advanced-toggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 0; border: 0; background: transparent; color: var(--vl-gold); font-size: 13px; font-weight: 800; }
+.form-advanced-toggle:hover { color: #ffca28; }
+.form-advanced-toggle svg { font-size: 18px; }
 .optional-material-section { margin-top: 14px; }
 
 /* 素材上传卡 */

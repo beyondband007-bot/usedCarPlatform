@@ -115,6 +115,7 @@ const sortBy = ref('complete')
 const showCompletedSlots = ref(false)
 const advanceAfterMaterialSave = ref(false)
 const showVehicleModal = ref(false)
+const showAdvancedVehicleFields = ref(false)
 const editingVehicleId = ref<string | null>(null)
 const showMaterialModal = ref(false)
 const highlightedMaterialSlot = ref<UploadSlotCode | null>(null)
@@ -214,6 +215,61 @@ const activeVehiclePendingSlots = computed(
 const activeVehicleDoneSlots = computed(
   () => activeVehicle.value?.slotStates.filter((slot) => slot.done) ?? [],
 )
+
+const activeVehicleRecord = computed(
+  () => vehicleRecords.value.find((item) => item.id === activeVehicleId.value) ?? null,
+)
+
+function overviewFieldValue(value?: string | null) {
+  const text = value?.trim()
+  return text || '待补充'
+}
+
+function formatGuidePriceDisplay(value?: string | null) {
+  const text = value?.trim()
+  if (!text) return '待补充'
+  const numberValue = Number(text)
+  if (Number.isFinite(numberValue)) return `${numberValue} 万元`
+  return text
+}
+
+const vehicleOverviewRows = computed(() => {
+  const record = activeVehicleRecord.value
+  const vehicle = activeVehicle.value
+  if (!record || !vehicle) return []
+  return [
+    { label: '品牌车系', value: overviewFieldValue([record.brand, record.series].filter(Boolean).join(' / ')) },
+    { label: '年款', value: overviewFieldValue(record.modelYear) },
+    { label: '车款名称', value: overviewFieldValue(record.model) },
+    { label: '车型名称', value: overviewFieldValue(record.modelName) },
+    { label: '车辆类型', value: overviewFieldValue(record.carType) },
+    { label: '车身结构', value: overviewFieldValue(record.bodyType) },
+    { label: '车辆级别', value: overviewFieldValue(record.vehicleLevel) },
+    { label: '燃料类型', value: overviewFieldValue(record.energyType) },
+    { label: '燃油标号', value: overviewFieldValue(record.fuelGrade) },
+    { label: '排量', value: overviewFieldValue(record.displacement) },
+    { label: '变速箱', value: overviewFieldValue(record.transmission) },
+    { label: '排放标准', value: overviewFieldValue(record.emissionStandard) },
+    { label: '新车指导价', value: formatGuidePriceDisplay(record.guidePrice) },
+    { label: '车身颜色', value: overviewFieldValue(record.color) },
+    { label: '车辆备注', value: overviewFieldValue(record.remark) },
+    { label: '最近更新', value: vehicle.updated },
+    { label: '容量占用', value: vehicle.size },
+  ]
+})
+
+function vehicleFormHasAdvancedValues() {
+  return Boolean(
+    vehicleForm.modelName.trim()
+    || vehicleForm.carType.trim()
+    || vehicleForm.bodyType.trim()
+    || vehicleForm.level.trim()
+    || vehicleForm.fuelGrade.trim()
+    || vehicleForm.transmission.trim()
+    || vehicleForm.emissionStandard.trim()
+    || vehicleForm.guidePrice.trim(),
+  )
+}
 
 const formatBytes = (bytes: number) => {
   if (!bytes) return '0 B'
@@ -474,6 +530,7 @@ function resetVehicleForm() {
     transmission: '', level: '', emissionStandard: '', guidePrice: '',
     color: '', note: '',
   })
+  showAdvancedVehicleFields.value = false
 }
 
 function openVehicleModal() {
@@ -518,6 +575,7 @@ async function openEditVehicleModal(vehicleId: string) {
   })
   resetMaterialFiles()
   setExistingMaterials(record.materials ?? [])
+  showAdvancedVehicleFields.value = vehicleFormHasAdvancedValues()
   showVehicleModal.value = true
   if (
     record.vin &&
@@ -1498,11 +1556,9 @@ onMounted(loadLibraryData)
                 </p>
               </div>
               <div v-else-if="activeDetailTab === 'overview'" class="info-list">
-                <div><span>品牌车系</span><strong>{{ activeVehicle.brand }} / {{ activeVehicle.series }}</strong></div>
-                <div><span>年款车型</span><strong>{{ activeVehicle.model }}</strong></div>
-                <div><span>动力类型</span><strong>{{ activeVehicle.energy }}</strong></div>
-                <div><span>最近更新</span><strong>{{ activeVehicle.updated }}</strong></div>
-                <div><span>容量占用</span><strong>{{ activeVehicle.size }}</strong></div>
+                <div v-for="row in vehicleOverviewRows" :key="row.label">
+                  <span>{{ row.label }}</span><strong>{{ row.value }}</strong>
+                </div>
               </div>
             </div>
           </aside>
@@ -1645,21 +1701,32 @@ onMounted(loadLibraryData)
             <div class="form-section-title"><span>2</span><div><strong>车辆基础信息</strong><small>车辆信息由第三方数据服务提供，仅供参考；如信息不准确，请手动修改。</small></div></div>
             <div class="vehicle-form-grid">
               <label><span>品牌 *</span><input v-model="vehicleForm.brand" placeholder="如：宝马" /></label>
-              <label><span>年款</span><input v-model="vehicleForm.year" placeholder="如：2021款" /></label>
               <label><span>车系 *</span><input v-model="vehicleForm.series" placeholder="如：宝马5系" /></label>
-              <label><span>车型</span><input v-model="vehicleForm.modelName" placeholder="如：宝马5系" /></label>
+              <label><span>年款</span><input v-model="vehicleForm.year" placeholder="如：2021款" /></label>
               <label><span>车款名称</span><input v-model="vehicleForm.model" placeholder="如：530Li 领先型" /></label>
+              <label><span>燃料类型</span><input v-model="vehicleForm.energy" placeholder="汽油 / 纯电 / 混动" /></label>
+              <label><span>排量</span><input v-model="vehicleForm.displacement" placeholder="如：2.0T" /></label>
+              <label><span>车身颜色</span><input v-model="vehicleForm.color" placeholder="如：黑色" /></label>
+              <label class="full"><span>车辆备注</span><input v-model="vehicleForm.note" maxlength="100" placeholder="门店、车辆亮点或配置补充" /></label>
+            </div>
+            <button
+              type="button"
+              class="form-advanced-toggle"
+              :aria-expanded="showAdvancedVehicleFields"
+              @click="showAdvancedVehicleFields = !showAdvancedVehicleFields"
+            >
+              <Icon :icon="showAdvancedVehicleFields ? 'mdi:chevron-up' : 'mdi:chevron-down'" />
+              {{ showAdvancedVehicleFields ? '收起更多参数' : '展开更多参数（选填）' }}
+            </button>
+            <div v-if="showAdvancedVehicleFields" class="vehicle-form-grid vehicle-form-grid-advanced">
+              <label><span>车型名称</span><input v-model="vehicleForm.modelName" placeholder="如：宝马5系 530Li" /></label>
               <label><span>车辆类型</span><input v-model="vehicleForm.carType" placeholder="如：轿车" /></label>
               <label><span>车身结构</span><input v-model="vehicleForm.bodyType" placeholder="如：三厢" /></label>
               <label><span>车辆级别</span><input v-model="vehicleForm.level" placeholder="如：中大型车" /></label>
-              <label><span>燃料类型</span><input v-model="vehicleForm.energy" placeholder="汽油 / 纯电 / 混动" /></label>
               <label><span>燃油标号</span><input v-model="vehicleForm.fuelGrade" placeholder="如：92号 / 95号；纯电可留空" /></label>
-              <label><span>排量</span><input v-model="vehicleForm.displacement" placeholder="如：2.0T" /></label>
               <label><span>变速箱</span><input v-model="vehicleForm.transmission" placeholder="如：自动" /></label>
               <label><span>排放标准</span><input v-model="vehicleForm.emissionStandard" placeholder="如：国6" /></label>
               <label><span>新车指导价（万元）</span><input v-model="vehicleForm.guidePrice" placeholder="如：46.69" /></label>
-              <label><span>车身颜色</span><input v-model="vehicleForm.color" placeholder="如：黑色" /></label>
-              <label class="full"><span>车辆备注</span><input v-model="vehicleForm.note" maxlength="100" placeholder="门店、车辆亮点或配置补充" /></label>
             </div>
           </section>
           <section class="form-section optional-material-section">
