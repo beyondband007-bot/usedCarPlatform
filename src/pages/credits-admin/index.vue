@@ -360,6 +360,8 @@ const functionNameZhByCode: Record<string, string> = {
   'watermark-remove': '去水印',
   'creative-image': '创意生图',
   'short-video': '短视频生成',
+  'video-generation': '视频生成',
+  'language-conversion': '语言转换',
   'batch-new-exterior': '批量上新',
   'batch-new-wall-logo-scene': '批量墙标场景',
   'batch-new-interior': '批量内饰',

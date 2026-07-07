@@ -36,6 +36,10 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '积分服务校验未通过，请检查账户状态后重试',
   },
   {
+    matches: ['insufficient balance', 'available balance is not enough', '余额不足'],
+    text: '积分不足，请充值后再试',
+  },
+  {
     matches: ['inputassetid is required'],
     text: '请先上传图片后再生成',
   },

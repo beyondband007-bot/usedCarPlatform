@@ -4,6 +4,7 @@ import type {
   LanguageConversionTask,
 } from '@/types/language-conversion'
 import type { ApiResponse } from '@/api/visual-workbench'
+import { parseLanguageConversionBillingPoints } from '@/utils/language-conversion-billing'
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
@@ -22,8 +23,13 @@ function normalizeMediaUrl(url?: string) {
 }
 
 function normalizeTask(task: LanguageConversionTask): LanguageConversionTask {
+  const estimatedCost =
+    parseLanguageConversionBillingPoints(task.estimatedCost)
+    ?? parseLanguageConversionBillingPoints(task.estimatedPoints)
+
   return {
     ...task,
+    estimatedCost,
     sourceVideoUrl: normalizeMediaUrl(task.sourceVideoUrl) ?? task.sourceVideoUrl,
     resultVideoUrl: normalizeMediaUrl(task.resultVideoUrl),
   }
@@ -41,9 +47,6 @@ export async function createLanguageConversionTask(
   form.append('preserveBackgroundAudio', String(payload.preserveBackgroundAudio))
   if (payload.sourceDurationSeconds != null) {
     form.append('sourceDurationSeconds', String(payload.sourceDurationSeconds))
-  }
-  if (payload.estimatedPoints != null) {
-    form.append('estimatedPoints', String(payload.estimatedPoints))
   }
 
   const response = await request.post<ApiResponse<LanguageConversionTask>>(

@@ -21,7 +21,6 @@ export interface CreateLanguageConversionPayload {
   preserveSpeakerVoice: boolean
   preserveBackgroundAudio: boolean
   sourceDurationSeconds?: number
-  estimatedPoints?: number
 }
 
 /** 后端返回的任务结构 */
