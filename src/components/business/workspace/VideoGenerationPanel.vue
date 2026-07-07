@@ -1250,6 +1250,9 @@ async function submitConfirmedVideo() {
             </label>
             <span>支持 JPG、PNG，识别后自动查询车辆信息</span>
           </div>
+          <p class="sv-vin-disclaimer">
+            VIN 识别及车型信息由第三方数据服务提供，仅供参考。
+          </p>
           <p v-if="vinError" class="sv-vin-error">{{ vinError }}</p>
         </div>
 
@@ -2614,6 +2617,13 @@ async function submitConfirmedVideo() {
 
 .sv-vin-image-btn input {
   display: none;
+}
+
+.sv-vin-disclaimer {
+  margin: 0;
+  color: var(--sv-text-soft);
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .sv-vin-error {
