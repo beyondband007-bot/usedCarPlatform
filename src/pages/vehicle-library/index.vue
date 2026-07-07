@@ -454,6 +454,24 @@ const libraryServiceStatusLabel = computed(
   () => getVehicleLibraryServiceStatusLabel(libraryServiceStatus.value),
 )
 
+type CapacityUsageLevel = 'normal' | 'warn' | 'danger'
+
+const capacityUsage = computed(() => {
+  const used = libraryHome.value?.stats.usedBytes ?? 0
+  const quota = libraryHome.value?.stats.quotaBytes ?? 0
+  if (!quota) {
+    return { percent: 0, level: 'normal' as CapacityUsageLevel, hint: '' }
+  }
+  const percent = Math.min(100, (used / quota) * 100)
+  if (percent >= 90) {
+    return { percent, level: 'danger' as CapacityUsageLevel, hint: '容量即将用尽，请清理素材' }
+  }
+  if (percent >= 80) {
+    return { percent, level: 'warn' as CapacityUsageLevel, hint: '容量偏高，建议及时清理' }
+  }
+  return { percent, level: 'normal' as CapacityUsageLevel, hint: '' }
+})
+
 const hasVehiclesInLibrary = computed(
   () => (libraryHome.value?.stats.activeVehicles ?? 0) > 0,
 )
@@ -521,7 +539,8 @@ function isStatsStatActive(target: StatsFilter) {
   if (activeLibraryTab.value !== 'vehicles') return false
   if (target === 'all') return activeFilter.value === 'all'
   if (target === 'complete') return activeFilter.value === 'complete'
-  return activeFilter.value === 'incomplete' || activeFilter.value.startsWith('missing-')
+  if (target === 'incomplete') return activeFilter.value === 'incomplete'
+  return false
 }
 
 function resetVehicleForm() {
@@ -1341,10 +1360,11 @@ onMounted(loadLibraryData)
           <span>车场</span>
           <strong>{{ libraryHome?.stats.activeLots ?? 0 }}<em>个</em></strong>
         </button>
-        <div class="stat capacity">
+        <div class="stat capacity" :class="capacityUsage.level">
           <span>已用容量</span>
           <strong>{{ formatBytes(libraryHome?.stats.usedBytes ?? 0) }}<em>/ {{ libraryHome?.stats.quotaBytes ? formatBytes(libraryHome.stats.quotaBytes) : '不限' }}</em></strong>
-          <div class="capacity-meter"><i :style="{ width: libraryHome?.stats.quotaBytes ? `${Math.min(100, libraryHome.stats.usedBytes / libraryHome.stats.quotaBytes * 100)}%` : '0%' }" /></div>
+          <div class="capacity-meter"><i :style="{ width: `${capacityUsage.percent}%` }" /></div>
+          <small v-if="capacityUsage.hint" class="capacity-hint">{{ capacityUsage.hint }}</small>
         </div>
       </section>
 

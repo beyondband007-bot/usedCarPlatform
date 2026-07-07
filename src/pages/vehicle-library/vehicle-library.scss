@@ -108,8 +108,16 @@ html[data-theme="light"] .operation-message-dismiss:hover { background: rgba(0, 
 .stats-ribbon .stat.ok > strong { color: var(--vl-ok); }
 .stats-ribbon .stat.warn > strong { color: var(--vl-gold); }
 .stats-ribbon .stat.capacity { flex: 1.4; }
+.stats-ribbon .stat.capacity.warn > strong em { color: var(--vl-gold); }
+.stats-ribbon .stat.capacity.danger > strong,
+.stats-ribbon .stat.capacity.danger > strong em { color: var(--vl-danger); }
 .capacity-meter { height: 6px; margin-top: 2px; overflow: hidden; border-radius: 999px; background: var(--vl-meter-bg); }
-.capacity-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--vl-ok), var(--vl-gold)); }
+.capacity-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--vl-ok), var(--vl-gold)); transition: width .2s ease; }
+.stat.capacity.warn .capacity-meter i { background: linear-gradient(90deg, var(--vl-gold), #e8a23c); }
+.stat.capacity.danger .capacity-meter i { background: linear-gradient(90deg, #ef7d72, var(--vl-danger)); }
+.capacity-hint { margin-top: 2px; color: var(--vl-muted); font-size: 11px; font-weight: 700; line-height: 1.4; }
+.stat.capacity.warn .capacity-hint { color: var(--vl-gold); }
+.stat.capacity.danger .capacity-hint { color: var(--vl-danger); }
 
 /* ─── 工作区：列表 + 详情 ─── */
 .vehicle-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); gap: 16px; align-items: start; }
