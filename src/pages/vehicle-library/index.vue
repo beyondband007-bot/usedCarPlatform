@@ -1372,7 +1372,10 @@ onMounted(loadLibraryData)
     <main class="vehicle-library-shell">
       <section class="library-hero">
         <div class="hero-title">
-          <h1>车辆库</h1>
+          <div class="hero-title-copy">
+            <h1>车辆库</h1>
+            <p class="hero-subtitle">统一管理车辆与车场素材，一次录入后续可重复复用。</p>
+          </div>
           <span class="service-pill" :data-service-status="libraryServiceStatus">
             <Icon icon="mdi:shield-check-outline" />{{ libraryServiceStatusLabel }}
           </span>
@@ -1470,6 +1473,7 @@ onMounted(loadLibraryData)
                 {{ filter.label }}
               </button>
             </div>
+            <p class="slot-progress-hint">素材进度对应：车头图 · 车尾图 · 主驾驶图 · 前排视频 · 后排视频</p>
 
             <div v-if="loadError" class="empty-state">
               <Icon icon="mdi:alert-circle-outline" />
@@ -1484,6 +1488,7 @@ onMounted(loadLibraryData)
                 <thead>
                   <tr>
                     <th class="col-thumb">图片</th>
+                    <th>品牌车系</th>
                     <th>年款车型</th>
                     <th>VIN</th>
                     <th>缺口摘要</th>
@@ -1508,6 +1513,7 @@ onMounted(loadLibraryData)
                         >{{ vehicle.brandLabel }}</span>
                       </div>
                     </td>
+                    <td class="cell-brand">{{ vehicle.brand }} {{ vehicle.series }}</td>
                     <td class="cell-model">{{ vehicle.model }}</td>
                     <td class="cell-vin">{{ vehicle.vin }}</td>
                     <td class="cell-gap-summary" :class="{ complete: vehicle.completed === 5 }">
