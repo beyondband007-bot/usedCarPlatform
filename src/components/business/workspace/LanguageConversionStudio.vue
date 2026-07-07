@@ -15,12 +15,15 @@ import {
   languageConversionLanguages,
   type CreateLanguageConversionPayload,
 } from '@/types/language-conversion'
-import type { LanguageConversionTask } from '@/types/language-conversion'
+import type { LanguageConversionTask, LanguageConversionStatus } from '@/types/language-conversion'
 import { downloadFile, sanitizeFilename } from '@/utils/download'
 
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024
 const POLL_INTERVAL_MS = 3000
 const MAX_POLL_FAILURES = 3
+const FAKE_PROGRESS_DURATION_MS = 5 * 60 * 1000
+const FAKE_PROGRESS_STALL_MIN = 90
+const FAKE_PROGRESS_STALL_MAX = 95
 
 const emit = defineEmits<{
   submit: [payload: CreateLanguageConversionPayload]
@@ -48,6 +51,12 @@ const previewTask = ref<LanguageConversionTask | null>(null)
 const previewOriginalRef = ref<HTMLVideoElement | null>(null)
 const previewResultRef = ref<HTMLVideoElement | null>(null)
 
+const simulatedProgress = ref(0)
+const progressStallCap = ref(93)
+let simulatedProgressStartedAt = 0
+let progressTickTimer: number | null = null
+let progressFinishFrame: number | null = null
+
 const availableSourceLanguages = computed(() =>
   languageConversionLanguages.filter((item) => item.status === 'available'),
 )
@@ -60,7 +69,7 @@ const canSubmit = computed(
   () =>
     Boolean(sourceFile.value) &&
     sourceLanguage.value !== targetLanguage.value &&
-    activeTask.value?.status !== 'processing' &&
+    (!activeTask.value || !isTaskInProgress(activeTask.value.status)) &&
     !isSubmitting.value,
 )
 const originalPreviewVideoUrl = computed(
@@ -80,16 +89,137 @@ const conversionStatusText = computed(() => {
   if (!activeTask.value) return ''
   if (activeTask.value.status === 'success') return '转换完成'
   if (activeTask.value.status === 'failed') return activeTask.value.errorMessage || '转换失败'
-  return `转换中 ${activeTask.value.progress}%`
+  return `转换中 ${conversionProgress.value}%`
 })
 const conversionProgress = computed(() => {
-  if (activeTask.value?.status === 'failed') return 0
-  return Math.min(100, Math.max(0, activeTask.value?.progress ?? 0))
+  if (!activeTask.value) return 0
+  if (activeTask.value.status === 'failed') return 0
+  if (activeTask.value.status === 'success') return 100
+  if (isTaskInProgress(activeTask.value.status)) return simulatedProgress.value
+  return 0
 })
 const isAwaitingConversion = computed(
   () => Boolean(sourceFile.value) && !activeTask.value,
 )
-const isTaskProcessing = computed(() => activeTask.value?.status === 'processing')
+const isTaskProcessing = computed(
+  () => Boolean(activeTask.value && isTaskInProgress(activeTask.value.status)),
+)
+
+function isTaskInProgress(status: LanguageConversionStatus) {
+  return status === 'parsing' || status === 'ready' || status === 'processing'
+}
+
+function randomBetween(min: number, max: number) {
+  return min + Math.random() * (max - min)
+}
+
+function stopProgressTickTimer() {
+  if (progressTickTimer !== null) {
+    window.clearTimeout(progressTickTimer)
+    progressTickTimer = null
+  }
+}
+
+function stopProgressFinishAnimation() {
+  if (progressFinishFrame !== null) {
+    window.cancelAnimationFrame(progressFinishFrame)
+    progressFinishFrame = null
+  }
+}
+
+function resetSimulatedProgress() {
+  stopProgressTickTimer()
+  stopProgressFinishAnimation()
+  simulatedProgress.value = 0
+  simulatedProgressStartedAt = 0
+  progressStallCap.value = 93
+}
+
+function scheduleProgressTick() {
+  stopProgressTickTimer()
+  const delay = randomBetween(500, 2200)
+  progressTickTimer = window.setTimeout(() => {
+    tickSimulatedProgress()
+    const task = activeTask.value
+    if (
+      task
+      && isTaskInProgress(task.status)
+      && simulatedProgress.value < progressStallCap.value
+    ) {
+      scheduleProgressTick()
+    }
+  }, delay)
+}
+
+function tickSimulatedProgress() {
+  const task = activeTask.value
+  if (!task || !isTaskInProgress(task.status)) return
+
+  if (!simulatedProgressStartedAt) {
+    simulatedProgressStartedAt = Date.now()
+  }
+
+  const elapsed = Date.now() - simulatedProgressStartedAt
+  const timeRatio = Math.min(1.15, elapsed / FAKE_PROGRESS_DURATION_MS)
+  const easedTarget = progressStallCap.value * (1 - (1 - Math.min(1, timeRatio)) ** 2.2)
+  const randomBump = randomBetween(0.4, 3.2)
+  const candidate = Math.max(
+    simulatedProgress.value,
+    easedTarget - randomBetween(0, 4),
+  ) + randomBump
+
+  simulatedProgress.value = Math.min(progressStallCap.value, Math.round(candidate))
+}
+
+function startSimulatedProgress() {
+  stopProgressFinishAnimation()
+  if (!simulatedProgressStartedAt) {
+    simulatedProgress.value = 0
+    progressStallCap.value = Math.floor(
+      randomBetween(FAKE_PROGRESS_STALL_MIN, FAKE_PROGRESS_STALL_MAX + 0.99),
+    )
+    simulatedProgressStartedAt = Date.now()
+  }
+  tickSimulatedProgress()
+  if (simulatedProgress.value < progressStallCap.value) {
+    scheduleProgressTick()
+  }
+}
+
+function finishSimulatedProgress() {
+  stopProgressTickTimer()
+  stopProgressFinishAnimation()
+  const start = simulatedProgress.value
+  const startedAt = performance.now()
+
+  const animate = (now: number) => {
+    const ratio = Math.min(1, (now - startedAt) / 450)
+    simulatedProgress.value = Math.round(start + (100 - start) * ratio)
+    if (ratio < 1) {
+      progressFinishFrame = window.requestAnimationFrame(animate)
+    } else {
+      simulatedProgress.value = 100
+      progressFinishFrame = null
+    }
+  }
+
+  progressFinishFrame = window.requestAnimationFrame(animate)
+}
+
+function syncSimulatedProgressWithTask(task: LanguageConversionTask) {
+  if (isTaskInProgress(task.status)) {
+    startSimulatedProgress()
+    return
+  }
+  if (task.status === 'success') {
+    if (simulatedProgress.value < 100) finishSimulatedProgress()
+    else simulatedProgress.value = 100
+    return
+  }
+  if (task.status === 'failed') {
+    resetSimulatedProgress()
+  }
+}
 
 const processingStageText = computed(() => {
   if (isAwaitingConversion.value) return '等待开始转换'
@@ -127,6 +257,7 @@ function acceptSourceFile(file?: File) {
     return
   }
   pausePreviewVideos()
+  resetSimulatedProgress()
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   sourceFile.value = file
   sourceVideoUrl.value = URL.createObjectURL(file)
@@ -164,12 +295,14 @@ async function handleSubmit() {
   isSubmitting.value = true
   activeTask.value = null
   stopPolling()
+  resetSimulatedProgress()
   try {
     const task = await createLanguageConversionTask({
       ...payload,
       sourceFile: sourceFile.value,
     })
     activeTask.value = task
+    syncSimulatedProgressWithTask(task)
     message.success('语言转换任务已提交')
     startPolling(task.taskId)
   } catch (error) {
@@ -199,11 +332,14 @@ async function refreshTask(taskId: string) {
     activeTask.value = task
     if (task.status === 'success') {
       stopPolling()
+      syncSimulatedProgressWithTask(task)
       message.success('语言转换完成')
     } else if (task.status === 'failed') {
       stopPolling()
+      syncSimulatedProgressWithTask(task)
       message.error(task.errorMessage || '语言转换失败')
     } else {
+      syncSimulatedProgressWithTask(task)
       pollTimer.value = window.setTimeout(() => {
         void refreshTask(taskId)
       }, POLL_INTERVAL_MS)
@@ -317,6 +453,7 @@ async function downloadResultVideo() {
 onUnmounted(() => {
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   stopPolling()
+  resetSimulatedProgress()
 })
 </script>
 
