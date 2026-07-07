@@ -204,7 +204,7 @@ const vehicleForm = reactive({
 })
 
 const activeVehicle = computed(
-  () => vehicles.value.find((vehicle) => vehicle.id === activeVehicleId.value) ?? vehicles.value[0],
+  () => vehicles.value.find((vehicle) => vehicle.id === activeVehicleId.value) ?? null,
 )
 
 const activeVehiclePendingSlots = computed(
@@ -558,7 +558,9 @@ async function loadVehiclePage() {
     showCompletedSlots.value = false
     advanceAfterMaterialSave.value = false
   } else if (!vehicles.value.some((vehicle) => vehicle.id === activeVehicleId.value)) {
-    activeVehicleId.value = vehicles.value[0]?.id ?? null
+    activeVehicleId.value = activeVehicleId.value === null
+      ? (vehicles.value[0]?.id ?? null)
+      : null
   }
 }
 
