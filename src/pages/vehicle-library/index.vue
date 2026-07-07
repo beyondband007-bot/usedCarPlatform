@@ -41,7 +41,7 @@ import type { VehicleIdentifyType, VehicleLibraryStatus } from '@/types/vehicle-
 const MAX_IMAGE_UPLOAD_MB = 20
 const MAX_VIDEO_UPLOAD_MB = 200
 
-type LibraryTab = 'vehicles' | 'lots' | 'templates'
+type LibraryTab = 'vehicles' | 'lots'
 type DetailTab = 'overview' | 'assets'
 type VehicleFilter = 'all' | 'incomplete' | 'complete' | 'missing-exterior' | 'missing-driver' | 'missing-video'
 type UploadSlotCode = Exclude<VehicleMaterialSlotCode, 'lot_image' | 'lot_video'>
@@ -137,7 +137,6 @@ const lotManagePreviews = reactive<{ image: string | null; video: string | null 
   image: null,
   video: null,
 })
-const showTemplateModal = ref(false)
 const vinLoading = ref(false)
 const vinOcrLoading = ref(false)
 const vinError = ref('')
@@ -1675,22 +1674,6 @@ onMounted(loadLibraryData)
           </div>
         </div>
       </section>
-
-      <section v-else class="content-panel">
-        <div class="section-heading"><div><h2>模板库</h2><p>一期维护模板信息和素材规则，不在此处提交视频生成任务。</p></div></div>
-        <div class="template-grid">
-          <article v-for="template in [
-            { icon: 'mdi:cellphone-play', name: '竖屏快速讲车', ratio: '9:16', rule: '需要 3 图 2 视频', state: '启用中' },
-            { icon: 'mdi:storefront-outline', name: '展厅品牌介绍', ratio: '16:9', rule: '需要车场图/视频', state: '启用中' },
-            { icon: 'mdi:diamond-stone', name: '高端质感展示', ratio: '9:16', rule: '建议补充细节素材', state: '待完善' },
-          ]" :key="template.name">
-            <div class="template-preview"><Icon :icon="template.icon" /><span>{{ template.ratio }}</span></div>
-            <div><span class="status-badge" :class="template.state === '启用中' ? 'ready' : 'warn'">{{ template.state }}</span>
-              <h3>{{ template.name }}</h3><p>{{ template.rule }} · 适合短视频与门店展示</p>
-              <NButton class="vl-button ghost" attr-type="button" @click="showTemplateModal = true">查看模板</NButton></div>
-          </article>
-        </div>
-      </section>
     </main>
 
     <div v-if="showVehicleModal" class="vl-modal-backdrop" @click.self="showVehicleModal = false">
@@ -1997,14 +1980,6 @@ onMounted(loadLibraryData)
             {{ deletingVehicle ? '正在删除' : '确认删除' }}
           </NButton>
         </footer>
-      </section>
-    </div>
-
-    <div v-if="showTemplateModal" class="vl-modal-backdrop" @click.self="showTemplateModal = false">
-      <section class="vl-modal compact-modal"><header><div><h2>模板详情</h2><p>当前阶段仅展示素材规则，不会提交生成任务。</p></div><button type="button" @click="showTemplateModal = false"><Icon icon="mdi:close" /></button></header>
-        <div class="modal-body"><div class="template-detail-banner"><Icon icon="mdi:cellphone-play" /><div><strong>竖屏快速讲车</strong><span>9:16 · 约 45 秒 · 适合抖音/视频号</span></div></div>
-          <div class="requirement-list"><div><Icon icon="mdi:check-circle" /><span>外观前 45° 图片</span><b>必需</b></div><div><Icon icon="mdi:check-circle" /><span>车尾与主驾驶图片</span><b>必需</b></div><div><Icon icon="mdi:check-circle" /><span>前排与后排视频</span><b>必需</b></div></div></div>
-        <footer><NButton class="vl-button primary" attr-type="button" @click="showTemplateModal = false">知道了</NButton></footer>
       </section>
     </div>
   </div>
