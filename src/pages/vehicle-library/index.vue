@@ -313,6 +313,36 @@ function lotSummaryText(lot: VehicleLot) {
   return lot.address || lot.remark || '暂无车场说明'
 }
 
+const lotMaterialSlots = [
+  { code: 'lot_image' as const, label: '车场图片', mediaType: 'image' as const },
+  { code: 'lot_video' as const, label: '车场视频', mediaType: 'video' as const },
+]
+
+function getLotSlotStates(lot: VehicleLot) {
+  const materials = lot.materials ?? []
+  return lotMaterialSlots.map((slot) => {
+    const material = materials.find((item) => item.slotCode === slot.code && item.status === 'active')
+    return {
+      ...slot,
+      done: Boolean(material),
+      url: material?.assetUrl ?? material?.assetThumbnailUrl ?? undefined,
+      fileName: material?.fileName ?? undefined,
+    }
+  })
+}
+
+const activeLot = computed(() => activeLotDetail.value)
+
+const activeLotSlotStates = computed(() => (activeLot.value ? getLotSlotStates(activeLot.value) : []))
+
+const activeLotPendingSlots = computed(
+  () => activeLotSlotStates.value.filter((slot) => !slot.done),
+)
+
+const activeLotDoneSlots = computed(
+  () => activeLotSlotStates.value.filter((slot) => slot.done),
+)
+
 function getVehicleBrandLabel(brand: string, series: string) {
   const brandText = brand.trim()
   if (brandText) return brandText
@@ -423,6 +453,18 @@ async function loadLotPage() {
     }
     lots.value = result.items
     lotTotal.value = result.total
+    if (!lots.value.some((lot) => lot.id === activeLotId.value)) {
+      if (activeLotId.value === null && lots.value.length > 0) {
+        void openLotRow(lots.value[0].id)
+      } else {
+        activeLotId.value = null
+        activeLotDetail.value = null
+      }
+    } else if (activeLotId.value) {
+      const cached = lots.value.find((lot) => lot.id === activeLotId.value)
+      if (cached) activeLotDetail.value = cached
+      void loadLotDetail(activeLotId.value)
+    }
   } catch (error) {
     lotLoadError.value = error instanceof Error ? error.message : '车场查询失败'
   } finally {
@@ -698,6 +740,12 @@ watch(lotPage, async () => {
   }
 })
 
+watch(activeLibraryTab, (tab) => {
+  if (tab === 'lots' && !activeLotId.value && lots.value.length > 0) {
+    void openLotRow(lots.value[0].id)
+  }
+})
+
 watch(showMaterialModal, (visible) => {
   if (!visible) highlightedMaterialSlot.value = null
 })
@@ -809,6 +857,7 @@ async function saveLot() {
     showLotModal.value = false
     await loadLibraryData()
     activeLibraryTab.value = 'lots'
+    void openLotRow(lot.id)
   } catch (error) {
     lotError.value = error instanceof Error ? error.message : '车场创建失败'
   } finally {
@@ -821,6 +870,40 @@ function lotMaterialUrl(lot: VehicleLot, slotCode: 'lot_image' | 'lot_video') {
     (item) => item.slotCode === slotCode && item.status === 'active',
   )
   return material?.assetThumbnailUrl ?? material?.assetUrl ?? null
+}
+
+function getLotCoverUrl(lot: VehicleLot) {
+  return lot.coverAsset?.thumbnailUrl
+    ?? lot.coverAsset?.url
+    ?? lotMaterialUrl(lot, 'lot_image')
+    ?? undefined
+}
+
+async function loadLotDetail(lotId: string) {
+  const detailed = await getVehicleLot(lotId).catch(() => null)
+  if (detailed && activeLotId.value === lotId) {
+    activeLotDetail.value = detailed
+  }
+}
+
+async function openLotRow(lotId: string) {
+  activeLotId.value = lotId
+  activeLotDetail.value = lots.value.find((lot) => lot.id === lotId) ?? null
+  await loadLotDetail(lotId)
+}
+
+function openLotAssetPreview(slot: {
+  label: string
+  url?: string
+  fileName?: string
+  mediaType: 'image' | 'video'
+}) {
+  if (!slot.url) return
+  assetPreview.value = {
+    url: slot.url,
+    label: slot.fileName || slot.label,
+    mediaType: slot.mediaType,
+  }
 }
 
 function releaseLotManagePreview(mediaType: 'image' | 'video') {
@@ -1596,7 +1679,7 @@ onMounted(loadLibraryData)
         </section>
       </template>
 
-      <section v-else-if="activeLibraryTab === 'lots'" class="lot-workspace">
+      <section v-else-if="activeLibraryTab === 'lots'" class="vehicle-workspace lot-workspace">
         <div class="vehicle-main-panel">
           <div class="lot-panel-heading">
             <div>
@@ -1636,12 +1719,19 @@ onMounted(loadLibraryData)
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="lot in lots" :key="lot.id">
+                <tr
+                  v-for="lot in lots"
+                  :key="lot.id"
+                  :class="{ active: lot.id === activeLotId }"
+                  tabindex="0"
+                  @click="openLotRow(lot.id)"
+                  @keydown.enter="openLotRow(lot.id)"
+                >
                   <td class="col-thumb">
                     <div class="row-thumb">
                       <img
-                        v-if="lot.coverAsset?.thumbnailUrl || lot.coverAsset?.url"
-                        :src="lot.coverAsset.thumbnailUrl || lot.coverAsset.url || ''"
+                        v-if="getLotCoverUrl(lot)"
+                        :src="getLotCoverUrl(lot)"
                         :alt="lot.name"
                       />
                       <span
@@ -1664,7 +1754,7 @@ onMounted(loadLibraryData)
                       type="button"
                       class="row-upload-trigger"
                       :class="{ ghost: lot.materialStatus === 'complete' }"
-                      @click="openLotManageModal(lot)"
+                      @click.stop="openLotManageModal(lot)"
                     >
                       {{ lot.materialStatus === 'complete' ? '管理' : '补素材' }}
                     </button>
@@ -1695,6 +1785,77 @@ onMounted(loadLibraryData)
             </NButton>
           </div>
         </div>
+
+        <aside v-if="activeLot" class="vehicle-detail lot-detail">
+          <div class="detail-cover">
+            <img v-if="getLotCoverUrl(activeLot)" :src="getLotCoverUrl(activeLot)" :alt="activeLot.name" />
+            <span
+              v-else
+              class="detail-cover-monogram"
+              :style="getLotMonogramStyle(activeLot.name)"
+              :aria-label="activeLot.name"
+            >{{ getLotThumbLabel(activeLot.name) }}</span>
+            <span class="status-badge" :class="activeLot.materialStatus === 'complete' ? 'ready' : 'warn'">
+              {{ activeLot.materialStatus === 'complete' ? '素材完整' : '待补充素材' }}
+            </span>
+          </div>
+          <div class="detail-body">
+            <div class="detail-heading">
+              <div>
+                <h2>{{ activeLot.name }}</h2>
+                <p class="detail-vin">{{ lotSummaryText(activeLot) }}</p>
+              </div>
+              <button type="button" title="删除车场" aria-label="删除车场" @click="deleteLotTarget = activeLot">
+                <Icon icon="mdi:trash-can-outline" />
+              </button>
+            </div>
+            <div class="detail-actions">
+              <NButton
+                class="vl-button primary"
+                attr-type="button"
+                @click="openLotManageModal(activeLot)"
+              >
+                <Icon :icon="activeLot.materialStatus === 'complete' ? 'mdi:cog-outline' : 'mdi:cloud-upload-outline'" />
+                {{ activeLot.materialStatus === 'complete' ? '管理车场' : '补素材' }}
+              </NButton>
+            </div>
+            <div class="slot-checklist">
+              <div
+                v-for="slot in activeLotPendingSlots"
+                :key="slot.code"
+                class="slot-item pending-action"
+                role="button"
+                tabindex="0"
+                @click="openLotManageModal(activeLot)"
+                @keydown.enter="openLotManageModal(activeLot)"
+                @keydown.space.prevent="openLotManageModal(activeLot)"
+              >
+                <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-outline' : 'mdi:video-outline'" />
+                <span>{{ slot.label }}</span>
+                <b>点击补充</b>
+              </div>
+              <div
+                v-for="slot in activeLotDoneSlots"
+                :key="slot.code"
+                class="slot-item done previewable"
+                role="button"
+                tabindex="0"
+                @click="openLotAssetPreview(slot)"
+                @keydown.enter="openLotAssetPreview(slot)"
+                @keydown.space.prevent="openLotAssetPreview(slot)"
+              >
+                <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-outline' : 'mdi:video-outline'" />
+                <span>{{ slot.label }}</span>
+                <b>已上传</b>
+              </div>
+              <p class="slot-checklist-hint">
+                {{ activeLot.materialStatus === 'complete'
+                  ? '车场图片与视频已齐全，可在模板生成时复用。'
+                  : `还差 ${activeLotPendingSlots.length} 项车场素材，点击待补项继续上传。` }}
+              </p>
+            </div>
+          </div>
+        </aside>
       </section>
     </main>
 

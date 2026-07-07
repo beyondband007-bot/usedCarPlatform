@@ -122,6 +122,7 @@ html[data-theme="light"] .operation-message-dismiss:hover { background: rgba(0, 
 /* ─── 工作区：列表 + 详情 ─── */
 .vehicle-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); gap: 16px; align-items: start; }
 .lot-workspace { margin-bottom: 0; }
+.lot-detail .detail-actions .vl-button.primary { flex: 1; }
 .lot-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 18px 0; }
 .lot-panel-heading h2 { margin: 0; font-size: 21px; }
 .lot-panel-heading p { margin: 6px 0 0; color: var(--vl-muted); font-size: 13px; line-height: 1.5; }
