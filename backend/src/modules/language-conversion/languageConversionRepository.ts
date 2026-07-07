@@ -11,12 +11,21 @@ export interface LanguageConversionTaskRecord {
   progress: number;
   sourceLanguage: string;
   targetLanguage: string;
+  sourceDurationSeconds: number;
+  billableMinutes: number;
   sourceFileName: string;
   sourceVideoUrl: string;
   resultVideoUrl?: string | null;
   localResultPath?: string | null;
   mpsTaskId?: string | null;
   outputBucket?: string | null;
+  creditsUserId?: number | null;
+  creditsTenantId?: number | null;
+  accountScope?: "personal" | "tenant" | null;
+  billingTaskId?: number | null;
+  billingStatus?: string | null;
+  estimatedPoints?: string | null;
+  settledPoints?: string | null;
   errorMessage?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -29,12 +38,21 @@ interface LanguageConversionTaskRow extends RowDataPacket {
   progress: number;
   source_language: string;
   target_language: string;
+  source_duration_seconds: number;
+  billable_minutes: number;
   source_file_name: string;
   source_video_url: string;
   result_video_url: string | null;
   local_result_path: string | null;
   mps_task_id: string | null;
   output_bucket: string | null;
+  credits_user_id: number | null;
+  credits_tenant_id: number | null;
+  account_scope: "personal" | "tenant" | null;
+  billing_task_id: number | null;
+  billing_status: string | null;
+  estimated_points: string | null;
+  settled_points: string | null;
   error_message: string | null;
   created_at: Date;
   updated_at: Date;
@@ -47,12 +65,21 @@ const mapRow = (row: LanguageConversionTaskRow): LanguageConversionTaskRecord =>
   progress: row.progress,
   sourceLanguage: row.source_language,
   targetLanguage: row.target_language,
+  sourceDurationSeconds: Number(row.source_duration_seconds ?? 60),
+  billableMinutes: Number(row.billable_minutes ?? 1),
   sourceFileName: row.source_file_name,
   sourceVideoUrl: row.source_video_url,
   resultVideoUrl: row.result_video_url,
   localResultPath: row.local_result_path,
   mpsTaskId: row.mps_task_id,
   outputBucket: row.output_bucket,
+  creditsUserId: row.credits_user_id,
+  creditsTenantId: row.credits_tenant_id,
+  accountScope: row.account_scope,
+  billingTaskId: row.billing_task_id,
+  billingStatus: row.billing_status,
+  estimatedPoints: row.estimated_points,
+  settledPoints: row.settled_points,
   errorMessage: row.error_message,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -63,18 +90,29 @@ export class LanguageConversionRepository extends Repository {
     await this.execute(
       `INSERT INTO language_conversion_tasks
         (id, user_id, status, progress, source_language, target_language,
-         source_file_name, source_video_url, result_video_url, local_result_path,
-         mps_task_id, output_bucket, error_message)
+         source_duration_seconds, billable_minutes, source_file_name, source_video_url,
+         result_video_url, local_result_path, mps_task_id, output_bucket,
+         credits_user_id, credits_tenant_id, account_scope, billing_task_id,
+         billing_status, estimated_points, settled_points, error_message)
        VALUES
         (:id, :userId, :status, :progress, :sourceLanguage, :targetLanguage,
-         :sourceFileName, :sourceVideoUrl, :resultVideoUrl, :localResultPath,
-         :mpsTaskId, :outputBucket, :errorMessage)`,
+         :sourceDurationSeconds, :billableMinutes, :sourceFileName, :sourceVideoUrl,
+         :resultVideoUrl, :localResultPath, :mpsTaskId, :outputBucket,
+         :creditsUserId, :creditsTenantId, :accountScope, :billingTaskId,
+         :billingStatus, :estimatedPoints, :settledPoints, :errorMessage)`,
       {
         ...input,
         resultVideoUrl: input.resultVideoUrl ?? null,
         localResultPath: input.localResultPath ?? null,
         mpsTaskId: input.mpsTaskId ?? null,
         outputBucket: input.outputBucket ?? null,
+        creditsUserId: input.creditsUserId ?? null,
+        creditsTenantId: input.creditsTenantId ?? null,
+        accountScope: input.accountScope ?? null,
+        billingTaskId: input.billingTaskId ?? null,
+        billingStatus: input.billingStatus ?? null,
+        estimatedPoints: input.estimatedPoints ?? null,
+        settledPoints: input.settledPoints ?? null,
         errorMessage: input.errorMessage ?? null,
       },
     );
@@ -154,6 +192,14 @@ export class LanguageConversionRepository extends Repository {
       fields.push("target_language = :targetLanguage");
       params.targetLanguage = patch.targetLanguage;
     }
+    if (patch.sourceDurationSeconds !== undefined) {
+      fields.push("source_duration_seconds = :sourceDurationSeconds");
+      params.sourceDurationSeconds = patch.sourceDurationSeconds;
+    }
+    if (patch.billableMinutes !== undefined) {
+      fields.push("billable_minutes = :billableMinutes");
+      params.billableMinutes = patch.billableMinutes;
+    }
     if (patch.sourceFileName !== undefined) {
       fields.push("source_file_name = :sourceFileName");
       params.sourceFileName = patch.sourceFileName;
@@ -177,6 +223,34 @@ export class LanguageConversionRepository extends Repository {
     if (patch.outputBucket !== undefined) {
       fields.push("output_bucket = :outputBucket");
       params.outputBucket = patch.outputBucket;
+    }
+    if (patch.creditsUserId !== undefined) {
+      fields.push("credits_user_id = :creditsUserId");
+      params.creditsUserId = patch.creditsUserId;
+    }
+    if (patch.creditsTenantId !== undefined) {
+      fields.push("credits_tenant_id = :creditsTenantId");
+      params.creditsTenantId = patch.creditsTenantId;
+    }
+    if (patch.accountScope !== undefined) {
+      fields.push("account_scope = :accountScope");
+      params.accountScope = patch.accountScope;
+    }
+    if (patch.billingTaskId !== undefined) {
+      fields.push("billing_task_id = :billingTaskId");
+      params.billingTaskId = patch.billingTaskId;
+    }
+    if (patch.billingStatus !== undefined) {
+      fields.push("billing_status = :billingStatus");
+      params.billingStatus = patch.billingStatus;
+    }
+    if (patch.estimatedPoints !== undefined) {
+      fields.push("estimated_points = :estimatedPoints");
+      params.estimatedPoints = patch.estimatedPoints;
+    }
+    if (patch.settledPoints !== undefined) {
+      fields.push("settled_points = :settledPoints");
+      params.settledPoints = patch.settledPoints;
     }
     if (patch.errorMessage !== undefined) {
       fields.push("error_message = :errorMessage");
@@ -215,6 +289,14 @@ export class LanguageConversionRepository extends Repository {
       fields.push("target_language = :targetLanguage");
       params.targetLanguage = patch.targetLanguage;
     }
+    if (patch.sourceDurationSeconds !== undefined) {
+      fields.push("source_duration_seconds = :sourceDurationSeconds");
+      params.sourceDurationSeconds = patch.sourceDurationSeconds;
+    }
+    if (patch.billableMinutes !== undefined) {
+      fields.push("billable_minutes = :billableMinutes");
+      params.billableMinutes = patch.billableMinutes;
+    }
     if (patch.sourceFileName !== undefined) {
       fields.push("source_file_name = :sourceFileName");
       params.sourceFileName = patch.sourceFileName;
@@ -238,6 +320,34 @@ export class LanguageConversionRepository extends Repository {
     if (patch.outputBucket !== undefined) {
       fields.push("output_bucket = :outputBucket");
       params.outputBucket = patch.outputBucket;
+    }
+    if (patch.creditsUserId !== undefined) {
+      fields.push("credits_user_id = :creditsUserId");
+      params.creditsUserId = patch.creditsUserId;
+    }
+    if (patch.creditsTenantId !== undefined) {
+      fields.push("credits_tenant_id = :creditsTenantId");
+      params.creditsTenantId = patch.creditsTenantId;
+    }
+    if (patch.accountScope !== undefined) {
+      fields.push("account_scope = :accountScope");
+      params.accountScope = patch.accountScope;
+    }
+    if (patch.billingTaskId !== undefined) {
+      fields.push("billing_task_id = :billingTaskId");
+      params.billingTaskId = patch.billingTaskId;
+    }
+    if (patch.billingStatus !== undefined) {
+      fields.push("billing_status = :billingStatus");
+      params.billingStatus = patch.billingStatus;
+    }
+    if (patch.estimatedPoints !== undefined) {
+      fields.push("estimated_points = :estimatedPoints");
+      params.estimatedPoints = patch.estimatedPoints;
+    }
+    if (patch.settledPoints !== undefined) {
+      fields.push("settled_points = :settledPoints");
+      params.settledPoints = patch.settledPoints;
     }
     if (patch.errorMessage !== undefined) {
       fields.push("error_message = :errorMessage");

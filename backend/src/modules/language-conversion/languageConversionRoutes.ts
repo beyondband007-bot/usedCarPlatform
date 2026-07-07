@@ -49,6 +49,8 @@ languageConversionRoutes.post(
       file: req.file,
       sourceLanguage: req.body.sourceLanguage,
       targetLanguage: req.body.targetLanguage,
+      sourceDurationSeconds: req.body.sourceDurationSeconds,
+      context: { headers: req.headers },
     });
     ok(res, task);
   }),

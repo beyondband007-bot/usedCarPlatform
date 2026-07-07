@@ -920,6 +920,27 @@ const run = async () => {
       "(subscription_user_key, status, created_at)",
     );
     await addIndexIfMissing("batch_tasks", "idx_batch_tasks_branded_scene_task", "(branded_scene_task_id)");
+
+    await addColumnIfMissing("language_conversion_tasks", "source_duration_seconds", "INT NOT NULL DEFAULT 60");
+    await addColumnIfMissing("language_conversion_tasks", "billable_minutes", "INT NOT NULL DEFAULT 1");
+    await addColumnIfMissing("language_conversion_tasks", "credits_user_id", "BIGINT NULL");
+    await addColumnIfMissing("language_conversion_tasks", "credits_tenant_id", "BIGINT NULL");
+    await addColumnIfMissing("language_conversion_tasks", "account_scope", "VARCHAR(16) NULL");
+    await addColumnIfMissing("language_conversion_tasks", "billing_task_id", "BIGINT NULL");
+    await addColumnIfMissing("language_conversion_tasks", "billing_status", "VARCHAR(24) NULL");
+    await addColumnIfMissing("language_conversion_tasks", "estimated_points", "DECIMAL(18, 4) NULL");
+    await addColumnIfMissing("language_conversion_tasks", "settled_points", "DECIMAL(18, 4) NULL");
+    await addIndexIfMissing(
+      "language_conversion_tasks",
+      "idx_language_conversion_tasks_billing_task",
+      "(billing_task_id)",
+    );
+    await addIndexIfMissing(
+      "language_conversion_tasks",
+      "idx_language_conversion_tasks_billing_status",
+      "(billing_status)",
+    );
+
     await addColumnIfMissing("account_creation_audit_logs", "idempotency_key", "VARCHAR(160) NULL");
     await addColumnIfMissing("account_creation_audit_logs", "request_hash", "CHAR(64) NULL");
     await addColumnIfMissing(

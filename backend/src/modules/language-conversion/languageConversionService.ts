@@ -6,6 +6,13 @@ import readline from "node:readline";
 import { env } from "../../config/env";
 import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
+import { creditsClient, type BillingTaskResponse } from "../billing/creditsClient";
+import {
+  resolveBillingIdentity,
+  type BillingIdentity,
+  type BillingRequestContext,
+} from "../billing/billingIdentity";
+import { languageConversionPointsByDurationSeconds } from "../billing/generationPointRules";
 import {
   languageConversionRepository,
   type LanguageConversionTaskRecord,
@@ -18,21 +25,34 @@ type LanguageConversionTask = {
   progress: number;
   sourceLanguage: string;
   targetLanguage: string;
+  sourceDurationSeconds: number;
+  billableMinutes: number;
   sourceFileName: string;
   sourceVideoUrl: string;
   resultVideoUrl?: string;
   localResultPath?: string;
   mpsTaskId?: string;
   outputBucket?: string;
+  billingTaskId?: number | null;
+  billingStatus?: string | null;
+  estimatedCost?: number | null;
+  estimatedPoints?: string | null;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+type LanguageConversionBilling = {
+  identity: BillingIdentity;
+  task: BillingTaskResponse;
 };
 
 type WorkerEvent = {
   event?: string;
   [key: string]: any;
 };
+
+const LANGUAGE_CONVERSION_FUNCTION_CODE = "language-conversion";
 
 const languageMap: Record<string, string> = {
   auto: "zh",
@@ -62,16 +82,36 @@ const toTaskResponse = (record: LanguageConversionTaskRecord): LanguageConversio
   progress: record.progress,
   sourceLanguage: record.sourceLanguage,
   targetLanguage: record.targetLanguage,
+  sourceDurationSeconds: record.sourceDurationSeconds,
+  billableMinutes: record.billableMinutes,
   sourceFileName: record.sourceFileName,
   sourceVideoUrl: record.sourceVideoUrl,
   resultVideoUrl: record.resultVideoUrl ?? undefined,
   localResultPath: record.localResultPath ?? undefined,
   mpsTaskId: record.mpsTaskId ?? undefined,
   outputBucket: record.outputBucket ?? undefined,
+  billingTaskId: record.billingTaskId ?? null,
+  billingStatus: record.billingStatus ?? null,
+  estimatedCost: record.estimatedPoints == null ? null : Number(record.estimatedPoints),
+  estimatedPoints: record.estimatedPoints ?? null,
   errorMessage: record.errorMessage ?? undefined,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 });
+
+const normalizeDurationSeconds = (value: unknown) => {
+  const duration = Number(value);
+  if (!Number.isFinite(duration) || duration <= 0) return 60;
+  return Math.ceil(duration);
+};
+
+const billableMinutesFor = (durationSeconds: number) =>
+  Math.max(1, Math.ceil(durationSeconds / 60));
+
+const billingKey = (
+  operation: "estimate" | "freeze" | "settle" | "refund",
+  taskId: string,
+) => `${operation}:language-conversion:${taskId}`;
 
 const parseWorkerLine = (line: string): WorkerEvent | null => {
   try {
@@ -90,6 +130,7 @@ const STALE_PROCESSING_MESSAGE =
 
 class LanguageConversionService {
   private readonly workerEventChains = new Map<string, Promise<void>>();
+  private readonly billings = new Map<string, LanguageConversionBilling>();
 
   async reconcileInterruptedProcessingTasks() {
     await languageConversionRepository.failInterruptedProcessing(INTERRUPTED_PROCESSING_MESSAGE);
@@ -105,6 +146,8 @@ class LanguageConversionService {
     file: Express.Multer.File;
     sourceLanguage: unknown;
     targetLanguage: unknown;
+    sourceDurationSeconds: unknown;
+    context?: BillingRequestContext;
   }) {
     if (!env.verification.tencentSecretId || !env.verification.tencentSecretKey) {
       throw errors.invalidParameter("Tencent Cloud credentials are not configured");
@@ -117,8 +160,20 @@ class LanguageConversionService {
     }
 
     const taskId = createId("lc");
+    const sourceDurationSeconds = normalizeDurationSeconds(input.sourceDurationSeconds);
+    const billableMinutes = billableMinutesFor(sourceDurationSeconds);
+    const estimatedPoints = languageConversionPointsByDurationSeconds(sourceDurationSeconds);
     const outputDir = path.join(env.resultsDir, "language-conversion", taskId);
     fs.mkdirSync(outputDir, { recursive: true });
+
+    let billing: LanguageConversionBilling | null = null;
+    try {
+      billing = await this.freezeBilling(taskId, estimatedPoints, input.context);
+    } catch (error) {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+      fs.rmSync(input.file.path, { force: true });
+      throw error;
+    }
 
     const record = await languageConversionRepository.create({
       id: taskId,
@@ -127,10 +182,20 @@ class LanguageConversionService {
       progress: 5,
       sourceLanguage,
       targetLanguage,
+      sourceDurationSeconds,
+      billableMinutes,
       sourceFileName: input.file.originalname,
       sourceVideoUrl: `/uploads/language-conversion/${path.basename(input.file.path)}`,
+      creditsUserId: billing?.identity.userId ?? null,
+      creditsTenantId: billing?.identity.tenantId ?? null,
+      accountScope: billing?.identity.accountScope ?? null,
+      billingTaskId: billing?.task.billingTaskId ?? null,
+      billingStatus: billing?.task.status ?? null,
+      estimatedPoints: billing?.task.estimatedPoints ?? estimatedPoints,
+      settledPoints: billing?.task.settledPoints ?? null,
     });
     if (!record) throw errors.generationFailed("failed to create language conversion task");
+    if (billing) this.billings.set(taskId, billing);
 
     this.runWorker(taskId, input.file.path, outputDir, sourceLanguage, targetLanguage);
     return toTaskResponse(record);
@@ -223,15 +288,7 @@ class LanguageConversionService {
     });
 
     child.once("error", (error) => {
-      void this.updateTask(
-        taskId,
-        {
-          status: "failed",
-          progress: 100,
-          errorMessage: error.message,
-        },
-        { onlyIfProcessing: true },
-      );
+      void this.failTask(taskId, error.message);
     });
 
     child.once("close", (code) => {
@@ -239,17 +296,94 @@ class LanguageConversionService {
         await this.drainWorkerEvents(taskId);
         const current = await languageConversionRepository.findById(taskId);
         if (!current || current.status !== "processing") return;
-        await this.updateTask(
+        await this.failTask(
           taskId,
-          {
-            status: "failed",
-            progress: 100,
-            errorMessage: `language conversion worker exited with code ${code}: ${stderr.slice(-1200)}`,
-          },
-          { onlyIfProcessing: true },
+          `language conversion worker exited with code ${code}: ${stderr.slice(-1200)}`,
         );
       })();
     });
+  }
+
+  private async freezeBilling(
+    taskId: string,
+    estimatedPoints: string,
+    context?: BillingRequestContext,
+  ) {
+    const identity = await resolveBillingIdentity({}, context);
+    if (!identity) return null;
+
+    const estimated = await creditsClient.estimate({
+      ...identity,
+      functionCode: LANGUAGE_CONVERSION_FUNCTION_CODE,
+      estimatedPoints,
+      bizType: "language_conversion_task",
+      bizId: taskId,
+      idempotencyKey: billingKey("estimate", taskId),
+    });
+    const frozen = await creditsClient.freeze({
+      userId: identity.userId,
+      billingTaskId: estimated.billingTaskId,
+      idempotencyKey: billingKey("freeze", taskId),
+    });
+    return { identity, task: frozen };
+  }
+
+  private async settleBilling(taskId: string) {
+    const billing = this.billings.get(taskId);
+    if (!billing) return null;
+    const settled = await creditsClient.settle({
+      userId: billing.identity.userId,
+      billingTaskId: billing.task.billingTaskId,
+      idempotencyKey: billingKey("settle", taskId),
+    });
+    const updated = { ...billing, task: settled };
+    this.billings.set(taskId, updated);
+    await this.updateTask(taskId, {
+      billingStatus: settled.status,
+      settledPoints: settled.settledPoints,
+      estimatedPoints: settled.estimatedPoints,
+    });
+    return updated;
+  }
+
+  private async refundBilling(taskId: string) {
+    const billing = this.billings.get(taskId);
+    if (!billing) return null;
+    const refunded = await creditsClient.refund({
+      userId: billing.identity.userId,
+      billingTaskId: billing.task.billingTaskId,
+      idempotencyKey: billingKey("refund", taskId),
+    });
+    const updated = { ...billing, task: refunded };
+    this.billings.set(taskId, updated);
+    await this.updateTask(taskId, {
+      billingStatus: refunded.status,
+      settledPoints: refunded.settledPoints,
+      estimatedPoints: refunded.estimatedPoints,
+    });
+    return updated;
+  }
+
+  private async failTask(taskId: string, errorMessage: string) {
+    await this.updateTask(
+      taskId,
+      {
+        status: "failed",
+        progress: 100,
+        errorMessage,
+      },
+      { onlyIfProcessing: true },
+    );
+    try {
+      await this.refundBilling(taskId);
+    } catch (error) {
+      await this.updateTask(taskId, {
+        billingStatus: "refund_failed",
+        errorMessage: `${errorMessage}; billing refund failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
   }
 
   private async handleWorkerEvent(taskId: string, event: WorkerEvent) {
@@ -304,6 +438,11 @@ class LanguageConversionService {
       const firstDownload = downloads[0] as { path?: string } | undefined;
       const current = await languageConversionRepository.findById(taskId);
       const localPath = firstDownload?.path ?? current?.localResultPath ?? null;
+      try {
+        await this.settleBilling(taskId);
+      } catch {
+        await this.updateTask(taskId, { billingStatus: "settle_failed" });
+      }
       await this.updateTask(
         taskId,
         {
@@ -319,15 +458,7 @@ class LanguageConversionService {
       return;
     }
     if (event.event === "failed") {
-      await this.updateTask(
-        taskId,
-        {
-          status: "failed",
-          progress: 100,
-          errorMessage: String(event.message ?? "language conversion failed"),
-        },
-        workerPatch,
-      );
+      await this.failTask(taskId, String(event.message ?? "language conversion failed"));
     }
   }
 }

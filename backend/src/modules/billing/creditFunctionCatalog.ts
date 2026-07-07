@@ -1,6 +1,7 @@
 import {
   batchItemGenerationPoints,
   batchWallLogoSceneGenerationPoints,
+  languageConversionPointsByDurationSeconds,
   shortVideoGenerationPoints,
   singleImageGenerationPoints,
   videoGenerationPointsByAudioSeconds,
@@ -67,6 +68,14 @@ export const creditFunctionCatalog: CreditFunctionCatalogItem[] = [
     description: "15-second Seedance 2.0 digital-human vehicle video generation",
     chargeMode: "estimate_required",
     defaultPoints: videoGenerationPointsByAudioSeconds(),
+    status: "active",
+  },
+  {
+    code: "language-conversion",
+    name: "Language Conversion",
+    description: "Video language translation with subtitles and AI dubbing",
+    chargeMode: "estimate_required",
+    defaultPoints: languageConversionPointsByDurationSeconds(),
     status: "active",
   },
   {

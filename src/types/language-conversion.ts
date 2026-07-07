@@ -31,11 +31,17 @@ export interface LanguageConversionTask {
   progress: number
   sourceLanguage: string
   targetLanguage: string
+  sourceDurationSeconds?: number
+  billableMinutes?: number
   sourceFileName: string
   sourceVideoUrl: string
   resultVideoUrl?: string
   mpsTaskId?: string
   outputBucket?: string
+  billingTaskId?: number | null
+  billingStatus?: string | null
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
   errorMessage?: string
   createdAt: string
   updatedAt: string

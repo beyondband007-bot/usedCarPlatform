@@ -315,7 +315,7 @@ function handleOriginalVideoMetadata() {
     return
   }
 
-  const duration = originalVideoRef.value?.duration
+  const duration = Number(originalVideoRef.value?.duration ?? 0)
   if (!Number.isFinite(duration) || duration <= 0) {
     sourceVideoDurationSeconds.value = 0
     return
@@ -351,7 +351,7 @@ async function handleSubmit() {
     sourceFileName: sourceFile.value.name,
     sourceLanguage: sourceLanguage.value,
     targetLanguage: targetLanguage.value,
-    preserveSpeakerVoice: true,
+    preserveSpeakerVoice: false,
     preserveBackgroundAudio: true,
     sourceDurationSeconds: Math.ceil(sourceVideoDurationSeconds.value),
     estimatedPoints,

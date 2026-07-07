@@ -121,6 +121,9 @@ def submit_mps_task(media_url: str, output_bucket: str):
                 "translate_src_language": SOURCE_LANGUAGE,
                 "translate_dst_language": TARGET_LANGUAGE,
                 "use_draw": True,
+                "voice_clone_param": {
+                    "voice_from": "match",
+                },
             },
         }
     }
