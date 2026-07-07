@@ -39,6 +39,12 @@ export async function createLanguageConversionTask(
   form.append('targetLanguage', payload.targetLanguage)
   form.append('preserveSpeakerVoice', String(payload.preserveSpeakerVoice))
   form.append('preserveBackgroundAudio', String(payload.preserveBackgroundAudio))
+  if (payload.sourceDurationSeconds != null) {
+    form.append('sourceDurationSeconds', String(payload.sourceDurationSeconds))
+  }
+  if (payload.estimatedPoints != null) {
+    form.append('estimatedPoints', String(payload.estimatedPoints))
+  }
 
   const response = await request.post<ApiResponse<LanguageConversionTask>>(
     '/modules/language-conversion/tasks',

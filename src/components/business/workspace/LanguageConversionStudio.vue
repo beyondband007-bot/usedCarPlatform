@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NModal, useMessage } from 'naive-ui'
 import {
@@ -7,7 +7,12 @@ import {
   getLanguageConversionTask,
   listLanguageConversionTasks,
 } from '@/api/language-conversion'
+import { useCreditsStore } from '@/stores/credits'
 import { formatDate } from '@/utils/dayjs'
+import {
+  calculateLanguageConversionPoints,
+  probeVideoDurationSeconds,
+} from '@/utils/language-conversion-billing'
 
 import originalExampleVideo from '@/assets/video/语言转换/处理前.mp4'
 import convertedExampleVideo from '@/assets/video/语言转换/处理后.mp4'
@@ -30,12 +35,14 @@ const emit = defineEmits<{
 }>()
 
 const message = useMessage()
+const creditsStore = useCreditsStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const originalVideoRef = ref<HTMLVideoElement | null>(null)
 const resultVideoRef = ref<HTMLVideoElement | null>(null)
 
 const sourceFile = ref<File | null>(null)
 const sourceVideoUrl = ref('')
+const sourceVideoDurationSeconds = ref(0)
 const sourceLanguage = ref('auto')
 const targetLanguage = ref('en-US')
 const activeTask = ref<LanguageConversionTask | null>(null)
@@ -66,9 +73,26 @@ const availableTargetLanguages = computed(() =>
     (item) => item.status === 'available' && item.value !== 'auto',
   ),
 )
+const isTaskProcessing = computed(
+  () => Boolean(activeTask.value && isTaskInProgress(activeTask.value.status)),
+)
+const estimatedConversionPoints = computed(() =>
+  calculateLanguageConversionPoints(sourceVideoDurationSeconds.value),
+)
+const startConversionLabel = computed(() => {
+  if (isSubmitting.value) return '正在提交'
+  if (isTaskProcessing.value) return '转换处理中'
+  if (activeTask.value?.status === 'failed') return '重新转换'
+  if (sourceFile.value && sourceVideoDurationSeconds.value) {
+    return `开始转换 预计${estimatedConversionPoints.value}积分`
+  }
+  return '开始转换'
+})
 const canSubmit = computed(
   () =>
     Boolean(sourceFile.value) &&
+    sourceVideoDurationSeconds.value > 0 &&
+    estimatedConversionPoints.value > 0 &&
     sourceLanguage.value !== targetLanguage.value &&
     (!activeTask.value || !isTaskInProgress(activeTask.value.status)) &&
     !isSubmitting.value,
@@ -101,9 +125,6 @@ const conversionProgress = computed(() => {
 })
 const isAwaitingConversion = computed(
   () => Boolean(sourceFile.value) && !activeTask.value,
-)
-const isTaskProcessing = computed(
-  () => Boolean(activeTask.value && isTaskInProgress(activeTask.value.status)),
 )
 
 function isTaskInProgress(status: LanguageConversionStatus) {
@@ -260,10 +281,22 @@ function acceptSourceFile(file?: File) {
   pausePreviewVideos()
   resetSimulatedProgress()
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
+  const nextUrl = URL.createObjectURL(file)
   sourceFile.value = file
-  sourceVideoUrl.value = URL.createObjectURL(file)
+  sourceVideoUrl.value = nextUrl
+  sourceVideoDurationSeconds.value = 0
   activeTask.value = null
   stopPolling()
+  void probeVideoDurationSeconds(nextUrl)
+    .then((duration) => {
+      if (sourceFile.value !== file) return
+      sourceVideoDurationSeconds.value = duration
+    })
+    .catch(() => {
+      void nextTick(() => {
+        originalVideoRef.value?.load()
+      })
+    })
   void nextTick(() => {
     if (originalVideoRef.value) originalVideoRef.value.currentTime = 0
   })
@@ -276,21 +309,52 @@ function handleFileChange(event: Event) {
   acceptSourceFile(file)
 }
 
+function handleOriginalVideoMetadata() {
+  if (!sourceFile.value) {
+    sourceVideoDurationSeconds.value = 0
+    return
+  }
+
+  const duration = originalVideoRef.value?.duration
+  if (!Number.isFinite(duration) || duration <= 0) {
+    sourceVideoDurationSeconds.value = 0
+    return
+  }
+
+  sourceVideoDurationSeconds.value = duration
+}
+
 async function handleSubmit() {
   if (!sourceFile.value) {
     message.error('请先上传需要转换的视频')
+    return
+  }
+  if (!sourceVideoDurationSeconds.value) {
+    message.warning('正在读取视频时长，请稍后再试')
     return
   }
   if (sourceLanguage.value === targetLanguage.value) {
     message.error('当前语言和目标语言不能相同')
     return
   }
+
+  const estimatedPoints = estimatedConversionPoints.value
+  await creditsStore.hydrateAccounts()
+  if (creditsStore.availableBalance < estimatedPoints) {
+    message.warning(
+      `积分不足，本次转换预计消耗 ${estimatedPoints} 积分，当前可用 ${creditsStore.balanceText} 积分`,
+    )
+    return
+  }
+
   const payload: CreateLanguageConversionPayload = {
     sourceFileName: sourceFile.value.name,
     sourceLanguage: sourceLanguage.value,
     targetLanguage: targetLanguage.value,
     preserveSpeakerVoice: true,
     preserveBackgroundAudio: true,
+    sourceDurationSeconds: Math.ceil(sourceVideoDurationSeconds.value),
+    estimatedPoints,
   }
   emit('submit', payload)
   isSubmitting.value = true
@@ -347,6 +411,7 @@ async function refreshTask(taskId: string) {
     if (task.status === 'success') {
       stopPolling()
       syncSimulatedProgressWithTask(task)
+      void creditsStore.hydrateAccounts(true)
       message.success('语言转换完成')
     } else if (task.status === 'failed') {
       stopPolling()
@@ -462,6 +527,10 @@ async function downloadResultVideo() {
   }
 }
 
+onMounted(() => {
+  void creditsStore.hydrateAccounts()
+})
+
 onUnmounted(() => {
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   stopPolling()
@@ -523,6 +592,7 @@ onUnmounted(() => {
             controls
             playsinline
             preload="metadata"
+            @loadedmetadata="handleOriginalVideoMetadata"
           />
         </article>
         <article class="video-player">
@@ -604,15 +674,17 @@ onUnmounted(() => {
                 </option>
               </select>
             </label>
-            <button
-              type="button"
-              class="start-conversion"
-              :disabled="!canSubmit"
-              @click="handleSubmit"
-            >
-              <Icon :icon="isSubmitting || isTaskProcessing ? 'mdi:loading' : 'mdi:translate'" :class="{ spinning: isSubmitting || isTaskProcessing }" />
-              {{ isSubmitting ? '正在提交' : isTaskProcessing ? '转换处理中' : activeTask?.status === 'failed' ? '重新转换' : '开始转换' }}
-            </button>
+            <div class="conversion-action-group">
+              <button
+                type="button"
+                class="start-conversion"
+                :disabled="!canSubmit"
+                @click="handleSubmit"
+              >
+                <Icon :icon="isSubmitting || isTaskProcessing ? 'mdi:loading' : 'mdi:translate'" :class="{ spinning: isSubmitting || isTaskProcessing }" />
+                {{ startConversionLabel }}
+              </button>
+            </div>
             <div v-if="activeTask" class="conversion-progress" :class="`is-${activeTask.status}`">
               <div><span>{{ conversionStatusText }}</span><b>{{ conversionProgress }}%</b></div>
               <progress :value="conversionProgress" max="100">{{ conversionProgress }}%</progress>
@@ -1333,9 +1405,24 @@ onUnmounted(() => {
   grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.45fr);
 }
 
+.conversion-action-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.conversion-action-group .start-conversion {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .result-controls .start-conversion {
+  width: calc(100% + 20px);
+  min-width: calc(100% + 20px);
   height: 40px;
   margin-top: 0;
+  white-space: nowrap;
 }
 
 .result-controls .conversion-progress {
@@ -1711,6 +1798,14 @@ onUnmounted(() => {
   .compare-stage {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  }
+
+  .conversion-action-group {
+    flex-wrap: wrap;
+  }
+
+  .conversion-points-inline {
+    white-space: normal;
   }
 
   .video-inline-controls,
