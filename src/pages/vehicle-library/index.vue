@@ -34,7 +34,7 @@ import {
 } from '@/api/vehicle-info'
 
 import './vehicle-library.scss'
-import { getVehicleLibraryServiceStatusLabel } from '@/constants/vehicle-library'
+import { getVehicleIdentifyTypeLabel, getVehicleLibraryServiceStatusLabel } from '@/constants/vehicle-library'
 import type { VehicleLibraryStatus } from '@/types/vehicle-library'
 
 // 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
@@ -88,6 +88,7 @@ interface Vehicle {
   size: string
   brandLabel: string
   gapSummary: string
+  identifyType: VehicleIdentifyType
 }
 
 const vehicles = ref<Vehicle[]>([])
@@ -377,6 +378,7 @@ const mapVehicle = (record: VehicleRecord): Vehicle => {
     size: formatBytes(size),
     brandLabel: getVehicleBrandLabel(record.brand, record.series),
     gapSummary: formatGapSummary(slotStates),
+    identifyType: record.identifyType,
   }
 }
 
@@ -1482,7 +1484,7 @@ onMounted(loadLibraryData)
               </div>
               <div class="detail-tags">
                 <span v-if="activeVehicle.note">{{ activeVehicle.note }}</span>
-                <span>VIN 查询入库</span>
+                <span>{{ getVehicleIdentifyTypeLabel(activeVehicle.identifyType) }}</span>
               </div>
               <div class="detail-actions">
                 <NButton
