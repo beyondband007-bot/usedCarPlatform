@@ -110,7 +110,6 @@ const activeFilter = ref<VehicleFilter>('incomplete')
 const activeVehicleId = ref<string | null>(null)
 const keyword = ref('')
 const sortBy = ref('complete')
-const focusAlmostComplete = ref(false)
 const showCompletedSlots = ref(false)
 const advanceAfterMaterialSave = ref(false)
 const showVehicleModal = ref(false)
@@ -385,9 +384,7 @@ const filteredVehicles = computed(() => vehicles.value)
 const pendingVehicleCount = computed(() =>
   Math.max(0, (libraryHome.value?.stats.activeVehicles ?? 0) - (libraryHome.value?.stats.completeVehicles ?? 0)),
 )
-const showTaskBanner = computed(
-  () => activeLibraryTab.value === 'vehicles' && pendingVehicleCount.value > 0,
-)
+
 const hasVehiclesInLibrary = computed(
   () => (libraryHome.value?.stats.activeVehicles ?? 0) > 0,
 )
@@ -442,20 +439,12 @@ function selectVehicle(id: string) {
 type StatsFilter = 'all' | 'complete' | 'incomplete' | 'lots'
 
 function applyStatsFilter(target: StatsFilter) {
-  focusAlmostComplete.value = false
   if (target === 'lots') {
     activeLibraryTab.value = 'lots'
     return
   }
   activeLibraryTab.value = 'vehicles'
   activeFilter.value = target
-}
-
-function filterAlmostCompleteMaterials() {
-  activeLibraryTab.value = 'vehicles'
-  focusAlmostComplete.value = true
-  activeFilter.value = 'incomplete'
-  sortBy.value = 'complete'
 }
 
 function isStatsStatActive(target: StatsFilter) {
@@ -596,9 +585,6 @@ watch(lotKeyword, () => {
 })
 
 watch([activeFilter, sortBy], () => {
-  if (activeFilter.value !== 'incomplete' || sortBy.value !== 'complete') {
-    focusAlmostComplete.value = false
-  }
   void reloadFromFirstPage()
 })
 
@@ -1266,24 +1252,6 @@ onMounted(loadLibraryData)
           <strong>{{ formatBytes(libraryHome?.stats.usedBytes ?? 0) }}<em>/ {{ libraryHome?.stats.quotaBytes ? formatBytes(libraryHome.stats.quotaBytes) : '不限' }}</em></strong>
           <div class="capacity-meter"><i :style="{ width: libraryHome?.stats.quotaBytes ? `${Math.min(100, libraryHome.stats.usedBytes / libraryHome.stats.quotaBytes * 100)}%` : '0%' }" /></div>
         </div>
-      </section>
-
-      <section v-if="showTaskBanner" class="task-banner" role="status" aria-live="polite">
-        <div class="task-banner-copy">
-          <Icon icon="mdi:clipboard-list-outline" aria-hidden="true" />
-          <p>
-            还有 <strong>{{ pendingVehicleCount }}</strong> 辆待补素材，建议从「只差 1 项」的车辆开始收尾。
-          </p>
-        </div>
-        <button
-          type="button"
-          class="task-banner-action"
-          :class="{ active: focusAlmostComplete }"
-          @click="filterAlmostCompleteMaterials"
-        >
-          <Icon icon="mdi:filter-variant" aria-hidden="true" />
-          筛选「只差 1 项」
-        </button>
       </section>
 
       <template v-if="activeLibraryTab === 'vehicles'">
