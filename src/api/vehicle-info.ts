@@ -102,6 +102,27 @@ const toNumberOrNull = (
   return Number.isFinite(result) ? result : null
 }
 
+const VIN_LOOKUP_FIELDS = [
+  'brand',
+  'brand_name',
+  'typename',
+  'car_line',
+  'name',
+  'sale_name',
+  'manufacturer',
+  'assembly_factory',
+] as const
+
+export function assertVinLookupHasData(data: VinApiData) {
+  const hasData = VIN_LOOKUP_FIELDS.some((key) => {
+    const value = data[key]
+    return typeof value === 'string' && value.trim().length > 0
+  })
+  if (!hasData) {
+    throw new Error('VIN未查到，请检查后重新查询')
+  }
+}
+
 export const normalizeVehicleInfo = (data: VinApiData): VehicleBasicInfo => ({
   brandName: data.brand || data.brand_name || '',
   manufacturerName: data.manufacturer || data.assembly_factory || '',
@@ -154,6 +175,7 @@ export async function queryVehicleByVin(vin: string) {
   if (response.code !== 0) {
     throw new Error(normalizeApiErrorMessage(response.message || 'VIN 查询失败'))
   }
+  assertVinLookupHasData(response.data)
   return response.data
 }
 
@@ -165,5 +187,6 @@ export async function queryVehicleByVinShowApi(vin: string) {
   if (response.code !== 0) {
     throw new Error(normalizeApiErrorMessage(response.message || 'VIN 查询失败'))
   }
+  assertVinLookupHasData(response.data)
   return response.data
 }

@@ -407,6 +407,22 @@ const seedAuthData = async () => {
       plan: "flagship",
       usesTenantCreditsBundle: true,
     },
+    {
+      id: "user_test1",
+      username: "test1",
+      phone: "13800000010",
+      displayName: "测试账号1",
+      role: "enterprise",
+      plan: "basic",
+    },
+    {
+      id: "user_test2",
+      username: "test2",
+      phone: "13800000011",
+      displayName: "测试账号2",
+      role: "enterprise",
+      plan: "basic",
+    },
   ];
 
   for (const user of users) {
@@ -959,6 +975,15 @@ const run = async () => {
     await addColumnIfMissing("kie_task_records", "is_winner", "TINYINT(1) NOT NULL DEFAULT 0");
     await addColumnIfMissing("kie_task_records", "finished_at", "DATETIME(3) NULL");
     await addColumnIfMissing("back_office_agent_policy_overrides", "commission_rate", "DECIMAL(8, 4) NULL");
+    const hadQuotaPolicy = await columnExists("vehicle_libraries", "quota_policy");
+    await addColumnIfMissing(
+      "vehicle_libraries",
+      "quota_policy",
+      "VARCHAR(20) NOT NULL DEFAULT 'standard' AFTER status",
+    );
+    if (!hadQuotaPolicy) {
+      await pool.query(`UPDATE vehicle_libraries SET quota_policy = 'legacy'`);
+    }
     await dropIndexIfExists("kie_task_records", "uk_kie_task_records_task");
     await addUniqueIndexIfMissing("kie_task_records", "uk_kie_task_records_task_role", "(task_id, role)");
     await backfillGenerationOwnership();

@@ -5,6 +5,7 @@ import { createId } from "../../shared/ids";
 import { assetsRepository } from "../assets/assetsRepository";
 import type { CurrentUserSession } from "../auth/authMiddleware";
 import type { AuthenticatedUser } from "../auth/authTypes";
+import { getSubscriptionSnapshotForUser } from "../auth/authService";
 import {
   mapMaterialRow,
   vehicleLibraryRepository,
@@ -36,6 +37,13 @@ import {
   type VehicleRecognitionStatus,
   type VehicleRecordStatus,
 } from "./vehicleLibraryTypes";
+import {
+  canAccessVehicleLibraryByPlan,
+  computeLibraryQuotaBytes,
+  getPlanLibraryLimits,
+  isLegacyQuotaPolicy,
+  type PlanLibraryLimits,
+} from "./vehicleLibraryQuota";
 
 const DEFAULT_LIBRARY_NAME = "Vehicle Library";
 const DEFAULT_PAGE_SIZE = 20;
@@ -81,6 +89,7 @@ const serializeLibrary = (row: VehicleLibraryRow) => ({
   ownerUserId: row.owner_user_id,
   name: row.name,
   status: row.status,
+  quotaPolicy: row.quota_policy,
   quotaBytes: Number(row.quota_bytes),
   usedBytes: Number(row.used_bytes),
   remark: row.remark,
@@ -274,20 +283,61 @@ export class VehicleLibraryService {
     return library;
   }
 
+  async resolvePlanLibraryLimits(current: CurrentUserSession): Promise<PlanLibraryLimits> {
+    const subscription = await getSubscriptionSnapshotForUser(current.user.id);
+    return getPlanLibraryLimits(subscription.currentPlan);
+  }
+
+  async requireVehicleLibraryPlan(current: CurrentUserSession, quotaPolicy?: string | null) {
+    const subscription = await getSubscriptionSnapshotForUser(current.user.id);
+    if (!canAccessVehicleLibraryByPlan(subscription.currentPlan, quotaPolicy)) {
+      throw errors.forbidden("vehicle library plan not available", {
+        planCode: subscription.currentPlan,
+      });
+    }
+    return getPlanLibraryLimits(subscription.currentPlan);
+  }
+
+  async syncPlanLibraryQuota(library: VehicleLibraryRow, limits: PlanLibraryLimits) {
+    if (isLegacyQuotaPolicy(library.quota_policy))
+      return Number(library.quota_bytes);
+
+    const computed = computeLibraryQuotaBytes(
+      limits.vehicleLimit,
+      limits.lotLimit,
+      limits.storageBudgetBytes,
+    );
+    const quotaBytes = Math.max(computed, Number(library.used_bytes));
+    if (quotaBytes !== Number(library.quota_bytes)) {
+      await vehicleLibraryRepository.updateLibrary({ libraryId: library.id, quotaBytes });
+    }
+    return quotaBytes;
+  }
+
   async ensureDefaultLibrary(current: CurrentUserSession) {
     const scope = getScope(current.user);
     const existing = await vehicleLibraryRepository.findDefaultLibraryForScope(scope);
-    if (existing) return existing;
+    if (existing) {
+      await this.requireVehicleLibraryPlan(current, existing.quota_policy);
+      return existing;
+    }
     // 用 scope 派生的确定性主键创建默认库：并发首访时两个请求会算出同一个 id，
     // 其中一个 INSERT 命中主键冲突后回退到再次查询，避免为同一用户建出多个默认库。
     const scopeKey = `u:${current.user.id}`;
     const defaultLibraryId = `vehicle_lib_${createHash("sha1").update(scopeKey).digest("hex").slice(0, 40)}`;
+    const limits = await this.requireVehicleLibraryPlan(current, "standard");
     try {
-      const created = await vehicleLibraryRepository.createLibrary({
+      const created = await vehicleLibraryRepository.createLibraryIfScopeEmpty({
         id: defaultLibraryId,
         tenantId: scope.tenantId,
         ownerUserId: current.user.id,
         name: DEFAULT_LIBRARY_NAME,
+        quotaPolicy: "standard",
+        quotaBytes: computeLibraryQuotaBytes(
+          limits.vehicleLimit,
+          limits.lotLimit,
+          limits.storageBudgetBytes,
+        ),
       });
       if (created) return created;
     } catch (error) {
@@ -305,20 +355,39 @@ export class VehicleLibraryService {
       getScope(current.user),
     );
     if (!library) throw errors.forbidden("vehicle library is not available");
+    await this.requireVehicleLibraryPlan(current, library.quota_policy);
     return library;
   }
 
   async getHome(current: CurrentUserSession) {
-    // used_bytes 在每次素材增删时通过 refreshOwnerCompleteness 增量维护，
-    // 读接口不再触发全量 UPDATE，避免读请求带写副作用与行锁压力。
-    const library = await this.ensureDefaultLibrary(current);
+    let library = await this.ensureDefaultLibrary(current);
+    const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
+    if (!isLegacyQuotaPolicy(library.quota_policy)) {
+      await this.syncPlanLibraryQuota(library, limits);
+      const refreshed = await vehicleLibraryRepository.findLibraryByIdForScope(
+        library.id,
+        getScope(current.user),
+      );
+      if (refreshed)
+        library = refreshed;
+    }
     const stats = await vehicleLibraryRepository.getLibraryStats(library.id);
+    const legacy = isLegacyQuotaPolicy(library.quota_policy);
     return {
       library: serializeLibrary(library),
       stats: {
         ...stats,
         usedBytes: Number(library.used_bytes),
-        quotaBytes: Number(library.quota_bytes),
+        quotaBytes: legacy
+          ? Number(library.quota_bytes)
+          : Number(library.quota_bytes) || computeLibraryQuotaBytes(
+            limits.vehicleLimit,
+            limits.lotLimit,
+            limits.storageBudgetBytes,
+          ),
+        quotaVehicles: legacy ? null : limits.vehicleLimit,
+        quotaLots: legacy ? null : limits.lotLimit,
+        planCode: legacy ? null : limits.planCode,
       },
     };
   }
@@ -327,14 +396,23 @@ export class VehicleLibraryService {
   // 否则用户可以自行扩容或解冻被平台冻结的库。
   async createLibrary(current: CurrentUserSession, body: Record<string, unknown>) {
     const scope = getScope(current.user);
-    const created = await vehicleLibraryRepository.createLibrary({
+    const limits = await this.requireVehicleLibraryPlan(current, "standard");
+    const created = await vehicleLibraryRepository.createLibraryIfScopeEmpty({
       id: createId("vehicle_lib"),
       tenantId: scope.tenantId,
       ownerUserId: current.user.id,
       name: parseOptionalString(body.name) ?? DEFAULT_LIBRARY_NAME,
       remark: parseOptionalString(body.remark),
+      quotaPolicy: "standard",
+      quotaBytes: computeLibraryQuotaBytes(
+        limits.vehicleLimit,
+        limits.lotLimit,
+        limits.storageBudgetBytes,
+      ),
     });
-    if (!created) throw errors.generationFailed("failed to create vehicle library");
+    if (!created) {
+      throw errors.conflict("vehicle library already exists for this account");
+    }
     return serializeLibrary(created);
   }
 
@@ -373,16 +451,24 @@ export class VehicleLibraryService {
 
   async createLot(current: CurrentUserSession, body: Record<string, unknown>) {
     const library = await this.getWritableLibraryForRequest(current, body.libraryId);
-    const lot = await vehicleLibraryRepository.createLot({
+    const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
+    const result = await vehicleLibraryRepository.createLotWithinLimit({
       id: createId("vehicle_lot"),
       libraryId: library.id,
       name: parseRequiredString(body.name, "name"),
       address: parseOptionalString(body.address),
       remark: parseOptionalString(body.remark),
       createdByUserId: current.user.id,
+      lotLimit: isLegacyQuotaPolicy(library.quota_policy) ? null : limits.lotLimit,
     });
-    if (!lot) throw errors.generationFailed("failed to create vehicle lot");
-    return serializeLot(lot);
+    if (!result.lot) {
+      throw errors.conflict("vehicle library lot limit reached", {
+        limit: limits.lotLimit,
+        activeLots: result.activeLots,
+        planCode: limits.planCode,
+      });
+    }
+    return serializeLot(result.lot);
   }
 
   async getLot(current: CurrentUserSession, lotId: string, query?: Record<string, unknown>) {
@@ -492,16 +578,18 @@ export class VehicleLibraryService {
 
   async createVehicle(current: CurrentUserSession, body: Record<string, unknown>) {
     const library = await this.getWritableLibraryForRequest(current, body.libraryId);
+    const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
     const payload = parseVehiclePayload(body);
     await this.assertSameLibraryLot(library.id, payload.lotId);
     await this.assertVinAvailable(library.id, payload.vin);
-    let vehicle;
+    let result;
     try {
-      vehicle = await vehicleLibraryRepository.createVehicle({
+      result = await vehicleLibraryRepository.createVehicleWithinLimit({
         id: createId("vehicle"),
         libraryId: library.id,
         ...payload,
         createdByUserId: current.user.id,
+        vehicleLimit: isLegacyQuotaPolicy(library.quota_policy) ? null : limits.vehicleLimit,
       });
     } catch (error) {
       if (isDuplicateEntryError(error)) {
@@ -509,8 +597,14 @@ export class VehicleLibraryService {
       }
       throw error;
     }
-    if (!vehicle) throw errors.generationFailed("failed to create vehicle");
-    return serializeVehicle(vehicle);
+    if (!result.vehicle) {
+      throw errors.conflict("vehicle library vehicle limit reached", {
+        limit: limits.vehicleLimit,
+        activeVehicles: result.activeVehicles,
+        planCode: limits.planCode,
+      });
+    }
+    return serializeVehicle(result.vehicle);
   }
 
   async getVehicle(current: CurrentUserSession, vehicleId: string, query?: Record<string, unknown>) {

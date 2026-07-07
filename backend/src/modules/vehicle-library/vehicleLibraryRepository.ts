@@ -1,5 +1,6 @@
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
+import { pool } from "../../db/mysql";
 import { Repository } from "../../db/repository";
 import type {
   VehicleIdentifyType,
@@ -21,12 +22,17 @@ type CountRow = RowDataPacket & {
   total: number;
 };
 
+type LockRow = RowDataPacket & {
+  acquired: 0 | 1 | null;
+};
+
 export type VehicleLibraryRow = RowDataPacket & {
   id: string;
   tenant_id: string | null;
   owner_user_id: string;
   name: string;
   status: VehicleLibraryStatus;
+  quota_policy: string;
   quota_bytes: number;
   used_bytes: number;
   remark: string | null;
@@ -218,19 +224,84 @@ export class VehicleLibraryRepository extends Repository {
     ownerUserId: string;
     name: string;
     quotaBytes?: number;
+    quotaPolicy?: string;
     remark?: string | null;
   }) {
     await this.execute(
       `INSERT INTO vehicle_libraries
-        (id, tenant_id, owner_user_id, name, quota_bytes, remark)
+        (id, tenant_id, owner_user_id, name, quota_policy, quota_bytes, remark)
        VALUES
-        (:id, :tenantId, :ownerUserId, :name, :quotaBytes, :remark)`,
+        (:id, :tenantId, :ownerUserId, :name, :quotaPolicy, :quotaBytes, :remark)`,
       {
         ...input,
+        quotaPolicy: input.quotaPolicy ?? "standard",
         quotaBytes: input.quotaBytes ?? 0,
         remark: input.remark ?? null,
       },
     );
+    return this.findLibraryByIdForScope(input.id, {
+      userId: input.ownerUserId,
+      tenantId: input.tenantId,
+    });
+  }
+
+  async createLibraryIfScopeEmpty(input: {
+    id: string;
+    tenantId: string | null;
+    ownerUserId: string;
+    name: string;
+    quotaBytes?: number;
+    quotaPolicy?: string;
+    remark?: string | null;
+  }) {
+    const connection = await pool.getConnection();
+    const lockName = `vehicle_library_scope:${input.ownerUserId}`;
+    let lockAcquired = false;
+    try {
+      const [lockRows] = await connection.query<LockRow[]>(
+        "SELECT GET_LOCK(:lockName, 5) acquired",
+        { lockName } as any,
+      );
+      lockAcquired = lockRows[0]?.acquired === 1;
+      if (!lockAcquired) {
+        throw new Error("failed to acquire vehicle library scope lock");
+      }
+
+      await connection.beginTransaction();
+      const [existingRows] = await connection.query<CountRow[]>(
+        `SELECT COUNT(*) total
+         FROM vehicle_libraries
+         WHERE owner_user_id = :ownerUserId`,
+        { ownerUserId: input.ownerUserId } as any,
+      );
+      if (Number(existingRows[0]?.total ?? 0) > 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      await connection.execute<ResultSetHeader>(
+        `INSERT INTO vehicle_libraries
+          (id, tenant_id, owner_user_id, name, quota_policy, quota_bytes, remark)
+         VALUES
+          (:id, :tenantId, :ownerUserId, :name, :quotaPolicy, :quotaBytes, :remark)`,
+        {
+          ...input,
+          quotaPolicy: input.quotaPolicy ?? "standard",
+          quotaBytes: input.quotaBytes ?? 0,
+          remark: input.remark ?? null,
+        } as any,
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      if (lockAcquired) {
+        await connection.query("SELECT RELEASE_LOCK(:lockName)", { lockName } as any).catch(() => undefined);
+      }
+      connection.release();
+    }
+
     return this.findLibraryByIdForScope(input.id, {
       userId: input.ownerUserId,
       tenantId: input.tenantId,
@@ -366,6 +437,63 @@ export class VehicleLibraryRepository extends Repository {
       input,
     );
     return this.findLotById(input.id, input.libraryId);
+  }
+
+  async createLotWithinLimit(input: {
+    id: string;
+    libraryId: string;
+    name: string;
+    address: string | null;
+    remark: string | null;
+    createdByUserId: string;
+    lotLimit: number | null;
+  }) {
+    const connection = await pool.getConnection();
+    let activeLots = 0;
+    try {
+      await connection.beginTransaction();
+      const [libraryRows] = await connection.query<VehicleLibraryRow[]>(
+        `SELECT *
+         FROM vehicle_libraries
+         WHERE id = :libraryId
+         FOR UPDATE`,
+        { libraryId: input.libraryId } as any,
+      );
+      if (!libraryRows.length) {
+        await connection.rollback();
+        return { lot: null, activeLots };
+      }
+
+      const [countRows] = await connection.query<CountRow[]>(
+        `SELECT COUNT(*) total
+         FROM vehicle_lots
+         WHERE library_id = :libraryId
+           AND status = 'active'
+           AND deleted_at IS NULL`,
+        { libraryId: input.libraryId } as any,
+      );
+      activeLots = Number(countRows[0]?.total ?? 0);
+      if (input.lotLimit !== null && activeLots >= input.lotLimit) {
+        await connection.rollback();
+        return { lot: null, activeLots };
+      }
+
+      await connection.execute<ResultSetHeader>(
+        `INSERT INTO vehicle_lots
+          (id, library_id, name, address, remark, created_by_user_id)
+         VALUES
+          (:id, :libraryId, :name, :address, :remark, :createdByUserId)`,
+        input as any,
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return { lot: await this.findLotById(input.id, input.libraryId), activeLots };
   }
 
   async updateLot(input: {
@@ -571,6 +699,64 @@ export class VehicleLibraryRepository extends Repository {
       input,
     );
     return this.findVehicleById(String(input.id), String(input.libraryId));
+  }
+
+  async createVehicleWithinLimit(input: Record<string, unknown> & {
+    libraryId: string;
+    vehicleLimit: number | null;
+  }) {
+    const connection = await pool.getConnection();
+    let activeVehicles = 0;
+    try {
+      await connection.beginTransaction();
+      const [libraryRows] = await connection.query<VehicleLibraryRow[]>(
+        `SELECT *
+         FROM vehicle_libraries
+         WHERE id = :libraryId
+         FOR UPDATE`,
+        { libraryId: input.libraryId } as any,
+      );
+      if (!libraryRows.length) {
+        await connection.rollback();
+        return { vehicle: null, activeVehicles };
+      }
+
+      const [countRows] = await connection.query<CountRow[]>(
+        `SELECT COUNT(*) total
+         FROM vehicles
+         WHERE library_id = :libraryId
+           AND status = 'active'
+           AND deleted_at IS NULL`,
+        { libraryId: input.libraryId } as any,
+      );
+      activeVehicles = Number(countRows[0]?.total ?? 0);
+      if (input.vehicleLimit !== null && activeVehicles >= input.vehicleLimit) {
+        await connection.rollback();
+        return { vehicle: null, activeVehicles };
+      }
+
+      await connection.execute<ResultSetHeader>(
+        `INSERT INTO vehicles
+          (id, library_id, lot_id, vin, identify_type, brand, series, model, model_name, model_year,
+           car_type, body_type, energy_type, fuel_grade, displacement, transmission, vehicle_level, emission_standard,
+           color, mileage_km, first_registration_date,
+           guide_price, sale_price, remark, created_by_user_id)
+         VALUES
+          (:id, :libraryId, :lotId, :vin, :identifyType, :brand, :series, :model, :modelName, :modelYear,
+           :carType, :bodyType, :energyType, :fuelGrade, :displacement, :transmission, :vehicleLevel, :emissionStandard,
+           :color, :mileageKm, :firstRegistrationDate,
+           :guidePrice, :salePrice, :remark, :createdByUserId)`,
+        input as any,
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return { vehicle: await this.findVehicleById(String(input.id), input.libraryId), activeVehicles };
   }
 
   async updateVehicle(input: Record<string, unknown>) {

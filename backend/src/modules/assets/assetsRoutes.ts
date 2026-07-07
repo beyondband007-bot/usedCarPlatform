@@ -6,9 +6,10 @@ import multer from "multer";
 
 import { env } from "../../config/env";
 import { asyncHandler } from "../../shared/asyncHandler";
-import { errors } from "../../shared/errors";
+import { AppError, errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
+import { probeVideoDurationSeconds } from "../../shared/videoProbe";
 import type { AssetPurpose } from "../../shared/types";
 import { getRequiredCurrentUser } from "../auth/authMiddleware";
 import { allowedPurposes, assetsService } from "./assetsService";
@@ -60,6 +61,25 @@ assetsRoutes.post(
     if (req.file.size > limitBytes) {
       await fs.promises.unlink(req.file.path).catch(() => undefined);
       throw errors.fileTooLarge({ maxUploadMb: limitMb, size: req.file.size });
+    }
+
+    if (req.file.mimetype.toLowerCase().startsWith("video/")) {
+      try {
+        const durationSeconds = await probeVideoDurationSeconds(req.file.path);
+        if (durationSeconds > env.maxVideoUploadDurationSeconds) {
+          await fs.promises.unlink(req.file.path).catch(() => undefined);
+          throw errors.invalidParameter("video duration exceeds limit", {
+            maxDurationSeconds: env.maxVideoUploadDurationSeconds,
+            durationSeconds,
+          });
+        }
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+        await fs.promises.unlink(req.file.path).catch(() => undefined);
+        throw errors.invalidParameter("failed to validate video duration");
+      }
     }
 
     const asset = await assetsService.saveUploadedFile(req.file, purpose, current.user.id);

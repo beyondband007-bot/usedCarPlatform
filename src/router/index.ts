@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import { AUTH_ROUTE } from '@/constants/app-flow'
 import { useAuthStore } from '@/stores/auth'
+import { useSubscriptionStore } from '@/stores/subscription'
+import { canAccessVehicleLibrary } from '@/utils/vehicle-library-access'
 
 import { routes } from './routes'
 
@@ -68,6 +70,13 @@ router.beforeEach(async (to) => {
           },
         }
       }
+      return '/home'
+    }
+
+    if (
+      (to.path === '/vehicle-library' || to.path.startsWith('/vehicle-library/')) &&
+      !canAccessVehicleLibrary(useSubscriptionStore().currentPlan)
+    ) {
       return '/home'
     }
 
