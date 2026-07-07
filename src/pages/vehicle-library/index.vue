@@ -953,6 +953,11 @@ function openMaterialModalForVehicle(vehicleId: string, slotCode?: UploadSlotCod
   if (slotCode) scrollToMaterialSlot(slotCode)
 }
 
+function openVehicleMaterialOverview() {
+  activeDetailTab.value = 'assets'
+  showCompletedSlots.value = true
+}
+
 function openMaterialModal(slotCode?: UploadSlotCode) {
   if (!activeVehicle.value) return
   openMaterialModalForVehicle(activeVehicle.value.id, slotCode)
@@ -1420,8 +1425,21 @@ onMounted(loadLibraryData)
                 <span>VIN 查询入库</span>
               </div>
               <div class="detail-actions">
-                <NButton class="vl-button primary" attr-type="button" @click="openMaterialModal">
+                <NButton
+                  v-if="activeVehicle.completed < 5"
+                  class="vl-button primary"
+                  attr-type="button"
+                  @click="openMaterialModal()"
+                >
                   <Icon icon="mdi:cloud-upload-outline" />补素材
+                </NButton>
+                <NButton
+                  v-else
+                  class="vl-button primary"
+                  attr-type="button"
+                  @click="openVehicleMaterialOverview"
+                >
+                  <Icon icon="mdi:eye-outline" />预览素材
                 </NButton>
                 <NButton class="icon-button" attr-type="button" title="编辑信息" @click="openEditVehicleModal(activeVehicle.id)"><Icon icon="mdi:pencil-outline" /></NButton>
               </div>
