@@ -34,6 +34,8 @@ import {
 } from '@/api/vehicle-info'
 
 import './vehicle-library.scss'
+import { getVehicleLibraryServiceStatusLabel } from '@/constants/vehicle-library'
+import type { VehicleLibraryStatus } from '@/types/vehicle-library'
 
 // 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
 const MAX_IMAGE_UPLOAD_MB = 20
@@ -383,6 +385,14 @@ async function loadLibraryData() {
 const filteredVehicles = computed(() => vehicles.value)
 const pendingVehicleCount = computed(() =>
   Math.max(0, (libraryHome.value?.stats.activeVehicles ?? 0) - (libraryHome.value?.stats.completeVehicles ?? 0)),
+)
+
+// 企业服务状态字段：当前从 library.status 读取，展示文案暂由常量映射写死。
+const libraryServiceStatus = computed<VehicleLibraryStatus>(
+  () => libraryHome.value?.library.status ?? 'active',
+)
+const libraryServiceStatusLabel = computed(
+  () => getVehicleLibraryServiceStatusLabel(libraryServiceStatus.value),
 )
 
 const hasVehiclesInLibrary = computed(
@@ -1177,7 +1187,9 @@ onMounted(loadLibraryData)
       <section class="library-hero">
         <div class="hero-title">
           <h1>车辆库</h1>
-          <span class="service-pill"><Icon icon="mdi:shield-check-outline" />企业服务有效</span>
+          <span class="service-pill" :data-service-status="libraryServiceStatus">
+            <Icon icon="mdi:shield-check-outline" />{{ libraryServiceStatusLabel }}
+          </span>
         </div>
         <nav class="library-tabs" aria-label="车辆素材库分类">
           <button v-for="tab in [
