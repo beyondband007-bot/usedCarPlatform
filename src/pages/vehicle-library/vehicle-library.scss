@@ -88,7 +88,12 @@ html[data-theme="light"] .vehicle-library-page {
 .library-tabs button { display: flex; align-items: center; gap: 7px; min-width: 118px; justify-content: center; padding: 10px 16px; border: 0; border-radius: 6px; background: transparent; color: var(--vl-muted); font-weight: 800; transition: .16s ease; }
 .library-tabs button.active { background: var(--vl-gold-soft); color: var(--vl-gold); }
 
-.operation-message { padding: 10px 14px; margin: -4px 0 14px; border: 1px solid rgba(67, 209, 143, .35); border-radius: 7px; background: var(--vl-ok-soft); color: var(--vl-ok); font-size: 13px; }
+.operation-message { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; margin: -4px 0 14px; border: 1px solid rgba(67, 209, 143, .35); border-radius: 7px; background: var(--vl-ok-soft); color: var(--vl-ok); font-size: 13px; }
+.operation-message.error { border-color: rgba(239, 125, 114, .45); background: rgba(239, 125, 114, .12); color: var(--vl-danger); }
+.operation-message > span { flex: 1; min-width: 0; }
+.operation-message-dismiss { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 6px; background: transparent; color: inherit; opacity: .75; transition: .16s ease; }
+.operation-message-dismiss:hover { opacity: 1; background: rgba(255, 255, 255, .08); }
+html[data-theme="light"] .operation-message-dismiss:hover { background: rgba(0, 0, 0, .06); }
 
 /* ─── 数据缎带：单行统计，替代旧的指标卡 + 状态条 ─── */
 .stats-ribbon { display: flex; align-items: stretch; gap: 1px; margin-bottom: 18px; overflow: hidden; border: 1px solid var(--vl-line); border-radius: 8px; background: var(--vl-line); }

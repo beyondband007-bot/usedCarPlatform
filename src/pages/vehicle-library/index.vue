@@ -143,6 +143,9 @@ const savingLot = ref(false)
 const deletingVehicle = ref(false)
 const deleteVehicleTarget = ref<Vehicle | null>(null)
 const operationMessage = ref('')
+const operationMessageTone = ref<'success' | 'error'>('success')
+let operationMessageTimer: ReturnType<typeof setTimeout> | undefined
+const materialUploadError = ref('')
 const lotError = ref('')
 const lotForm = reactive({
   name: '',
@@ -402,6 +405,20 @@ const vehicleEmptyState = computed(() => {
   }
 })
 
+function showOperationFeedback(message: string, tone: 'success' | 'error' = 'success') {
+  operationMessage.value = message
+  operationMessageTone.value = tone
+  if (operationMessageTimer) clearTimeout(operationMessageTimer)
+  operationMessageTimer = setTimeout(() => {
+    operationMessage.value = ''
+  }, tone === 'error' ? 8000 : 5000)
+}
+
+function dismissOperationFeedback() {
+  operationMessage.value = ''
+  if (operationMessageTimer) clearTimeout(operationMessageTimer)
+}
+
 const hasActiveLotQuery = computed(() => Boolean(lotKeyword.value.trim()))
 
 const filters: Array<{ value: VehicleFilter; label: string }> = [
@@ -461,6 +478,7 @@ function resetVehicleForm() {
 function openVehicleModal() {
   editingVehicleId.value = null
   vinError.value = ''
+  materialUploadError.value = ''
   vinResult.value = null
   resetVehicleForm()
   resetMaterialFiles()
@@ -475,6 +493,7 @@ async function openEditVehicleModal(vehicleId: string) {
   if (!record) return
   editingVehicleId.value = record.id
   vinError.value = ''
+  materialUploadError.value = ''
   vinResult.value = null
   resetVehicleForm()
   Object.assign(vehicleForm, {
@@ -618,11 +637,11 @@ async function confirmDeleteVehicle() {
   deletingVehicle.value = true
   try {
     await deleteVehicle(vehicle.id)
-    operationMessage.value = '车辆已删除。'
+    showOperationFeedback('车辆已删除。')
     deleteVehicleTarget.value = null
     await loadLibraryData()
   } catch (error) {
-    operationMessage.value = error instanceof Error ? error.message : '车辆删除失败'
+    showOperationFeedback(error instanceof Error ? error.message : '车辆删除失败', 'error')
   } finally {
     deletingVehicle.value = false
   }
@@ -697,9 +716,12 @@ async function saveLot() {
         failedMaterials.push(withUploadFailReason('车场视频', error))
       }
     }
-    operationMessage.value = failedMaterials.length
-      ? `车场已创建；${failedMaterials.join('、')}上传失败，可稍后补充。`
-      : '车场已成功创建。'
+    showOperationFeedback(
+      failedMaterials.length
+        ? `车场已创建；${failedMaterials.join('、')}上传失败，可稍后补充。`
+        : '车场已成功创建。',
+      failedMaterials.length ? 'error' : 'success',
+    )
     showLotModal.value = false
     await loadLibraryData()
     activeLibraryTab.value = 'lots'
@@ -802,9 +824,12 @@ async function saveLotManage() {
         failedMaterials.push(withUploadFailReason('车场视频', error))
       }
     }
-    operationMessage.value = failedMaterials.length
-      ? `车场已更新；${failedMaterials.join('、')}上传失败，可稍后重试。`
-      : '车场信息已更新。'
+    showOperationFeedback(
+      failedMaterials.length
+        ? `车场已更新；${failedMaterials.join('、')}上传失败，可稍后重试。`
+        : '车场信息已更新。',
+      failedMaterials.length ? 'error' : 'success',
+    )
     showLotManageModal.value = false
     managingLot.value = null
     releaseLotManagePreview('image')
@@ -823,7 +848,7 @@ async function confirmDeleteLot() {
   deletingLot.value = true
   try {
     await deleteVehicleLot(lot.id)
-    operationMessage.value = '车场已删除。'
+    showOperationFeedback('车场已删除。')
     deleteLotTarget.value = null
     showLotManageModal.value = false
     managingLot.value = null
@@ -850,12 +875,12 @@ function selectMaterialFile(slot: (typeof uploadSlots)[number], event: Event) {
     ? file.type.startsWith('image/')
     : file.type.startsWith('video/')
   if (!validType) {
-    vinError.value = `${slot.label}请选择${slot.mediaType === 'image' ? '图片' : '视频'}文件`
+    materialUploadError.value = `${slot.label}请选择${slot.mediaType === 'image' ? '图片' : '视频'}文件`
     return
   }
   const sizeError = uploadSizeError(file, slot.mediaType)
   if (sizeError) {
-    vinError.value = `${slot.label}${sizeError}`
+    materialUploadError.value = `${slot.label}${sizeError}`
     return
   }
   materialFiles[slot.code] = file
@@ -909,7 +934,7 @@ function showVideoFirstFrame(event: Event) {
 
 function openMaterialModalForVehicle(vehicleId: string) {
   selectVehicle(vehicleId)
-  vinError.value = ''
+  materialUploadError.value = ''
   resetMaterialFiles()
   const record = vehicleRecords.value.find((item) => item.id === vehicleId)
   setExistingMaterials(record?.materials ?? [])
@@ -958,12 +983,12 @@ async function uploadExistingVehicleMaterials() {
   if (!vehicle) return
   const selectedSlots = uploadSlots.filter((slot) => materialFiles[slot.code])
   if (!selectedSlots.length) {
-    vinError.value = '请至少选择一个车辆素材'
+    materialUploadError.value = '请至少选择一个车辆素材'
     return
   }
 
   savingMaterials.value = true
-  vinError.value = ''
+  materialUploadError.value = ''
   const failedSlots: string[] = []
   try {
     for (const slot of selectedSlots) {
@@ -976,9 +1001,12 @@ async function uploadExistingVehicleMaterials() {
         failedSlots.push(withUploadFailReason(slot.label, error))
       }
     }
-    operationMessage.value = failedSlots.length
-      ? `${failedSlots.join('、')}上传失败，其余素材已保存。`
-      : '车辆素材已保存。'
+    showOperationFeedback(
+      failedSlots.length
+        ? `${failedSlots.join('、')}上传失败，其余素材已保存。`
+        : '车辆素材已保存。',
+      failedSlots.length ? 'error' : 'success',
+    )
     showMaterialModal.value = false
     resetMaterialFiles()
     const savedVehicleId = vehicle.id
@@ -1007,6 +1035,7 @@ onBeforeUnmount(() => {
   releaseLotManagePreview('image')
   releaseLotManagePreview('video')
   if (vehicleSearchTimer) clearTimeout(vehicleSearchTimer)
+  if (operationMessageTimer) clearTimeout(operationMessageTimer)
 })
 
 function fillVehicleForm(vin: string, result: VehicleBasicInfo) {
@@ -1132,9 +1161,12 @@ async function saveVehicle() {
       }
     }
     const savedText = isEditing ? '车辆信息已更新' : '车辆已入库'
-    operationMessage.value = failedSlots.length
-      ? `${savedText}；${failedSlots.join('、')}上传失败，可在车辆详情中补充。`
-      : `${savedText}。`
+    showOperationFeedback(
+      failedSlots.length
+        ? `${savedText}；${failedSlots.join('、')}上传失败，可在车辆详情中补充。`
+        : `${savedText}。`,
+      failedSlots.length ? 'error' : 'success',
+    )
   } catch (error) {
     vinError.value = error instanceof Error ? error.message : (isEditing ? '车辆信息保存失败' : '车辆入库失败')
     return
@@ -1179,7 +1211,18 @@ onMounted(loadLibraryData)
           </NButton>
         </div>
       </section>
-      <p v-if="operationMessage" class="operation-message">{{ operationMessage }}</p>
+      <div
+        v-if="operationMessage"
+        class="operation-message"
+        :class="operationMessageTone"
+        role="status"
+        aria-live="polite"
+      >
+        <span>{{ operationMessage }}</span>
+        <button type="button" class="operation-message-dismiss" aria-label="关闭提示" @click="dismissOperationFeedback">
+          <Icon icon="mdi:close" />
+        </button>
+      </div>
 
       <section class="stats-ribbon" aria-label="车辆库统计">
         <button
@@ -1639,6 +1682,7 @@ onMounted(loadLibraryData)
                 </template>
               </label>
             </div>
+            <p v-if="materialUploadError" class="form-error">{{ materialUploadError }}</p>
           </section>
         </div>
         <footer><NButton class="vl-button ghost" attr-type="button" @click="showVehicleModal = false">取消</NButton>
@@ -1690,7 +1734,7 @@ onMounted(loadLibraryData)
             </label>
           </div>
           <p class="material-upload-note">素材均为选填；再次上传同一槽位会替换原素材。</p>
-          <p v-if="vinError" class="form-error">{{ vinError }}</p>
+          <p v-if="materialUploadError" class="form-error">{{ materialUploadError }}</p>
         </div>
         <footer>
           <NButton class="vl-button ghost" attr-type="button" :disabled="savingMaterials" @click="showMaterialModal = false">取消</NButton>
