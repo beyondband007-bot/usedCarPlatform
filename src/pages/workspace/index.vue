@@ -42,6 +42,7 @@ import WorkspaceSidebar from "@/components/business/workspace/WorkspaceSidebar.v
 import { DEFAULT_GENERATION_OUTPUT_RATIO } from "@/constants/output-ratio";
 import {
   defaultWorkspaceCapabilityCode,
+  disabledWorkspaceCapabilityCodes,
   workspaceCapabilities,
   workspaceStaticImageUrls,
 } from "@/constants/workspace";
@@ -186,6 +187,9 @@ interface ActiveGenerationTaskSnapshot {
 
 function resolveCapabilityCode(code: unknown) {
   if (typeof code !== "string") return defaultWorkspaceCapabilityCode;
+  if (disabledWorkspaceCapabilityCodes.has(code)) {
+    return defaultWorkspaceCapabilityCode;
+  }
   return workspaceCapabilities.some((item) => item.code === code)
     ? code
     : defaultWorkspaceCapabilityCode;
@@ -222,6 +226,7 @@ let batchPollTimer: number | null = null;
 let globalGenerationPollTimer: number | null = null;
 let isRefreshingRunningTasks = false;
 let isBatchPollInFlight = false;
+let isGenerationPollInFlight = false;
 /** 正在由 resolve* 主动轮询的任务，全局轮询跳过以免重复打 KIE */
 const activelyResolvingTaskIds = new Set<string>();
 /** 已弹出过完成提示的任务，避免 resolve 与全局轮询重复 toast */
@@ -489,17 +494,56 @@ function setCreativeConversationGenerating(
 
 function stopGlobalGenerationPolling() {
   if (globalGenerationPollTimer !== null) {
-    window.clearInterval(globalGenerationPollTimer);
+    window.clearTimeout(globalGenerationPollTimer);
     globalGenerationPollTimer = null;
   }
 }
 
-function startGlobalGenerationPolling() {
-  if (globalGenerationPollTimer !== null) return;
+function scheduleNextGlobalGenerationPoll(delayMs: number) {
+  stopGlobalGenerationPolling();
+  if (!Object.keys(trackedRunningTasks.value).length) return;
 
-  globalGenerationPollTimer = window.setInterval(() => {
-    void pollTrackedRunningTasks();
-  }, GENERATION_TASK_POLL_MS);
+  globalGenerationPollTimer = window.setTimeout(() => {
+    globalGenerationPollTimer = null;
+    void runGlobalGenerationPoll();
+  }, delayMs);
+}
+
+async function runGlobalGenerationPoll() {
+  if (isGenerationPollInFlight) return;
+  if (!Object.keys(trackedRunningTasks.value).length) {
+    stopGlobalGenerationPolling();
+    return;
+  }
+
+  isGenerationPollInFlight = true;
+  let nextDelayMs = GENERATION_TASK_POLL_MS;
+  try {
+    nextDelayMs = await pollTrackedRunningTasks();
+  } finally {
+    isGenerationPollInFlight = false;
+    if (Object.keys(trackedRunningTasks.value).length) {
+      scheduleNextGlobalGenerationPoll(nextDelayMs);
+    }
+  }
+}
+
+function startGlobalGenerationPolling() {
+  if (globalGenerationPollTimer !== null || isGenerationPollInFlight) return;
+  if (!Object.keys(trackedRunningTasks.value).length) return;
+  void runGlobalGenerationPoll();
+}
+
+function resolveGenerationPollIntervalMs(
+  tasks?: Array<GenerationTaskDetail | null | undefined>,
+) {
+  const recommended = tasks
+    ?.map((task) => task?.pollingRecommendedMs)
+    .filter((ms): ms is number => typeof ms === "number" && ms > 0);
+  if (recommended?.length) {
+    return Math.min(...recommended);
+  }
+  return GENERATION_TASK_POLL_MS;
 }
 
 function mapBatchDetailToJob(
@@ -881,16 +925,17 @@ async function pollTrackedRunningTasks() {
   const allEntries = Object.entries(trackedRunningTasks.value);
   if (!allEntries.length) {
     stopGlobalGenerationPolling();
-    return;
+    return GENERATION_TASK_POLL_MS;
   }
 
   const entries = allEntries.filter(
     ([taskId]) => !activelyResolvingTaskIds.has(taskId),
   );
-  if (!entries.length) return;
+  if (!entries.length) return GENERATION_TASK_POLL_MS;
 
   const next: Record<string, string> = { ...trackedRunningTasks.value };
   let hasTerminalTask = false;
+  const polledTasks: GenerationTaskDetail[] = [];
 
   const results = await Promise.allSettled(
     entries.map(([taskId]) => getGenerationTask(taskId)),
@@ -900,6 +945,7 @@ async function pollTrackedRunningTasks() {
     if (result.status !== "fulfilled") continue;
 
     const task = result.value;
+    polledTasks.push(task);
     if (isTerminalGenerationStatus(task)) {
       if (task.status === "success") {
         notifyGenerationSuccess(task);
@@ -924,6 +970,8 @@ async function pollTrackedRunningTasks() {
     }
     void assistPanelRef.value?.refreshRecentItems();
   }
+
+  return resolveGenerationPollIntervalMs(polledTasks);
 }
 
 async function refreshRunningTaskSummary() {
@@ -1309,7 +1357,9 @@ async function pollGenerationTask(
       } else {
         const remaining = deadline - Date.now();
         if (remaining <= 0) break;
-        await sleep(Math.min(GENERATION_TASK_POLL_MS, remaining));
+        await sleep(
+          Math.min(resolveGenerationPollIntervalMs([latest]), remaining),
+        );
         latest = await getGenerationTask(taskId);
       }
 
@@ -1356,7 +1406,14 @@ async function pollMultipleGenerationTasks(taskIds: string[]) {
 
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
-      await sleep(Math.min(GENERATION_TASK_POLL_MS, remaining));
+      await sleep(
+        Math.min(
+          resolveGenerationPollIntervalMs(
+            taskIds.map((taskId) => latest.get(taskId)),
+          ),
+          remaining,
+        ),
+      );
     }
   } finally {
     endActiveTaskResolves(taskIds);

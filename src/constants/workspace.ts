@@ -629,6 +629,12 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
 
 export const defaultWorkspaceCapabilityCode = 'showroom-light'
 
+/** 工作台侧栏暂时禁用的能力（保留配置，入口不可点） */
+export const disabledWorkspaceCapabilityCodes = new Set([
+  'simultaneous-interpretation',
+  'long-video',
+])
+
 const showroomTutorialImageByTitle: Record<string, string> = {
   经典白棚: showroomTutorialClassicWhite,
   玻璃展厅: showroomTutorialGlass,
@@ -749,9 +755,7 @@ function toMenuItem(capability: WorkspaceCapability): WorkspaceMenuItem {
     tag: capability.tag,
     tagType: capability.tagType,
     tagVariant: menuTagVariant(capability.tag, capability.tagType),
-    disabled:
-      capability.code === 'long-video' ||
-      capability.code === 'simultaneous-interpretation',
+    disabled: disabledWorkspaceCapabilityCodes.has(capability.code),
   }
 }
 

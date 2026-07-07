@@ -35,6 +35,7 @@ const creditsBalanceText = computed(() => {
 
 const visibleNavigation = computed(() =>
   secondaryNavigation.filter((item) => {
+    if (item.hidden) return false
     const permission = permissionMap[item.path]
     return !permission || authStore.permissions.includes(permission)
   }),

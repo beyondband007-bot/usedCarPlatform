@@ -11,7 +11,7 @@ export const studioGuestNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
   {
     path: '/workspace',
-    label: '视觉工作台',
+    label: '内容工作台',
     workbenchEntry: true,
   },
   { path: '/pricing', label: '企业套餐' },
@@ -22,7 +22,7 @@ export const topNavigation: NavItem[] = [
   { path: '/home', label: '首页', icon: 'mdi:home-outline' },
   {
     path: '/workspace',
-    label: '视觉工作台',
+    label: '内容工作台',
     icon: 'mdi:palette-outline',
     workbenchEntry: true,
   },
@@ -30,6 +30,7 @@ export const topNavigation: NavItem[] = [
     path: '/vehicle-library',
     label: '车辆库',
     icon: 'mdi:car-multiple',
+    hidden: true,
   },
   { path: '/pricing', label: '企业套餐', icon: 'mdi:briefcase-outline' },
   { path: '/credits', label: '积分查询', icon: 'mdi:diamond-stone' },
@@ -39,8 +40,8 @@ export const topNavigation: NavItem[] = [
 /** 旧版登录后二级导航配置，仅保留给历史组件引用 */
 export const secondaryNavigation: NavItem[] = [
   { path: '/home', label: '首页' },
-  { path: '/workspace', label: '视觉工作台' },
-  { path: '/vehicle-library', label: '车辆库' },
+  { path: '/workspace', label: '内容工作台' },
+  { path: '/vehicle-library', label: '车辆库', hidden: true },
   { path: '/pricing', label: '企业套餐' },
   { path: '/credits', label: '积分查询' },
   { path: '/reusable-credits-console', label: 'Reusable Credits Console' },
@@ -48,7 +49,7 @@ export const secondaryNavigation: NavItem[] = [
 
 export const homeFeatures: FeatureEntry[] = [
   {
-    title: '视觉工作台',
+    title: '内容工作台',
     description: '场景影棚、批量上新、成片交付',
     action: '进入工作台',
     workbenchEntry: true,

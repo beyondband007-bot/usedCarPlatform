@@ -4,6 +4,8 @@ export interface NavItem {
   icon?: string
   /** 访客点击时展示浮层，登录后正常跳转 path */
   workbenchEntry?: boolean
+  /** 暂时隐藏导航入口，路由仍可保留 */
+  hidden?: boolean
 }
 
 export interface HeroMetric {

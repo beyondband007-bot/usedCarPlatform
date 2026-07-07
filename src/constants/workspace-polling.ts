@@ -1,5 +1,5 @@
-/** 单张/短视频等生成任务轮询间隔 */
-export const GENERATION_TASK_POLL_MS = 25_000
+/** 单张/短视频等生成任务轮询间隔（与后端 pollingRecommendedMs 默认一致） */
+export const GENERATION_TASK_POLL_MS = 5_000
 
 /** 单任务最长轮询时长（与 GENERATION_TASK_POLL_MS 联动） */
 export const GENERATION_TASK_POLL_MAX_MS = 20 * 60 * 1000

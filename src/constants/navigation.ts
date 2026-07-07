@@ -12,7 +12,7 @@ export const mainNavigation: NavigationItem[] = [
   },
   {
     path: '/workspace',
-    label: '视觉工作台',
+    label: '内容工作台',
     description: 'AI 图片生成核心',
   },
   {

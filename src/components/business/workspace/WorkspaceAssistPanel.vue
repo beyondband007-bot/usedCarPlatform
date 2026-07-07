@@ -207,7 +207,7 @@ const templateCards = computed<SceneTemplateRecommendationItem[]>(() =>
       id: item.optionId,
       title: item.title,
       image: item.image,
-      description: templateDescriptionMap[item.title] ?? "推荐的视觉工作台场景",
+      description: templateDescriptionMap[item.title] ?? "推荐的内容工作台场景",
     })),
 );
 

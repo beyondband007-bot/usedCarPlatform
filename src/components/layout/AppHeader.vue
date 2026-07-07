@@ -117,6 +117,7 @@ function resolveNavPermission(path: string) {
 }
 
 function canShowNavItem(item: NavItem) {
+  if (item.hidden) return false;
   if (!authStore.isLoggedIn)
     return item.path !== "/credits" && item.path !== "/points";
   if (

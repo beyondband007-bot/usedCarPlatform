@@ -51,7 +51,7 @@ function getStatusAriaLabel(
 </script>
 
 <template>
-  <aside class="workspace-sidebar" aria-label="视觉工作台能力导航">
+  <aside class="workspace-sidebar" aria-label="内容工作台能力导航">
     <div class="workspace-sidebar-body">
       <section
         v-for="group in workspaceMenuGroups"

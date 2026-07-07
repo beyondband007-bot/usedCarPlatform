@@ -64,7 +64,7 @@ function openSupportModal() {
         登录后使用完整功能
       </h2>
       <p class="visitor-modal-desc">
-        场景影棚、批量上新与成片交付等功能需企业账号登录后使用。登录后即可进入视觉工作台，开启专业级汽车内容生成体验。
+        场景影棚、批量上新与成片交付等功能需企业账号登录后使用。登录后即可进入内容工作台，开启专业级汽车内容生成体验。
       </p>
 
       <div class="visitor-modal-actions">

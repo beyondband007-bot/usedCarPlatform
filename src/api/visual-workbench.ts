@@ -147,6 +147,7 @@ export interface GenerationTaskDetail {
   } | null
   createdAt?: string
   updatedAt?: string
+  pollingRecommendedMs?: number | null
 }
 
 export interface CreativeImageConversation {

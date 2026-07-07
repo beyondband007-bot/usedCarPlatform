@@ -42,6 +42,7 @@ const activeTask = ref<LanguageConversionTask | null>(null)
 const isSubmitting = ref(false)
 const pollTimer = ref<number | null>(null)
 const pollFailures = ref(0)
+let activePollingTaskId = ''
 const isDownloading = ref(false)
 
 const activeView = ref<'convert' | 'history'>('convert')
@@ -314,20 +315,33 @@ async function handleSubmit() {
 
 function startPolling(taskId: string) {
   stopPolling()
+  activePollingTaskId = taskId
   pollFailures.value = 0
   void refreshTask(taskId)
 }
 
 function stopPolling() {
+  activePollingTaskId = ''
   if (pollTimer.value !== null) {
-    window.clearInterval(pollTimer.value)
+    window.clearTimeout(pollTimer.value)
     pollTimer.value = null
   }
 }
 
+function schedulePollRefresh(taskId: string) {
+  if (activePollingTaskId !== taskId) return
+  pollTimer.value = window.setTimeout(() => {
+    void refreshTask(taskId)
+  }, POLL_INTERVAL_MS)
+}
+
 async function refreshTask(taskId: string) {
+  if (activePollingTaskId !== taskId) return
+
   try {
     const task = await getLanguageConversionTask(taskId)
+    if (activePollingTaskId !== taskId) return
+
     pollFailures.value = 0
     activeTask.value = task
     if (task.status === 'success') {
@@ -340,20 +354,18 @@ async function refreshTask(taskId: string) {
       message.error(task.errorMessage || '语言转换失败')
     } else {
       syncSimulatedProgressWithTask(task)
-      pollTimer.value = window.setTimeout(() => {
-        void refreshTask(taskId)
-      }, POLL_INTERVAL_MS)
+      schedulePollRefresh(taskId)
     }
   } catch (error) {
+    if (activePollingTaskId !== taskId) return
+
     pollFailures.value += 1
     if (pollFailures.value >= MAX_POLL_FAILURES) {
       stopPolling()
       message.error(error instanceof Error ? error.message : '语言转换状态查询失败')
       return
     }
-    pollTimer.value = window.setTimeout(() => {
-      void refreshTask(taskId)
-    }, POLL_INTERVAL_MS)
+    schedulePollRefresh(taskId)
   }
 }
 
