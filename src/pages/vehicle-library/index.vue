@@ -385,9 +385,22 @@ const pendingVehicleCount = computed(() =>
 const showTaskBanner = computed(
   () => activeLibraryTab.value === 'vehicles' && pendingVehicleCount.value > 0,
 )
-const hasActiveVehicleQuery = computed(
-  () => activeFilter.value !== 'incomplete' || Boolean(keyword.value.trim()),
+const hasVehiclesInLibrary = computed(
+  () => (libraryHome.value?.stats.activeVehicles ?? 0) > 0,
 )
+
+const vehicleEmptyState = computed(() => {
+  if (hasVehiclesInLibrary.value) {
+    return {
+      title: '没有匹配的车辆',
+      description: '尝试更换筛选条件或搜索关键词。',
+    }
+  }
+  return {
+    title: '车辆库还是空的',
+    description: '点击“新增车辆”录入第一辆车。',
+  }
+})
 
 const hasActiveLotQuery = computed(() => Boolean(lotKeyword.value.trim()))
 
@@ -1337,8 +1350,8 @@ onMounted(loadLibraryData)
             </div>
             <div v-if="!filteredVehicles.length && !loading && !loadError" class="empty-state">
               <Icon icon="mdi:car-plus" />
-              <h2>{{ hasActiveVehicleQuery ? '没有匹配的车辆' : '车辆库还是空的' }}</h2>
-              <p>{{ hasActiveVehicleQuery ? '尝试更换筛选条件或搜索关键词。' : '点击“新增车辆”录入第一辆车。' }}</p>
+              <h2>{{ vehicleEmptyState.title }}</h2>
+              <p>{{ vehicleEmptyState.description }}</p>
             </div>
           </div>
 
