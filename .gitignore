@@ -25,3 +25,5 @@ coverage
 node_modules/.tmp/
 *.log
 /secrets/
+.claude/
+.tmp-sdk/
