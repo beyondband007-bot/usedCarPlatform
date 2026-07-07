@@ -309,6 +309,7 @@ html[data-theme="light"] .detail-cover-monogram { filter: saturate(0.9) brightne
 .existing-material-uploads { grid-template-columns: repeat(5, minmax(120px, 1fr)); }
 .material-upload-card { position: relative; display: flex; min-height: 120px; align-items: center; justify-content: center; flex-direction: column; gap: 6px; padding: 12px 8px; overflow: hidden; border: 1px dashed var(--vl-line-strong); border-radius: 8px; background: var(--vl-input); color: var(--vl-muted); cursor: pointer; text-align: center; transition: .16s ease; }
 .material-upload-card:hover { border-color: var(--vl-gold); background: rgba(232, 179, 60, .06); }
+.material-upload-card.focused { border-color: var(--vl-gold); background: var(--vl-gold-soft); box-shadow: 0 0 0 3px rgba(232, 179, 60, .18); }
 .material-upload-card > input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .material-upload-card > svg { font-size: 27px; color: var(--vl-gold); }
 .material-upload-card > strong { color: var(--vl-text); font-size: 13px; }

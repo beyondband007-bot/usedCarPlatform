@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { NButton, NPagination, NSelect } from 'naive-ui'
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
 import {
   createVehicle,
@@ -117,6 +117,8 @@ const advanceAfterMaterialSave = ref(false)
 const showVehicleModal = ref(false)
 const editingVehicleId = ref<string | null>(null)
 const showMaterialModal = ref(false)
+const highlightedMaterialSlot = ref<UploadSlotCode | null>(null)
+const materialModalBodyRef = ref<HTMLElement | null>(null)
 const showLotModal = ref(false)
 const showLotManageModal = ref(false)
 const managingLot = ref<VehicleLot | null>(null)
@@ -614,6 +616,10 @@ watch(lotPage, async () => {
   }
 })
 
+watch(showMaterialModal, (visible) => {
+  if (!visible) highlightedMaterialSlot.value = null
+})
+
 watch(activeVehicleId, () => {
   showCompletedSlots.value = (activeVehicle.value?.completed ?? 0) === 5
 })
@@ -928,18 +934,28 @@ function showVideoFirstFrame(event: Event) {
   }
 }
 
-function openMaterialModalForVehicle(vehicleId: string) {
+function scrollToMaterialSlot(slotCode: UploadSlotCode) {
+  void nextTick(() => {
+    const container = materialModalBodyRef.value
+    const target = container?.querySelector<HTMLElement>(`[data-material-slot="${slotCode}"]`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+function openMaterialModalForVehicle(vehicleId: string, slotCode?: UploadSlotCode) {
   selectVehicle(vehicleId)
   materialUploadError.value = ''
   resetMaterialFiles()
+  highlightedMaterialSlot.value = slotCode ?? null
   const record = vehicleRecords.value.find((item) => item.id === vehicleId)
   setExistingMaterials(record?.materials ?? [])
   showMaterialModal.value = true
+  if (slotCode) scrollToMaterialSlot(slotCode)
 }
 
-function openMaterialModal() {
+function openMaterialModal(slotCode?: UploadSlotCode) {
   if (!activeVehicle.value) return
-  openMaterialModalForVehicle(activeVehicle.value.id)
+  openMaterialModalForVehicle(activeVehicle.value.id, slotCode)
 }
 
 function selectNextPendingVehicle(afterVehicleId: string) {
@@ -1423,9 +1439,9 @@ onMounted(loadLibraryData)
                   class="slot-item pending-action"
                   role="button"
                   tabindex="0"
-                  @click="openMaterialModal"
-                  @keydown.enter="openMaterialModal"
-                  @keydown.space.prevent="openMaterialModal"
+                  @click="openMaterialModal(slot.code)"
+                  @keydown.enter="openMaterialModal(slot.code)"
+                  @keydown.space.prevent="openMaterialModal(slot.code)"
                 >
                   <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-outline' : 'mdi:video-outline'" />
                   <span>{{ slot.label }}</span>
@@ -1684,10 +1700,14 @@ onMounted(loadLibraryData)
             <Icon icon="mdi:close" />
           </button>
         </header>
-        <div class="modal-body">
+        <div ref="materialModalBodyRef" class="modal-body">
           <div class="vehicle-material-uploads existing-material-uploads">
             <label v-for="slot in uploadSlots" :key="slot.code" class="material-upload-card"
-              :class="{ 'has-preview': materialPreviewUrl(slot.code) }">
+              :class="{
+                'has-preview': materialPreviewUrl(slot.code),
+                focused: highlightedMaterialSlot === slot.code,
+              }"
+              :data-material-slot="slot.code">
               <input
                 type="file"
                 :accept="slot.mediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/quicktime'"
