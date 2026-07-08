@@ -505,6 +505,13 @@ export class VehicleLibraryService {
     // 先解绑场内车辆，否则这些车辆会带着已删场地 id 卡在 lot 归属校验上。
     await vehicleLibraryRepository.detachVehiclesFromLot(lotId, library.id, current.user.id);
     await vehicleLibraryRepository.archiveLot(lotId, library.id, current.user.id);
+    // 同步释放素材占用的存储配额，否则 used_bytes 会被已删车场永久占用。
+    await vehicleLibraryRepository.deleteMaterialsForOwner({
+      libraryId: library.id,
+      ownerType: "lot",
+      ownerId: lotId,
+    });
+    await vehicleLibraryRepository.recalculateLibraryUsedBytes(library.id);
     return { deleted: true };
   }
 
@@ -641,6 +648,13 @@ export class VehicleLibraryService {
   async deleteVehicle(current: CurrentUserSession, vehicleId: string, query?: Record<string, unknown>) {
     const library = await this.getWritableLibraryForRequest(current, query?.libraryId);
     await vehicleLibraryRepository.archiveVehicle(vehicleId, library.id, current.user.id);
+    // 同步释放素材占用的存储配额，否则 used_bytes 会被已删车辆永久占用。
+    await vehicleLibraryRepository.deleteMaterialsForOwner({
+      libraryId: library.id,
+      ownerType: "vehicle",
+      ownerId: vehicleId,
+    });
+    await vehicleLibraryRepository.recalculateLibraryUsedBytes(library.id);
     return { deleted: true };
   }
 

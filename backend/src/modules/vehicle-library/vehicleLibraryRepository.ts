@@ -907,6 +907,23 @@ export class VehicleLibraryRepository extends Repository {
     );
   }
 
+  async deleteMaterialsForOwner(input: {
+    libraryId: string;
+    ownerType: VehicleOwnerType;
+    ownerId: string;
+  }) {
+    await this.execute(
+      `UPDATE vehicle_library_materials
+       SET status = 'deleted',
+           deleted_at = CURRENT_TIMESTAMP(3)
+       WHERE library_id = :libraryId
+         AND owner_type = :ownerType
+         AND owner_id = :ownerId
+         AND deleted_at IS NULL`,
+      input,
+    );
+  }
+
   async deleteMaterialSlot(input: {
     libraryId: string;
     ownerType: VehicleOwnerType;
