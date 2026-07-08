@@ -3,6 +3,7 @@ import { LOGIN_PAGE } from '@/router/config'
 
 definePage({
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '注册',
   },
 })

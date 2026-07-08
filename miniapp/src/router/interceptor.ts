@@ -107,7 +107,7 @@ export const navigateToInterceptor = {
           return true // 明确表示允许路由继续执行
         }
         FG_LOG_ENABLE && console.log('1 isNeedLogin(白名单策略) redirectUrl:', redirectUrl)
-        uni.navigateTo({ url: redirectUrl })
+        uni.reLaunch({ url: redirectUrl })
         return false // 明确表示阻止原路由继续执行
       }
     }
@@ -118,7 +118,7 @@ export const navigateToInterceptor = {
       // 不需要登录里面的 EXCLUDE_LOGIN_PATH_LIST 表示黑名单，需要重定向到登录页
       if (judgeIsExcludePath(path)) {
         FG_LOG_ENABLE && console.log('2 isNeedLogin(黑名单策略) redirectUrl:', redirectUrl)
-        uni.navigateTo({ url: redirectUrl })
+        uni.reLaunch({ url: redirectUrl })
         return false // 修改为false，阻止原路由继续执行
       }
       return true // 明确表示允许路由继续执行

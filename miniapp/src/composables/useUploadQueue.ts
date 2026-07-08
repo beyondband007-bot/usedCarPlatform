@@ -60,7 +60,18 @@ export function useUploadQueue() {
     }
   }
 
+  function reviveStaleUploadingTasks() {
+    uploadStore.uploadingTasks
+      .filter(task => !activeTaskIds.has(task.id))
+      .forEach(task => uploadStore.updateTask(task.id, {
+        status: 'waiting',
+        progress: 0,
+        errorMessage: undefined,
+      }))
+  }
+
   function processQueue() {
+    reviveStaleUploadingTasks()
     const available = Math.max(0, uploadStore.concurrency - activeTaskIds.size)
     uploadStore.waitingTasks.slice(0, available).forEach(task => upload(task))
   }

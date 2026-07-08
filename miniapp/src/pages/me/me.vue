@@ -15,18 +15,10 @@ const tokenStore = useTokenStore()
 // 使用storeToRefs解构userInfo
 const { userInfo } = storeToRefs(userStore)
 
-// 微信小程序下登录
-async function handleLogin() {
-  // #ifdef MP-WEIXIN
-  // 微信登录
-  await tokenStore.wxLogin()
-
-  // #endif
-  // #ifndef MP-WEIXIN
+function handleLogin() {
   uni.navigateTo({
-    url: `${LOGIN_PAGE}`,
+    url: LOGIN_PAGE,
   })
-  // #endif
 }
 
 function handleLogout() {

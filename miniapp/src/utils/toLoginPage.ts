@@ -4,7 +4,7 @@ import { debounce } from '@/utils/debounce'
 interface ToLoginPageOptions {
   /**
    * 跳转模式, uni.navigateTo | uni.reLaunch
-   * @default 'navigateTo'
+   * @default 'reLaunch'
    */
   mode?: 'navigateTo' | 'reLaunch'
   /**
@@ -22,7 +22,7 @@ const LOGIN_PAGE = '/pages/auth/login'
  * 如果要立即跳转，不做延时，可以使用 `toLoginPage.flush()` 方法
  */
 export const toLoginPage = debounce((options: ToLoginPageOptions = {}) => {
-  const { mode = 'navigateTo', queryString = '' } = options
+  const { mode = 'reLaunch', queryString = '' } = options
 
   const url = `${LOGIN_PAGE}${queryString}`
 

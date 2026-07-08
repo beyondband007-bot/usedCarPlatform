@@ -8,6 +8,7 @@ import { useTokenStore } from '@/store/token'
 definePage({
   excludeLoginPath: true,
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '登录',
   },
 })

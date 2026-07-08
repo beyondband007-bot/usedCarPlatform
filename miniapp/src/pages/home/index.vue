@@ -4,7 +4,7 @@ import type { VehicleLibraryStats } from '@/api/vehicle'
 import { computed, ref } from 'vue'
 import { DEFAULT_CAPTURE_POSITIONS } from '@/constants/capture'
 import { VEHICLE_STATUS_TEXT } from '@/constants/vehicle'
-import { getVehicleLibraryHome } from '@/api/vehicle'
+import { getVehicleLibraryHome, getVehicleList } from '@/api/vehicle'
 import { useUploadStore } from '@/store/upload'
 import { useUserStore } from '@/store/user'
 import { useVehicleStore } from '@/store/vehicle'
@@ -25,10 +25,11 @@ const userStore = useUserStore()
 const vehicleStore = useVehicleStore()
 const uploadStore = useUploadStore()
 const libraryStats = ref<VehicleLibraryStats | null>(null)
+const recentVehicleList = ref<VehicleTask[]>([])
 
 const userInfo = computed(() => userStore.userInfo)
 const displayName = computed(() => userInfo.value.nickname || userInfo.value.username || '车辆拍摄员')
-const recentVehicles = computed(() => vehicleStore.list.slice(0, 5))
+const recentVehicles = computed(() => recentVehicleList.value)
 const pendingCount = computed(() => {
   if (libraryStats.value)
     return Math.max(0, libraryStats.value.activeVehicles - libraryStats.value.completeVehicles)
@@ -48,6 +49,27 @@ async function loadLibraryStats() {
   }
 }
 
+async function loadRecentVehicles() {
+  try {
+    const result = await getVehicleList({
+      page: 1,
+      pageSize: 5,
+      status: 'all',
+    })
+    recentVehicleList.value = result.list
+  }
+  catch {
+    // 最近车辆加载失败时保留当前列表，不影响首页统计和主流程。
+  }
+}
+
+function loadHomeData() {
+  return Promise.allSettled([
+    loadLibraryStats(),
+    loadRecentVehicles(),
+  ])
+}
+
 function goTo(url: string, tabbar = false) {
   if (tabbar) {
     uni.switchTab({ url })
@@ -62,11 +84,11 @@ function goCapture(vehicle: VehicleTask) {
 }
 
 onShow(() => {
-  loadLibraryStats()
+  loadHomeData()
 })
 
 onPullDownRefresh(() => {
-  loadLibraryStats().finally(() => {
+  loadHomeData().finally(() => {
     uni.stopPullDownRefresh()
   })
 })

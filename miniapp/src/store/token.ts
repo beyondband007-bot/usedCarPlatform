@@ -6,13 +6,13 @@ import {
   login as _login,
   logout as _logout,
   refreshToken as _refreshToken,
-  wxLogin as _wxLogin,
-  getWxCode,
 } from '@/api/login'
 import { isDoubleTokenRes, isSingleTokenRes } from '@/api/types/login'
 import { canAccessVehicleLibrary } from '@/constants/vehicle-library'
 import { toLoginPage } from '@/utils/toLoginPage'
+import { useUploadStore } from './upload'
 import { useUserStore } from './user'
+import { useVehicleStore } from './vehicle'
 
 export const isDoubleTokenMode = import.meta.env.VITE_AUTH_MODE === 'double'
 
@@ -46,8 +46,13 @@ export const useTokenStore = defineStore(
       return legacyExpireAt ? Number(legacyExpireAt) : 0
     }
 
-    const updateNowTime = () => {
+    const touchNowTime = () => {
       nowTime.value = Date.now()
+    }
+
+    const updateNowTime = () => {
+      touchNowTime()
+      clearExpiredAuthState()
       return useTokenStore()
     }
 
@@ -83,13 +88,17 @@ export const useTokenStore = defineStore(
     })
 
     const clearLocalAuthState = () => {
-      updateNowTime()
+      touchNowTime()
       tokenExpireAt.value = 0
       uni.removeStorageSync('accessTokenExpireTime')
       uni.removeStorageSync('refreshTokenExpireTime')
       tokenInfo.value = { ...tokenInfoState }
       uni.removeStorageSync('token')
+      uni.removeStorageSync('vehicle')
+      uni.removeStorageSync('upload')
       useUserStore().clearUserInfo()
+      useVehicleStore().resetVehicleState()
+      useUploadStore().resetUploadState()
     }
 
     async function postLogin(nextTokenInfo: IAuthLoginRes) {
@@ -129,29 +138,6 @@ export const useTokenStore = defineStore(
         uni.showToast({
           title: error instanceof Error ? error.message : '登录失败，请重试',
           icon: 'none',
-        })
-        throw error
-      }
-      finally {
-        updateNowTime()
-      }
-    }
-
-    const wxLogin = async () => {
-      try {
-        const { code } = await getWxCode()
-        const res = await _wxLogin({ code })
-        await postLogin(res)
-        uni.showToast({
-          title: '登录成功',
-          icon: 'success',
-        })
-        return res
-      }
-      catch (error) {
-        uni.showToast({
-          title: '微信登录失败，请重试',
-          icon: 'error',
         })
         throw error
       }
@@ -201,6 +187,14 @@ export const useTokenStore = defineStore(
 
     const hasValidLogin = computed(() => hasLoginInfo.value && !isTokenExpired.value)
 
+    function clearExpiredAuthState() {
+      if (!hasLoginInfo.value || !isTokenExpired.value)
+        return
+      if (isDoubleTokenMode && !isRefreshTokenExpired.value)
+        return
+      clearLocalAuthState()
+    }
+
     const tryGetValidToken = async (): Promise<string> => {
       updateNowTime()
       if (!getValidToken.value && isDoubleTokenMode && !isRefreshTokenExpired.value) {
@@ -222,7 +216,6 @@ export const useTokenStore = defineStore(
 
     return {
       login,
-      wxLogin,
       logout,
       hasLogin: hasValidLogin,
       consumeRouteGuardBypass,

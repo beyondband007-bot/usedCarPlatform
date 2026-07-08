@@ -155,7 +155,12 @@ export default defineConfig(({ command, mode }) => {
       }),
       // 若存在改变 pages.json 的插件，请将 UniKuRoot 放置其后
       UniKuRoot({
-        excludePages: ['**/components/**/**.*', '**/sections/**/**.*'],
+        excludePages: [
+          '**/components/**/**.*',
+          '**/sections/**/**.*',
+          'pages/auth/login.vue',
+          'pages/auth/register.vue',
+        ],
       }),
       Uni(),
       {
