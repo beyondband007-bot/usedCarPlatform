@@ -56,6 +56,10 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '视频时长不能超过 60 秒，请剪辑后重试',
   },
   {
+    matches: ['failed to validate video duration'],
+    text: '视频校验失败，请更换文件后重试',
+  },
+  {
     matches: ['查询超时请重新查询'],
     text: '查询超时请重新查询',
   },

@@ -6,7 +6,7 @@ import multer from "multer";
 
 import { env } from "../../config/env";
 import { asyncHandler } from "../../shared/asyncHandler";
-import { AppError, errors } from "../../shared/errors";
+import { errors } from "../../shared/errors";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
 import { probeVideoDurationSeconds } from "../../shared/videoProbe";
@@ -64,21 +64,22 @@ assetsRoutes.post(
     }
 
     if (req.file.mimetype.toLowerCase().startsWith("video/")) {
+      // ffprobe 缺失或探测失败时放行（前端已做时长预检），避免环境问题阻断全部视频上传。
+      let durationSeconds: number | null = null;
       try {
-        const durationSeconds = await probeVideoDurationSeconds(req.file.path);
-        if (durationSeconds > env.maxVideoUploadDurationSeconds) {
-          await fs.promises.unlink(req.file.path).catch(() => undefined);
-          throw errors.invalidParameter("video duration exceeds limit", {
-            maxDurationSeconds: env.maxVideoUploadDurationSeconds,
-            durationSeconds,
-          });
-        }
+        durationSeconds = await probeVideoDurationSeconds(req.file.path);
       } catch (error) {
-        if (error instanceof AppError) {
-          throw error;
-        }
+        console.warn(
+          "[assets] video duration probe failed, skipping duration check:",
+          error instanceof Error ? error.message : error,
+        );
+      }
+      if (durationSeconds !== null && durationSeconds > env.maxVideoUploadDurationSeconds) {
         await fs.promises.unlink(req.file.path).catch(() => undefined);
-        throw errors.invalidParameter("failed to validate video duration");
+        throw errors.invalidParameter("video duration exceeds limit", {
+          maxDurationSeconds: env.maxVideoUploadDurationSeconds,
+          durationSeconds,
+        });
       }
     }
 
