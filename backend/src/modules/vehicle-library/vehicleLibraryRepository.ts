@@ -190,6 +190,46 @@ export const mapMaterialRow = (row: VehicleLibraryMaterialRow) => ({
 // tenant_id is stored for enterprise attribution but never widens read/write access.
 const ownerScopeSql = (_scope: LibraryScope) => "owner_user_id = :userId";
 
+// 普通更新与带限额的更新（状态翻回 active 时）必须执行完全相同的 UPDATE，抽出共享 SQL。
+const UPDATE_VEHICLE_SQL = `UPDATE vehicles
+       SET lot_id = :lotId,
+           vin = :vin,
+           identify_type = :identifyType,
+           brand = :brand,
+           series = :series,
+           model = :model,
+           model_name = :modelName,
+           model_year = :modelYear,
+           car_type = :carType,
+           body_type = :bodyType,
+           energy_type = :energyType,
+           fuel_grade = :fuelGrade,
+           displacement = :displacement,
+           transmission = :transmission,
+           vehicle_level = :vehicleLevel,
+           emission_standard = :emissionStandard,
+           color = :color,
+           mileage_km = :mileageKm,
+           first_registration_date = :firstRegistrationDate,
+           guide_price = :guidePrice,
+           sale_price = :salePrice,
+           remark = :remark,
+           status = :status,
+           updated_by_user_id = :updatedByUserId
+       WHERE id = :vehicleId
+         AND library_id = :libraryId
+         AND deleted_at IS NULL`;
+
+const UPDATE_LOT_SQL = `UPDATE vehicle_lots
+       SET name = COALESCE(:name, name),
+           address = :address,
+           remark = :remark,
+           status = COALESCE(:status, status),
+           updated_by_user_id = :updatedByUserId
+       WHERE id = :lotId
+         AND library_id = :libraryId
+         AND deleted_at IS NULL`;
+
 export class VehicleLibraryRepository extends Repository {
   // Intentionally not filtered by status: a frozen/disabled default library must
   // still be returned (and block writes) instead of silently creating a fresh
@@ -517,17 +557,60 @@ export class VehicleLibraryRepository extends Repository {
     status?: VehicleLotStatus;
     updatedByUserId: string;
   }) {
-    await this.execute(
-      `UPDATE vehicle_lots
-       SET name = COALESCE(:name, name),
-           address = :address,
-           remark = :remark,
-           status = COALESCE(:status, status),
-           updated_by_user_id = :updatedByUserId
-       WHERE id = :lotId
-         AND library_id = :libraryId
-         AND deleted_at IS NULL`,
-      {
+    await this.execute(UPDATE_LOT_SQL, {
+      lotId: input.lotId,
+      libraryId: input.libraryId,
+      name: input.name ?? null,
+      address: input.address ?? null,
+      remark: input.remark ?? null,
+      status: input.status ?? null,
+      updatedByUserId: input.updatedByUserId,
+    });
+  }
+
+  // 车场从 archived 翻回 active 时同样要重新占用数量名额，与创建共用限额事务逻辑。
+  async updateLotWithinLimit(input: {
+    lotId: string;
+    libraryId: string;
+    name?: string;
+    address?: string | null;
+    remark?: string | null;
+    status?: VehicleLotStatus;
+    updatedByUserId: string;
+    lotLimit: number | null;
+  }) {
+    const connection = await pool.getConnection();
+    let activeLots = 0;
+    try {
+      await connection.beginTransaction();
+      const [libraryRows] = await connection.query<VehicleLibraryRow[]>(
+        `SELECT *
+         FROM vehicle_libraries
+         WHERE id = :libraryId
+         FOR UPDATE`,
+        { libraryId: input.libraryId } as any,
+      );
+      if (!libraryRows.length) {
+        await connection.rollback();
+        return { updated: false, activeLots };
+      }
+
+      const [countRows] = await connection.query<CountRow[]>(
+        `SELECT COUNT(*) total
+         FROM vehicle_lots
+         WHERE library_id = :libraryId
+           AND status = 'active'
+           AND deleted_at IS NULL
+           AND id <> :lotId`,
+        { libraryId: input.libraryId, lotId: input.lotId } as any,
+      );
+      activeLots = Number(countRows[0]?.total ?? 0);
+      if (input.lotLimit !== null && activeLots >= input.lotLimit) {
+        await connection.rollback();
+        return { updated: false, activeLots };
+      }
+
+      await connection.execute<ResultSetHeader>(UPDATE_LOT_SQL, {
         lotId: input.lotId,
         libraryId: input.libraryId,
         name: input.name ?? null,
@@ -535,8 +618,16 @@ export class VehicleLibraryRepository extends Repository {
         remark: input.remark ?? null,
         status: input.status ?? null,
         updatedByUserId: input.updatedByUserId,
-      },
-    );
+      } as any);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return { updated: true, activeLots };
   }
 
   async detachVehiclesFromLot(lotId: string, libraryId: string, userId: string) {
@@ -772,37 +863,57 @@ export class VehicleLibraryRepository extends Repository {
   }
 
   async updateVehicle(input: Record<string, unknown>) {
-    await this.execute(
-      `UPDATE vehicles
-       SET lot_id = :lotId,
-           vin = :vin,
-           identify_type = :identifyType,
-           brand = :brand,
-           series = :series,
-           model = :model,
-           model_name = :modelName,
-           model_year = :modelYear,
-           car_type = :carType,
-           body_type = :bodyType,
-           energy_type = :energyType,
-           fuel_grade = :fuelGrade,
-           displacement = :displacement,
-           transmission = :transmission,
-           vehicle_level = :vehicleLevel,
-           emission_standard = :emissionStandard,
-           color = :color,
-           mileage_km = :mileageKm,
-           first_registration_date = :firstRegistrationDate,
-           guide_price = :guidePrice,
-           sale_price = :salePrice,
-           remark = :remark,
-           status = :status,
-           updated_by_user_id = :updatedByUserId
-       WHERE id = :vehicleId
-         AND library_id = :libraryId
-         AND deleted_at IS NULL`,
-      input,
-    );
+    await this.execute(UPDATE_VEHICLE_SQL, input);
+  }
+
+  // 车辆从 sold/archived 翻回 active 时相当于重新占用一个数量名额，
+  // 必须和创建走同样的“锁库 -> 数名额 -> 写入”事务，否则可先释放名额再翻转绕过限额。
+  async updateVehicleWithinLimit(input: Record<string, unknown> & {
+    vehicleId: string;
+    libraryId: string;
+    vehicleLimit: number | null;
+  }) {
+    const connection = await pool.getConnection();
+    let activeVehicles = 0;
+    try {
+      await connection.beginTransaction();
+      const [libraryRows] = await connection.query<VehicleLibraryRow[]>(
+        `SELECT *
+         FROM vehicle_libraries
+         WHERE id = :libraryId
+         FOR UPDATE`,
+        { libraryId: input.libraryId } as any,
+      );
+      if (!libraryRows.length) {
+        await connection.rollback();
+        return { updated: false, activeVehicles };
+      }
+
+      const [countRows] = await connection.query<CountRow[]>(
+        `SELECT COUNT(*) total
+         FROM vehicles
+         WHERE library_id = :libraryId
+           AND status = 'active'
+           AND deleted_at IS NULL
+           AND id <> :vehicleId`,
+        { libraryId: input.libraryId, vehicleId: input.vehicleId } as any,
+      );
+      activeVehicles = Number(countRows[0]?.total ?? 0);
+      if (input.vehicleLimit !== null && activeVehicles >= input.vehicleLimit) {
+        await connection.rollback();
+        return { updated: false, activeVehicles };
+      }
+
+      await connection.execute<ResultSetHeader>(UPDATE_VEHICLE_SQL, input as any);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return { updated: true, activeVehicles };
   }
 
   async archiveVehicle(vehicleId: string, libraryId: string, userId: string) {

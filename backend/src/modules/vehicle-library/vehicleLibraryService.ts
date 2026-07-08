@@ -486,7 +486,7 @@ export class VehicleLibraryService {
     const status = body.status
       ? assertValue(String(body.status), ["active", "archived"] as const, "status")
       : existing.status;
-    await vehicleLibraryRepository.updateLot({
+    const updateInput = {
       lotId,
       libraryId: library.id,
       name: parseOptionalString(body.name) ?? existing.name,
@@ -494,7 +494,26 @@ export class VehicleLibraryService {
       remark: body.remark === undefined ? existing.remark : parseOptionalString(body.remark),
       status,
       updatedByUserId: current.user.id,
-    });
+    };
+    // 从 archived 翻回 active 会重新占用车场名额，必须走和创建相同的限额校验，
+    // 否则可通过“归档腾名额 -> 新建 -> 翻回 active”无限突破车场上限。
+    const reactivating = existing.status !== "active" && status === "active";
+    if (reactivating && !isLegacyQuotaPolicy(library.quota_policy)) {
+      const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
+      const result = await vehicleLibraryRepository.updateLotWithinLimit({
+        ...updateInput,
+        lotLimit: limits.lotLimit,
+      });
+      if (!result.updated) {
+        throw errors.conflict("vehicle library lot limit reached", {
+          limit: limits.lotLimit,
+          activeLots: result.activeLots,
+          planCode: limits.planCode,
+        });
+      }
+    } else {
+      await vehicleLibraryRepository.updateLot(updateInput);
+    }
     return this.getLot(current, lotId, { libraryId: library.id });
   }
 
@@ -629,13 +648,32 @@ export class VehicleLibraryService {
     const payload = parseVehiclePayload(body, existing);
     await this.assertSameLibraryLot(library.id, payload.lotId);
     await this.assertVinAvailable(library.id, payload.vin, vehicleId);
+    const updateInput = {
+      vehicleId,
+      libraryId: library.id,
+      ...payload,
+      updatedByUserId: current.user.id,
+    };
+    // 从 sold/archived 翻回 active 会重新占用车辆名额，必须走和创建相同的限额校验，
+    // 否则可通过“改成 sold 腾名额 -> 新建 -> 翻回 active”无限突破车辆上限。
+    const reactivating = existing.status !== "active" && payload.status === "active";
     try {
-      await vehicleLibraryRepository.updateVehicle({
-        vehicleId,
-        libraryId: library.id,
-        ...payload,
-        updatedByUserId: current.user.id,
-      });
+      if (reactivating && !isLegacyQuotaPolicy(library.quota_policy)) {
+        const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
+        const result = await vehicleLibraryRepository.updateVehicleWithinLimit({
+          ...updateInput,
+          vehicleLimit: limits.vehicleLimit,
+        });
+        if (!result.updated) {
+          throw errors.conflict("vehicle library vehicle limit reached", {
+            limit: limits.vehicleLimit,
+            activeVehicles: result.activeVehicles,
+            planCode: limits.planCode,
+          });
+        }
+      } else {
+        await vehicleLibraryRepository.updateVehicle(updateInput);
+      }
     } catch (error) {
       if (isDuplicateEntryError(error)) {
         throw errors.conflict("VIN already exists in this vehicle library", { vin: payload.vin });
