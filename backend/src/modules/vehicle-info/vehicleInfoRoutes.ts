@@ -232,25 +232,22 @@ vehicleInfoRoutes.post(
           payload.showapi_res_error || "VIN 查询服务暂时不可用",
         );
       }
+      if (responseBody?.ret_code !== undefined && responseBody.ret_code !== 0) {
+        const notFound = isVinNotFoundMessage(responseBody.remark);
+        throw new AppError(
+          notFound ? 404 : 502,
+          notFound ? 40420 : 50220,
+          notFound
+            ? VIN_NOT_FOUND_MESSAGE
+            : responseBody.remark || payload.showapi_res_error || "VIN 查询服务暂时不可用",
+        );
+      }
       if (Array.isArray(responseBody?.data) && responseBody.data.length === 0) {
         throw new AppError(404, 40420, VIN_NOT_FOUND_MESSAGE);
       }
       const result =
         responseBody?.data?.[0] ??
         (responseBody && typeof responseBody === "object" ? responseBody : null);
-      if (
-        responseBody?.ret_code !== undefined &&
-        responseBody.ret_code !== 0 &&
-        !result
-      ) {
-        throw new AppError(
-          isVinNotFoundMessage(responseBody.remark) ? 404 : 502,
-          isVinNotFoundMessage(responseBody.remark) ? 40420 : 50220,
-          isVinNotFoundMessage(responseBody.remark)
-            ? VIN_NOT_FOUND_MESSAGE
-            : responseBody.remark || payload.showapi_res_error || VIN_NOT_FOUND_MESSAGE,
-        );
-      }
       if (!result) {
         throw new AppError(404, 40420, VIN_NOT_FOUND_MESSAGE);
       }
