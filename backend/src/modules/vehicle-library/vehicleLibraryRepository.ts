@@ -308,6 +308,8 @@ export class VehicleLibraryRepository extends Repository {
     });
   }
 
+  // 只更新显式传入的字段：remark 允许传 null 清空，但未传时必须保持原值，
+  // 否则仅同步 quotaBytes 的调用（如套餐配额同步）会把备注误清成 NULL。
   async updateLibrary(input: {
     libraryId: string;
     name?: string;
@@ -315,20 +317,30 @@ export class VehicleLibraryRepository extends Repository {
     status?: VehicleLibraryStatus;
     quotaBytes?: number;
   }) {
+    const sets: string[] = [];
+    const params: Record<string, unknown> = { libraryId: input.libraryId };
+    if (input.name !== undefined) {
+      sets.push("name = :name");
+      params.name = input.name;
+    }
+    if ("remark" in input) {
+      sets.push("remark = :remark");
+      params.remark = input.remark ?? null;
+    }
+    if (input.status !== undefined) {
+      sets.push("status = :status");
+      params.status = input.status;
+    }
+    if (input.quotaBytes !== undefined) {
+      sets.push("quota_bytes = :quotaBytes");
+      params.quotaBytes = input.quotaBytes;
+    }
+    if (!sets.length) return;
     await this.execute(
       `UPDATE vehicle_libraries
-       SET name = COALESCE(:name, name),
-           remark = :remark,
-           status = COALESCE(:status, status),
-           quota_bytes = COALESCE(:quotaBytes, quota_bytes)
+       SET ${sets.join(", ")}
        WHERE id = :libraryId`,
-      {
-        libraryId: input.libraryId,
-        name: input.name ?? null,
-        remark: input.remark ?? null,
-        status: input.status ?? null,
-        quotaBytes: input.quotaBytes ?? null,
-      },
+      params,
     );
   }
 
