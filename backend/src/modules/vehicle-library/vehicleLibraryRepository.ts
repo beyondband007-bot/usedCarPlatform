@@ -248,6 +248,37 @@ const RECALC_LIBRARY_USED_BYTES_SQL = `UPDATE vehicle_libraries vl
        ), 0)
        WHERE vl.id = :libraryId`;
 
+const UPSERT_MATERIAL_SQL = `INSERT INTO vehicle_library_materials
+        (id, library_id, owner_type, owner_id, asset_id, slot_code, media_type, file_name, file_size,
+         duration_seconds, width, height, is_required, is_cover, sort_order, status, audit_status,
+         metadata_json, created_by_user_id, deleted_at)
+       VALUES
+        (:id, :libraryId, :ownerType, :ownerId, :assetId, :slotCode, :mediaType, :fileName, :fileSize,
+         :durationSeconds, :width, :height, :isRequired, :isCover, :sortOrder, 'active', 'pending',
+         :metadataJson, :createdByUserId, NULL)
+       ON DUPLICATE KEY UPDATE
+         library_id = VALUES(library_id),
+         asset_id = VALUES(asset_id),
+         media_type = VALUES(media_type),
+         file_name = VALUES(file_name),
+         file_size = VALUES(file_size),
+         duration_seconds = VALUES(duration_seconds),
+         width = VALUES(width),
+         height = VALUES(height),
+         is_required = VALUES(is_required),
+         is_cover = VALUES(is_cover),
+         sort_order = VALUES(sort_order),
+         status = 'active',
+         audit_status = 'pending',
+         metadata_json = VALUES(metadata_json),
+         created_by_user_id = VALUES(created_by_user_id),
+         deleted_at = NULL`;
+
+export type UpsertMaterialOutcome =
+  | { outcome: "ok" }
+  | { outcome: "owner_missing" }
+  | { outcome: "quota_exceeded"; quotaBytes: number; usedBytes: number };
+
 export class VehicleLibraryRepository extends Repository {
   // Intentionally not filtered by status: a frozen/disabled default library must
   // still be returned (and block writes) instead of silently creating a fresh
@@ -954,7 +985,11 @@ export class VehicleLibraryRepository extends Repository {
     return rows.map(mapMaterialRow);
   }
 
-  async upsertMaterial(input: {
+  // 素材写入的配额校验必须和写入同事务：
+  // 1. 锁库行后读 used_bytes/quota_bytes，避免并发上传用同一份旧值双双通过校验超额；
+  // 2. 锁 owner 行并校验未删除，避免与删除车辆/车场并发时把素材“复活”挂到已删 owner 上；
+  // 3. 写入后在事务内重算 used_bytes，保证配额账实时一致。
+  async upsertMaterialWithQuota(input: {
     id: string;
     libraryId: string;
     ownerType: VehicleOwnerType;
@@ -972,39 +1007,85 @@ export class VehicleLibraryRepository extends Repository {
     sortOrder: number;
     metadataJson: string | null;
     createdByUserId: string;
-  }) {
-    await this.execute(
-      `INSERT INTO vehicle_library_materials
-        (id, library_id, owner_type, owner_id, asset_id, slot_code, media_type, file_name, file_size,
-         duration_seconds, width, height, is_required, is_cover, sort_order, status, audit_status,
-         metadata_json, created_by_user_id, deleted_at)
-       VALUES
-        (:id, :libraryId, :ownerType, :ownerId, :assetId, :slotCode, :mediaType, :fileName, :fileSize,
-         :durationSeconds, :width, :height, :isRequired, :isCover, :sortOrder, 'active', 'pending',
-         :metadataJson, :createdByUserId, NULL)
-       ON DUPLICATE KEY UPDATE
-         library_id = VALUES(library_id),
-         asset_id = VALUES(asset_id),
-         media_type = VALUES(media_type),
-         file_name = VALUES(file_name),
-         file_size = VALUES(file_size),
-         duration_seconds = VALUES(duration_seconds),
-         width = VALUES(width),
-         height = VALUES(height),
-         is_required = VALUES(is_required),
-         is_cover = VALUES(is_cover),
-         sort_order = VALUES(sort_order),
-         status = 'active',
-         audit_status = 'pending',
-         metadata_json = VALUES(metadata_json),
-         created_by_user_id = VALUES(created_by_user_id),
-         deleted_at = NULL`,
-      {
+  }): Promise<UpsertMaterialOutcome> {
+    const ownerTable = input.ownerType === "vehicle" ? "vehicles" : "vehicle_lots";
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [libraryRows] = await connection.query<VehicleLibraryRow[]>(
+        `SELECT *
+         FROM vehicle_libraries
+         WHERE id = :libraryId
+         FOR UPDATE`,
+        { libraryId: input.libraryId } as any,
+      );
+      const library = libraryRows[0];
+      if (!library) {
+        await connection.rollback();
+        return { outcome: "owner_missing" };
+      }
+
+      const [ownerRows] = await connection.query<RowDataPacket[]>(
+        `SELECT id
+         FROM ${ownerTable}
+         WHERE id = :ownerId
+           AND library_id = :libraryId
+           AND deleted_at IS NULL
+         FOR UPDATE`,
+        { ownerId: input.ownerId, libraryId: input.libraryId } as any,
+      );
+      if (!ownerRows.length) {
+        await connection.rollback();
+        return { outcome: "owner_missing" };
+      }
+
+      // quota_bytes 为 0 表示不限；替换同槽位素材时旧文件的空间会被释放。
+      const quotaBytes = Number(library.quota_bytes);
+      if (quotaBytes > 0) {
+        const [slotRows] = await connection.query<RowDataPacket[]>(
+          `SELECT file_size
+           FROM vehicle_library_materials
+           WHERE owner_type = :ownerType
+             AND owner_id = :ownerId
+             AND slot_code = :slotCode
+             AND status = 'active'
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          {
+            ownerType: input.ownerType,
+            ownerId: input.ownerId,
+            slotCode: input.slotCode,
+          } as any,
+        );
+        const replacedSize = Number(slotRows[0]?.file_size ?? 0);
+        const projectedBytes =
+          Number(library.used_bytes) - replacedSize + (input.fileSize ?? 0);
+        if (projectedBytes > quotaBytes) {
+          await connection.rollback();
+          return {
+            outcome: "quota_exceeded",
+            quotaBytes,
+            usedBytes: Number(library.used_bytes),
+          };
+        }
+      }
+
+      await connection.execute<ResultSetHeader>(UPSERT_MATERIAL_SQL, {
         ...input,
         isRequired: input.isRequired ? 1 : 0,
         isCover: input.isCover ? 1 : 0,
-      },
-    );
+      } as any);
+      await connection.execute<ResultSetHeader>(RECALC_LIBRARY_USED_BYTES_SQL, {
+        libraryId: input.libraryId,
+      } as any);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+    return { outcome: "ok" };
   }
 
   // 归档车辆 + 软删素材 + 重算配额必须原子执行：任一步骤后崩溃都会留下

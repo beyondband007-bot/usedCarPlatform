@@ -718,27 +718,15 @@ export class VehicleLibraryService {
     const asset = await assetsRepository.findById(assetId, current.user.id);
     if (!asset) throw errors.assetNotFound();
     assertAssetMediaType(asset.mimeType, slot.mediaType);
-    // 配额强制：quota_bytes 为 0 表示不限；替换素材时旧文件的空间会被释放。
-    const quotaBytes = Number(library.quota_bytes);
-    if (quotaBytes > 0) {
-      const currentMaterials = await vehicleLibraryRepository.listMaterials(
-        ownerType,
-        ownerId,
-        library.id,
-      );
-      const replacedSize =
-        currentMaterials.find((item) => item.slotCode === slot.code)?.fileSize ?? 0;
-      const projectedBytes = Number(library.used_bytes) - replacedSize + (asset.size ?? 0);
-      if (projectedBytes > quotaBytes) {
-        throw errors.conflict("vehicle library storage quota exceeded", {
-          quotaBytes,
-          usedBytes: Number(library.used_bytes),
-          fileSize: asset.size ?? 0,
-        });
-      }
+    // 上传前同步一次套餐配额：套餐降级后 quota_bytes 只在首页刷新，
+    // 直接调上传接口（如小程序采集端）也必须按最新套餐限额校验。
+    if (!isLegacyQuotaPolicy(library.quota_policy)) {
+      const limits = await this.requireVehicleLibraryPlan(current, library.quota_policy);
+      await this.syncPlanLibraryQuota(library, limits);
     }
     const metadata = parseJsonObject(body.metadata);
-    await vehicleLibraryRepository.upsertMaterial({
+    // 配额校验、owner 存活校验与写入在同一事务内完成（见仓储层说明）。
+    const result = await vehicleLibraryRepository.upsertMaterialWithQuota({
       id: createId("vehicle_mat"),
       libraryId: library.id,
       ownerType,
@@ -757,6 +745,19 @@ export class VehicleLibraryService {
       metadataJson: metadata ? JSON.stringify(metadata) : null,
       createdByUserId: current.user.id,
     });
+    if (result.outcome === "owner_missing") {
+      throw errors.invalidParameter(
+        ownerType === "vehicle" ? "vehicle not found" : "vehicle lot not found",
+        { ownerId },
+      );
+    }
+    if (result.outcome === "quota_exceeded") {
+      throw errors.conflict("vehicle library storage quota exceeded", {
+        quotaBytes: result.quotaBytes,
+        usedBytes: result.usedBytes,
+        fileSize: asset.size ?? 0,
+      });
+    }
     await this.refreshOwnerCompleteness({ libraryId: library.id, ownerType, ownerId });
     const rows = await vehicleLibraryRepository.listMaterials(ownerType, ownerId, library.id);
     return { items: rows };
