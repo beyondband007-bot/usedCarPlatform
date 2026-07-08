@@ -3,19 +3,22 @@ import type { IAuthLoginRes } from '@/api/types/login'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
-  getWxCode,
   login as _login,
   logout as _logout,
   refreshToken as _refreshToken,
   wxLogin as _wxLogin,
+  getWxCode,
 } from '@/api/login'
 import { isDoubleTokenRes, isSingleTokenRes } from '@/api/types/login'
+import { canAccessVehicleLibrary } from '@/constants/vehicle-library'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { useUserStore } from './user'
 
 export const isDoubleTokenMode = import.meta.env.VITE_AUTH_MODE === 'double'
 
 let routeGuardBypass = false
+
+const VEHICLE_LIBRARY_LOGIN_DENIED_MESSAGE = '当前账号套餐不支持素材采集，请联系管理员开通团队版或旗舰版'
 
 const tokenInfoState = isDoubleTokenMode
   ? {
@@ -79,17 +82,37 @@ export const useTokenStore = defineStore(
       return !refreshExpireTime || nowTime.value >= refreshExpireTime
     })
 
+    const clearLocalAuthState = () => {
+      updateNowTime()
+      tokenExpireAt.value = 0
+      uni.removeStorageSync('accessTokenExpireTime')
+      uni.removeStorageSync('refreshTokenExpireTime')
+      tokenInfo.value = { ...tokenInfoState }
+      uni.removeStorageSync('token')
+      useUserStore().clearUserInfo()
+    }
+
     async function postLogin(nextTokenInfo: IAuthLoginRes) {
       toLoginPage.cancel()
-      setTokenInfo(nextTokenInfo)
-      routeGuardBypass = true
       const userStore = useUserStore()
       const loginUserInfo = (nextTokenInfo as IAuthLoginRes & { userInfo?: any }).userInfo
       if (loginUserInfo) {
+        if (!canAccessVehicleLibrary(loginUserInfo.packageName)) {
+          throw new Error(VEHICLE_LIBRARY_LOGIN_DENIED_MESSAGE)
+        }
+        setTokenInfo(nextTokenInfo)
+        routeGuardBypass = true
         userStore.setUserInfo(loginUserInfo)
         return
       }
+
+      setTokenInfo(nextTokenInfo)
       await userStore.fetchUserInfo()
+      if (!canAccessVehicleLibrary(userStore.userInfo?.packageName)) {
+        clearLocalAuthState()
+        throw new Error(VEHICLE_LIBRARY_LOGIN_DENIED_MESSAGE)
+      }
+      routeGuardBypass = true
     }
 
     const login = async (loginForm: ILoginForm) => {
@@ -145,13 +168,7 @@ export const useTokenStore = defineStore(
         console.error('logout failed:', error)
       }
       finally {
-        updateNowTime()
-        tokenExpireAt.value = 0
-        uni.removeStorageSync('accessTokenExpireTime')
-        uni.removeStorageSync('refreshTokenExpireTime')
-        tokenInfo.value = { ...tokenInfoState }
-        uni.removeStorageSync('token')
-        useUserStore().clearUserInfo()
+        clearLocalAuthState()
       }
     }
 
