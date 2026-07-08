@@ -867,6 +867,37 @@ const run = async () => {
        WHERE vl.deleted_at IS NOT NULL
          AND v.deleted_at IS NULL`,
     );
+    // 归属车辆/车场已被软删的素材是“孤儿素材”，会永久占用 used_bytes 配额：
+    // 既覆盖释放配额修复上线前的存量数据，也兜住删除流程中途失败留下的残留。
+    await pool.query(
+      `UPDATE vehicle_library_materials vlm
+       JOIN vehicles v ON v.id = vlm.owner_id
+       SET vlm.status = 'deleted',
+           vlm.deleted_at = COALESCE(v.deleted_at, CURRENT_TIMESTAMP(3))
+       WHERE vlm.owner_type = 'vehicle'
+         AND vlm.deleted_at IS NULL
+         AND v.deleted_at IS NOT NULL`,
+    );
+    await pool.query(
+      `UPDATE vehicle_library_materials vlm
+       JOIN vehicle_lots vl ON vl.id = vlm.owner_id
+       SET vlm.status = 'deleted',
+           vlm.deleted_at = COALESCE(vl.deleted_at, CURRENT_TIMESTAMP(3))
+       WHERE vlm.owner_type = 'lot'
+         AND vlm.deleted_at IS NULL
+         AND vl.deleted_at IS NOT NULL`,
+    );
+    // 清理完孤儿素材后全量重算各库的 used_bytes，纠正历史虚高。
+    await pool.query(
+      `UPDATE vehicle_libraries vl
+       SET vl.used_bytes = COALESCE((
+         SELECT SUM(vlm.file_size)
+         FROM vehicle_library_materials vlm
+         WHERE vlm.library_id = vl.id
+           AND vlm.status = 'active'
+           AND vlm.deleted_at IS NULL
+       ), 0)`,
+    );
 
     await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
     await addIndexIfMissing("assets", "idx_assets_user_purpose_created", "(user_id, purpose, created_at)");
