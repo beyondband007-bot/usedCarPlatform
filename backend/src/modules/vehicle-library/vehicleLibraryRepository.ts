@@ -230,6 +230,24 @@ const UPDATE_LOT_SQL = `UPDATE vehicle_lots
          AND library_id = :libraryId
          AND deleted_at IS NULL`;
 
+const DELETE_MATERIALS_FOR_OWNER_SQL = `UPDATE vehicle_library_materials
+       SET status = 'deleted',
+           deleted_at = CURRENT_TIMESTAMP(3)
+       WHERE library_id = :libraryId
+         AND owner_type = :ownerType
+         AND owner_id = :ownerId
+         AND deleted_at IS NULL`;
+
+const RECALC_LIBRARY_USED_BYTES_SQL = `UPDATE vehicle_libraries vl
+       SET used_bytes = COALESCE((
+         SELECT SUM(file_size)
+         FROM vehicle_library_materials vlm
+         WHERE vlm.library_id = vl.id
+           AND vlm.status = 'active'
+           AND vlm.deleted_at IS NULL
+       ), 0)
+       WHERE vl.id = :libraryId`;
+
 export class VehicleLibraryRepository extends Repository {
   // Intentionally not filtered by status: a frozen/disabled default library must
   // still be returned (and block writes) instead of silently creating a fresh
@@ -630,31 +648,6 @@ export class VehicleLibraryRepository extends Repository {
     return { updated: true, activeLots };
   }
 
-  async detachVehiclesFromLot(lotId: string, libraryId: string, userId: string) {
-    await this.execute(
-      `UPDATE vehicles
-       SET lot_id = NULL,
-           updated_by_user_id = :userId
-       WHERE lot_id = :lotId
-         AND library_id = :libraryId
-         AND deleted_at IS NULL`,
-      { lotId, libraryId, userId },
-    );
-  }
-
-  async archiveLot(lotId: string, libraryId: string, userId: string) {
-    await this.execute(
-      `UPDATE vehicle_lots
-       SET status = 'archived',
-           deleted_at = CURRENT_TIMESTAMP(3),
-           updated_by_user_id = :userId
-       WHERE id = :lotId
-         AND library_id = :libraryId
-         AND deleted_at IS NULL`,
-      { lotId, libraryId, userId },
-    );
-  }
-
   async listVehicles(
     input: PageInput & {
       libraryId: string;
@@ -916,22 +909,6 @@ export class VehicleLibraryRepository extends Repository {
     return { updated: true, activeVehicles };
   }
 
-  async archiveVehicle(vehicleId: string, libraryId: string, userId: string) {
-    // vin participates in uk_vehicles_library_vin, which also covers
-    // soft-deleted rows; clear it so the VIN can be registered again.
-    await this.execute(
-      `UPDATE vehicles
-       SET status = 'archived',
-           deleted_at = CURRENT_TIMESTAMP(3),
-           updated_by_user_id = :userId,
-           vin = NULL
-       WHERE id = :vehicleId
-         AND library_id = :libraryId
-         AND deleted_at IS NULL`,
-      { vehicleId, libraryId, userId },
-    );
-  }
-
   async listMaterialsForOwners(ownerType: VehicleOwnerType, ownerIds: string[], libraryId: string) {
     if (!ownerIds.length) return [];
     const params: Record<string, unknown> = { ownerType, libraryId };
@@ -1030,21 +1007,79 @@ export class VehicleLibraryRepository extends Repository {
     );
   }
 
-  async deleteMaterialsForOwner(input: {
-    libraryId: string;
-    ownerType: VehicleOwnerType;
-    ownerId: string;
-  }) {
-    await this.execute(
-      `UPDATE vehicle_library_materials
-       SET status = 'deleted',
-           deleted_at = CURRENT_TIMESTAMP(3)
-       WHERE library_id = :libraryId
-         AND owner_type = :ownerType
-         AND owner_id = :ownerId
-         AND deleted_at IS NULL`,
-      input,
-    );
+  // 归档车辆 + 软删素材 + 重算配额必须原子执行：任一步骤后崩溃都会留下
+  // 永久占用 used_bytes 的孤儿素材（owner 已删，没有任何后续请求会再触发清理）。
+  async archiveVehicleCascade(vehicleId: string, libraryId: string, userId: string) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute<ResultSetHeader>(
+        `UPDATE vehicles
+         SET status = 'archived',
+             deleted_at = CURRENT_TIMESTAMP(3),
+             updated_by_user_id = :userId,
+             vin = NULL
+         WHERE id = :vehicleId
+           AND library_id = :libraryId
+           AND deleted_at IS NULL`,
+        { vehicleId, libraryId, userId } as any,
+      );
+      await connection.execute<ResultSetHeader>(DELETE_MATERIALS_FOR_OWNER_SQL, {
+        libraryId,
+        ownerType: "vehicle",
+        ownerId: vehicleId,
+      } as any);
+      await connection.execute<ResultSetHeader>(RECALC_LIBRARY_USED_BYTES_SQL, {
+        libraryId,
+      } as any);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // 同上：解绑车辆、归档车场、软删素材、重算配额需要原子执行。
+  async archiveLotCascade(lotId: string, libraryId: string, userId: string) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute<ResultSetHeader>(
+        `UPDATE vehicles
+         SET lot_id = NULL,
+             updated_by_user_id = :userId
+         WHERE lot_id = :lotId
+           AND library_id = :libraryId
+           AND deleted_at IS NULL`,
+        { lotId, libraryId, userId } as any,
+      );
+      await connection.execute<ResultSetHeader>(
+        `UPDATE vehicle_lots
+         SET status = 'archived',
+             deleted_at = CURRENT_TIMESTAMP(3),
+             updated_by_user_id = :userId
+         WHERE id = :lotId
+           AND library_id = :libraryId
+           AND deleted_at IS NULL`,
+        { lotId, libraryId, userId } as any,
+      );
+      await connection.execute<ResultSetHeader>(DELETE_MATERIALS_FOR_OWNER_SQL, {
+        libraryId,
+        ownerType: "lot",
+        ownerId: lotId,
+      } as any);
+      await connection.execute<ResultSetHeader>(RECALC_LIBRARY_USED_BYTES_SQL, {
+        libraryId,
+      } as any);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async deleteMaterialSlot(input: {
@@ -1116,18 +1151,7 @@ export class VehicleLibraryRepository extends Repository {
   }
 
   async recalculateLibraryUsedBytes(libraryId: string) {
-    await this.execute(
-      `UPDATE vehicle_libraries vl
-       SET used_bytes = COALESCE((
-         SELECT SUM(file_size)
-         FROM vehicle_library_materials vlm
-         WHERE vlm.library_id = vl.id
-           AND vlm.status = 'active'
-           AND vlm.deleted_at IS NULL
-       ), 0)
-       WHERE vl.id = :libraryId`,
-      { libraryId },
-    );
+    await this.execute(RECALC_LIBRARY_USED_BYTES_SQL, { libraryId });
   }
 
   async createRecognitionRecord(input: {
