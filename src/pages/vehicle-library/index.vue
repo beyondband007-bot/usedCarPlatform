@@ -179,6 +179,7 @@ const materialPreviews = reactive<Record<UploadSlotCode, string | null>>({
   front_row_video: null,
   rear_row_video: null,
 })
+const materialInputRefs = new Map<UploadSlotCode, HTMLInputElement>()
 const existingMaterials = reactive<Record<UploadSlotCode, VehicleLibraryMaterial | null>>({
   front_image: null,
   rear_image: null,
@@ -233,34 +234,14 @@ function overviewFieldValue(value?: string | null) {
   return text || '待补充'
 }
 
-function formatGuidePriceDisplay(value?: string | null) {
-  const text = value?.trim()
-  if (!text) return '待补充'
-  const numberValue = Number(text)
-  if (Number.isFinite(numberValue)) return `${numberValue} 万元`
-  return text
-}
-
 const vehicleOverviewRows = computed(() => {
   const record = activeVehicleRecord.value
   const vehicle = activeVehicle.value
   if (!record || !vehicle) return []
   return [
     { label: '品牌车系', value: overviewFieldValue([record.brand, record.series].filter(Boolean).join(' / ')) },
-    { label: '年款', value: overviewFieldValue(record.modelYear) },
-    { label: '车款名称', value: overviewFieldValue(record.model) },
-    { label: '车型名称', value: overviewFieldValue(record.modelName) },
-    { label: '车辆类型', value: overviewFieldValue(record.carType) },
-    { label: '车身结构', value: overviewFieldValue(record.bodyType) },
-    { label: '车辆级别', value: overviewFieldValue(record.vehicleLevel) },
-    { label: '燃料类型', value: overviewFieldValue(record.energyType) },
-    { label: '燃油标号', value: overviewFieldValue(record.fuelGrade) },
-    { label: '排量', value: overviewFieldValue(record.displacement) },
-    { label: '变速箱', value: overviewFieldValue(record.transmission) },
-    { label: '排放标准', value: overviewFieldValue(record.emissionStandard) },
-    { label: '新车指导价', value: formatGuidePriceDisplay(record.guidePrice) },
-    { label: '车身颜色', value: overviewFieldValue(record.color) },
-    { label: '车辆备注', value: overviewFieldValue(record.remark) },
+    { label: '年款车型', value: overviewFieldValue([record.modelYear, record.model].filter(Boolean).join(' ')) },
+    { label: '动力类型', value: overviewFieldValue([record.displacement, record.energyType].filter(Boolean).join(' ')) },
     { label: '最近更新', value: vehicle.updated },
     { label: '容量占用', value: vehicle.size },
   ]
@@ -1079,6 +1060,18 @@ function selectMaterialFile(slot: (typeof uploadSlots)[number], event: Event) {
   void handleMaterialFileSelection(slot, event)
 }
 
+function setMaterialInputRef(slotCode: UploadSlotCode, element: HTMLInputElement | null) {
+  if (element) {
+    materialInputRefs.set(slotCode, element)
+  } else {
+    materialInputRefs.delete(slotCode)
+  }
+}
+
+function openMaterialFilePicker(slotCode: UploadSlotCode) {
+  materialInputRefs.get(slotCode)?.click()
+}
+
 async function handleMaterialFileSelection(slot: (typeof uploadSlots)[number], event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
@@ -1507,7 +1500,7 @@ onMounted(loadLibraryData)
           <strong v-if="quotaSummary.hasLimit">
             {{ quotaSummary.vehicles }}<em>/{{ quotaSummary.vehicleLimit }}辆</em>
             ·
-            {{ quotaSummary.lots }}<em>/{{ quotaSummary.lotLimit }}个</em>
+            {{ quotaSummary.lots }}<em>/{{ quotaSummary.lotLimit }}个车场</em>
           </strong>
           <strong v-else>
             {{ quotaSummary.vehicles }}<em>辆</em>
@@ -1992,6 +1985,7 @@ onMounted(loadLibraryData)
                   type="file"
                   :accept="slot.mediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/quicktime'"
                   :disabled="savingVehicle"
+                  :ref="(element) => setMaterialInputRef(slot.code, element as HTMLInputElement | null)"
                   @change="selectMaterialFile(slot, $event)"
                 />
                 <template v-if="materialPreviewUrl(slot.code)">
@@ -2001,6 +1995,8 @@ onMounted(loadLibraryData)
                     @loadedmetadata="showVideoFirstFrame"
                     title="点击预览视频" @click.prevent="openMaterialPreview(slot)" />
                   <span class="material-preview-label">{{ slot.label }}{{ materialFiles[slot.code] ? ' · 待替换' : ' · 已上传' }}</span>
+                  <button class="material-preview-replace" type="button" title="替换素材" :disabled="savingVehicle"
+                    @click.prevent.stop="openMaterialFilePicker(slot.code)">替换</button>
                   <button v-if="materialFiles[slot.code]" class="material-preview-remove" type="button" title="撤销替换" :disabled="savingVehicle"
                     @click.prevent="clearMaterialFile(slot.code)"><Icon icon="mdi:close" /></button>
                 </template>
@@ -2050,6 +2046,7 @@ onMounted(loadLibraryData)
                 type="file"
                 :accept="slot.mediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/quicktime'"
                 :disabled="savingMaterials"
+                :ref="(element) => setMaterialInputRef(slot.code, element as HTMLInputElement | null)"
                 @change="selectMaterialFile(slot, $event)"
               />
               <template v-if="materialPreviewUrl(slot.code)">
@@ -2059,7 +2056,9 @@ onMounted(loadLibraryData)
                   @loadedmetadata="showVideoFirstFrame"
                   title="点击预览视频" @click.prevent="openMaterialPreview(slot)" />
                 <span class="material-preview-label">{{ slot.label }}</span>
-                <button class="material-preview-remove" type="button" title="删除" :disabled="savingMaterials"
+                <button class="material-preview-replace" type="button" title="替换素材" :disabled="savingMaterials"
+                  @click.prevent.stop="openMaterialFilePicker(slot.code)">替换</button>
+                <button v-if="materialFiles[slot.code]" class="material-preview-remove" type="button" title="撤销替换" :disabled="savingMaterials"
                   @click.prevent="clearMaterialFile(slot.code)"><Icon icon="mdi:close" /></button>
               </template>
               <template v-else>

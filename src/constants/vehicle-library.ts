@@ -1,8 +1,13 @@
 import type { VehicleLibraryStatus, VehicleIdentifyType } from '@/types/vehicle-library'
 
-/** 车辆库企业服务状态展示文案；当前暂写死，后续按套餐/权限系统映射。 */
-export function getVehicleLibraryServiceStatusLabel(_status: VehicleLibraryStatus): string {
-  return '企业服务有效'
+const vehicleLibraryServiceStatusLabels: Record<VehicleLibraryStatus, string> = {
+  active: '套餐服务有效',
+  frozen: '套餐到期已冻结',
+  disabled: '套餐服务未开通',
+}
+
+export function getVehicleLibraryServiceStatusLabel(status: VehicleLibraryStatus): string {
+  return vehicleLibraryServiceStatusLabels[status] ?? vehicleLibraryServiceStatusLabels.disabled
 }
 
 const vehicleIdentifyTypeLabels: Record<VehicleIdentifyType, string> = {
