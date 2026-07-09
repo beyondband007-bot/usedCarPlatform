@@ -26,6 +26,8 @@ const optimizedArkAssetDir = path.join(env.resultsDir, "video-generation", "ark-
 const IMAGE_UPLOAD_MAX_EDGE = 1200;
 const IMAGE_UPLOAD_QUALITY = 72;
 const KIE_PUBLIC_UPLOAD_ATTEMPTS = 3;
+const PUBLIC_SOURCE_READY_ATTEMPTS = 8;
+const ARK_CREATE_ASSET_ATTEMPTS = 5;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -73,6 +75,21 @@ const ensurePublicCopy = async (filePath: string, sourceHash: string) => {
 };
 
 const isProviderReachableUrl = (url: string) => /^https:\/\//i.test(url) && !/localhost|127\.0\.0\.1/i.test(url);
+
+const normalizePublicOrigin = (url: string) => {
+  try {
+    return new URL(url).origin.replace(/\/$/, "").toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+/** Ark 需从公网拉取素材；平台自建 publicBaseUrl 对后端可达，但对 Ark 侧常不稳定。 */
+const isSelfHostedPublicUrl = (url: string) => {
+  const origin = normalizePublicOrigin(url);
+  const platformOrigin = normalizePublicOrigin(env.publicBaseUrl);
+  return Boolean(origin && platformOrigin && origin === platformOrigin);
+};
 
 const prepareUploadSource = async (
   filePath: string,
@@ -130,6 +147,54 @@ const uploadPublicSource = async (filePath: string, assetType: ArkVirtualAssetTy
   throw lastError;
 };
 
+const waitForPublicSourceReady = async (url: string) => {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= PUBLIC_SOURCE_READY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Range: "bytes=0-0",
+        },
+      });
+      if (response.ok || response.status === 206) return;
+      lastError = new Error(`public source returned ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < PUBLIC_SOURCE_READY_ATTEMPTS) {
+      await delay(800 * attempt);
+    }
+  }
+  throw errors.generationFailed("ark virtual asset public source is not reachable", {
+    url,
+    message: lastError instanceof Error ? lastError.message : String(lastError ?? "unknown"),
+  });
+};
+
+const createArkAssetWithRetry = async (input: {
+  groupId: string;
+  url: string;
+  assetType: ArkVirtualAssetType;
+  name: string;
+}) => {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= ARK_CREATE_ASSET_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) {
+      await waitForPublicSourceReady(input.url);
+    }
+    try {
+      return await arkOpenApiClient.createAsset(input);
+    } catch (error) {
+      lastError = error;
+      if (attempt < ARK_CREATE_ASSET_ATTEMPTS) {
+        await delay(1200 * attempt);
+      }
+    }
+  }
+  throw lastError ?? errors.generationFailed("ark virtual asset CreateAsset failed", { url: input.url });
+};
+
 class ArkVirtualAssetService {
   async ensureAssetGroup(userId: string) {
     const existing = await arkVirtualAssetRepository.findReadyGroup({
@@ -177,18 +242,23 @@ class ArkVirtualAssetService {
 
     const group = await this.ensureAssetGroup(input.userId);
     const uploadSource = await prepareUploadSource(input.filePath, input.assetType, hash);
-    const preferredPublicUrl = input.publicUrl?.trim();
-    const publicMedia = preferredPublicUrl && isProviderReachableUrl(preferredPublicUrl)
+    const preferredPublicUrl = input.publicUrl?.trim() ?? "";
+    const canUsePreferredPublicUrl =
+      preferredPublicUrl.length > 0 &&
+      isProviderReachableUrl(preferredPublicUrl) &&
+      !isSelfHostedPublicUrl(preferredPublicUrl);
+    const publicMedia = canUsePreferredPublicUrl
       ? { publicUrl: preferredPublicUrl, localPath: input.filePath }
       : {
           ...(await ensurePublicCopy(uploadSource.filePath, hash)),
           publicUrl: await uploadPublicSource(uploadSource.filePath, input.assetType),
         };
+    await waitForPublicSourceReady(publicMedia.publicUrl);
     const fileName =
       input.assetType === "Image"
         ? uploadSource.fileName
         : input.fileName?.trim() || path.basename(input.filePath);
-    const createdAsset = await arkOpenApiClient.createAsset({
+    const createdAsset = await createArkAssetWithRetry({
       groupId: group.providerGroupId,
       url: publicMedia.publicUrl,
       assetType: input.assetType,

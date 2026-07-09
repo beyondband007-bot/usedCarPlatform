@@ -68,6 +68,23 @@ const firstString = (...values: unknown[]) => {
   return "";
 };
 
+const extractOpenApiErrorMessage = (raw: unknown) => {
+  const record = asRecord(raw);
+  const responseMetadata = asRecord(record.ResponseMetadata ?? record.response_metadata);
+  const responseError = asRecord(responseMetadata.Error ?? responseMetadata.error);
+  const code = firstString(responseError.Code, responseError.code);
+  const message = firstString(responseError.Message, responseError.message);
+  if (code && message) return `${code}: ${message}`;
+  if (message) return message;
+  if (code) return code;
+  return "";
+};
+
+const formatOpenApiFailure = (action: ArkOpenApiAction, raw: unknown) => {
+  const detail = extractOpenApiErrorMessage(raw);
+  return detail ? `ark OpenAPI ${action} failed: ${detail}` : `ark OpenAPI ${action} failed`;
+};
+
 const requireOpenApiConfig = () => {
   if (!env.ark.accessKeyId || !env.ark.secretAccessKey) {
     throw errors.generationFailed("VOLC_ACCESS_KEY_ID / VOLC_SECRET_ACCESS_KEY is not configured");
@@ -175,12 +192,12 @@ class ArkOpenApiClient {
 
     const raw = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw errors.generationFailed(`ark OpenAPI ${action} failed`, raw);
+      throw errors.generationFailed(formatOpenApiFailure(action, raw), raw);
     }
     const responseMetadata = asRecord(asRecord(raw).ResponseMetadata ?? asRecord(raw).response_metadata);
     const responseError = asRecord(responseMetadata.Error ?? responseMetadata.error);
     if (responseError.Code || responseError.Message) {
-      throw errors.generationFailed(`ark OpenAPI ${action} failed`, raw);
+      throw errors.generationFailed(formatOpenApiFailure(action, raw), raw);
     }
     return raw;
   }
