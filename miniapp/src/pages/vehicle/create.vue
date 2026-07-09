@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { VehicleBasicInfo } from '@/api/vehicle-info'
 import { computed, reactive, ref, watch } from 'vue'
-import { createVehicle } from '@/api/vehicle'
+import { createVehicle, getVehicleEditForm, updateVehicle } from '@/api/vehicle'
 import { queryVehicleByVinShowApi, recognizeVinFromImage } from '@/api/vehicle-info'
 import { useVehicleStore } from '@/store/vehicle'
 
@@ -14,6 +14,8 @@ definePage({
 const VIN_PATTERN = /^[A-HJ-NPR-Z0-9]{17}$/
 
 const vehicleStore = useVehicleStore()
+const vehicleId = ref('')
+const pageLoading = ref(false)
 const submitting = ref(false)
 const vinLoading = ref(false)
 const vinOcrLoading = ref(false)
@@ -44,7 +46,14 @@ const form = reactive({
 })
 
 const canSubmit = computed(() => !!form.brandName.trim() && !!form.seriesName.trim())
-const busy = computed(() => submitting.value || vinLoading.value || vinOcrLoading.value)
+const isEditMode = computed(() => !!vehicleId.value)
+const busy = computed(() => submitting.value || vinLoading.value || vinOcrLoading.value || pageLoading.value)
+const footerButtonText = computed(() => {
+  if (submitting.value)
+    return isEditMode.value ? '正在保存' : '正在创建'
+  return isEditMode.value ? '保存' : '创建并开始拍摄'
+})
+const footerButtonColor = computed(() => canSubmit.value && !submitting.value ? '#3B82F6' : '#93C5FD')
 
 watch(form, () => {
   dirty.value = true
@@ -89,6 +98,53 @@ function fillVehicleForm(vin: string, result: VehicleBasicInfo) {
   form.vehicleLevel = result.vehicleLevel
   form.emissionStandard = result.emissionStandard
   form.guidePrice = result.guidePrice
+}
+
+function fillFormFromVehicle(data: Awaited<ReturnType<typeof getVehicleEditForm>>) {
+  form.vin = data.vin || ''
+  form.brandName = data.brandName || ''
+  form.seriesName = data.seriesName || ''
+  form.modelYear = data.modelYear || ''
+  form.modelName = data.modelName || ''
+  form.model = data.model || ''
+  form.carType = data.carType || ''
+  form.bodyType = data.bodyType || ''
+  form.energyType = data.energyType || ''
+  form.fuelGrade = data.fuelGrade || ''
+  form.displacement = data.displacement || ''
+  form.transmission = data.transmission || ''
+  form.vehicleLevel = data.vehicleLevel || ''
+  form.emissionStandard = data.emissionStandard || ''
+  form.guidePrice = data.guidePrice != null ? String(data.guidePrice) : ''
+  form.colorName = data.colorName || ''
+  form.remark = data.remark || ''
+  showMoreFields.value = !!(
+    data.model
+    || data.carType
+    || data.bodyType
+    || data.fuelGrade
+    || data.transmission
+    || data.vehicleLevel
+    || data.emissionStandard
+    || data.guidePrice != null
+  )
+}
+
+async function loadVehicleForEdit() {
+  if (!vehicleId.value)
+    return
+  pageLoading.value = true
+  vinError.value = ''
+  try {
+    fillFormFromVehicle(await getVehicleEditForm(vehicleId.value))
+    dirty.value = false
+  }
+  catch (error) {
+    vinError.value = error instanceof Error ? error.message : '车辆信息加载失败，请稍后重试'
+  }
+  finally {
+    pageLoading.value = false
+  }
 }
 
 async function queryVin(vinValue = form.vin) {
@@ -158,7 +214,7 @@ async function submit() {
 
   submitting.value = true
   try {
-    const vehicle = await createVehicle({
+    const payload = {
       vin: form.vin.trim() || undefined,
       brandName: form.brandName.trim(),
       seriesName: form.seriesName.trim(),
@@ -176,6 +232,21 @@ async function submit() {
       guidePrice: normalizeGuidePrice(form.guidePrice),
       colorName: form.colorName.trim(),
       remark: form.remark.trim(),
+      ...(vinResult.value ? { identifyType: 'vin_text' as const } : {}),
+    }
+
+    if (isEditMode.value) {
+      const vehicle = await updateVehicle(vehicleId.value, payload)
+      vehicleStore.setCurrentVehicle(vehicle)
+      dirty.value = false
+      allowLeave.value = true
+      uni.showToast({ title: '保存成功', icon: 'success' })
+      setTimeout(() => uni.navigateBack(), 500)
+      return
+    }
+
+    const vehicle = await createVehicle({
+      ...payload,
       identifyType: vinResult.value ? 'vin_text' : 'manual',
     })
     vehicleStore.setCurrentVehicle(vehicle)
@@ -196,8 +267,8 @@ onBackPress(() => {
     return false
   }
   uni.showModal({
-    title: '放弃创建？',
-    content: '当前填写的内容尚未保存，返回后将会丢失。',
+    title: isEditMode.value ? '放弃修改？' : '放弃创建？',
+    content: isEditMode.value ? '当前修改尚未保存，返回后将会丢失。' : '当前填写的内容尚未保存，返回后将会丢失。',
     confirmText: '放弃',
     confirmColor: '#EF4444',
     success: (result) => {
@@ -209,10 +280,23 @@ onBackPress(() => {
   })
   return true
 })
+
+onLoad((options) => {
+  vehicleId.value = String(options?.id || options?.vehicleId || '')
+  if (vehicleId.value) {
+    uni.setNavigationBarTitle({ title: '编辑车辆' })
+    void loadVehicleForEdit()
+  }
+})
 </script>
 
 <template>
-  <view class="min-h-screen bg-[#F5F7FA] px-3 pb-28 pt-3">
+  <view class="min-h-screen bg-[#F5F7FA] px-3 pt-3">
+    <view class="pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+      <view v-if="pageLoading" class="rounded-3 bg-white p-8 text-center text-3.5 text-[#9CA3AF]">
+        正在加载车辆信息…
+      </view>
+      <template v-else>
     <view class="rounded-3 bg-white p-4">
       <view class="mb-3 flex items-start gap-3">
         <view class="h-7 w-7 flex shrink-0 items-center justify-center rounded-full bg-[#FEF3C7] text-3.5 text-[#B45309] font-700">
@@ -336,18 +420,41 @@ onBackPress(() => {
           placeholder="门店、车况亮点或配置补充"
         />
       </view>
+      </view>
+      </template>
     </view>
 
-    <view class="safe-area-inset-bottom fixed bottom-0 left-0 right-0 border-t border-[#E5E7EB] bg-white p-3">
+    <!-- #ifdef MP-WEIXIN -->
+    <cover-view
+      v-if="!pageLoading"
+      class="fixed bottom-0 left-0 right-0 z-[999] border-t border-[#E5E7EB] bg-white px-3 pt-3"
+      :style="{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }"
+    >
+      <cover-view
+        class="flex h-12 items-center justify-center rounded-2 text-center text-4 text-white"
+        :style="{ backgroundColor: footerButtonColor }"
+        @tap="submit"
+      >
+        {{ footerButtonText }}
+      </cover-view>
+    </cover-view>
+    <!-- #endif -->
+
+    <!-- #ifndef MP-WEIXIN -->
+    <view
+      v-if="!pageLoading"
+      class="fixed bottom-0 left-0 right-0 z-50 border-t border-[#E5E7EB] bg-white p-3 pb-safe"
+    >
       <button
-        class="h-12 rounded-2 text-4 text-white"
+        class="h-12 w-full rounded-2 text-4 text-white"
         :class="canSubmit ? 'bg-[#3B82F6]' : 'bg-[#93C5FD]'"
         :disabled="submitting || !canSubmit"
         :loading="submitting"
         @click="submit"
       >
-        {{ submitting ? '正在创建' : '创建并开始拍摄' }}
+        {{ footerButtonText }}
       </button>
     </view>
+    <!-- #endif -->
   </view>
 </template>

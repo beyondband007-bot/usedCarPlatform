@@ -34,7 +34,7 @@ export function syncVehicleCaptureProgress(vehicleId: string) {
     return
 
   const status: VehicleTaskStatus = photoCount >= vehicle.requiredPhotoCount
-    ? 'waiting_complete'
+    ? 'completed'
     : photoCount > 0
       ? 'capturing'
       : 'waiting_capture'

@@ -26,6 +26,15 @@ type VehicleLibraryVehicle = {
   model?: string | null
   modelName?: string | null
   modelYear?: string | null
+  carType?: string | null
+  bodyType?: string | null
+  energyType?: string | null
+  fuelGrade?: string | null
+  displacement?: string | null
+  transmission?: string | null
+  vehicleLevel?: string | null
+  emissionStandard?: string | null
+  guidePrice?: number | null
   color?: string | null
   mileageKm?: number | null
   firstRegistrationDate?: string | null
@@ -39,6 +48,28 @@ type VehicleLibraryVehicle = {
   materials?: VehicleLibraryMaterial[]
   createdAt: string
   updatedAt: string
+}
+
+export type VehicleEditForm = {
+  vin?: string
+  brandName: string
+  seriesName: string
+  modelYear?: string
+  modelName?: string
+  model?: string
+  carType?: string
+  bodyType?: string
+  energyType?: string
+  fuelGrade?: string
+  displacement?: string
+  transmission?: string
+  vehicleLevel?: string
+  emissionStandard?: string
+  guidePrice?: number | null
+  colorName?: string
+  mileage?: number
+  registerDate?: string
+  remark?: string
 }
 
 type VehicleLibraryPage<T> = {
@@ -128,6 +159,30 @@ function mapVehicle(vehicle: VehicleLibraryVehicle): VehicleTask {
   }
 }
 
+function mapVehicleEdit(vehicle: VehicleLibraryVehicle): VehicleEditForm {
+  return {
+    vin: vehicle.vin || undefined,
+    brandName: vehicle.brand,
+    seriesName: vehicle.series,
+    modelYear: vehicle.modelYear || undefined,
+    modelName: vehicle.modelName || undefined,
+    model: vehicle.model || undefined,
+    carType: vehicle.carType || undefined,
+    bodyType: vehicle.bodyType || undefined,
+    energyType: vehicle.energyType || undefined,
+    fuelGrade: vehicle.fuelGrade || undefined,
+    displacement: vehicle.displacement || undefined,
+    transmission: vehicle.transmission || undefined,
+    vehicleLevel: vehicle.vehicleLevel || undefined,
+    emissionStandard: vehicle.emissionStandard || undefined,
+    guidePrice: vehicle.guidePrice ?? undefined,
+    colorName: vehicle.color || undefined,
+    mileage: vehicle.mileageKm ?? undefined,
+    registerDate: vehicle.firstRegistrationDate || undefined,
+    remark: vehicle.remark || undefined,
+  }
+}
+
 function compactPayload(payload: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined && value !== ''),
@@ -202,6 +257,12 @@ export function getVehicleDetail(id: string) {
   return http
     .get<VehicleLibraryVehicle>(`${VEHICLE_LIBRARY_BASE}/vehicles/${id}`)
     .then(mapVehicle)
+}
+
+export function getVehicleEditForm(id: string) {
+  return http
+    .get<VehicleLibraryVehicle>(`${VEHICLE_LIBRARY_BASE}/vehicles/${id}`)
+    .then(mapVehicleEdit)
 }
 
 export function getVehicleMaterials(vehicleId: string) {
