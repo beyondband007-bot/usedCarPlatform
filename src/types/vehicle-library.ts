@@ -38,6 +38,9 @@ export interface VehicleLibraryStats {
   activeLots: number
   usedBytes: number
   quotaBytes: number
+  quotaVehicles?: number | null
+  quotaLots?: number | null
+  planCode?: string | null
 }
 
 export interface VehicleLibraryHome {

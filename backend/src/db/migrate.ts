@@ -407,6 +407,22 @@ const seedAuthData = async () => {
       plan: "flagship",
       usesTenantCreditsBundle: true,
     },
+    {
+      id: "user_test1",
+      username: "test1",
+      phone: "13800000010",
+      displayName: "测试账号1",
+      role: "enterprise",
+      plan: "basic",
+    },
+    {
+      id: "user_test2",
+      username: "test2",
+      phone: "13800000011",
+      displayName: "测试账号2",
+      role: "enterprise",
+      plan: "basic",
+    },
   ];
 
   for (const user of users) {
@@ -851,6 +867,37 @@ const run = async () => {
        WHERE vl.deleted_at IS NOT NULL
          AND v.deleted_at IS NULL`,
     );
+    // 归属车辆/车场已被软删的素材是“孤儿素材”，会永久占用 used_bytes 配额：
+    // 既覆盖释放配额修复上线前的存量数据，也兜住删除流程中途失败留下的残留。
+    await pool.query(
+      `UPDATE vehicle_library_materials vlm
+       JOIN vehicles v ON v.id = vlm.owner_id
+       SET vlm.status = 'deleted',
+           vlm.deleted_at = COALESCE(v.deleted_at, CURRENT_TIMESTAMP(3))
+       WHERE vlm.owner_type = 'vehicle'
+         AND vlm.deleted_at IS NULL
+         AND v.deleted_at IS NOT NULL`,
+    );
+    await pool.query(
+      `UPDATE vehicle_library_materials vlm
+       JOIN vehicle_lots vl ON vl.id = vlm.owner_id
+       SET vlm.status = 'deleted',
+           vlm.deleted_at = COALESCE(vl.deleted_at, CURRENT_TIMESTAMP(3))
+       WHERE vlm.owner_type = 'lot'
+         AND vlm.deleted_at IS NULL
+         AND vl.deleted_at IS NOT NULL`,
+    );
+    // 清理完孤儿素材后全量重算各库的 used_bytes，纠正历史虚高。
+    await pool.query(
+      `UPDATE vehicle_libraries vl
+       SET vl.used_bytes = COALESCE((
+         SELECT SUM(vlm.file_size)
+         FROM vehicle_library_materials vlm
+         WHERE vlm.library_id = vl.id
+           AND vlm.status = 'active'
+           AND vlm.deleted_at IS NULL
+       ), 0)`,
+    );
 
     await addColumnIfMissing("assets", "user_id", "VARCHAR(64) NOT NULL DEFAULT 'user_admin' AFTER id");
     await addIndexIfMissing("assets", "idx_assets_user_purpose_created", "(user_id, purpose, created_at)");
@@ -959,6 +1006,15 @@ const run = async () => {
     await addColumnIfMissing("kie_task_records", "is_winner", "TINYINT(1) NOT NULL DEFAULT 0");
     await addColumnIfMissing("kie_task_records", "finished_at", "DATETIME(3) NULL");
     await addColumnIfMissing("back_office_agent_policy_overrides", "commission_rate", "DECIMAL(8, 4) NULL");
+    const hadQuotaPolicy = await columnExists("vehicle_libraries", "quota_policy");
+    await addColumnIfMissing(
+      "vehicle_libraries",
+      "quota_policy",
+      "VARCHAR(20) NOT NULL DEFAULT 'standard' AFTER status",
+    );
+    if (!hadQuotaPolicy) {
+      await pool.query(`UPDATE vehicle_libraries SET quota_policy = 'legacy'`);
+    }
     await dropIndexIfExists("kie_task_records", "uk_kie_task_records_task");
     await addUniqueIndexIfMissing("kie_task_records", "uk_kie_task_records_task_role", "(task_id, role)");
     await backfillGenerationOwnership();

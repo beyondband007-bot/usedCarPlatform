@@ -31,6 +31,41 @@ type ShowApiVinOcrResponse = {
   };
 };
 
+const VIN_QUERY_TIMEOUT_MESSAGE = "查询超时请重新查询";
+const VIN_NOT_FOUND_MESSAGE = "VIN未查到，请检查后重新查询";
+
+const VIN_NOT_FOUND_HINTS = ["查无", "未查到", "不存在", "没有找到", "无数据", "not found", "no data"];
+
+const isVinNotFoundMessage = (message?: string) => {
+  if (!message) return false;
+  const normalized = message.trim().toLowerCase();
+  return VIN_NOT_FOUND_HINTS.some((hint) => normalized.includes(hint.toLowerCase()));
+};
+
+const hasVinLookupData = (record: Record<string, unknown> | null | undefined) => {
+  if (!record || typeof record !== "object") return false;
+  const textFields = [
+    "brand",
+    "brand_name",
+    "typename",
+    "car_line",
+    "name",
+    "sale_name",
+    "manufacturer",
+    "assembly_factory",
+  ];
+  return textFields.some((key) => {
+    const value = record[key];
+    return typeof value === "string" && value.trim().length > 0;
+  });
+};
+
+const assertVinLookupData = (record: Record<string, unknown> | null | undefined) => {
+  if (!hasVinLookupData(record)) {
+    throw new AppError(404, 40420, VIN_NOT_FOUND_MESSAGE);
+  }
+};
+
 export const vehicleInfoRoutes = Router();
 const vinImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -122,15 +157,19 @@ vehicleInfoRoutes.post(
         signal: controller.signal,
       });
       const payload = (await response.json()) as JisuVinResponse;
-      if (!response.ok || payload.status !== 0 || !payload.result) {
+      if (!response.ok) {
+        throw new AppError(502, 50220, "VIN 查询服务暂时不可用");
+      }
+      if (payload.status !== 0 || !payload.result) {
         throw new AppError(
-          502,
-          50220,
-          payload.msg || "VIN 查询失败，请检查车架号后重试",
+          isVinNotFoundMessage(payload.msg) ? 404 : 502,
+          isVinNotFoundMessage(payload.msg) ? 40420 : 50220,
+          isVinNotFoundMessage(payload.msg) ? VIN_NOT_FOUND_MESSAGE : payload.msg || VIN_NOT_FOUND_MESSAGE,
         );
       }
 
       const result = payload.result;
+      assertVinLookupData(result);
       ok(res, {
         ...result,
         vin,
@@ -151,7 +190,7 @@ vehicleInfoRoutes.post(
         502,
         50221,
         error instanceof Error && error.name === "AbortError"
-          ? "VIN 查询超时，请稍后重试"
+          ? VIN_QUERY_TIMEOUT_MESSAGE
           : "VIN 查询服务暂时不可用",
       );
     } finally {
@@ -186,23 +225,33 @@ vehicleInfoRoutes.post(
       });
       const payload = (await response.json()) as ShowApiVinResponse;
       const responseBody = payload.showapi_res_body;
-      const result =
-        responseBody?.data?.[0] ??
-        (responseBody && typeof responseBody === "object" ? responseBody : null);
-      if (
-        !response.ok ||
-        payload.showapi_res_code !== 0 ||
-        (responseBody?.ret_code !== undefined && responseBody.ret_code !== 0) ||
-        !result
-      ) {
+      if (!response.ok || payload.showapi_res_code !== 0) {
         throw new AppError(
           502,
           50220,
-          responseBody?.remark ||
-            payload.showapi_res_error ||
-            "VIN 查询失败，请检查车架号后重试",
+          payload.showapi_res_error || "VIN 查询服务暂时不可用",
         );
       }
+      if (responseBody?.ret_code !== undefined && responseBody.ret_code !== 0) {
+        const notFound = isVinNotFoundMessage(responseBody.remark);
+        throw new AppError(
+          notFound ? 404 : 502,
+          notFound ? 40420 : 50220,
+          notFound
+            ? VIN_NOT_FOUND_MESSAGE
+            : responseBody.remark || payload.showapi_res_error || "VIN 查询服务暂时不可用",
+        );
+      }
+      if (Array.isArray(responseBody?.data) && responseBody.data.length === 0) {
+        throw new AppError(404, 40420, VIN_NOT_FOUND_MESSAGE);
+      }
+      const result =
+        responseBody?.data?.[0] ??
+        (responseBody && typeof responseBody === "object" ? responseBody : null);
+      if (!result) {
+        throw new AppError(404, 40420, VIN_NOT_FOUND_MESSAGE);
+      }
+      assertVinLookupData(result as Record<string, unknown>);
       ok(res, { vin, ...result });
     } catch (error) {
       if (error instanceof AppError) throw error;
@@ -210,7 +259,7 @@ vehicleInfoRoutes.post(
         502,
         50221,
         error instanceof Error && error.name === "AbortError"
-          ? "VIN 查询超时，请稍后重试"
+          ? VIN_QUERY_TIMEOUT_MESSAGE
           : "VIN 查询服务暂时不可用",
       );
     } finally {

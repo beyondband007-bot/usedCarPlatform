@@ -36,10 +36,16 @@ import {
 import './vehicle-library.scss'
 import { getVehicleIdentifyTypeLabel, getVehicleLibraryServiceStatusLabel } from '@/constants/vehicle-library'
 import type { VehicleIdentifyType, VehicleLibraryStatus } from '@/types/vehicle-library'
+import {
+  MAX_VEHICLE_LIBRARY_VIDEO_MB,
+  MAX_VEHICLE_LIBRARY_VIDEO_SECONDS,
+  validateVehicleLibraryVideo,
+} from '@/utils/video-upload'
 
 // 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
 const MAX_IMAGE_UPLOAD_MB = 20
-const MAX_VIDEO_UPLOAD_MB = 200
+const MAX_VIDEO_UPLOAD_MB = MAX_VEHICLE_LIBRARY_VIDEO_MB
+const MAX_VIDEO_UPLOAD_SECONDS = MAX_VEHICLE_LIBRARY_VIDEO_SECONDS
 
 type LibraryTab = 'vehicles' | 'lots'
 type DetailTab = 'overview' | 'assets'
@@ -173,6 +179,7 @@ const materialPreviews = reactive<Record<UploadSlotCode, string | null>>({
   front_row_video: null,
   rear_row_video: null,
 })
+const materialInputRefs = new Map<UploadSlotCode, HTMLInputElement>()
 const existingMaterials = reactive<Record<UploadSlotCode, VehicleLibraryMaterial | null>>({
   front_image: null,
   rear_image: null,
@@ -227,34 +234,14 @@ function overviewFieldValue(value?: string | null) {
   return text || '待补充'
 }
 
-function formatGuidePriceDisplay(value?: string | null) {
-  const text = value?.trim()
-  if (!text) return '待补充'
-  const numberValue = Number(text)
-  if (Number.isFinite(numberValue)) return `${numberValue} 万元`
-  return text
-}
-
 const vehicleOverviewRows = computed(() => {
   const record = activeVehicleRecord.value
   const vehicle = activeVehicle.value
   if (!record || !vehicle) return []
   return [
     { label: '品牌车系', value: overviewFieldValue([record.brand, record.series].filter(Boolean).join(' / ')) },
-    { label: '年款', value: overviewFieldValue(record.modelYear) },
-    { label: '车款名称', value: overviewFieldValue(record.model) },
-    { label: '车型名称', value: overviewFieldValue(record.modelName) },
-    { label: '车辆类型', value: overviewFieldValue(record.carType) },
-    { label: '车身结构', value: overviewFieldValue(record.bodyType) },
-    { label: '车辆级别', value: overviewFieldValue(record.vehicleLevel) },
-    { label: '燃料类型', value: overviewFieldValue(record.energyType) },
-    { label: '燃油标号', value: overviewFieldValue(record.fuelGrade) },
-    { label: '排量', value: overviewFieldValue(record.displacement) },
-    { label: '变速箱', value: overviewFieldValue(record.transmission) },
-    { label: '排放标准', value: overviewFieldValue(record.emissionStandard) },
-    { label: '新车指导价', value: formatGuidePriceDisplay(record.guidePrice) },
-    { label: '车身颜色', value: overviewFieldValue(record.color) },
-    { label: '车辆备注', value: overviewFieldValue(record.remark) },
+    { label: '年款车型', value: overviewFieldValue([record.modelYear, record.model].filter(Boolean).join(' ')) },
+    { label: '动力类型', value: overviewFieldValue([record.displacement, record.energyType].filter(Boolean).join(' ')) },
     { label: '最近更新', value: vehicle.updated },
     { label: '容量占用', value: vehicle.size },
   ]
@@ -498,22 +485,27 @@ const libraryServiceStatusLabel = computed(
   () => getVehicleLibraryServiceStatusLabel(libraryServiceStatus.value),
 )
 
-type CapacityUsageLevel = 'normal' | 'warn' | 'danger'
+type QuotaSummary = {
+  hasLimit: boolean
+  vehicles: number
+  vehicleLimit: number
+  lots: number
+  lotLimit: number
+}
 
-const capacityUsage = computed(() => {
-  const used = libraryHome.value?.stats.usedBytes ?? 0
-  const quota = libraryHome.value?.stats.quotaBytes ?? 0
-  if (!quota) {
-    return { percent: 0, level: 'normal' as CapacityUsageLevel, hint: '' }
+const quotaSummary = computed<QuotaSummary>(() => {
+  const stats = libraryHome.value?.stats
+  const vehicles = stats?.activeVehicles ?? 0
+  const lots = stats?.activeLots ?? 0
+  const vehicleLimit = stats?.quotaVehicles ?? 0
+  const lotLimit = stats?.quotaLots ?? 0
+  return {
+    hasLimit: vehicleLimit > 0 && lotLimit > 0,
+    vehicles,
+    vehicleLimit,
+    lots,
+    lotLimit,
   }
-  const percent = Math.min(100, (used / quota) * 100)
-  if (percent >= 90) {
-    return { percent, level: 'danger' as CapacityUsageLevel, hint: '容量即将用尽，请清理素材' }
-  }
-  if (percent >= 80) {
-    return { percent, level: 'warn' as CapacityUsageLevel, hint: '容量偏高，建议及时清理' }
-  }
-  return { percent, level: 'normal' as CapacityUsageLevel, hint: '' }
 })
 
 const hasVehiclesInLibrary = computed(
@@ -798,7 +790,18 @@ function uploadSizeError(file: File, mediaType: 'image' | 'video') {
   return `文件不能超过 ${limitMb}MB，请压缩后重试`
 }
 
+async function validateSelectedVideo(file: File) {
+  return validateVehicleLibraryVideo(file, {
+    maxMb: MAX_VIDEO_UPLOAD_MB,
+    maxSeconds: MAX_VIDEO_UPLOAD_SECONDS,
+  })
+}
+
 function selectLotFile(mediaType: 'image' | 'video', event: Event) {
+  void handleLotFileSelection(mediaType, event)
+}
+
+async function handleLotFileSelection(mediaType: 'image' | 'video', event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
   input.value = ''
@@ -808,10 +811,18 @@ function selectLotFile(mediaType: 'image' | 'video', event: Event) {
     lotError.value = `请选择${mediaType === 'image' ? '图片' : '视频'}文件`
     return
   }
-  const sizeError = uploadSizeError(file, mediaType)
-  if (sizeError) {
-    lotError.value = `${mediaType === 'image' ? '车场图片' : '车场视频'}${sizeError}`
-    return
+  if (mediaType === 'video') {
+    const videoError = await validateSelectedVideo(file)
+    if (videoError) {
+      lotError.value = `车场视频${videoError}`
+      return
+    }
+  } else {
+    const sizeError = uploadSizeError(file, mediaType)
+    if (sizeError) {
+      lotError.value = `车场图片${sizeError}`
+      return
+    }
   }
   lotForm[mediaType] = file
   lotError.value = ''
@@ -930,6 +941,10 @@ async function openLotManageModal(lot: VehicleLot) {
 }
 
 function selectLotManageFile(mediaType: 'image' | 'video', event: Event) {
+  void handleLotManageFileSelection(mediaType, event)
+}
+
+async function handleLotManageFileSelection(mediaType: 'image' | 'video', event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
   input.value = ''
@@ -939,10 +954,18 @@ function selectLotManageFile(mediaType: 'image' | 'video', event: Event) {
     lotManageError.value = `请选择${mediaType === 'image' ? '图片' : '视频'}文件`
     return
   }
-  const sizeError = uploadSizeError(file, mediaType)
-  if (sizeError) {
-    lotManageError.value = `${mediaType === 'image' ? '车场图片' : '车场视频'}${sizeError}`
-    return
+  if (mediaType === 'video') {
+    const videoError = await validateSelectedVideo(file)
+    if (videoError) {
+      lotManageError.value = `车场视频${videoError}`
+      return
+    }
+  } else {
+    const sizeError = uploadSizeError(file, mediaType)
+    if (sizeError) {
+      lotManageError.value = `车场图片${sizeError}`
+      return
+    }
   }
   lotManageFiles[mediaType] = file
   releaseLotManagePreview(mediaType)
@@ -1034,6 +1057,22 @@ function openVehicleRow(vehicleId: string) {
 }
 
 function selectMaterialFile(slot: (typeof uploadSlots)[number], event: Event) {
+  void handleMaterialFileSelection(slot, event)
+}
+
+function setMaterialInputRef(slotCode: UploadSlotCode, element: HTMLInputElement | null) {
+  if (element) {
+    materialInputRefs.set(slotCode, element)
+  } else {
+    materialInputRefs.delete(slotCode)
+  }
+}
+
+function openMaterialFilePicker(slotCode: UploadSlotCode) {
+  materialInputRefs.get(slotCode)?.click()
+}
+
+async function handleMaterialFileSelection(slot: (typeof uploadSlots)[number], event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0] ?? null
   input.value = ''
@@ -1045,10 +1084,18 @@ function selectMaterialFile(slot: (typeof uploadSlots)[number], event: Event) {
     materialUploadError.value = `${slot.label}请选择${slot.mediaType === 'image' ? '图片' : '视频'}文件`
     return
   }
-  const sizeError = uploadSizeError(file, slot.mediaType)
-  if (sizeError) {
-    materialUploadError.value = `${slot.label}${sizeError}`
-    return
+  if (slot.mediaType === 'video') {
+    const videoError = await validateSelectedVideo(file)
+    if (videoError) {
+      materialUploadError.value = `${slot.label}${videoError}`
+      return
+    }
+  } else {
+    const sizeError = uploadSizeError(file, slot.mediaType)
+    if (sizeError) {
+      materialUploadError.value = `${slot.label}${sizeError}`
+      return
+    }
   }
   materialFiles[slot.code] = file
   releaseMaterialPreview(slot.code)
@@ -1448,11 +1495,18 @@ onMounted(loadLibraryData)
           <span>车场</span>
           <strong>{{ libraryHome?.stats.activeLots ?? 0 }}<em>个</em></strong>
         </button>
-        <div class="stat capacity" :class="capacityUsage.level">
-          <span>已用容量</span>
-          <strong>{{ formatBytes(libraryHome?.stats.usedBytes ?? 0) }}<em>/ {{ libraryHome?.stats.quotaBytes ? formatBytes(libraryHome.stats.quotaBytes) : '不限' }}</em></strong>
-          <div class="capacity-meter"><i :style="{ width: `${capacityUsage.percent}%` }" /></div>
-          <small v-if="capacityUsage.hint" class="capacity-hint">{{ capacityUsage.hint }}</small>
+        <div class="stat">
+          <span>配额</span>
+          <strong v-if="quotaSummary.hasLimit">
+            {{ quotaSummary.vehicles }}<em>/{{ quotaSummary.vehicleLimit }}辆</em>
+            ·
+            {{ quotaSummary.lots }}<em>/{{ quotaSummary.lotLimit }}个车场</em>
+          </strong>
+          <strong v-else>
+            {{ quotaSummary.vehicles }}<em>辆</em>
+            ·
+            {{ quotaSummary.lots }}<em>个</em>
+          </strong>
         </div>
       </section>
 
@@ -1931,6 +1985,7 @@ onMounted(loadLibraryData)
                   type="file"
                   :accept="slot.mediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/quicktime'"
                   :disabled="savingVehicle"
+                  :ref="(element) => setMaterialInputRef(slot.code, element as HTMLInputElement | null)"
                   @change="selectMaterialFile(slot, $event)"
                 />
                 <template v-if="materialPreviewUrl(slot.code)">
@@ -1940,6 +1995,8 @@ onMounted(loadLibraryData)
                     @loadedmetadata="showVideoFirstFrame"
                     title="点击预览视频" @click.prevent="openMaterialPreview(slot)" />
                   <span class="material-preview-label">{{ slot.label }}{{ materialFiles[slot.code] ? ' · 待替换' : ' · 已上传' }}</span>
+                  <button class="material-preview-replace" type="button" title="替换素材" :disabled="savingVehicle"
+                    @click.prevent.stop="openMaterialFilePicker(slot.code)">替换</button>
                   <button v-if="materialFiles[slot.code]" class="material-preview-remove" type="button" title="撤销替换" :disabled="savingVehicle"
                     @click.prevent="clearMaterialFile(slot.code)"><Icon icon="mdi:close" /></button>
                 </template>
@@ -1948,7 +2005,7 @@ onMounted(loadLibraryData)
                   <strong>{{ slot.label }}</strong>
                   <span v-if="materialFiles[slot.code]" class="selected-file">{{ materialFiles[slot.code]?.name }}</span>
                   <span v-else-if="existingMaterials[slot.code]" class="selected-file">{{ existingMaterials[slot.code]?.fileName || '已上传素材' }}</span>
-                  <span v-else>{{ slot.mediaType === 'image' ? 'JPG / PNG / WebP' : 'MP4 / MOV' }}</span>
+                  <span v-else>{{ slot.mediaType === 'image' ? 'JPG / PNG / WebP' : `MP4 / MOV，最长 ${MAX_VIDEO_UPLOAD_SECONDS} 秒，不超过 ${MAX_VIDEO_UPLOAD_MB}MB` }}</span>
                   <button v-if="materialFiles[slot.code]" type="button" @click.prevent="clearMaterialFile(slot.code)">
                     移除
                   </button>
@@ -1989,6 +2046,7 @@ onMounted(loadLibraryData)
                 type="file"
                 :accept="slot.mediaType === 'image' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/quicktime'"
                 :disabled="savingMaterials"
+                :ref="(element) => setMaterialInputRef(slot.code, element as HTMLInputElement | null)"
                 @change="selectMaterialFile(slot, $event)"
               />
               <template v-if="materialPreviewUrl(slot.code)">
@@ -1998,14 +2056,16 @@ onMounted(loadLibraryData)
                   @loadedmetadata="showVideoFirstFrame"
                   title="点击预览视频" @click.prevent="openMaterialPreview(slot)" />
                 <span class="material-preview-label">{{ slot.label }}</span>
-                <button class="material-preview-remove" type="button" title="删除" :disabled="savingMaterials"
+                <button class="material-preview-replace" type="button" title="替换素材" :disabled="savingMaterials"
+                  @click.prevent.stop="openMaterialFilePicker(slot.code)">替换</button>
+                <button v-if="materialFiles[slot.code]" class="material-preview-remove" type="button" title="撤销替换" :disabled="savingMaterials"
                   @click.prevent="clearMaterialFile(slot.code)"><Icon icon="mdi:close" /></button>
               </template>
               <template v-else>
                 <Icon :icon="slot.mediaType === 'image' ? 'mdi:image-plus-outline' : 'mdi:video-plus-outline'" />
                 <strong>{{ slot.label }}</strong>
                 <span v-if="materialFiles[slot.code]" class="selected-file">{{ materialFiles[slot.code]?.name }}</span>
-                <span v-else>{{ slot.mediaType === 'image' ? 'JPG / PNG / WebP' : 'MP4 / MOV' }}</span>
+                <span v-else>{{ slot.mediaType === 'image' ? 'JPG / PNG / WebP' : `MP4 / MOV，最长 ${MAX_VIDEO_UPLOAD_SECONDS} 秒，不超过 ${MAX_VIDEO_UPLOAD_MB}MB` }}</span>
                 <button v-if="materialFiles[slot.code]" type="button" @click.prevent="clearMaterialFile(slot.code)">移除</button>
               </template>
             </label>
@@ -2040,7 +2100,7 @@ onMounted(loadLibraryData)
             <label class="lot-upload-card">
               <input type="file" accept="video/mp4,video/quicktime" :disabled="savingLot" @change="selectLotFile('video', $event)" />
               <Icon icon="mdi:video-plus-outline" /><strong>车场视频</strong>
-              <span :class="{ 'selected-file': lotForm.video }">{{ lotForm.video?.name || 'MP4 / MOV，建议 10-30 秒' }}</span>
+              <span :class="{ 'selected-file': lotForm.video }">{{ lotForm.video?.name || `MP4 / MOV，最长 ${MAX_VIDEO_UPLOAD_SECONDS} 秒，不超过 ${MAX_VIDEO_UPLOAD_MB}MB` }}</span>
             </label>
           </div>
           <p v-if="lotError" class="form-error">{{ lotError }}</p>
@@ -2084,7 +2144,7 @@ onMounted(loadLibraryData)
               </template>
               <template v-else>
                 <Icon icon="mdi:video-plus-outline" /><strong>车场视频</strong>
-                <span>MP4 / MOV，建议 10-30 秒</span>
+                <span>MP4 / MOV，最长 {{ MAX_VIDEO_UPLOAD_SECONDS }} 秒，不超过 {{ MAX_VIDEO_UPLOAD_MB }}MB</span>
               </template>
             </label>
           </div>

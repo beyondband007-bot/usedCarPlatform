@@ -10,8 +10,8 @@ import {
 import { useCreditsStore } from '@/stores/credits'
 import { formatDate } from '@/utils/dayjs'
 import {
-  calculateLanguageConversionPoints,
   probeVideoDurationSeconds,
+  resolveLanguageConversionPoints,
 } from '@/utils/language-conversion-billing'
 
 import originalExampleVideo from '@/assets/video/语言转换/处理前.mp4'
@@ -76,9 +76,17 @@ const availableTargetLanguages = computed(() =>
 const isTaskProcessing = computed(
   () => Boolean(activeTask.value && isTaskInProgress(activeTask.value.status)),
 )
-const estimatedConversionPoints = computed(() =>
-  calculateLanguageConversionPoints(sourceVideoDurationSeconds.value),
-)
+const estimatedConversionPoints = computed(() => {
+  if (isTaskProcessing.value && activeTask.value) {
+    return resolveLanguageConversionPoints({
+      estimatedCost: activeTask.value.estimatedCost,
+      estimatedPoints: activeTask.value.estimatedPoints,
+    })
+  }
+  return resolveLanguageConversionPoints({
+    durationSeconds: sourceVideoDurationSeconds.value,
+  })
+})
 const startConversionLabel = computed(() => {
   if (isSubmitting.value) return '正在提交'
   if (isTaskProcessing.value) return '转换处理中'
@@ -339,7 +347,7 @@ async function handleSubmit() {
   }
 
   const estimatedPoints = estimatedConversionPoints.value
-  await creditsStore.hydrateAccounts()
+  await creditsStore.hydrateAccounts(true)
   if (creditsStore.availableBalance < estimatedPoints) {
     message.warning(
       `积分不足，本次转换预计消耗 ${estimatedPoints} 积分，当前可用 ${creditsStore.balanceText} 积分`,
@@ -354,7 +362,6 @@ async function handleSubmit() {
     preserveSpeakerVoice: false,
     preserveBackgroundAudio: true,
     sourceDurationSeconds: Math.ceil(sourceVideoDurationSeconds.value),
-    estimatedPoints,
   }
   emit('submit', payload)
   isSubmitting.value = true
@@ -368,9 +375,11 @@ async function handleSubmit() {
     })
     activeTask.value = task
     syncSimulatedProgressWithTask(task)
+    void creditsStore.hydrateAccounts(true)
     message.success('语言转换任务已提交')
     startPolling(task.taskId)
   } catch (error) {
+    void creditsStore.hydrateAccounts(true)
     message.error(error instanceof Error ? error.message : '语言转换任务提交失败')
   } finally {
     isSubmitting.value = false
@@ -416,6 +425,7 @@ async function refreshTask(taskId: string) {
     } else if (task.status === 'failed') {
       stopPolling()
       syncSimulatedProgressWithTask(task)
+      void creditsStore.hydrateAccounts(true)
       message.error(task.errorMessage || '语言转换失败')
     } else {
       syncSimulatedProgressWithTask(task)

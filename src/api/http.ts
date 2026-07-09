@@ -36,6 +36,10 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '积分服务校验未通过，请检查账户状态后重试',
   },
   {
+    matches: ['insufficient balance', 'available balance is not enough', '余额不足'],
+    text: '积分不足，请充值后再试',
+  },
+  {
     matches: ['inputassetid is required'],
     text: '请先上传图片后再生成',
   },
@@ -48,8 +52,28 @@ const errorMessageRules: ErrorMessageRule[] = [
     text: '文件过大，请压缩后重试',
   },
   {
+    matches: ['video duration exceeds limit'],
+    text: '视频时长不能超过 60 秒，请剪辑后重试',
+  },
+  {
+    matches: ['failed to validate video duration'],
+    text: '视频校验失败，请更换文件后重试',
+  },
+  {
+    matches: ['查询超时请重新查询'],
+    text: '查询超时请重新查询',
+  },
+  {
+    matches: ['vin未查到', 'VIN未查到'],
+    text: 'VIN未查到，请检查后重新查询',
+  },
+  {
     matches: ['vin already exists'],
     text: '该 VIN 已存在于车辆库中，请勿重复录入',
+  },
+  {
+    matches: ['vehicle library plan not available'],
+    text: '当前套餐未开通车辆库，请升级至企业团队档或企业旗舰档',
   },
   {
     matches: ['vehicle library is not active'],
@@ -58,6 +82,14 @@ const errorMessageRules: ErrorMessageRule[] = [
   {
     matches: ['vehicle library storage quota exceeded'],
     text: '车辆库存储空间不足，请清理素材后重试或联系平台扩容',
+  },
+  {
+    matches: ['vehicle library vehicle limit reached'],
+    text: '车辆数量已达当前套餐上限，请升级套餐或联系平台扩容',
+  },
+  {
+    matches: ['vehicle library lot limit reached'],
+    text: '车场数量已达当前套餐上限，请升级套餐或联系平台扩容',
   },
   {
     matches: [

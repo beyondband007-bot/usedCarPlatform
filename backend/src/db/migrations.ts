@@ -717,6 +717,7 @@ export const migrations = [
     owner_user_id VARCHAR(64) NOT NULL,
     name VARCHAR(100) NOT NULL DEFAULT 'Vehicle Library',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
+    quota_policy VARCHAR(20) NOT NULL DEFAULT 'standard',
     quota_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
     used_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
     remark VARCHAR(500) NULL,

@@ -12,6 +12,28 @@ export function calculateLanguageConversionPoints(durationSeconds: number) {
   return billableMinutes * LANGUAGE_CONVERSION_POINTS_PER_MINUTE
 }
 
+export function parseLanguageConversionBillingPoints(value: unknown) {
+  if (value == null || value === '') return null
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return Math.round(parsed)
+}
+
+export function resolveLanguageConversionPoints(input: {
+  durationSeconds?: number
+  estimatedCost?: number | null
+  estimatedPoints?: string | null
+}) {
+  const billedPoints =
+    parseLanguageConversionBillingPoints(input.estimatedCost)
+    ?? parseLanguageConversionBillingPoints(input.estimatedPoints)
+  if (billedPoints) return billedPoints
+  if (input.durationSeconds) {
+    return calculateLanguageConversionPoints(input.durationSeconds)
+  }
+  return 0
+}
+
 export function probeVideoDurationSeconds(url: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')

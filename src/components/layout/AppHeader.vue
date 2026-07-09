@@ -18,11 +18,14 @@ import { useStudioChrome } from "@/composables/useStudioChrome";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import { useCreditsStore } from "@/stores/credits";
+import { useSubscriptionStore } from "@/stores/subscription";
+import { canAccessVehicleLibrary } from "@/utils/vehicle-library-access";
 import type { NavItem } from "@/types/prototype";
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const creditsStore = useCreditsStore();
+const subscriptionStore = useSubscriptionStore();
 const router = useRouter();
 const route = useRoute();
 const workbenchEntry = inject(WORKBENCH_ENTRY_KEY);
@@ -118,6 +121,12 @@ function resolveNavPermission(path: string) {
 
 function canShowNavItem(item: NavItem) {
   if (item.hidden) return false;
+  if (
+    item.path === "/vehicle-library" &&
+    !canAccessVehicleLibrary(subscriptionStore.currentPlan)
+  ) {
+    return false;
+  }
   if (!authStore.isLoggedIn)
     return item.path !== "/credits" && item.path !== "/points";
   if (

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { migrations } from "../../db/migrations";
 import { AppError } from "../../shared/errors";
 import { vehicleLibraryRepository } from "./vehicleLibraryRepository";
 import {
@@ -11,6 +12,17 @@ import {
   parseOptionalDateString,
   vehicleRequiredSlotCodes,
 } from "./vehicleLibraryTypes";
+import {
+  assertCanCreateLot,
+  assertCanCreateVehicle,
+  canAccessVehicleLibraryByPlan,
+  computeLibraryQuotaBytes,
+  getPlanLibraryLimits,
+  isLegacyQuotaPolicy,
+  PLAN_LIBRARY_LIMITS,
+  STORAGE_BYTES_PER_LOT,
+  STORAGE_BYTES_PER_VEHICLE,
+} from "./vehicleLibraryQuota";
 
 type CapturedCall = {
   sql: string;
@@ -65,6 +77,47 @@ function testDateRules() {
   assertThrowsAppError(() => parseOptionalDateString("2026-13-01", "firstRegistrationDate"));
 }
 
+function testQuotaRules() {
+  const gb = (value: number) => value * 1024 * 1024 * 1024;
+  assert.deepEqual(PLAN_LIBRARY_LIMITS.basic, {
+    vehicles: 0,
+    lots: 0,
+    storageBudgetBytes: 0,
+    enabled: false,
+  });
+  assert.deepEqual(PLAN_LIBRARY_LIMITS.team, {
+    vehicles: 5,
+    lots: 2,
+    storageBudgetBytes: gb(1),
+    enabled: true,
+  });
+  assert.deepEqual(PLAN_LIBRARY_LIMITS.flagship, {
+    vehicles: 10,
+    lots: 6,
+    storageBudgetBytes: gb(2),
+    enabled: true,
+  });
+  assert.equal(STORAGE_BYTES_PER_VEHICLE > STORAGE_BYTES_PER_LOT, true);
+  assert.equal(
+    computeLibraryQuotaBytes(5, 2, gb(1)),
+    Math.min(5 * STORAGE_BYTES_PER_VEHICLE + 2 * STORAGE_BYTES_PER_LOT, gb(1)),
+  );
+  assert.equal(getPlanLibraryLimits("team").vehicleLimit, 5);
+  assert.equal(getPlanLibraryLimits("team").lotLimit, 2);
+  assert.equal(getPlanLibraryLimits("basic").enabled, false);
+  assert.equal(canAccessVehicleLibraryByPlan("basic"), false);
+  assert.equal(canAccessVehicleLibraryByPlan("team"), true);
+  assert.equal(canAccessVehicleLibraryByPlan("flagship"), true);
+  assert.equal(canAccessVehicleLibraryByPlan("basic", "legacy"), true);
+  assert.equal(isLegacyQuotaPolicy("legacy"), true);
+  assert.equal(isLegacyQuotaPolicy("standard"), false);
+  assert.doesNotThrow(() => assertCanCreateVehicle(4, "standard", 5));
+  assert.throws(() => assertCanCreateVehicle(5, "standard", 5));
+  assert.doesNotThrow(() => assertCanCreateVehicle(100, "legacy", 5));
+  assert.doesNotThrow(() => assertCanCreateLot(1, "standard", 2));
+  assert.throws(() => assertCanCreateLot(2, "standard", 2));
+}
+
 function testSlotRules() {
   assert.deepEqual(vehicleRequiredSlotCodes, [
     "front_image",
@@ -79,6 +132,14 @@ function testSlotRules() {
   assert.equal(getMaterialSlotDefinition("lot", "lot_video").mediaType, "video");
   assertThrowsAppError(() => getMaterialSlotDefinition("lot", "front_image"));
   assertThrowsAppError(() => getMaterialSlotDefinition("vehicle", "lot_image"));
+}
+
+function testVehicleLibrarySchemaIncludesQuotaPolicy() {
+  const schema = migrations.find((migration) =>
+    migration.includes("CREATE TABLE IF NOT EXISTS vehicle_libraries"),
+  );
+  assert.ok(schema);
+  assert.match(schema, /quota_policy\s+VARCHAR\(20\)\s+NOT NULL\s+DEFAULT 'standard'/);
 }
 
 async function testRepositoryOwnershipScopeSql() {
@@ -157,7 +218,9 @@ async function testOwnerStatusTargetsExpectedTables() {
 async function run() {
   testVinRules();
   testDateRules();
+  testQuotaRules();
   testSlotRules();
+  testVehicleLibrarySchemaIncludesQuotaPolicy();
   await testRepositoryOwnershipScopeSql();
   await testCompletenessQueryUsesActiveRequiredSlots();
   await testOwnerStatusTargetsExpectedTables();
