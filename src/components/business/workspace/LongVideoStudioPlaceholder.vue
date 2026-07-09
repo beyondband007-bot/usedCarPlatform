@@ -363,6 +363,7 @@ watch(
 )
 
 onUnmounted(() => {
+  dismissOverlayState()
   Object.values(uploadedSlots.value).forEach((item) => {
     cleanupUploadedSlot(item)
   })
@@ -402,6 +403,14 @@ function closeAssetPreview() {
 
 function handleAssetPreviewVisibleChange(show: boolean) {
   if (!show) closeAssetPreview()
+}
+
+function dismissOverlayState() {
+  closeTemplatePreview()
+  humanPreviewModalVisible.value = false
+  previewingDigitalHuman.value = null
+  enlargedHumanPreview.value = null
+  closeAssetPreview()
 }
 
 function formatDuration(durationMs: number) {

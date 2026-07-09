@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import { NModal, useMessage } from "naive-ui";
 
@@ -346,6 +346,17 @@ function handleTemplatePreviewVisibleChange(show: boolean) {
     closeTemplatePreviewPlayer();
   }
 }
+
+function dismissOverlayState() {
+  closeTemplatePreviewPlayer();
+  humanPreviewModalVisible.value = false;
+  previewingDigitalHuman.value = null;
+  enlargedHumanPreview.value = null;
+}
+
+onBeforeUnmount(() => {
+  dismissOverlayState();
+});
 
 function openTemplatesView() {
   activeView.value = "templates";

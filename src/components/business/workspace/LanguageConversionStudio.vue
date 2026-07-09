@@ -542,6 +542,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  previewTask.value = null
   if (sourceVideoUrl.value) URL.revokeObjectURL(sourceVideoUrl.value)
   stopPolling()
   resetSimulatedProgress()

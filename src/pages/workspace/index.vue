@@ -2636,6 +2636,11 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+.workspace-col--nav {
+  position: relative;
+  z-index: 3;
+}
+
 .workspace-col--assist > :deep(*) {
   flex: 1;
   min-height: 0;

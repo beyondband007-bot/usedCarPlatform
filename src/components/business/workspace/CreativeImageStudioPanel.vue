@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NDropdown } from 'naive-ui'
 
@@ -202,6 +202,10 @@ onMounted(() => {
   if (authStore.isLoggedIn && !creditsStore.accountsLoaded) {
     void creditsStore.hydrateAccounts()
   }
+})
+
+onBeforeUnmount(() => {
+  previewModalVisible.value = false
 })
 
 function resolveConversationTitle(conversation: CreativeImageConversation) {
