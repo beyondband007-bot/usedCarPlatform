@@ -382,8 +382,8 @@ const validateAssets = async (input: {
   vehicleImageAssetIds: string[];
   interiorVideoAssetIds: string[];
 }) => {
-  if (input.vehicleImageAssetIds.length < 1) {
-    throw errors.invalidParameter("vehicleImageAssetIds requires at least one image");
+  if (input.vehicleImageAssetIds.length !== 3) {
+    throw errors.invalidParameter("vehicleImageAssetIds requires exactly three images");
   }
   if (input.interiorVideoAssetIds.length !== 2) {
     throw errors.invalidParameter("interiorVideoAssetIds requires exactly two videos");
@@ -392,10 +392,16 @@ const validateAssets = async (input: {
   for (const assetId of input.vehicleImageAssetIds) {
     const asset = await assetsRepository.findById(assetId, input.userId);
     if (!asset) throw errors.assetNotFound();
-    if (!["car_exterior", "video_reference_image"].includes(asset.purpose)) {
-      throw errors.invalidParameter("vehicleImageAssetIds must be car exterior image assets", {
+    if (!["car_exterior", "car_interior", "video_reference_image"].includes(asset.purpose)) {
+      throw errors.invalidParameter("vehicleImageAssetIds must be vehicle image assets", {
         assetId,
         purpose: asset.purpose,
+      });
+    }
+    if (!asset.mimeType.startsWith("image/")) {
+      throw errors.invalidParameter("vehicleImageAssetIds must reference image files", {
+        assetId,
+        mimeType: asset.mimeType,
       });
     }
     vehicleImages.push(asset);
