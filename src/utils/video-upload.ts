@@ -1,31 +1,10 @@
+import { arkVideoWidthError, readVideoFileDimensions } from '@/utils/ark-media-validation'
+
 export const MAX_VEHICLE_LIBRARY_VIDEO_MB = 50
 export const MAX_VEHICLE_LIBRARY_VIDEO_SECONDS = 60
 
 export function readVideoDurationSeconds(file: File): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const video = document.createElement('video')
-    video.preload = 'metadata'
-
-    const cleanup = () => {
-      URL.revokeObjectURL(url)
-      video.removeAttribute('src')
-      video.load()
-    }
-
-    video.onloadedmetadata = () => {
-      const duration = video.duration
-      cleanup()
-      resolve(duration)
-    }
-
-    video.onerror = () => {
-      cleanup()
-      reject(new Error('无法读取视频时长，请更换文件后重试'))
-    }
-
-    video.src = url
-  })
+  return readVideoFileDimensions(file).then((result) => result.duration)
 }
 
 export async function validateVehicleLibraryVideo(
@@ -40,7 +19,9 @@ export async function validateVehicleLibraryVideo(
   }
 
   try {
-    const duration = await readVideoDurationSeconds(file)
+    const { width, height, duration } = await readVideoFileDimensions(file)
+    const widthError = arkVideoWidthError(width, height)
+    if (widthError) return widthError
     if (!Number.isFinite(duration) || duration <= 0) {
       return '无法读取视频时长，请更换文件后重试'
     }
@@ -49,7 +30,7 @@ export async function validateVehicleLibraryVideo(
     }
   }
   catch (error) {
-    return error instanceof Error ? error.message : '无法读取视频时长，请更换文件后重试'
+    return error instanceof Error ? error.message : '无法读取视频信息，请更换文件后重试'
   }
 
   return ''

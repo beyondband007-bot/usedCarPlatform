@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { DEFAULT_LOT_CAPTURE_POSITIONS } from '@/constants/capture'
 import { UPLOAD_LIMITS, UPLOAD_STATUS_TEXT } from '@/constants/upload'
 import { useUploadQueue } from '@/composables/useUploadQueue'
+import { validateArkImagePath, validateArkVideoPath } from '@/utils/arkMediaValidation'
 import { hydrateLotMaterialsFromServer, removeLotMaterial } from '@/utils/lotMaterials'
 
 definePage({
@@ -90,6 +91,11 @@ async function chooseImage(position: CapturePosition) {
         return
       }
       const localPath = await persistFile(path)
+      const dimensionError = await validateArkImagePath(localPath)
+      if (dimensionError) {
+        uni.showToast({ title: dimensionError, icon: 'none' })
+        return
+      }
       enqueueMedia(position, localPath, file?.size)
     },
     fail: handleAuthError,
@@ -113,6 +119,11 @@ async function chooseVideo(position: CapturePosition) {
         return
       }
       const localPath = await persistFile(path)
+      const dimensionError = await validateArkVideoPath(localPath, result.size)
+      if (dimensionError) {
+        uni.showToast({ title: dimensionError, icon: 'none' })
+        return
+      }
       enqueueMedia(position, localPath, result.size)
     },
     fail: handleAuthError,

@@ -41,6 +41,7 @@ import {
   MAX_VEHICLE_LIBRARY_VIDEO_SECONDS,
   validateVehicleLibraryVideo,
 } from '@/utils/video-upload'
+import { validateArkImageFile } from '@/utils/ark-media-validation'
 
 // 与后端 MAX_UPLOAD_MB / MAX_VIDEO_UPLOAD_MB 默认值保持一致，用于选文件时的即时预检。
 const MAX_IMAGE_UPLOAD_MB = 20
@@ -797,6 +798,10 @@ async function validateSelectedVideo(file: File) {
   })
 }
 
+async function validateSelectedImage(file: File) {
+  return validateArkImageFile(file)
+}
+
 function selectLotFile(mediaType: 'image' | 'video', event: Event) {
   void handleLotFileSelection(mediaType, event)
 }
@@ -821,6 +826,11 @@ async function handleLotFileSelection(mediaType: 'image' | 'video', event: Event
     const sizeError = uploadSizeError(file, mediaType)
     if (sizeError) {
       lotError.value = `车场图片${sizeError}`
+      return
+    }
+    const imageError = await validateSelectedImage(file)
+    if (imageError) {
+      lotError.value = `车场图片${imageError}`
       return
     }
   }
@@ -966,6 +976,11 @@ async function handleLotManageFileSelection(mediaType: 'image' | 'video', event:
       lotManageError.value = `车场图片${sizeError}`
       return
     }
+    const imageError = await validateSelectedImage(file)
+    if (imageError) {
+      lotManageError.value = `车场图片${imageError}`
+      return
+    }
   }
   lotManageFiles[mediaType] = file
   releaseLotManagePreview(mediaType)
@@ -1094,6 +1109,11 @@ async function handleMaterialFileSelection(slot: (typeof uploadSlots)[number], e
     const sizeError = uploadSizeError(file, slot.mediaType)
     if (sizeError) {
       materialUploadError.value = `${slot.label}${sizeError}`
+      return
+    }
+    const imageError = await validateSelectedImage(file)
+    if (imageError) {
+      materialUploadError.value = `${slot.label}${imageError}`
       return
     }
   }
