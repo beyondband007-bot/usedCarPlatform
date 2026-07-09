@@ -127,27 +127,40 @@ export class MinimaxClient {
   async synthesizeSpeech(input: {
     text: string;
     voiceId: string;
+    model?: string;
     speed?: number;
-    language?: MinimaxTtsLanguageBoost;
+    vol?: number;
+    pitch?: number;
+    language?: MinimaxTtsLanguageBoost | string;
+    audioSetting?: {
+      sampleRate?: number;
+      bitrate?: number;
+      format?: "mp3";
+      channel?: 1 | 2;
+    };
   }): Promise<MinimaxSpeechAudio> {
+    const model = input.model ?? env.minimax.speechModel;
     const speed = input.speed ?? 1;
+    const vol = input.vol ?? 1;
+    const pitch = input.pitch ?? 0;
     const languageBoost = input.language ?? "auto";
+    const audioSetting = input.audioSetting ?? {};
     const raw = await requestJson("/v1/t2a_v2", {
-      model: env.minimax.speechModel,
+      model,
       text: input.text,
       stream: false,
       language_boost: languageBoost,
       voice_setting: {
         voice_id: input.voiceId,
         speed,
-        vol: 1,
-        pitch: 0,
+        vol,
+        pitch,
       },
       audio_setting: {
-        sample_rate: 32000,
-        bitrate: 128000,
-        format: "mp3",
-        channel: 1,
+        sample_rate: audioSetting.sampleRate ?? 32000,
+        bitrate: audioSetting.bitrate ?? 128000,
+        format: audioSetting.format ?? "mp3",
+        channel: audioSetting.channel ?? 1,
       },
     });
 
@@ -170,10 +183,10 @@ export class MinimaxClient {
       audio,
       durationMs: Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : null,
       sizeBytes: audio.length,
-      model: env.minimax.speechModel,
+      model,
       voiceId: input.voiceId,
       speed,
-      languageBoost,
+      languageBoost: String(languageBoost),
       raw,
     };
   }

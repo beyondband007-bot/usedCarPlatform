@@ -2762,7 +2762,6 @@ onUnmounted(() => {
 }
 
 .workspace-page--creative-image .workspace-shell,
-.workspace-page--long-video .workspace-shell,
 .workspace-page--language-conversion .workspace-shell,
 .workspace-page--simultaneous-interpretation .workspace-shell {
   @media (width >= 1024px) and (width < 1180px) {
@@ -2776,6 +2775,26 @@ onUnmounted(() => {
   @media (width >= 1536px) {
     grid-template-columns: 216px minmax(0, 1fr);
   }
+}
+
+.workspace-page--long-video .workspace-shell {
+  @media (width >= 1024px) and (width < 1180px) {
+    grid-template-columns: 184px minmax(0, 1fr);
+  }
+
+  @media (width >= 1180px) {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  @media (width >= 1536px) {
+    grid-template-columns: 216px minmax(0, 1fr);
+  }
+}
+
+.workspace-page--long-video .workspace-col--main,
+.workspace-page--long-video .workspace-col--main .workspace-col-scroll {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-page--language-conversion .workspace-col-scroll {

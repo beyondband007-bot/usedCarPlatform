@@ -3,16 +3,15 @@ import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NModal, useMessage } from 'naive-ui'
 
-import HoverPreviewVideo from '@/components/common/HoverPreviewVideo.vue'
-import PreloadImage from '@/components/common/PreloadImage.vue'
 import TemplatePreviewVideoPlayer from '@/components/business/workspace/TemplatePreviewVideoPlayer.vue'
 import {
-  queryVehicleByVinShowApi,
-  normalizeVehicleInfo,
-  recognizeVinFromImage,
-  type VehicleBasicInfo,
-  type VinVehicleCandidate,
-} from '@/api/vehicle-info'
+  createLongVideoAudioPreview,
+  createLongVideoDraft,
+  createLongVideoTask,
+  getLongVideoTask,
+  updateLongVideoDraftSegments,
+} from '@/api/long-video-generation'
+import { uploadAsset, type UploadedAsset } from '@/api/visual-workbench'
 import { VIDEO_GENERATION_FLOW_KEY } from '@/constants/video-generation'
 import {
   resolveTemplatePosterUrl,
@@ -21,3057 +20,1816 @@ import {
 import { resolveTemplateDefaultDigitalHumanId } from '@/constants/video-generation-local-assets'
 import type { VideoGenerationFlow } from '@/composables/useVideoGenerationFlow'
 import type { DigitalHuman, VideoTemplate } from '@/types/video-generation'
+import type {
+  LongVideoAudioPreview,
+  LongVideoDraft,
+  LongVideoNarrationSegment,
+  LongVideoTask,
+  LongVideoSlot,
+} from '@/types/long-video-generation'
 
-const currentView = ref<
-  'dashboard' | 'vehicle-upload' | 'vehicle-info' | 'vehicle-template' | 'venue-upload'
->('vehicle-upload')
+type StepKey = 'assets' | 'vehicle' | 'template' | 'script'
+type UploadSlotKey = 'body' | 'frontInterior' | 'rearInterior'
+
+type UploadSlot = {
+  key: UploadSlotKey
+  label: string
+  hint: string
+  accept: string
+  purpose: 'car_exterior' | 'car_interior'
+  kind: 'image' | 'video'
+}
+
+type UploadedSlot = {
+  id: string
+  file: File
+  objectUrl: string
+  asset: UploadedAsset | null
+  status: 'local' | 'uploading' | 'uploaded' | 'failed'
+  error?: string
+}
+
 const message = useMessage()
 const videoFlow = inject<VideoGenerationFlow | null>(VIDEO_GENERATION_FLOW_KEY, null)
-const longVideoMode = ref<'vehicle' | 'venue'>('vehicle')
-type LocalUploadPreview = {
-  name: string
-  size: number
-  type: string
-  url: string
-}
-const uploadedFiles = ref<Record<string, LocalUploadPreview>>({})
-const vin = ref('')
-const vinLoading = ref(false)
-const vinOcrLoading = ref(false)
-const vehicleInfo = ref<VehicleBasicInfo | null>(null)
-const vehicleCandidates = ref<VinVehicleCandidate[]>([])
-const selectedVehicleCandidateId = ref<number | null>(null)
-const templateSearch = ref('')
-const templatePreviewSession = ref<VideoTemplate | null>(null)
+
+const currentStep = ref<StepKey>('assets')
+const uploadedSlots = ref<Partial<Record<UploadSlotKey, UploadedSlot>>>({})
+const bodyImageUploads = ref<UploadedSlot[]>([])
+const vehicleInfo = ref({
+  brandName: '',
+  seriesName: '',
+  fullModelName: '',
+  year: '',
+  mileage: '',
+  price: '',
+})
+const sellingPointsText = ref('')
+const selectedPreviewTemplate = ref<VideoTemplate | null>(null)
 const previewDigitalHumanId = ref('')
-const activeWorkflowStep = computed(() => {
-  if (currentView.value === 'vehicle-template') return 2
-  if (currentView.value === 'vehicle-info') return 1
-  return 0
-})
-const longVideoTemplates = computed(() => {
-  const keyword = templateSearch.value.trim().toLowerCase()
-  const targetType = isVenueFlow.value ? 'dealership' : 'single-car'
-  return (videoFlow?.templateList.value ?? []).filter((item) => {
-    if (item.type !== targetType) return false
-    if (!keyword) return true
-    return `${item.title} ${item.description ?? ''} ${item.styleLabel}`
-      .toLowerCase()
-      .includes(keyword)
-  })
-})
-const selectedLongVideoTemplateId = computed(
-  () =>
-    videoFlow?.selectedTemplate.value?.type === (isVenueFlow.value ? 'dealership' : 'single-car')
-      ? videoFlow.selectedTemplate.value.templateId
-      : '',
+const draft = ref<LongVideoDraft | null>(null)
+const editableSegments = ref<LongVideoNarrationSegment[]>([])
+const audioPreview = ref<LongVideoAudioPreview | null>(null)
+const currentTask = ref<LongVideoTask | null>(null)
+const activeAudioIndex = ref(0)
+const audioElement = ref<HTMLAudioElement | null>(null)
+const loadingAction = ref<'upload' | 'draft' | 'audio' | 'task' | null>(null)
+let taskPollingTimer: ReturnType<typeof window.setInterval> | null = null
+
+const uploadSlots: UploadSlot[] = [
+  {
+    key: 'body',
+    label: '车身外观图',
+    hint: '至少 1 张清晰车身图，用作 AI 视频统一场景参考',
+    accept: 'image/jpeg,image/png,image/webp',
+    purpose: 'car_exterior',
+    kind: 'image',
+  },
+  {
+    key: 'frontInterior',
+    label: '前排内饰实拍',
+    hint: '第一段用户实拍视频，后续会匹配画外音时长',
+    accept: 'video/mp4,video/quicktime',
+    purpose: 'car_interior',
+    kind: 'video',
+  },
+  {
+    key: 'rearInterior',
+    label: '后排/细节实拍',
+    hint: '第二段用户实拍视频，作为后半段实拍佐证',
+    accept: 'video/mp4,video/quicktime',
+    purpose: 'car_interior',
+    kind: 'video',
+  },
+]
+
+const stepItems: Array<{ key: StepKey; label: string }> = [
+  { key: 'assets', label: '素材上传' },
+  { key: 'vehicle', label: '车辆信息' },
+  { key: 'template', label: '数字人与模板' },
+  { key: 'script', label: '五段文案确认' },
+]
+
+const slotLabels: Record<LongVideoSlot, string> = {
+  ai_video_1: 'AI 1 车外开场',
+  user_video_1: '实拍 1 前排画外音',
+  ai_video_2: 'AI 2 车内坐姿讲解',
+  user_video_2: '实拍 2 后排画外音',
+  ai_video_3: 'AI 3 车外收尾',
+}
+
+const selectedTemplate = computed(() =>
+  videoFlow?.selectedTemplate.value?.type === 'single-car' ? videoFlow.selectedTemplate.value : null,
 )
-const selectedLongVideoTemplate = computed(() =>
-  longVideoTemplates.value.find((item) => item.templateId === selectedLongVideoTemplateId.value) ??
-  null,
-)
-const templatesLoading = computed(() => videoFlow?.isLoading('bootstrap') ?? false)
-const digitalHumanList = computed(() => videoFlow?.digitalHumanList.value ?? [])
 const selectedDigitalHuman = computed(() => videoFlow?.selectedDigitalHuman.value ?? null)
-
-const projectTypes = [
-  {
-    icon: 'mdi:car-hatchback',
-    title: '车辆介绍视频',
-    description: '适合单车讲解、车型亮点与车况展示',
-    requirement: '3 张图片 + 2 个视频 · 约 2～5 分钟',
-    action: '创建车辆视频',
-    tone: 'blue',
-    badge: '常用',
-  },
-  {
-    icon: 'mdi:office-building-outline',
-    title: '车场介绍视频',
-    description: '适合门店环境、品牌实力与服务介绍',
-    requirement: '1 张图片 + 1 个视频 · 约 1～3 分钟',
-    action: '创建车场视频',
-    tone: 'green',
-  },
-] as const
-
-const recentProjects = [
-  {
-    icon: 'mdi:car-hatchback',
-    title: '2023 款精品 SUV 介绍',
-    meta: '车辆介绍 · 已完成 35%',
-    progress: 35,
-    status: '草稿',
-    action: '继续编辑',
-    tone: 'blue',
-  },
-  {
-    icon: 'mdi:office-building-outline',
-    title: '诚信车行展厅介绍',
-    meta: '车场介绍 · 已完成 68%',
-    progress: 68,
-    status: '视频渲染中',
-    action: '查看进度',
-    tone: 'green',
-  },
-] as const
-
-const workflowSteps = ['素材上传', '信息填写', '数字人与模板', '脚本确认'] as const
-
-const uploadSlots = [
-  {
-    label: '车头图片',
-    accept: 'image/jpeg、image/png、image/webp · 最大 20.0 MB',
-    acceptValue: 'image/jpeg,image/png,image/webp',
-  },
-  {
-    label: '副驾图片',
-    accept: 'image/jpeg、image/png、image/webp · 最大 20.0 MB',
-    acceptValue: 'image/jpeg,image/png,image/webp',
-  },
-  {
-    label: '车尾图片',
-    accept: 'image/jpeg、image/png、image/webp · 最大 20.0 MB',
-    acceptValue: 'image/jpeg,image/png,image/webp',
-  },
-  {
-    label: '前排视频',
-    accept: 'video/mp4、video/quicktime · 最大 500.0 MB',
-    acceptValue: 'video/mp4,video/quicktime',
-  },
-  {
-    label: '后排视频',
-    accept: 'video/mp4、video/quicktime · 最大 500.0 MB',
-    acceptValue: 'video/mp4,video/quicktime',
-  },
-] as const
-
-const venueUploadSlots = [
-  {
-    label: '车场图片',
-    accept: 'image/jpeg、image/png、image/webp · 最大 20.0 MB',
-    acceptValue: 'image/jpeg,image/png,image/webp',
-  },
-  {
-    label: '车场视频',
-    accept: 'video/mp4、video/quicktime · 最大 500.0 MB',
-    acceptValue: 'video/mp4,video/quicktime',
-  },
-] as const
-
-const isVenueFlow = computed(() => longVideoMode.value === 'venue')
-const currentUploadSlots = computed(() =>
-  isVenueFlow.value ? venueUploadSlots : uploadSlots,
+const digitalHumanList = computed(() => videoFlow?.digitalHumanList.value ?? [])
+const templatesLoading = computed(() => videoFlow?.isLoading('bootstrap') ?? false)
+const singleCarTemplates = computed(() =>
+  (videoFlow?.templateList.value ?? []).filter((item) => item.type === 'single-car'),
+)
+const previewTemplatePosterUrl = computed(() =>
+  selectedPreviewTemplate.value ? resolveTemplatePosterUrl(selectedPreviewTemplate.value) : null,
+)
+const previewTemplateVideoUrl = computed(() =>
+  selectedPreviewTemplate.value ? resolveTemplatePreviewUrl(selectedPreviewTemplate.value) : null,
+)
+const isBusy = computed(() => Boolean(loadingAction.value))
+const stepIndex = computed(() => stepItems.findIndex((item) => item.key === currentStep.value))
+const activeAudioSegment = computed(() => audioPreview.value?.segments[activeAudioIndex.value] ?? null)
+const totalAudioDuration = computed(() =>
+  audioPreview.value ? formatDuration(audioPreview.value.totalDurationMs) : '0.0s',
+)
+const displayTaskProgress = computed(() => {
+  const task = currentTask.value
+  if (!task) return 0
+  if (task.status === 'failed') return Math.min(task.progress ?? 0, 95)
+  return Math.max(0, Math.min(100, task.progress ?? 0))
+})
+const taskStatusLabel = computed(() => {
+  const status = currentTask.value?.status
+  if (status === 'queued') return '排队中'
+  if (status === 'generating_ai_video') return 'AI 视频生成中'
+  if (status === 'rendering') return '拼接渲染中'
+  if (status === 'completed') return '生成完成'
+  if (status === 'failed') return '生成失败'
+  return '未提交'
+})
+const hasRunningTask = computed(() =>
+  Boolean(currentTask.value && !['completed', 'failed'].includes(currentTask.value.status)),
+)
+const primaryActionLabel = computed(() => {
+  if (currentStep.value === 'template') return '生成五段文案'
+  if (currentStep.value === 'script') {
+    if (!audioPreview.value) return loadingAction.value === 'audio' ? '正在生成音频' : '生成五段音频'
+    if (hasRunningTask.value) return '任务已提交'
+    if (currentTask.value?.status === 'failed') return loadingAction.value === 'task' ? '正在重新提交' : '重新生成视频'
+    return loadingAction.value === 'task' ? '正在提交任务' : '生成视频'
+  }
+  return '下一步'
+})
+const canContinueFromAssets = computed(() =>
+  Boolean(
+    bodyImageUploads.value.some((item) => item.asset?.assetId && item.status === 'uploaded') &&
+      uploadedSlots.value.frontInterior?.asset?.assetId &&
+      uploadedSlots.value.rearInterior?.asset?.assetId,
+  ),
+)
+const canCreateDraft = computed(() =>
+  Boolean(canContinueFromAssets.value && selectedTemplate.value && selectedDigitalHuman.value),
 )
 
-type EditableVehicleField =
-  | 'brandName'
-  | 'year'
-  | 'fullModelName'
-  | 'vehicleLevel'
-  | 'seriesName'
-  | 'emissionStandard'
-  | 'engineModel'
-  | 'gearbox'
-  | 'fuelType'
-  | 'displacement'
+onMounted(() => {
+  void videoFlow?.initializeFlow()
+})
 
-const coreVehicleFields: ReadonlyArray<readonly [EditableVehicleField, string]> = [
-  ['brandName', '品牌'],
-  ['year', '年款'],
-  ['fullModelName', '车款名称'],
-  ['vehicleLevel', '车辆级别'],
-  ['seriesName', '车系'],
-  ['emissionStandard', '排放标准'],
-  ['engineModel', '发动机型号'],
-  ['gearbox', '变速箱'],
-  ['fuelType', '燃油类型'],
-  ['displacement', '排量'],
-] as const
-
-const displayedCoreFields = computed(() =>
-  coreVehicleFields.map(([key, label]) => ({
-    key,
-    label,
-    value: vehicleInfo.value?.[key] ?? '',
-  })),
-)
-
-function startManualVehicleInfoInput() {
-  vehicleInfo.value = normalizeVehicleInfo({})
-  vehicleCandidates.value = []
-  selectedVehicleCandidateId.value = null
-  message.info('已切换为手动录入，请填写车辆信息')
-}
-
-function updateVehicleInfo(key: EditableVehicleField, event: Event) {
-  if (!vehicleInfo.value) return
-  vehicleInfo.value[key] = (event.target as HTMLInputElement).value
-}
-
-function extractCandidateYear(name: string): string {
-  return name.match(/(?:19|20)\d{2}(?=款)/)?.[0] ?? ''
-}
-
-function selectVehicleCandidate(candidate: VinVehicleCandidate) {
-  if (!vehicleInfo.value) return
-  selectedVehicleCandidateId.value = candidate.carid
-  vehicleInfo.value.fullModelName = candidate.name
-  vehicleInfo.value.seriesName = candidate.typename || vehicleInfo.value.seriesName
-  vehicleInfo.value.year = extractCandidateYear(candidate.name) || vehicleInfo.value.year
-  vehicleInfo.value.displacement = candidate.displacement || vehicleInfo.value.displacement
-  vehicleInfo.value.guidePrice = candidate.price || vehicleInfo.value.guidePrice
-}
-
-function setLongVideoMode(mode: 'vehicle' | 'venue') {
-  longVideoMode.value = mode
-  currentView.value = mode === 'venue' ? 'venue-upload' : 'vehicle-upload'
-  const expectedType = mode === 'venue' ? 'dealership' : 'single-car'
-  if (videoFlow?.selectedTemplate.value && videoFlow.selectedTemplate.value.type !== expectedType) {
-    videoFlow.selectedTemplate.value = null
-    videoFlow.goBackToTemplate()
-  }
-}
-
-function openProjectType(index: number) {
-  setLongVideoMode(index === 1 ? 'venue' : 'vehicle')
-}
-
-function handleFileChange(label: string, event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  const previous = uploadedFiles.value[label]
-  if (previous?.url) URL.revokeObjectURL(previous.url)
-  uploadedFiles.value = {
-    ...uploadedFiles.value,
-    [label]: {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-    },
-  }
-  input.value = ''
-}
-
-function removeUploadedFile(label: string) {
-  const current = uploadedFiles.value[label]
-  if (current?.url) URL.revokeObjectURL(current.url)
-  const next = { ...uploadedFiles.value }
-  delete next[label]
-  uploadedFiles.value = next
-}
+onUnmounted(() => {
+  bodyImageUploads.value.forEach((item) => {
+    if (item.objectUrl) URL.revokeObjectURL(item.objectUrl)
+  })
+  Object.values(uploadedSlots.value).forEach((item) => {
+    if (item?.objectUrl) URL.revokeObjectURL(item.objectUrl)
+  })
+  stopTaskPolling()
+})
 
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
 }
 
-onUnmounted(() => {
-  Object.values(uploadedFiles.value).forEach((item) => {
-    if (item.url) URL.revokeObjectURL(item.url)
-  })
-})
-
-onMounted(() => {
-  void videoFlow?.initializeFlow()
-})
-
-function handleNextStep() {
-  if (currentView.value === 'vehicle-info') {
-    currentView.value = 'vehicle-template'
-    if (!videoFlow?.templateList.value.length) {
-      void videoFlow?.initializeFlow()
-    }
-    return
-  }
-  if (currentView.value === 'vehicle-template') {
-    if (!selectedLongVideoTemplateId.value) {
-      message.error('请先选择一个车辆介绍模板')
-    }
-    return
-  }
-  if (currentView.value === 'vehicle-upload') {
-    currentView.value = 'vehicle-info'
-  }
+function formatDuration(durationMs: number) {
+  return `${(durationMs / 1000).toFixed(1)}s`
 }
 
-function handlePreviousStep() {
-  if (currentView.value === 'vehicle-template') {
-    currentView.value = 'vehicle-info'
-    return
-  }
-  if (currentView.value === 'vehicle-info') {
-    currentView.value = 'vehicle-upload'
-  }
+function sellingPoints() {
+  return sellingPointsText.value
+    .split(/[\n,，、]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
-function resolvePreviewDefaultDigitalHumanId(template: VideoTemplate): string {
-  const activeId =
-    videoFlow?.selectedTemplate.value?.templateId === template.templateId
-      ? videoFlow.activeDigitalHumanId.value
-      : ''
-  if (activeId && digitalHumanList.value.some((item) => item.id === activeId)) {
-    return activeId
-  }
-
-  const defaultId =
-    template.defaultDigitalHumanId ??
-    resolveTemplateDefaultDigitalHumanId(template.templateId) ??
-    ''
-  if (!defaultId) return ''
-  return digitalHumanList.value.some((item) => item.id === defaultId) ? defaultId : ''
+function syncEditableSegments(nextDraft: LongVideoDraft) {
+  editableSegments.value = nextDraft.segments.map((segment) => ({ ...segment }))
 }
 
-function openLongVideoTemplatePreview(template: VideoTemplate) {
-  templatePreviewSession.value = template
-  previewDigitalHumanId.value = resolvePreviewDefaultDigitalHumanId(template)
+function updateSegmentText(slot: LongVideoSlot, event: Event) {
+  const target = event.target as HTMLTextAreaElement
+  editableSegments.value = editableSegments.value.map((segment) =>
+    segment.slot === slot ? { ...segment, narrationText: target.value } : segment,
+  )
 }
 
-function closeLongVideoTemplatePreview() {
-  templatePreviewSession.value = null
-  previewDigitalHumanId.value = ''
-}
-
-function handleLongVideoPreviewVisibleChange(show: boolean) {
-  if (!show) closeLongVideoTemplatePreview()
-}
-
-function selectPreviewDigitalHuman(human: DigitalHuman) {
-  previewDigitalHumanId.value = human.id
-}
-
-function confirmLongVideoTemplatePreview() {
-  const template = templatePreviewSession.value
-  if (!template || !videoFlow) return
-
-  videoFlow.selectTemplate(template)
-
-  const human = digitalHumanList.value.find((item) => item.id === previewDigitalHumanId.value)
-  if (human) {
-    videoFlow.selectDigitalHuman(human)
-  }
-
-  closeLongVideoTemplatePreview()
-  message.success('已选择模板和数字人')
-}
-
-async function handleVinQuery() {
-  const normalizedVin = vin.value.trim().toUpperCase()
-  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(normalizedVin)) {
-    message.error('请输入正确的 17 位 VIN 车架号')
-    return
-  }
-
-  vinLoading.value = true
-  vehicleInfo.value = null
-  vehicleCandidates.value = []
-  selectedVehicleCandidateId.value = null
-  try {
-    const result = await queryVehicleByVinShowApi(normalizedVin)
-    vehicleInfo.value = normalizeVehicleInfo(result)
-    vehicleCandidates.value = []
-    selectedVehicleCandidateId.value = null
-    vin.value = normalizedVin
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : 'VIN 查询失败，请稍后重试')
-  } finally {
-    vinLoading.value = false
-  }
-}
-
-async function handleVinImageChange(event: Event) {
+async function handleFileChange(slot: UploadSlot, event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (!['image/jpeg', 'image/png'].includes(file.type)) {
-    message.error('仅支持 JPG、JPEG 或 PNG 图片')
+
+  if (slot.kind === 'image' && !file.type.startsWith('image/')) {
+    message.error('请上传车身图片')
     return
   }
-  if (file.size > 7 * 1024 * 1024) {
-    message.error('VIN 图片大小不能超过 7MB')
+  if (slot.kind === 'video' && !file.type.startsWith('video/')) {
+    message.error('请上传汽车内饰实拍视频')
     return
   }
 
-  vinOcrLoading.value = true
+  const previous = uploadedSlots.value[slot.key]
+  if (previous?.objectUrl) URL.revokeObjectURL(previous.objectUrl)
+
+  uploadedSlots.value = {
+    ...uploadedSlots.value,
+    [slot.key]: {
+      file,
+      id: `${slot.key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      objectUrl: URL.createObjectURL(file),
+      asset: null,
+      status: 'uploading',
+    },
+  }
+
+  loadingAction.value = 'upload'
   try {
-    vin.value = await recognizeVinFromImage(file)
-    message.success('VIN 识别成功')
-    await handleVinQuery()
+    const asset = await uploadAsset(file, slot.purpose)
+    uploadedSlots.value = {
+      ...uploadedSlots.value,
+      [slot.key]: {
+        file,
+        id:
+          uploadedSlots.value[slot.key]?.id ??
+          `${slot.key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        objectUrl: uploadedSlots.value[slot.key]?.objectUrl ?? URL.createObjectURL(file),
+        asset,
+        status: 'uploaded',
+      },
+    }
+    message.success(`${slot.label}已上传`)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : 'VIN 图片识别失败')
+    uploadedSlots.value = {
+      ...uploadedSlots.value,
+      [slot.key]: {
+        file,
+        id:
+          uploadedSlots.value[slot.key]?.id ??
+          `${slot.key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        objectUrl: uploadedSlots.value[slot.key]?.objectUrl ?? URL.createObjectURL(file),
+        asset: null,
+        status: 'failed',
+        error: error instanceof Error ? error.message : '上传失败',
+      },
+    }
+    message.error(error instanceof Error ? error.message : '上传失败，请重试')
   } finally {
-    vinOcrLoading.value = false
+    loadingAction.value = null
+  }
+}
+
+async function handleBodyImagesChange(slot: UploadSlot, event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+
+  const invalid = files.find((file) => !file.type.startsWith('image/'))
+  if (invalid) {
+    message.error('车身外观只支持上传图片')
+    return
+  }
+
+  const pendingItems: UploadedSlot[] = files.map((file) => ({
+    id: `${slot.key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    file,
+    objectUrl: URL.createObjectURL(file),
+    asset: null,
+    status: 'uploading',
+  }))
+  bodyImageUploads.value = [...bodyImageUploads.value, ...pendingItems]
+
+  loadingAction.value = 'upload'
+  const results = await Promise.allSettled(
+    pendingItems.map(async (item) => ({
+      id: item.id,
+      asset: await uploadAsset(item.file, slot.purpose),
+    })),
+  )
+
+  const assetById = new Map<string, UploadedAsset>()
+  const failedIds = new Set<string>()
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      assetById.set(result.value.id, result.value.asset)
+    } else {
+      failedIds.add(pendingItems[results.indexOf(result)]?.id ?? '')
+    }
+  }
+
+  bodyImageUploads.value = bodyImageUploads.value.map((item) => {
+    const asset = assetById.get(item.id)
+    if (asset) return { ...item, asset, status: 'uploaded' }
+    if (failedIds.has(item.id)) return { ...item, status: 'failed', error: '上传失败' }
+    return item
+  })
+
+  const successCount = assetById.size
+  const failedCount = failedIds.size
+  if (successCount > 0) message.success(`车身外观图已上传 ${successCount} 张`)
+  if (failedCount > 0) message.error(`${failedCount} 张车身外观图上传失败，请删除后重试`)
+  loadingAction.value = null
+}
+
+function removeUploadedFile(slot: UploadSlot) {
+  const current = uploadedSlots.value[slot.key]
+  if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl)
+  const next = { ...uploadedSlots.value }
+  delete next[slot.key]
+  uploadedSlots.value = next
+}
+
+function removeBodyImageUpload(id: string) {
+  const target = bodyImageUploads.value.find((item) => item.id === id)
+  if (target?.objectUrl) URL.revokeObjectURL(target.objectUrl)
+  bodyImageUploads.value = bodyImageUploads.value.filter((item) => item.id !== id)
+}
+
+function chooseTemplate(template: VideoTemplate) {
+  const defaultId =
+    template.defaultDigitalHumanId ?? resolveTemplateDefaultDigitalHumanId(template.templateId) ?? ''
+  previewDigitalHumanId.value = digitalHumanList.value.some((item) => item.id === defaultId)
+    ? defaultId
+    : digitalHumanList.value[0]?.id ?? ''
+  videoFlow?.selectTemplate(template)
+  const human = digitalHumanList.value.find((item) => item.id === previewDigitalHumanId.value)
+  if (human) videoFlow?.selectDigitalHuman(human)
+}
+
+function openTemplatePreview(template: VideoTemplate) {
+  selectedPreviewTemplate.value = template
+  const defaultId =
+    selectedTemplate.value?.templateId === template.templateId
+      ? selectedDigitalHuman.value?.id ?? ''
+      : template.defaultDigitalHumanId ?? resolveTemplateDefaultDigitalHumanId(template.templateId) ?? ''
+  previewDigitalHumanId.value = digitalHumanList.value.some((item) => item.id === defaultId)
+    ? defaultId
+    : digitalHumanList.value[0]?.id ?? ''
+}
+
+function closeTemplatePreview() {
+  selectedPreviewTemplate.value = null
+}
+
+function handleTemplatePreviewVisibleChange(show: boolean) {
+  if (!show) closeTemplatePreview()
+}
+
+function confirmTemplatePreview() {
+  const template = selectedPreviewTemplate.value
+  if (!template) return
+  chooseTemplate(template)
+  closeTemplatePreview()
+}
+
+function chooseDigitalHuman(human: DigitalHuman) {
+  previewDigitalHumanId.value = human.id
+  videoFlow?.selectDigitalHuman(human)
+}
+
+function goNext() {
+  if (currentStep.value === 'assets') {
+    if (!canContinueFromAssets.value) {
+      message.error('请先上传 1 张车身图和 2 段内饰实拍视频')
+      return
+    }
+    currentStep.value = 'vehicle'
+    return
+  }
+  if (currentStep.value === 'vehicle') {
+    currentStep.value = 'template'
+    return
+  }
+  if (currentStep.value === 'template') {
+    void handleCreateDraft()
+  }
+}
+
+function goPrevious() {
+  if (currentStep.value === 'script') currentStep.value = 'template'
+  else if (currentStep.value === 'template') currentStep.value = 'vehicle'
+  else if (currentStep.value === 'vehicle') currentStep.value = 'assets'
+}
+
+async function handleCreateDraft() {
+  if (!canCreateDraft.value || !selectedDigitalHuman.value) {
+    message.error('请先选择模板和数字人')
+    return
+  }
+  const bodyAssetIds = bodyImageUploads.value
+    .map((item) => item.asset?.assetId)
+    .filter((assetId): assetId is string => Boolean(assetId))
+  const frontVideoAssetId = uploadedSlots.value.frontInterior?.asset?.assetId
+  const rearVideoAssetId = uploadedSlots.value.rearInterior?.asset?.assetId
+  if (!bodyAssetIds.length || !frontVideoAssetId || !rearVideoAssetId) {
+    message.error('素材还没有上传完成')
+    return
+  }
+
+  loadingAction.value = 'draft'
+  try {
+    const nextDraft = await createLongVideoDraft({
+      vehicleImageAssetIds: bodyAssetIds,
+      interiorVideoAssetIds: [frontVideoAssetId, rearVideoAssetId],
+      digitalHumanId: selectedDigitalHuman.value.id,
+      vehicleInfo: { ...vehicleInfo.value },
+      sellingPoints: sellingPoints(),
+      language: 'Chinese',
+    })
+    draft.value = nextDraft
+    syncEditableSegments(nextDraft)
+    audioPreview.value = null
+    currentTask.value = null
+    activeAudioIndex.value = 0
+    currentStep.value = 'script'
+    message.success('五段文案已生成，请确认')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '长视频文案生成失败')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+async function handleCreateAudioPreview() {
+  if (!draft.value) return
+  if (editableSegments.value.some((segment) => !segment.narrationText.trim())) {
+    message.error('五段文案不能为空')
+    return
+  }
+
+  loadingAction.value = 'audio'
+  try {
+    const updatedDraft = await updateLongVideoDraftSegments(draft.value.draftId, {
+      segments: editableSegments.value.map((segment) => ({
+        slot: segment.slot,
+        narrationText: segment.narrationText.trim(),
+      })),
+    })
+    draft.value = updatedDraft
+    syncEditableSegments(updatedDraft)
+    const preview = await createLongVideoAudioPreview(updatedDraft.draftId)
+    audioPreview.value = preview
+    currentTask.value = null
+    activeAudioIndex.value = 0
+    message.success('五段独立音频已生成')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '音频生成失败')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+async function handleCreateTask() {
+  if (!draft.value || !audioPreview.value) return
+  loadingAction.value = 'task'
+  try {
+    currentTask.value = await createLongVideoTask(draft.value.draftId, {
+      audioPreviewId: audioPreview.value.audioPreviewId,
+    })
+    startTaskPolling(currentTask.value.taskId)
+    message.success('长视频生成任务已提交')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '长视频任务提交失败')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+function handlePrimaryStepAction() {
+  if (currentStep.value === 'script') {
+    if (audioPreview.value) {
+      void handleCreateTask()
+      return
+    }
+    void handleCreateAudioPreview()
+    return
+  }
+  goNext()
+}
+
+function stopTaskPolling() {
+  if (taskPollingTimer) {
+    window.clearInterval(taskPollingTimer)
+    taskPollingTimer = null
+  }
+}
+
+function startTaskPolling(taskId: string) {
+  stopTaskPolling()
+  taskPollingTimer = window.setInterval(() => {
+    void refreshTask(taskId)
+  }, 8000)
+  void refreshTask(taskId)
+}
+
+async function refreshTask(taskId: string) {
+  try {
+    const task = await getLongVideoTask(taskId)
+    currentTask.value = task
+    if (['completed', 'failed'].includes(task.status)) {
+      stopTaskPolling()
+    }
+  } catch (error) {
+    console.warn('long video task polling failed', error)
+  }
+}
+
+function openEditor() {
+  const url = currentTask.value?.editorProjectUrl
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+async function playAllAudio() {
+  if (!audioPreview.value?.segments.length || !audioElement.value) return
+  if (audioElement.value.paused) {
+    await audioElement.value.play()
+  } else {
+    audioElement.value.pause()
+  }
+}
+
+function playAudioSegment(index: number) {
+  activeAudioIndex.value = index
+  requestAnimationFrame(() => {
+    void audioElement.value?.play()
+  })
+}
+
+function handleAudioEnded() {
+  const segments = audioPreview.value?.segments ?? []
+  if (activeAudioIndex.value < segments.length - 1) {
+    activeAudioIndex.value += 1
+    requestAnimationFrame(() => {
+      void audioElement.value?.play()
+    })
   }
 }
 </script>
 
 <template>
-  <section
-    v-if="currentView === 'dashboard'"
-    class="long-video-workbench"
-    aria-label="长视频生成工作台"
-  >
-    <header class="workbench-header">
-      <div>
-        <h1>今天想制作什么视频？</h1>
-        <p class="workbench-description">
-          选择一个创作类型，上传素材后即可生成专业的二手车介绍视频。
-        </p>
-      </div>
-
-      <dl class="project-summary" aria-label="项目统计">
-        <div>
-          <dt>2</dt>
-          <dd>全部项目</dd>
-        </div>
-        <div>
-          <dt>1</dt>
-          <dd>生成中</dd>
-        </div>
-        <div>
-          <dt>0</dt>
-          <dd>已完成</dd>
-        </div>
-      </dl>
-    </header>
-
-    <div class="project-type-grid">
-      <article
-        v-for="(item, index) in projectTypes"
-        :key="item.title"
-        class="project-type-card"
-        :class="`is-${item.tone}`"
-      >
-        <span class="card-decoration" aria-hidden="true" />
-        <span v-if="'badge' in item" class="type-badge">{{ item.badge }}</span>
-        <span class="type-icon" aria-hidden="true">
-          <Icon :icon="item.icon" />
-        </span>
-        <h2>{{ item.title }}</h2>
-        <p>{{ item.description }}</p>
-        <p class="type-requirement">
-          <Icon icon="mdi:clock-outline" aria-hidden="true" />
-          {{ item.requirement }}
-        </p>
-        <button class="type-action" type="button" @click="openProjectType(index)">
-          <span><Icon icon="mdi:plus" />{{ item.action }}</span>
-          <Icon icon="mdi:arrow-right" aria-hidden="true" />
-        </button>
-      </article>
-    </div>
-
-    <section class="generating-banner" aria-label="当前生成项目">
-      <span class="generating-play" aria-hidden="true">
-        <Icon icon="mdi:play" />
-      </span>
-      <div class="generating-content">
-        <div class="generating-title">
-          <strong>正在生成</strong>
-          <span>诚信车行展厅介绍</span>
-        </div>
-        <div class="progress-track">
-          <span style="width: 68%" />
-        </div>
-      </div>
-      <span class="generating-state">视频渲染 · 68%</span>
-      <Icon class="row-arrow" icon="mdi:chevron-right" aria-hidden="true" />
-    </section>
-
-    <section class="recent-panel">
-      <header class="recent-header">
-        <div>
-          <h2><Icon icon="mdi:folder-play-outline" />最近项目</h2>
-          <p>从上次离开的地方继续</p>
-        </div>
-        <span class="view-all">查看全部 <Icon icon="mdi:arrow-right" /></span>
-      </header>
-
-      <div
-        v-for="item in recentProjects"
-        :key="item.title"
-        class="recent-row"
-        :class="`is-${item.tone}`"
-      >
-        <span class="recent-icon" aria-hidden="true">
-          <Icon :icon="item.icon" />
-        </span>
-        <div class="recent-info">
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.meta }}</span>
-        </div>
-        <div class="recent-progress">
-          <div class="progress-track">
-            <span :style="{ width: `${item.progress}%` }" />
+  <section class="long-video-workflow">
+    <main class="workflow-grid">
+      <section class="primary-panel">
+        <header class="page-head">
+          <div>
+            <p>长视频生成</p>
+            <h1>单车介绍长视频</h1>
+            <span>上传素材、填写车辆信息、确认五段文案后生成长视频。</span>
           </div>
-        </div>
-        <span class="recent-status">{{ item.status }}</span>
-        <span class="recent-action">{{ item.action }} <Icon icon="mdi:chevron-right" /></span>
-      </div>
-    </section>
-  </section>
-
-  <section
-    v-else
-    class="vehicle-upload-workflow"
-    :class="{ 'is-venue-flow': isVenueFlow }"
-    aria-label="长视频素材上传"
-  >
-    <button
-      v-if="false"
-      type="button"
-      class="workflow-back"
-      @click="currentView = 'dashboard'"
-    >
-      <Icon icon="mdi:arrow-left" aria-hidden="true" />
-      返回
-    </button>
-
-    <nav v-if="false" class="workflow-steps" aria-label="创建车辆视频步骤">
-      <div
-        v-for="(step, index) in workflowSteps"
-        :key="step"
-        class="workflow-step"
-        :class="{ 'is-active': index === activeWorkflowStep, 'is-complete': index < activeWorkflowStep }"
-      >
-        <span>{{ index + 1 }}</span>
-        <strong>{{ step }}</strong>
-      </div>
-    </nav>
-
-    <div class="long-video-compose-grid">
-      <main class="long-video-params-panel" aria-label="长视频生成参数">
-        <header class="workflow-heading long-video-compose-heading">
-          <p>长视频生成</p>
-          <h1>选择参数</h1>
-          <span>左侧填写素材和车辆信息，右侧选择模板与数字人。</span>
+          <div class="head-meta">
+            <strong>AI / 实拍 / AI / 实拍 / AI</strong>
+            <span>5 段固定顺序</span>
+          </div>
         </header>
 
-        <div class="long-video-mode-switch" role="tablist" aria-label="长视频类型">
+        <nav class="step-nav" aria-label="长视频生成步骤">
           <button
+            v-for="(step, index) in stepItems"
+            :key="step.key"
             type="button"
-            role="tab"
-            :aria-selected="!isVenueFlow"
-            :class="{ 'is-active': !isVenueFlow }"
-            @click="setLongVideoMode('vehicle')"
+            :class="{ 'is-active': currentStep === step.key, 'is-done': index < stepIndex }"
+            @click="currentStep = step.key"
           >
-            <Icon icon="mdi:car-hatchback" aria-hidden="true" />
-            车辆介绍
+            <span>{{ index + 1 }}</span>
+            {{ step.label }}
           </button>
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="isVenueFlow"
-            :class="{ 'is-active': isVenueFlow }"
-            @click="setLongVideoMode('venue')"
-          >
-            <Icon icon="mdi:office-building-outline" aria-hidden="true" />
-            车场介绍
-          </button>
-        </div>
+        </nav>
 
-        <article
-          v-if="selectedLongVideoTemplate"
-          class="long-selected-template-card"
-          aria-label="已选择的长视频模板"
-        >
-          <PreloadImage
-            v-if="resolveTemplatePosterUrl(selectedLongVideoTemplate)"
-            class="long-selected-template-card__cover"
-            :src="resolveTemplatePosterUrl(selectedLongVideoTemplate)!"
-            :alt="selectedLongVideoTemplate.title"
-            fit="cover"
-          />
-          <div v-else class="long-selected-template-card__cover long-selected-template-card__cover--empty">
-            <Icon icon="mdi:movie-open-outline" />
-          </div>
-          <div class="long-selected-template-card__body">
-            <strong>{{ selectedLongVideoTemplate.title }}</strong>
-            <span>
-              {{ selectedLongVideoTemplate.typeLabel }} ·
-              {{ selectedLongVideoTemplate.durationSeconds }}S ·
-              {{ selectedLongVideoTemplate.styleLabel }}
-            </span>
-            <div class="long-selected-template-card__tags">
-              <em>{{ selectedLongVideoTemplate.typeLabel }}</em>
-              <em>{{ selectedLongVideoTemplate.styleLabel }}</em>
-              <em>{{ selectedLongVideoTemplate.outputRatio }} {{ selectedLongVideoTemplate.outputRatio === '9:16' ? '竖屏' : '横屏' }}</em>
-            </div>
-            <small v-if="selectedDigitalHuman">数字人：{{ selectedDigitalHuman.name }}</small>
-          </div>
-        </article>
-
-    <template v-if="currentView === 'vehicle-upload' || currentView === 'venue-upload'">
-      <header class="workflow-heading">
-        <p>素材参数</p>
-        <h1>{{ isVenueFlow ? '上传车场素材' : '上传车辆素材' }}</h1>
-        <span>
-          {{
-            isVenueFlow
-              ? '选择能体现门店环境与服务能力的清晰素材'
-              : '清晰、稳定的素材能显著提升成片效果'
-          }}
-        </span>
-      </header>
-
-      <div class="upload-slot-grid" :class="{ 'is-venue': isVenueFlow }">
-        <label
-          v-for="slot in currentUploadSlots"
-          :key="slot.label"
-          class="upload-slot"
-          :class="{ 'is-uploaded': uploadedFiles[slot.label] }"
-        >
-          <input
-            class="upload-slot-input"
-            type="file"
-            :accept="slot.acceptValue"
-            @change="handleFileChange(slot.label, $event)"
-          />
-          <span
-            v-if="!uploadedFiles[slot.label]"
-            class="upload-slot-icon"
-            aria-hidden="true"
-          >
-            <Icon icon="mdi:tray-arrow-up" />
-          </span>
-          <template v-if="uploadedFiles[slot.label]">
-            <header class="uploaded-slot-header">
-              <div>
-                <Icon
-                  :icon="
-                    uploadedFiles[slot.label].type.startsWith('video/')
-                      ? 'mdi:file-video-outline'
-                      : 'mdi:file-image-outline'
-                  "
-                />
-                <strong>{{ slot.label }}</strong>
-              </div>
-              <span
-                class="uploaded-slot-remove"
-                role="button"
-                tabindex="0"
-                aria-label="删除素材"
-                @click.prevent.stop="removeUploadedFile(slot.label)"
-                @keyup.enter.prevent.stop="removeUploadedFile(slot.label)"
-              >
-                <Icon icon="mdi:close" />
-              </span>
-            </header>
-            <p class="uploaded-slot-name">
-              {{ uploadedFiles[slot.label].name }} ·
-              {{ formatFileSize(uploadedFiles[slot.label].size) }}
-            </p>
-            <video
-              v-if="uploadedFiles[slot.label].type.startsWith('video/')"
-              class="uploaded-slot-preview"
-              :src="uploadedFiles[slot.label].url"
-              controls
-              preload="metadata"
-              @click.stop
-            />
-            <img
-              v-else
-              class="uploaded-slot-preview"
-              :src="uploadedFiles[slot.label].url"
-              :alt="slot.label"
-            />
-            <span class="uploaded-slot-ready">
-              <Icon icon="mdi:check-circle-outline" />
-              素材已就绪
-            </span>
-          </template>
-          <template v-else>
-            <strong>{{ slot.label }}</strong>
-            <span>点击上传</span>
-            <small>{{ slot.accept }}</small>
-          </template>
-        </label>
-      </div>
-    </template>
-
-    <template v-else-if="currentView === 'vehicle-info'">
-      <header class="workflow-heading">
-        <p>车型参数</p>
-        <h1>车辆五维信息</h1>
-        <span>输入 VIN 车架号，自动获取车辆完整信息</span>
-      </header>
-
-      <section class="vin-query-panel">
-        <div class="vin-query-copy">
-          <span class="vin-query-icon" aria-hidden="true">
-            <Icon icon="mdi:barcode-scan" />
-          </span>
-          <div class="vin-query-copy-text">
-            <h2>VIN 智能识别</h2>
-            <p>请输入车辆行驶证上的 17 位 VIN 车架号</p>
-          </div>
-        </div>
-        <div class="vin-query-form">
-          <div class="vin-query-form-primary">
-            <div class="vin-input-wrap">
-              <Icon icon="mdi:car-search-outline" aria-hidden="true" />
-              <input
-                v-model="vin"
-                maxlength="17"
-                placeholder="请输入 17 位 VIN 车架号"
-                @keyup.enter="handleVinQuery"
-              />
-              <span>{{ vin.length }}/17</span>
-            </div>
-            <button type="button" :disabled="vinLoading" @click="handleVinQuery">
-              <Icon :icon="vinLoading ? 'mdi:loading' : 'mdi:magnify'" :class="{ 'is-spinning': vinLoading }" />
-              {{ vinLoading ? '查询中' : '查询车辆' }}
-            </button>
-          </div>
-          <div class="vin-query-form-secondary">
-            <label class="vin-image-button" :class="{ 'is-loading': vinOcrLoading }">
+        <div class="step-scroll">
+          <template v-if="currentStep === 'assets'">
+          <header class="section-head">
+            <h2>上传素材</h2>
+            <p>上传 1 张车身外观图和 2 段汽车内饰实拍视频，素材会用于 AI 生成和实拍拼接。</p>
+          </header>
+          <div class="upload-grid upload-grid--left">
+            <label
+              v-for="slot in uploadSlots"
+              :key="slot.key"
+              class="upload-card"
+              :class="{
+                'is-ready':
+                  slot.key === 'body'
+                    ? bodyImageUploads.some((item) => item.status === 'uploaded')
+                    : uploadedSlots[slot.key]?.status === 'uploaded',
+                'is-multiple': slot.key === 'body',
+              }"
+            >
               <input
                 type="file"
-                accept="image/jpeg,image/png"
-                :disabled="vinOcrLoading || vinLoading"
-                @change="handleVinImageChange"
+                :accept="slot.accept"
+                :multiple="slot.key === 'body'"
+                :disabled="isBusy"
+                @change="
+                  slot.key === 'body'
+                    ? handleBodyImagesChange(slot, $event)
+                    : handleFileChange(slot, $event)
+                "
               />
-              <Icon :icon="vinOcrLoading ? 'mdi:loading' : 'mdi:image-search-outline'" :class="{ 'is-spinning': vinOcrLoading }" />
-              {{ vinOcrLoading ? '识别中' : '图片识别' }}
-            </label>
-            <button type="button" class="vin-manual-button" @click="startManualVehicleInfoInput">
-              <Icon icon="mdi:pencil-outline" aria-hidden="true" />
-              手动录入
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="vehicleInfo" class="vehicle-info-panel">
-        <header>
-          <div class="vehicle-info-panel-title">
-            <span class="vehicle-info-status-icon" aria-hidden="true">
-              <Icon icon="mdi:check-circle-outline" />
-            </span>
-            <div>
-              <h2>车辆基础信息</h2>
-              <p>识别结果仅供参考，所有信息均可直接修改。</p>
-            </div>
-          </div>
-          <span v-if="vin" class="vehicle-vin">{{ vin }}</span>
-        </header>
-
-        <section v-if="vehicleCandidates.length" class="vehicle-candidate-section">
-          <div class="vehicle-candidate-heading">
-            <div>
-              <strong>请选择准确车型与年款</strong>
-              <span>VIN 匹配到 {{ vehicleCandidates.length }} 个相近结果，请根据实车信息确认</span>
-            </div>
-            <span class="vehicle-candidate-count">
-              <Icon icon="mdi:format-list-bulleted" aria-hidden="true" />
-              {{ vehicleCandidates.length }} 个候选
-            </span>
-          </div>
-          <div class="vehicle-candidate-grid">
-            <label
-              v-for="(candidate, index) in vehicleCandidates"
-              :key="candidate.carid"
-              class="vehicle-candidate-card"
-              :class="{ 'is-selected': selectedVehicleCandidateId === candidate.carid }"
-            >
-              <input
-                type="radio"
-                name="vehicle-candidate"
-                :value="candidate.carid"
-                :checked="selectedVehicleCandidateId === candidate.carid"
-                @change="selectVehicleCandidate(candidate)"
-              />
-              <span class="vehicle-candidate-radio" aria-hidden="true"></span>
-              <span class="vehicle-candidate-content">
-                <span class="vehicle-candidate-name">
-                  {{ candidate.name }}
-                  <em v-if="index === 0">推荐</em>
-                </span>
-                <span class="vehicle-candidate-meta">
-                  <span v-if="candidate.displacement">{{ candidate.displacement }}</span>
-                  <span v-if="candidate.price">指导价 {{ candidate.price }}</span>
-                </span>
-              </span>
-            </label>
-          </div>
-        </section>
-
-        <dl class="vehicle-info-grid">
-          <div
-            v-for="item in displayedCoreFields"
-            :key="item.key"
-          >
-            <dt>{{ item.label }}</dt>
-            <dd>
-              <input
-                class="vehicle-info-input"
-                type="text"
-                :value="item.value"
-                :aria-label="item.label"
-                :placeholder="`请输入${item.label}`"
-                @input="updateVehicleInfo(item.key, $event)"
-              />
-            </dd>
-          </div>
-        </dl>
-      </section>
-    </template>
-
-    <template v-else>
-      <header class="workflow-heading template-heading">
-        <p>模板参数</p>
-        <h1>选择数字人与模板</h1>
-        <span>选择适合当前车辆的单车品介绍模板</span>
-      </header>
-
-      <section class="long-template-panel">
-        <header class="long-template-toolbar">
-          <div>
-            <h2>单车品介绍</h2>
-            <p>仅展示适用于车辆介绍的模板</p>
-          </div>
-          <label class="long-template-search">
-            <Icon icon="mdi:magnify" aria-hidden="true" />
-            <input
-              v-model="templateSearch"
-              type="search"
-              placeholder="搜索模板名称或关键词..."
-            />
-          </label>
-        </header>
-
-        <div v-if="templatesLoading && !longVideoTemplates.length" class="template-empty">
-          <Icon icon="mdi:loading" class="is-spinning" />
-          <span>正在加载车辆模板</span>
-        </div>
-        <div v-else-if="!longVideoTemplates.length" class="template-empty">
-          <Icon icon="mdi:movie-search-outline" />
-          <span>暂无匹配的单车品介绍模板</span>
-        </div>
-        <div v-else class="long-template-grid">
-          <article
-            v-for="item in longVideoTemplates"
-            :key="item.templateId"
-            class="long-template-card"
-            :class="{ 'is-selected': selectedLongVideoTemplateId === item.templateId }"
-            role="button"
-            tabindex="0"
-            @click="openLongVideoTemplatePreview(item)"
-            @keyup.enter="openLongVideoTemplatePreview(item)"
-          >
-            <div class="long-template-media">
-              <PreloadImage
-                v-if="resolveTemplatePosterUrl(item)"
-                class="long-template-cover"
-                :src="resolveTemplatePosterUrl(item)!"
-                :alt="item.title"
-                fit="cover"
-                loading="lazy"
-              />
-              <HoverPreviewVideo
-                v-if="resolveTemplatePreviewUrl(item)"
-                class="long-template-cover"
-                :src="resolveTemplatePreviewUrl(item)!"
-                :alt="item.title"
-                :defer-src-until-hover="Boolean(resolveTemplatePosterUrl(item))"
-                :preload="resolveTemplatePosterUrl(item) ? 'none' : 'metadata'"
-                lazy
-              />
-              <span
-                v-if="selectedLongVideoTemplateId === item.templateId"
-                class="long-template-selected"
-              >
-                已选
-              </span>
-              <div class="long-template-caption">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.styleLabel }}</span>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-    </template>
-      </main>
-
-      <aside class="long-video-picker-panel" aria-label="长视频模板与数字人">
-        <section class="long-picker-section">
-          <header class="long-picker-header">
-            <div>
-              <p>模板库</p>
-              <h2>{{ isVenueFlow ? '车场介绍模板' : '单车介绍模板' }}</h2>
-            </div>
-            <label class="long-template-search long-template-search--compact">
-              <Icon icon="mdi:magnify" aria-hidden="true" />
-              <input
-                v-model="templateSearch"
-                type="search"
-                placeholder="搜索模板..."
-              />
-            </label>
-          </header>
-
-          <div v-if="templatesLoading && !longVideoTemplates.length" class="template-empty template-empty--compact">
-            <Icon icon="mdi:loading" class="is-spinning" />
-            <span>正在加载模板</span>
-          </div>
-          <div v-else-if="!longVideoTemplates.length" class="template-empty template-empty--compact">
-            <Icon icon="mdi:movie-search-outline" />
-            <span>暂无匹配模板</span>
-          </div>
-          <div v-else class="long-picker-template-grid">
-            <article
-              v-for="item in longVideoTemplates"
-              :key="item.templateId"
-              class="long-template-card long-template-card--compact"
-              :class="{ 'is-selected': selectedLongVideoTemplateId === item.templateId }"
-              role="button"
-              tabindex="0"
-              @click="openLongVideoTemplatePreview(item)"
-              @keyup.enter="openLongVideoTemplatePreview(item)"
-            >
-              <div class="long-template-media">
-                <PreloadImage
-                  v-if="resolveTemplatePosterUrl(item)"
-                  class="long-template-cover"
-                  :src="resolveTemplatePosterUrl(item)!"
-                  :alt="item.title"
-                  fit="cover"
-                  loading="lazy"
-                />
-                <HoverPreviewVideo
-                  v-if="resolveTemplatePreviewUrl(item)"
-                  class="long-template-cover"
-                  :src="resolveTemplatePreviewUrl(item)!"
-                  :alt="item.title"
-                  :defer-src-until-hover="Boolean(resolveTemplatePosterUrl(item))"
-                  :preload="resolveTemplatePosterUrl(item) ? 'none' : 'metadata'"
-                  lazy
-                />
-                <span
-                  v-if="selectedLongVideoTemplateId === item.templateId"
-                  class="long-template-selected"
-                >
-                  已选
-                </span>
-                <div class="long-template-caption">
-                  <strong>{{ item.title }}</strong>
+              <template v-if="slot.key === 'body' && bodyImageUploads.length">
+                <div class="body-image-grid">
+                  <figure
+                    v-for="item in bodyImageUploads"
+                    :key="item.id"
+                    :class="{ 'is-failed': item.status === 'failed' }"
+                  >
+                    <img :src="item.objectUrl" :alt="item.file.name" />
+                    <button
+                      type="button"
+                      :aria-label="`删除${item.file.name}`"
+                      @click.prevent="removeBodyImageUpload(item.id)"
+                    >
+                      <Icon icon="mdi:close" />
+                    </button>
+                    <figcaption>{{ item.status === 'uploading' ? '上传中' : item.status === 'uploaded' ? '已入库' : '失败' }}</figcaption>
+                  </figure>
                 </div>
+                <div class="upload-card__body">
+                  <strong>{{ slot.label }}</strong>
+                  <span>已添加 {{ bodyImageUploads.length }} 张，点击继续追加</span>
+                  <small>至少 1 张，支持多选上传</small>
+                </div>
+              </template>
+              <template v-else-if="slot.key !== 'body' && uploadedSlots[slot.key]">
+                <div class="upload-preview">
+                  <video
+                    v-if="slot.kind === 'video'"
+                    :src="uploadedSlots[slot.key]?.objectUrl"
+                    controls
+                    preload="metadata"
+                  />
+                  <img v-else :src="uploadedSlots[slot.key]?.objectUrl" :alt="slot.label" />
+                </div>
+                <div class="upload-card__body">
+                  <strong>{{ slot.label }}</strong>
+                  <span>{{ uploadedSlots[slot.key]?.file.name }}</span>
+                  <small>{{ formatFileSize(uploadedSlots[slot.key]?.file.size ?? 0) }}</small>
+                  <em v-if="uploadedSlots[slot.key]?.status === 'uploading'">上传中</em>
+                  <em v-else-if="uploadedSlots[slot.key]?.status === 'uploaded'">已入库</em>
+                  <em v-else class="is-error">上传失败</em>
+                </div>
+                <button type="button" @click.prevent="removeUploadedFile(slot)">移除</button>
+              </template>
+              <template v-else>
+                <Icon :icon="slot.kind === 'video' ? 'mdi:file-video-plus' : 'mdi:image-plus'" />
+                <div class="upload-card__body">
+                  <strong>{{ slot.label }}</strong>
+                  <span>{{ slot.hint }}</span>
+                </div>
+              </template>
+            </label>
+          </div>
+          </template>
+
+          <template v-else-if="currentStep === 'vehicle'">
+          <header class="section-head">
+            <h2>车辆信息</h2>
+            <p>这里的信息会进入全片文案，不确定的字段可以留空，后端会避免编造车况。</p>
+          </header>
+          <div class="vehicle-form">
+            <label>
+              <span>品牌</span>
+              <input v-model="vehicleInfo.brandName" type="text" placeholder="例如 本田" />
+            </label>
+            <label>
+              <span>车系</span>
+              <input v-model="vehicleInfo.seriesName" type="text" placeholder="例如 雅阁" />
+            </label>
+            <label class="is-wide">
+              <span>完整车型</span>
+              <input
+                v-model="vehicleInfo.fullModelName"
+                type="text"
+                placeholder="例如 2016款 本田雅阁 2.0L"
+              />
+            </label>
+            <label>
+              <span>年款</span>
+              <input v-model="vehicleInfo.year" type="text" placeholder="例如 2016" />
+            </label>
+            <label>
+              <span>里程</span>
+              <input v-model="vehicleInfo.mileage" type="text" placeholder="例如 8万公里" />
+            </label>
+            <label>
+              <span>价格</span>
+              <input v-model="vehicleInfo.price" type="text" placeholder="例如 到店详谈" />
+            </label>
+            <label class="is-wide">
+              <span>卖点提示</span>
+              <textarea
+                v-model="sellingPointsText"
+                rows="4"
+                placeholder="一行一个卖点，例如：外观成色好&#10;内饰干净&#10;家用空间够"
+              />
+            </label>
+          </div>
+          </template>
+
+          <template v-else-if="currentStep === 'template'">
+          <header class="section-head">
+            <h2>确认模板与数字人</h2>
+            <p>请在右侧选择单车介绍模板和数字人，系统会使用所选数字人的后端预设音色生成五段音频。</p>
+          </header>
+          <div class="selection-confirm">
+            <article :class="{ 'is-ready': Boolean(selectedTemplate) }">
+              <Icon :icon="selectedTemplate ? 'mdi:check-circle-outline' : 'mdi:view-grid-outline'" />
+              <div>
+                <strong>{{ selectedTemplate?.title ?? '未选择模板' }}</strong>
+                <p>{{ selectedTemplate ? `${selectedTemplate.styleLabel} / ${selectedTemplate.outputRatio}` : '在右侧模板区选择一个单车介绍模板' }}</p>
+              </div>
+            </article>
+            <article :class="{ 'is-ready': Boolean(selectedDigitalHuman) }">
+              <Icon :icon="selectedDigitalHuman ? 'mdi:check-circle-outline' : 'mdi:account-outline'" />
+              <div>
+                <strong>{{ selectedDigitalHuman?.name ?? '未选择数字人' }}</strong>
+                <p>{{ draft?.voice.label ?? '文案生成后自动读取该数字人的预设音色' }}</p>
               </div>
             </article>
           </div>
-        </section>
+          </template>
 
-      </aside>
-    </div>
-
-    <footer class="workflow-footer">
-      <button
-        type="button"
-        class="workflow-button is-previous"
-        :disabled="currentView === 'vehicle-upload' || currentView === 'venue-upload'"
-        @click="handlePreviousStep"
-      >
-        上一步
-      </button>
-      <div class="workflow-footer-actions">
-        <button type="button" class="workflow-button is-save">保存草稿</button>
-        <button
-          type="button"
-          class="workflow-button is-next"
-          :disabled="
-            (currentView === 'vehicle-info' && !vehicleInfo) ||
-            (currentView === 'vehicle-template' && !selectedLongVideoTemplateId)
-          "
-          @click="handleNextStep"
-        >
-          下一步
-          <Icon icon="mdi:arrow-right" aria-hidden="true" />
-        </button>
-      </div>
-    </footer>
-  </section>
-
-  <NModal
-    v-if="templatePreviewSession"
-    :show="true"
-    to="body"
-    :mask-closable="true"
-    transform-origin="center"
-    @update:show="handleLongVideoPreviewVisibleChange"
-  >
-    <div class="lv-preview-dialog">
-      <header class="lv-preview-dialog__head">
-        <h3>{{ templatePreviewSession.title }}</h3>
-        <button type="button" aria-label="关闭" @click="closeLongVideoTemplatePreview">
-          <Icon icon="mdi:close" />
-        </button>
-      </header>
-
-      <div class="lv-preview-dialog__body">
-        <div class="lv-preview-dialog__main">
-          <div class="lv-preview-dialog__media">
-            <TemplatePreviewVideoPlayer
-              v-if="resolveTemplatePreviewUrl(templatePreviewSession)"
-              :key="templatePreviewSession.templateId"
-              :src="resolveTemplatePreviewUrl(templatePreviewSession)!"
-              :poster="resolveTemplatePosterUrl(templatePreviewSession) ?? undefined"
-              :template-id="templatePreviewSession.templateId"
-            />
-            <PreloadImage
-              v-else-if="resolveTemplatePosterUrl(templatePreviewSession)"
-              :src="resolveTemplatePosterUrl(templatePreviewSession)!"
-              :alt="templatePreviewSession.title"
-              fit="contain"
-            />
-            <div v-else class="lv-preview-dialog__video-empty">
-              <Icon icon="mdi:movie-open-outline" />
-            </div>
+          <template v-else>
+          <header class="section-head">
+            <h2>五段文案确认</h2>
+            <p>这 5 段会分别生成 MiniMax 音频；播放时前端用一个播放器按顺序播完。</p>
+          </header>
+          <div v-if="!draft" class="empty-state">
+            <Icon icon="mdi:text-box-search-outline" />
+            <span>请先生成长视频文案</span>
           </div>
-
-          <div class="lv-preview-dialog__meta">
-            <div class="lv-preview-dialog__tags">
-              <span>最长时长：{{ templatePreviewSession.durationSeconds }}s</span>
-              <span class="is-accent">
-                视频内容：{{ templatePreviewSession.previewSubtitle || templatePreviewSession.styleLabel }}
-              </span>
+          <div v-else class="script-list">
+            <article v-for="segment in editableSegments" :key="segment.slot" class="script-card">
+              <header>
+                <strong>{{ slotLabels[segment.slot] }}</strong>
+                <span>{{ segment.targetDurationSeconds }}s 目标</span>
+              </header>
+              <textarea
+                rows="4"
+                :value="segment.narrationText"
+                @input="updateSegmentText(segment.slot, $event)"
+              />
+              <footer>
+                <span>承接：{{ segment.enterCue }}</span>
+                <span>引出：{{ segment.exitCue }}</span>
+              </footer>
+            </article>
+          </div>
+          <section v-if="audioPreview" class="audio-card audio-card--inline">
+            <header>
+              <h2>音频预览</h2>
+              <span>总时长 {{ totalAudioDuration }}</span>
+            </header>
+            <audio
+              ref="audioElement"
+              :src="activeAudioSegment?.audioUrl"
+              controls
+              @ended="handleAudioEnded"
+            />
+            <button type="button" class="primary-action" @click="playAllAudio">
+              <Icon icon="mdi:play-circle-outline" />
+              顺序播放五段音频
+            </button>
+            <div class="audio-segments">
+              <button
+                v-for="(segment, index) in audioPreview.segments"
+                :key="segment.slot"
+                type="button"
+                :class="{ 'is-active': index === activeAudioIndex }"
+                @click="playAudioSegment(index)"
+              >
+                <span>{{ slotLabels[segment.slot] }}</span>
+                <small>{{ formatDuration(segment.durationMs) }}</small>
+              </button>
             </div>
-            <p v-if="templatePreviewSession.description || templatePreviewSession.stylePrompt">
-              {{ templatePreviewSession.description || templatePreviewSession.stylePrompt }}
-            </p>
+          </section>
+          </template>
+
+          <div v-if="currentTask" class="inline-task-status" :class="`is-${currentTask.status}`">
+          <div class="inline-task-status__head">
+            <strong>{{ taskStatusLabel }}</strong>
+            <span>{{ displayTaskProgress }}%</span>
+          </div>
+          <div class="inline-task-status__bar" role="progressbar" :aria-valuenow="displayTaskProgress" aria-valuemin="0" aria-valuemax="100">
+            <span :style="{ width: `${displayTaskProgress}%` }" />
+          </div>
+          <div
+            v-if="currentTask.status === 'completed' && currentTask.resultUrl"
+            class="final-video-preview"
+          >
+            <video :src="currentTask.resultUrl" controls playsinline preload="metadata" />
+          </div>
+          <p v-if="currentTask.status === 'failed'">
+            {{ currentTask.errorMessage || '长视频生成失败，请稍后重试。' }}
+          </p>
+          <div v-if="currentTask.resultUrl || currentTask.editorProjectUrl" class="inline-task-status__actions">
+            <a v-if="currentTask.resultUrl" :href="currentTask.resultUrl" target="_blank" rel="noreferrer">
+              新窗口查看
+            </a>
             <button
+              v-if="currentTask.editorProjectUrl"
               type="button"
-              class="lv-preview-dialog__confirm"
-              :disabled="!previewDigitalHumanId"
-              @click="confirmLongVideoTemplatePreview"
+              class="secondary-action"
+              @click="openEditor"
             >
-              确认使用此模板
+              进入剪辑
             </button>
           </div>
         </div>
+        </div>
 
-        <div class="lv-preview-dialog__humans">
-          <h4>选择数字人形象</h4>
-          <p>已按模板默认推荐，可手动更换</p>
+        <footer class="step-action-bar">
+          <button
+            type="button"
+            class="secondary-action"
+            :disabled="currentStep === 'assets' || isBusy"
+            @click="goPrevious"
+          >
+            上一步
+          </button>
+          <button
+            type="button"
+            class="primary-action"
+            :disabled="isBusy || (currentStep === 'script' && (!draft || hasRunningTask))"
+            @click="handlePrimaryStepAction"
+          >
+            <Icon
+              :icon="
+                loadingAction === 'draft' || loadingAction === 'audio' || loadingAction === 'task'
+                  ? 'mdi:loading'
+                  : currentStep === 'script' && audioPreview
+                    ? 'mdi:movie-check-outline'
+                    : currentStep === 'script'
+                      ? 'mdi:waveform'
+                      : 'mdi:arrow-right'
+              "
+              :class="{ 'is-spinning': loadingAction === 'draft' || loadingAction === 'audio' || loadingAction === 'task' }"
+            />
+            {{ primaryActionLabel }}
+          </button>
+        </footer>
+      </section>
 
-          <div v-if="digitalHumanList.length" class="lv-preview-dialog__humans-grid">
+      <aside class="side-panel">
+        <section class="template-resource-card">
+          <header>
+            <h2>模板</h2>
+            <span>点击预览</span>
+          </header>
+          <div v-if="templatesLoading && !singleCarTemplates.length" class="empty-state is-compact">
+            <Icon icon="mdi:loading" class="is-spinning" />
+            <span>正在加载模板</span>
+          </div>
+          <div v-else class="template-grid">
+            <button
+              v-for="template in singleCarTemplates"
+              :key="template.templateId"
+              type="button"
+              class="template-card"
+              :class="{ 'is-selected': selectedTemplate?.templateId === template.templateId }"
+              @click="openTemplatePreview(template)"
+            >
+              <img
+                v-if="resolveTemplatePosterUrl(template)"
+                :src="resolveTemplatePosterUrl(template)!"
+                :alt="template.title"
+              />
+              <video
+                v-else-if="resolveTemplatePreviewUrl(template)"
+                :src="resolveTemplatePreviewUrl(template)!"
+                muted
+                preload="metadata"
+              />
+              <span>{{ template.title }}</span>
+              <small>{{ template.styleLabel }} / {{ template.outputRatio }}</small>
+            </button>
+          </div>
+        </section>
+
+        <section class="human-card">
+          <h2>数字人</h2>
+          <div class="human-grid">
             <button
               v-for="human in digitalHumanList"
               :key="human.id"
               type="button"
-              class="lv-preview-dialog__human"
-              :class="{ 'is-active': previewDigitalHumanId === human.id }"
-              :title="human.name"
-              @click="selectPreviewDigitalHuman(human)"
+              :class="{ 'is-selected': selectedDigitalHuman?.id === human.id }"
+              @click="chooseDigitalHuman(human)"
             >
-              <span class="lv-preview-dialog__human-avatar">
-                <PreloadImage
-                  v-if="human.previewUrl"
-                  :src="human.previewUrl"
-                  :alt="human.name"
-                  fit="cover"
-                />
-                <Icon v-else icon="mdi:account-outline" />
-              </span>
+              <img v-if="human.previewUrl" :src="human.previewUrl" :alt="human.name" />
+              <Icon v-else icon="mdi:account-outline" />
               <span>{{ human.name }}</span>
             </button>
           </div>
-          <p v-else class="lv-preview-dialog__humans-empty">暂无可用数字人</p>
+        </section>
+
+        <section class="summary-card">
+          <h2>当前选择</h2>
+          <dl>
+            <div>
+              <dt>模板</dt>
+              <dd>{{ selectedTemplate?.title ?? '未选择' }}</dd>
+            </div>
+            <div>
+              <dt>数字人</dt>
+              <dd>{{ selectedDigitalHuman?.name ?? '未选择' }}</dd>
+            </div>
+            <div>
+              <dt>预设音色</dt>
+              <dd>{{ draft?.voice.label ?? '生成文案后读取' }}</dd>
+            </div>
+            <div>
+              <dt>预计 AI 视频</dt>
+              <dd>{{ draft?.estimatedAiSeconds ?? 0 }}s</dd>
+            </div>
+          </dl>
+        </section>
+
+      </aside>
+    </main>
+
+    <NModal
+      v-if="selectedPreviewTemplate"
+      :show="true"
+      to="body"
+      :mask-closable="true"
+      transform-origin="center"
+      @update:show="handleTemplatePreviewVisibleChange"
+    >
+      <div class="lv-preview-dialog">
+        <header class="lv-preview-dialog__head">
+          <h3>{{ selectedPreviewTemplate.title }}</h3>
+          <button type="button" aria-label="关闭" @click="closeTemplatePreview">
+            <Icon icon="mdi:close" />
+          </button>
+        </header>
+        <div class="lv-preview-dialog__body">
+          <div class="lv-preview-dialog__media">
+            <TemplatePreviewVideoPlayer
+              v-if="previewTemplateVideoUrl"
+              :key="selectedPreviewTemplate.templateId"
+              :src="previewTemplateVideoUrl"
+              :poster="previewTemplatePosterUrl ?? undefined"
+              :template-id="selectedPreviewTemplate.templateId"
+            />
+            <img
+              v-else-if="previewTemplatePosterUrl"
+              :src="previewTemplatePosterUrl"
+              :alt="selectedPreviewTemplate.title"
+            />
+            <div v-else class="lv-preview-dialog__empty">
+              <Icon icon="mdi:movie-open-outline" />
+            </div>
+          </div>
+          <aside class="lv-preview-dialog__side">
+            <div>
+              <span>{{ selectedPreviewTemplate.typeLabel }}</span>
+              <span>{{ selectedPreviewTemplate.styleLabel }}</span>
+              <span>{{ selectedPreviewTemplate.outputRatio }}</span>
+            </div>
+            <p v-if="selectedPreviewTemplate.previewSubtitle">
+              {{ selectedPreviewTemplate.previewSubtitle }}
+            </p>
+            <button type="button" class="primary-action" @click="confirmTemplatePreview">
+              确认使用此模板
+            </button>
+          </aside>
         </div>
       </div>
-    </div>
-  </NModal>
+    </NModal>
+  </section>
 </template>
 
 <style scoped lang="scss">
-.long-video-workbench {
-  --lv-primary: #2f7cff;
-  --lv-primary-soft: #eaf2ff;
-  --lv-green: #15966f;
-  --lv-green-soft: #e8f6f1;
+.long-video-workflow {
+  --lv-primary: #2563eb;
+  --lv-primary-soft: #eff6ff;
   --lv-panel: var(--workspace-panel, var(--app-surface));
   --lv-surface: var(--workspace-panel-soft, var(--app-surface-soft));
   --lv-border: var(--workspace-line, var(--app-border));
   --lv-text: var(--workspace-text, var(--app-text));
   --lv-muted: var(--workspace-text-secondary, var(--app-text-soft));
 
+  display: flex;
   min-height: 100%;
-  padding: clamp(22px, 3vw, 42px);
-  color: var(--lv-text);
-}
-
-.workbench-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(28px, 2.3vw, 38px);
-  letter-spacing: -0.04em;
-}
-
-.workbench-description {
-  margin: 12px 0 0;
-  color: var(--lv-muted);
-  font-size: 15px;
-}
-
-.project-summary {
-  display: flex;
-  min-width: 360px;
-  margin: 0;
-  padding: 18px 10px;
-  border: 1px solid var(--lv-border);
-  border-radius: 16px;
-  background: var(--lv-panel);
-}
-
-.project-summary div {
-  display: flex;
-  flex: 1;
-  align-items: baseline;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-right: 1px solid var(--lv-border);
-}
-
-.project-summary div:last-child {
-  border-right: 0;
-}
-
-.project-summary dt {
-  font-size: 27px;
-  font-weight: 800;
-}
-
-.project-summary dd {
-  margin: 0;
-  color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.project-type-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 28px;
-}
-
-.project-type-card {
-  position: relative;
-  min-height: 300px;
-  overflow: hidden;
-  padding: 30px 30px 0;
-  border: 1px solid var(--lv-border);
-  border-radius: 18px;
-  background: var(--lv-panel);
-}
-
-.card-decoration {
-  position: absolute;
-  top: -95px;
-  right: -70px;
-  width: 230px;
-  height: 230px;
-  border-radius: 50%;
-  background: var(--lv-primary-soft);
-  opacity: 0.8;
-}
-
-.project-type-card.is-green .card-decoration {
-  background: var(--lv-green-soft);
-}
-
-.type-badge {
-  position: absolute;
-  z-index: 1;
-  top: 30px;
-  right: 30px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.type-icon,
-.recent-icon {
-  display: grid;
-  place-items: center;
-  border-radius: 13px;
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-}
-
-.type-icon {
-  position: relative;
-  width: 50px;
-  height: 50px;
-  font-size: 25px;
-}
-
-.is-green .type-icon,
-.recent-row.is-green .recent-icon {
-  background: var(--lv-green-soft);
-  color: var(--lv-green);
-}
-
-.project-type-card h2 {
-  margin: 26px 0 0;
-  font-size: 23px;
-}
-
-.project-type-card > p {
-  margin: 12px 0 0;
-  color: var(--lv-muted);
-}
-
-.type-requirement {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-}
-
-.type-action {
-  position: absolute;
-  right: 30px;
-  bottom: 0;
-  left: 30px;
-  display: flex;
-  height: 72px;
-  align-items: center;
-  justify-content: space-between;
-  border: 0;
-  border-top: 1px solid var(--lv-border);
-  color: var(--lv-primary);
-  font-weight: 700;
-  appearance: none;
-  background: transparent;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.type-action span {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.is-green .type-action {
-  color: var(--lv-green);
-}
-
-.generating-banner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 20px;
-  padding: 16px 22px;
-  border: 1px solid color-mix(in srgb, var(--lv-primary) 30%, var(--lv-border));
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--lv-primary-soft) 68%, var(--lv-panel));
-}
-
-.generating-play {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--lv-primary);
-  color: #fff;
-}
-
-.generating-content {
-  width: min(520px, 48%);
-}
-
-.generating-title {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-
-.generating-title strong {
-  color: var(--lv-primary);
-}
-
-.progress-track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--lv-primary) 12%, var(--lv-border));
-}
-
-.progress-track span {
-  display: block;
   height: 100%;
-  border-radius: inherit;
-  background: var(--lv-primary);
-}
-
-.generating-state {
-  margin-left: auto;
-  color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.row-arrow {
-  font-size: 22px;
-}
-
-.recent-panel {
-  overflow: hidden;
-  margin-top: 20px;
-  border: 1px solid var(--lv-border);
-  border-radius: 18px;
-  background: var(--lv-panel);
-}
-
-.recent-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px;
-}
-
-.recent-header h2 {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0;
-  font-size: 18px;
-}
-
-.recent-header h2 svg,
-.view-all {
-  color: var(--lv-primary);
-}
-
-.recent-header p {
-  margin: 6px 0 0 28px;
-  color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.view-all,
-.recent-action {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-}
-
-.recent-row {
-  display: grid;
-  grid-template-columns: 44px minmax(220px, 1fr) minmax(120px, 220px) auto auto;
-  align-items: center;
-  gap: 18px;
-  padding: 18px 28px;
-  border-top: 1px solid var(--lv-border);
-}
-
-.recent-icon {
-  width: 40px;
-  height: 40px;
-  font-size: 20px;
-}
-
-.recent-info {
-  display: grid;
-  gap: 5px;
-}
-
-.recent-info span,
-.recent-action {
-  color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.recent-status {
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--lv-surface);
-  color: var(--lv-muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.recent-row.is-green .recent-status {
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-}
-
-:global(.workspace-page.theme-dark) .long-video-workbench {
-  --lv-primary: #66a0ff;
-  --lv-primary-soft: #182a47;
-  --lv-green: #52cba2;
-  --lv-green-soft: #15372f;
-}
-
-:global(.workspace-page.theme-dark) .project-type-card,
-:global(.workspace-page.theme-dark) .project-summary,
-:global(.workspace-page.theme-dark) .recent-panel {
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
-}
-
-.vehicle-upload-workflow {
-  --lv-primary: #2f7cff;
-  --lv-primary-soft: #eaf2ff;
-  --lv-panel: var(--workspace-panel, var(--app-surface));
-  --lv-surface: var(--workspace-panel-soft, var(--app-surface-soft));
-  --lv-border: var(--workspace-line, var(--app-border));
-  --lv-text: var(--workspace-text, var(--app-text));
-  --lv-muted: var(--workspace-text-secondary, var(--app-text-soft));
-
-  display: flex;
-  box-sizing: border-box;
-  height: 100%;
-  min-height: 0;
   flex-direction: column;
-  overflow: hidden;
+  gap: 16px;
   padding: 20px;
   color: var(--lv-text);
 }
 
-.long-video-compose-grid {
-  display: grid;
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: minmax(400px, 470px) minmax(560px, 1fr);
-  gap: 18px;
-  overflow: hidden;
-}
-
-.long-video-params-panel,
-.long-video-picker-panel {
-  min-width: 0;
-  min-height: 0;
-}
-
-.long-video-params-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: auto;
-  padding: 2px 4px 96px 0;
-}
-
-.long-video-picker-panel {
-  overflow: auto;
-  padding: 18px;
-  border: 1px solid var(--lv-border);
-  border-radius: 16px;
-  background: var(--lv-panel);
-}
-
-.long-video-compose-heading {
-  margin-bottom: 0;
-}
-
-.long-video-mode-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 5px;
+.primary-panel,
+.side-panel > section {
   border: 1px solid var(--lv-border);
   border-radius: 14px;
   background: var(--lv-panel);
 }
 
-.long-video-mode-switch button {
-  display: inline-flex;
-  height: 40px;
+.page-head {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--lv-border);
+}
+
+.page-head p,
+.section-head p,
+.summary-card dt,
+.asset-readiness p,
+.selection-confirm p {
+  margin: 0;
   color: var(--lv-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.page-head h1,
+.section-head h2,
+.side-panel h2 {
+  margin: 4px 0;
+}
+
+.page-head span,
+.head-meta span {
+  color: var(--lv-muted);
+  font-size: 13px;
+}
+
+.head-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+}
+
+.step-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--lv-border);
+}
+
+.step-nav button,
+.secondary-action,
+.primary-action,
+.template-card,
+.human-grid button,
+.audio-segments button {
+  border: 1px solid var(--lv-border);
+  background: var(--lv-panel);
+  color: var(--lv-text);
   cursor: pointer;
   font: inherit;
-  font-weight: 800;
 }
 
-.long-selected-template-card {
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--lv-primary) 44%, var(--lv-border));
-  border-radius: 16px;
-  background: var(--lv-panel);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--lv-primary) 8%, transparent);
-}
-
-.long-selected-template-card__cover {
-  width: 88px;
-  height: 106px;
-  overflow: hidden;
-  border-radius: 10px;
-  background: var(--lv-surface);
-}
-
-.long-selected-template-card__cover--empty {
-  display: grid;
-  place-items: center;
-  color: var(--lv-muted);
-  font-size: 28px;
-}
-
-.long-selected-template-card__body {
+.step-nav button {
   display: flex;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-}
-
-.long-selected-template-card__body strong {
-  overflow: hidden;
-  color: var(--lv-text);
-  font-size: 18px;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.long-selected-template-card__body span,
-.long-selected-template-card__body small {
-  overflow: hidden;
-  color: var(--lv-muted);
-  font-size: 13px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.long-selected-template-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.long-selected-template-card__tags em {
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--lv-primary) 10%, var(--lv-surface));
-  color: var(--lv-primary);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.long-video-mode-switch button.is-active {
-  background: var(--lv-primary);
-  color: #fff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--lv-primary) 22%, transparent);
-}
-
-.long-picker-section + .long-picker-section {
-  margin-top: 26px;
-}
-
-.long-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.long-picker-header p {
-  margin: 0 0 5px;
-  color: var(--lv-muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.long-picker-header h2 {
-  margin: 0;
-  font-size: 19px;
-}
-
-.long-template-search--compact {
-  width: min(300px, 48%);
-  height: 42px;
-  border-radius: 10px;
-}
-
-.long-picker-template-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.long-template-card--compact {
-  border-radius: 14px;
-}
-
-.long-template-card--compact .long-template-caption {
-  right: 12px;
-  bottom: 12px;
-  left: 12px;
-}
-
-.long-template-card--compact .long-template-caption strong {
-  font-size: 14px;
-}
-
-.template-empty--compact {
-  min-height: 180px;
-}
-
-.lv-preview-dialog {
-  display: flex;
-  width: 60vw;
-  height: 60vh;
-  min-height: 60vh;
-  max-height: 60vh;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #fff;
-  color-scheme: light;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-}
-
-.lv-preview-dialog__head {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.lv-preview-dialog__head h3 {
-  margin: 0;
-  color: #111;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.lv-preview-dialog__head button {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  font-size: 20px;
-}
-
-.lv-preview-dialog__head button:hover {
-  background: #f5f5f5;
-}
-
-.lv-preview-dialog__body {
-  display: grid;
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: 1fr 1fr;
-}
-
-.lv-preview-dialog__main {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  border-right: 1px solid #eee;
-  background: #fafafa;
-}
-
-.lv-preview-dialog__media {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 12px 16px;
-}
-
-.lv-preview-dialog__media :deep(.template-preview-video-shell) {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-}
-
-.lv-preview-dialog__media :deep(.template-preview-video-player) {
-  width: auto;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100% !important;
-  border-radius: 8px;
-  object-fit: contain;
-}
-
-.lv-preview-dialog__media :deep(.preload-image),
-.lv-preview-dialog__media :deep(.preload-image__img) {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: 8px;
-  object-fit: contain;
-}
-
-.lv-preview-dialog__video-empty {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  color: #999;
-  font-size: 48px;
-}
-
-.lv-preview-dialog__meta {
-  flex-shrink: 0;
-  padding: 10px 16px 14px;
-  border-top: 1px solid #eee;
-  background: #fff;
-}
-
-.lv-preview-dialog__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.lv-preview-dialog__tags span {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.lv-preview-dialog__tags .is-accent {
-  background: #fff7e6;
-  color: #b8860b;
-}
-
-.lv-preview-dialog__meta p {
-  margin: 0 0 12px;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.55;
-}
-
-.lv-preview-dialog__confirm {
-  display: inline-flex;
-  width: 100%;
-  min-height: 40px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 10px;
-  background: #d4a017;
-  color: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  transition:
-    background 0.15s ease,
-    opacity 0.15s ease;
-}
-
-.lv-preview-dialog__confirm:hover:not(:disabled) {
-  background: #e5b85c;
-}
-
-.lv-preview-dialog__confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.lv-preview-dialog__humans {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 16px 20px;
-}
-
-.lv-preview-dialog__humans h4 {
-  margin: 0 0 4px;
-  color: #111;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.lv-preview-dialog__humans p {
-  margin: 0 0 12px;
-  color: #888;
-  font-size: 12px;
-}
-
-.lv-preview-dialog__humans-grid {
-  display: grid;
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 10px;
-  align-content: start;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.65) #f1f5f9;
-}
-
-.lv-preview-dialog__humans-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.lv-preview-dialog__humans-grid::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: #f1f5f9;
-}
-
-.lv-preview-dialog__humans-grid::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.65);
-}
-
-.lv-preview-dialog__humans-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.78);
-}
-
-.lv-preview-dialog__human {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 6px;
-  border: 2px solid #eee;
-  border-radius: 10px;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-
-.lv-preview-dialog__human:hover:not(:disabled) {
-  border-color: #d4a017;
-}
-
-.lv-preview-dialog__human.is-active {
-  border-color: #d4a017;
-  background: #fffbf0;
-}
-
-.lv-preview-dialog__human-avatar {
-  display: flex;
-  width: 48px;
   height: 48px;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #f0f0f0;
-  color: #d4a017;
-  font-size: 24px;
+  gap: 8px;
+  border-radius: 12px;
+  font-weight: 800;
 }
 
-.lv-preview-dialog__human-avatar :deep(img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.lv-preview-dialog__human > span:last-child {
-  overflow: hidden;
-  max-width: 100%;
-  color: #333;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-  text-align: center;
-  word-break: break-all;
-}
-
-.lv-preview-dialog__humans-empty {
-  margin: 0;
-  color: #999;
-  font-size: 13px;
-}
-
-.vehicle-upload-workflow.is-venue-flow {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  padding-bottom: 96px;
-  overflow: hidden;
-}
-
-:global(.workspace-col-scroll:has(.is-venue-flow)) {
-  overflow-y: hidden;
-}
-
-.is-venue-flow .workflow-heading {
-  flex: 0 0 auto;
-  margin: 22px 0 20px;
-}
-
-.is-venue-flow .upload-slot-grid {
-  min-height: 0;
-  flex: 0 0 clamp(260px, 32vh, 340px);
-}
-
-.is-venue-flow .upload-slot {
-  height: 100%;
-  min-height: 0;
-}
-
-.is-venue-flow .workflow-footer {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  margin: 0;
-}
-
-.workflow-steps {
+.step-nav span {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.workflow-back {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 18px;
-  padding: 7px 4px;
-  border: 0;
-  background: transparent;
-  color: var(--lv-muted);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  transition:
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.workflow-back:hover {
-  color: var(--lv-primary);
-  transform: translateX(-2px);
-}
-
-.workflow-step {
-  display: flex;
-  height: 72px;
-  align-items: center;
-  gap: 14px;
-  padding: 0 20px;
-  border: 1px solid var(--lv-border);
-  border-radius: 15px;
-  background: var(--lv-panel);
-  color: var(--lv-muted);
-}
-
-.workflow-step span {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
   place-items: center;
   border-radius: 50%;
   background: var(--lv-surface);
-  font-weight: 800;
 }
 
-.workflow-step strong {
-  font-size: 15px;
-}
-
-.workflow-step.is-active {
-  border-color: color-mix(in srgb, var(--lv-primary) 62%, var(--lv-border));
-  background: color-mix(in srgb, var(--lv-primary-soft) 52%, var(--lv-panel));
-  color: var(--lv-primary);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--lv-primary) 8%, transparent);
-}
-
-.workflow-step.is-active span {
-  background: var(--lv-primary);
-  color: #fff;
-}
-
-.workflow-step.is-complete {
-  color: var(--lv-primary);
-}
-
-.workflow-step.is-complete span {
-  background: color-mix(in srgb, var(--lv-primary) 14%, var(--lv-panel));
-  color: var(--lv-primary);
-}
-
-.workflow-heading {
-  margin: 4px 0 2px;
-}
-
-.workflow-heading p {
-  margin: 0 0 6px;
-  color: var(--lv-primary);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.workflow-heading h1 {
-  margin: 0;
-  font-size: 26px;
-  letter-spacing: 0;
-}
-
-.workflow-heading span {
-  display: block;
-  margin-top: 8px;
-  color: var(--lv-muted);
-  font-size: 14px;
-}
-
-.upload-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  overflow: visible;
-  padding-bottom: 0;
-}
-
-.upload-slot-grid.is-venue {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  overflow-x: hidden;
-}
-
-.upload-slot-grid.is-venue .upload-slot {
-  min-height: 0;
-}
-
-.upload-slot {
-  display: flex;
-  min-width: 0;
-  min-height: 154px;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  box-sizing: border-box;
-  padding: 18px 14px;
-  border: 1px dashed color-mix(in srgb, var(--lv-muted) 48%, var(--lv-border));
-  border-radius: 14px;
-  background: var(--lv-panel);
-  color: var(--lv-text);
-  cursor: pointer;
-  font-family: inherit;
-  text-align: center;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.2s ease;
-}
-
-.upload-slot-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.upload-slot:hover {
+.step-nav button.is-active,
+.step-nav button.is-done {
   border-color: var(--lv-primary);
-  background: color-mix(in srgb, var(--lv-primary-soft) 28%, var(--lv-panel));
-  transform: translateY(-2px);
-}
-
-.upload-slot.is-uploaded {
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 16px;
-  border-color: color-mix(in srgb, #22a06b 65%, var(--lv-border));
-  background: var(--lv-panel);
-  text-align: left;
-}
-
-.upload-slot.is-uploaded .upload-slot-icon {
-  background: color-mix(in srgb, #22a06b 14%, var(--lv-panel));
-  color: #22a06b;
-}
-
-.uploaded-slot-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.uploaded-slot-header > div {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.uploaded-slot-header > div > svg {
-  flex: 0 0 auto;
   color: var(--lv-primary);
-  font-size: 21px;
 }
 
-.uploaded-slot-header strong {
-  overflow: hidden;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.uploaded-slot-remove {
+.workflow-grid {
   display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  margin: 0;
-  place-items: center;
-  border-radius: 7px;
-  color: var(--lv-muted);
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.uploaded-slot-remove:hover {
-  background: var(--lv-surface);
-  color: #e5484d;
-}
-
-.uploaded-slot-name {
-  overflow: hidden;
-  margin: 7px 0 10px;
-  color: var(--lv-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.uploaded-slot-preview {
-  display: block;
-  width: 100%;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #0d1117;
-  object-fit: cover;
-}
-
-.uploaded-slot-ready {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 0 !important;
-  color: #15966f !important;
-  font-size: 12px !important;
-  font-weight: 700;
-}
-
-.upload-slot-icon {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 12px;
-  place-items: center;
-  border-radius: 13px;
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-  font-size: 24px;
-}
-
-.upload-slot strong {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.upload-slot em {
-  margin-left: 3px;
-  color: #f04444;
-  font-style: normal;
-}
-
-.upload-slot > span:not(.upload-slot-icon) {
-  margin-top: 7px;
-  color: var(--lv-muted);
-  font-size: 12px;
-}
-
-.upload-slot small {
-  max-width: 100%;
-  margin-top: 8px;
-  color: color-mix(in srgb, var(--lv-muted) 75%, transparent);
-  font-size: 11px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
-.vin-query-panel,
-.vehicle-info-panel {
-  border: 1px solid var(--lv-border);
-  border-radius: 18px;
-  background: var(--lv-panel);
-}
-
-.vin-query-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  grid-template-columns: minmax(520px, 620px) minmax(640px, 1fr);
   gap: 16px;
-  padding: 20px 24px;
 }
 
-.vin-query-copy {
+.primary-panel {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.vin-query-icon {
+.step-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+.section-head {
+  margin-bottom: 16px;
+}
+
+.upload-grid,
+.template-grid,
+.asset-readiness,
+.selection-confirm {
+  display: grid;
+  gap: 12px;
+}
+
+.upload-grid--left {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.asset-readiness article,
+.selection-confirm article {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-surface);
+}
+
+.asset-readiness article.is-ready,
+.selection-confirm article.is-ready {
+  border-color: color-mix(in srgb, var(--lv-primary) 42%, var(--lv-border));
+  background: color-mix(in srgb, var(--lv-primary) 8%, var(--lv-panel));
+}
+
+.asset-readiness article.is-failed {
+  border-color: color-mix(in srgb, #dc2626 48%, var(--lv-border));
+}
+
+.asset-readiness__icon,
+.selection-confirm article > svg {
   display: grid;
   width: 42px;
   height: 42px;
-  flex: 0 0 auto;
   place-items: center;
-  border-radius: 11px;
-  background: var(--lv-primary-soft);
+  border-radius: 10px;
+  background: var(--lv-panel);
   color: var(--lv-primary);
   font-size: 22px;
 }
 
-.vin-query-copy-text {
+.selection-confirm article > svg {
+  width: 42px;
+  height: 42px;
+}
+
+.upload-card,
+.template-card {
+  display: flex;
+  min-height: 240px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed var(--lv-border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.upload-card.is-multiple {
+  min-height: 280px;
+  align-items: stretch;
+}
+
+.body-image-grid {
   display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.body-image-grid figure {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  border-radius: 10px;
+  background: var(--lv-surface);
+}
+
+.body-image-grid figure.is-failed {
+  outline: 2px solid #dc2626;
+}
+
+.body-image-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.body-image-grid button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+}
+
+.body-image-grid figcaption {
+  padding: 5px 6px;
+  color: var(--lv-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.side-panel .template-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.upload-card__body {
+  display: grid;
+  min-width: 0;
   gap: 3px;
 }
 
-.vin-query-copy h2,
-.vehicle-info-panel h2 {
-  margin: 0;
-  font-size: 17px;
+.upload-card input {
+  display: none;
 }
 
-.vin-query-copy p,
-.vehicle-info-panel header p {
-  margin: 0;
+.upload-card > svg {
+  color: var(--lv-primary);
+  font-size: 36px;
+}
+
+.upload-card span,
+.upload-card small,
+.template-card small,
+.script-card footer,
+.audio-segments small {
   color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.vin-query-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.vin-query-form-primary {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.vin-query-form-primary .vin-input-wrap {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.vin-query-form-primary button {
-  width: 100%;
-  height: 46px;
-}
-
-.vin-query-form-secondary {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.vin-query-form-secondary .vin-image-button,
-.vin-query-form-secondary .vin-manual-button {
-  width: 100%;
-  height: 40px;
-}
-
-.vin-input-wrap {
-  display: flex;
-  height: 48px;
-  flex: 1;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--lv-border);
-  border-radius: 11px;
-  background: var(--lv-surface);
-  color: var(--lv-muted);
-}
-
-.vin-input-wrap:focus-within {
-  border-color: var(--lv-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 11%, transparent);
-}
-
-.vin-input-wrap input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--lv-text);
-  font: inherit;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.vin-input-wrap span {
   font-size: 12px;
 }
 
-.vin-query-form button {
-  display: inline-flex;
-  min-width: 112px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 11px;
-  background: var(--lv-primary);
-  color: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
+.upload-card.is-ready {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--lv-primary) 52%, var(--lv-border));
 }
 
-.vin-image-button {
-  display: inline-flex;
-  min-width: 112px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--lv-primary) 45%, var(--lv-border));
-  border-radius: 11px;
-  background: var(--lv-panel);
+.upload-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--lv-surface);
+}
+
+.upload-preview img,
+.upload-preview video,
+.template-card img,
+.template-card video,
+.human-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-card em {
   color: var(--lv-primary);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.upload-card em.is-error {
+  color: #dc2626;
+}
+
+.upload-card button {
+  border: 0;
+  background: transparent;
+  color: #dc2626;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
+  font: inherit;
+  font-size: 12px;
 }
 
-.vin-image-button input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.vehicle-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.vin-image-button.is-loading {
-  cursor: wait;
-  opacity: 0.72;
+.vehicle-form label,
+.script-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.vin-query-form button:disabled {
-  cursor: wait;
-  opacity: 0.72;
+.vehicle-form label.is-wide {
+  grid-column: 1 / -1;
 }
 
-.vin-query-form .vin-manual-button {
-  border: 1px solid color-mix(in srgb, var(--lv-primary) 36%, var(--lv-border));
+.vehicle-form span {
+  color: var(--lv-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.vehicle-form input,
+.vehicle-form textarea,
+.script-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-surface);
+  color: var(--lv-text);
+  font: inherit;
+}
+
+.vehicle-form input {
+  height: 44px;
+  padding: 0 12px;
+}
+
+.vehicle-form textarea,
+.script-card textarea {
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.6;
+}
+
+.template-card {
+  min-height: 250px;
+  overflow: hidden;
+  border-style: solid;
+}
+
+.template-card.is-selected,
+.human-grid button.is-selected,
+.audio-segments button.is-active {
+  border-color: var(--lv-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
+}
+
+.template-card img,
+.template-card video {
+  height: 180px;
+  border-radius: 10px;
+}
+
+.script-list {
+  display: grid;
+  gap: 12px;
+}
+
+.script-card {
+  padding: 14px;
+  border: 1px solid var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-surface);
+}
+
+.script-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.script-card header span {
+  color: var(--lv-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.script-card footer {
+  display: grid;
+  gap: 4px;
+}
+
+.side-panel {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+
+.side-panel > section {
+  padding: 16px;
+}
+
+.template-resource-card header,
+.audio-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.template-resource-card header span,
+.audio-card header span {
+  color: var(--lv-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.summary-card div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.summary-card dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.human-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 10px;
+}
+
+.human-grid button {
+  overflow: hidden;
+  padding: 8px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.human-grid img,
+.human-grid svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--lv-surface);
+}
+
+.human-grid span {
+  display: block;
+  overflow: hidden;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-card {
+  display: grid;
+  gap: 12px;
+}
+
+.audio-card--inline {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-surface);
+}
+
+.audio-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.audio-card audio {
+  width: 100%;
+}
+
+.audio-card.is-empty {
+  place-items: center;
+  min-height: 160px;
+  color: var(--lv-muted);
+  text-align: center;
+}
+
+.audio-card.is-empty svg {
+  color: var(--lv-primary);
+  font-size: 34px;
+}
+
+.audio-segments {
+  display: grid;
+  gap: 8px;
+}
+
+.audio-segments button {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 9px;
+}
+
+.task-status {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: var(--lv-primary-soft);
   color: var(--lv-primary);
 }
 
-.is-spinning {
-  animation: vin-spin 0.9s linear infinite;
+.task-status small.is-error {
+  color: #dc2626;
+  font-weight: 800;
 }
 
-@keyframes vin-spin {
+.task-status span,
+.task-status small {
+  font-size: 12px;
+}
+
+.empty-state {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--lv-muted);
+}
+
+.empty-state.is-compact {
+  min-height: 120px;
+}
+
+.is-spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+.step-action-bar {
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--lv-border);
+  background: color-mix(in srgb, var(--lv-panel) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.inline-task-status {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--lv-primary) 28%, var(--lv-border));
+  border-radius: 12px;
+  background: var(--lv-primary-soft);
+  color: var(--lv-primary);
+}
+
+.inline-task-status.is-failed {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--lv-border));
+  background: color-mix(in srgb, #dc2626 9%, var(--lv-panel));
+  color: #dc2626;
+}
+
+.inline-task-status__head,
+.inline-task-status__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-task-status__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lv-primary) 16%, #fff);
+}
+
+.inline-task-status__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  transition: width 0.2s ease;
+}
+
+.final-video-preview {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--lv-primary) 24%, var(--lv-border));
+  border-radius: 12px;
+  background: #050505;
+}
+
+.final-video-preview video {
+  display: block;
+  width: 100%;
+  max-height: min(58vh, 680px);
+  background: #050505;
+  object-fit: contain;
+}
+
+.inline-task-status p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.secondary-action,
+.primary-action {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.primary-action {
+  border-color: var(--lv-primary);
+  background: var(--lv-primary);
+  color: #fff;
+}
+
+.primary-action:disabled,
+.secondary-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lv-preview-dialog {
+  width: min(1120px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--lv-border, #d6e0ed);
+  border-radius: 16px;
+  background: var(--lv-panel, #ffffff);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+
+.lv-preview-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--lv-border, #d6e0ed);
+}
+
+.lv-preview-dialog__head h3 {
+  margin: 0;
+}
+
+.lv-preview-dialog__head button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--lv-border, #d6e0ed);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lv-preview-dialog__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 18px;
+  padding: 18px;
+}
+
+.lv-preview-dialog__media {
+  display: grid;
+  min-height: 560px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #050505;
+}
+
+.lv-preview-dialog__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lv-preview-dialog__empty {
+  color: #fff;
+  font-size: 42px;
+}
+
+.lv-preview-dialog__side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lv-preview-dialog__side div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lv-preview-dialog__side span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--lv-primary-soft, #eff6ff);
+  color: var(--lv-primary, #2563eb);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lv-preview-dialog__side p {
+  margin: 0;
+  color: var(--lv-muted, #64748b);
+  line-height: 1.65;
+}
+
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-.vehicle-info-panel {
-  margin-top: 18px;
-  padding: 22px 24px;
+@media (max-width: 1180px) {
+  .workflow-grid {
+    grid-template-columns: minmax(440px, 520px) minmax(0, 1fr);
+  }
 }
 
-.vehicle-info-panel > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--lv-border);
-}
-
-.vehicle-vin {
-  padding: 7px 11px;
-  border-radius: 8px;
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-}
-
-.vehicle-info-panel-title {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  min-width: 0;
-}
-
-.vehicle-info-status-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 11px;
-  background: color-mix(in srgb, #22a06b 14%, var(--lv-panel));
-  color: #22a06b;
-  font-size: 22px;
-}
-
-.vehicle-candidate-section {
-  padding: 20px 0 4px;
-}
-
-.vehicle-candidate-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.vehicle-candidate-heading > div {
-  display: grid;
-  gap: 4px;
-}
-
-.vehicle-candidate-heading strong {
-  color: var(--lv-text);
-  font-size: 14px;
-}
-
-.vehicle-candidate-heading > div > span {
-  color: var(--lv-muted);
-  font-size: 12px;
-}
-
-.vehicle-candidate-count {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
-  border-radius: 7px;
-  background: var(--lv-primary-soft);
-  color: var(--lv-primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.vehicle-candidate-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.vehicle-candidate-card {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 13px 14px;
-  border: 1px solid var(--lv-border);
-  border-radius: 10px;
-  background: var(--lv-surface);
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.vehicle-candidate-card:hover {
-  border-color: color-mix(in srgb, var(--lv-primary) 50%, var(--lv-border));
-}
-
-.vehicle-candidate-card.is-selected {
-  border-color: var(--lv-primary);
-  background: color-mix(in srgb, var(--lv-primary-soft) 42%, var(--lv-panel));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-primary) 8%, transparent);
-}
-
-.vehicle-candidate-card > input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.vehicle-candidate-radio {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-  margin-top: 2px;
-  border: 1.5px solid color-mix(in srgb, var(--lv-muted) 65%, var(--lv-border));
-  border-radius: 50%;
-  background: var(--lv-panel);
-  box-shadow: inset 0 0 0 3px var(--lv-panel);
-}
-
-.vehicle-candidate-card.is-selected .vehicle-candidate-radio {
-  border-color: var(--lv-primary);
-  background: var(--lv-primary);
-}
-
-.vehicle-candidate-content {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-}
-
-.vehicle-candidate-name {
-  color: var(--lv-text);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.vehicle-candidate-name em {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--lv-primary);
-  color: #fff;
-  font-size: 10px;
-  font-style: normal;
-  line-height: 18px;
-  vertical-align: 1px;
-}
-
-.vehicle-candidate-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 12px;
-  color: var(--lv-muted);
-  font-size: 11px;
-}
-
-.vehicle-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  margin: 20px 0 0;
-}
-
-.vehicle-info-grid div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--lv-border);
-  border-radius: 12px;
-  background: var(--lv-surface);
-}
-
-.vehicle-info-grid dt {
-  color: var(--lv-muted);
-  font-size: 12px;
-}
-
-.vehicle-info-grid dd {
-  margin: 0;
-  width: 100%;
-}
-
-.vehicle-info-input {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  padding: 0 11px;
-  border: 1px solid var(--lv-border);
-  border-radius: 8px;
-  outline: none;
-  background: var(--lv-panel);
-  color: var(--lv-text);
-  font: inherit;
-  font-weight: 600;
-}
-
-.vehicle-info-input:focus {
-  border-color: var(--lv-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
-}
-
-.vehicle-info-input::placeholder {
-  color: color-mix(in srgb, var(--lv-muted) 65%, transparent);
-  font-weight: 400;
-}
-
-.template-heading {
-  margin-bottom: 22px;
-}
-
-.long-template-panel {
-  padding: 22px;
-  border: 1px solid var(--lv-border);
-  border-radius: 18px;
-  background: var(--lv-panel);
-}
-
-.long-template-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 22px;
-  margin-bottom: 20px;
-}
-
-.long-template-toolbar h2 {
-  margin: 0;
-  font-size: 19px;
-}
-
-.long-template-toolbar p {
-  margin: 6px 0 0;
-  color: var(--lv-muted);
-  font-size: 13px;
-}
-
-.long-template-search {
-  display: flex;
-  width: min(480px, 50%);
-  height: 46px;
-  align-items: center;
-  gap: 10px;
-  padding: 0 15px;
-  border: 1px solid var(--lv-border);
-  border-radius: 12px;
-  background: var(--lv-surface);
-  color: var(--lv-muted);
-}
-
-.long-template-search:focus-within {
-  border-color: var(--lv-primary);
-}
-
-.long-template-search input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--lv-text);
-  font: inherit;
-}
-
-.long-template-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.long-template-card {
-  min-width: 0;
-  overflow: hidden;
-  border: 2px solid transparent;
-  border-radius: 18px;
-  background: var(--lv-surface);
-  cursor: pointer;
-  outline: 0;
-}
-
-.long-template-card.is-selected {
-  border-color: var(--lv-primary);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--lv-primary) 16%, transparent);
-}
-
-.long-template-media {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 9 / 13;
-  background: var(--lv-surface);
-}
-
-.long-template-cover {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.long-template-media::after {
-  position: absolute;
-  inset: 55% 0 0;
-  background: linear-gradient(transparent, rgba(5, 12, 25, 0.82));
-  content: '';
-  pointer-events: none;
-}
-
-.long-template-selected {
-  position: absolute;
-  z-index: 3;
-  top: 14px;
-  right: 14px;
-  padding: 6px 11px;
-  border-radius: 999px;
-  background: var(--lv-primary);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.long-template-caption {
-  position: absolute;
-  z-index: 2;
-  right: 18px;
-  bottom: 17px;
-  left: 18px;
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
-  color: #fff;
-}
-
-.long-template-caption strong {
-  font-size: 17px;
-  line-height: 1.4;
-}
-
-.long-template-caption span {
-  flex: 0 0 auto;
-  font-size: 11px;
-  opacity: 0.8;
-}
-
-.template-empty {
-  display: grid;
-  min-height: 280px;
-  place-items: center;
-  align-content: center;
-  gap: 12px;
-  color: var(--lv-muted);
-}
-
-.template-empty svg {
-  font-size: 30px;
-}
-
-.workflow-footer {
-  position: sticky;
-  z-index: 4;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  flex: 0 0 auto;
-  margin: auto -20px -20px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--lv-border);
-  background: color-mix(in srgb, var(--lv-panel) 94%, transparent);
-  box-shadow: 0 -12px 30px rgba(20, 36, 62, 0.06);
-  backdrop-filter: blur(14px);
-}
-
-.workflow-footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.workflow-button {
-  display: inline-flex;
-  min-width: 104px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 20px;
-  border: 1px solid var(--lv-border);
-  border-radius: 10px;
-  background: var(--lv-panel);
-  color: var(--lv-text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.workflow-button:not(:disabled):hover {
-  transform: translateY(-1px);
-}
-
-.workflow-button.is-save:hover {
-  border-color: color-mix(in srgb, var(--lv-primary) 55%, var(--lv-border));
-  color: var(--lv-primary);
-}
-
-.workflow-button.is-next {
-  border-color: var(--lv-primary);
-  background: var(--lv-primary);
-  color: #fff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--lv-primary) 22%, transparent);
-}
-
-.workflow-button.is-next:hover {
-  background: color-mix(in srgb, var(--lv-primary) 88%, #0d3f99);
-}
-
-.workflow-button:disabled {
-  background: var(--lv-surface);
-  color: color-mix(in srgb, var(--lv-muted) 48%, transparent);
-  cursor: not-allowed;
-}
-
-:global(.workspace-page.theme-dark) .vehicle-upload-workflow {
-  --lv-primary: #66a0ff;
-  --lv-primary-soft: #182a47;
-}
-
-:global(.workspace-page.theme-dark) .workflow-footer {
-  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.24);
-}
-
-@media (max-width: 1100px) {
-  .long-video-compose-grid {
+@media (max-width: 1120px) {
+  .workflow-grid {
     grid-template-columns: 1fr;
   }
 
-  .long-picker-template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .workbench-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .project-summary {
-    width: 100%;
-  }
-
-  .recent-row {
-    grid-template-columns: 44px minmax(180px, 1fr) 130px auto;
-  }
-
-  .recent-action {
-    display: none;
-  }
-
-  .workflow-steps,
-  .workflow-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .upload-slot-grid.is-venue {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .vin-query-panel {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .vehicle-candidate-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .long-template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .side-panel {
+    height: auto;
+    overflow: visible;
   }
 }
 
 @media (max-width: 760px) {
-  .long-video-compose-grid {
-    gap: 16px;
-  }
-
-  .long-video-picker-panel {
-    padding: 16px;
-  }
-
-  .long-picker-header {
+  .page-head,
+  .step-action-bar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .long-template-search--compact {
-    width: 100%;
+  .head-meta {
+    text-align: left;
   }
 
-  .long-picker-template-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .step-nav,
+  .upload-grid,
+  .template-grid,
+  .vehicle-form {
+    grid-template-columns: 1fr;
   }
 
-  .lv-preview-dialog {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    min-height: 0;
-    max-height: calc(100vh - 24px);
-  }
-
-  .lv-preview-dialog__head {
-    padding: 14px 18px;
+  .side-panel .template-grid {
+    grid-template-columns: 1fr;
   }
 
   .lv-preview-dialog__body {
     grid-template-columns: 1fr;
-    overflow: auto;
   }
 
-  .lv-preview-dialog__main {
-    border-right: 0;
-    border-bottom: 1px solid #eee;
-  }
-
-  .lv-preview-dialog__media,
-  .lv-preview-dialog__humans {
-    padding: 18px;
-  }
-
-  .lv-preview-dialog__humans-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .long-video-workbench {
-    padding: 18px;
-  }
-
-  .project-summary {
-    min-width: 0;
-  }
-
-  .project-summary div {
-    align-items: center;
-    flex-direction: column;
-    gap: 2px;
-    padding: 0 8px;
-  }
-
-  .project-type-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .generating-state {
-    display: none;
-  }
-
-  .generating-content {
-    width: 100%;
-  }
-
-  .recent-row {
-    grid-template-columns: 40px 1fr auto;
-  }
-
-  .recent-progress {
-    display: none;
-  }
-
-  .workflow-steps,
-  .workflow-steps {
-    grid-template-columns: 1fr;
-  }
-
-  .upload-slot-grid.is-venue {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .workflow-step {
-    height: 60px;
-  }
-
-  .vin-query-form-secondary {
-    grid-template-columns: 1fr;
-  }
-
-  .vin-query-form-secondary .vin-image-button,
-  .vin-query-form-secondary .vin-manual-button {
-    height: 46px;
-  }
-
-  .vehicle-candidate-heading {
-    align-items: flex-start;
-  }
-
-  .long-template-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .long-template-search {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .long-template-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .upload-slot {
-    min-height: 230px;
-  }
-
-  .workflow-footer {
-    margin: auto -18px -18px;
-    padding: 14px 18px;
-  }
-
-  .workflow-button {
-    min-width: 88px;
-    padding: 0 14px;
+  .lv-preview-dialog__media {
+    min-height: 420px;
   }
 }
 </style>

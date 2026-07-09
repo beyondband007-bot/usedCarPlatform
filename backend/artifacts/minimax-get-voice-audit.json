@@ -1,0 +1,936 @@
+{
+  "status": 200,
+  "systemCount": 303,
+  "cloningCount": 73,
+  "generationCount": 0,
+  "matches": [
+    {
+      "voice_id": "female-shaonv",
+      "voice_name": "少女音色",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "female-tianmei",
+      "voice_name": "甜美女性音色",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "female-shaonv-jingpin",
+      "voice_name": "少女音色-beta",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "female-tianmei-jingpin",
+      "voice_name": "甜美女性音色-beta",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "lovely_girl",
+      "voice_name": "萌萌女童",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Charming_Lady",
+      "voice_name": "Charming Lady",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Sweet_Girl",
+      "voice_name": "Sweet Girl",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Attractive_Girl",
+      "voice_name": "Attractive Girl",
+      "description": [],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_News_Anchor",
+      "voice_name": "新闻女声",
+      "description": [
+        "一位专业、播音腔的中年女性新闻主播，标准普通话。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Warm_Bestie",
+      "voice_name": "温暖闺蜜",
+      "description": [
+        "一位温暖清脆的青年女性闺蜜声音，标准普通话，友好而清晰。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Sweet_Lady",
+      "voice_name": "甜美女声",
+      "description": [
+        "一位温柔甜美的青年女性声音，标准普通话。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Wise_Women",
+      "voice_name": "阅历姐姐",
+      "description": [
+        "一位富有阅历、声音抒情的中年姐姐声音，标准普通话。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Warm_Girl",
+      "voice_name": "温暖少女",
+      "description": [
+        "一位温柔温暖的少年女声，标准普通话。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Crisp_Girl",
+      "voice_name": "清脆少女",
+      "description": [
+        "一位温暖清脆的少女声音，标准普通话。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Chinese (Mandarin)_Soft_Girl",
+      "voice_name": "软软女孩",
+      "description": [
+        "一位温暖柔软的青年女性声音，带有南方口音的中文。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Cantonese_GentleLady",
+      "voice_name": "温柔女声",
+      "description": [
+        "一位平静温柔的青年女性粤语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Cantonese_CuteGirl",
+      "voice_name": "可爱女孩",
+      "description": [
+        "一位柔和可爱的青年女性粤语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "English_Graceful_Lady",
+      "voice_name": "Graceful Lady",
+      "description": [
+        "一位优雅的中年女士，带有经典的英式口音，散发着成熟的魅力。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "English_Whispering_girl",
+      "voice_name": "Whispering girl",
+      "description": [
+        "一位青年女性的轻柔耳语声，带通用美式口音，非常适合ASMR内容。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Japanese_KindLady",
+      "voice_name": "Kind Lady",
+      "description": [
+        "一位迷人善良的青年女性声音，日语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Japanese_CalmLady",
+      "voice_name": "Calm Lady",
+      "description": [
+        "一位沉静迷人的青年女性声音，日语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Dutch_kindhearted_girl",
+      "voice_name": "Kind-hearted girl",
+      "description": [
+        "一位温暖善良的少女荷兰语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Vietnamese_kindhearted_girl",
+      "voice_name": "Kind-hearted girl",
+      "description": [
+        "一位温暖善良的少女越南语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_SweetGirl",
+      "voice_name": "Sweet Girl",
+      "description": [
+        "一位温柔甜美的中年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CheerfulBoyfriend",
+      "voice_name": "Cheerful Boyfriend",
+      "description": [
+        "一位犀利开朗的中年男性男友声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_EnchantingSister",
+      "voice_name": "Enchanting Sister",
+      "description": [
+        "一位迷人的青年姐姐声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ShyGirl",
+      "voice_name": "Shy Girl",
+      "description": [
+        "一位腼腆害羞的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ReliableSister",
+      "voice_name": "Reliable Sister",
+      "description": [
+        "一位权威可靠的中年姐姐声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_StrictBoss",
+      "voice_name": "Strict Boss",
+      "description": [
+        "一位严厉的中年男性老板声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_SassyGirl",
+      "voice_name": "Sassy Girl",
+      "description": [
+        "一位温柔的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ChildhoodFriendGirl",
+      "voice_name": "Childhood Friend Girl",
+      "description": [
+        "一位温柔的青梅竹马女孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_PlayboyCharmer",
+      "voice_name": "Playboy Charmer",
+      "description": [
+        "一位富有诱惑力的青年花花公子声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ElegantPrincess",
+      "voice_name": "Elegant Princess",
+      "description": [
+        "一位优雅的青年公主声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_BraveFemaleWarrior",
+      "voice_name": "Brave Female Warrior",
+      "description": [
+        "一位坚定的青年女战士声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_BraveYouth",
+      "voice_name": "Brave Youth",
+      "description": [
+        "一位强有力的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CalmLady",
+      "voice_name": "Calm Lady",
+      "description": [
+        "一位沉静坚定的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_EnthusiasticTeen",
+      "voice_name": "Enthusiastic Teen",
+      "description": [
+        "一位热情活泼的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_SoothingLady",
+      "voice_name": "Soothing Lady",
+      "description": [
+        "一位迷人舒缓的中年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_IntellectualSenior",
+      "voice_name": "Intellectual Senior",
+      "description": [
+        "一位具有磁性、知性的青年学长声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_LonelyWarrior",
+      "voice_name": "Lonely Warrior",
+      "description": [
+        "一位青春无畏的孤独战士声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_MatureLady",
+      "voice_name": "Mature Lady",
+      "description": [
+        "一位优雅成熟的中年女士声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_InnocentBoy",
+      "voice_name": "Innocent Boy",
+      "description": [
+        "一位纯真无邪的青年男孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CharmingSister",
+      "voice_name": "Charming Sister",
+      "description": [
+        "一位富有魅惑力的中年姐姐声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_AthleticStudent",
+      "voice_name": "Athletic Student",
+      "description": [
+        "一位充满活力的青年运动学生声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_BraveAdventurer",
+      "voice_name": "Brave Adventurer",
+      "description": [
+        "一位活泼勇敢的青年女冒险家声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CalmGentleman",
+      "voice_name": "Calm Gentleman",
+      "description": [
+        "一位沉稳冷静的中年绅士声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_WiseElf",
+      "voice_name": "Wise Elf",
+      "description": [
+        "一位甜美空灵的智慧精灵声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CheerfulCoolJunior",
+      "voice_name": "Cheerful Cool Junior",
+      "description": [
+        "一位充满活力的开朗酷学弟声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_DecisiveQueen",
+      "voice_name": "Decisive Queen",
+      "description": [
+        "一位甜美果断的青年女王声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ColdYoungMan",
+      "voice_name": "Cold Young Man",
+      "description": [
+        "一位冷静的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_MysteriousGirl",
+      "voice_name": "Mysterious Girl",
+      "description": [
+        "一位灵动神秘的青年女孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_QuirkyGirl",
+      "voice_name": "Quirky Girl",
+      "description": [
+        "一位可爱古怪的青年女孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ConsiderateSenior",
+      "voice_name": "Considerate Senior",
+      "description": [
+        "一位温柔成熟的体贴学长声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CheerfulLittleSister",
+      "voice_name": "Cheerful Little Sister",
+      "description": [
+        "一位活泼开朗的小妹妹声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_DominantMan",
+      "voice_name": "Dominant Man",
+      "description": [
+        "一位成熟权威的强势青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_AirheadedGirl",
+      "voice_name": "Airheaded Girl",
+      "description": [
+        "一位呆萌可爱的天然呆女孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ReliableYouth",
+      "voice_name": "Reliable Youth",
+      "description": [
+        "一位温柔可靠的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_FriendlyBigSister",
+      "voice_name": "Friendly Big Sister",
+      "description": [
+        "一位迷人友好的中年大姐姐声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_GentleBoss",
+      "voice_name": "Gentle Boss",
+      "description": [
+        "一位高贵温柔的中年老板声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ColdGirl",
+      "voice_name": "Cold Girl",
+      "description": [
+        "一位冷漠的青年女孩声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_HaughtyLady",
+      "voice_name": "Haughty Lady",
+      "description": [
+        "一位高傲冷漠的青年女士声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CharmingElderSister",
+      "voice_name": "Charming Elder Sister",
+      "description": [
+        "一位调皮迷人的中年姐姐声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_IntellectualMan",
+      "voice_name": "Intellectual Man",
+      "description": [
+        "一位好斗的知性中年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CaringWoman",
+      "voice_name": "Caring Woman",
+      "description": [
+        "一位灵动体贴的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_WiseTeacher",
+      "voice_name": "Wise Teacher",
+      "description": [
+        "一位睿智的的中年男教师声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ConfidentBoss",
+      "voice_name": "Confident Boss",
+      "description": [
+        "一位深沉有力的自信中年老板声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_AthleticGirl",
+      "voice_name": "Athletic Girl",
+      "description": [
+        "一位健美的运动少女声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_PossessiveMan",
+      "voice_name": "Possessive Man",
+      "description": [
+        "一位权威、占有欲强的中年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_GentleWoman",
+      "voice_name": "Gentle Woman",
+      "description": [
+        "一位坚毅温柔的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_CockyGuy",
+      "voice_name": "Cocky Guy",
+      "description": [
+        "一位调皮自大的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_ThoughtfulWoman",
+      "voice_name": "Thoughtful Woman",
+      "description": [
+        "一位成熟体贴的青年女性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Korean_OptimisticYouth",
+      "voice_name": "Optimistic Youth",
+      "description": [
+        "一位开朗乐观的青年男性声音，韩语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_WiseScholar",
+      "voice_name": "Wise Scholar",
+      "description": [
+        "一位亲切健谈的青年男性智慧学者声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_Kind-heartedGirl",
+      "voice_name": "Kind-hearted Girl",
+      "description": [
+        "一位明亮善良的青年女性声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_SophisticatedLady",
+      "voice_name": "Sophisticated Lady",
+      "description": [
+        "一位优雅、精致的青年女士声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_FrankLady",
+      "voice_name": "Frank Lady",
+      "description": [
+        "一位激动、坦率的青年女士声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_Wiselady",
+      "voice_name": "Wise Lady",
+      "description": [
+        "一位中性、智慧的中年女士声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_Intonategirl",
+      "voice_name": "Intonate Girl",
+      "description": [
+        "一位声线多变的青年女性声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_WhimsicalGirl",
+      "voice_name": "Whimsical Girl",
+      "description": [
+        "一位机智、奇特的青年女性声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_CaringGirlfriend",
+      "voice_name": "Caring Girlfriend",
+      "description": [
+        "一位梦幻般的青年女性关怀女友声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_ChattyGirl",
+      "voice_name": "Chatty Girl",
+      "description": [
+        "一位健谈的青年女性声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_CompellingGirl",
+      "voice_name": "Compelling Girl",
+      "description": [
+        "一位富有说服力、引人注目的青年女性声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Spanish_ThoughtfulLady",
+      "voice_name": "Thoughtful Lady",
+      "description": [
+        "一位忧虑、体贴的青年女士声音，西班牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_SentimentalLady",
+      "voice_name": "Sentimental Lady",
+      "description": [
+        "一位优雅感性的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_Wiselady",
+      "voice_name": "Wise lady",
+      "description": [
+        "一位柔和智慧的中年女士声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_UpsetGirl",
+      "voice_name": "Upset Girl",
+      "description": [
+        "一位悲伤的青年女性声音，传达不安情绪，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_SmartYoungGirl",
+      "voice_name": "Smart Young Girl",
+      "description": [
+        "一位聪慧的青年女孩声音，敏锐而清晰，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_Kind-heartedGirl",
+      "voice_name": "Kind-hearted Girl",
+      "description": [
+        "一位平和善良的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_Pompouslady",
+      "voice_name": "Pompous lady",
+      "description": [
+        "一位夸张自负的青年女性声音，充满个性，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_SweetGirl",
+      "voice_name": "Sweet Girl",
+      "description": [
+        "一位甜美可爱的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_AttractiveGirl",
+      "voice_name": "Attractive Girl",
+      "description": [
+        "一位迷人有魅力的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_PlayfulGirl",
+      "voice_name": "Playful Girl",
+      "description": [
+        "一位俏皮可爱的青年女孩声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_GorgeousLady",
+      "voice_name": "Gorgeous Lady",
+      "description": [
+        "一位俏皮华丽的青年女性声音，散发自信，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_LovelyLady",
+      "voice_name": "Lovely Lady",
+      "description": [
+        "一位迷人可爱的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_NaughtySchoolgirl",
+      "voice_name": "Naughty Schoolgirl",
+      "description": [
+        "一位诱人顽皮的青年女学生声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_CharmingLady",
+      "voice_name": "Charming Lady",
+      "description": [
+        "一位迷人的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_WhimsicalGirl",
+      "voice_name": "Whimsical Girl",
+      "description": [
+        "一位可爱奇特的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_StressedLady",
+      "voice_name": "Stressed Lady",
+      "description": [
+        "一位不安、紧张的中年女士声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_FriendlyNeighbor",
+      "voice_name": "Friendly Neighbor",
+      "description": [
+        "一位充满活力的友好青年女性邻居声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_CaringGirlfriend",
+      "voice_name": "Caring Girlfriend",
+      "description": [
+        "一位梦幻般的中年女性关怀女友声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_InspiringLady",
+      "voice_name": "Inspiring Lady",
+      "description": [
+        "一位威严、鼓舞人心的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_ElegantGirl",
+      "voice_name": "Elegant Girl",
+      "description": [
+        "一位富有戏剧性、优雅的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_CompellingGirl",
+      "voice_name": "Compelling Girl",
+      "description": [
+        "一位富有说服力、引人注目的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_ThoughtfulLady",
+      "voice_name": "Thoughtful Lady",
+      "description": [
+        "一位忧虑体贴的中年女士声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_ChattyGirl",
+      "voice_name": "Chatty Girl",
+      "description": [
+        "一位健谈的青年女性声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_WiseScholar",
+      "voice_name": "Wise Scholar",
+      "description": [
+        "一位亲切健谈的青年男性智慧学者声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Portuguese_FrankLady",
+      "voice_name": "Frank Lady",
+      "description": [
+        "一位激动坦率的中年女士声音，葡萄牙语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "French_Female_News Anchor",
+      "voice_name": "Patient Female Presenter",
+      "description": [
+        "一位耐心的青年女性法语主持人，沉静而清晰。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "French_FemaleAnchor",
+      "voice_name": "Female Anchor",
+      "description": [
+        "一位成熟的女性法语主播声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Indonesian_SweetGirl",
+      "voice_name": "Sweet Girl",
+      "description": [
+        "一位甜美可爱的青年女性印尼语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Indonesian_CharmingGirl",
+      "voice_name": "Charming Girl",
+      "description": [
+        "一位迷人的青年女性印尼语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Indonesian_GentleGirl",
+      "voice_name": "Gentle Girl",
+      "description": [
+        "一位柔和的青年女性印尼语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "German_FriendlyMan",
+      "voice_name": "Friendly Man",
+      "description": [
+        "一位真诚友好的中年男性德语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "German_SweetLady",
+      "voice_name": "Sweet Lady",
+      "description": [
+        "一位灵动甜美的青年女性德语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Russian_CrazyQueen",
+      "voice_name": "Crazy Girl",
+      "description": [
+        "一位充满活力的青年“疯狂女孩”声音，狂野而不可预测，俄语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Russian_PessimisticGirl",
+      "voice_name": "Pessimistic Girl",
+      "description": [
+        "一位富有同情心的青年“悲观女孩”声音，俄语。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Arabic_FriendlyGuy",
+      "voice_name": "Friendly Guy",
+      "description": [
+        "一位沉稳友好的青年男性阿拉伯语声音。"
+      ],
+      "created_time": "1970-01-01"
+    },
+    {
+      "voice_id": "Ukrainian_WiseScholar",
+      "voice_name": "Wise Scholar",
+      "description": [
+        "一位亲切健谈的青年男性智慧学者声音，乌克兰语。"
+      ],
+      "created_time": "1970-01-01"
+    }
+  ]
+}

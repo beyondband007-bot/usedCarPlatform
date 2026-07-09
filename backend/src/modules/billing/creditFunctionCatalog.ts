@@ -71,6 +71,14 @@ export const creditFunctionCatalog: CreditFunctionCatalogItem[] = [
     status: "active",
   },
   {
+    code: "long-video-generation",
+    name: "Long Vehicle Video",
+    description: "Five-segment long vehicle video generation with digital human and real-shot stitching",
+    chargeMode: "estimate_required",
+    defaultPoints: videoGenerationPointsByAudioSeconds(45),
+    status: "active",
+  },
+  {
     code: "language-conversion",
     name: "Language Conversion",
     description: "Video language translation with subtitles and AI dubbing",

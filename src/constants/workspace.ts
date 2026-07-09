@@ -581,12 +581,12 @@ export const workspaceCapabilities: WorkspaceCapability[] = [
     groupTitle: '营销工具',
     icon: 'mdi:filmstrip-box-multiple',
     label: '长视频生成',
-    tag: '开发中',
-    tagType: 'info',
+    tag: '内测',
+    tagType: 'warning',
     title: '长视频生成',
-    description: '面向长时内容创作的视频生成工作台。',
-    uploadTitle: '视频素材',
-    uploadHint: '长视频生成能力框架',
+    description: '上传车身图和两段内饰实拍，生成 AI / 实拍 / AI / 实拍 / AI 的单车介绍长视频。',
+    uploadTitle: '车身图与内饰实拍',
+    uploadHint: '至少 1 张车身图 + 2 段汽车内饰实拍视频',
     middleBlocks: onlyActions,
     options: [],
     actionLabel: '生成长视频',
@@ -632,7 +632,6 @@ export const defaultWorkspaceCapabilityCode = 'showroom-light'
 /** 工作台侧栏暂时禁用的能力（保留配置，入口不可点） */
 export const disabledWorkspaceCapabilityCodes = new Set([
   'simultaneous-interpretation',
-  'long-video',
 ])
 
 const showroomTutorialImageByTitle: Record<string, string> = {

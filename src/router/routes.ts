@@ -71,6 +71,16 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'long-video-editor',
+        name: 'LongVideoEditor',
+        component: () => import('@/pages/long-video-editor/index.vue'),
+        meta: {
+          title: '长视频剪辑',
+          requiresAuth: true,
+          permission: 'menu:workspace',
+        },
+      },
+      {
         path: 'credits',
         name: 'Credits',
         component: () => import('@/pages/points/index.vue'),

@@ -12,6 +12,7 @@ docs/*
 !docs/vehicle-library-database-spec-and-build-plan.md
 !docs/vehicle-library-database-design.md
 !docs/vehicle-library-database-design.zh-CN.md
+!docs/长视频口播切分与AI提示词前置规格.md
 digital human/*-three-view.png
 digital human/male-02-four-view.png
 .env

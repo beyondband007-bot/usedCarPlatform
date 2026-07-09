@@ -107,7 +107,7 @@ export const env = {
     virtualAssetPollIntervalMs: toNumber(process.env.ARK_VIRTUAL_ASSET_POLL_INTERVAL_MS, 10_000),
     virtualAssetPollAttempts: toNumber(process.env.ARK_VIRTUAL_ASSET_POLL_ATTEMPTS, 18),
     createTimeoutMs: toNumber(process.env.ARK_CREATE_TIMEOUT_MS, 30_000),
-    detailTimeoutMs: toNumber(process.env.ARK_DETAIL_TIMEOUT_MS, 10_000),
+    detailTimeoutMs: toNumber(process.env.ARK_DETAIL_TIMEOUT_MS, 20_000),
   },
 
   deepseek: {
