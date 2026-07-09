@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { NModal, useMessage } from 'naive-ui'
+import { NModal, NStep, NSteps, useMessage } from 'naive-ui'
 
+import PreloadImage from '@/components/common/PreloadImage.vue'
+import HoverPreviewVideo from '@/components/common/HoverPreviewVideo.vue'
 import TemplatePreviewVideoPlayer from '@/components/business/workspace/TemplatePreviewVideoPlayer.vue'
 import {
   createLongVideoAudioPreview,
@@ -11,13 +13,32 @@ import {
   getLongVideoTask,
   updateLongVideoDraftSegments,
 } from '@/api/long-video-generation'
-import { uploadAsset, type UploadedAsset } from '@/api/visual-workbench'
+import { getVehicles, type VehicleLibraryMaterial, type VehicleRecord } from '@/api/vehicle-library'
+import {
+  normalizeVehicleInfo,
+  queryVehicleByVinShowApi,
+  recognizeVinFromImage,
+  type VehicleBasicInfo,
+} from '@/api/vehicle-info'
+import {
+  getRecentGenerationTasks,
+  uploadAsset,
+  type RecentGenerationTask,
+  type UploadedAsset,
+} from '@/api/visual-workbench'
+import { validateArkImageFile, validateArkMaterialDimensions } from '@/utils/ark-media-validation'
+import { validateVehicleLibraryVideo } from '@/utils/video-upload'
 import { VIDEO_GENERATION_FLOW_KEY } from '@/constants/video-generation'
 import {
   resolveTemplatePosterUrl,
   resolveTemplatePreviewUrl,
 } from '@/constants/video-template-previews'
 import { resolveTemplateDefaultDigitalHumanId } from '@/constants/video-generation-local-assets'
+import {
+  shortVideoTemplateCategories,
+  shortVideoTemplateStyles,
+  type ShortVideoTemplateCategory,
+} from '@/constants/short-video-templates'
 import type { VideoGenerationFlow } from '@/composables/useVideoGenerationFlow'
 import type { DigitalHuman, VideoTemplate } from '@/types/video-generation'
 import type {
@@ -29,7 +50,12 @@ import type {
 } from '@/types/long-video-generation'
 
 type StepKey = 'assets' | 'vehicle' | 'template' | 'script'
-type UploadSlotKey = 'body' | 'frontInterior' | 'rearInterior'
+type LongVideoRightView = 'templates' | 'recent'
+type UploadSlotKey = 'frontImage' | 'rearImage' | 'driverImage' | 'frontInterior' | 'rearInterior'
+type AssetSourceMode = 'library' | 'upload'
+
+const GENERATION_LOADING_VIDEO_URL = '/videos/generation-loading.mp4'
+let hasRequestedGenerationLoadingVideoPreload = false
 
 type UploadSlot = {
   key: UploadSlotKey
@@ -42,10 +68,11 @@ type UploadSlot = {
 
 type UploadedSlot = {
   id: string
-  file: File
+  file?: File
   objectUrl: string
   asset: UploadedAsset | null
   status: 'local' | 'uploading' | 'uploaded' | 'failed'
+  source: AssetSourceMode
   error?: string
 }
 
@@ -53,9 +80,16 @@ const message = useMessage()
 const videoFlow = inject<VideoGenerationFlow | null>(VIDEO_GENERATION_FLOW_KEY, null)
 
 const currentStep = ref<StepKey>('assets')
+const maxReachedStepIndex = ref(0)
+const assetSourceMode = ref<AssetSourceMode>('library')
 const uploadedSlots = ref<Partial<Record<UploadSlotKey, UploadedSlot>>>({})
-const bodyImageUploads = ref<UploadedSlot[]>([])
+const libraryVehicles = ref<VehicleRecord[]>([])
+const selectedLibraryVehicleId = ref('')
+const libraryVehiclesLoading = ref(false)
+const libraryVehiclesError = ref('')
+const libraryVehicleSearchQuery = ref('')
 const vehicleInfo = ref({
+  vin: '',
   brandName: '',
   seriesName: '',
   fullModelName: '',
@@ -63,25 +97,57 @@ const vehicleInfo = ref({
   mileage: '',
   price: '',
 })
+const vinLoading = ref(false)
+const vinOcrLoading = ref(false)
+const vinError = ref('')
 const sellingPointsText = ref('')
 const selectedPreviewTemplate = ref<VideoTemplate | null>(null)
+const assetPreview = ref<{ title: string; url: string; kind: 'image' | 'video' } | null>(null)
 const previewDigitalHumanId = ref('')
+const humanPreviewModalVisible = ref(false)
+const previewingDigitalHuman = ref<DigitalHuman | null>(null)
+const enlargedHumanPreview = ref<{ label: string; url: string } | null>(null)
 const draft = ref<LongVideoDraft | null>(null)
 const editableSegments = ref<LongVideoNarrationSegment[]>([])
 const audioPreview = ref<LongVideoAudioPreview | null>(null)
 const currentTask = ref<LongVideoTask | null>(null)
+const activeRightView = ref<LongVideoRightView>('templates')
+const activeTemplateCategory = ref<ShortVideoTemplateCategory>('all')
+const activeTemplateStyle = ref('all')
+const templateSearchQuery = ref('')
+const historyTasks = ref<RecentGenerationTask[]>([])
+const historyLoading = ref(false)
+const historyError = ref('')
+const focusedTaskId = ref('')
+const focusedLongVideoTask = ref<LongVideoTask | null>(null)
 const activeAudioIndex = ref(0)
 const audioElement = ref<HTMLAudioElement | null>(null)
 const loadingAction = ref<'upload' | 'draft' | 'audio' | 'task' | null>(null)
-let taskPollingTimer: ReturnType<typeof window.setInterval> | null = null
+let historyPollingTimer: ReturnType<typeof window.setInterval> | null = null
 
 const uploadSlots: UploadSlot[] = [
   {
-    key: 'body',
-    label: '车身外观图',
-    hint: '至少 1 张清晰车身图，用作 AI 视频统一场景参考',
+    key: 'frontImage',
+    label: '车头图',
+    hint: '上传清晰车头视角，用作 AI 开场外观参考',
     accept: 'image/jpeg,image/png,image/webp',
     purpose: 'car_exterior',
+    kind: 'image',
+  },
+  {
+    key: 'rearImage',
+    label: '车尾图',
+    hint: '上传清晰车尾视角，用作 AI 收尾外观参考',
+    accept: 'image/jpeg,image/png,image/webp',
+    purpose: 'car_exterior',
+    kind: 'image',
+  },
+  {
+    key: 'driverImage',
+    label: '主驾驶位图',
+    hint: '上传主驾驶或前排内饰图片，用作车内讲解参考',
+    accept: 'image/jpeg,image/png,image/webp',
+    purpose: 'car_interior',
     kind: 'image',
   },
   {
@@ -101,6 +167,14 @@ const uploadSlots: UploadSlot[] = [
     kind: 'video',
   },
 ]
+
+const libraryMaterialSlotByUploadKey: Record<UploadSlotKey, VehicleLibraryMaterial['slotCode']> = {
+  frontImage: 'front_image',
+  rearImage: 'rear_image',
+  driverImage: 'driver_image',
+  frontInterior: 'front_row_video',
+  rearInterior: 'rear_row_video',
+}
 
 const stepItems: Array<{ key: StepKey; label: string }> = [
   { key: 'assets', label: '素材上传' },
@@ -123,29 +197,86 @@ const selectedTemplate = computed(() =>
 const selectedDigitalHuman = computed(() => videoFlow?.selectedDigitalHuman.value ?? null)
 const digitalHumanList = computed(() => videoFlow?.digitalHumanList.value ?? [])
 const templatesLoading = computed(() => videoFlow?.isLoading('bootstrap') ?? false)
-const singleCarTemplates = computed(() =>
-  (videoFlow?.templateList.value ?? []).filter((item) => item.type === 'single-car'),
+const templateList = computed(() => videoFlow?.templateList.value ?? [])
+
+const longVideoCategoryTypeMap: Record<Exclude<ShortVideoTemplateCategory, 'all'>, string> = {
+  showroom: 'dealership',
+  'single-car': 'single-car',
+  'vehicle-ad': 'vehicle-ad',
+}
+
+const longVideoTemplateCategories = shortVideoTemplateCategories.filter(
+  (category) => category.id === 'all' || category.id === 'single-car',
 )
+
+const filteredTemplates = computed(() => {
+  const keyword = templateSearchQuery.value.trim().toLowerCase()
+
+  return templateList.value.filter((item) => {
+    if (item.type !== 'single-car') return false
+
+    if (activeTemplateCategory.value !== 'all') {
+      const mappedType = longVideoCategoryTypeMap[activeTemplateCategory.value]
+      if (item.type !== mappedType) return false
+    }
+
+    if (activeTemplateStyle.value !== 'all' && item.style !== activeTemplateStyle.value) {
+      return false
+    }
+
+    if (!keyword) return true
+
+    const haystack = [item.title, item.typeLabel, item.styleLabel, item.stylePrompt]
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(keyword)
+  })
+})
 const previewTemplatePosterUrl = computed(() =>
   selectedPreviewTemplate.value ? resolveTemplatePosterUrl(selectedPreviewTemplate.value) : null,
 )
 const previewTemplateVideoUrl = computed(() =>
   selectedPreviewTemplate.value ? resolveTemplatePreviewUrl(selectedPreviewTemplate.value) : null,
 )
+const selectedTemplatePosterUrl = computed(() =>
+  selectedTemplate.value ? resolveTemplatePosterUrl(selectedTemplate.value) : null,
+)
+const selectedTemplateVideoUrl = computed(() =>
+  selectedTemplate.value ? resolveTemplatePreviewUrl(selectedTemplate.value) : null,
+)
+const activeHumanPreviewImages = computed(
+  () => previewingDigitalHuman.value?.previewImages?.slice(0, 4) ?? [],
+)
 const isBusy = computed(() => Boolean(loadingAction.value))
 const stepIndex = computed(() => stepItems.findIndex((item) => item.key === currentStep.value))
+const workflowStepCurrent = computed(() => Math.max(stepIndex.value + 1, 1))
+const canEnterStep = (index: number) => index <= maxReachedStepIndex.value
+const filteredLibraryVehicles = computed(() => {
+  const keyword = libraryVehicleSearchQuery.value.trim().toLowerCase()
+  if (!keyword) return libraryVehicles.value
+
+  return libraryVehicles.value.filter((vehicle) => {
+    const haystack = [
+      vehicle.vin,
+      vehicle.brand,
+      vehicle.series,
+      vehicle.model,
+      vehicle.modelName,
+      vehicle.modelYear,
+      vehicleTitle(vehicle),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(keyword)
+  })
+})
 const activeAudioSegment = computed(() => audioPreview.value?.segments[activeAudioIndex.value] ?? null)
 const totalAudioDuration = computed(() =>
   audioPreview.value ? formatDuration(audioPreview.value.totalDurationMs) : '0.0s',
 )
-const displayTaskProgress = computed(() => {
-  const task = currentTask.value
-  if (!task) return 0
-  if (task.status === 'failed') return Math.min(task.progress ?? 0, 95)
-  return Math.max(0, Math.min(100, task.progress ?? 0))
-})
 const taskStatusLabel = computed(() => {
-  const status = currentTask.value?.status
+  const status = focusedLongVideoTask.value?.status ?? currentTask.value?.status
   if (status === 'queued') return '排队中'
   if (status === 'generating_ai_video') return 'AI 视频生成中'
   if (status === 'rendering') return '拼接渲染中'
@@ -154,8 +285,35 @@ const taskStatusLabel = computed(() => {
   return '未提交'
 })
 const hasRunningTask = computed(() =>
-  Boolean(currentTask.value && !['completed', 'failed'].includes(currentTask.value.status)),
+  Boolean(
+    currentStep.value === 'script' &&
+      draft.value &&
+      currentTask.value &&
+      currentTask.value.draftId === draft.value.draftId &&
+      !['completed', 'failed'].includes(currentTask.value.status),
+  ),
 )
+const focusedTaskProgress = computed(() => {
+  const task = focusedLongVideoTask.value
+  if (!task) return 0
+  if (task.status === 'failed') return Math.min(task.progress ?? 0, 95)
+  return Math.max(0, Math.min(100, task.progress ?? 0))
+})
+const focusedTaskIsRunning = computed(() =>
+  Boolean(focusedLongVideoTask.value && !['completed', 'failed'].includes(focusedLongVideoTask.value.status)),
+)
+const showRecentGeneratingView = computed(
+  () =>
+    activeRightView.value === 'recent' &&
+    Boolean(focusedLongVideoTask.value && focusedTaskIsRunning.value),
+)
+const generatingDescription = computed(() => {
+  const status = focusedLongVideoTask.value?.status
+  if (status === 'queued') return '任务排队中，请稍候。'
+  if (status === 'generating_ai_video') return 'AI 片段生成中，通常需要几分钟。'
+  if (status === 'rendering') return '正在拼接最终成片。'
+  return '视频生成中，左侧可继续准备下一条素材。'
+})
 const primaryActionLabel = computed(() => {
   if (currentStep.value === 'template') return '生成五段文案'
   if (currentStep.value === 'script') {
@@ -168,7 +326,9 @@ const primaryActionLabel = computed(() => {
 })
 const canContinueFromAssets = computed(() =>
   Boolean(
-    bodyImageUploads.value.some((item) => item.asset?.assetId && item.status === 'uploaded') &&
+    uploadedSlots.value.frontImage?.asset?.assetId &&
+      uploadedSlots.value.rearImage?.asset?.assetId &&
+      uploadedSlots.value.driverImage?.asset?.assetId &&
       uploadedSlots.value.frontInterior?.asset?.assetId &&
       uploadedSlots.value.rearInterior?.asset?.assetId,
   ),
@@ -179,21 +339,69 @@ const canCreateDraft = computed(() =>
 
 onMounted(() => {
   void videoFlow?.initializeFlow()
+  void loadLibraryVehicles()
+  preloadGenerationLoadingVideo()
 })
 
+function preloadGenerationLoadingVideo() {
+  if (hasRequestedGenerationLoadingVideoPreload || typeof document === 'undefined') return
+  hasRequestedGenerationLoadingVideoPreload = true
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'video'
+  link.href = GENERATION_LOADING_VIDEO_URL
+  document.head.appendChild(link)
+}
+
+watch(
+  () => focusedLongVideoTask.value?.status,
+  (status) => {
+    if (status === 'completed' || status === 'failed') {
+      void loadHistoryTasks()
+    }
+  },
+)
+
 onUnmounted(() => {
-  bodyImageUploads.value.forEach((item) => {
-    if (item.objectUrl) URL.revokeObjectURL(item.objectUrl)
-  })
   Object.values(uploadedSlots.value).forEach((item) => {
-    if (item?.objectUrl) URL.revokeObjectURL(item.objectUrl)
+    cleanupUploadedSlot(item)
   })
-  stopTaskPolling()
+  stopHistoryPolling()
 })
+
+function cleanupUploadedSlot(item?: UploadedSlot | null) {
+  if (item?.source === 'upload' && item.objectUrl) URL.revokeObjectURL(item.objectUrl)
+}
 
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function slotDisplayName(item?: UploadedSlot | null) {
+  return item?.file?.name || item?.asset?.fileName || '车辆库素材'
+}
+
+function slotDisplaySize(item?: UploadedSlot | null) {
+  return formatFileSize(item?.file?.size ?? item?.asset?.size ?? 0)
+}
+
+function openAssetPreview(slot: UploadSlot, item?: UploadedSlot | null) {
+  const url = item?.objectUrl || item?.asset?.url || item?.asset?.thumbnailUrl || ''
+  if (!url) return
+  assetPreview.value = {
+    title: `${slot.label} · ${slotDisplayName(item)}`,
+    url,
+    kind: slot.kind,
+  }
+}
+
+function closeAssetPreview() {
+  assetPreview.value = null
+}
+
+function handleAssetPreviewVisibleChange(show: boolean) {
+  if (!show) closeAssetPreview()
 }
 
 function formatDuration(durationMs: number) {
@@ -205,6 +413,205 @@ function sellingPoints() {
     .split(/[\n,，、]/)
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+async function loadLibraryVehicles() {
+  libraryVehiclesLoading.value = true
+  libraryVehiclesError.value = ''
+  try {
+    const result = await getVehicles({
+      page: 1,
+      pageSize: 20,
+      sort: 'complete',
+    })
+    libraryVehicles.value = result.items
+  } catch (error) {
+    libraryVehiclesError.value = error instanceof Error ? error.message : '车辆库读取失败'
+  } finally {
+    libraryVehiclesLoading.value = false
+  }
+}
+
+function findLibraryMaterial(vehicle: VehicleRecord, key: UploadSlotKey) {
+  const slotCode = libraryMaterialSlotByUploadKey[key]
+  return (
+    (vehicle.materials ?? []).find(
+      (item) => item.slotCode === slotCode && item.status === 'active',
+    ) ?? null
+  )
+}
+
+function getVehicleMissingSlotLabels(vehicle: VehicleRecord) {
+  return uploadSlots
+    .filter((slot) => !findLibraryMaterial(vehicle, slot.key))
+    .map((slot) => slot.label)
+}
+
+function vehicleTitle(vehicle: VehicleRecord) {
+  return (
+    [vehicle.brand, vehicle.series, vehicle.modelYear, vehicle.model].filter(Boolean).join(' ') ||
+    vehicle.modelName ||
+    vehicle.vin ||
+    '未命名车辆'
+  )
+}
+
+function materialToUploadedSlot(material: VehicleLibraryMaterial, slot: UploadSlot): UploadedSlot {
+  return {
+    id: `library-${material.id}`,
+    objectUrl: material.assetUrl || material.assetThumbnailUrl || '',
+    asset: {
+      assetId: material.assetId,
+      purpose: slot.purpose,
+      url: material.assetUrl || material.assetThumbnailUrl || '',
+      thumbnailUrl: material.assetThumbnailUrl ?? null,
+      fileName: material.fileName || slot.label,
+      mimeType: material.assetMimeType || (slot.kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+      size: material.fileSize ?? 0,
+    },
+    status: 'uploaded',
+    source: 'library',
+  }
+}
+
+function fillVehicleInfoFromLibrary(vehicle: VehicleRecord) {
+  vehicleInfo.value = {
+    vin: vehicle.vin || '',
+    brandName: vehicle.brand || '',
+    seriesName: vehicle.series || '',
+    fullModelName:
+      vehicle.modelName ||
+      [vehicle.modelYear, vehicle.brand, vehicle.series, vehicle.model].filter(Boolean).join(' '),
+    year: vehicle.modelYear || '',
+    mileage: vehicle.mileageKm ? `${vehicle.mileageKm}公里` : '',
+    price: vehicle.salePrice ? `${vehicle.salePrice}万元` : '',
+  }
+}
+
+function normalizeVinModelYear(year: string) {
+  return year.match(/(?:19|20)\d{2}/)?.[0] ?? year.trim()
+}
+
+function fillVehicleInfoFromVin(vin: string, result: VehicleBasicInfo) {
+  vehicleInfo.value = {
+    ...vehicleInfo.value,
+    vin,
+    brandName: result.brandName || vehicleInfo.value.brandName,
+    seriesName: result.seriesName || vehicleInfo.value.seriesName,
+    fullModelName:
+      result.modelName || result.fullModelName || vehicleInfo.value.fullModelName,
+    year: normalizeVinModelYear(result.year) || vehicleInfo.value.year,
+  }
+}
+
+function normalizeVinInput(event: Event) {
+  vehicleInfo.value.vin = (event.target as HTMLInputElement).value.toUpperCase()
+}
+
+async function recognizeLongVideoVin(vinValue = vehicleInfo.value.vin) {
+  const vin = vinValue.trim().toUpperCase()
+  vinError.value = ''
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+    vinError.value = '请输入 17 位标准 VIN 码（不包含 I、O、Q）'
+    return
+  }
+
+  vinLoading.value = true
+  try {
+    const result = normalizeVehicleInfo(await queryVehicleByVinShowApi(vin))
+    fillVehicleInfoFromVin(vin, result)
+    message.success('车辆信息已自动填充')
+  } catch (error) {
+    vinError.value = error instanceof Error ? error.message : 'VIN 查询失败，请稍后重试'
+  } finally {
+    vinLoading.value = false
+  }
+}
+
+async function recognizeLongVideoVinImage(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  vinError.value = ''
+  if (!['image/jpeg', 'image/png'].includes(file.type)) {
+    vinError.value = '仅支持 JPG、JPEG 或 PNG 图片'
+    return
+  }
+  if (file.size > 7 * 1024 * 1024) {
+    vinError.value = 'VIN 图片大小不能超过 7MB'
+    return
+  }
+
+  vinOcrLoading.value = true
+  try {
+    const vin = await recognizeVinFromImage(file)
+    vehicleInfo.value.vin = vin
+    await recognizeLongVideoVin(vin)
+  } catch (error) {
+    vinError.value = error instanceof Error ? error.message : 'VIN 图片识别失败'
+  } finally {
+    vinOcrLoading.value = false
+  }
+}
+
+function clearUploadedSlots() {
+  Object.values(uploadedSlots.value).forEach((item) => cleanupUploadedSlot(item))
+  uploadedSlots.value = {}
+  selectedLibraryVehicleId.value = ''
+}
+
+function switchAssetSourceMode(mode: AssetSourceMode) {
+  if (assetSourceMode.value === mode) return
+  clearUploadedSlots()
+  resetFlowAfterAssetChange()
+  assetSourceMode.value = mode
+  if (mode !== 'library') {
+    libraryVehicleSearchQuery.value = ''
+  }
+  if (mode === 'library' && !libraryVehicles.value.length) {
+    void loadLibraryVehicles()
+  }
+}
+
+function selectLibraryVehicle(vehicle: VehicleRecord) {
+  const missing = getVehicleMissingSlotLabels(vehicle)
+  if (missing.length) {
+    message.error(`该车辆缺少：${missing.join('、')}`)
+    return
+  }
+
+  for (const slot of uploadSlots) {
+    const material = findLibraryMaterial(vehicle, slot.key)
+    if (!material) continue
+    const dimensionError = validateArkMaterialDimensions({
+      width: material.width,
+      height: material.height,
+      mediaType: slot.kind === 'video' ? 'video' : 'image',
+    })
+    if (dimensionError) {
+      message.error(`${slot.label}：${dimensionError}`)
+      return
+    }
+  }
+
+  const nextSlots: Partial<Record<UploadSlotKey, UploadedSlot>> = {}
+  for (const slot of uploadSlots) {
+    const material = findLibraryMaterial(vehicle, slot.key)
+    if (material) nextSlots[slot.key] = materialToUploadedSlot(material, slot)
+  }
+
+  clearUploadedSlots()
+  resetFlowAfterAssetChange()
+  uploadedSlots.value = nextSlots
+  selectedLibraryVehicleId.value = vehicle.id
+  fillVehicleInfoFromLibrary(vehicle)
+  message.success('已从车辆库带入车辆素材和车辆信息')
+}
+
+function openVehicleLibrary() {
+  window.location.assign('/vehicle-library')
 }
 
 function syncEditableSegments(nextDraft: LongVideoDraft) {
@@ -233,8 +640,23 @@ async function handleFileChange(slot: UploadSlot, event: Event) {
     return
   }
 
+  if (slot.kind === 'image') {
+    const dimensionError = await validateArkImageFile(file)
+    if (dimensionError) {
+      message.error(`${slot.label}：${dimensionError}`)
+      return
+    }
+  } else {
+    const videoError = await validateVehicleLibraryVideo(file)
+    if (videoError) {
+      message.error(`${slot.label}：${videoError}`)
+      return
+    }
+  }
+
+  resetFlowAfterAssetChange()
   const previous = uploadedSlots.value[slot.key]
-  if (previous?.objectUrl) URL.revokeObjectURL(previous.objectUrl)
+  cleanupUploadedSlot(previous)
 
   uploadedSlots.value = {
     ...uploadedSlots.value,
@@ -244,6 +666,7 @@ async function handleFileChange(slot: UploadSlot, event: Event) {
       objectUrl: URL.createObjectURL(file),
       asset: null,
       status: 'uploading',
+      source: 'upload',
     },
   }
 
@@ -260,6 +683,7 @@ async function handleFileChange(slot: UploadSlot, event: Event) {
         objectUrl: uploadedSlots.value[slot.key]?.objectUrl ?? URL.createObjectURL(file),
         asset,
         status: 'uploaded',
+        source: 'upload',
       },
     }
     message.success(`${slot.label}已上传`)
@@ -274,6 +698,7 @@ async function handleFileChange(slot: UploadSlot, event: Event) {
         objectUrl: uploadedSlots.value[slot.key]?.objectUrl ?? URL.createObjectURL(file),
         asset: null,
         status: 'failed',
+        source: 'upload',
         error: error instanceof Error ? error.message : '上传失败',
       },
     }
@@ -283,97 +708,51 @@ async function handleFileChange(slot: UploadSlot, event: Event) {
   }
 }
 
-async function handleBodyImagesChange(slot: UploadSlot, event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
-  if (!files.length) return
-
-  const invalid = files.find((file) => !file.type.startsWith('image/'))
-  if (invalid) {
-    message.error('车身外观只支持上传图片')
-    return
-  }
-
-  const pendingItems: UploadedSlot[] = files.map((file) => ({
-    id: `${slot.key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    file,
-    objectUrl: URL.createObjectURL(file),
-    asset: null,
-    status: 'uploading',
-  }))
-  bodyImageUploads.value = [...bodyImageUploads.value, ...pendingItems]
-
-  loadingAction.value = 'upload'
-  const results = await Promise.allSettled(
-    pendingItems.map(async (item) => ({
-      id: item.id,
-      asset: await uploadAsset(item.file, slot.purpose),
-    })),
-  )
-
-  const assetById = new Map<string, UploadedAsset>()
-  const failedIds = new Set<string>()
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      assetById.set(result.value.id, result.value.asset)
-    } else {
-      failedIds.add(pendingItems[results.indexOf(result)]?.id ?? '')
-    }
-  }
-
-  bodyImageUploads.value = bodyImageUploads.value.map((item) => {
-    const asset = assetById.get(item.id)
-    if (asset) return { ...item, asset, status: 'uploaded' }
-    if (failedIds.has(item.id)) return { ...item, status: 'failed', error: '上传失败' }
-    return item
-  })
-
-  const successCount = assetById.size
-  const failedCount = failedIds.size
-  if (successCount > 0) message.success(`车身外观图已上传 ${successCount} 张`)
-  if (failedCount > 0) message.error(`${failedCount} 张车身外观图上传失败，请删除后重试`)
-  loadingAction.value = null
-}
-
 function removeUploadedFile(slot: UploadSlot) {
   const current = uploadedSlots.value[slot.key]
-  if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl)
+  cleanupUploadedSlot(current)
   const next = { ...uploadedSlots.value }
   delete next[slot.key]
   uploadedSlots.value = next
+  resetFlowAfterAssetChange()
 }
 
-function removeBodyImageUpload(id: string) {
-  const target = bodyImageUploads.value.find((item) => item.id === id)
-  if (target?.objectUrl) URL.revokeObjectURL(target.objectUrl)
-  bodyImageUploads.value = bodyImageUploads.value.filter((item) => item.id !== id)
-}
+function resolvePreviewDefaultDigitalHumanId(template: VideoTemplate) {
+  const activeId =
+    selectedTemplate.value?.templateId === template.templateId ? selectedDigitalHuman.value?.id ?? '' : ''
+  if (activeId && digitalHumanList.value.some((item) => item.id === activeId)) {
+    return activeId
+  }
 
-function chooseTemplate(template: VideoTemplate) {
   const defaultId =
     template.defaultDigitalHumanId ?? resolveTemplateDefaultDigitalHumanId(template.templateId) ?? ''
-  previewDigitalHumanId.value = digitalHumanList.value.some((item) => item.id === defaultId)
-    ? defaultId
-    : digitalHumanList.value[0]?.id ?? ''
+  if (defaultId && digitalHumanList.value.some((item) => item.id === defaultId)) {
+    return defaultId
+  }
+
+  return digitalHumanList.value[0]?.id ?? ''
+}
+
+function commitTemplateSelection(template: VideoTemplate, digitalHumanId: string) {
   videoFlow?.selectTemplate(template)
-  const human = digitalHumanList.value.find((item) => item.id === previewDigitalHumanId.value)
+
+  const human = digitalHumanList.value.find((item) => item.id === digitalHumanId)
   if (human) videoFlow?.selectDigitalHuman(human)
+}
+
+function resolveTemplateCardSubtitle(template: VideoTemplate) {
+  if (template.previewSubtitle) return template.previewSubtitle
+  return [template.typeLabel, template.styleLabel].filter(Boolean).join(' · ')
 }
 
 function openTemplatePreview(template: VideoTemplate) {
   selectedPreviewTemplate.value = template
-  const defaultId =
-    selectedTemplate.value?.templateId === template.templateId
-      ? selectedDigitalHuman.value?.id ?? ''
-      : template.defaultDigitalHumanId ?? resolveTemplateDefaultDigitalHumanId(template.templateId) ?? ''
-  previewDigitalHumanId.value = digitalHumanList.value.some((item) => item.id === defaultId)
-    ? defaultId
-    : digitalHumanList.value[0]?.id ?? ''
+  previewDigitalHumanId.value = resolvePreviewDefaultDigitalHumanId(template)
 }
 
 function closeTemplatePreview() {
   selectedPreviewTemplate.value = null
+  previewDigitalHumanId.value = ''
 }
 
 function handleTemplatePreviewVisibleChange(show: boolean) {
@@ -383,26 +762,180 @@ function handleTemplatePreviewVisibleChange(show: boolean) {
 function confirmTemplatePreview() {
   const template = selectedPreviewTemplate.value
   if (!template) return
-  chooseTemplate(template)
+  const human = digitalHumanList.value.find((item) => item.id === previewDigitalHumanId.value)
+  if (!human) {
+    message.error('请先选择数字人')
+    return
+  }
+  commitTemplateSelection(template, human.id)
   closeTemplatePreview()
+  message.success('已确认使用该模板')
 }
 
-function chooseDigitalHuman(human: DigitalHuman) {
+function handleSelectPreviewDigitalHuman(human: DigitalHuman) {
+  if (isBusy.value) return
   previewDigitalHumanId.value = human.id
-  videoFlow?.selectDigitalHuman(human)
+  previewingDigitalHuman.value = human
+  humanPreviewModalVisible.value = Boolean(human.previewImages?.length)
+}
+
+function openHumanPreviewImage(item: { label: string; url: string }) {
+  enlargedHumanPreview.value = item
+}
+
+function closeEnlargedHumanPreview() {
+  enlargedHumanPreview.value = null
+}
+
+function stepIndexByKey(step: StepKey) {
+  return stepItems.findIndex((item) => item.key === step)
+}
+
+function advanceToStep(step: StepKey) {
+  const nextIndex = stepIndexByKey(step)
+  if (nextIndex < 0) return
+  currentStep.value = step
+  maxReachedStepIndex.value = Math.max(maxReachedStepIndex.value, nextIndex)
+}
+
+function handleStepNavClick(step: StepKey, index: number) {
+  if (!canEnterStep(index) || isBusy.value) return
+  currentStep.value = step
+}
+
+function handleStepsCurrentChange(nextCurrent: number) {
+  const index = nextCurrent - 1
+  const step = stepItems[index]
+  if (!step) return
+  handleStepNavClick(step.key, index)
+}
+
+function resetLeftPanelToStart() {
+  maxReachedStepIndex.value = 0
+  currentStep.value = 'assets'
+  draft.value = null
+  editableSegments.value = []
+  audioPreview.value = null
+  activeAudioIndex.value = 0
+  clearUploadedSlots()
+  vehicleInfo.value = {
+    vin: '',
+    brandName: '',
+    seriesName: '',
+    fullModelName: '',
+    year: '',
+    mileage: '',
+    price: '',
+  }
+  vinError.value = ''
+  sellingPointsText.value = ''
+}
+
+function formatTaskTime(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function historyRecentStatusLabel(item: RecentGenerationTask) {
+  const status = String(item.uiStatus ?? item.status ?? '')
+  if (status === 'generating' || status === 'processing') return '生成中'
+  if (status === 'success') return '已完成'
+  if (status === 'fail' || status === 'failed') return '失败'
+  if (status === 'waiting' || status === 'queued' || status === 'queue') return '排队中'
+  return '处理中'
+}
+
+function isRecentTaskRunning(item: RecentGenerationTask) {
+  const status = String(item.uiStatus ?? item.status ?? '')
+  return ['waiting', 'queued', 'queue', 'generating', 'processing'].includes(status)
+}
+
+async function loadHistoryTasks() {
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const result = await getRecentGenerationTasks({
+      moduleCode: 'long-video-generation',
+      page: 1,
+      pageSize: 30,
+    })
+    historyTasks.value = result.items
+  } catch (error) {
+    historyError.value = error instanceof Error ? error.message : '历史记录加载失败'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function openTemplatesView() {
+  activeRightView.value = 'templates'
+}
+
+function openRecentView() {
+  activeRightView.value = 'recent'
+  void loadHistoryTasks()
+  if (focusedTaskId.value) {
+    void refreshFocusedTask(focusedTaskId.value)
+    if (focusedTaskIsRunning.value) {
+      startHistoryPolling()
+    }
+  }
+}
+
+function resolveHistoryCoverUrl(item: RecentGenerationTask) {
+  return item.thumbnail || item.previewImage || item.inputAssetThumbnailUrl || null
+}
+
+function resolveHistoryVideoUrl(item: RecentGenerationTask) {
+  if (item.status !== 'success') return null
+  const url = item.downloadUrl?.trim()
+  return url || null
+}
+
+function shouldShowHistoryStatus(item: RecentGenerationTask) {
+  const status = String(item.uiStatus ?? item.status ?? '')
+  return status !== 'success'
+}
+
+async function focusHistoryTask(taskId: string) {
+  focusedTaskId.value = taskId
+  activeRightView.value = 'recent'
+  await refreshFocusedTask(taskId)
+  if (focusedTaskIsRunning.value) {
+    startHistoryPolling()
+  } else {
+    stopHistoryPolling()
+  }
+}
+
+function resetFlowAfterAssetChange() {
+  maxReachedStepIndex.value = 0
+  currentStep.value = 'assets'
+  draft.value = null
+  editableSegments.value = []
+  audioPreview.value = null
+  currentTask.value = null
+  activeAudioIndex.value = 0
 }
 
 function goNext() {
   if (currentStep.value === 'assets') {
     if (!canContinueFromAssets.value) {
-      message.error('请先上传 1 张车身图和 2 段内饰实拍视频')
+      message.error('请先上传车头图、车尾图、主驾驶位图和 2 段内饰实拍视频')
       return
     }
-    currentStep.value = 'vehicle'
+    advanceToStep('vehicle')
     return
   }
   if (currentStep.value === 'vehicle') {
-    currentStep.value = 'template'
+    advanceToStep('template')
     return
   }
   if (currentStep.value === 'template') {
@@ -421,12 +954,14 @@ async function handleCreateDraft() {
     message.error('请先选择模板和数字人')
     return
   }
-  const bodyAssetIds = bodyImageUploads.value
-    .map((item) => item.asset?.assetId)
-    .filter((assetId): assetId is string => Boolean(assetId))
+  const imageAssetIds = [
+    uploadedSlots.value.frontImage?.asset?.assetId,
+    uploadedSlots.value.rearImage?.asset?.assetId,
+    uploadedSlots.value.driverImage?.asset?.assetId,
+  ].filter((assetId): assetId is string => Boolean(assetId))
   const frontVideoAssetId = uploadedSlots.value.frontInterior?.asset?.assetId
   const rearVideoAssetId = uploadedSlots.value.rearInterior?.asset?.assetId
-  if (!bodyAssetIds.length || !frontVideoAssetId || !rearVideoAssetId) {
+  if (imageAssetIds.length !== 3 || !frontVideoAssetId || !rearVideoAssetId) {
     message.error('素材还没有上传完成')
     return
   }
@@ -434,7 +969,7 @@ async function handleCreateDraft() {
   loadingAction.value = 'draft'
   try {
     const nextDraft = await createLongVideoDraft({
-      vehicleImageAssetIds: bodyAssetIds,
+      vehicleImageAssetIds: imageAssetIds,
       interiorVideoAssetIds: [frontVideoAssetId, rearVideoAssetId],
       digitalHumanId: selectedDigitalHuman.value.id,
       vehicleInfo: { ...vehicleInfo.value },
@@ -446,7 +981,7 @@ async function handleCreateDraft() {
     audioPreview.value = null
     currentTask.value = null
     activeAudioIndex.value = 0
-    currentStep.value = 'script'
+    advanceToStep('script')
     message.success('五段文案已生成，请确认')
   } catch (error) {
     message.error(error instanceof Error ? error.message : '长视频文案生成失败')
@@ -488,11 +1023,17 @@ async function handleCreateTask() {
   if (!draft.value || !audioPreview.value) return
   loadingAction.value = 'task'
   try {
-    currentTask.value = await createLongVideoTask(draft.value.draftId, {
+    const task = await createLongVideoTask(draft.value.draftId, {
       audioPreviewId: audioPreview.value.audioPreviewId,
     })
-    startTaskPolling(currentTask.value.taskId)
-    message.success('长视频生成任务已提交')
+    currentTask.value = task
+    focusedTaskId.value = task.taskId
+    focusedLongVideoTask.value = task
+    activeRightView.value = 'recent'
+    resetLeftPanelToStart()
+    void loadHistoryTasks()
+    startHistoryPolling()
+    message.success('长视频生成任务已提交，可在右侧查看进度')
   } catch (error) {
     message.error(error instanceof Error ? error.message : '长视频任务提交失败')
   } finally {
@@ -512,37 +1053,43 @@ function handlePrimaryStepAction() {
   goNext()
 }
 
-function stopTaskPolling() {
-  if (taskPollingTimer) {
-    window.clearInterval(taskPollingTimer)
-    taskPollingTimer = null
+function stopHistoryPolling() {
+  if (historyPollingTimer) {
+    window.clearInterval(historyPollingTimer)
+    historyPollingTimer = null
   }
 }
 
-function startTaskPolling(taskId: string) {
-  stopTaskPolling()
-  taskPollingTimer = window.setInterval(() => {
-    void refreshTask(taskId)
+function startHistoryPolling() {
+  stopHistoryPolling()
+  historyPollingTimer = window.setInterval(() => {
+    if (focusedTaskId.value) {
+      void refreshFocusedTask(focusedTaskId.value)
+    }
+    const focusedRunning = Boolean(
+      focusedLongVideoTask.value &&
+        !['completed', 'failed'].includes(focusedLongVideoTask.value.status),
+    )
+    if (focusedRunning || historyTasks.value.some(isRecentTaskRunning)) {
+      void loadHistoryTasks()
+    } else {
+      stopHistoryPolling()
+    }
   }, 8000)
-  void refreshTask(taskId)
 }
 
-async function refreshTask(taskId: string) {
+async function refreshFocusedTask(taskId: string) {
   try {
     const task = await getLongVideoTask(taskId)
+    focusedLongVideoTask.value = task
     currentTask.value = task
     if (['completed', 'failed'].includes(task.status)) {
-      stopTaskPolling()
+      stopHistoryPolling()
+      void loadHistoryTasks()
     }
   } catch (error) {
-    console.warn('long video task polling failed', error)
+    console.warn('long video focused task polling failed', error)
   }
-}
-
-function openEditor() {
-  const url = currentTask.value?.editorProjectUrl
-  if (!url) return
-  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 async function playAllAudio() {
@@ -588,87 +1135,182 @@ function handleAudioEnded() {
           </div>
         </header>
 
-        <nav class="step-nav" aria-label="长视频生成步骤">
-          <button
+        <NSteps
+          class="workflow-steps"
+          :current="workflowStepCurrent"
+          size="small"
+          aria-label="长视频生成步骤"
+          @update:current="handleStepsCurrentChange"
+        >
+          <NStep
             v-for="(step, index) in stepItems"
             :key="step.key"
-            type="button"
-            :class="{ 'is-active': currentStep === step.key, 'is-done': index < stepIndex }"
-            @click="currentStep = step.key"
-          >
-            <span>{{ index + 1 }}</span>
-            {{ step.label }}
-          </button>
-        </nav>
+            :title="step.label"
+            :disabled="!canEnterStep(index) || isBusy"
+          />
+        </NSteps>
 
         <div class="step-scroll">
           <template v-if="currentStep === 'assets'">
           <header class="section-head">
             <h2>上传素材</h2>
-            <p>上传 1 张车身外观图和 2 段汽车内饰实拍视频，素材会用于 AI 生成和实拍拼接。</p>
+            <p>上传车头图、车尾图、主驾驶位图和 2 段汽车内饰实拍视频，素材会用于 AI 生成和实拍拼接。</p>
           </header>
-          <div class="upload-grid upload-grid--left">
+          <div class="asset-source-tabs" aria-label="素材来源">
+            <button
+              type="button"
+              :class="{ 'is-active': assetSourceMode === 'library' }"
+              @click="switchAssetSourceMode('library')"
+            >
+              从车辆库选择
+            </button>
+            <button
+              type="button"
+              :class="{ 'is-active': assetSourceMode === 'upload' }"
+              @click="switchAssetSourceMode('upload')"
+            >
+              本地上传
+            </button>
+          </div>
+
+          <label v-if="assetSourceMode === 'library'" class="library-vehicle-search">
+            <Icon icon="mdi:magnify" aria-hidden="true" />
+            <input
+              v-model="libraryVehicleSearchQuery"
+              type="search"
+              placeholder="搜索 VIN / 车辆名称"
+              :disabled="libraryVehiclesLoading"
+            />
+          </label>
+
+          <div v-if="assetSourceMode === 'library'" class="library-picker">
+            <div class="library-picker__head">
+              <div>
+                <strong>选择车辆库素材</strong>
+                <span>完整车辆可一键带入 5 个素材槽，并自动填入车辆信息。</span>
+              </div>
+              <button type="button" class="secondary-action" @click="loadLibraryVehicles">
+                刷新
+              </button>
+            </div>
+            <div v-if="libraryVehiclesLoading" class="library-empty">正在读取车辆库</div>
+            <div v-else-if="libraryVehiclesError" class="library-empty is-error">
+              {{ libraryVehiclesError }}
+            </div>
+            <div v-else-if="!libraryVehicles.length" class="library-empty">
+              <span>车辆库还没有车辆素材</span>
+              <button type="button" class="secondary-action" @click="openVehicleLibrary">
+                去车辆库
+              </button>
+            </div>
+            <div v-else-if="!filteredLibraryVehicles.length" class="library-empty">
+              <span>未找到匹配车辆，请调整搜索关键词</span>
+            </div>
+            <div v-else class="library-vehicle-list">
+              <article
+                v-for="vehicle in filteredLibraryVehicles"
+                :key="vehicle.id"
+                class="library-vehicle-card"
+                :class="{ 'is-selected': selectedLibraryVehicleId === vehicle.id }"
+              >
+                <img
+                  v-if="vehicle.coverAsset?.thumbnailUrl || vehicle.coverAsset?.url"
+                  :src="vehicle.coverAsset?.thumbnailUrl || vehicle.coverAsset?.url || ''"
+                  :alt="vehicleTitle(vehicle)"
+                />
+                <div v-else class="library-vehicle-card__placeholder">
+                  <Icon icon="mdi:car-outline" />
+                </div>
+                <div class="library-vehicle-card__body">
+                  <strong>{{ vehicleTitle(vehicle) }}</strong>
+                  <span>{{ vehicle.vin || '未填写 VIN' }}</span>
+                  <small v-if="getVehicleMissingSlotLabels(vehicle).length">
+                    缺：{{ getVehicleMissingSlotLabels(vehicle).join('、') }}
+                  </small>
+                  <small v-else>素材完整，可直接使用</small>
+                </div>
+                <button
+                  type="button"
+                  :class="getVehicleMissingSlotLabels(vehicle).length ? 'secondary-action' : 'primary-action'"
+                  @click="
+                    getVehicleMissingSlotLabels(vehicle).length
+                      ? openVehicleLibrary()
+                      : selectLibraryVehicle(vehicle)
+                  "
+                >
+                  {{ getVehicleMissingSlotLabels(vehicle).length ? '去补充' : '使用这辆车' }}
+                </button>
+              </article>
+            </div>
+
+            <div v-if="canContinueFromAssets" class="selected-library-assets">
+              <strong>已带入素材</strong>
+              <div class="upload-grid upload-grid--left">
+                <article
+                  v-for="slot in uploadSlots"
+                  :key="slot.key"
+                  class="upload-card is-ready is-readonly"
+                >
+                  <button
+                    type="button"
+                    class="upload-preview"
+                    :aria-label="`预览${slot.label}`"
+                    @click="openAssetPreview(slot, uploadedSlots[slot.key])"
+                  >
+                    <video
+                      v-if="slot.kind === 'video'"
+                      :src="uploadedSlots[slot.key]?.objectUrl"
+                      muted
+                      preload="metadata"
+                    />
+                    <img v-else :src="uploadedSlots[slot.key]?.objectUrl" :alt="slot.label" />
+                    <span class="upload-preview__hint">点击预览</span>
+                  </button>
+                  <div class="upload-card__body">
+                    <strong>{{ slot.label }}</strong>
+                    <span>{{ slotDisplayName(uploadedSlots[slot.key]) }}</span>
+                    <small>{{ slotDisplaySize(uploadedSlots[slot.key]) }}</small>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="upload-grid upload-grid--left">
             <label
               v-for="slot in uploadSlots"
               :key="slot.key"
               class="upload-card"
               :class="{
-                'is-ready':
-                  slot.key === 'body'
-                    ? bodyImageUploads.some((item) => item.status === 'uploaded')
-                    : uploadedSlots[slot.key]?.status === 'uploaded',
-                'is-multiple': slot.key === 'body',
+                'is-ready': uploadedSlots[slot.key]?.status === 'uploaded',
               }"
             >
               <input
                 type="file"
                 :accept="slot.accept"
-                :multiple="slot.key === 'body'"
                 :disabled="isBusy"
-                @change="
-                  slot.key === 'body'
-                    ? handleBodyImagesChange(slot, $event)
-                    : handleFileChange(slot, $event)
-                "
+                @change="handleFileChange(slot, $event)"
               />
-              <template v-if="slot.key === 'body' && bodyImageUploads.length">
-                <div class="body-image-grid">
-                  <figure
-                    v-for="item in bodyImageUploads"
-                    :key="item.id"
-                    :class="{ 'is-failed': item.status === 'failed' }"
-                  >
-                    <img :src="item.objectUrl" :alt="item.file.name" />
-                    <button
-                      type="button"
-                      :aria-label="`删除${item.file.name}`"
-                      @click.prevent="removeBodyImageUpload(item.id)"
-                    >
-                      <Icon icon="mdi:close" />
-                    </button>
-                    <figcaption>{{ item.status === 'uploading' ? '上传中' : item.status === 'uploaded' ? '已入库' : '失败' }}</figcaption>
-                  </figure>
-                </div>
-                <div class="upload-card__body">
-                  <strong>{{ slot.label }}</strong>
-                  <span>已添加 {{ bodyImageUploads.length }} 张，点击继续追加</span>
-                  <small>至少 1 张，支持多选上传</small>
-                </div>
-              </template>
-              <template v-else-if="slot.key !== 'body' && uploadedSlots[slot.key]">
-                <div class="upload-preview">
+              <template v-if="uploadedSlots[slot.key]">
+                <button
+                  type="button"
+                  class="upload-preview"
+                  :aria-label="`预览${slot.label}`"
+                  @click.prevent="openAssetPreview(slot, uploadedSlots[slot.key])"
+                >
                   <video
                     v-if="slot.kind === 'video'"
                     :src="uploadedSlots[slot.key]?.objectUrl"
-                    controls
+                    muted
                     preload="metadata"
                   />
                   <img v-else :src="uploadedSlots[slot.key]?.objectUrl" :alt="slot.label" />
-                </div>
+                  <span class="upload-preview__hint">点击预览</span>
+                </button>
                 <div class="upload-card__body">
                   <strong>{{ slot.label }}</strong>
-                  <span>{{ uploadedSlots[slot.key]?.file.name }}</span>
-                  <small>{{ formatFileSize(uploadedSlots[slot.key]?.file.size ?? 0) }}</small>
+                  <span>{{ slotDisplayName(uploadedSlots[slot.key]) }}</span>
+                  <small>{{ slotDisplaySize(uploadedSlots[slot.key]) }}</small>
                   <em v-if="uploadedSlots[slot.key]?.status === 'uploading'">上传中</em>
                   <em v-else-if="uploadedSlots[slot.key]?.status === 'uploaded'">已入库</em>
                   <em v-else class="is-error">上传失败</em>
@@ -691,6 +1333,71 @@ function handleAudioEnded() {
             <h2>车辆信息</h2>
             <p>这里的信息会进入全片文案，不确定的字段可以留空，后端会避免编造车况。</p>
           </header>
+
+          <div class="lv-vin-panel">
+            <div class="lv-vin-panel-head">
+              <span class="lv-vin-panel-icon" aria-hidden="true">
+                <Icon icon="mdi:barcode-scan" />
+              </span>
+              <div>
+                <strong>VIN 智能识别</strong>
+                <p>输入 17 位 VIN 或上传图片，自动填充下方车型信息</p>
+              </div>
+            </div>
+            <div class="lv-vin-row">
+              <label class="lv-vin-field">
+                <span>VIN 码</span>
+                <input
+                  v-model="vehicleInfo.vin"
+                  type="text"
+                  maxlength="17"
+                  placeholder="请输入 17 位 VIN"
+                  :disabled="isBusy || vinLoading || vinOcrLoading"
+                  @input="normalizeVinInput"
+                  @keyup.enter="recognizeLongVideoVin()"
+                />
+              </label>
+              <button
+                type="button"
+                class="lv-vin-query-btn"
+                :disabled="isBusy || vinLoading || vinOcrLoading"
+                @click="recognizeLongVideoVin()"
+              >
+                <Icon
+                  :icon="vinLoading ? 'mdi:loading' : 'mdi:magnify'"
+                  :class="{ 'is-spinning': vinLoading }"
+                  aria-hidden="true"
+                />
+                {{ vinLoading ? '查询中' : '立即查询' }}
+              </button>
+            </div>
+            <div class="lv-vin-secondary">
+              <label
+                class="lv-vin-image-btn"
+                :class="{
+                  'is-loading': vinOcrLoading,
+                  'is-disabled': isBusy || vinLoading || vinOcrLoading,
+                }"
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  :disabled="isBusy || vinLoading || vinOcrLoading"
+                  @change="recognizeLongVideoVinImage"
+                />
+                <Icon
+                  :icon="vinOcrLoading ? 'mdi:loading' : 'mdi:image-search-outline'"
+                  :class="{ 'is-spinning': vinOcrLoading }"
+                  aria-hidden="true"
+                />
+                {{ vinOcrLoading ? '识别并查询中' : '上传图片识别 VIN' }}
+              </label>
+              <span>支持 JPG、PNG，识别后自动查询车辆信息</span>
+            </div>
+            <p class="lv-vin-disclaimer">VIN 识别及车型信息由第三方数据服务提供，仅供参考。</p>
+            <p v-if="vinError" class="lv-vin-error">{{ vinError }}</p>
+          </div>
+
           <div class="vehicle-form">
             <label>
               <span>品牌</span>
@@ -737,16 +1444,38 @@ function handleAudioEnded() {
             <p>请在右侧选择单车介绍模板和数字人，系统会使用所选数字人的后端预设音色生成五段音频。</p>
           </header>
           <div class="selection-confirm">
-            <article :class="{ 'is-ready': Boolean(selectedTemplate) }">
-              <Icon :icon="selectedTemplate ? 'mdi:check-circle-outline' : 'mdi:view-grid-outline'" />
-              <div>
+            <article class="selection-confirm__card selection-confirm__card--template" :class="{ 'is-ready': Boolean(selectedTemplate) }">
+              <div class="selection-confirm__preview">
+                <PreloadImage
+                  v-if="selectedTemplatePosterUrl"
+                  :src="selectedTemplatePosterUrl"
+                  :alt="selectedTemplate?.title ?? '已选模板'"
+                  fit="cover"
+                />
+                <video
+                  v-else-if="selectedTemplateVideoUrl"
+                  :src="selectedTemplateVideoUrl"
+                  muted
+                  preload="metadata"
+                />
+                <Icon v-else :icon="selectedTemplate ? 'mdi:check-circle-outline' : 'mdi:view-grid-outline'" />
+              </div>
+              <div class="selection-confirm__body">
                 <strong>{{ selectedTemplate?.title ?? '未选择模板' }}</strong>
                 <p>{{ selectedTemplate ? `${selectedTemplate.styleLabel} / ${selectedTemplate.outputRatio}` : '在右侧模板区选择一个单车介绍模板' }}</p>
               </div>
             </article>
-            <article :class="{ 'is-ready': Boolean(selectedDigitalHuman) }">
-              <Icon :icon="selectedDigitalHuman ? 'mdi:check-circle-outline' : 'mdi:account-outline'" />
-              <div>
+            <article class="selection-confirm__card selection-confirm__card--human" :class="{ 'is-ready': Boolean(selectedDigitalHuman) }">
+              <div class="selection-confirm__preview selection-confirm__preview--avatar">
+                <PreloadImage
+                  v-if="selectedDigitalHuman?.previewUrl"
+                  :src="selectedDigitalHuman.previewUrl"
+                  :alt="selectedDigitalHuman.name"
+                  fit="cover"
+                />
+                <Icon v-else :icon="selectedDigitalHuman ? 'mdi:check-circle-outline' : 'mdi:account-outline'" />
+              </div>
+              <div class="selection-confirm__body">
                 <strong>{{ selectedDigitalHuman?.name ?? '未选择数字人' }}</strong>
                 <p>{{ draft?.voice.label ?? '文案生成后自动读取该数字人的预设音色' }}</p>
               </div>
@@ -810,37 +1539,6 @@ function handleAudioEnded() {
           </section>
           </template>
 
-          <div v-if="currentTask" class="inline-task-status" :class="`is-${currentTask.status}`">
-          <div class="inline-task-status__head">
-            <strong>{{ taskStatusLabel }}</strong>
-            <span>{{ displayTaskProgress }}%</span>
-          </div>
-          <div class="inline-task-status__bar" role="progressbar" :aria-valuenow="displayTaskProgress" aria-valuemin="0" aria-valuemax="100">
-            <span :style="{ width: `${displayTaskProgress}%` }" />
-          </div>
-          <div
-            v-if="currentTask.status === 'completed' && currentTask.resultUrl"
-            class="final-video-preview"
-          >
-            <video :src="currentTask.resultUrl" controls playsinline preload="metadata" />
-          </div>
-          <p v-if="currentTask.status === 'failed'">
-            {{ currentTask.errorMessage || '长视频生成失败，请稍后重试。' }}
-          </p>
-          <div v-if="currentTask.resultUrl || currentTask.editorProjectUrl" class="inline-task-status__actions">
-            <a v-if="currentTask.resultUrl" :href="currentTask.resultUrl" target="_blank" rel="noreferrer">
-              新窗口查看
-            </a>
-            <button
-              v-if="currentTask.editorProjectUrl"
-              type="button"
-              class="secondary-action"
-              @click="openEditor"
-            >
-              进入剪辑
-            </button>
-          </div>
-        </div>
         </div>
 
         <footer class="step-action-bar">
@@ -875,81 +1573,248 @@ function handleAudioEnded() {
         </footer>
       </section>
 
-      <aside class="side-panel">
-        <section class="template-resource-card">
-          <header>
-            <h2>模板</h2>
-            <span>点击预览</span>
+      <aside class="side-panel" aria-label="长视频右侧面板">
+        <div class="lv-right-main-shell" aria-label="长视频辅助面板">
+          <header class="lv-right-primary-tabs" role="tablist" aria-label="长视频视图">
+            <button
+              type="button"
+              role="tab"
+              class="lv-right-primary-tab"
+              :class="{ 'is-active': activeRightView === 'recent' }"
+              :aria-selected="activeRightView === 'recent'"
+              @click="openRecentView"
+            >
+              最近生成
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="lv-right-primary-tab"
+              :class="{ 'is-active': activeRightView === 'templates' }"
+              :aria-selected="activeRightView === 'templates'"
+              @click="openTemplatesView"
+            >
+              模板库
+            </button>
           </header>
-          <div v-if="templatesLoading && !singleCarTemplates.length" class="empty-state is-compact">
-            <Icon icon="mdi:loading" class="is-spinning" />
-            <span>正在加载模板</span>
-          </div>
-          <div v-else class="template-grid">
-            <button
-              v-for="template in singleCarTemplates"
-              :key="template.templateId"
-              type="button"
-              class="template-card"
-              :class="{ 'is-selected': selectedTemplate?.templateId === template.templateId }"
-              @click="openTemplatePreview(template)"
+
+          <section
+            v-if="activeRightView === 'recent'"
+            class="lv-right-recent-panel"
+            :class="{ 'is-generating': showRecentGeneratingView }"
+            aria-label="最近生成"
+          >
+            <section
+              v-if="showRecentGeneratingView && focusedLongVideoTask"
+              class="lv-right-generating"
+              aria-live="polite"
             >
-              <img
-                v-if="resolveTemplatePosterUrl(template)"
-                :src="resolveTemplatePosterUrl(template)!"
-                :alt="template.title"
-              />
-              <video
-                v-else-if="resolveTemplatePreviewUrl(template)"
-                :src="resolveTemplatePreviewUrl(template)!"
-                muted
-                preload="metadata"
-              />
-              <span>{{ template.title }}</span>
-              <small>{{ template.styleLabel }} / {{ template.outputRatio }}</small>
-            </button>
-          </div>
-        </section>
+              <div class="lv-right-generating-visual" aria-hidden="true">
+                <video
+                  class="lv-right-generating-video"
+                  :src="GENERATION_LOADING_VIDEO_URL"
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                  preload="auto"
+                />
+              </div>
+              <div class="lv-right-generating-copy">
+                <p>长视频生成</p>
+                <h2>{{ taskStatusLabel }}</h2>
+                <span>{{ generatingDescription }}</span>
+                <p v-if="focusedLongVideoTask.status === 'failed'" class="lv-right-generating-error">
+                  {{ focusedLongVideoTask.errorMessage || '长视频生成失败，请稍后重试。' }}
+                </p>
+              </div>
+              <div
+                class="lv-right-generating-progress"
+                role="progressbar"
+                :aria-valuenow="focusedTaskProgress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <span :style="{ width: `${Math.max(focusedTaskProgress, 8)}%` }" />
+              </div>
+            </section>
 
-        <section class="human-card">
-          <h2>数字人</h2>
-          <div class="human-grid">
-            <button
-              v-for="human in digitalHumanList"
-              :key="human.id"
-              type="button"
-              :class="{ 'is-selected': selectedDigitalHuman?.id === human.id }"
-              @click="chooseDigitalHuman(human)"
-            >
-              <img v-if="human.previewUrl" :src="human.previewUrl" :alt="human.name" />
-              <Icon v-else icon="mdi:account-outline" />
-              <span>{{ human.name }}</span>
-            </button>
-          </div>
-        </section>
+            <template v-else>
+              <div v-if="historyLoading && !historyTasks.length" class="lv-right-empty">
+                <Icon icon="mdi:loading" class="is-spinning" />
+                <span>正在加载最近生成</span>
+              </div>
+              <div v-else-if="historyError && !historyTasks.length" class="lv-right-empty is-error">
+                <span>{{ historyError }}</span>
+              </div>
+              <div v-else-if="!historyTasks.length" class="lv-right-empty">
+                <Icon icon="mdi:video-off-outline" />
+                <span>暂无最近生成记录</span>
+              </div>
+              <div v-else class="lv-right-template-grid lv-right-recent-grid">
+                <article
+                  v-for="item in historyTasks"
+                  :key="item.taskId"
+                  class="lv-right-recent-card is-clickable"
+                  :class="{ 'is-selected': focusedTaskId === item.taskId }"
+                  role="button"
+                  tabindex="0"
+                  @click="focusHistoryTask(item.taskId)"
+                  @keydown.enter.prevent="focusHistoryTask(item.taskId)"
+                >
+                  <div class="lv-right-recent-card-media">
+                    <video
+                      v-if="resolveHistoryVideoUrl(item)"
+                      class="lv-right-recent-card-cover lv-right-recent-card-cover--video"
+                      :src="resolveHistoryVideoUrl(item)!"
+                      :poster="resolveHistoryCoverUrl(item) || undefined"
+                      muted
+                      playsinline
+                      preload="metadata"
+                    />
+                    <PreloadImage
+                      v-else-if="resolveHistoryCoverUrl(item)"
+                      class="lv-right-recent-card-cover"
+                      :src="resolveHistoryCoverUrl(item)!"
+                      :alt="item.title || '长视频'"
+                      loading="lazy"
+                      fit="cover"
+                    />
+                    <div v-else class="lv-right-recent-card-placeholder">
+                      <Icon icon="mdi:video-off-outline" />
+                    </div>
+                    <span
+                      v-if="shouldShowHistoryStatus(item)"
+                      class="lv-right-recent-card-status"
+                      :class="{ 'is-running': isRecentTaskRunning(item) }"
+                    >
+                      {{ historyRecentStatusLabel(item) }}
+                    </span>
+                    <div class="lv-right-recent-card-body">
+                      <strong>{{ item.title || '长视频生成任务' }}</strong>
+                      <span>{{ formatTaskTime(item.createdAt) }}</span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </template>
+          </section>
 
-        <section class="summary-card">
-          <h2>当前选择</h2>
-          <dl>
-            <div>
-              <dt>模板</dt>
-              <dd>{{ selectedTemplate?.title ?? '未选择' }}</dd>
-            </div>
-            <div>
-              <dt>数字人</dt>
-              <dd>{{ selectedDigitalHuman?.name ?? '未选择' }}</dd>
-            </div>
-            <div>
-              <dt>预设音色</dt>
-              <dd>{{ draft?.voice.label ?? '生成文案后读取' }}</dd>
-            </div>
-            <div>
-              <dt>预计 AI 视频</dt>
-              <dd>{{ draft?.estimatedAiSeconds ?? 0 }}s</dd>
-            </div>
-          </dl>
-        </section>
+          <section v-else class="lv-right-gallery" aria-label="长视频模板库">
+            <header class="lv-gallery-toolbar">
+              <div class="lv-gallery-tabs" role="tablist" aria-label="模板分类">
+                <button
+                  v-for="category in longVideoTemplateCategories"
+                  :key="category.id"
+                  type="button"
+                  role="tab"
+                  class="lv-gallery-tab"
+                  :class="{ 'is-active': activeTemplateCategory === category.id }"
+                  :aria-selected="activeTemplateCategory === category.id"
+                  @click="activeTemplateCategory = category.id"
+                >
+                  {{ category.label }}
+                </button>
+              </div>
 
+              <div class="lv-gallery-actions">
+                <label class="lv-style-filter">
+                  <span class="lv-style-filter-label">风格筛选</span>
+                  <select v-model="activeTemplateStyle">
+                    <option
+                      v-for="style in shortVideoTemplateStyles"
+                      :key="style.id"
+                      :value="style.id"
+                    >
+                      {{ style.label }}
+                    </option>
+                  </select>
+                  <Icon icon="mdi:chevron-down" aria-hidden="true" />
+                </label>
+
+                <label class="lv-search">
+                  <Icon icon="mdi:magnify" aria-hidden="true" />
+                  <input
+                    v-model="templateSearchQuery"
+                    type="search"
+                    placeholder="搜索模板名称或关键词..."
+                  />
+                </label>
+              </div>
+            </header>
+
+            <div v-if="templatesLoading && !templateList.length" class="lv-right-empty lv-right-empty--inline">
+              <Icon icon="mdi:loading" class="is-spinning" />
+              <span>正在加载模板库</span>
+            </div>
+            <div v-else-if="!filteredTemplates.length" class="lv-right-empty lv-right-empty--inline">
+              <Icon icon="mdi:movie-search-outline" />
+              <span>未找到匹配模板，请调整筛选条件</span>
+            </div>
+            <div v-else class="lv-right-template-grid">
+              <article
+                v-for="template in filteredTemplates"
+                :key="template.templateId"
+                class="lv-right-template-card"
+                :class="{ 'is-selected': selectedTemplate?.templateId === template.templateId }"
+                role="button"
+                tabindex="0"
+                :aria-label="`预览模板 ${template.title}`"
+                @click="openTemplatePreview(template)"
+                @keydown.enter.prevent="openTemplatePreview(template)"
+                @keydown.space.prevent="openTemplatePreview(template)"
+              >
+                <div class="lv-right-template-media">
+                  <PreloadImage
+                    v-if="resolveTemplatePosterUrl(template)"
+                    class="lv-right-template-cover lv-right-template-cover--poster"
+                    :src="resolveTemplatePosterUrl(template)!"
+                    :alt="template.title"
+                    loading="lazy"
+                    decoding="async"
+                    fit="cover"
+                  />
+                  <HoverPreviewVideo
+                    v-if="resolveTemplatePreviewUrl(template)"
+                    class="lv-right-template-cover lv-right-template-cover--video"
+                    :class="{
+                      'is-poster-backed': Boolean(resolveTemplatePosterUrl(template)),
+                    }"
+                    :src="resolveTemplatePreviewUrl(template)!"
+                    :alt="template.title"
+                    lazy
+                    lazy-root-margin="60px"
+                    :defer-src-until-hover="Boolean(resolveTemplatePosterUrl(template))"
+                    :preload="resolveTemplatePosterUrl(template) ? 'none' : 'metadata'"
+                  />
+                  <div
+                    v-if="!resolveTemplatePreviewUrl(template) && !resolveTemplatePosterUrl(template)"
+                    class="lv-right-template-cover lv-right-template-cover--placeholder"
+                  >
+                    <Icon icon="mdi:image-outline" />
+                  </div>
+                  <div class="lv-right-template-caption">
+                    <strong class="lv-right-template-caption__title">{{ template.title }}</strong>
+                    <div
+                      v-if="resolveTemplateCardSubtitle(template)"
+                      class="lv-right-template-caption__hover-meta"
+                    >
+                      <span class="lv-right-template-caption__subtitle">
+                        {{ resolveTemplateCardSubtitle(template) }}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    v-if="selectedTemplate?.templateId === template.templateId"
+                    class="lv-right-template-selected-badge"
+                  >
+                    已选
+                  </span>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
       </aside>
     </main>
 
@@ -977,10 +1842,11 @@ function handleAudioEnded() {
               :poster="previewTemplatePosterUrl ?? undefined"
               :template-id="selectedPreviewTemplate.templateId"
             />
-            <img
+            <PreloadImage
               v-else-if="previewTemplatePosterUrl"
               :src="previewTemplatePosterUrl"
               :alt="selectedPreviewTemplate.title"
+              fit="contain"
             />
             <div v-else class="lv-preview-dialog__empty">
               <Icon icon="mdi:movie-open-outline" />
@@ -999,6 +1865,126 @@ function handleAudioEnded() {
               确认使用此模板
             </button>
           </aside>
+          <aside class="lv-preview-dialog__humans">
+            <h4>选择数字人形象</h4>
+            <p>已按模板默认推荐，可手动更换</p>
+            <div v-if="digitalHumanList.length" class="lv-preview-dialog__humans-grid">
+              <button
+                v-for="human in digitalHumanList"
+                :key="human.id"
+                type="button"
+                class="lv-preview-dialog__human"
+                :class="{ 'is-active': previewDigitalHumanId === human.id }"
+                :title="human.name"
+                @click="handleSelectPreviewDigitalHuman(human)"
+              >
+                <span class="lv-preview-dialog__human-avatar">
+                  <PreloadImage
+                    v-if="human.previewUrl"
+                    :src="human.previewUrl"
+                    :alt="human.name"
+                    fit="cover"
+                  />
+                  <Icon v-else icon="mdi:account-outline" />
+                </span>
+                <span class="lv-preview-dialog__human-name">{{ human.name }}</span>
+              </button>
+            </div>
+            <p v-else class="lv-preview-dialog__humans-empty">暂无可用数字人</p>
+          </aside>
+        </div>
+      </div>
+    </NModal>
+
+    <NModal
+      v-model:show="humanPreviewModalVisible"
+      preset="card"
+      to="body"
+      transform-origin="center"
+      class="lv-human-preview-modal"
+      :style="{ width: '80vw', height: '60vh', maxWidth: 'none' }"
+      :bordered="false"
+      :segmented="{ content: true }"
+    >
+      <template #header>
+        <div class="lv-human-preview-head">
+          <strong>{{ previewingDigitalHuman?.name }}</strong>
+          <span>四视图预览</span>
+        </div>
+      </template>
+
+      <div class="lv-human-preview-grid">
+        <figure
+          v-for="item in activeHumanPreviewImages"
+          :key="item.url"
+          class="lv-human-preview-item"
+        >
+          <button
+            type="button"
+            class="lv-human-preview-image-button"
+            :aria-label="`放大查看${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+            @click="openHumanPreviewImage(item)"
+          >
+            <PreloadImage
+              class="lv-human-preview-image"
+              :src="item.url"
+              :alt="`${previewingDigitalHuman?.name ?? '数字人'}${item.label}`"
+              loading="eager"
+              fit="contain"
+            />
+          </button>
+          <figcaption>{{ item.label }}</figcaption>
+        </figure>
+      </div>
+    </NModal>
+
+    <NModal
+      v-if="enlargedHumanPreview"
+      :show="true"
+      to="body"
+      :mask-closable="true"
+      transform-origin="center"
+      @update:show="(show) => { if (!show) closeEnlargedHumanPreview() }"
+    >
+      <div class="lv-human-preview-large">
+        <header class="lv-human-preview-head">
+          <strong>{{ previewingDigitalHuman?.name }}</strong>
+          <button type="button" aria-label="关闭" @click="closeEnlargedHumanPreview">
+            <Icon icon="mdi:close" />
+          </button>
+        </header>
+        <PreloadImage
+          :src="enlargedHumanPreview.url"
+          :alt="`${previewingDigitalHuman?.name ?? '数字人'}${enlargedHumanPreview.label}`"
+          fit="contain"
+        />
+      </div>
+    </NModal>
+
+    <NModal
+      v-if="assetPreview"
+      :show="true"
+      to="body"
+      :mask-closable="true"
+      transform-origin="center"
+      @update:show="handleAssetPreviewVisibleChange"
+    >
+      <div class="asset-preview-dialog">
+        <header class="asset-preview-dialog__head">
+          <h3>{{ assetPreview.title }}</h3>
+          <button type="button" aria-label="关闭" @click="closeAssetPreview">
+            <Icon icon="mdi:close" />
+          </button>
+        </header>
+        <div class="asset-preview-dialog__body">
+          <video
+            v-if="assetPreview.kind === 'video'"
+            :src="assetPreview.url"
+            controls
+            autoplay
+            playsinline
+          />
+          <img v-else :src="assetPreview.url" :alt="assetPreview.title" />
         </div>
       </div>
     </NModal>
@@ -1009,6 +1995,8 @@ function handleAudioEnded() {
 .long-video-workflow {
   --lv-primary: #2563eb;
   --lv-primary-soft: #eff6ff;
+  --lv-accent: var(--workspace-accent, #d4a017);
+  --lv-accent-soft: color-mix(in srgb, var(--workspace-accent, #d4a017) 12%, transparent);
   --lv-panel: var(--workspace-panel, var(--app-surface));
   --lv-surface: var(--workspace-panel-soft, var(--app-surface-soft));
   --lv-border: var(--workspace-line, var(--app-border));
@@ -1025,7 +2013,7 @@ function handleAudioEnded() {
 }
 
 .primary-panel,
-.side-panel > section {
+.side-panel {
   border: 1px solid var(--lv-border);
   border-radius: 14px;
   background: var(--lv-panel);
@@ -1042,7 +2030,6 @@ function handleAudioEnded() {
 
 .page-head p,
 .section-head p,
-.summary-card dt,
 .asset-readiness p,
 .selection-confirm p {
   margin: 0;
@@ -1052,8 +2039,7 @@ function handleAudioEnded() {
 }
 
 .page-head h1,
-.section-head h2,
-.side-panel h2 {
+.section-head h2 {
   margin: 4px 0;
 }
 
@@ -1070,19 +2056,67 @@ function handleAudioEnded() {
   text-align: right;
 }
 
-.step-nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px 20px;
+.workflow-steps {
+  flex-shrink: 0;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid var(--lv-border);
 }
 
-.step-nav button,
+.workflow-steps :deep(.n-step-content-header__title) {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workflow-steps :deep(.n-step--finish-status .n-step-indicator) {
+  background-color: var(--lv-accent);
+  border-color: var(--lv-accent);
+  color: #fff;
+}
+
+.workflow-steps :deep(.n-step--process-status .n-step-indicator) {
+  background-color: var(--lv-accent);
+  border-color: var(--lv-accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--lv-accent) 18%, transparent);
+}
+
+.workflow-steps :deep(.n-step--wait-status .n-step-indicator) {
+  background-color: var(--lv-panel);
+  border-color: var(--lv-border);
+  color: var(--lv-muted);
+}
+
+.workflow-steps :deep(.n-step--finish-status .n-step-splitor) {
+  background-color: color-mix(in srgb, var(--lv-accent) 55%, var(--lv-border));
+}
+
+.workflow-steps :deep(.n-step--process-status .n-step-splitor),
+.workflow-steps :deep(.n-step--wait-status .n-step-splitor) {
+  background-color: var(--lv-border);
+}
+
+.workflow-steps :deep(.n-step--finish-status .n-step-content-header__title) {
+  color: var(--lv-text);
+}
+
+.workflow-steps :deep(.n-step--process-status .n-step-content-header__title) {
+  color: var(--lv-accent);
+  font-weight: 800;
+}
+
+.workflow-steps :deep(.n-step--wait-status .n-step-content-header__title) {
+  color: var(--lv-muted);
+}
+
+.workflow-steps :deep(.n-step--disabled .n-step-indicator),
+.workflow-steps :deep(.n-step--disabled .n-step-content-header__title) {
+  opacity: 0.45;
+}
+
 .secondary-action,
 .primary-action,
 .template-card,
-.human-grid button,
 .audio-segments button {
   border: 1px solid var(--lv-border);
   background: var(--lv-panel);
@@ -1091,36 +2125,11 @@ function handleAudioEnded() {
   font: inherit;
 }
 
-.step-nav button {
-  display: flex;
-  height: 48px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 12px;
-  font-weight: 800;
-}
-
-.step-nav span {
-  display: grid;
-  width: 22px;
-  height: 22px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--lv-surface);
-}
-
-.step-nav button.is-active,
-.step-nav button.is-done {
-  border-color: var(--lv-primary);
-  color: var(--lv-primary);
-}
-
 .workflow-grid {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(520px, 620px) minmax(640px, 1fr);
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
   gap: 16px;
 }
 
@@ -1151,6 +2160,167 @@ function handleAudioEnded() {
   gap: 12px;
 }
 
+.asset-source-tabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border: 1px solid var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-surface);
+}
+
+.asset-source-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--lv-muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.asset-source-tabs button.is-active {
+  background: var(--lv-panel);
+  color: var(--lv-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lv-primary) 32%, transparent);
+}
+
+.library-picker {
+  display: grid;
+  gap: 14px;
+}
+
+.library-vehicle-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-panel);
+  color: var(--lv-muted);
+}
+
+.library-vehicle-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--lv-text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.library-vehicle-search input::placeholder {
+  color: color-mix(in srgb, var(--lv-muted) 84%, transparent);
+}
+
+.library-vehicle-search input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.library-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.library-picker__head div {
+  display: grid;
+  gap: 4px;
+}
+
+.library-picker__head span,
+.library-empty,
+.library-vehicle-card small,
+.library-vehicle-card span {
+  color: var(--lv-muted);
+}
+
+.library-empty {
+  display: flex;
+  min-height: 96px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  border: 1px dashed var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-surface);
+  font-weight: 800;
+}
+
+.library-empty.is-error {
+  color: #dc2626;
+}
+
+.library-vehicle-list {
+  display: grid;
+  gap: 10px;
+}
+
+.library-vehicle-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--lv-border);
+  border-radius: 12px;
+  background: var(--lv-panel);
+}
+
+.library-vehicle-card.is-selected {
+  border-color: var(--lv-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
+}
+
+.library-vehicle-card img,
+.library-vehicle-card__placeholder {
+  width: 88px;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+}
+
+.library-vehicle-card img {
+  object-fit: cover;
+}
+
+.library-vehicle-card__placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--lv-surface);
+  color: var(--lv-muted);
+  font-size: 28px;
+}
+
+.library-vehicle-card__body {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.library-vehicle-card__body strong,
+.library-vehicle-card__body span,
+.library-vehicle-card__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-library-assets {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
 .upload-grid--left {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
@@ -1164,6 +2334,72 @@ function handleAudioEnded() {
   border: 1px solid var(--lv-border);
   border-radius: 12px;
   background: var(--lv-surface);
+}
+
+.selection-confirm__card {
+  grid-template-columns: 86px minmax(0, 1fr) !important;
+  align-items: center;
+  min-height: 128px;
+}
+
+.selection-confirm__card--template {
+  grid-template-columns: 78px minmax(0, 1fr) !important;
+}
+
+.selection-confirm__card--human {
+  grid-template-columns: 72px minmax(0, 1fr) !important;
+}
+
+.selection-confirm__preview {
+  display: grid;
+  width: 72px;
+  aspect-ratio: 9 / 16;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--lv-panel);
+  color: var(--lv-primary);
+  font-size: 24px;
+}
+
+.selection-confirm__preview--avatar {
+  width: 58px;
+  aspect-ratio: 1;
+  border-radius: 14px;
+}
+
+.selection-confirm__preview :deep(.preload-image),
+.selection-confirm__preview :deep(.preload-image__img),
+.selection-confirm__preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.selection-confirm__body {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.selection-confirm__body strong,
+.selection-confirm__body p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-confirm__body strong {
+  color: var(--lv-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.selection-confirm__body p {
+  margin: 0;
+  color: var(--lv-muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .asset-readiness article.is-ready,
@@ -1207,67 +2443,21 @@ function handleAudioEnded() {
   text-align: center;
 }
 
-.upload-card.is-multiple {
-  min-height: 280px;
-  align-items: stretch;
-}
-
-.body-image-grid {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 8px;
-}
-
-.body-image-grid figure {
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-  margin: 0;
-  border-radius: 10px;
-  background: var(--lv-surface);
-}
-
-.body-image-grid figure.is-failed {
-  outline: 2px solid #dc2626;
-}
-
-.body-image-grid img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.body-image-grid button {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #fff;
-}
-
-.body-image-grid figcaption {
-  padding: 5px 6px;
-  color: var(--lv-muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.side-panel .template-grid {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-}
-
 .upload-card__body {
   display: grid;
   min-width: 0;
+  width: 100%;
   gap: 3px;
+}
+
+.upload-card__body strong,
+.upload-card__body span,
+.upload-card__body small,
+.upload-card__body em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .upload-card input {
@@ -1294,21 +2484,50 @@ function handleAudioEnded() {
 }
 
 .upload-preview {
+  position: relative;
+  display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   border-radius: 10px;
   background: var(--lv-surface);
+  cursor: zoom-in;
 }
 
 .upload-preview img,
 .upload-preview video,
 .template-card img,
-.template-card video,
-.human-grid img {
+.template-card video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.upload-preview__hint {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--lv-primary);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.92;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(8px);
+  transition: opacity 0.18s ease;
+}
+
+.upload-preview:hover .upload-preview__hint {
+  opacity: 0.92;
 }
 
 .upload-card em {
@@ -1329,6 +2548,166 @@ function handleAudioEnded() {
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+}
+
+.lv-vin-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--lv-accent) 24%, var(--lv-border));
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--lv-accent) 7%, transparent),
+      transparent 72%
+    ),
+    var(--lv-surface);
+}
+
+.lv-vin-panel-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lv-vin-panel-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--lv-accent-soft);
+  color: var(--lv-accent);
+  font-size: 20px;
+}
+
+.lv-vin-panel-head strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lv-vin-panel-head p {
+  margin: 0;
+  color: var(--lv-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lv-vin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.lv-vin-field {
+  display: grid;
+  gap: 8px;
+}
+
+.lv-vin-field span {
+  color: var(--lv-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lv-vin-field input {
+  width: 100%;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-panel);
+  color: var(--lv-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
+.lv-vin-field input:focus {
+  border-color: color-mix(in srgb, var(--lv-primary) 45%, var(--lv-border));
+  outline: none;
+}
+
+.lv-vin-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lv-vin-query-btn {
+  display: inline-flex;
+  height: 42px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lv-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lv-vin-query-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lv-vin-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  color: var(--lv-muted);
+  font-size: 12px;
+}
+
+.lv-vin-image-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px dashed color-mix(in srgb, var(--lv-accent) 40%, var(--lv-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lv-accent) 6%, var(--lv-panel));
+  color: var(--lv-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lv-vin-image-btn.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lv-vin-image-btn input {
+  display: none;
+}
+
+.lv-vin-disclaimer {
+  margin: 0;
+  color: var(--lv-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lv-vin-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .vehicle-form {
@@ -1379,13 +2758,12 @@ function handleAudioEnded() {
 }
 
 .template-card {
-  min-height: 250px;
+  min-height: 0;
   overflow: hidden;
   border-style: solid;
 }
 
 .template-card.is-selected,
-.human-grid button.is-selected,
 .audio-segments button.is-active {
   border-color: var(--lv-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-primary) 12%, transparent);
@@ -1393,8 +2771,11 @@ function handleAudioEnded() {
 
 .template-card img,
 .template-card video {
-  height: 180px;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  height: auto;
   border-radius: 10px;
+  object-fit: cover;
 }
 
 .script-list {
@@ -1431,15 +2812,513 @@ function handleAudioEnded() {
   min-width: 0;
   height: 100%;
   flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.lv-right-main-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  padding-top: 12px;
+}
+
+.lv-right-primary-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 34px;
+  align-self: flex-start;
+  align-items: center;
+  min-height: 32px;
+  margin: 0 18px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.lv-right-primary-tab {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lv-muted);
+  padding: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.lv-right-primary-tab:hover:not(.is-active) {
+  color: var(--lv-text);
+}
+
+.lv-right-primary-tab.is-active {
+  background: transparent;
+  color: var(--lv-text);
+  font-weight: 800;
+}
+
+.lv-right-gallery,
+.lv-right-recent-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lv-right-recent-panel {
+  padding: 0 16px 20px 18px;
+}
+
+.lv-right-gallery {
+  gap: 16px;
+  padding: 0 16px 20px 18px;
+}
+
+.lv-right-recent-panel.is-generating {
+  padding: 0;
+}
+
+.lv-gallery-toolbar {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  overflow: auto;
+  flex-shrink: 0;
 }
 
-.side-panel > section {
-  padding: 16px;
+.lv-gallery-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.template-resource-card header,
+.lv-gallery-tab {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lv-text);
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.lv-gallery-tab.is-active {
+  background: var(--lv-accent-soft);
+  color: var(--lv-accent);
+}
+
+.lv-gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.lv-style-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-panel);
+  color: var(--lv-muted);
+  font-size: 13px;
+}
+
+.lv-style-filter select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lv-text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.lv-style-filter > svg {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  font-size: 16px;
+}
+
+.lv-style-filter-label {
+  color: var(--lv-muted);
+  white-space: nowrap;
+}
+
+.lv-search {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: min(100%, 260px);
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--lv-border);
+  border-radius: 10px;
+  background: var(--lv-panel);
+  color: var(--lv-muted);
+}
+
+.lv-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--lv-text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.lv-search input::placeholder {
+  color: color-mix(in srgb, var(--lv-muted) 84%, transparent);
+}
+
+.lv-right-template-grid {
+  --lv-grid-gap: 16px;
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(180px, calc((100% - 5 * var(--lv-grid-gap)) / 6)), 1fr)
+  );
+  gap: var(--lv-grid-gap);
+  align-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.lv-right-recent-grid {
+  min-height: 0;
+  flex: 1;
+}
+
+.lv-right-template-card,
+.lv-right-recent-card {
+  position: relative;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lv-right-template-media,
+.lv-right-recent-card-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  background: var(--lv-surface);
+  transition: transform 0.28s ease, box-shadow 0.2s ease;
+}
+
+.lv-right-template-card:hover .lv-right-template-media,
+.lv-right-template-card:focus-within .lv-right-template-media,
+.lv-right-recent-card.is-clickable:hover .lv-right-recent-card-media {
+  transform: scale(1.03);
+}
+
+.lv-right-template-card.is-selected .lv-right-template-media {
+  box-shadow:
+    0 0 0 3px var(--lv-accent),
+    0 10px 26px color-mix(in srgb, var(--lv-accent) 32%, transparent);
+  transform: none;
+}
+
+.lv-right-recent-card.is-selected .lv-right-recent-card-media {
+  box-shadow: 0 0 0 2px var(--lv-accent);
+}
+
+.lv-right-template-cover,
+.lv-right-recent-card-cover,
+.lv-right-recent-card-cover--video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lv-right-template-cover--poster {
+  z-index: 0;
+}
+
+.lv-right-template-cover--video {
+  z-index: 1;
+  opacity: 1;
+}
+
+.lv-right-template-cover--video.is-poster-backed {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.lv-right-template-card:hover .lv-right-template-cover--video.is-poster-backed,
+.lv-right-template-card:focus-within .lv-right-template-cover--video.is-poster-backed {
+  opacity: 1;
+}
+
+.lv-right-template-cover :deep(.preload-image),
+.lv-right-template-cover :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lv-right-template-cover--placeholder,
+.lv-right-recent-card-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--lv-muted);
+  font-size: 28px;
+}
+
+.lv-right-template-caption {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.lv-right-template-caption__title {
+  overflow: hidden;
+  max-width: 100%;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.72),
+    0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.lv-right-template-caption__hover-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  max-width: 100%;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    max-height 0.3s ease,
+    opacity 0.26s ease,
+    transform 0.26s ease;
+}
+
+.lv-right-template-card:hover .lv-right-template-caption__hover-meta,
+.lv-right-template-card:focus-within .lv-right-template-caption__hover-meta {
+  max-height: 24px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.lv-right-template-caption__subtitle {
+  overflow: hidden;
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lv-right-template-selected-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--lv-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.4px;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.28),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.lv-right-recent-card-body {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  padding: 28px 10px 10px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
+  color: #fff;
+}
+
+.lv-right-template-caption strong,
+.lv-right-recent-card-body strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lv-right-template-caption span,
+.lv-right-recent-card-body span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lv-right-recent-card-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.lv-right-recent-card-status.is-running {
+  background: rgba(37, 99, 235, 0.88);
+}
+
+.lv-right-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 24px;
+  border: 1px dashed var(--lv-border);
+  border-radius: 14px;
+  color: var(--lv-muted);
+  text-align: center;
+}
+
+.lv-right-empty.is-error {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.lv-right-empty--inline {
+  min-height: 180px;
+}
+
+.lv-right-generating {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(28px, 5vh, 64px) clamp(20px, 4vw, 72px);
+  border-radius: 0 0 14px 14px;
+  background: #050914;
+}
+
+.lv-right-generating-visual {
+  position: absolute;
+  inset: 0;
+}
+
+.lv-right-generating-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.42;
+}
+
+.lv-right-generating-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+  color: #fff;
+  text-align: center;
+}
+
+.lv-right-generating-copy p,
+.lv-right-generating-copy span {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+}
+
+.lv-right-generating-copy h2 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.lv-right-generating-error {
+  color: #fecaca !important;
+}
+
+.lv-right-generating-progress {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  height: 8px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.lv-right-generating-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  transition: width 0.35s ease;
+}
+
 .audio-card header {
   display: flex;
   align-items: center;
@@ -1447,64 +3326,10 @@ function handleAudioEnded() {
   gap: 10px;
 }
 
-.template-resource-card header span,
 .audio-card header span {
   color: var(--lv-primary);
   font-size: 12px;
   font-weight: 800;
-}
-
-.summary-card dl {
-  display: grid;
-  gap: 10px;
-  margin: 12px 0 0;
-}
-
-.summary-card div {
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 10px;
-}
-
-.summary-card dd {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.human-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-  gap: 10px;
-}
-
-.human-grid button {
-  overflow: hidden;
-  padding: 8px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.human-grid img,
-.human-grid svg {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: var(--lv-surface);
-}
-
-.human-grid span {
-  display: block;
-  overflow: hidden;
-  margin-top: 6px;
-  font-size: 12px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .audio-card {
@@ -1692,102 +3517,439 @@ function handleAudioEnded() {
 }
 
 .lv-preview-dialog {
-  width: min(1120px, calc(100vw - 48px));
+  display: flex;
+  width: 60vw;
+  height: 60vh;
+  min-height: 60vh;
+  max-height: 60vh;
+  flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--lv-border, #d6e0ed);
-  border-radius: 16px;
-  background: var(--lv-panel, #ffffff);
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+  border-radius: 12px;
+  background: #fff;
+  color-scheme: light;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 }
 
 .lv-preview-dialog__head {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--lv-border, #d6e0ed);
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
 }
 
 .lv-preview-dialog__head h3 {
   margin: 0;
+  color: #111;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .lv-preview-dialog__head button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid var(--lv-border, #d6e0ed);
-  border-radius: 10px;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
+  color: #666;
+  font-size: 20px;
   cursor: pointer;
+}
+
+.lv-preview-dialog__head button:hover {
+  background: #f5f5f5;
 }
 
 .lv-preview-dialog__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 18px;
-  padding: 18px;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .lv-preview-dialog__media {
-  display: grid;
-  min-height: 560px;
-  place-items: center;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
   overflow: hidden;
-  border-radius: 14px;
-  background: #050505;
+  border-right: 1px solid #eee;
+  background: #fafafa;
 }
 
-.lv-preview-dialog__media img {
+.lv-preview-dialog__media :deep(.template-preview-video-shell) {
   width: 100%;
   height: 100%;
+  max-height: 100%;
+}
+
+.lv-preview-dialog__media :deep(.template-preview-video-player) {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100% !important;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.lv-preview-dialog__media :deep(.preload-image),
+.lv-preview-dialog__media :deep(.preload-image__img) {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
   object-fit: contain;
 }
 
 .lv-preview-dialog__empty {
-  color: #fff;
-  font-size: 42px;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #999;
+  font-size: 48px;
 }
 
 .lv-preview-dialog__side {
-  display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 14px;
+  grid-column: 1;
+  grid-row: 2;
+  flex-shrink: 0;
+  padding: 10px 16px 14px;
+  border-top: 1px solid #eee;
+  border-right: 1px solid #eee;
+  background: #fff;
 }
 
 .lv-preview-dialog__side div {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .lv-preview-dialog__side span {
-  padding: 6px 9px;
+  padding: 3px 8px;
   border-radius: 999px;
-  background: var(--lv-primary-soft, #eff6ff);
-  color: var(--lv-primary, #2563eb);
-  font-size: 12px;
-  font-weight: 800;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .lv-preview-dialog__side p {
+  margin: 0 0 12px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.lv-preview-dialog__side .primary-action {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #d4a017;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lv-preview-dialog__side .primary-action:hover:not(:disabled) {
+  background: #e5b85c;
+}
+
+.lv-preview-dialog__humans {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 16px 20px;
+}
+
+.lv-preview-dialog__humans h4 {
+  margin: 0 0 4px;
+  color: #222;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.lv-preview-dialog__humans > p {
+  margin: 0 0 14px;
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lv-preview-dialog__humans-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.65) #f1f5f9;
+}
+
+.lv-preview-dialog__humans-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lv-preview-dialog__humans-grid::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.lv-preview-dialog__humans-grid::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.65);
+}
+
+.lv-preview-dialog__humans-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.78);
+}
+
+.lv-preview-dialog__human {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 2px solid #eee;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.lv-preview-dialog__human:hover:not(:disabled) {
+  border-color: #d4a017;
+}
+
+.lv-preview-dialog__human.is-active {
+  border-color: #d4a017;
+  background: #fffbf0;
+}
+
+.lv-preview-dialog__human-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #d4a017;
+  font-size: 24px;
+}
+
+.lv-preview-dialog__human-avatar :deep(.preload-image),
+.lv-preview-dialog__human-avatar :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lv-preview-dialog__human-name {
+  overflow: hidden;
+  max-width: 100%;
+  color: #333;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  word-break: break-all;
+}
+
+.lv-preview-dialog__humans-empty {
   margin: 0;
-  color: var(--lv-muted, #64748b);
-  line-height: 1.65;
+  color: #999;
+  font-size: 13px;
+}
+
+.lv-human-preview-modal {
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.lv-human-preview-modal > :deep(.n-card-header) {
+  padding: 16px 20px;
+}
+
+.lv-human-preview-modal > :deep(.n-card__content) {
+  height: calc(60vh - 66px);
+  padding: 18px 20px;
+  overflow: auto;
+}
+
+.lv-human-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lv-human-preview-head strong {
+  color: #111;
+  font-size: 16px;
+}
+
+.lv-human-preview-head span {
+  color: #777;
+  font-size: 13px;
+}
+
+.lv-human-preview-grid {
+  display: grid;
+  height: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lv-human-preview-item {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin: 0;
+}
+
+.lv-human-preview-image-button {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  cursor: zoom-in;
+}
+
+.lv-human-preview-image,
+.lv-human-preview-image :deep(.preload-image),
+.lv-human-preview-image :deep(.preload-image__img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lv-human-preview-item figcaption {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lv-human-preview-large {
+  display: grid;
+  width: min(920px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.lv-human-preview-large .lv-human-preview-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.lv-human-preview-large .lv-human-preview-head button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.lv-human-preview-large :deep(.preload-image),
+.lv-human-preview-large :deep(.preload-image__img) {
+  width: 100%;
+  height: min(76vh, 760px);
+  object-fit: contain;
+}
+
+.asset-preview-dialog {
+  width: min(960px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+  border: 1px solid var(--lv-border, #d6e0ed);
+  border-radius: 16px;
+  background: var(--lv-panel, #fff);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+
+.asset-preview-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--lv-border, #d6e0ed);
+}
+
+.asset-preview-dialog__head h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--lv-text, #0f172a);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-preview-dialog__head button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--lv-border, #d6e0ed);
+  border-radius: 10px;
+  background: var(--lv-surface, #f8fafc);
+  color: var(--lv-text, #0f172a);
+  cursor: pointer;
+}
+
+.asset-preview-dialog__body {
+  display: grid;
+  max-height: calc(100vh - 140px);
+  place-items: center;
+  padding: 16px;
+  background: #0f172a;
+}
+
+.asset-preview-dialog__body img,
+.asset-preview-dialog__body video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 172px);
+  border-radius: 10px;
+  object-fit: contain;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 1180px) {
-  .workflow-grid {
-    grid-template-columns: minmax(440px, 520px) minmax(0, 1fr);
   }
 }
 
@@ -1813,14 +3975,10 @@ function handleAudioEnded() {
     text-align: left;
   }
 
-  .step-nav,
   .upload-grid,
   .template-grid,
-  .vehicle-form {
-    grid-template-columns: 1fr;
-  }
-
-  .side-panel .template-grid {
+  .vehicle-form,
+  .lv-vin-row {
     grid-template-columns: 1fr;
   }
 
@@ -1828,8 +3986,102 @@ function handleAudioEnded() {
     grid-template-columns: 1fr;
   }
 
+  .lv-preview-dialog__humans {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .lv-preview-dialog__media {
     min-height: 420px;
   }
+}
+</style>
+
+<style lang="scss">
+.lv-human-preview-modal {
+  display: flex !important;
+  width: 80vw !important;
+  height: 60vh !important;
+  max-width: none !important;
+  flex-direction: column !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.lv-human-preview-modal > .n-card-header {
+  background: #fff !important;
+  border-bottom: 1px solid #eef2f7 !important;
+}
+
+.lv-human-preview-modal > .n-card-header .n-card-header__main,
+.lv-human-preview-modal > .n-card-header .n-card-header__extra,
+.lv-human-preview-modal > .n-card-header .n-base-close {
+  color: #0f172a !important;
+}
+
+.lv-human-preview-modal > .n-card__content {
+  padding: 28px 36px 24px !important;
+  overflow: hidden;
+  background: #fff !important;
+}
+
+.lv-human-preview-modal .lv-human-preview-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.lv-human-preview-modal .lv-human-preview-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.lv-human-preview-modal .lv-human-preview-image-button {
+  display: block;
+  width: 100%;
+  height: min(420px, calc(60vh - 150px));
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: zoom-in;
+  outline: none;
+}
+
+.lv-human-preview-modal .lv-human-preview-image,
+.lv-human-preview-modal .lv-human-preview-image.preload-image,
+.lv-human-preview-modal .lv-human-preview-image .preload-image,
+.lv-human-preview-modal .lv-human-preview-image .preload-image.is-loaded,
+.lv-human-preview-modal .lv-human-preview-image .preload-image__img,
+.lv-human-preview-modal .lv-human-preview-image .preload-image.is-loaded .preload-image__img {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  border-radius: 10px;
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  object-fit: contain;
+}
+
+.lv-human-preview-modal .lv-human-preview-image-button:hover,
+.lv-human-preview-modal .lv-human-preview-image-button:focus-visible {
+  box-shadow: inset 0 0 0 2px #c99518;
+}
+
+.lv-human-preview-modal .lv-human-preview-item figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
 }
 </style>
