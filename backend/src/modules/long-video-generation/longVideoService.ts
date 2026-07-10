@@ -9,6 +9,7 @@ import { path as ffprobeStaticPath } from "ffprobe-static";
 
 import { env } from "../../config/env";
 import { arkClient } from "../../providers/ark/arkClient";
+import { deepSeekClient } from "../../providers/deepseek/deepseekClient";
 import { minimaxClient } from "../../providers/minimax/minimaxClient";
 import { assetsRepository, type AssetRecord } from "../assets/assetsRepository";
 import { errors } from "../../shared/errors";
@@ -49,7 +50,7 @@ const renderPlanDir = path.join(env.resultsDir, "long-video-generation", "render
 const taskOutputDir = path.join(env.resultsDir, "long-video-generation", "tasks");
 const arkPollIntervalMs = 12_000;
 const arkPollAttempts = 90;
-const arkDetailFailureLimit = 6;
+const arkDetailFailureLimit = 20;
 
 const longVideoSlots: Array<Omit<LongVideoNarrationSegment, "narrationText">> = [
   {
@@ -158,13 +159,98 @@ const buildSegments = (vehicleInfo: Record<string, unknown>, sellingPoints: stri
   }));
 };
 
+const longVideoRewriteForbiddenPattern =
+  /这条视频|本视频|全新|准新车|无事故|原版原漆|公认|标杆|首选|领先|闭眼买|价格|报价|优惠|首付|月供|质保|包过户|公里|里程/;
+
+const isValidLongVideoRewrite = (text: string) => {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (!normalized) return false;
+  if (normalized.length < 12 || normalized.length > 130) return false;
+  if (!/[\u4e00-\u9fff]/.test(normalized)) return false;
+  return !longVideoRewriteForbiddenPattern.test(normalized);
+};
+
+const buildLongVideoRewriteSystemPrompt = () =>
+  [
+    "You are a Chinese used-car short video narration editor.",
+    "Rewrite five existing narration segments for a vertical long-form stitched vehicle introduction.",
+    "Keep the same meaning, same order, same screen role, and same facts as the source segments.",
+    "Only change the wording so repeated generations do not sound identical.",
+    "Do not add price, mileage, accident history, warranty, configuration, owner history, store policy, or any unprovided fact.",
+    "Do not use expressions such as 这条视频, 本视频, 全新, 准新车, 无事故, 原版原漆, 闭眼买, 标杆, 首选.",
+    "The tone should be natural, professional, restrained, and suitable for one host continuously introducing one used car.",
+    "Return JSON only. The JSON schema is: {\"segments\":[{\"slot\":\"ai_video_1\",\"narrationText\":\"...\"}],\"riskNotes\":[]}.",
+    "The output must contain exactly five segments with the same slot values as the input.",
+    "narrationText must be Simplified Chinese, concise, and easy for TTS to speak.",
+  ].join("\n");
+
+const buildLongVideoRewriteUserPrompt = (input: {
+  vehicleInfo: Record<string, unknown>;
+  sellingPoints: string[];
+  segments: LongVideoNarrationSegment[];
+}) =>
+  JSON.stringify(
+    {
+      vehicleName: vehicleNameFromInfo(input.vehicleInfo),
+      vehicleInfo: input.vehicleInfo,
+      sellingPoints: input.sellingPoints,
+      rewriteGoal:
+        "Rewrite each segment with similar meaning and similar length. Keep AI/user segment transition intent.",
+      sourceSegments: input.segments.map((segment) => ({
+        slot: segment.slot,
+        role: segment.role,
+        screenType: segment.screenType,
+        targetDurationSeconds: segment.targetDurationSeconds,
+        narrationText: segment.narrationText,
+      })),
+    },
+    null,
+    2,
+  );
+
+const rewriteSegmentsWithAi = async (input: {
+  vehicleInfo: Record<string, unknown>;
+  sellingPoints: string[];
+  segments: LongVideoNarrationSegment[];
+}) => {
+  if (!deepSeekClient.isConfigured) return input.segments;
+
+  try {
+    const generated = await deepSeekClient.rewriteLongVideoSegments({
+      systemPrompt: buildLongVideoRewriteSystemPrompt(),
+      userPrompt: buildLongVideoRewriteUserPrompt(input),
+    });
+    if (!generated?.segments.length) return input.segments;
+
+    const generatedBySlot = new Map(
+      generated.segments.map((segment) => [
+        segment.slot,
+        segment.narrationText.trim().replace(/\s+/g, " "),
+      ]),
+    );
+    return input.segments.map((segment) => {
+      const candidate = generatedBySlot.get(segment.slot);
+      if (!candidate || !isValidLongVideoRewrite(candidate)) return segment;
+      return {
+        ...segment,
+        narrationText: candidate,
+      };
+    });
+  } catch (error) {
+    console.warn("[long-video-generation] DeepSeek narration rewrite fallback", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return input.segments;
+  }
+};
+
 const buildAiPrompt = (input: {
   draft: LongVideoDraftRecord;
   segment: LongVideoNarrationSegment;
 }) => {
   const vehicleName = vehicleNameFromInfo(input.draft.vehicleInfo);
   const voiceLine =
-    "声音必须完全跟随输入的 reference_audio：口型、停顿、语速和表情节奏都由 reference_audio 驱动，不要重新配音，不要改变音色，不要忽然提高音量。";
+    "音频1是唯一口播声源。必须逐字、逐句严格跟读音频1，口型、停顿、语速、音色、情绪和响度都与音频1一致；不要重新配音，不要改写台词，不要生成第二条声音。";
   const commonLines = [
     `精品二手车销售口播短视频，真人数字人自然讲解，9:16 竖屏，车型主题：${vehicleName}。`,
     "输入的数字人参考图只用于锁定人物身份：同一张脸、同一发型、同一服装、同一体型。只能出现一个女数字人，不要第二个人，不要双人同框，不要复制人物。",
@@ -285,6 +371,21 @@ const probeFps = async (filePath: string) => {
   }
   const value = Number(rate);
   return Number.isFinite(value) && value > 0 ? value : 30;
+};
+
+const probeHasAudioStream = async (filePath: string) => {
+  const { stdout } = await execFileAsync(ffprobePath(), [
+    "-v",
+    "error",
+    "-select_streams",
+    "a:0",
+    "-show_entries",
+    "stream=index",
+    "-of",
+    "csv=p=0",
+    filePath,
+  ]);
+  return Boolean(stdout.trim());
 };
 
 const runFfmpeg = async (args: string[]) => {
@@ -437,6 +538,12 @@ class LongVideoService {
     const voice = await readDigitalHumanVoice(digitalHumanId);
     const vehicleInfo = asRecord(body.vehicleInfo);
     const sellingPoints = normalizeSellingPoints(body.sellingPoints);
+    const defaultSegments = buildSegments(vehicleInfo, sellingPoints);
+    const segments = await rewriteSegmentsWithAi({
+      vehicleInfo,
+      sellingPoints,
+      segments: defaultSegments,
+    });
     const now = new Date().toISOString();
     const draft: LongVideoDraftRecord = {
       draftId: createId("long_video_draft"),
@@ -448,7 +555,7 @@ class LongVideoService {
       sellingPoints,
       language: "Chinese",
       voice,
-      segments: buildSegments(vehicleInfo, sellingPoints),
+      segments,
       status: "script_ready",
       createdAt: now,
       updatedAt: now,
@@ -669,6 +776,8 @@ class LongVideoService {
         cutTailFramesPerClip: 2,
         userVideoStretchToVoiceover: true,
         aiVideoMustUseReferenceAudio: true,
+        preserveSeedanceAudioForAiSegments: true,
+        requireSeedanceAudioStream: true,
       },
       editorIntegration: {
         source: "ai-video-state",
@@ -921,6 +1030,11 @@ class LongVideoService {
               role: "reference_image",
               image_url: { url: digitalHumanReference.assetUri },
             },
+            {
+              type: "audio_url",
+              role: "reference_audio",
+              audio_url: { url: audioAsset.assetUri },
+            },
             ...slotSpecificReferences
               .filter((reference) => Boolean(reference.assetUri))
               .map((reference) => ({
@@ -928,16 +1042,11 @@ class LongVideoService {
                 role: "reference_image" as const,
                 image_url: { url: reference.assetUri as string },
               })),
-            {
-              type: "audio_url",
-              role: "reference_audio",
-              audio_url: { url: audioAsset.assetUri },
-            },
           ],
           ratio: "9:16",
           resolution: "720p",
           duration: Math.max(5, Math.min(12, Math.ceil(segment.durationMs / 1000))),
-          generateAudio: false,
+          generateAudio: true,
         });
         arkStates.set(segment.slot, {
           index,
@@ -965,10 +1074,10 @@ class LongVideoService {
             ),
             referenceOrder: [
               "digital_human_identity",
-              "slot_scene_images",
               "narration_audio",
+              "slot_scene_images",
             ],
-            generateAudio: false,
+            generateAudio: true,
           },
           responseJson: arkTask.raw,
           attemptNo: index + 1,
@@ -989,6 +1098,12 @@ class LongVideoService {
         const resultUrl = detail.resultUrls[0];
         const localPath = path.join(taskOutputDir, taskId, "ai", `${segment.slot}.mp4`);
         await downloadFile(resultUrl, localPath);
+        if (!(await probeHasAudioStream(localPath))) {
+          throw errors.generationFailed(
+            "Seedance result is missing the required audio stream; stopping before submitting remaining AI segments",
+            { slot: segment.slot, arkTaskId: arkTask.taskId, localPath },
+          );
+        }
         const current = arkStates.get(segment.slot);
         if (current) {
           arkStates.set(segment.slot, {
@@ -1003,19 +1118,26 @@ class LongVideoService {
         return { slot: segment.slot, localPath, resultUrl };
       };
 
-      const aiResults = await Promise.allSettled(
-        aiSegments.map((segment, index) => generateAiSegment(segment, index)),
+      const aiOutputs: Array<{ slot: string; localPath: string; resultUrl: string }> = [];
+      const [probeSegment, ...remainingAiSegments] = aiSegments;
+      if (!probeSegment) {
+        throw errors.generationFailed("long-video render plan has no AI segments");
+      }
+      aiOutputs.push(await generateAiSegment(probeSegment, 0));
+
+      const remainingAiResults = await Promise.allSettled(
+        remainingAiSegments.map((segment, index) => generateAiSegment(segment, index + 1)),
       );
-      const failedAiResult = aiResults.find(
+      const failedAiResult = remainingAiResults.find(
         (result): result is PromiseRejectedResult => result.status === "rejected",
       );
       if (failedAiResult) throw failedAiResult.reason;
 
-      const aiOutputs = aiResults
+      aiOutputs.push(...remainingAiResults
         .filter((result): result is PromiseFulfilledResult<{ slot: string; localPath: string; resultUrl: string }> =>
           result.status === "fulfilled",
         )
-        .map((result) => result.value);
+        .map((result) => result.value));
 
       task = await longVideoRepository.patchTask(taskId, userId, {
         progress: 68,
@@ -1139,7 +1261,7 @@ class LongVideoService {
       if (segment.userVideo) {
         await this.renderUserSegment(inputVideo, segment.audioLocalPath, outputPath, segment.durationMs);
       } else {
-        await this.renderAiSegment(inputVideo, segment.audioLocalPath, outputPath);
+        await this.renderAiSegment(inputVideo, outputPath);
       }
       segmentPaths.push(outputPath);
     }
@@ -1185,30 +1307,31 @@ class LongVideoService {
     ]);
   }
 
-  private async renderAiSegment(
-    videoPath: string,
-    audioPath: string,
-    outputPath: string,
-  ) {
+  private async renderAiSegment(videoPath: string, outputPath: string) {
     const sourceSeconds = await probeDurationSeconds(videoPath);
-    const targetSeconds = await probeDurationSeconds(audioPath);
     const fps = await probeFps(videoPath);
     const safeVideoEndSeconds = Math.max(0.3, sourceSeconds - 2 / Math.max(1, fps));
-    const trimSeconds = Math.max(0.3, Math.min(safeVideoEndSeconds, targetSeconds));
-    const setPtsRatio = trimSeconds > 0 ? targetSeconds / trimSeconds : 1;
+    const hasSeedanceAudio = await probeHasAudioStream(videoPath);
+
+    if (!hasSeedanceAudio) {
+      throw errors.generationFailed(
+        "Seedance result is missing the required audio stream; refusing to attach audio after generation",
+        { videoPath },
+      );
+    }
+
+    const trimSeconds = Math.max(0.3, safeVideoEndSeconds);
     await runFfmpeg([
       "-i",
       videoPath,
-      "-i",
-      audioPath,
       "-filter_complex",
-      `[0:v]trim=0:${trimSeconds.toFixed(3)},setpts=${setPtsRatio.toFixed(8)}*(PTS-STARTPTS),scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30,format=yuv420p[vout];[1:a]atrim=0:${targetSeconds.toFixed(3)},asetpts=PTS-STARTPTS,aresample=async=1:first_pts=0,loudnorm=I=-18:TP=-1.5:LRA=11,aresample=44100,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[aout]`,
+      `[0:v]trim=0:${trimSeconds.toFixed(3)},setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30,format=yuv420p[vout];[0:a]atrim=0:${trimSeconds.toFixed(3)},asetpts=PTS-STARTPTS,loudnorm=I=-18:TP=-1.5:LRA=11,aresample=async=1:first_pts=0,aresample=44100,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[aout]`,
       "-map",
       "[vout]",
       "-map",
       "[aout]",
       "-t",
-      targetSeconds.toFixed(3),
+      trimSeconds.toFixed(3),
       "-c:v",
       "libx264",
       "-preset",

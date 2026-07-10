@@ -33,6 +33,14 @@ export interface DeepSeekNarrationTranslation {
   scriptText: string;
 }
 
+export interface DeepSeekLongVideoSegmentRewrite {
+  segments: Array<{
+    slot: string;
+    narrationText: string;
+  }>;
+  riskNotes: string[];
+}
+
 const stripCodeFence = (value: string) => {
   const trimmed = value.trim();
   const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
@@ -105,6 +113,21 @@ const normalizeShotCues = (value: unknown): DeepSeekScriptDraft["shotCues"] => {
       };
     })
     .filter((item) => item.timeRange && item.visual && item.voiceover);
+};
+
+const normalizeLongVideoSegments = (
+  value: unknown,
+): DeepSeekLongVideoSegmentRewrite["segments"] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      return {
+        slot: asString(record.slot),
+        narrationText: asString(record.narrationText),
+      };
+    })
+    .filter((item) => item.slot && item.narrationText);
 };
 
 export class DeepSeekClient {
@@ -309,6 +332,69 @@ export class DeepSeekClient {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw errors.generationFailed("deepseek narration translation timeout", {
+          timeoutMs: env.deepseek.timeoutMs,
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async rewriteLongVideoSegments(input: {
+    systemPrompt: string;
+    userPrompt: string;
+  }): Promise<DeepSeekLongVideoSegmentRewrite | null> {
+    if (!this.isConfigured) return null;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), env.deepseek.timeoutMs);
+    try {
+      const response = await fetch(`${env.deepseek.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.deepseek.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: env.deepseek.model,
+          temperature: 0.62,
+          max_tokens: Math.min(env.deepseek.maxTokens, 1600),
+          response_format: { type: "json_object" },
+          thinking: { type: "disabled" },
+          messages: [
+            { role: "system", content: input.systemPrompt },
+            { role: "user", content: input.userPrompt },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      const raw = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw errors.generationFailed("deepseek long-video narration rewrite failed", {
+          status: response.status,
+          response: raw,
+        });
+      }
+      const choice = raw?.choices?.[0] ?? {};
+      const message = choice?.message ?? {};
+      const content =
+        asMessageContent(message.content) ||
+        asString(choice.text) ||
+        asString(raw?.content) ||
+        asString(raw?.output_text);
+      if (!content) {
+        throw errors.generationFailed("deepseek long-video narration rewrite response missing content");
+      }
+      const parsed = parseJsonObject(content);
+      return {
+        segments: normalizeLongVideoSegments(parsed.segments),
+        riskNotes: asStringArray(parsed.riskNotes),
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw errors.generationFailed("deepseek long-video narration rewrite timeout", {
           timeoutMs: env.deepseek.timeoutMs,
         });
       }

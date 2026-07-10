@@ -46,6 +46,28 @@ globalThis.fetch = (async (
               },
             ],
             riskNotes: [],
+            segments: [
+              {
+                slot: "ai_video_1",
+                narrationText: "这台车先看外观，线条和整体姿态都比较耐看。",
+              },
+              {
+                slot: "user_video_1",
+                narrationText: "接着看前排实拍，中控和座椅区域可以重点确认。",
+              },
+              {
+                slot: "ai_video_2",
+                narrationText: "坐进车里，驾驶位视野和按键布局都比较直观。",
+              },
+              {
+                slot: "user_video_2",
+                narrationText: "后排空间也通过实拍看一下，乘坐感受建议到店体验。",
+              },
+              {
+                slot: "ai_video_3",
+                narrationText: "整体看完外观和内饰细节，具体车况以实车核验为准。",
+              },
+            ],
           }),
           reasoning_content: "",
         },
@@ -79,6 +101,15 @@ const run = async () => {
       "Meet the 2016 BMW 218i, a practical choice for city driving and family use.",
     );
     assert.equal(requestBody?.temperature, 0.25);
+
+    const rewritten = await deepSeekClient.rewriteLongVideoSegments({
+      systemPrompt: "Return JSON with five segments.",
+      userPrompt: "Rewrite the five long-video narration segments.",
+    });
+    assert.ok(rewritten);
+    assert.equal(rewritten.segments.length, 5);
+    assert.equal(rewritten.segments[0]?.slot, "ai_video_1");
+    assert.equal(requestBody?.temperature, 0.62);
 
     console.log(
       JSON.stringify(

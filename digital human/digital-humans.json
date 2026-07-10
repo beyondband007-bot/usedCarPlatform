@@ -19,7 +19,7 @@
       "sortOrder": 1,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Sweet_Girl",
+        "voiceId": "conversational_female_2_v1",
         "displayName": "Friendly Paige",
         "languageBoost": "English",
         "speed": 1.1,
@@ -40,9 +40,9 @@
       "sortOrder": 2,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "English_Trustworthy_Man",
-        "displayName": "博学讲师",
-        "languageBoost": "English",
+        "voiceId": "hunyin_6",
+        "displayName": "舒朗男声",
+        "languageBoost": "Chinese",
         "speed": 1.15,
         "vol": 2.5,
         "pitch": 0,
@@ -82,7 +82,7 @@
       "sortOrder": 4,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Attractive_Girl",
+        "voiceId": "moss_audio_c12a59b9-7115-11f0-a447-9613c873494c",
         "displayName": "EngagingGirl",
         "languageBoost": "English",
         "speed": 1.15,
@@ -103,7 +103,7 @@
       "sortOrder": 5,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+        "voiceId": "moss_audio_aaa1346a-7ce7-11f0-8e61-2e6e3c7ee85d",
         "displayName": "Grounded Grace - 清亮女声",
         "languageBoost": "Chinese",
         "speed": 1.05,
@@ -145,7 +145,7 @@
       "sortOrder": 7,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Crisp_Girl",
+        "voiceId": "English_compelling_lady1",
         "displayName": "灵动女声 - 清脆明亮女声",
         "languageBoost": "English",
         "speed": 1.08,
@@ -166,7 +166,7 @@
       "sortOrder": 8,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Sweet_Girl",
+        "voiceId": "conversational_female_2_v1",
         "displayName": "Friendly Paige - 清亮轻快女声",
         "languageBoost": "English",
         "speed": 1.05,
@@ -187,7 +187,7 @@
       "sortOrder": 9,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Attractive_Girl",
+        "voiceId": "moss_audio_c12a59b9-7115-11f0-a447-9613c873494c",
         "displayName": "EngagingGirl - 清亮有活力女声",
         "languageBoost": "English",
         "speed": 1.15,
@@ -229,7 +229,7 @@
       "sortOrder": 11,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "female-shaonv",
+        "voiceId": "Chinese_sweet_girl_nv1",
         "displayName": "甜美少女 - 清脆表现力女声",
         "languageBoost": "Chinese",
         "speed": 1.05,
@@ -250,7 +250,7 @@
       "sortOrder": 12,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+        "voiceId": "moss_audio_aaa1346a-7ce7-11f0-8e61-2e6e3c7ee85d",
         "displayName": "Grounded Grace - 清亮女声",
         "languageBoost": "Chinese",
         "speed": 1.1,
@@ -271,7 +271,7 @@
       "sortOrder": 13,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Korean_CheerfulLittleSister",
+        "voiceId": "Korean_energetic_marketer_vv1",
         "displayName": "Energetic Marketer - 清亮营销女声",
         "languageBoost": "Korean",
         "speed": 1.02,
@@ -292,7 +292,7 @@
       "sortOrder": 14,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Korean_CheerfulLittleSister",
+        "voiceId": "Korean_energetic_marketer_vv1",
         "displayName": "Energetic Marketer - 清亮营销女声",
         "languageBoost": "Korean",
         "speed": 1.02,
@@ -306,16 +306,16 @@
       "id": "dh-message-15",
       "name": "数字人 15｜外观成色",
       "gender": "female",
-      "ageStyle": "单车讲解形象 · 预设音色 清爽女声 - 清晰对话感女声",
+      "ageStyle": "单车讲解形象 · 预设音色 Energetic Marketer - 清亮营销女声",
       "imagePath": "digital human/dh-message-15.jpg",
       "frontPreviewStrategy": "use_left_panel_or_backend_crop",
       "status": "active",
       "sortOrder": 15,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Crisp_Girl",
-        "displayName": "清爽女声 - 清晰对话感女声",
-        "languageBoost": "Chinese",
+        "voiceId": "Korean_energetic_marketer_vv1",
+        "displayName": "Energetic Marketer - 清亮营销女声",
+        "languageBoost": "Korean",
         "speed": 1.08,
         "vol": 1.0,
         "pitch": 0,
@@ -334,7 +334,7 @@
       "sortOrder": 16,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Korean_CheerfulLittleSister",
+        "voiceId": "Korean_energetic_marketer_vv1",
         "displayName": "Energetic Marketer - 清亮营销女声",
         "languageBoost": "Korean",
         "speed": 1.08,
@@ -355,7 +355,7 @@
       "sortOrder": 17,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+        "voiceId": "moss_audio_aaa1346a-7ce7-11f0-8e61-2e6e3c7ee85d",
         "displayName": "Grounded Grace - 清亮女声",
         "languageBoost": "Chinese",
         "speed": 1.05,
@@ -376,7 +376,7 @@
       "sortOrder": 18,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Crisp_Girl",
+        "voiceId": "Chinese_crisp_podcaster_nv1",
         "displayName": "清爽女声 - 清晰对话感女声",
         "languageBoost": "Chinese",
         "speed": 1.17,
@@ -397,7 +397,7 @@
       "sortOrder": 19,
       "presetVoice": {
         "status": "ready",
-        "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+        "voiceId": "moss_audio_aaa1346a-7ce7-11f0-8e61-2e6e3c7ee85d",
         "displayName": "Grounded Grace - 清亮女声",
         "languageBoost": "Chinese",
         "speed": 1.1,

@@ -123,6 +123,8 @@ export interface LongVideoTask {
       cutTailFramesPerClip: 2
       userVideoStretchToVoiceover: true
       aiVideoMustUseReferenceAudio: true
+      preserveSeedanceAudioForAiSegments: true
+      requireSeedanceAudioStream: true
     }
     editorIntegration: {
       source: 'ai-video-state'
