@@ -1168,6 +1168,15 @@ class LongVideoService {
         progress: 72,
       });
       const finalVideo = await this.renderFinalVideo(task, aiOutputs);
+      const coverPath = path.join(path.dirname(finalVideo.localPath), "long-video-cover.jpg");
+      let coverUrl: string | null = null;
+      try {
+        await extractReferenceFrame(finalVideo.localPath, coverPath, 0);
+        coverUrl = taskPublicUrl(taskId, "rendered/long-video-cover.jpg");
+      } catch (error) {
+        console.warn(`[long-video-generation] failed to create cover for ${taskId}`, error);
+      }
+      const draft = await longVideoRepository.getDraft(task.draftId, userId);
       await tasksRepository.updateFromKie(taskId, {
         status: "success",
         progress: 100,
@@ -1175,6 +1184,8 @@ class LongVideoService {
           provider: "ark",
           moduleCode: "long-video-generation",
           resultUrl: finalVideo.publicUrl,
+          thumbnailUrl: coverUrl,
+          vehicleName: vehicleNameFromInfo(draft.vehicleInfo),
           renderPlanPath: task.renderPlanPath,
         },
       });

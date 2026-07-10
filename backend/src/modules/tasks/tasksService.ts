@@ -28,6 +28,7 @@ import {
   type KieTaskRecord,
   type RecentGenerationRecord,
 } from "./tasksRepository";
+import { parseJsonValue } from "./taskJson";
 
 const terminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
 const kieTerminalStatuses: TaskStatus[] = ["success", "fail", "canceled"];
@@ -53,6 +54,12 @@ const asyncKeyHashMatcher = (accountHash: string) => {
 
 const asRecord = (value: unknown): Record<string, any> =>
   value && typeof value === "object" ? (value as Record<string, any>) : {};
+
+const getResultString = (value: unknown, key: string) => {
+  const result = parseJsonValue<Record<string, unknown>>(value, {});
+  const candidate = result[key];
+  return typeof candidate === "string" ? candidate.trim() : "";
+};
 
 const stringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -841,6 +848,11 @@ class TasksService {
 
     if (task.moduleCode === "video-generation" && task.videoVehicleName) {
       return `${task.videoVehicleName} 数字人口播视频`;
+    }
+
+    if (task.moduleCode === "long-video-generation") {
+      const vehicleName = getResultString(task.resultJson, "vehicleName");
+      if (vehicleName) return vehicleName;
     }
 
     const labels: Record<string, string> = {

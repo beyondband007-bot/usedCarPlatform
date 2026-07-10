@@ -913,14 +913,23 @@ function shouldShowHistoryStatus(item: RecentGenerationTask) {
   return status !== 'success'
 }
 
-async function focusHistoryTask(taskId: string) {
-  focusedTaskId.value = taskId
+async function focusHistoryTask(item: RecentGenerationTask) {
+  focusedTaskId.value = item.taskId
   activeRightView.value = 'recent'
-  await refreshFocusedTask(taskId)
+  await refreshFocusedTask(item.taskId)
   if (focusedTaskIsRunning.value) {
     startHistoryPolling()
   } else {
     stopHistoryPolling()
+  }
+
+  const videoUrl = focusedLongVideoTask.value?.resultUrl?.trim() || resolveHistoryVideoUrl(item)
+  if (focusedLongVideoTask.value?.status === 'completed' && videoUrl) {
+    assetPreview.value = {
+      title: item.title || '长视频预览',
+      url: videoUrl,
+      kind: 'video',
+    }
   }
 }
 
@@ -1668,8 +1677,8 @@ function handleAudioEnded() {
                   :class="{ 'is-selected': focusedTaskId === item.taskId }"
                   role="button"
                   tabindex="0"
-                  @click="focusHistoryTask(item.taskId)"
-                  @keydown.enter.prevent="focusHistoryTask(item.taskId)"
+                  @click="focusHistoryTask(item)"
+                  @keydown.enter.prevent="focusHistoryTask(item)"
                 >
                   <div class="lv-right-recent-card-media">
                     <video
@@ -2870,6 +2879,18 @@ function handleAudioEnded() {
   background: transparent;
   color: var(--lv-text);
   font-weight: 800;
+}
+
+.lv-right-primary-tab.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -9px;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lv-primary);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--lv-primary) 34%, transparent);
+  content: '';
 }
 
 .lv-right-gallery,

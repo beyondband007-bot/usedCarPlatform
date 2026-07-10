@@ -718,14 +718,38 @@ export class TasksRepository extends Repository {
 }
 
 export const tasksRepository = new TasksRepository();
-export const normalizeTaskResults = (value: unknown) =>
-  parseJsonValue<
-    Array<{
-      url: string;
-      sourceUrl?: string;
-      localPath?: string;
-      thumbnailUrl?: string;
-      width?: number;
-      height?: number;
-    }>
-  >(value, []);
+export type NormalizedTaskResult = {
+  url: string;
+  sourceUrl?: string;
+  localPath?: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+};
+
+export const normalizeTaskResults = (value: unknown): NormalizedTaskResult[] => {
+  const parsed = parseJsonValue<unknown>(value, []);
+
+  if (Array.isArray(parsed)) return parsed as NormalizedTaskResult[];
+
+  // Long-video tasks persist their completed output as { resultUrl, ... } rather
+  // than the array shape used by the shared generation-task history API.
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    typeof (parsed as { resultUrl?: unknown }).resultUrl === "string"
+  ) {
+    const result = parsed as { resultUrl: string; thumbnailUrl?: unknown };
+    return [
+      {
+        url: result.resultUrl,
+        thumbnailUrl:
+          typeof result.thumbnailUrl === "string" ? result.thumbnailUrl : undefined,
+      },
+    ];
+  }
+
+  // Progress and failed tasks may store metadata objects (for example { phase }).
+  // They have no renderable output, but must not break the whole recent-task list.
+  return [];
+};
