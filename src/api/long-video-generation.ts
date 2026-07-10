@@ -82,3 +82,12 @@ export async function getLongVideoTask(taskId: string) {
   )
   return unwrapApiResponse(response)
 }
+
+export async function retryLongVideoTask(taskId: string) {
+  const response = await request.post<ApiResponse<LongVideoTask>>(
+    `/modules/long-video-generation/tasks/${encodeURIComponent(taskId)}/retry`,
+    {},
+    generationRequestConfig,
+  )
+  return unwrapApiResponse(response)
+}

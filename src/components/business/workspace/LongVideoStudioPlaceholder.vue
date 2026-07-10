@@ -11,6 +11,7 @@ import {
   createLongVideoDraft,
   createLongVideoTask,
   getLongVideoTask,
+  retryLongVideoTask,
   updateLongVideoDraftSegments,
 } from '@/api/long-video-generation'
 import { getVehicles, type VehicleLibraryMaterial, type VehicleRecord } from '@/api/vehicle-library'
@@ -120,6 +121,7 @@ const historyLoading = ref(false)
 const historyError = ref('')
 const focusedTaskId = ref('')
 const focusedLongVideoTask = ref<LongVideoTask | null>(null)
+const retryingHistoryTaskId = ref('')
 const activeAudioIndex = ref(0)
 const audioElement = ref<HTMLAudioElement | null>(null)
 const loadingAction = ref<'upload' | 'draft' | 'audio' | 'task' | null>(null)
@@ -333,13 +335,26 @@ const canContinueFromAssets = computed(() =>
       uploadedSlots.value.rearInterior?.asset?.assetId,
   ),
 )
+const hasVehicleInfo = computed(() =>
+  Boolean(
+    vehicleInfo.value.fullModelName.trim() ||
+      vehicleInfo.value.brandName.trim() ||
+      vehicleInfo.value.seriesName.trim(),
+  ),
+)
 const canCreateDraft = computed(() =>
-  Boolean(canContinueFromAssets.value && selectedTemplate.value && selectedDigitalHuman.value),
+  Boolean(
+    canContinueFromAssets.value &&
+      hasVehicleInfo.value &&
+      selectedTemplate.value &&
+      selectedDigitalHuman.value,
+  ),
 )
 
 onMounted(() => {
   void videoFlow?.initializeFlow()
   void loadLibraryVehicles()
+  void loadHistoryTasks()
   preloadGenerationLoadingVideo()
 })
 
@@ -632,6 +647,13 @@ function updateSegmentText(slot: LongVideoSlot, event: Event) {
   editableSegments.value = editableSegments.value.map((segment) =>
     segment.slot === slot ? { ...segment, narrationText: target.value } : segment,
   )
+  // Any script change invalidates the already synthesized narration. Requiring a
+  // fresh audio preview prevents submitting a video with stale voice-over text.
+  if (audioPreview.value) {
+    audioElement.value?.pause()
+    audioPreview.value = null
+    activeAudioIndex.value = 0
+  }
 }
 
 async function handleFileChange(slot: UploadSlot, event: Event) {
@@ -876,6 +898,9 @@ async function loadHistoryTasks() {
       pageSize: 30,
     })
     historyTasks.value = result.items
+    if (historyTasks.value.some(isRecentTaskRunning) && !historyPollingTimer) {
+      startHistoryPolling()
+    }
   } catch (error) {
     historyError.value = error instanceof Error ? error.message : '历史记录加载失败'
   } finally {
@@ -930,6 +955,27 @@ async function focusHistoryTask(item: RecentGenerationTask) {
       url: videoUrl,
       kind: 'video',
     }
+  } else if (focusedLongVideoTask.value?.status === 'failed') {
+    message.error(focusedLongVideoTask.value.errorMessage || '长视频生成失败，请重新生成')
+  }
+}
+
+async function retryHistoryTask(item: RecentGenerationTask) {
+  if (retryingHistoryTaskId.value) return
+  retryingHistoryTaskId.value = item.taskId
+  try {
+    const task = await retryLongVideoTask(item.taskId)
+    currentTask.value = task
+    focusedTaskId.value = task.taskId
+    focusedLongVideoTask.value = task
+    activeRightView.value = 'recent'
+    await loadHistoryTasks()
+    startHistoryPolling()
+    message.success('已重新提交长视频任务')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '重新提交失败，请稍后重试')
+  } finally {
+    retryingHistoryTaskId.value = ''
   }
 }
 
@@ -953,6 +999,10 @@ function goNext() {
     return
   }
   if (currentStep.value === 'vehicle') {
+    if (!hasVehicleInfo.value) {
+      message.error('请填写车辆名称，或使用 VIN 查询自动填充')
+      return
+    }
     advanceToStep('template')
     return
   }
@@ -1711,6 +1761,15 @@ function handleAudioEnded() {
                     <div class="lv-right-recent-card-body">
                       <strong>{{ item.title || '长视频生成任务' }}</strong>
                       <span>{{ formatTaskTime(item.createdAt) }}</span>
+                      <button
+                        v-if="String(item.uiStatus ?? item.status) === 'fail'"
+                        type="button"
+                        class="lv-right-recent-card-retry"
+                        :disabled="Boolean(retryingHistoryTaskId)"
+                        @click.stop="retryHistoryTask(item)"
+                      >
+                        {{ retryingHistoryTaskId === item.taskId ? '重新提交中' : '重新生成' }}
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -3237,6 +3296,29 @@ function handleAudioEnded() {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lv-right-recent-card-retry {
+  justify-self: start;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.45);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.lv-right-recent-card-retry:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lv-right-recent-card-retry:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .lv-right-recent-card-status {

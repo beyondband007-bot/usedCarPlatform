@@ -89,3 +89,16 @@ longVideoRoutes.get(
     ok(res, await longVideoService.getTask(String(req.params.taskId), current.user.id));
   }),
 );
+
+longVideoRoutes.post(
+  "/tasks/:taskId/retry",
+  asyncHandler(async (req, res) => {
+    const current = getRequiredCurrentUser(req);
+    ok(
+      res,
+      await longVideoService.retryTask(String(req.params.taskId), current.user.id, {
+        headers: req.headers,
+      }),
+    );
+  }),
+);
