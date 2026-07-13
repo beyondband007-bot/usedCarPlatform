@@ -1,0 +1,152 @@
+{
+  "taskId": "long_video_task_513ea91b49f94622b058cf900881ed11",
+  "draftId": "long_video_draft_a51e89602e0d46cba3d20363e8f81c8e",
+  "audioPreviewId": "long_video_audio_preview_35d5734dab734923bd2987c56b86298a",
+  "userId": "user_team",
+  "status": "failed",
+  "progress": 10,
+  "renderPlanPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\render-plans\\long_video_task_513ea91b49f94622b058cf900881ed11\\render-plan.json",
+  "renderPlan": {
+    "planVersion": 1,
+    "draftId": "long_video_draft_a51e89602e0d46cba3d20363e8f81c8e",
+    "audioPreviewId": "long_video_audio_preview_35d5734dab734923bd2987c56b86298a",
+    "digitalHumanId": "dh-message-15",
+    "vehicleImageAssetIds": [
+      "asset_9b7b90b0c4d54db38f3ab0385b6a4f12",
+      "asset_1fcff574a5064f0da9e0a5a8367bb4c2",
+      "asset_08ce2fbb15ba4568a7af142c32dc8296"
+    ],
+    "interiorVideoAssetIds": [
+      "asset_e50c9e1b0e644be8bb8a65da895ca0de",
+      "asset_5b0e927b7c4f443a99774e59afa25a59"
+    ],
+    "sequence": [
+      {
+        "slot": "ai_video_1",
+        "role": "front_exterior_opening",
+        "screenType": "ai_digital_human",
+        "order": 1,
+        "narrationText": "揽胜星脉，先看外观。车身线条、漆面观感和整体姿态可以先建立第一印象。",
+        "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/01-ai_video_1.mp3",
+        "audioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\01-ai_video_1.mp3",
+        "durationMs": 5590,
+        "seedance": {
+          "prompt": "精品二手车销售口播短视频，真人数字人自然讲解，9:16 竖屏，车型主题：用户上传车辆。\n输入的数字人参考图只用于锁定人物身份：同一张脸、同一发型、同一服装、同一体型。只能出现一个女数字人，不要第二个人，不要双人同框，不要复制人物。\n输入的车辆和场景参考图只用于锁定车辆外观、车身颜色、内饰空间和真实户外车源环境；不要换车，不要室内展厅。\n音频1是唯一口播声源。必须逐字、逐句严格跟读音频1，口型、停顿、语速、音色、情绪和响度都与音频1一致；不要重新配音，不要改写台词，不要生成第二条声音。\n画面里绝对不要字幕、不要中文字幕、不要英文字幕、不要任何文字、不要标题、不要水印、不要屏幕字。\n画面真实可信，不编造车况、价格、配置和实拍中不存在的细节。\n当前段是数字人站在车辆外侧车头附近介绍外观，能看到车头、中网、大灯和户外背景。\n数字人看镜头自然讲解，少量手势指向车头；不要坐进车里，不要打开引擎盖，不要夸张特写。\n口播：揽胜星脉，先看外观。车身线条、漆面观感和整体姿态可以先建立第一印象。",
+          "referenceAudioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/01-ai_video_1.mp3",
+          "referenceAudioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\01-ai_video_1.mp3",
+          "useReferenceAudioForLipSync": true,
+          "expectedScene": "outdoor_vehicle_exterior"
+        }
+      },
+      {
+        "slot": "user_video_1",
+        "role": "front_cabin_proof",
+        "screenType": "user_video_voiceover",
+        "order": 2,
+        "narrationText": "打开车门看前排实拍。方向盘、中控和座椅区域都比较直观，日常使用痕迹建议结合实车再仔细看。",
+        "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/02-user_video_1.mp3",
+        "audioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\02-user_video_1.mp3",
+        "durationMs": 7340,
+        "userVideo": {
+          "assetId": "asset_e50c9e1b0e644be8bb8a65da895ca0de",
+          "sourceUrl": "http://localhost:3101/uploads/upload_41b59427bdba4216afc0208d229d2d12.mp4",
+          "sourceLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\uploads\\upload_41b59427bdba4216afc0208d229d2d12.mp4",
+          "stretchToAudioDuration": true,
+          "trimTailFrames": 2,
+          "originalAudioDuckDb": -20
+        }
+      },
+      {
+        "slot": "ai_video_2",
+        "role": "seated_interior_bridge",
+        "screenType": "ai_digital_human",
+        "order": 3,
+        "narrationText": "坐进车里看，驾驶位视野比较直观，中控按键布局也比较顺手。座椅状态和内饰细节，是看车时要重点确认的地方。",
+        "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/03-ai_video_2.mp3",
+        "audioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\03-ai_video_2.mp3",
+        "durationMs": 7444,
+        "seedance": {
+          "prompt": "精品二手车销售口播短视频，真人数字人自然讲解，9:16 竖屏，车型主题：用户上传车辆。\n输入的数字人参考图只用于锁定人物身份：同一张脸、同一发型、同一服装、同一体型。只能出现一个女数字人，不要第二个人，不要双人同框，不要复制人物。\n输入的车辆和场景参考图只用于锁定车辆外观、车身颜色、内饰空间和真实户外车源环境；不要换车，不要室内展厅。\n音频1是唯一口播声源。必须逐字、逐句严格跟读音频1，口型、停顿、语速、音色、情绪和响度都与音频1一致；不要重新配音，不要改写台词，不要生成第二条声音。\n画面里绝对不要字幕、不要中文字幕、不要英文字幕、不要任何文字、不要标题、不要水印、不要屏幕字。\n画面真实可信，不编造车况、价格、配置和实拍中不存在的细节。\n当前段必须是数字人坐在车里面介绍内饰，不是站在车外。人物坐在主驾或副驾位置，半身出镜，旁边能看到方向盘、中控、挡把和前排座椅。\n坐姿自然，看镜头口播，偶尔用手势指向中控和座椅；不要站在车外，不要打开车门站着讲，不要只拍内饰空镜，不要只出现手部。\n口播：坐进车里看，驾驶位视野比较直观，中控按键布局也比较顺手。座椅状态和内饰细节，是看车时要重点确认的地方。",
+          "referenceAudioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/03-ai_video_2.mp3",
+          "referenceAudioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\03-ai_video_2.mp3",
+          "useReferenceAudioForLipSync": true,
+          "expectedScene": "vehicle_interior_seated"
+        }
+      },
+      {
+        "slot": "user_video_2",
+        "role": "rear_space_proof",
+        "screenType": "user_video_voiceover",
+        "order": 4,
+        "narrationText": "后排实拍也看一下。座椅和腿部空间比较直观，适合现场坐进去感受乘坐姿态。",
+        "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/04-user_video_2.mp3",
+        "audioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\04-user_video_2.mp3",
+        "durationMs": 6164,
+        "userVideo": {
+          "assetId": "asset_5b0e927b7c4f443a99774e59afa25a59",
+          "sourceUrl": "http://localhost:3101/uploads/upload_476bab0fcbe04792a8e00520890c4203.mp4",
+          "sourceLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\uploads\\upload_476bab0fcbe04792a8e00520890c4203.mp4",
+          "stretchToAudioDuration": true,
+          "trimTailFrames": 2,
+          "originalAudioDuckDb": -20
+        }
+      },
+      {
+        "slot": "ai_video_3",
+        "role": "rear_exterior_closing",
+        "screenType": "ai_digital_human",
+        "order": 5,
+        "narrationText": "揽胜星脉外观看整体成色，车内看前排和后排细节。具体车况、配置和价格，还是以门店实车核验为准。",
+        "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/05-ai_video_3.mp3",
+        "audioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\05-ai_video_3.mp3",
+        "durationMs": 6948,
+        "seedance": {
+          "prompt": "精品二手车销售口播短视频，真人数字人自然讲解，9:16 竖屏，车型主题：用户上传车辆。\n输入的数字人参考图只用于锁定人物身份：同一张脸、同一发型、同一服装、同一体型。只能出现一个女数字人，不要第二个人，不要双人同框，不要复制人物。\n输入的车辆和场景参考图只用于锁定车辆外观、车身颜色、内饰空间和真实户外车源环境；不要换车，不要室内展厅。\n音频1是唯一口播声源。必须逐字、逐句严格跟读音频1，口型、停顿、语速、音色、情绪和响度都与音频1一致；不要重新配音，不要改写台词，不要生成第二条声音。\n画面里绝对不要字幕、不要中文字幕、不要英文字幕、不要任何文字、不要标题、不要水印、不要屏幕字。\n画面真实可信，不编造车况、价格、配置和实拍中不存在的细节。\n当前段是数字人站在车辆外侧后方或车尾附近做总结，能看到车尾、侧后方外观或车门区域。\n数字人看镜头自然收尾，语气和前面保持一致；不要室内展厅，不要换车，不要多人站在车旁。\n口播：揽胜星脉外观看整体成色，车内看前排和后排细节。具体车况、配置和价格，还是以门店实车核验为准。",
+          "referenceAudioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/05-ai_video_3.mp3",
+          "referenceAudioLocalPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\05-ai_video_3.mp3",
+          "useReferenceAudioForLipSync": true,
+          "expectedScene": "outdoor_vehicle_exterior"
+        }
+      }
+    ],
+    "audioRules": {
+      "independentTtsSegments": true,
+      "loudnessTargetLufs": -16,
+      "crossfadeMs": 220,
+      "segmentHeadSilenceMs": 30,
+      "segmentTailFadeMs": 90
+    },
+    "videoRules": {
+      "order": [
+        "ai_video_1",
+        "user_video_1",
+        "ai_video_2",
+        "user_video_2",
+        "ai_video_3"
+      ],
+      "cutTailFramesPerClip": 2,
+      "userVideoStretchToVoiceover": true,
+      "aiVideoMustUseReferenceAudio": true,
+      "preserveSeedanceAudioForAiSegments": true,
+      "requireSeedanceAudioStream": true
+    },
+    "editorIntegration": {
+      "source": "ai-video-state",
+      "adapter": "packages/pipeline-adapter",
+      "openEditorAfterGeneratedOnly": true,
+      "pipelineJobPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\render-plans\\long_video_task_513ea91b49f94622b058cf900881ed11\\pipeline-job.json"
+    }
+  },
+  "arkTasks": [],
+  "resultUrl": null,
+  "resultLocalPath": null,
+  "editorProjectUrl": null,
+  "billingTaskId": 44,
+  "billingStatus": "frozen",
+  "estimatedCost": 5100,
+  "estimatedPoints": "5100.0000",
+  "createdAt": "2026-07-13T02:26:14.402Z",
+  "updatedAt": "2026-07-13T02:26:55.189Z",
+  "errorMessage": "ark.openApi.GetAsset failed",
+  "pollingUrl": "/api/v1/modules/long-video-generation/tasks/long_video_task_513ea91b49f94622b058cf900881ed11"
+}

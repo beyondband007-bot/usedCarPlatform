@@ -85,6 +85,10 @@ function goCapture(lot: LotTask) {
   uni.navigateTo({ url: `/pages/lot/capture?lotId=${lot.id}` })
 }
 
+function goCreateLot() {
+  uni.navigateTo({ url: '/pages/lot/create' })
+}
+
 function actionText(lot: LotTask) {
   if (lot.materialStatus === 'complete')
     return '查看素材'
@@ -149,8 +153,11 @@ onReachBottom(() => loadLots())
           暂无车场任务
         </view>
         <view class="mt-2 text-3.5 text-[#9CA3AF]">
-          请在 Web 车辆库创建车场后，在此补充图片与视频
+          点击“新增车场并上传素材”即可在小程序完成创建和素材上传
         </view>
+        <button class="mt-5 h-11 rounded-2 bg-[#3B82F6] px-6 text-4 text-white" @click="goCreateLot">
+          新增车场并上传素材
+        </button>
       </view>
 
       <view v-else class="space-y-3">
@@ -163,7 +170,7 @@ onReachBottom(() => loadLots())
               mode="aspectFill"
               lazy-load
             />
-            <view v-else class="h-21 w-28 flex shrink-0 items-center justify-center rounded-2 bg-[#FEF3C7] text-3 text-[#D97706]">
+            <view v-else class="h-21 w-28 flex shrink-0 items-center justify-center rounded-2 bg-[#EFF6FF] text-3 text-[#3B82F6]">
               车场
             </view>
             <view class="min-w-0 flex-1">
@@ -173,7 +180,7 @@ onReachBottom(() => loadLots())
                 </view>
                 <view
                   class="shrink-0 rounded-full px-2 py-1 text-3"
-                  :class="lot.materialStatus === 'complete' ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEF3C7] text-[#D97706]'"
+                  :class="lot.materialStatus === 'complete' ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#EFF6FF] text-[#2563EB]'"
                 >
                   {{ LOT_MATERIAL_STATUS_TEXT[lot.materialStatus] }}
                 </view>
@@ -184,7 +191,7 @@ onReachBottom(() => loadLots())
               <view class="mt-2 flex items-center gap-2">
                 <view class="h-1.5 flex-1 overflow-hidden rounded-full bg-[#E5E7EB]">
                   <view
-                    class="h-full rounded-full bg-[#D97706]"
+                    class="h-full rounded-full bg-[#3B82F6]"
                     :style="{ width: `${Math.min(100, lot.requiredPhotoCount ? lot.photoCount / lot.requiredPhotoCount * 100 : 0)}%` }"
                   />
                 </view>
@@ -194,7 +201,7 @@ onReachBottom(() => loadLots())
           </view>
           <view class="mt-3 flex items-center justify-between border-t border-[#F3F4F6] pt-3">
             <text class="text-3 text-[#9CA3AF]">{{ lot.updatedAt }}</text>
-            <button class="m-0 h-8 rounded-1.5 bg-[#FEF3C7] px-3 text-3 text-[#D97706]" @click.stop="goCapture(lot)">
+            <button class="m-0 h-8 rounded-1.5 bg-[#EFF6FF] px-3 text-3 text-[#2563EB]" @click.stop="goCapture(lot)">
               {{ actionText(lot) }}
             </button>
           </view>

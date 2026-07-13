@@ -9,7 +9,7 @@ import { hydrateLotMaterialsFromServer, removeLotMaterial } from '@/utils/lotMat
 
 definePage({
   style: {
-    navigationBarTitleText: '补充车场素材',
+    navigationBarTitleText: '上传车场素材',
     enablePullDownRefresh: true,
   },
 })

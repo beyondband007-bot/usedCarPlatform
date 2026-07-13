@@ -1,0 +1,85 @@
+{
+  "draftId": "long_video_draft_a51e89602e0d46cba3d20363e8f81c8e",
+  "userId": "user_team",
+  "digitalHumanId": "dh-message-15",
+  "vehicleImageAssetIds": [
+    "asset_9b7b90b0c4d54db38f3ab0385b6a4f12",
+    "asset_1fcff574a5064f0da9e0a5a8367bb4c2",
+    "asset_08ce2fbb15ba4568a7af142c32dc8296"
+  ],
+  "interiorVideoAssetIds": [
+    "asset_e50c9e1b0e644be8bb8a65da895ca0de",
+    "asset_5b0e927b7c4f443a99774e59afa25a59"
+  ],
+  "vehicleInfo": {
+    "vehicleName": "用户上传车辆",
+    "fullModelName": "用户上传车辆"
+  },
+  "sellingPoints": [
+    "外观成色",
+    "前排内饰",
+    "后排空间"
+  ],
+  "language": "Chinese",
+  "voice": {
+    "voiceId": "Korean_energetic_marketer_vv1",
+    "label": "Energetic Marketer - 清亮营销女声",
+    "model": "speech-2.8-hd",
+    "speed": 1.08,
+    "vol": 1,
+    "pitch": 0,
+    "languageBoost": "Korean"
+  },
+  "segments": [
+    {
+      "slot": "ai_video_1",
+      "role": "front_exterior_opening",
+      "screenType": "ai_digital_human",
+      "enterCue": "开场直接进入单车介绍。",
+      "exitCue": "引出第一段内饰实拍。",
+      "targetDurationSeconds": 8,
+      "narrationText": "揽胜星脉，先看外观。车身线条、漆面观感和整体姿态可以先建立第一印象。"
+    },
+    {
+      "slot": "user_video_1",
+      "role": "front_cabin_proof",
+      "screenType": "user_video_voiceover",
+      "enterCue": "承接车外开场，切到前排/中控实拍。",
+      "exitCue": "引出数字人坐进车内继续讲解。",
+      "targetDurationSeconds": 8,
+      "narrationText": "打开车门看前排实拍。方向盘、中控和座椅区域都比较直观，日常使用痕迹建议结合实车再仔细看。"
+    },
+    {
+      "slot": "ai_video_2",
+      "role": "seated_interior_bridge",
+      "screenType": "ai_digital_human",
+      "enterCue": "数字人坐在车内承接实拍。",
+      "exitCue": "引出第二段后排/座椅实拍。",
+      "targetDurationSeconds": 10,
+      "narrationText": "坐进车里看，驾驶位视野比较直观，中控按键布局也比较顺手。座椅状态和内饰细节，是看车时要重点确认的地方。"
+    },
+    {
+      "slot": "user_video_2",
+      "role": "rear_space_proof",
+      "screenType": "user_video_voiceover",
+      "enterCue": "承接车内讲解，切到后排/座椅实拍。",
+      "exitCue": "引出车外收尾。",
+      "targetDurationSeconds": 7,
+      "narrationText": "后排实拍也看一下。座椅和腿部空间比较直观，适合现场坐进去感受乘坐姿态。"
+    },
+    {
+      "slot": "ai_video_3",
+      "role": "rear_exterior_closing",
+      "screenType": "ai_digital_human",
+      "enterCue": "数字人回到车外总结。",
+      "exitCue": "自然结束并提示以门店实车核验为准。",
+      "targetDurationSeconds": 9,
+      "narrationText": "揽胜星脉外观看整体成色，车内看前排和后排细节。具体车况、配置和价格，还是以门店实车核验为准。"
+    }
+  ],
+  "status": "script_ready",
+  "createdAt": "2026-07-13T02:26:04.336Z",
+  "updatedAt": "2026-07-13T02:26:04.340Z",
+  "estimatedAiSeconds": 27,
+  "estimatedCostPoints": 4050
+}

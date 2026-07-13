@@ -7,6 +7,7 @@ import multer from "multer";
 import { env } from "../../config/env";
 import { asyncHandler } from "../../shared/asyncHandler";
 import { errors } from "../../shared/errors";
+import { normalizeMultipartFileName } from "../../shared/fileName";
 import { createId } from "../../shared/ids";
 import { ok } from "../../shared/response";
 import { probeVideoDurationSeconds } from "../../shared/videoProbe";
@@ -19,6 +20,7 @@ fs.mkdirSync(env.uploadDir, { recursive: true });
 const storage = multer.diskStorage({
   destination: (_req, _file, callback) => callback(null, env.uploadDir),
   filename: (_req, file, callback) => {
+    file.originalname = normalizeMultipartFileName(file.originalname);
     const ext = path.extname(file.originalname).toLowerCase();
     callback(null, `${createId("upload")}${ext}`);
   },

@@ -9,7 +9,7 @@ import { longVideoService } from "../src/modules/long-video-generation/longVideo
 const runId = process.env.LONG_VIDEO_RERUN_ID?.trim() || "long-video-preset-voice-rerun-20260708";
 const rootDir = path.resolve(__dirname, "../..");
 const artifactDir = path.join(rootDir, "artifacts", runId);
-const sourceTaskPath = path.join(
+const preferredSourceTaskPath = path.join(
   rootDir,
   "backend",
   "storage",
@@ -19,6 +19,7 @@ const sourceTaskPath = path.join(
   "tasks",
   "long_video_task_e0d3310800ab4d109c3ff17beade2094.json",
 );
+const sourceTaskMetadataDir = path.dirname(preferredSourceTaskPath);
 const digitalHumanId = "dh-message-15";
 const userId = "user_team";
 const vehicleName =
@@ -45,8 +46,34 @@ const log = (...args: unknown[]) => {
   console.log(`[${new Date().toISOString()}] [${runId}]`, ...args);
 };
 
+const resolveSourceTaskPath = async () => {
+  try {
+    await fs.access(preferredSourceTaskPath);
+    return preferredSourceTaskPath;
+  } catch {
+    const entries = await fs.readdir(sourceTaskMetadataDir, { withFileTypes: true });
+    const candidates = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => {
+          const filePath = path.join(sourceTaskMetadataDir, entry.name);
+          const content = await fs.readFile(filePath, "utf8");
+          const task = JSON.parse(content);
+          return { filePath, task, updatedAt: Date.parse(task.updatedAt || "") || 0 };
+        }),
+    );
+    const source = candidates
+      .filter((candidate) => candidate.task.status === "completed")
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0];
+    if (!source) throw new Error("No completed long-video task metadata is available as a rerun baseline");
+    log("preferred source task metadata is missing; using latest completed task", source.filePath);
+    return source.filePath;
+  }
+};
+
 const main = async () => {
   await fs.mkdir(artifactDir, { recursive: true });
+  const sourceTaskPath = await resolveSourceTaskPath();
   const sourceTask = JSON.parse(await fs.readFile(sourceTaskPath, "utf8"));
   const sourceSegments = sourceTask.renderPlan.sequence.map((segment: any) => ({
     slot: segment.slot,
