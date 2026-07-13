@@ -53,7 +53,7 @@ export const customTabbarList: CustomTabBarItem[] = [
     pagePath: 'pages/lot/list',
     text: '车场',
     iconType: 'unocss',
-    icon: 'i-carbon-garage',
+    icon: 'i-carbon-building',
   },
   {
     pagePath: 'pages/user/index',

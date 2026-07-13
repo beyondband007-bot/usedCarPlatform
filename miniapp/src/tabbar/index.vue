@@ -2,7 +2,7 @@
 // i-carbon-code
 // i-carbon-home
 // i-carbon-car
-// i-carbon-garage
+// i-carbon-building
 // i-carbon-user
 import { customTabbarEnable, needHideNativeTabbar, tabbarCacheEnable } from './config'
 import { setTabbarItem } from './i18n'
