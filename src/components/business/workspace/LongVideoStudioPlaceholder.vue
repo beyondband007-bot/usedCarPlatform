@@ -1188,29 +1188,33 @@ async function refreshFocusedTask(taskId: string) {
   }
 }
 
-async function playAllAudio() {
-  if (!audioPreview.value?.segments.length || !audioElement.value) return
-  if (audioElement.value.paused) {
-    await audioElement.value.play()
-  } else {
-    audioElement.value.pause()
-  }
+function startAudioSegment(index: number) {
+  const segments = audioPreview.value?.segments ?? []
+  if (!segments[index]) return
+  activeAudioIndex.value = index
+  requestAnimationFrame(() => {
+    const audio = audioElement.value
+    if (!audio) return
+    audio.currentTime = 0
+    void audio.play().catch((error) => {
+      console.warn('long video audio playback failed', error)
+      message.error('音频暂时无法播放，请稍后重试')
+    })
+  })
+}
+
+function playAllAudio() {
+  startAudioSegment(0)
 }
 
 function playAudioSegment(index: number) {
-  activeAudioIndex.value = index
-  requestAnimationFrame(() => {
-    void audioElement.value?.play()
-  })
+  startAudioSegment(index)
 }
 
 function handleAudioEnded() {
   const segments = audioPreview.value?.segments ?? []
   if (activeAudioIndex.value < segments.length - 1) {
-    activeAudioIndex.value += 1
-    requestAnimationFrame(() => {
-      void audioElement.value?.play()
-    })
+    startAudioSegment(activeAudioIndex.value + 1)
   }
 }
 </script>
@@ -1618,7 +1622,7 @@ function handleAudioEnded() {
             />
             <button type="button" class="primary-action" @click="playAllAudio">
               <Icon icon="mdi:play-circle-outline" />
-              顺序播放五段音频
+              从头顺序播放五段音频
             </button>
             <div class="audio-segments">
               <button
