@@ -891,6 +891,11 @@ function isRecentTaskRunning(item: RecentGenerationTask) {
   return ['waiting', 'queued', 'queue', 'generating', 'processing'].includes(status)
 }
 
+function isRecentTaskFailed(item: RecentGenerationTask) {
+  const status = String(item.uiStatus ?? item.status ?? '')
+  return ['fail', 'failed'].includes(status)
+}
+
 async function loadHistoryTasks() {
   historyLoading.value = true
   historyError.value = ''
@@ -1794,7 +1799,7 @@ function handleAudioEnded() {
                       <strong>{{ item.title || '长视频生成任务' }}</strong>
                       <span>{{ formatTaskTime(item.createdAt) }}</span>
                       <button
-                        v-if="String(item.uiStatus ?? item.status) === 'fail'"
+                        v-if="isRecentTaskFailed(item)"
                         type="button"
                         class="lv-right-recent-card-retry"
                         :disabled="Boolean(retryingHistoryTaskId)"
