@@ -307,7 +307,10 @@ const focusedTaskIsRunning = computed(() =>
 const showRecentGeneratingView = computed(
   () =>
     activeRightView.value === 'recent' &&
-    Boolean(focusedLongVideoTask.value && focusedTaskIsRunning.value),
+    Boolean(
+      focusedLongVideoTask.value &&
+        (focusedTaskIsRunning.value || focusedLongVideoTask.value.status === 'failed'),
+    ),
 )
 const generatingDescription = computed(() => {
   const status = focusedLongVideoTask.value?.status
@@ -969,6 +972,26 @@ async function retryHistoryTask(item: RecentGenerationTask) {
     focusedTaskId.value = task.taskId
     focusedLongVideoTask.value = task
     activeRightView.value = 'recent'
+    await loadHistoryTasks()
+    startHistoryPolling()
+    message.success('已重新提交长视频任务')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '重新提交失败，请稍后重试')
+  } finally {
+    retryingHistoryTaskId.value = ''
+  }
+}
+
+async function retryFocusedTask() {
+  const task = focusedLongVideoTask.value
+  if (!task || task.status !== 'failed' || retryingHistoryTaskId.value) return
+
+  retryingHistoryTaskId.value = task.taskId
+  try {
+    const nextTask = await retryLongVideoTask(task.taskId)
+    currentTask.value = nextTask
+    focusedTaskId.value = nextTask.taskId
+    focusedLongVideoTask.value = nextTask
     await loadHistoryTasks()
     startHistoryPolling()
     message.success('已重新提交长视频任务')
@@ -1695,6 +1718,15 @@ function handleAudioEnded() {
                 <p v-if="focusedLongVideoTask.status === 'failed'" class="lv-right-generating-error">
                   {{ focusedLongVideoTask.errorMessage || '长视频生成失败，请稍后重试。' }}
                 </p>
+                <button
+                  v-if="focusedLongVideoTask.status === 'failed'"
+                  type="button"
+                  class="lv-right-generating-retry"
+                  :disabled="Boolean(retryingHistoryTaskId)"
+                  @click="retryFocusedTask"
+                >
+                  {{ retryingHistoryTaskId === focusedLongVideoTask.taskId ? '重新提交中' : '重新生成' }}
+                </button>
               </div>
               <div
                 class="lv-right-generating-progress"
@@ -3410,6 +3442,28 @@ function handleAudioEnded() {
 
 .lv-right-generating-error {
   color: #fecaca !important;
+}
+
+.lv-right-generating-retry {
+  justify-self: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lv-right-generating-retry:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.lv-right-generating-retry:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .lv-right-generating-progress {
