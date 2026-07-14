@@ -1640,7 +1640,6 @@ function handleAudioEnded() {
           <template v-else>
           <header class="section-head">
             <h2>五段文案确认</h2>
-            <p>这 5 段会分别生成 MiniMax 音频；播放时前端用一个播放器按顺序播完。</p>
           </header>
           <div v-if="!draft" class="empty-state">
             <Icon icon="mdi:text-box-search-outline" />
