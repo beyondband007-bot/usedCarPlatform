@@ -21,6 +21,7 @@ const functionNameMap: Record<string, string> = {
   'creative-image': '创意图',
   'short-video': '短视频',
   'video-generation': '视频生成',
+  'long-video-generation': '长视频生成',
   'language-conversion': '语言转换',
   'batch-new-exterior': '批量外观',
   'batch-new-interior': '批量内饰',
@@ -78,7 +79,11 @@ export function mapCreditsBizSource(
   if (txnType === 'recharge') return 'purchase'
   if (txnType === 'gift') return 'package'
   if (txnType === 'refund' && normalizedTxnType === 'refund') return 'fail'
-  if (normalizedFunctionCode === 'video-generation' || normalizedFunctionCode === 'short-video') return 'video'
+  if (
+    normalizedFunctionCode === 'video-generation'
+    || normalizedFunctionCode === 'short-video'
+    || normalizedFunctionCode === 'long-video-generation'
+  ) return 'video'
   if (normalizedFunctionCode === 'language-conversion' || normalized.includes('language_conversion')) return 'video'
   if (normalized.includes('batch')) return 'batch'
   return 'single'
@@ -98,6 +103,7 @@ function resolveSceneTitle(
   if (txnType === 'refund' && normalizedTxnType === 'refund') return '失败退款'
   if (normalized.includes('batch')) return '批量上新'
   if (normalizedFunctionCode === 'language-conversion' || normalized.includes('language_conversion')) return '语言转换'
+  if (normalizedFunctionCode === 'long-video-generation') return '长视频生成'
   if (normalizedFunctionCode === 'video-generation' || normalizedFunctionCode === 'short-video') return '视频生成'
   if (normalized.includes('video')) return '短视频生成'
   return '单图生成'

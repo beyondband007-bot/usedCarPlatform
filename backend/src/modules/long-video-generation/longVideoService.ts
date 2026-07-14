@@ -24,7 +24,7 @@ import {
   type FrozenGenerationBilling,
 } from "../billing/billingLifecycle";
 import type { BillingRequestContext } from "../billing/billingIdentity";
-import { videoGenerationPointsByAudioSeconds } from "../billing/generationPointRules";
+import { longVideoGenerationPointsByAiAudioSegments } from "../billing/generationPointRules";
 import { assertCanStartGeneration } from "../subscription/subscriptionService";
 import { tasksRepository } from "../tasks/tasksRepository";
 import { arkVirtualAssetService } from "../video-generation/arkVirtualAssetService";
@@ -812,13 +812,12 @@ class LongVideoService {
       subscriptionPlanCode: subscription.planCode,
     });
 
-    const estimatedAudioSeconds = Math.ceil(audioPreview.totalDurationMs / 1000);
     let billing: FrozenGenerationBilling | null = null;
     try {
       billing = await freezeGenerationBilling({
         taskId,
         functionCode: "long-video-generation",
-        estimatedPoints: videoGenerationPointsByAudioSeconds(estimatedAudioSeconds),
+        estimatedPoints: longVideoGenerationPointsByAiAudioSegments(audioPreview.segments),
         body: body as Record<string, unknown>,
         context,
       });

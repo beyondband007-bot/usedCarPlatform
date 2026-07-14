@@ -22,6 +22,16 @@ export const shortVideoGenerationPoints = (videoCount = 1) =>
 export const videoGenerationPointsByAudioSeconds = (audioSeconds = 15) =>
   formatPoints(Math.max(0, audioSeconds) * VIDEO_GENERATION_POINTS_PER_SECOND);
 
+export const longVideoGenerationPointsByAiAudioSegments = (
+  segments: Array<{ screenType: string; durationMs: number }>,
+) => {
+  const aiAudioDurationMs = segments
+    .filter((segment) => segment.screenType === "ai_digital_human")
+    .reduce((total, segment) => total + Math.max(0, segment.durationMs), 0);
+
+  return videoGenerationPointsByAudioSeconds(Math.ceil(aiAudioDurationMs / 1000));
+};
+
 export const videoGenerationPointsByDurationSeconds = (durationSeconds = 15) =>
   formatPoints(Math.max(0, durationSeconds) * VIDEO_GENERATION_POINTS_PER_SECOND);
 

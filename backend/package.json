@@ -25,6 +25,7 @@
     "video-task-lifecycle-test": "tsx src/modules/video-generation/videoTaskLifecycle.test.ts",
     "deepseek-script-contract-test": "tsx src/providers/deepseek/deepseekClient.test.ts",
     "video-prompt-assembly-test": "tsx src/modules/video-generation/videoPromptAssembly.test.ts",
+    "long-video-billing-test": "tsx src/modules/billing/longVideoGenerationPointRules.test.ts",
     "batch-branded-scene-url-test": "tsx src/modules/batch-new/batchBrandedScene.test.ts",
     "batch-interior-workflow-test": "tsx src/modules/batch-new/batchInteriorWorkflow.test.ts",
     "vehicle-library-contract-test": "tsx src/modules/vehicle-library/vehicleLibraryContract.test.ts",
