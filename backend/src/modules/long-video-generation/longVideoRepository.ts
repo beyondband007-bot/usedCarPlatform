@@ -35,6 +35,26 @@ const readJson = async <T>(filePath: string, notFound: () => Error): Promise<T> 
 };
 
 class LongVideoRepository {
+  async listTasks() {
+    await ensureDirs();
+    const entries = await fs.readdir(taskDir, { withFileTypes: true });
+    const tasks = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => {
+          try {
+            return JSON.parse(
+              await fs.readFile(path.join(taskDir, entry.name), "utf8"),
+            ) as LongVideoTaskRecord;
+          } catch (error) {
+            console.warn(`[long-video-generation] failed to read task metadata ${entry.name}`, error);
+            return null;
+          }
+        }),
+    );
+    return tasks.filter((task): task is LongVideoTaskRecord => Boolean(task));
+  }
+
   async saveDraft(record: LongVideoDraftRecord) {
     await ensureDirs();
     await fs.writeFile(draftPath(record.draftId), JSON.stringify(record, null, 2), "utf8");

@@ -1,0 +1,69 @@
+{
+  "audioPreviewId": "long_video_audio_preview_35d5734dab734923bd2987c56b86298a",
+  "draftId": "long_video_draft_a51e89602e0d46cba3d20363e8f81c8e",
+  "userId": "user_team",
+  "voice": {
+    "voiceId": "Korean_energetic_marketer_vv1",
+    "label": "Energetic Marketer - 清亮营销女声",
+    "model": "speech-2.8-hd",
+    "speed": 1.08,
+    "vol": 1,
+    "pitch": 0,
+    "languageBoost": "Korean"
+  },
+  "segments": [
+    {
+      "slot": "ai_video_1",
+      "role": "front_exterior_opening",
+      "screenType": "ai_digital_human",
+      "text": "揽胜星脉，先看外观。车身线条、漆面观感和整体姿态可以先建立第一印象。",
+      "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/01-ai_video_1.mp3",
+      "localPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\01-ai_video_1.mp3",
+      "durationMs": 5590,
+      "bytes": 91000
+    },
+    {
+      "slot": "user_video_1",
+      "role": "front_cabin_proof",
+      "screenType": "user_video_voiceover",
+      "text": "打开车门看前排实拍。方向盘、中控和座椅区域都比较直观，日常使用痕迹建议结合实车再仔细看。",
+      "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/02-user_video_1.mp3",
+      "localPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\02-user_video_1.mp3",
+      "durationMs": 7340,
+      "bytes": 119003
+    },
+    {
+      "slot": "ai_video_2",
+      "role": "seated_interior_bridge",
+      "screenType": "ai_digital_human",
+      "text": "坐进车里看，驾驶位视野比较直观，中控按键布局也比较顺手。座椅状态和内饰细节，是看车时要重点确认的地方。",
+      "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/03-ai_video_2.mp3",
+      "localPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\03-ai_video_2.mp3",
+      "durationMs": 7444,
+      "bytes": 120675
+    },
+    {
+      "slot": "user_video_2",
+      "role": "rear_space_proof",
+      "screenType": "user_video_voiceover",
+      "text": "后排实拍也看一下。座椅和腿部空间比较直观，适合现场坐进去感受乘坐姿态。",
+      "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/04-user_video_2.mp3",
+      "localPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\04-user_video_2.mp3",
+      "durationMs": 6164,
+      "bytes": 100195
+    },
+    {
+      "slot": "ai_video_3",
+      "role": "rear_exterior_closing",
+      "screenType": "ai_digital_human",
+      "text": "揽胜星脉外观看整体成色，车内看前排和后排细节。具体车况、配置和价格，还是以门店实车核验为准。",
+      "audioUrl": "http://localhost:3101/results/long-video-generation/audio-previews/long_video_audio_preview_35d5734dab734923bd2987c56b86298a/05-ai_video_3.mp3",
+      "localPath": "F:\\usedCarPlatform\\usedCarPlatform\\backend\\storage\\results\\long-video-generation\\audio-previews\\long_video_audio_preview_35d5734dab734923bd2987c56b86298a\\05-ai_video_3.mp3",
+      "durationMs": 6948,
+      "bytes": 112734
+    }
+  ],
+  "totalDurationMs": 33486,
+  "canUseForVideo": true,
+  "createdAt": "2026-07-13T02:26:14.344Z"
+}

@@ -9,7 +9,7 @@ definePage({
   excludeLoginPath: true,
   style: {
     navigationStyle: 'custom',
-    navigationBarTitleText: '登录',
+    navigationBarTitleText: '车辆库',
   },
 })
 
@@ -74,7 +74,7 @@ async function handlePasswordLogin() {
         车
       </view>
       <view class="text-7 text-[#111827] font-700">
-        素材采集
+        车辆库
       </view>
       <view class="mt-2 whitespace-nowrap text-3 text-[#6B7280]">
         登录后拍摄车辆与车场素材，并同步上传至车辆库

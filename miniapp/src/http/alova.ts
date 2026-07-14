@@ -82,6 +82,9 @@ const alovaInstance = createAlova({
       data: rawData,
       errMsg,
     } = response as UniNamespace.RequestSuccessCallbackResult
+    const responseMessage = typeof rawData === 'object' && rawData !== null
+      ? String((rawData as IResponse).message || (rawData as IResponse).msg || '')
+      : ''
 
     // 处理特殊请求类型（上传/下载）
     if (requestType === 'upload' || requestType === 'download') {
@@ -90,7 +93,7 @@ const alovaInstance = createAlova({
 
     // 处理 HTTP 状态码错误
     if (statusCode !== 200) {
-      const errorMessage = ShowMessage(statusCode) || `HTTP请求错误[${statusCode}]`
+      const errorMessage = responseMessage || ShowMessage(statusCode) || `HTTP请求错误[${statusCode}]`
       console.error('errorMessage===>', errorMessage)
       uni.showToast({
         title: errorMessage,

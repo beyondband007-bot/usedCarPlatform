@@ -91,6 +91,16 @@ export function getLotList(params: LotQueryParams) {
     }))
 }
 
+export function createLot(payload: {
+  name: string
+  address?: string | null
+  remark?: string | null
+}) {
+  return http
+    .post<VehicleLibraryLot>(`${VEHICLE_LIBRARY_BASE}/lots`, payload)
+    .then(mapLot)
+}
+
 export function getLotMaterials(lotId: string) {
   return http
     .get<VehicleLibraryLot>(`${VEHICLE_LIBRARY_BASE}/lots/${lotId}`)

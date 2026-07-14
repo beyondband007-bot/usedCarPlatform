@@ -77,7 +77,7 @@ export default defineConfig({
     'i-carbon-code',
     'i-carbon-home',
     'i-carbon-car',
-    'i-carbon-garage',
+    'i-carbon-building',
     'i-carbon-user',
     'i-carbon-ibm-watson-language-translator',
     'i-carbon-menu',

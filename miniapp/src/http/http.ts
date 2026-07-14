@@ -23,11 +23,18 @@ export function http<T>(options: CustomRequestOptions) {
       success: async (res) => {
         const responseData = res.data as IResponse<T>
         const { code } = responseData
+        const responseMessage = responseData.message || responseData.msg || '请求错误'
+        const isLoginRequest = /\/auth\/(login|login-with-code|login-code)(?:[/?]|$)/.test(options.url)
 
         // 检查是否是401错误（包括HTTP状态码401或业务码401）
         const isTokenExpired = res.statusCode === 401 || code === 401
 
         if (isTokenExpired) {
+          // 登录接口返回 401 代表账号凭据错误，不应按登录态过期处理。
+          if (isLoginRequest) {
+            return reject(new Error(responseMessage))
+          }
+
           const tokenStore = useTokenStore()
           if (!isDoubleTokenMode) {
             // 未启用双token策略，清理用户信息，跳转到登录页
@@ -98,9 +105,9 @@ export function http<T>(options: CustomRequestOptions) {
           if (code !== ResultEnum.Success0 && code !== ResultEnum.Success200) {
             uni.showToast({
               icon: 'none',
-              title: responseData.msg || responseData.message || '请求错误',
+              title: responseMessage,
             })
-            return reject(responseData.data)
+            return reject(new Error(responseMessage))
           }
           return resolve(responseData.data)
         }
@@ -111,7 +118,7 @@ export function http<T>(options: CustomRequestOptions) {
           icon: 'none',
           title: (res.data as any).msg || '请求错误',
         })
-        reject(res)
+        reject(new Error(responseMessage))
       },
       // 响应失败
       fail(err) {

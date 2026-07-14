@@ -37,6 +37,7 @@ import type {
   LongVideoRenderPlan,
   LongVideoRenderPlanSegment,
   LongVideoSlot,
+  LongVideoTaskStatus,
   LongVideoTaskRecord,
   LongVideoVoicePreset,
   UpdateLongVideoSegmentsRequest,
@@ -51,6 +52,8 @@ const taskOutputDir = path.join(env.resultsDir, "long-video-generation", "tasks"
 const arkPollIntervalMs = 12_000;
 const arkPollAttempts = 90;
 const arkDetailFailureLimit = 20;
+const maxNarrationChars = 180;
+const maxSegmentAudioDurationMs = 12_000;
 
 const longVideoSlots: Array<Omit<LongVideoNarrationSegment, "narrationText">> = [
   {
@@ -139,6 +142,21 @@ const vehicleNameFromInfo = (vehicleInfo: Record<string, unknown>) => {
 
 const normalizeSellingPoints = (value: unknown) =>
   asStringArray(value).slice(0, 6);
+
+const validateNarrationSegments = (segments: LongVideoNarrationSegment[]) => {
+  for (const segment of segments) {
+    const narrationText = segment.narrationText.trim();
+    if (!narrationText) {
+      throw errors.invalidParameter("long-video narration cannot be empty", { slot: segment.slot });
+    }
+    if (narrationText.length > maxNarrationChars) {
+      throw errors.invalidParameter(
+        `long-video narration must not exceed ${maxNarrationChars} characters`,
+        { slot: segment.slot, maxNarrationChars },
+      );
+    }
+  }
+};
 
 const buildSegments = (vehicleInfo: Record<string, unknown>, sellingPoints: string[]) => {
   const vehicleName = vehicleNameFromInfo(vehicleInfo);
@@ -586,18 +604,21 @@ class LongVideoService {
       status: "script_ready",
       updatedAt: new Date().toISOString(),
     };
+    validateNarrationSegments(next.segments);
     await longVideoRepository.saveDraft(next);
     return this.toDraftResponse(next);
   }
 
   async createAudioPreview(draftId: string, userId: string) {
     const draft = await longVideoRepository.getDraft(draftId, userId);
+    validateNarrationSegments(draft.segments);
     const audioPreviewId = createId("long_video_audio_preview");
     const outputDir = path.join(audioOutputDir, audioPreviewId);
     await fs.mkdir(outputDir, { recursive: true });
     const segments = [];
-    for (const [index, segment] of draft.segments.entries()) {
-      const speech = await minimaxClient.synthesizeSpeech({
+    try {
+      for (const [index, segment] of draft.segments.entries()) {
+        const speech = await minimaxClient.synthesizeSpeech({
         text: segment.narrationText,
         voiceId: draft.voice.voiceId,
         model: draft.voice.model,
@@ -612,15 +633,25 @@ class LongVideoService {
           channel: 2,
         },
       });
-      if (!speech.durationMs) {
+        if (!speech.durationMs) {
         throw errors.generationFailed("MiniMax long-video audio response missing duration", {
           slot: segment.slot,
         });
       }
-      const fileName = `${String(index + 1).padStart(2, "0")}-${segment.slot}.mp3`;
-      const localPath = path.join(outputDir, fileName);
-      await fs.writeFile(localPath, speech.audio);
-      segments.push({
+        if (speech.durationMs > maxSegmentAudioDurationMs) {
+        throw errors.invalidParameter(
+          "long-video narration is too long for one segment; shorten it and regenerate audio",
+          {
+            slot: segment.slot,
+            durationMs: speech.durationMs,
+            maxDurationMs: maxSegmentAudioDurationMs,
+          },
+        );
+      }
+        const fileName = `${String(index + 1).padStart(2, "0")}-${segment.slot}.mp3`;
+        const localPath = path.join(outputDir, fileName);
+        await fs.writeFile(localPath, speech.audio);
+        segments.push({
         slot: segment.slot,
         role: segment.role,
         screenType: segment.screenType,
@@ -629,7 +660,11 @@ class LongVideoService {
         localPath,
         durationMs: speech.durationMs,
         bytes: speech.sizeBytes,
-      });
+        });
+      }
+    } catch (error) {
+      await fs.rm(outputDir, { recursive: true, force: true });
+      throw error;
     }
     const preview = await longVideoRepository.saveAudioPreview({
       audioPreviewId,
@@ -856,6 +891,46 @@ class LongVideoService {
 
   async getTask(taskId: string, userId: string) {
     return this.toTaskResponse(await longVideoRepository.getTask(taskId, userId));
+  }
+
+  async retryTask(taskId: string, userId: string, context?: BillingRequestContext) {
+    const task = await longVideoRepository.getTask(taskId, userId);
+    if (task.status !== "failed") {
+      throw errors.invalidParameter("only failed long-video tasks can be retried");
+    }
+    return this.createTask(
+      task.draftId,
+      { audioPreviewId: task.audioPreviewId },
+      userId,
+      context,
+    );
+  }
+
+  async reconcileInterruptedTasks() {
+    const tasks = await longVideoRepository.listTasks();
+    const terminalStatuses: LongVideoTaskStatus[] = ["completed", "failed"];
+
+    for (const task of tasks) {
+      if (terminalStatuses.includes(task.status)) continue;
+      const message = "Long-video generation was interrupted by a backend restart. Please submit it again.";
+      await longVideoRepository.patchTask(task.taskId, task.userId, {
+        status: "failed",
+        progress: Math.min(task.progress ?? 95, 95),
+        errorMessage: message,
+      });
+      await tasksRepository.markFailed(task.taskId, "LONG_VIDEO_TASK_INTERRUPTED", message);
+    }
+
+    await this.reconcileBilling();
+  }
+
+  async reconcileBilling() {
+    const tasks = await longVideoRepository.listTasks();
+    for (const task of tasks) {
+      if (task.status !== "completed" && task.status !== "failed") continue;
+      const generationTask = await tasksRepository.findById(task.taskId);
+      if (generationTask) await finalizeGenerationBilling(generationTask);
+    }
   }
 
   private async runTask(
@@ -1167,6 +1242,15 @@ class LongVideoService {
         progress: 72,
       });
       const finalVideo = await this.renderFinalVideo(task, aiOutputs);
+      const coverPath = path.join(path.dirname(finalVideo.localPath), "long-video-cover.jpg");
+      let coverUrl: string | null = null;
+      try {
+        await extractReferenceFrame(finalVideo.localPath, coverPath, 0);
+        coverUrl = taskPublicUrl(taskId, "rendered/long-video-cover.jpg");
+      } catch (error) {
+        console.warn(`[long-video-generation] failed to create cover for ${taskId}`, error);
+      }
+      const draft = await longVideoRepository.getDraft(task.draftId, userId);
       await tasksRepository.updateFromKie(taskId, {
         status: "success",
         progress: 100,
@@ -1174,6 +1258,8 @@ class LongVideoService {
           provider: "ark",
           moduleCode: "long-video-generation",
           resultUrl: finalVideo.publicUrl,
+          thumbnailUrl: coverUrl,
+          vehicleName: vehicleNameFromInfo(draft.vehicleInfo),
           renderPlanPath: task.renderPlanPath,
         },
       });
