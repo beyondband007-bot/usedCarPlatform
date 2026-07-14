@@ -8,6 +8,8 @@ export default defineUniPages({
     navigationBarBackgroundColor: '#f8f8f8',
     navigationBarTextStyle: 'black',
     backgroundColor: '#FFFFFF',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
   easycom: {
     autoscan: true,

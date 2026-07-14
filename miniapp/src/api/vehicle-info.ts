@@ -1,5 +1,7 @@
 import type { ApiResponse } from '@/types/api'
 import { http } from '@/http/http'
+import { useTokenStore } from '@/store'
+import { getEnvBaseUrl } from '@/utils'
 
 export interface VinApiData extends Record<string, unknown> {
   vin?: string
@@ -86,10 +88,15 @@ export function queryVehicleByVinShowApi(vin: string) {
 
 export function recognizeVinFromImage(filePath: string) {
   return new Promise<string>((resolve, reject) => {
-    uni.uploadFile({
-      url: '/api/v1/vehicle-info/vin-ocr',
+    const baseUrl = getEnvBaseUrl().replace(/\/$/, '')
+    const token = useTokenStore().updateNowTime().validToken
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const task = uni.uploadFile({
+      url: `${baseUrl}/api/v1/vehicle-info/vin-ocr`,
       filePath,
       name: 'image',
+      timeout: 20_000,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
       success: (res) => {
         try {
           const body = typeof res.data === 'string'
@@ -106,6 +113,15 @@ export function recognizeVinFromImage(filePath: string) {
         }
       },
       fail: reject,
+      complete: () => {
+        if (timeoutId)
+          clearTimeout(timeoutId)
+      },
     })
+
+    timeoutId = setTimeout(() => {
+      task.abort()
+      reject(new Error('VIN 图片识别超时，请稍后重试'))
+    }, 22_000)
   })
 }
