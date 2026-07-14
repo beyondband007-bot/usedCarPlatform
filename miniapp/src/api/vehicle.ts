@@ -2,7 +2,7 @@ import type { PaginationResult } from '@/types/api'
 import type { VehicleCreateParams, VehicleQueryParams, VehicleTask, VehicleTaskStatus, VehicleUpdateParams } from '@/types/vehicle'
 import { http } from '@/http/http'
 
-const VEHICLE_LIBRARY_BASE = '/api/v1/vehicle-library'
+const VEHICLE_LIBRARY_BASE = '/vehicle-library'
 const REQUIRED_SLOT_CODES = ['front_image', 'rear_image', 'driver_image', 'front_row_video', 'rear_row_video']
 
 type VehicleLibraryMaterial = {

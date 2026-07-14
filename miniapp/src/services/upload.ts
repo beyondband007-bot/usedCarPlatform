@@ -43,7 +43,7 @@ function parseUploadResponse(res: UniApp.UploadFileSuccessCallbackResult) {
 function uploadAsset(options: UploadFileOptions) {
   return new Promise<UploadedAsset>((resolve, reject) => {
     const task = uni.uploadFile({
-      url: '/api/v1/assets/upload',
+      url: '/assets/upload',
       filePath: options.filePath,
       name: options.name || 'file',
       formData: {
@@ -70,8 +70,8 @@ async function uploadOwnerFile(options: UploadFileOptions & { ownerType?: 'vehic
   const asset = await uploadAsset(options)
   const ownerType = options.ownerType || 'vehicle'
   const materialBase = ownerType === 'lot'
-    ? `/api/v1/vehicle-library/lots/${options.vehicleId}/materials/${options.captureCode}`
-    : `/api/v1/vehicle-library/vehicles/${options.vehicleId}/materials/${options.captureCode}`
+    ? `/vehicle-library/lots/${options.vehicleId}/materials/${options.captureCode}`
+    : `/vehicle-library/vehicles/${options.vehicleId}/materials/${options.captureCode}`
   await http.put(materialBase, {
     assetId: asset.assetId,
   })

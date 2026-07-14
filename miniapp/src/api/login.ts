@@ -81,22 +81,22 @@ export function getCode() {
  * @param loginForm 登录表单
  */
 export function login(loginForm: ILoginForm) {
-  return http.post<WebAuthLoginRes>('/api/v1/auth/login', loginForm).then(mapLoginResult)
+  return http.post<WebAuthLoginRes>('/auth/login', loginForm).then(mapLoginResult)
 }
 
 /**
  * 刷新token
  * @param refreshToken 刷新token
  */
-export function refreshToken(refreshToken: string) {
-  return http.post<IDoubleTokenRes>('/api/miniapp/auth/refresh-token', { refreshToken })
+export function refreshToken(_refreshToken: string) {
+  return Promise.reject<IDoubleTokenRes>(new Error('Web backend does not support refresh token'))
 }
 
 /**
  * 获取用户信息
  */
 export function getUserInfo() {
-  return http.get<WebAuthProfileRes>('/api/v1/auth/me').then((res) => {
+  return http.get<WebAuthProfileRes>('/auth/me').then((res) => {
     const userInfo = mapUserInfo(res.userInfo, res.subscription)
     if (!userInfo) {
       throw new Error('用户信息为空')
@@ -109,7 +109,7 @@ export function getUserInfo() {
  * 退出登录
  */
 export function logout() {
-  return http.post<void>('/api/v1/auth/logout')
+  return http.post<void>('/auth/logout')
 }
 
 /**

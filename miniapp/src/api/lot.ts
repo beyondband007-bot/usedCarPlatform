@@ -3,7 +3,7 @@ import type { LotQueryParams, LotTask } from '@/types/lot'
 import { LOT_REQUIRED_SLOT_CODES } from '@/constants/capture'
 import { http } from '@/http/http'
 
-const VEHICLE_LIBRARY_BASE = '/api/v1/vehicle-library'
+const VEHICLE_LIBRARY_BASE = '/vehicle-library'
 
 type VehicleLibraryMaterial = {
   slotCode: string

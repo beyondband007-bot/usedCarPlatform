@@ -3,7 +3,7 @@ import { http } from '@/http/http'
 import { useTokenStore } from '@/store'
 import { getEnvBaseUrl } from '@/utils'
 
-type OcrLogLevel = 'info' | 'error'
+type OcrLogLevel = 'info' | 'warn'
 
 function getOcrErrorMessage(error: unknown) {
   if (error instanceof Error)
@@ -14,12 +14,17 @@ function getOcrErrorMessage(error: unknown) {
 }
 
 function reportOcrLog(level: OcrLogLevel, event: string, details: Record<string, unknown> = {}) {
+  const logPayload = { event, ...details }
+  if (level === 'warn')
+    console.error('[vin-ocr]', logPayload)
+  else
+    console.info('[vin-ocr]', logPayload)
+
   // #ifdef MP-WEIXIN
-  const logger = wx.getRealtimeLogManager?.()
-  const logPayload = JSON.stringify({ event, ...details }).slice(0, 900)
+  const logger = wx.getLogManager?.({ level: 1 })
+  const serializedPayload = JSON.stringify(logPayload).slice(0, 900)
   // 不记录图片、VIN 或鉴权信息。
-  const payload = JSON.stringify({ event, ...details }).slice(0, 900)
-  logger?.[level]('[vin-ocr]', logPayload)
+  logger?.[level]('[vin-ocr]', serializedPayload)
   // #endif
 }
 
@@ -102,14 +107,14 @@ export function normalizeVehicleInfo(data: VinApiData): VehicleBasicInfo {
 
 export function queryVehicleByVinShowApi(vin: string) {
   return http
-    .post<VinApiData>('/api/v1/vehicle-info/vin-query/showapi', { vin })
+    .post<VinApiData>('/vehicle-info/vin-query/showapi', { vin })
     .then(normalizeVehicleInfo)
 }
 
 export function recognizeVinFromImage(filePath: string) {
   return new Promise<string>((resolve, reject) => {
-    const baseUrl = getEnvBaseUrl().replace(/\/$/, '')
-    const url = `${baseUrl}/api/v1/vehicle-info/vin-ocr`
+    const apiBaseUrl = getEnvBaseUrl().replace(/\/$/, '')
+    const url = `${apiBaseUrl}/vehicle-info/vin-ocr`
     const token = useTokenStore().updateNowTime().validToken
     const startedAt = Date.now()
     let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -127,7 +132,7 @@ export function recognizeVinFromImage(filePath: string) {
             ? JSON.parse(res.data) as ApiResponse<{ vin: string }>
             : res.data as ApiResponse<{ vin: string }>
           if (res.statusCode < 200 || res.statusCode >= 300 || ![0, 200].includes(body.code)) {
-            reportOcrLog('error', 'response_error', {
+            reportOcrLog('warn', 'response_error', {
               elapsedMs: Date.now() - startedAt,
               statusCode: res.statusCode,
               code: body.code,
@@ -143,7 +148,7 @@ export function recognizeVinFromImage(filePath: string) {
           resolve(body.data.vin)
         }
         catch (error) {
-          reportOcrLog('error', 'response_parse_failed', {
+          reportOcrLog('warn', 'response_parse_failed', {
             elapsedMs: Date.now() - startedAt,
             message: getOcrErrorMessage(error),
           })
@@ -152,7 +157,7 @@ export function recognizeVinFromImage(filePath: string) {
       },
       fail: (error) => {
         if (!timedOut) {
-          reportOcrLog('error', 'upload_failed', {
+          reportOcrLog('warn', 'upload_failed', {
             elapsedMs: Date.now() - startedAt,
             message: getOcrErrorMessage(error),
           })
@@ -167,7 +172,7 @@ export function recognizeVinFromImage(filePath: string) {
 
     timeoutId = setTimeout(() => {
       timedOut = true
-      reportOcrLog('error', 'request_timeout', {
+      reportOcrLog('warn', 'request_timeout', {
         elapsedMs: Date.now() - startedAt,
         timeoutMs: 22_000,
       })

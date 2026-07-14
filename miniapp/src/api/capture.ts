@@ -34,11 +34,11 @@ function bindVehicleMaterial(vehicleId: string, data: CreatePhotoParams) {
   if (!data.assetId) {
     return Promise.reject(new Error('缺少 assetId，车辆库素材需先上传资产再绑定'))
   }
-  return http.put(`/api/v1/vehicle-library/vehicles/${vehicleId}/materials/${data.captureCode}`, {
+  return http.put(`/vehicle-library/vehicles/${vehicleId}/materials/${data.captureCode}`, {
     assetId: data.assetId,
   })
 }
 
 function deleteVehicleMaterial(vehicleId: string, slotCode: string) {
-  return http.delete<void>(`/api/v1/vehicle-library/vehicles/${vehicleId}/materials/${slotCode}`)
+  return http.delete<void>(`/vehicle-library/vehicles/${vehicleId}/materials/${slotCode}`)
 }

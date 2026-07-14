@@ -4,13 +4,14 @@ import AdapterUniapp from '@alova/adapter-uniapp'
 import { createAlova } from 'alova'
 import { createServerTokenAuthentication } from 'alova/client'
 import VueHook from 'alova/vue'
+import { getEnvBaseUrl } from '@/utils'
 import { toLoginPage } from '@/utils/toLoginPage'
 import { ContentTypeEnum, ResultEnum, ShowMessage } from './tools/enum'
 
 // 配置动态Tag
 export const API_DOMAINS = {
-  DEFAULT: import.meta.env.VITE_SERVER_BASEURL,
-  SECONDARY: import.meta.env.VITE_SERVER_BASEURL_SECONDARY,
+  DEFAULT: getEnvBaseUrl(),
+  SECONDARY: getEnvBaseUrl(),
 }
 
 /**

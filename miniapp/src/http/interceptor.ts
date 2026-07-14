@@ -4,7 +4,7 @@ import { getEnvBaseUrl } from '@/utils'
 import { stringifyQuery } from './tools/queryString'
 
 // 请求基准地址
-const baseUrl = getEnvBaseUrl()
+const baseUrl = getEnvBaseUrl().replace(/\/$/, '')
 
 // 拦截器配置
 const httpInterceptor = {
