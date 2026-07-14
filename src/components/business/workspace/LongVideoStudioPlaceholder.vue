@@ -11,7 +11,6 @@ import {
   createLongVideoDraft,
   createLongVideoTask,
   getLongVideoTask,
-  retryLongVideoTask,
   updateLongVideoDraftSegments,
 } from '@/api/long-video-generation'
 import { getVehicles, type VehicleLibraryMaterial, type VehicleRecord } from '@/api/vehicle-library'
@@ -72,6 +71,7 @@ type UploadedSlot = {
   file?: File
   objectUrl: string
   asset: UploadedAsset | null
+  libraryMaterial?: VehicleLibraryMaterial
   status: 'local' | 'uploading' | 'uploaded' | 'failed'
   source: AssetSourceMode
   error?: string
@@ -84,6 +84,7 @@ const currentStep = ref<StepKey>('assets')
 const maxReachedStepIndex = ref(0)
 const assetSourceMode = ref<AssetSourceMode>('library')
 const uploadedSlots = ref<Partial<Record<UploadSlotKey, UploadedSlot>>>({})
+const selectedMaterialSlotKey = ref<UploadSlotKey | null>(null)
 const libraryVehicles = ref<VehicleRecord[]>([])
 const selectedLibraryVehicleId = ref('')
 const libraryVehiclesLoading = ref(false)
@@ -121,7 +122,7 @@ const historyLoading = ref(false)
 const historyError = ref('')
 const focusedTaskId = ref('')
 const focusedLongVideoTask = ref<LongVideoTask | null>(null)
-const retryingHistoryTaskId = ref('')
+const showInitialGenerationProgress = ref(false)
 const activeAudioIndex = ref(0)
 const audioElement = ref<HTMLAudioElement | null>(null)
 const loadingAction = ref<'upload' | 'draft' | 'audio' | 'task' | null>(null)
@@ -274,6 +275,14 @@ const filteredLibraryVehicles = computed(() => {
   })
 })
 const activeAudioSegment = computed(() => audioPreview.value?.segments[activeAudioIndex.value] ?? null)
+const selectedMaterialDetail = computed(() => {
+  const slotKey = selectedMaterialSlotKey.value
+  if (!slotKey) return null
+  const slot = uploadSlots.find((item) => item.key === slotKey)
+  const item = uploadedSlots.value[slotKey]
+  if (!slot || !item) return null
+  return { slot, item }
+})
 const totalAudioDuration = computed(() =>
   audioPreview.value ? formatDuration(audioPreview.value.totalDurationMs) : '0.0s',
 )
@@ -307,10 +316,8 @@ const focusedTaskIsRunning = computed(() =>
 const showRecentGeneratingView = computed(
   () =>
     activeRightView.value === 'recent' &&
-    Boolean(
-      focusedLongVideoTask.value &&
-        (focusedTaskIsRunning.value || focusedLongVideoTask.value.status === 'failed'),
-    ),
+    showInitialGenerationProgress.value &&
+    Boolean(focusedLongVideoTask.value && focusedTaskIsRunning.value),
 )
 const generatingDescription = computed(() => {
   const status = focusedLongVideoTask.value?.status
@@ -405,6 +412,27 @@ function slotDisplaySize(item?: UploadedSlot | null) {
   return formatFileSize(item?.file?.size ?? item?.asset?.size ?? 0)
 }
 
+function selectMaterialDetails(slot: UploadSlot, item?: UploadedSlot | null) {
+  if (!item) return
+  selectedMaterialSlotKey.value = slot.key
+}
+
+function formatMaterialDuration(value?: string | null) {
+  const seconds = Number(value)
+  if (!Number.isFinite(seconds) || seconds <= 0) return '—'
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}分${Math.round(seconds % 60)}秒` : `${seconds.toFixed(1)} 秒`
+}
+
+function materialMediaTypeLabel(slot: UploadSlot, item: UploadedSlot) {
+  const mediaType = item.libraryMaterial?.mediaType ?? (slot.kind === 'video' ? 'video' : 'image')
+  return mediaType === 'video' ? '视频' : '图片'
+}
+
+function materialResolution(item: UploadedSlot) {
+  const { width, height } = item.libraryMaterial ?? {}
+  return width && height ? `${width} × ${height}` : '—'
+}
+
 function openAssetPreview(slot: UploadSlot, item?: UploadedSlot | null) {
   const url = item?.objectUrl || item?.asset?.url || item?.asset?.thumbnailUrl || ''
   if (!url) return
@@ -496,6 +524,7 @@ function materialToUploadedSlot(material: VehicleLibraryMaterial, slot: UploadSl
       mimeType: material.assetMimeType || (slot.kind === 'video' ? 'video/mp4' : 'image/jpeg'),
       size: material.fileSize ?? 0,
     },
+    libraryMaterial: material,
     status: 'uploaded',
     source: 'library',
   }
@@ -586,6 +615,7 @@ async function recognizeLongVideoVinImage(event: Event) {
 function clearUploadedSlots() {
   Object.values(uploadedSlots.value).forEach((item) => cleanupUploadedSlot(item))
   uploadedSlots.value = {}
+  selectedMaterialSlotKey.value = null
   selectedLibraryVehicleId.value = ''
 }
 
@@ -634,6 +664,7 @@ function selectLibraryVehicle(vehicle: VehicleRecord) {
   uploadedSlots.value = nextSlots
   selectedLibraryVehicleId.value = vehicle.id
   fillVehicleInfoFromLibrary(vehicle)
+  advanceToStep('vehicle')
   message.success('已从车辆库带入车辆素材和车辆信息')
 }
 
@@ -896,6 +927,20 @@ function isRecentTaskFailed(item: RecentGenerationTask) {
   return ['fail', 'failed'].includes(status)
 }
 
+function formatLongVideoFailureReason(error?: RecentGenerationTask['error'] | string | null) {
+  const raw = typeof error === 'string' ? error : error?.message || error?.code || ''
+  const normalized = raw.replace(/\s+/g, ' ').trim()
+
+  if (!normalized) return '视频生成失败，请稍后再试'
+  if (/ark\.openapi\.getasset failed/i.test(normalized)) {
+    return '获取 Ark 视频素材失败，请稍后再试'
+  }
+  if (/ark\.getseedancetaskdetail failed/i.test(normalized)) {
+    return '获取视频生成进度失败，请稍后再试'
+  }
+  return normalized
+}
+
 async function loadHistoryTasks() {
   historyLoading.value = true
   historyError.value = ''
@@ -917,10 +962,12 @@ async function loadHistoryTasks() {
 }
 
 function openTemplatesView() {
+  showInitialGenerationProgress.value = false
   activeRightView.value = 'templates'
 }
 
 function openRecentView() {
+  showInitialGenerationProgress.value = false
   activeRightView.value = 'recent'
   void loadHistoryTasks()
   if (focusedTaskId.value) {
@@ -947,6 +994,8 @@ function shouldShowHistoryStatus(item: RecentGenerationTask) {
 }
 
 async function focusHistoryTask(item: RecentGenerationTask) {
+  if (isRecentTaskFailed(item)) return
+
   focusedTaskId.value = item.taskId
   activeRightView.value = 'recent'
   await refreshFocusedTask(item.taskId)
@@ -963,48 +1012,11 @@ async function focusHistoryTask(item: RecentGenerationTask) {
       url: videoUrl,
       kind: 'video',
     }
-  } else if (focusedLongVideoTask.value?.status === 'failed') {
-    message.error(focusedLongVideoTask.value.errorMessage || '长视频生成失败，请重新生成')
   }
 }
 
-async function retryHistoryTask(item: RecentGenerationTask) {
-  if (retryingHistoryTaskId.value) return
-  retryingHistoryTaskId.value = item.taskId
-  try {
-    const task = await retryLongVideoTask(item.taskId)
-    currentTask.value = task
-    focusedTaskId.value = task.taskId
-    focusedLongVideoTask.value = task
-    activeRightView.value = 'recent'
-    await loadHistoryTasks()
-    startHistoryPolling()
-    message.success('已重新提交长视频任务')
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : '重新提交失败，请稍后重试')
-  } finally {
-    retryingHistoryTaskId.value = ''
-  }
-}
-
-async function retryFocusedTask() {
-  const task = focusedLongVideoTask.value
-  if (!task || task.status !== 'failed' || retryingHistoryTaskId.value) return
-
-  retryingHistoryTaskId.value = task.taskId
-  try {
-    const nextTask = await retryLongVideoTask(task.taskId)
-    currentTask.value = nextTask
-    focusedTaskId.value = nextTask.taskId
-    focusedLongVideoTask.value = nextTask
-    await loadHistoryTasks()
-    startHistoryPolling()
-    message.success('已重新提交长视频任务')
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : '重新提交失败，请稍后重试')
-  } finally {
-    retryingHistoryTaskId.value = ''
-  }
+function returnToTemplatesFromGeneration() {
+  openTemplatesView()
 }
 
 function resetFlowAfterAssetChange() {
@@ -1125,6 +1137,7 @@ async function handleCreateTask() {
     currentTask.value = task
     focusedTaskId.value = task.taskId
     focusedLongVideoTask.value = task
+    showInitialGenerationProgress.value = true
     activeRightView.value = 'recent'
     resetLeftPanelToStart()
     void loadHistoryTasks()
@@ -1354,8 +1367,10 @@ function handleAudioEnded() {
                   <button
                     type="button"
                     class="upload-preview"
-                    :aria-label="`预览${slot.label}`"
-                    @click="openAssetPreview(slot, uploadedSlots[slot.key])"
+                    :class="{ 'is-selected': selectedMaterialSlotKey === slot.key }"
+                    :aria-label="`查看${slot.label}详情`"
+                    @click="selectMaterialDetails(slot, uploadedSlots[slot.key])"
+                    @dblclick="openAssetPreview(slot, uploadedSlots[slot.key])"
                   >
                     <video
                       v-if="slot.kind === 'video'"
@@ -1364,7 +1379,7 @@ function handleAudioEnded() {
                       preload="metadata"
                     />
                     <img v-else :src="uploadedSlots[slot.key]?.objectUrl" :alt="slot.label" />
-                    <span class="upload-preview__hint">点击预览</span>
+                    <span class="upload-preview__hint">点击查看详情</span>
                   </button>
                   <div class="upload-card__body">
                     <strong>{{ slot.label }}</strong>
@@ -1395,8 +1410,10 @@ function handleAudioEnded() {
                 <button
                   type="button"
                   class="upload-preview"
-                  :aria-label="`预览${slot.label}`"
-                  @click.prevent="openAssetPreview(slot, uploadedSlots[slot.key])"
+                  :class="{ 'is-selected': selectedMaterialSlotKey === slot.key }"
+                  :aria-label="`查看${slot.label}详情`"
+                  @click.prevent="selectMaterialDetails(slot, uploadedSlots[slot.key])"
+                  @dblclick.prevent="openAssetPreview(slot, uploadedSlots[slot.key])"
                 >
                   <video
                     v-if="slot.kind === 'video'"
@@ -1405,7 +1422,7 @@ function handleAudioEnded() {
                     preload="metadata"
                   />
                   <img v-else :src="uploadedSlots[slot.key]?.objectUrl" :alt="slot.label" />
-                  <span class="upload-preview__hint">点击预览</span>
+                  <span class="upload-preview__hint">点击查看详情</span>
                 </button>
                 <div class="upload-card__body">
                   <strong>{{ slot.label }}</strong>
@@ -1426,6 +1443,43 @@ function handleAudioEnded() {
               </template>
             </label>
           </div>
+          <section v-if="selectedMaterialDetail" class="material-detail-panel" aria-live="polite">
+            <header>
+              <div>
+                <span>素材详细信息</span>
+                <strong>{{ selectedMaterialDetail.slot.label }}</strong>
+              </div>
+              <span class="material-detail-panel__source">
+                {{ selectedMaterialDetail.item.source === 'library' ? '车辆库素材' : '本地上传' }}
+              </span>
+            </header>
+            <dl>
+              <div>
+                <dt>文件名称</dt>
+                <dd>{{ slotDisplayName(selectedMaterialDetail.item) }}</dd>
+              </div>
+              <div>
+                <dt>素材类型</dt>
+                <dd>{{ materialMediaTypeLabel(selectedMaterialDetail.slot, selectedMaterialDetail.item) }}</dd>
+              </div>
+              <div>
+                <dt>文件大小</dt>
+                <dd>{{ slotDisplaySize(selectedMaterialDetail.item) }}</dd>
+              </div>
+              <div>
+                <dt>分辨率</dt>
+                <dd>{{ materialResolution(selectedMaterialDetail.item) }}</dd>
+              </div>
+              <div>
+                <dt>视频时长</dt>
+                <dd>{{ formatMaterialDuration(selectedMaterialDetail.item.libraryMaterial?.durationSeconds) }}</dd>
+              </div>
+              <div>
+                <dt>素材槽位</dt>
+                <dd>{{ selectedMaterialDetail.slot.label }}</dd>
+              </div>
+            </dl>
+          </section>
           </template>
 
           <template v-else-if="currentStep === 'vehicle'">
@@ -1709,6 +1763,14 @@ function handleAudioEnded() {
               class="lv-right-generating"
               aria-live="polite"
             >
+              <button
+                type="button"
+                class="lv-right-generating-back"
+                @click="returnToTemplatesFromGeneration"
+              >
+                <Icon icon="mdi:arrow-left" />
+                返回模板库
+              </button>
               <div class="lv-right-generating-visual" aria-hidden="true">
                 <video
                   class="lv-right-generating-video"
@@ -1725,17 +1787,8 @@ function handleAudioEnded() {
                 <h2>{{ taskStatusLabel }}</h2>
                 <span>{{ generatingDescription }}</span>
                 <p v-if="focusedLongVideoTask.status === 'failed'" class="lv-right-generating-error">
-                  {{ focusedLongVideoTask.errorMessage || '长视频生成失败，请稍后重试。' }}
+                  {{ formatLongVideoFailureReason(focusedLongVideoTask.errorMessage) }}
                 </p>
-                <button
-                  v-if="focusedLongVideoTask.status === 'failed'"
-                  type="button"
-                  class="lv-right-generating-retry"
-                  :disabled="Boolean(retryingHistoryTaskId)"
-                  @click="retryFocusedTask"
-                >
-                  {{ retryingHistoryTaskId === focusedLongVideoTask.taskId ? '重新提交中' : '重新生成' }}
-                </button>
               </div>
               <div
                 class="lv-right-generating-progress"
@@ -1764,10 +1817,14 @@ function handleAudioEnded() {
                 <article
                   v-for="item in historyTasks"
                   :key="item.taskId"
-                  class="lv-right-recent-card is-clickable"
-                  :class="{ 'is-selected': focusedTaskId === item.taskId }"
-                  role="button"
-                  tabindex="0"
+                  class="lv-right-recent-card"
+                  :class="{
+                    'is-clickable': !isRecentTaskFailed(item),
+                    'is-selected': focusedTaskId === item.taskId,
+                    'is-failed': isRecentTaskFailed(item),
+                  }"
+                  :role="isRecentTaskFailed(item) ? undefined : 'button'"
+                  :tabindex="isRecentTaskFailed(item) ? undefined : 0"
                   @click="focusHistoryTask(item)"
                   @keydown.enter.prevent="focusHistoryTask(item)"
                 >
@@ -1802,15 +1859,12 @@ function handleAudioEnded() {
                     <div class="lv-right-recent-card-body">
                       <strong>{{ item.title || '长视频生成任务' }}</strong>
                       <span>{{ formatTaskTime(item.createdAt) }}</span>
-                      <button
+                      <p
                         v-if="isRecentTaskFailed(item)"
-                        type="button"
-                        class="lv-right-recent-card-retry"
-                        :disabled="Boolean(retryingHistoryTaskId)"
-                        @click.stop="retryHistoryTask(item)"
+                        class="lv-right-recent-card-error"
                       >
-                        {{ retryingHistoryTaskId === item.taskId ? '重新提交中' : '重新生成' }}
-                      </button>
+                        失败原因：{{ formatLongVideoFailureReason(item.error) }}
+                      </p>
                     </div>
                   </div>
                 </article>
@@ -2439,6 +2493,74 @@ function handleAudioEnded() {
   padding-top: 4px;
 }
 
+.material-detail-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--lv-primary) 35%, var(--lv-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--lv-primary) 4%, var(--lv-surface));
+}
+
+.material-detail-panel header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.material-detail-panel header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.material-detail-panel header > div > span,
+.material-detail-panel__source,
+.material-detail-panel dt {
+  color: var(--lv-muted);
+  font-size: 12px;
+}
+
+.material-detail-panel header strong {
+  font-size: 15px;
+}
+
+.material-detail-panel__source {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--lv-accent-soft);
+  color: var(--lv-primary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.material-detail-panel dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.material-detail-panel dl > div {
+  min-width: 0;
+}
+
+.material-detail-panel dt,
+.material-detail-panel dd {
+  margin: 0;
+}
+
+.material-detail-panel dd {
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--lv-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .upload-grid--left {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
@@ -2646,6 +2768,10 @@ function handleAudioEnded() {
 
 .upload-preview:hover .upload-preview__hint {
   opacity: 0.92;
+}
+
+.upload-preview.is-selected {
+  box-shadow: 0 0 0 2px var(--lv-primary);
 }
 
 .upload-card em {
@@ -3182,6 +3308,10 @@ function handleAudioEnded() {
   box-shadow: 0 0 0 2px var(--lv-accent);
 }
 
+.lv-right-recent-card.is-failed {
+  cursor: default;
+}
+
 .lv-right-template-cover,
 .lv-right-recent-card-cover,
 .lv-right-recent-card-cover--video {
@@ -3339,27 +3469,15 @@ function handleAudioEnded() {
   white-space: nowrap;
 }
 
-.lv-right-recent-card-retry {
-  justify-self: start;
-  padding: 3px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.45);
-  color: #fff;
-  font: inherit;
+.lv-right-recent-card-error {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #fecaca;
   font-size: 11px;
-  font-weight: 700;
-  line-height: 1.25;
-  cursor: pointer;
-}
-
-.lv-right-recent-card-retry:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.lv-right-recent-card-retry:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .lv-right-recent-card-status {
@@ -3420,6 +3538,35 @@ function handleAudioEnded() {
   inset: 0;
 }
 
+.lv-right-generating-back {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.52);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+.lv-right-generating-back:hover {
+  background: rgba(30, 41, 59, 0.82);
+}
+
+.lv-right-generating-back svg {
+  font-size: 16px;
+}
+
 .lv-right-generating-video {
   width: 100%;
   height: 100%;
@@ -3451,28 +3598,6 @@ function handleAudioEnded() {
 
 .lv-right-generating-error {
   color: #fecaca !important;
-}
-
-.lv-right-generating-retry {
-  justify-self: center;
-  padding: 8px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.lv-right-generating-retry:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.lv-right-generating-retry:disabled {
-  cursor: wait;
-  opacity: 0.62;
 }
 
 .lv-right-generating-progress {
