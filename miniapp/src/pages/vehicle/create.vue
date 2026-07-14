@@ -8,8 +8,22 @@ import { useVehicleStore } from '@/store/vehicle'
 definePage({
   style: {
     navigationBarTitleText: '创建车辆',
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+const sharePath = '/pages/vehicle/create'
+
+onShareAppMessage(() => ({
+  title: '车新新车源库 - 创建车辆',
+  path: sharePath,
+}))
+
+onShareTimeline(() => ({
+  title: '车新新车源库 - 创建车辆',
+  query: '',
+}))
 
 const VIN_PATTERN = /^[A-HJ-NPR-Z0-9]{17}$/
 

@@ -1,5 +1,27 @@
 import type { ApiResponse } from '@/types/api'
 import { http } from '@/http/http'
+import { useTokenStore } from '@/store'
+import { getEnvBaseUrl } from '@/utils'
+
+type OcrLogLevel = 'info' | 'error'
+
+function getOcrErrorMessage(error: unknown) {
+  if (error instanceof Error)
+    return error.message
+  if (error && typeof error === 'object' && 'errMsg' in error && typeof error.errMsg === 'string')
+    return error.errMsg
+  return String(error || 'unknown error')
+}
+
+function reportOcrLog(level: OcrLogLevel, event: string, details: Record<string, unknown> = {}) {
+  // #ifdef MP-WEIXIN
+  const logger = wx.getRealtimeLogManager?.()
+  const logPayload = JSON.stringify({ event, ...details }).slice(0, 900)
+  // 不记录图片、VIN 或鉴权信息。
+  const payload = JSON.stringify({ event, ...details }).slice(0, 900)
+  logger?.[level]('[vin-ocr]', logPayload)
+  // #endif
+}
 
 export interface VinApiData extends Record<string, unknown> {
   vin?: string
@@ -86,26 +108,71 @@ export function queryVehicleByVinShowApi(vin: string) {
 
 export function recognizeVinFromImage(filePath: string) {
   return new Promise<string>((resolve, reject) => {
-    uni.uploadFile({
-      url: '/api/v1/vehicle-info/vin-ocr',
+    const baseUrl = getEnvBaseUrl().replace(/\/$/, '')
+    const url = `${baseUrl}/api/v1/vehicle-info/vin-ocr`
+    const token = useTokenStore().updateNowTime().validToken
+    const startedAt = Date.now()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let timedOut = false
+    reportOcrLog('info', 'request_started', { url })
+    const task = uni.uploadFile({
+      url,
       filePath,
       name: 'image',
+      timeout: 20_000,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
       success: (res) => {
         try {
           const body = typeof res.data === 'string'
             ? JSON.parse(res.data) as ApiResponse<{ vin: string }>
             : res.data as ApiResponse<{ vin: string }>
           if (res.statusCode < 200 || res.statusCode >= 300 || ![0, 200].includes(body.code)) {
+            reportOcrLog('error', 'response_error', {
+              elapsedMs: Date.now() - startedAt,
+              statusCode: res.statusCode,
+              code: body.code,
+              message: body.message || 'VIN OCR failed',
+            })
             reject(new Error(body.message || 'VIN 图片识别失败'))
             return
           }
+          reportOcrLog('info', 'request_succeeded', {
+            elapsedMs: Date.now() - startedAt,
+            statusCode: res.statusCode,
+          })
           resolve(body.data.vin)
         }
         catch (error) {
+          reportOcrLog('error', 'response_parse_failed', {
+            elapsedMs: Date.now() - startedAt,
+            message: getOcrErrorMessage(error),
+          })
           reject(error)
         }
       },
-      fail: reject,
+      fail: (error) => {
+        if (!timedOut) {
+          reportOcrLog('error', 'upload_failed', {
+            elapsedMs: Date.now() - startedAt,
+            message: getOcrErrorMessage(error),
+          })
+        }
+        reject(error)
+      },
+      complete: () => {
+        if (timeoutId)
+          clearTimeout(timeoutId)
+      },
     })
+
+    timeoutId = setTimeout(() => {
+      timedOut = true
+      reportOcrLog('error', 'request_timeout', {
+        elapsedMs: Date.now() - startedAt,
+        timeoutMs: 22_000,
+      })
+      task.abort()
+      reject(new Error('VIN 图片识别超时，请稍后重试'))
+    }, 22_000)
   })
 }

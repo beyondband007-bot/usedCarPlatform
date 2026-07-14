@@ -18,8 +18,20 @@ definePage({
   style: {
     navigationBarTitleText: '素材采集',
     enablePullDownRefresh: true,
+    enableShareAppMessage: true,
+    enableShareTimeline: true,
   },
 })
+
+onShareAppMessage(() => ({
+  title: '车新新车源库 - 素材采集',
+  path: '/pages/home/index',
+}))
+
+onShareTimeline(() => ({
+  title: '车新新车源库 - 素材采集',
+  query: '',
+}))
 
 const userStore = useUserStore()
 const vehicleStore = useVehicleStore()
