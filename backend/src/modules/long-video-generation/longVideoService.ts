@@ -268,7 +268,7 @@ const buildAiPrompt = (input: {
 }) => {
   const vehicleName = vehicleNameFromInfo(input.draft.vehicleInfo);
   const voiceLine =
-    "音频1是唯一口播声源。必须逐字、逐句严格跟读音频1，口型、停顿、语速、音色、情绪和响度都与音频1一致；不要重新配音，不要改写台词，不要生成第二条声音。";
+    "必须参考音频1生成这段视频。音频1是唯一口播依据：台词内容、说话人音色、语速、停顿、重音和情绪节奏都必须与音频1保持一致，人物口型逐句对齐音频1。不要根据提示词另写台词，不要更换说话人，不要改成相似音色，不要生成第二条人声。";
   const commonLines = [
     `精品二手车销售口播短视频，真人数字人自然讲解，9:16 竖屏，车型主题：${vehicleName}。`,
     "输入的数字人参考图只用于锁定人物身份：同一张脸、同一发型、同一服装、同一体型。只能出现一个女数字人，不要第二个人，不要双人同框，不要复制人物。",
@@ -283,7 +283,6 @@ const buildAiPrompt = (input: {
       ...commonLines,
       "当前段必须是数字人坐在车里面介绍内饰，不是站在车外。人物坐在主驾或副驾位置，半身出镜，旁边能看到方向盘、中控、挡把和前排座椅。",
       "坐姿自然，看镜头口播，偶尔用手势指向中控和座椅；不要站在车外，不要打开车门站着讲，不要只拍内饰空镜，不要只出现手部。",
-      `口播：${input.segment.narrationText}`,
     ].join("\n");
   }
 
@@ -292,7 +291,6 @@ const buildAiPrompt = (input: {
       ...commonLines,
       "当前段是数字人站在车辆外侧后方或车尾附近做总结，能看到车尾、侧后方外观或车门区域。",
       "数字人看镜头自然收尾，语气和前面保持一致；不要室内展厅，不要换车，不要多人站在车旁。",
-      `口播：${input.segment.narrationText}`,
     ].join("\n");
   }
 
@@ -300,7 +298,6 @@ const buildAiPrompt = (input: {
     ...commonLines,
     "当前段是数字人站在车辆外侧车头附近介绍外观，能看到车头、中网、大灯和户外背景。",
     "数字人看镜头自然讲解，少量手势指向车头；不要坐进车里，不要打开引擎盖，不要夸张特写。",
-    `口播：${input.segment.narrationText}`,
   ].join("\n");
 };
 
@@ -1104,11 +1101,6 @@ class LongVideoService {
               role: "reference_image",
               image_url: { url: digitalHumanReference.assetUri },
             },
-            {
-              type: "audio_url",
-              role: "reference_audio",
-              audio_url: { url: audioAsset.assetUri },
-            },
             ...slotSpecificReferences
               .filter((reference) => Boolean(reference.assetUri))
               .map((reference) => ({
@@ -1116,6 +1108,11 @@ class LongVideoService {
                 role: "reference_image" as const,
                 image_url: { url: reference.assetUri as string },
               })),
+            {
+              type: "audio_url",
+              role: "reference_audio",
+              audio_url: { url: audioAsset.assetUri },
+            },
           ],
           ratio: "9:16",
           resolution: "720p",
@@ -1148,8 +1145,8 @@ class LongVideoService {
             ),
             referenceOrder: [
               "digital_human_identity",
-              "narration_audio",
               "slot_scene_images",
+              "narration_audio",
             ],
             generateAudio: true,
           },
@@ -1174,7 +1171,7 @@ class LongVideoService {
         await downloadFile(resultUrl, localPath);
         if (!(await probeHasAudioStream(localPath))) {
           throw errors.generationFailed(
-            "Seedance result is missing the required audio stream; stopping before submitting remaining AI segments",
+            "Seedance result is missing the required generated audio stream",
             { slot: segment.slot, arkTaskId: arkTask.taskId, localPath },
           );
         }
@@ -1396,15 +1393,6 @@ class LongVideoService {
     const sourceSeconds = await probeDurationSeconds(videoPath);
     const fps = await probeFps(videoPath);
     const safeVideoEndSeconds = Math.max(0.3, sourceSeconds - 2 / Math.max(1, fps));
-    const hasSeedanceAudio = await probeHasAudioStream(videoPath);
-
-    if (!hasSeedanceAudio) {
-      throw errors.generationFailed(
-        "Seedance result is missing the required audio stream; refusing to attach audio after generation",
-        { videoPath },
-      );
-    }
-
     const trimSeconds = Math.max(0.3, safeVideoEndSeconds);
     await runFfmpeg([
       "-i",
