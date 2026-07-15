@@ -5,21 +5,13 @@ import type {
 } from '@/types/language-conversion'
 import type { ApiResponse } from '@/api/visual-workbench'
 import { parseLanguageConversionBillingPoints } from '@/utils/language-conversion-billing'
+import { normalizeMediaUrl } from '@/utils/media-url'
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
     throw new Error(normalizeApiErrorMessage(response.message || 'request failed'))
   }
   return response.data
-}
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin
-
-function normalizeMediaUrl(url?: string) {
-  const value = url?.trim()
-  if (!value) return undefined
-  return new URL(value, apiOrigin).toString()
 }
 
 function normalizeTask(task: LanguageConversionTask): LanguageConversionTask {

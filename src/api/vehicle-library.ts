@@ -1,5 +1,6 @@
 import { normalizeApiErrorMessage, request } from '@/api/http'
 import type { ApiResponse } from '@/api/visual-workbench'
+import { normalizeMediaUrl } from '@/utils/media-url'
 import type {
   PageResult,
   PutVehicleLibraryMaterialPayload,
@@ -42,6 +43,34 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
   return response.data
 }
 
+function normalizeAsset<T extends { url?: string | null; thumbnailUrl?: string | null }>(asset: T): T {
+  return {
+    ...asset,
+    url: normalizeMediaUrl(asset.url),
+    thumbnailUrl: normalizeMediaUrl(asset.thumbnailUrl),
+  }
+}
+
+function normalizeMaterial(material: VehicleLibraryMaterial): VehicleLibraryMaterial {
+  return {
+    ...material,
+    assetUrl: normalizeMediaUrl(material.assetUrl),
+    assetThumbnailUrl: normalizeMediaUrl(material.assetThumbnailUrl),
+  }
+}
+
+function normalizeVehicle<T extends VehicleRecord | VehicleLot>(record: T): T {
+  return {
+    ...record,
+    coverAsset: record.coverAsset ? normalizeAsset(record.coverAsset) : record.coverAsset,
+    materials: record.materials?.map(normalizeMaterial),
+  }
+}
+
+function normalizePage<T extends VehicleRecord | VehicleLot>(page: PageResult<T>): PageResult<T> {
+  return { ...page, items: page.items.map(normalizeVehicle) }
+}
+
 export async function getVehicleLibraryHome() {
   const response = await request.get<ApiResponse<VehicleLibraryHome>>('/vehicle-library/me')
   return unwrapApiResponse(response)
@@ -78,12 +107,12 @@ export async function getVehicleLots(params?: VehicleLibraryListParams) {
     '/vehicle-library/lots',
     { params },
   )
-  return unwrapApiResponse(response)
+  return normalizePage(unwrapApiResponse(response))
 }
 
 export async function createVehicleLot(payload: UpsertVehicleLotPayload) {
   const response = await request.post<ApiResponse<VehicleLot>>('/vehicle-library/lots', payload)
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function getVehicleLot(lotId: string, params?: { libraryId?: string }) {
@@ -91,7 +120,7 @@ export async function getVehicleLot(lotId: string, params?: { libraryId?: string
     `/vehicle-library/lots/${encodeURIComponent(lotId)}`,
     { params },
   )
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function updateVehicleLot(lotId: string, payload: UpsertVehicleLotPayload) {
@@ -99,7 +128,7 @@ export async function updateVehicleLot(lotId: string, payload: UpsertVehicleLotP
     `/vehicle-library/lots/${encodeURIComponent(lotId)}`,
     payload,
   )
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function deleteVehicleLot(lotId: string, params?: { libraryId?: string }) {
@@ -119,7 +148,8 @@ export async function putVehicleLotMaterial(
     `/vehicle-library/lots/${encodeURIComponent(lotId)}/materials/${encodeURIComponent(slotCode)}`,
     payload,
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return { ...result, items: result.items.map(normalizeMaterial) }
 }
 
 export async function deleteVehicleLotMaterial(
@@ -141,7 +171,7 @@ export async function getVehicles(params?: VehicleListParams) {
     '/vehicle-library/vehicles',
     { params },
   )
-  return unwrapApiResponse(response)
+  return normalizePage(unwrapApiResponse(response))
 }
 
 export async function queryVehicles(params?: VehicleQueryParams) {
@@ -149,7 +179,7 @@ export async function queryVehicles(params?: VehicleQueryParams) {
     '/vehicle-library/vehicles/query',
     { params },
   )
-  return unwrapApiResponse(response)
+  return normalizePage(unwrapApiResponse(response))
 }
 
 export async function createVehicle(payload: UpsertVehiclePayload) {
@@ -157,7 +187,7 @@ export async function createVehicle(payload: UpsertVehiclePayload) {
     '/vehicle-library/vehicles',
     payload,
   )
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function getVehicle(vehicleId: string, params?: { libraryId?: string }) {
@@ -165,7 +195,7 @@ export async function getVehicle(vehicleId: string, params?: { libraryId?: strin
     `/vehicle-library/vehicles/${encodeURIComponent(vehicleId)}`,
     { params },
   )
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function updateVehicle(vehicleId: string, payload: UpsertVehiclePayload) {
@@ -173,7 +203,7 @@ export async function updateVehicle(vehicleId: string, payload: UpsertVehiclePay
     `/vehicle-library/vehicles/${encodeURIComponent(vehicleId)}`,
     payload,
   )
-  return unwrapApiResponse(response)
+  return normalizeVehicle(unwrapApiResponse(response))
 }
 
 export async function deleteVehicle(vehicleId: string, params?: { libraryId?: string }) {
@@ -193,7 +223,8 @@ export async function putVehicleMaterial(
     `/vehicle-library/vehicles/${encodeURIComponent(vehicleId)}/materials/${encodeURIComponent(slotCode)}`,
     payload,
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return { ...result, items: result.items.map(normalizeMaterial) }
 }
 
 export async function deleteVehicleMaterial(

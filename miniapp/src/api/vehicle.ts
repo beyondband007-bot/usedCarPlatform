@@ -1,6 +1,7 @@
 import type { PaginationResult } from '@/types/api'
 import type { VehicleCreateParams, VehicleQueryParams, VehicleTask, VehicleTaskStatus, VehicleUpdateParams } from '@/types/vehicle'
 import { http } from '@/http/http'
+import { normalizeMediaUrl } from '@/utils/mediaUrl'
 
 const VEHICLE_LIBRARY_BASE = '/vehicle-library'
 const REQUIRED_SLOT_CODES = ['front_image', 'rear_image', 'driver_image', 'front_row_video', 'rear_row_video']
@@ -134,11 +135,11 @@ function mapVehicle(vehicle: VehicleLibraryVehicle): VehicleTask {
   const coverMaterial = materials.find(item => item.isCover && item.status === 'active')
   const photoCount = uploadedSlotCodes.size
   const requiredPhotoCount = REQUIRED_SLOT_CODES.length
-  const coverUrl = vehicle.coverAsset?.thumbnailUrl
+  const coverUrl = normalizeMediaUrl(vehicle.coverAsset?.thumbnailUrl
     || vehicle.coverAsset?.url
     || coverMaterial?.assetThumbnailUrl
     || coverMaterial?.assetUrl
-    || undefined
+    || undefined)
 
   return {
     id: vehicle.id,
@@ -277,8 +278,8 @@ export function getVehicleMaterials(vehicleId: string) {
         mediaType: material.mediaType,
         fileName: material.fileName ?? undefined,
         fileSize: material.fileSize ?? undefined,
-        assetUrl: material.assetUrl,
-        assetThumbnailUrl: material.assetThumbnailUrl,
+        assetUrl: normalizeMediaUrl(material.assetUrl),
+        assetThumbnailUrl: normalizeMediaUrl(material.assetThumbnailUrl),
       })),
     }))
 }

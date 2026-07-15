@@ -1,5 +1,6 @@
 import type { CaptureMediaType, UploadTask } from '@/types/upload'
 import { http } from '@/http/http'
+import { normalizeMediaUrl } from '@/utils/mediaUrl'
 
 type AssetPurpose = 'car_exterior' | 'car_interior'
 
@@ -78,7 +79,7 @@ async function uploadOwnerFile(options: UploadFileOptions & { ownerType?: 'vehic
   options.onProgress?.(100)
   return {
     assetId: asset.assetId,
-    remoteUrl: asset.thumbnailUrl || asset.url,
+    remoteUrl: normalizeMediaUrl(asset.thumbnailUrl || asset.url),
     fileName: asset.fileName,
     fileSize: asset.size,
   } satisfies Partial<UploadTask>

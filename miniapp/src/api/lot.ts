@@ -2,6 +2,7 @@ import type { PaginationResult } from '@/types/api'
 import type { LotQueryParams, LotTask } from '@/types/lot'
 import { LOT_REQUIRED_SLOT_CODES } from '@/constants/capture'
 import { http } from '@/http/http'
+import { normalizeMediaUrl } from '@/utils/mediaUrl'
 
 const VEHICLE_LIBRARY_BASE = '/vehicle-library'
 
@@ -51,11 +52,11 @@ function mapLot(lot: VehicleLibraryLot): LotTask {
       .map(item => item.slotCode),
   )
   const coverMaterial = materials.find(item => item.slotCode === 'lot_image' && item.status === 'active')
-  const coverUrl = lot.coverAsset?.thumbnailUrl
+  const coverUrl = normalizeMediaUrl(lot.coverAsset?.thumbnailUrl
     || lot.coverAsset?.url
     || coverMaterial?.assetThumbnailUrl
     || coverMaterial?.assetUrl
-    || undefined
+    || undefined)
 
   return {
     id: lot.id,
@@ -113,8 +114,8 @@ export function getLotMaterials(lotId: string) {
         mediaType: material.mediaType,
         fileName: material.fileName ?? undefined,
         fileSize: material.fileSize ?? undefined,
-        assetUrl: material.assetUrl,
-        assetThumbnailUrl: material.assetThumbnailUrl,
+        assetUrl: normalizeMediaUrl(material.assetUrl),
+        assetThumbnailUrl: normalizeMediaUrl(material.assetThumbnailUrl),
       })),
     }))
 }

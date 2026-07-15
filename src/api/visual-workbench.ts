@@ -1,5 +1,6 @@
 import { normalizeApiErrorMessage, request } from '@/api/http'
 import { compressUploadImage } from '@/utils/compress-upload-image'
+import { normalizeMediaUrl } from '@/utils/media-url'
 
 export interface ApiResponse<T> {
   code: number
@@ -422,28 +423,6 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
   }
 
   return response.data
-}
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin
-const mediaPathPrefixes = ['/uploads/', '/results/', '/packages/', '/scene-refs/']
-
-function normalizeMediaUrl(url?: string | null) {
-  const trimmed = url?.trim()
-  if (!trimmed) return url ?? trimmed
-
-  try {
-    const parsed = new URL(trimmed, apiOrigin)
-    if (
-      mediaPathPrefixes.some((prefix) => parsed.pathname.startsWith(prefix)) &&
-      parsed.origin !== apiOrigin
-    ) {
-      return `${apiOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`
-    }
-    return parsed.toString()
-  } catch {
-    return trimmed
-  }
 }
 
 function normalizeUploadedAsset(asset: UploadedAsset): UploadedAsset {

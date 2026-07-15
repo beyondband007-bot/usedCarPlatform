@@ -2,18 +2,7 @@ import type { UploadTask } from '@/types/upload'
 import { deleteLotMaterial, getLotMaterials } from '@/api/lot'
 import { LOT_CAPTURE_POSITION_MAP } from '@/constants/capture'
 import { useUploadStore } from '@/store/upload'
-
-function resolveMaterialUrl(url?: string | null) {
-  const value = url?.trim()
-  if (!value)
-    return ''
-  if (/^https?:\/\//i.test(value))
-    return value
-  const baseUrl = String(import.meta.env.VITE_SERVER_BASEURL || '').replace(/\/$/, '')
-  if (!baseUrl)
-    return value
-  return `${baseUrl}${value.startsWith('/') ? value : `/${value}`}`
-}
+import { normalizeMediaUrl } from '@/utils/mediaUrl'
 
 function pickMaterialPreviewUrl(
   mediaType: 'image' | 'video',
@@ -21,8 +10,8 @@ function pickMaterialPreviewUrl(
   assetThumbnailUrl?: string | null,
 ) {
   if (mediaType === 'video')
-    return resolveMaterialUrl(assetUrl || assetThumbnailUrl)
-  return resolveMaterialUrl(assetThumbnailUrl || assetUrl)
+    return normalizeMediaUrl(assetUrl || assetThumbnailUrl)
+  return normalizeMediaUrl(assetThumbnailUrl || assetUrl)
 }
 
 function buildRemoteTask(
