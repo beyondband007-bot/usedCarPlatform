@@ -132,7 +132,7 @@ const uploadSlots: UploadSlot[] = [
   {
     key: 'frontImage',
     label: '车头图',
-    hint: '上传清晰车头视角，用作 AI 开场外观参考',
+    hint: '上传清晰车头视角',
     accept: 'image/jpeg,image/png,image/webp',
     purpose: 'car_exterior',
     kind: 'image',
@@ -140,7 +140,7 @@ const uploadSlots: UploadSlot[] = [
   {
     key: 'rearImage',
     label: '车尾图',
-    hint: '上传清晰车尾视角，用作 AI 收尾外观参考',
+    hint: '上传清晰车尾视角',
     accept: 'image/jpeg,image/png,image/webp',
     purpose: 'car_exterior',
     kind: 'image',
@@ -148,7 +148,7 @@ const uploadSlots: UploadSlot[] = [
   {
     key: 'driverImage',
     label: '主驾驶位图',
-    hint: '上传主驾驶或前排内饰图片，用作车内讲解参考',
+    hint: '上传主驾驶或前排内饰图片',
     accept: 'image/jpeg,image/png,image/webp',
     purpose: 'car_interior',
     kind: 'image',
@@ -156,7 +156,7 @@ const uploadSlots: UploadSlot[] = [
   {
     key: 'frontInterior',
     label: '前排内饰实拍',
-    hint: '第一段用户实拍视频，后续会匹配画外音时长',
+    hint: '第一段用户实拍视频',
     accept: 'video/mp4,video/quicktime',
     purpose: 'car_interior',
     kind: 'video',
@@ -164,7 +164,7 @@ const uploadSlots: UploadSlot[] = [
   {
     key: 'rearInterior',
     label: '后排/细节实拍',
-    hint: '第二段用户实拍视频，作为后半段实拍佐证',
+    hint: '第二段用户实拍视频',
     accept: 'video/mp4,video/quicktime',
     purpose: 'car_interior',
     kind: 'video',
@@ -1398,6 +1398,7 @@ function handleAudioEnded() {
               class="upload-card"
               :class="{
                 'is-ready': uploadedSlots[slot.key]?.status === 'uploaded',
+                'is-empty': !uploadedSlots[slot.key],
               }"
             >
               <input
@@ -1440,6 +1441,10 @@ function handleAudioEnded() {
                   <strong>{{ slot.label }}</strong>
                   <span>{{ slot.hint }}</span>
                 </div>
+                <span class="upload-card__action">
+                  <Icon icon="mdi:upload" aria-hidden="true" />
+                  {{ slot.kind === 'video' ? '上传视频' : '上传图片' }}
+                </span>
               </template>
             </label>
           </div>
@@ -2682,6 +2687,14 @@ function handleAudioEnded() {
   text-align: center;
 }
 
+.upload-card.is-empty {
+  min-height: 0;
+  aspect-ratio: 3 / 2;
+  box-sizing: border-box;
+  gap: 4px;
+  padding: 10px;
+}
+
 .upload-card__body {
   display: grid;
   min-width: 0;
@@ -2708,6 +2721,48 @@ function handleAudioEnded() {
   font-size: 36px;
 }
 
+.upload-card.is-empty > svg {
+  font-size: 30px;
+}
+
+.upload-card__action {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--lv-primary);
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 700;
+  line-height: 34px;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--lv-primary) 22%, transparent);
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.upload-card.is-empty .upload-card__action {
+  min-height: 30px;
+  margin-top: 4px;
+  line-height: 30px;
+}
+
+.upload-card__action svg {
+  flex: 0 0 auto;
+  font-size: 17px;
+}
+
+.upload-card:not(.is-ready):hover .upload-card__action {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--lv-primary) 30%, transparent);
+}
+
+.upload-card:has(input:disabled) .upload-card__action {
+  opacity: 0.55;
+}
+
 .upload-card span,
 .upload-card small,
 .template-card small,
@@ -2726,7 +2781,7 @@ function handleAudioEnded() {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   padding: 0;
   overflow: hidden;
   border: 0;
