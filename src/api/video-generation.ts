@@ -1,5 +1,6 @@
 import { normalizeApiErrorMessage, request } from '@/api/http'
 import type { ApiResponse } from '@/api/visual-workbench'
+import { normalizeMediaUrl } from '@/utils/media-url'
 import type {
   CreateVideoScriptDraftPayload,
   DigitalHuman,
@@ -59,6 +60,38 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
 
 const generationRequestConfig = {
   timeout: 0,
+}
+
+function normalizeAudioPreview(preview: VideoAudioPreview): VideoAudioPreview {
+  return {
+    ...preview,
+    audioUrl: normalizeMediaUrl(preview.audioUrl) ?? preview.audioUrl,
+  }
+}
+
+function normalizeVideoTask(task: VideoGenerationTask): VideoGenerationTask {
+  return {
+    ...task,
+    thumbnail: normalizeMediaUrl(task.thumbnail),
+    downloadUrl: normalizeMediaUrl(task.downloadUrl),
+    previewVideo: normalizeMediaUrl(task.previewVideo),
+    videoUrl: normalizeMediaUrl(task.videoUrl),
+    resultVideos: task.resultVideos?.map((item) => ({
+      ...item,
+      url: normalizeMediaUrl(item.url) ?? item.url,
+      thumbnail: normalizeMediaUrl(item.thumbnail),
+      thumbnailUrl: normalizeMediaUrl(item.thumbnailUrl),
+      downloadUrl: normalizeMediaUrl(item.downloadUrl),
+    })),
+    resultImages: task.resultImages?.map((item) => ({
+      ...item,
+      url: normalizeMediaUrl(item.url) ?? item.url,
+      thumbnail: normalizeMediaUrl(item.thumbnail),
+    })),
+    narrationAudio: task.narrationAudio
+      ? { ...task.narrationAudio, url: normalizeMediaUrl(task.narrationAudio.url) }
+      : task.narrationAudio,
+  }
 }
 
 export async function getVideoWorkflowContract() {
@@ -130,7 +163,7 @@ export async function createVideoAudioPreview(payload: {
     payload,
     generationRequestConfig,
   )
-  return unwrapApiResponse(response)
+  return normalizeAudioPreview(unwrapApiResponse(response))
 }
 
 export async function optimizeVideoNarration(
@@ -142,7 +175,8 @@ export async function optimizeVideoNarration(
     payload,
     generationRequestConfig,
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return { ...result, preview: normalizeAudioPreview(result.preview) }
 }
 
 export async function translateVideoNarration(
@@ -195,7 +229,7 @@ export async function getVideoGenerationTask(taskId: string) {
   const response = await request.get<ApiResponse<VideoGenerationTask>>(
     `/modules/video-generation/tasks/${encodeURIComponent(taskId)}`,
   )
-  return unwrapApiResponse(response)
+  return normalizeVideoTask(unwrapApiResponse(response))
 }
 
 export async function getVideoGenerationTasks(params?: {
@@ -207,7 +241,8 @@ export async function getVideoGenerationTasks(params?: {
     '/modules/video-generation/tasks',
     { params },
   )
-  return unwrapApiResponse(response)
+  const result = unwrapApiResponse(response)
+  return { ...result, items: result.items.map(normalizeVideoTask) }
 }
 
 export async function cancelVideoGenerationTask(taskId: string) {
