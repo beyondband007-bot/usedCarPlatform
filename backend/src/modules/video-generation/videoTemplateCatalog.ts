@@ -401,6 +401,14 @@ const definitions: VideoTemplateDefinition[] = [
     badge: "new",
     inputRequirements: singleCarRequirements(),
   },
+  {
+    referenceMaterialId: "ref-video-021",
+    type: "single-car",
+    style: "professional",
+    outputRatio: "16:9",
+    badge: "new",
+    inputRequirements: singleCarRequirements(),
+  },
 ];
 
 const definitionByReferenceMaterialId = new Map(

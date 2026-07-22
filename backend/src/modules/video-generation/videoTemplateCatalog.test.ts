@@ -10,10 +10,10 @@ import {
 
 const definitions = listVideoTemplateDefinitions();
 
-assert.equal(definitions.length, 20);
+assert.equal(definitions.length, 21);
 assert.equal(
   definitions.filter((item) => item.type === "single-car").length,
-  7,
+  8,
 );
 assert.equal(
   definitions.filter((item) => item.type === "vehicle-ad").length,
@@ -57,6 +57,8 @@ assert.equal(getVideoTemplateDefinition("ref-video-015")?.type, "dealership");
 assert.equal(getVideoTemplateDefinition("ref-video-016")?.type, "single-car");
 assert.equal(getVideoTemplateDefinition("ref-video-005")?.type, "vehicle-ad");
 assert.equal(getVideoTemplateDefinition("ref-video-020")?.type, "single-car");
+assert.equal(getVideoTemplateDefinition("ref-video-021")?.type, "single-car");
+assert.equal(getVideoTemplateDefinition("ref-video-021")?.outputRatio, "16:9");
 
 const supportedLanguageValues = videoGenerationWorkflowContract.supportedLanguages.map(
   (item): string => item.value,
@@ -186,7 +188,7 @@ console.log(
       runId: "video-template-contract-20260615-test-message",
       templateCount: definitions.length,
       typeCounts: {
-        singleCar: 7,
+        singleCar: 8,
         promotion: 0,
         dealership: 12,
         vehicleAd: 1,

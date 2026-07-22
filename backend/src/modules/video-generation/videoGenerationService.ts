@@ -890,6 +890,8 @@ const videoTemplateNarrationInstructionById: Record<string, string> = {
     "用于介绍用户上传的车辆，通过专业检测与可查报告呈现车辆真实情况，提升车商形象及客户咨询与成交度。",
   "ref-video-020":
     "用于介绍用户上传的车辆，介绍车辆出售原因及车源背景，帮助客户更了解车辆来路，助力商家塑造诚信经营的形象；不得出现具体行驶里程及未经用户确认的具体车辆数据，必须模糊化表达。",
+  "ref-video-021":
+    "用于介绍用户上传的车辆，围绕车辆外观、车身姿态和图片能够确认的特点进行自然讲解，引导用户进一步了解实车；不得编造用户未提供的品牌、年款、配置、价格、里程、动力表现或车况信息。",
 };
 
 const buildTemplateNarrationInstruction = (input: {

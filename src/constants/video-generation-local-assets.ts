@@ -8,6 +8,7 @@ import messageDh04 from '@/assets/img/video-generation/message-dh-04.png'
 import messageDh04Closeup from '@/assets/img/video-generation/message-dh-04-closeup.png'
 import messageDh05 from '@/assets/img/video-generation/message-dh-05.png'
 import messageDh19 from '@/assets/img/video-generation/dh-message-19.jpg'
+import messageDh21 from '@/assets/img/video-generation/dh-message-21.png'
 import messageDh18 from '@/assets/img/video-generation/dh-message-18.jpg'
 import messageDh17 from '@/assets/img/video-generation/dh-message-17.jpg'
 import messageDh16 from '@/assets/img/video-generation/dh-message-16.jpg'
@@ -28,6 +29,7 @@ import scene04Video from '@/assets/video/video-generation/message-scene-04-singl
 import scene05Video from '@/assets/video/video-generation/message-scene-05-market-info.mp4'
 import scene06Video from '@/assets/video/video-generation/message-scene-06-dealership-scale.mp4'
 import scene20Video from '@/assets/video/video-generation/message-scene-ref-video-020-single-car.mp4'
+import scene21Video from '@/assets/video/video-generation/message-scene-ref-video-021-single-car-landscape-v2.mp4'
 import scene19Video from '@/assets/video/video-generation/message-scene-ref-video-019-single-car.mp4'
 import scene18Video from '@/assets/video/video-generation/message-scene-ref-video-018-single-car.mp4'
 import scene17Video from '@/assets/video/video-generation/message-scene-ref-video-017-single-car.mp4'
@@ -373,6 +375,21 @@ const LOCAL_SCENE_DEFINITIONS: LocalSceneDefinition[] = [
     videoUrl: scene20Video,
     outputRatio: '9:16',
   },
+  {
+    templateId: 'ref-video-021',
+    title: '户外实车全景介绍',
+    type: 'single-car',
+    typeLabel: '单车品介绍',
+    styleLabel: '户外专业讲解',
+    stylePrompt:
+      '白天户外实车导览，女性汽车销售顾问与车辆自然同框，围绕车辆外观和图片能够确认的特点进行专业、亲和的讲解。',
+    previewSubtitle: '单车品介绍08 · 15S · 户外专业讲解',
+    description:
+      '在明亮户外环境展示车辆整体外观和车身姿态，通过自然口播引导用户进一步了解实车。',
+    badge: 'new',
+    videoUrl: scene21Video,
+    outputRatio: '16:9',
+  },
   // END generated material templates 2-15
   {
     templateId: 'ref-video-004',
@@ -596,6 +613,16 @@ const LOCAL_DIGITAL_HUMANS: DigitalHuman[] = [
     voiceModel: 'speech-2.8-hd',
   },
   // END generated digital humans 6-19
+  {
+    id: 'dh-message-21',
+    name: '数字人 21｜户外实车女顾问',
+    gender: 'female',
+    ageStyle: '专业亲和汽车销售顾问 · 预设音色 亲和女声 - 温和讲解',
+    previewUrl: messageDh21,
+    imageUrl: messageDh21,
+    voiceStatus: 'ready',
+    voiceModel: 'speech-2.8-hd',
+  },
 ]
 
 /** 模板预览出镜数字人 → 左侧默认选中的数字人（非强绑定，用户可手动更换） */
@@ -619,6 +646,7 @@ export const templateDefaultDigitalHumanById: Record<string, string> = {
   'ref-video-018': 'dh-message-17',
   'ref-video-019': 'dh-message-18',
   'ref-video-020': 'dh-message-19',
+  'ref-video-021': 'dh-message-21',
 }
 
 export function resolveTemplateDefaultDigitalHumanId(templateId: string) {
@@ -627,6 +655,7 @@ export function resolveTemplateDefaultDigitalHumanId(templateId: string) {
 
 /** 生成质量优先展示的模板，按运营指定顺序排列 */
 export const featuredTemplateOrder: string[] = [
+  'ref-video-021',
   'ref-video-017',
   'ref-video-018',
   'ref-video-016',
