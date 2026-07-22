@@ -8,6 +8,7 @@ import type {
   LongVideoTask,
   UpdateLongVideoSegmentsPayload,
 } from '@/types/long-video-generation'
+import { normalizeMediaUrl } from '@/utils/media-url'
 
 function unwrapApiResponse<T>(response: ApiResponse<T>) {
   if (response.code !== 0) {
@@ -18,6 +19,43 @@ function unwrapApiResponse<T>(response: ApiResponse<T>) {
 
 const generationRequestConfig = {
   timeout: 0,
+}
+
+function normalizeAudioPreview(preview: LongVideoAudioPreview): LongVideoAudioPreview {
+  return {
+    ...preview,
+    segments: preview.segments.map((segment) => ({
+      ...segment,
+      audioUrl: normalizeMediaUrl(segment.audioUrl) ?? segment.audioUrl,
+    })),
+  }
+}
+
+function normalizeLongVideoTask(task: LongVideoTask): LongVideoTask {
+  return {
+    ...task,
+    resultUrl: normalizeMediaUrl(task.resultUrl),
+    renderPlan: {
+      ...task.renderPlan,
+      sequence: task.renderPlan.sequence.map((segment) => ({
+        ...segment,
+        audioUrl: normalizeMediaUrl(segment.audioUrl) ?? segment.audioUrl,
+        seedance: segment.seedance
+          ? {
+              ...segment.seedance,
+              referenceAudioUrl:
+                normalizeMediaUrl(segment.seedance.referenceAudioUrl) ?? segment.seedance.referenceAudioUrl,
+            }
+          : segment.seedance,
+        userVideo: segment.userVideo
+          ? {
+              ...segment.userVideo,
+              sourceUrl: normalizeMediaUrl(segment.userVideo.sourceUrl) ?? segment.userVideo.sourceUrl,
+            }
+          : segment.userVideo,
+      })),
+    },
+  }
 }
 
 export async function createLongVideoDraft(payload: CreateLongVideoDraftPayload) {
@@ -54,14 +92,14 @@ export async function createLongVideoAudioPreview(draftId: string) {
     {},
     generationRequestConfig,
   )
-  return unwrapApiResponse(response)
+  return normalizeAudioPreview(unwrapApiResponse(response))
 }
 
 export async function getLongVideoAudioPreview(audioPreviewId: string) {
   const response = await request.get<ApiResponse<LongVideoAudioPreview>>(
     `/modules/long-video-generation/audio-previews/${encodeURIComponent(audioPreviewId)}`,
   )
-  return unwrapApiResponse(response)
+  return normalizeAudioPreview(unwrapApiResponse(response))
 }
 
 export async function createLongVideoTask(
@@ -80,7 +118,7 @@ export async function getLongVideoTask(taskId: string) {
   const response = await request.get<ApiResponse<LongVideoTask>>(
     `/modules/long-video-generation/tasks/${encodeURIComponent(taskId)}`,
   )
-  return unwrapApiResponse(response)
+  return normalizeLongVideoTask(unwrapApiResponse(response))
 }
 
 export async function retryLongVideoTask(taskId: string) {
