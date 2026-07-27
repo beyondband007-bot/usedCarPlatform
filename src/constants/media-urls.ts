@@ -70,8 +70,7 @@ export const mediaUrls = {
   global: {
     footerBrandLogo:
       'https://vip.123pan.cn/1849524247/ymjew503t0l000ddygtpsuzk2rof7bkkDIYxBIJvAdixAvxzBIUzAIr=.png',
-    contactWechatQr:
-      'https://vip.123pan.cn/1849524247/ymjew503t0n000ddygtovrj0u5of6yr3DIYxBIJvAdixAvxzBIUzAIr=.png',
+    contactWechatQr: '/images/contact-wechat-qr.png',
   },
   workspace: {
     showroom: {
