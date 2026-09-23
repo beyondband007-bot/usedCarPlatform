@@ -98,7 +98,7 @@ export const roadMotionService = {
     }
 
     try {
-      const lease = await kieKeyPool.acquire();
+      const lease = await kieKeyPool.acquireImage();
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(lease, asset.localPath, uploadPath);
       const uploadedLogo = logoAsset
         ? await kieClient.uploadLocalFileWithLease(lease, logoAsset.localPath, `${uploadPath}/logo`)
@@ -116,7 +116,7 @@ export const roadMotionService = {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode,
           generationMode: "image-and-scene-prompt",
           prompt,

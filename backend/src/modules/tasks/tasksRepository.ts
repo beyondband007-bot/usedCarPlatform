@@ -206,6 +206,11 @@ const getKieMeta = (responseJson: unknown) => {
   return meta && typeof meta === "object" ? (meta as Record<string, unknown>) : {};
 };
 
+const serializeTaskRequest = (value: unknown) =>
+  JSON.stringify(value, (_key, item) =>
+    typeof item === "string" && item.startsWith("data:image/") ? "[inline reference image]" : item,
+  );
+
 const generationTaskDeadline = (moduleCode: string) => {
   if (moduleCode === "short-video") {
     return {
@@ -436,7 +441,7 @@ export class TasksRepository extends Repository {
       input.model ??
       (typeof meta.model === "string" ? meta.model : null) ??
       parseJsonValue<Record<string, unknown>>(input.requestJson, {}).model?.toString() ??
-      env.kie.primaryImageModel;
+      env.kie.legacyImageModel;
     const role =
       input.role ??
       (meta.role === "fallback" ? "fallback" : "primary");
@@ -485,7 +490,7 @@ export class TasksRepository extends Repository {
         taskId: input.id,
         kieTaskId: input.kieTaskId,
         kieAccountHash: input.kieAccountHash,
-        requestJson: JSON.stringify(input.requestJson),
+        requestJson: serializeTaskRequest(input.requestJson),
         responseJson: JSON.stringify(input.responseJson),
         attemptNo,
         model,

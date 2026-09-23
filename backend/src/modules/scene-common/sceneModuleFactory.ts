@@ -116,7 +116,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
       }
 
       try {
-        const lease = await kieKeyPool.acquire();
+        const lease = await kieKeyPool.acquireImage();
         const uploadedVehicle = await kieClient.uploadLocalFileWithLease(
           lease,
           asset.localPath,
@@ -152,7 +152,7 @@ export const createSceneModuleService = (config: SceneModuleConfig) => {
           kieTaskId: kieTask.kieTaskId,
           kieAccountHash: kieTask.accountHash,
           requestJson: {
-            model: "gpt-image-2-image-to-image",
+            model: kieTask.model,
             moduleCode: config.moduleCode,
             prompt,
             inputUrls,

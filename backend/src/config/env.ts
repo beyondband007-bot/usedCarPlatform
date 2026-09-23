@@ -73,18 +73,12 @@ export const env = {
     maxUploadConcurrent: toNumber(process.env.KIE_MAX_UPLOAD_CONCURRENT, 5),
     acquireWaitTimeoutMs: toNumber(process.env.KIE_ACQUIRE_WAIT_TIMEOUT_MS, 15_000),
     acquireRetryIntervalMs: toNumber(process.env.KIE_ACQUIRE_RETRY_INTERVAL_MS, 500),
-    createTaskUrl:
-      process.env.KIE_CREATE_TASK_URL ?? "https://api.kie.ai/api/v1/jobs/createTask",
     taskDetailUrl:
       process.env.KIE_TASK_DETAIL_URL ?? "https://api.kie.ai/api/v1/jobs/recordInfo",
     fileUploadBaseUrl: process.env.KIE_FILE_UPLOAD_BASE_URL ?? "https://kieai.redpandaai.co",
-    model: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
-    primaryImageModel: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "gpt-image-2-image-to-image",
-    fallbackImageModel: process.env.KIE_FALLBACK_IMAGE_MODEL ?? "nano-banana-2",
-    fallbackOutputFormat: process.env.KIE_FALLBACK_OUTPUT_FORMAT ?? "jpg",
+    legacyImageModel: process.env.KIE_PRIMARY_IMAGE_MODEL ?? "legacy-kie-image",
     fallbackEnabled: toBoolean(process.env.KIE_FALLBACK_ENABLED, true),
     uploadTimeoutMs: toNumber(process.env.KIE_UPLOAD_TIMEOUT_MS, 30_000),
-    createTimeoutMs: toNumber(process.env.KIE_CREATE_TIMEOUT_MS, 20_000),
     detailTimeoutMs: toNumber(process.env.KIE_DETAIL_TIMEOUT_MS, 10_000),
     downloadTimeoutMs: toNumber(process.env.KIE_DOWNLOAD_TIMEOUT_MS, 60_000),
     networkRetryLimit: toNumber(process.env.KIE_NETWORK_RETRY_LIMIT, 2),
@@ -94,6 +88,14 @@ export const env = {
     imageSoftTimeoutMs: toNumber(process.env.KIE_IMAGE_SOFT_TIMEOUT_MS, 180_000),
     videoDeadlineMs: toNumber(process.env.KIE_VIDEO_DEADLINE_MS, 1_200_000),
     pollFailureLimit: toNumber(process.env.KIE_POLL_FAILURE_LIMIT, 3),
+  },
+
+  tencentImage: {
+    vodSubAppId: toNumber(process.env.TENCENTCLOUD_VOD_SUB_APP_ID, 0),
+    modelName: process.env.TENCENTCLOUD_IMAGE_MODEL_NAME ?? "Hunyuan",
+    modelVersion: process.env.TENCENTCLOUD_IMAGE_MODEL_VERSION ?? "3.5-preview",
+    requestTimeoutMs: toNumber(process.env.TENCENTCLOUD_IMAGE_REQUEST_TIMEOUT_MS, 30_000),
+    referenceTimeoutMs: toNumber(process.env.TENCENTCLOUD_IMAGE_REFERENCE_TIMEOUT_MS, 30_000),
   },
 
   ark: {

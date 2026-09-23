@@ -10,8 +10,6 @@ export interface CreateKieImageTaskInput {
   inputUrls: string[];
   aspectRatio: OutputRatio;
   resolution: Resolution;
-  model?: string;
-  outputFormat?: string;
 }
 
 export interface CreateKieTextToImageTaskInput {

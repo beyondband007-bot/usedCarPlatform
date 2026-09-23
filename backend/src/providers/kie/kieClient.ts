@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "../../config/env";
-import { IMAGE_GENERATION_RESOLUTION } from "../../shared/types";
 import { errors } from "../../shared/errors";
 import type {
   CreateKieImageTaskInput,
@@ -13,6 +12,7 @@ import type {
   KieUploadedFile,
 } from "./kieTypes";
 import { kieKeyPool } from "./kieKeyPool";
+import { TENCENT_IMAGE_ACCOUNT, registerLocalImage, tencentImageClient } from "../tencent/tencentImageClient";
 
 const asRecord = (value: unknown): Record<string, any> =>
   value && typeof value === "object" ? (value as Record<string, any>) : {};
@@ -245,47 +245,6 @@ const fetchWithTimeout = async (
   throw lastError ?? timeoutError(operation, timeoutMs, errorCode);
 };
 
-const buildImageToImageRequestBody = (model: string, input: CreateKieImageTaskInput) => {
-  if (model === env.kie.fallbackImageModel) {
-    return {
-      model,
-      input: {
-        prompt: input.prompt,
-        image_input: input.inputUrls,
-        aspect_ratio: input.aspectRatio,
-        resolution: IMAGE_GENERATION_RESOLUTION,
-        output_format: input.outputFormat ?? env.kie.fallbackOutputFormat,
-      },
-    };
-  }
-
-  return {
-    model,
-    input: {
-      prompt: input.prompt,
-      input_urls: input.inputUrls,
-      aspect_ratio: input.aspectRatio,
-      resolution: IMAGE_GENERATION_RESOLUTION,
-    },
-  };
-};
-
-const withKieMeta = (
-  raw: unknown,
-  meta: {
-    model: string;
-    role: "primary" | "fallback";
-    attemptNo: number;
-    inputUrls?: string[];
-  },
-) => {
-  const record = asRecord(raw);
-  return {
-    ...record,
-    _usedCarPlatform: meta,
-  };
-};
-
 const isTimeoutError = (error: unknown) =>
   error instanceof Error &&
   [
@@ -300,76 +259,23 @@ const withKieHttpStatus = <T extends Error>(error: T, status: number) => {
   return error;
 };
 
-const getKieHttpStatus = (error: unknown) => {
-  const status = Number((error as { kieHttpStatus?: number } | null)?.kieHttpStatus);
-  return Number.isFinite(status) ? status : null;
-};
-
-const isFallbackEligibleCreateError = (error: unknown) => {
-  if (isTimeoutError(error)) return true;
-  if (!(error instanceof Error)) return true;
-  const kieHttpStatus = getKieHttpStatus(error);
-  if (kieHttpStatus !== null && kieHttpStatus >= 400 && kieHttpStatus < 500) return false;
-  if (error.message.includes("missing taskId")) return true;
-  if (!("statusCode" in error)) return true;
-  const statusCode = Number((error as { statusCode?: number }).statusCode);
-  return !Number.isFinite(statusCode) || statusCode >= 500;
-};
-
 class KieClient {
   async createImageToImageTask(input: CreateKieImageTaskInput): Promise<CreateKieImageTaskResult> {
-    const lease = await kieKeyPool.acquire();
+    const lease = await kieKeyPool.acquireImage();
     return this.createImageToImageTaskWithLease(lease, input);
   }
 
   async createTextToImageTaskWithLease(
-    lease: KieAccountLease,
+    _lease: KieAccountLease,
     input: CreateKieTextToImageTaskInput,
   ): Promise<CreateKieImageTaskResult> {
-    const requestBody = {
-      model: "gpt-image-2-text-to-image",
-      input: {
-        prompt: input.prompt,
-        aspect_ratio: input.aspectRatio,
-        resolution: IMAGE_GENERATION_RESOLUTION,
-      },
+    const task = await tencentImageClient.createTask({ ...input, inputUrls: [] });
+    return {
+      kieTaskId: task.taskId,
+      accountHash: TENCENT_IMAGE_ACCOUNT,
+      model: task.model,
+      raw: task.raw,
     };
-
-    try {
-      const response = await fetchWithTimeout(env.kie.createTaskUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lease.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      }, env.kie.createTimeoutMs, "kie.createTextToImageTask", "KIE_CREATE_TIMEOUT");
-
-      const raw = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieHttpFailure(response.status));
-        throw withKieHttpStatus(errors.generationFailed("kie create text-to-image task failed", raw), response.status);
-      }
-
-      const rawRecord = asRecord(raw);
-      const data = asRecord(rawRecord.data ?? rawRecord);
-      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
-      if (typeof kieTaskId !== "string" || !kieTaskId) {
-        await applyKieLeaseFailurePolicy(lease.accountHash, "short-cooldown");
-        throw errors.generationFailed("kie text-to-image response missing taskId", raw);
-      }
-
-      return {
-        kieTaskId,
-        accountHash: lease.accountHash,
-        raw,
-      };
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes("kie create text-to-image task failed"))) {
-        await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieLeaseFailure(error));
-      }
-      throw toKieProviderError(error, "kie create text-to-image task failed");
-    }
   }
 
   async uploadLocalFileWithLease(
@@ -377,6 +283,9 @@ class KieClient {
     filePath: string,
     uploadPath = "used-car-platform",
   ): Promise<KieUploadedFile> {
+    if (lease.accountHash === TENCENT_IMAGE_ACCOUNT) {
+      return { fileUrl: registerLocalImage(filePath), raw: { provider: "tencent-vod-image" } };
+    }
     const bytes = await fs.readFile(filePath);
     const formData = new FormData();
     formData.append("file", new Blob([bytes]), path.basename(filePath));
@@ -429,90 +338,16 @@ class KieClient {
   }
 
   async createImageToImageTaskWithLease(
-    lease: KieAccountLease,
+    _lease: KieAccountLease,
     input: CreateKieImageTaskInput,
   ): Promise<CreateKieImageTaskResult> {
-    const primaryModel = input.model ?? env.kie.primaryImageModel;
-
-    try {
-      return await this.createImageToImageTaskAttempt(lease, input, {
-        model: primaryModel,
-        role: "primary",
-        attemptNo: 1,
-      });
-    } catch (error) {
-      if (!env.kie.fallbackEnabled || !isFallbackEligibleCreateError(error)) {
-        if (error instanceof Error && error.message.includes("kie create task failed")) {
-          await kieKeyPool.release(lease.accountHash);
-        } else {
-          await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieLeaseFailure(error));
-        }
-        throw toKieProviderError(error, "kie create task failed");
-      }
-
-      await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieLeaseFailure(error));
-      const fallbackLease = await kieKeyPool.acquire();
-      try {
-        return await this.createImageToImageTaskAttempt(fallbackLease, input, {
-          model: env.kie.fallbackImageModel,
-          role: "fallback",
-          attemptNo: 2,
-        });
-      } catch (fallbackError) {
-        if (fallbackError instanceof Error && fallbackError.message.includes("kie create task failed")) {
-          await kieKeyPool.release(fallbackLease.accountHash);
-        } else {
-          await applyKieLeaseFailurePolicy(fallbackLease.accountHash, classifyKieLeaseFailure(fallbackError));
-        }
-        throw toKieProviderError(fallbackError, "kie create task failed");
-      }
-    }
-  }
-
-  async createImageToImageTaskAttempt(
-    lease: KieAccountLease,
-    input: CreateKieImageTaskInput,
-    meta: { model: string; role: "primary" | "fallback"; attemptNo: number },
-  ): Promise<CreateKieImageTaskResult> {
-    const requestBody = buildImageToImageRequestBody(meta.model, input);
-
-    try {
-      const response = await fetchWithTimeout(env.kie.createTaskUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lease.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      }, env.kie.createTimeoutMs, `kie.createImageTask.${meta.role}`, "KIE_CREATE_TIMEOUT");
-
-      const raw = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        await applyKieLeaseFailurePolicy(lease.accountHash, classifyKieHttpFailure(response.status));
-        throw withKieHttpStatus(errors.generationFailed("kie create task failed", raw), response.status);
-      }
-
-      const rawRecord = asRecord(raw);
-      const data = asRecord(rawRecord.data ?? rawRecord);
-      const kieTaskId = data.taskId ?? data.task_id ?? data.recordId ?? data.record_id ?? data.id;
-      if (typeof kieTaskId !== "string" || !kieTaskId) {
-        throw errors.generationFailed("kie response missing taskId", raw);
-      }
-
-      return {
-        kieTaskId,
-        accountHash: lease.accountHash,
-        model: meta.model,
-        role: meta.role,
-        attemptNo: meta.attemptNo,
-        raw: withKieMeta(raw, {
-          ...meta,
-          inputUrls: input.inputUrls,
-        }),
-      };
-    } catch (error) {
-      throw error;
-    }
+    const task = await tencentImageClient.createTask(input);
+    return {
+      kieTaskId: task.taskId,
+      accountHash: TENCENT_IMAGE_ACCOUNT,
+      model: task.model,
+      raw: task.raw,
+    };
   }
 
   async getTaskDetail(kieTaskId: string, apiKey: string): Promise<KieTaskDetail> {

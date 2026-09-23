@@ -203,7 +203,7 @@ class CreativeImageService {
     }
 
     try {
-      const lease = await kieKeyPool.acquire();
+      const lease = await kieKeyPool.acquireImage();
       const kieTask =
         reference.mode === "text_to_image"
           ? await kieClient.createTextToImageTaskWithLease(lease, {
@@ -223,10 +223,7 @@ class CreativeImageService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model:
-            reference.mode === "text_to_image"
-              ? "gpt-image-2-text-to-image"
-              : "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode: "creative-image",
           generationMode: reference.mode,
           prompt,

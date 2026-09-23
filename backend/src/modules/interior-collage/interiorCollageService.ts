@@ -148,7 +148,7 @@ class InteriorCollageService {
       const { taskId, group, groupIndex, groupCount, billing } = entry;
 
       try {
-        const lease = await kieKeyPool.acquire();
+        const lease = await kieKeyPool.acquireImage();
         const uploaded = [];
         for (const asset of group) {
           uploaded.push(
@@ -172,7 +172,7 @@ class InteriorCollageService {
           kieTaskId: kieTask.kieTaskId,
           kieAccountHash: kieTask.accountHash,
           requestJson: {
-            model: "gpt-image-2-image-to-image",
+            model: kieTask.model,
             moduleCode: "interior-collage",
             prompt,
             inputAssetIds: group.map((asset) => asset.id),

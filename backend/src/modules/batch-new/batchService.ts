@@ -510,7 +510,7 @@ class BatchService {
     };
 
     try {
-      lease = await kieKeyPool.acquire();
+      lease = await kieKeyPool.acquireImage();
       billing = await freezeGenerationBilling({
         taskId: task.id,
         functionCode: batchWallLogoSceneFunctionCode,
@@ -568,7 +568,7 @@ class BatchService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: kieTask.model ?? "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode: batchWallLogoSceneFunctionCode,
           batchId: batch.id,
           prompt: task.prompt,
@@ -1009,7 +1009,7 @@ class BatchService {
       }
     };
     try {
-      lease = await kieKeyPool.acquire();
+      lease = await kieKeyPool.acquireImage();
       billing = await freezeGenerationBilling({
         taskId: task.id,
         functionCode: batchItemFunctionCode(item.itemKind),
@@ -1109,7 +1109,7 @@ class BatchService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: kieTask.model ?? "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode: "batch-new",
           itemKind: item.itemKind,
           prompt: task.prompt,

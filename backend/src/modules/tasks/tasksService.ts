@@ -8,6 +8,7 @@ import { arkClient } from "../../providers/ark/arkClient";
 import type { ArkTaskDetail } from "../../providers/ark/arkTypes";
 import { kieClient } from "../../providers/kie/kieClient";
 import { kieKeyPool } from "../../providers/kie/kieKeyPool";
+import { TENCENT_IMAGE_ACCOUNT, tencentImageClient } from "../../providers/tencent/tencentImageClient";
 import { downloadFile } from "../../shared/downloadFile";
 import { errors } from "../../shared/errors";
 import type { TaskStatus } from "../../shared/types";
@@ -274,7 +275,7 @@ class TasksService {
           status: task.status,
           attemptNo: 1,
           role: "primary",
-          model: task.activeModel ?? env.kie.primaryImageModel,
+          model: task.activeModel ?? env.kie.legacyImageModel,
           isWinner: false,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
@@ -289,6 +290,8 @@ class TasksService {
       try {
         const detail = isArkVideoRecord(record)
           ? await arkClient.getTaskDetail(record.kieTaskId)
+          : record.kieAccountHash === TENCENT_IMAGE_ACCOUNT
+            ? await tencentImageClient.getTaskDetail(record.kieTaskId)
           : await this.getKieTaskDetail(record);
         polledSuccessfully = true;
         await tasksRepository.markPollSuccess(task.id);
@@ -299,7 +302,9 @@ class TasksService {
         const timeoutCode = extractKieTimeoutErrorCode(error);
         await tasksRepository.markPollFailure(
           task.id,
-          timeoutCode ?? "KIE_DETAIL_FAILED",
+          timeoutCode ?? (record.kieAccountHash === TENCENT_IMAGE_ACCOUNT
+            ? "TENCENT_IMAGE_DETAIL_FAILED"
+            : "KIE_DETAIL_FAILED"),
         );
       }
     }
@@ -321,7 +326,14 @@ class TasksService {
       refreshedRecords.length > 0 &&
       refreshedRecords.every((record) => record.status === "fail")
     ) {
-      await tasksRepository.markFailed(task.id, "KIE_TASK_FAILED", "Kie task failed");
+      const isTencentImageTask = refreshedRecords.every(
+        (record) => record.kieAccountHash === TENCENT_IMAGE_ACCOUNT,
+      );
+      await tasksRepository.markFailed(
+        task.id,
+        isTencentImageTask ? "TENCENT_IMAGE_TASK_FAILED" : "KIE_TASK_FAILED",
+        isTencentImageTask ? "Tencent Cloud image task failed" : "Kie task failed",
+      );
       for (const record of refreshedRecords) {
         await this.releaseProviderRecord(record);
       }
@@ -339,7 +351,7 @@ class TasksService {
   }
 
   private async releaseProviderRecord(record: KieTaskRecord) {
-    if (isArkVideoRecord(record)) return;
+    if (isArkVideoRecord(record) || record.kieAccountHash === TENCENT_IMAGE_ACCOUNT) return;
     await kieKeyPool.release(record.kieAccountHash);
   }
 
@@ -442,6 +454,7 @@ class TasksService {
   ) {
     if (
       !env.kie.fallbackEnabled ||
+      records.some((record) => record.kieAccountHash === TENCENT_IMAGE_ACCOUNT) ||
       task.moduleCode === "short-video" ||
       task.moduleCode === "video-generation"
     ) return false;
@@ -458,48 +471,34 @@ class TasksService {
     const sourceRecord = records.find((record) => getRecordInputUrls(record).length > 0);
     if (!sourceRecord) return;
     const inputUrls = getRecordInputUrls(sourceRecord);
-    const lease = await kieKeyPool.acquire();
 
     try {
-      const kieTask = await kieClient.createImageToImageTaskAttempt(
-        lease,
-        {
-          prompt: task.prompt ?? "",
-          inputUrls,
-          aspectRatio: task.outputRatio,
-          resolution: task.resolution,
-          model: env.kie.fallbackImageModel,
-          outputFormat: env.kie.fallbackOutputFormat,
-        },
-        {
-          model: env.kie.fallbackImageModel,
-          role: "fallback",
-          attemptNo: 2,
-        },
-      );
+      const imageTask = await tencentImageClient.createTask({
+        prompt: task.prompt ?? "",
+        inputUrls,
+        aspectRatio: task.outputRatio,
+        resolution: task.resolution,
+      });
 
       await tasksRepository.recordFallbackStarted({
         taskId: task.id,
-        kieTaskId: kieTask.kieTaskId,
-        kieAccountHash: kieTask.accountHash,
-        model: env.kie.fallbackImageModel,
+        kieTaskId: imageTask.taskId,
+        kieAccountHash: TENCENT_IMAGE_ACCOUNT,
+        model: imageTask.model,
         requestJson: {
-          model: env.kie.fallbackImageModel,
+          model: imageTask.model,
           fallbackFor: sourceRecord.kieTaskId,
           prompt: task.prompt,
           inputUrls,
           aspectRatio: task.outputRatio,
           resolution: task.resolution,
-          outputFormat: env.kie.fallbackOutputFormat,
         },
-        responseJson: kieTask.raw,
+        responseJson: imageTask.raw,
       });
-    } catch (error) {
-      await kieKeyPool.markFailure(lease.accountHash);
-      const timeoutCode = extractKieTimeoutErrorCode(error);
+    } catch {
       await tasksRepository.markPollFailure(
         task.id,
-        timeoutCode ?? "KIE_FALLBACK_SUBMIT_FAILED",
+        "TENCENT_IMAGE_FALLBACK_SUBMIT_FAILED",
       );
     }
   }

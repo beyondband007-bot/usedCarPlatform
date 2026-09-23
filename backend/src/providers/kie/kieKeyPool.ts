@@ -5,6 +5,7 @@ import { env } from "../../config/env";
 import { pool } from "../../db/mysql";
 import { errors } from "../../shared/errors";
 import type { KieAccountLease } from "./kieTypes";
+import { TENCENT_IMAGE_ACCOUNT } from "../tencent/tencentImageClient";
 
 const hashKey = (apiKey: string) => createHash("sha256").update(apiKey).digest("hex");
 type KieAccountConcurrencyRow = RowDataPacket & {
@@ -23,6 +24,10 @@ const accountEntries = () =>
 class KieKeyPool {
   private cursor = 0;
   private synced = false;
+
+  acquireImage(): Promise<KieAccountLease> {
+    return Promise.resolve({ apiKey: "", accountHash: TENCENT_IMAGE_ACCOUNT });
+  }
 
   async syncAccounts() {
     if (this.synced || env.kie.apiKeys.length === 0) return;
@@ -155,7 +160,7 @@ class KieKeyPool {
   }
 
   async release(accountHash: string) {
-    if (!accountHash) return;
+    if (!accountHash || accountHash === TENCENT_IMAGE_ACCOUNT) return;
     await pool.execute(
       `UPDATE kie_accounts
        SET current_concurrency = GREATEST(current_concurrency - 1, 0)

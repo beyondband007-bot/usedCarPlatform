@@ -90,7 +90,7 @@ class PaintRefreshService {
     }
 
     try {
-      const lease = await kieKeyPool.acquire();
+      const lease = await kieKeyPool.acquireImage();
       const uploadedVehicle = await kieClient.uploadLocalFileWithLease(
         lease,
         asset.localPath,
@@ -109,7 +109,7 @@ class PaintRefreshService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode: "paint-refresh",
           prompt,
           inputUrls,

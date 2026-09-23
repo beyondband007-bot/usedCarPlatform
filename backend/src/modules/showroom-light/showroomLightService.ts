@@ -133,7 +133,7 @@ class ShowroomLightService {
     }
 
     try {
-      const lease = await kieKeyPool.acquire();
+      const lease = await kieKeyPool.acquireImage();
       const uploaded = await kieClient.uploadLocalFileWithLease(
         lease,
         asset.localPath,
@@ -177,7 +177,7 @@ class ShowroomLightService {
         kieTaskId: kieTask.kieTaskId,
         kieAccountHash: kieTask.accountHash,
         requestJson: {
-          model: "gpt-image-2-image-to-image",
+          model: kieTask.model,
           moduleCode: "showroom-light",
           prompt,
           inputUrls,
